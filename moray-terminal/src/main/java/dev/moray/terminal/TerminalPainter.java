@@ -78,7 +78,7 @@ final class TerminalPainter {
         if (!look.on() || !snapshot.cursorVisible()) {
             return;
         }
-        int column = snapshot.cursorColumn();
+        int column = Math.min(snapshot.cursorColumn(), snapshot.width() - 1);
         int row = snapshot.cursorRow();
         if (column < 0 || row < 0 || column >= snapshot.width() || row >= snapshot.height()) {
             return;

@@ -73,6 +73,13 @@ class TerminalPainterTest {
         assertThat(rgb(image, 2 * cw + cw - 2, ch / 2)).isEqualTo(rgb(palette.background()));
     }
 
+    @Test
+    void cursorInPendingWrapStateIsDrawnInTheLastColumn() throws Exception {
+        BufferedImage image = paint(snapshotAfter("abcdefghij", 10), new TerminalPainter.CursorLook(CursorStyle.BEAM, true, true));
+
+        assertThat(rgb(image, (COLUMNS - 1) * cw, ch / 2)).isEqualTo(rgb(palette.cursor()));
+    }
+
     private ScreenSnapshot snapshotAfter(String output, int expectedCursorColumn) throws Exception {
         FakeConnector connector = new FakeConnector();
         TerminalSession session = new TerminalSession(connector, COLUMNS, ROWS, 10);
