@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 
@@ -75,6 +76,22 @@ class TerminalViewTest {
     }
 
     @Test
+    void ctrlJSendsLineFeed() {
+        view.handleKey(pressed(KeyEvent.VK_J, InputEvent.CTRL_DOWN_MASK));
+        view.handleKey(typed('\n', InputEvent.CTRL_DOWN_MASK));
+
+        assertThat(connector.written()).isEqualTo("\n");
+    }
+
+    @Test
+    void ctrlEnterStillSendsOneCarriageReturn() {
+        view.handleKey(pressed(KeyEvent.VK_ENTER, InputEvent.CTRL_DOWN_MASK));
+        view.handleKey(typed('\n', InputEvent.CTRL_DOWN_MASK));
+
+        assertThat(connector.written()).isEqualTo("\r");
+    }
+
+    @Test
     void paintsTheThemeBackground() {
         view.setSize(20 * fonts.cellWidth(), 4 * fonts.cellHeight());
         BufferedImage image = new BufferedImage(view.getWidth(), view.getHeight(), BufferedImage.TYPE_INT_RGB);
@@ -90,10 +107,18 @@ class TerminalViewTest {
     }
 
     private KeyEvent pressed(int keyCode) {
-        return new KeyEvent(view, KeyEvent.KEY_PRESSED, 0, 0, keyCode, KeyEvent.CHAR_UNDEFINED);
+        return pressed(keyCode, 0);
+    }
+
+    private KeyEvent pressed(int keyCode, int modifiers) {
+        return new KeyEvent(view, KeyEvent.KEY_PRESSED, 0, modifiers, keyCode, KeyEvent.CHAR_UNDEFINED);
     }
 
     private KeyEvent typed(char c) {
-        return new KeyEvent(view, KeyEvent.KEY_TYPED, 0, 0, KeyEvent.VK_UNDEFINED, c);
+        return typed(c, 0);
+    }
+
+    private KeyEvent typed(char c, int modifiers) {
+        return new KeyEvent(view, KeyEvent.KEY_TYPED, 0, modifiers, KeyEvent.VK_UNDEFINED, c);
     }
 }

@@ -83,6 +83,15 @@ class KeyEncoderTest {
     }
 
     @Test
+    void controlChordsThatTypeControlCharactersAreSent() {
+        assertThat(text(mac.typed(typed('\n', CTRL)))).isEqualTo("\n");
+        assertThat(text(mac.typed(typed('\b', CTRL)))).isEqualTo("\b");
+        assertThat(text(mac.typed(typed('\t', CTRL)))).isEqualTo("\t");
+        assertThat(text(mac.typed(typed('\r', CTRL)))).isEqualTo("\r");
+        assertThat(text(mac.typed(typed('\033', CTRL)))).isEqualTo("\033");
+    }
+
+    @Test
     void surrogatePairIsEncodedOnceComplete() {
         assertThat(mac.typed(typed('\uD83D', 0))).isNull();
         assertThat(text(mac.typed(typed('\uDE80', 0)))).isEqualTo("🚀");

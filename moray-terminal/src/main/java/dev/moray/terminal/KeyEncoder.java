@@ -57,7 +57,10 @@ final class KeyEncoder {
             return null;
         }
         char c = key.keyChar();
-        if (c == KeyEvent.CHAR_UNDEFINED || c == '\n' || c == '\r' || c == '\b' || c == 0x7f || c == '\t' || c == ESC) {
+        if (c == KeyEvent.CHAR_UNDEFINED) {
+            return null;
+        }
+        if (!key.ctrl() && (c == '\n' || c == '\r' || c == '\b' || c == 0x7f || c == '\t' || c == ESC)) {
             return null;
         }
         if (Character.isHighSurrogate(c)) {
