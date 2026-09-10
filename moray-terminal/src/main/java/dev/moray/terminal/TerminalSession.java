@@ -72,7 +72,8 @@ public final class TerminalSession implements AutoCloseable {
         buffer = new TerminalTextBuffer(columns, rows, styleState, scrollback);
         display = new SessionDisplay(
             title -> listeners.forEach(l -> l.titleChanged(title)),
-            () -> listeners.forEach(Listener::bell));
+            () -> listeners.forEach(Listener::bell),
+            () -> listeners.forEach(Listener::screenChanged));
         terminal = new JediTerminal(display, buffer, styleState);
         terminal.setTerminalOutput(new TerminalOutputStream() {
             @Override

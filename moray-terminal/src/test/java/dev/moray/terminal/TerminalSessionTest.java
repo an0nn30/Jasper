@@ -122,6 +122,24 @@ class TerminalSessionTest {
     }
 
     @Test
+    void cursorOnlyMovesAreReportedAsScreenChanges() throws Exception {
+        connector.feed("abc");
+        Await.until(() -> session.snapshot().cursorColumn() == 3, "cursor after abc");
+        AtomicInteger changes = new AtomicInteger();
+        session.addListener(new TerminalSession.Listener() {
+            @Override
+            public void screenChanged() {
+                changes.incrementAndGet();
+            }
+        });
+
+        connector.feed("\b"); // cursor backward: JediTerm moves the cursor without a buffer change
+
+        Await.until(() -> changes.get() > 0, "screenChanged after a cursor-only move");
+        assertThat(session.snapshot().cursorColumn()).isEqualTo(2);
+    }
+
+    @Test
     void exitFutureCompletesWhenOutputEnds() throws Exception {
         connector.finish();
 

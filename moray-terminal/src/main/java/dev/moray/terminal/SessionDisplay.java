@@ -15,6 +15,7 @@ import java.util.function.Consumer;
 final class SessionDisplay implements TerminalDisplay {
     private final Consumer<String> onTitle;
     private final Runnable onBell;
+    private final Runnable onCursorChange;
     private volatile boolean cursorVisible = true;
     private volatile CursorShape cursorShape;
     private volatile String title = "";
@@ -22,19 +23,23 @@ final class SessionDisplay implements TerminalDisplay {
     private volatile MouseFormat mouseFormat;
     private volatile boolean bracketedPaste;
 
-    SessionDisplay(Consumer<String> onTitle, Runnable onBell) {
+    SessionDisplay(Consumer<String> onTitle, Runnable onBell, Runnable onCursorChange) {
         this.onTitle = onTitle;
         this.onBell = onBell;
+        this.onCursorChange = onCursorChange;
     }
 
     @Override
     public void setCursor(int x, int y) {
-        // The view reads the cursor position from JediTerminal when it snapshots.
+        // The view reads the cursor position from JediTerminal when it snapshots;
+        // we only need to notify listeners that a repaint is due.
+        onCursorChange.run();
     }
 
     @Override
     public void setCursorShape(CursorShape shape) {
         cursorShape = shape;
+        onCursorChange.run();
     }
 
     @Override
@@ -50,6 +55,7 @@ final class SessionDisplay implements TerminalDisplay {
     @Override
     public void setCursorVisible(boolean visible) {
         cursorVisible = visible;
+        onCursorChange.run();
     }
 
     @Override
