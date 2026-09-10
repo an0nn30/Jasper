@@ -9,10 +9,15 @@ import com.jediterm.terminal.emulator.JediEmulator;
 import com.jediterm.terminal.model.JediTerminal;
 import com.jediterm.terminal.model.StyleState;
 import com.jediterm.terminal.model.TerminalTextBuffer;
+import com.pty4j.PtyProcess;
+import com.pty4j.PtyProcessBuilder;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -40,6 +45,24 @@ public final class TerminalSession implements AutoCloseable {
     private volatile int columns;
     private volatile int rows;
     private volatile Thread reader;
+
+    /** Starts {@code command} in a new pseudo-terminal and begins emulating its output. */
+    public static TerminalSession start(List<String> command, Map<String, String> environment, Path workingDirectory,
+                                        int columns, int rows, int scrollback) throws IOException {
+        Map<String, String> env = new HashMap<>(environment);
+        env.put("TERM", "xterm-256color");
+        env.put("COLORTERM", "truecolor");
+        PtyProcess process = new PtyProcessBuilder(command.toArray(String[]::new))
+            .setEnvironment(env)
+            .setDirectory(workingDirectory.toString())
+            .setInitialColumns(columns)
+            .setInitialRows(rows)
+            .setUnixOpenTtyToPreserveOutputAfterTermination(true)
+            .start();
+        TerminalSession session = new TerminalSession(new PtyConnector(process), columns, rows, scrollback);
+        session.startReading();
+        return session;
+    }
 
     TerminalSession(TtyConnector connector, int columns, int rows, int scrollback) {
         this.connector = connector;
