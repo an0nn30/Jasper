@@ -14,3 +14,12 @@ application {
         "-Dapple.awt.application.name=Moray",
     )
 }
+
+tasks.register<JavaExec>("bench") {
+    group = "verification"
+    description = "Pipes ~100 MB of ANSI-colored text through a Moray terminal window and prints MB/s."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass = "dev.moray.app.Bench"
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    args(layout.buildDirectory.file("bench/ansi-100mb.txt").get().asFile.absolutePath)
+}
