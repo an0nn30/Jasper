@@ -111,6 +111,9 @@ class KeyEncoderTest {
         assertThat(text(mac.pressed(new KeyInput(KeyEvent.VK_PERIOD, '≥', ALT, true, false), NO_SPECIAL_KEYS))).isEqualTo("\033.");
         assertThat(text(mac.pressed(new KeyInput(KeyEvent.VK_7, '¶', ALT, true, false), NO_SPECIAL_KEYS))).isEqualTo("\0337");
         assertThat(text(mac.pressed(new KeyInput(KeyEvent.VK_X, '\030', ALT | CTRL, true, false), NO_SPECIAL_KEYS))).isEqualTo("\033\030");
+        assertThat(text(mac.pressed(new KeyInput(KeyEvent.VK_TAB, '\t', ALT, true, false), NO_SPECIAL_KEYS))).isEqualTo("\033\t");
+        assertThat(text(mac.pressed(new KeyInput(KeyEvent.VK_TAB, '\t', ALT | SHIFT, true, false), NO_SPECIAL_KEYS))).isEqualTo("\033[Z");
+        assertThat(text(mac.pressed(new KeyInput(KeyEvent.VK_ESCAPE, '\033', ALT, true, false), NO_SPECIAL_KEYS))).isEqualTo("\033");
     }
 
     @Test

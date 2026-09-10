@@ -48,7 +48,7 @@ final class KeyEncoder {
         if (plain == null) {
             return null;
         }
-        return asMeta && code != KeyEvent.VK_ESCAPE ? prefixEscape(plain) : plain;
+        return asMeta && plain[0] != ESC ? prefixEscape(plain) : plain;
     }
 
     /** Bytes for a KEY_TYPED event that {@link #pressed} did not already handle, or null. */
