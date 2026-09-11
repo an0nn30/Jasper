@@ -4,6 +4,8 @@
 **Authority:** User feedback after trying Plan 3: the app looks good overall; next build a custom macOS title bar, fix theming using FlatLaf, aim for Atom-style dark/light themes, and discuss a toolbar with actual colored icons.
 **Parent:** [Phase 1 design](../specs/2026-09-10-moray-phase-1-terminal-design.md), especially §§5–7. This amendment supersedes the earlier sequencing that deferred all theme work to Plan 4 and the assumption that the current toolbar presentation is final.
 
+**Execution update:** The user approved work and selected toolbar study B (fuller, two-tone colored icons). The [concrete design](../specs/2026-09-11-moray-plan-3-5-titlebar-themes-design.md) and [four-task implementation plan](2026-09-11-moray-plan-3-5-titlebar-themes-implementation.md) now cover title bar, coordinated themes and that toolbar treatment together. Initial title layout uses a slim custom surface with separate tabs; an optional integrated-tab preference remains open to user steering.
+
 ## Goal
 
 Give the working terminal a coherent macOS window and Atom/One Dark- and One Light-inspired appearance, then refine the toolbar with the user. Preserve the terminal functionality and ownership contracts delivered in Plan 3.

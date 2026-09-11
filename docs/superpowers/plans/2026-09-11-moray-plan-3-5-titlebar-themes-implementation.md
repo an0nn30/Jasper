@@ -116,7 +116,7 @@ Keep original foreground geometry after the backdrop. Replace hardcoded legacygr
 
 - [ ] All task reviews and final whole-branch review approved; fix rounds as required.
 - [ ] Full final headless check passes; count skips and preserve warnings/limitations.
-- [ ] Update STATUS/README/roadmap for implemented 3.5a and pending 3.5b discussion.
+- [ ] Update STATUS/README/roadmap for implemented title/themes and selected two-tone toolbar; record native acceptance pending.
 - [ ] User native title-bar/light-dark checks, including fullscreen/scaling/drag and screen menus.
 - [x] Toolbar alternatives shown; user selected B (fuller, two-tone colored icons).
 - [ ] Selected toolbar treatment implemented, reviewed and included in final verification.
