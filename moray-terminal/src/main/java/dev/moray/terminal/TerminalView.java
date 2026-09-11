@@ -13,6 +13,7 @@ import java.awt.event.FocusEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -117,7 +118,8 @@ public final class TerminalView extends JComponent {
         boolean blinks = CursorStyle.effectiveBlink(snapshot.cursorShape(), options.cursorBlink());
         boolean focused = isFocusOwner();
         boolean on = !blinks || !focused || blinkOn;
-        painter.paint((Graphics2D) g, snapshot, new TerminalPainter.CursorLook(style, on, focused), getWidth(), getHeight());
+        painter.paint((Graphics2D) g, snapshot, new TerminalPainter.CursorLook(style, on, focused), List.of(),
+            getWidth(), getHeight());
     }
 
     @Override

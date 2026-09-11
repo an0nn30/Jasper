@@ -45,8 +45,13 @@ class PaletteTest {
 
     @Test
     void rejectsAnsiListOfWrongSize() {
-        assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, Color.WHITE, Collections.nCopies(8, Color.RED)))
+        assertThatThrownBy(() -> new Palette(Color.WHITE, Color.BLACK, Color.WHITE, Color.GRAY, Collections.nCopies(8, Color.RED)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("16");
+    }
+
+    @Test
+    void theThemeHasASelectionColor() {
+        assertThat(palette.selection()).isEqualTo(new Color(0x3e4451));
     }
 }

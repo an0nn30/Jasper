@@ -80,6 +80,44 @@ class TerminalPainterTest {
         assertThat(rgb(image, (COLUMNS - 1) * cw, ch / 2)).isEqualTo(rgb(palette.cursor()));
     }
 
+    @Test
+    void highlightsFillTheirCells() throws Exception {
+        BufferedImage image = paint(snapshotAfter("", 0), cursorOff(),
+            List.of(new TerminalPainter.Highlight(1, 2, 3, Color.RED)));
+
+        assertThat(rgb(image, 2 * cw + cw / 2, ch + ch / 2)).isEqualTo(rgb(Color.RED));
+        assertThat(rgb(image, 3 * cw + cw / 2, ch + ch / 2)).isEqualTo(rgb(Color.RED));
+        assertThat(rgb(image, 4 * cw + cw / 2, ch + ch / 2)).isEqualTo(rgb(palette.background()));
+        assertThat(rgb(image, 2 * cw + cw / 2, ch / 2)).isEqualTo(rgb(palette.background()));
+    }
+
+    @Test
+    void underlineCursorSitsOnTheBottomOfItsCell() throws Exception {
+        BufferedImage image = paint(snapshotAfter("ab", 2), new TerminalPainter.CursorLook(CursorStyle.UNDERLINE, true, true));
+
+        assertThat(rgb(image, 2 * cw + cw / 2, ch - 1)).isEqualTo(rgb(palette.cursor()));
+        assertThat(rgb(image, 2 * cw + cw / 2, ch / 2)).isEqualTo(rgb(palette.background()));
+    }
+
+    @Test
+    void aScrollIndicatorShowsOnlyWhenScrolledBack() throws Exception {
+        FakeConnector connector = new FakeConnector();
+        TerminalSession session = new TerminalSession(connector, COLUMNS, ROWS, 10);
+        session.startReading();
+        try {
+            connector.feed("a\r\nb\r\nc\r\nd\r\ne");
+            Await.until(() -> "e".equals(session.snapshot().lineText(2)), "two lines of scrollback");
+
+            BufferedImage scrolled = paint(session.snapshot(0), cursorOff());
+            BufferedImage live = paint(session.snapshot(), cursorOff());
+
+            assertThat(rgb(scrolled, COLUMNS * cw - 2, 1)).isNotEqualTo(rgb(palette.background()));
+            assertThat(rgb(live, COLUMNS * cw - 2, 1)).isEqualTo(rgb(palette.background()));
+        } finally {
+            session.close();
+        }
+    }
+
     private ScreenSnapshot snapshotAfter(String output, int expectedCursorColumn) throws Exception {
         FakeConnector connector = new FakeConnector();
         TerminalSession session = new TerminalSession(connector, COLUMNS, ROWS, 10);
@@ -94,10 +132,15 @@ class TerminalPainterTest {
     }
 
     private BufferedImage paint(ScreenSnapshot snapshot, TerminalPainter.CursorLook cursor) {
+        return paint(snapshot, cursor, List.of());
+    }
+
+    private BufferedImage paint(ScreenSnapshot snapshot, TerminalPainter.CursorLook cursor,
+                                List<TerminalPainter.Highlight> highlights) {
         BufferedImage image = new BufferedImage(COLUMNS * cw, ROWS * ch, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = image.createGraphics();
         try {
-            painter.paint(g, snapshot, cursor, image.getWidth(), image.getHeight());
+            painter.paint(g, snapshot, cursor, highlights, image.getWidth(), image.getHeight());
         } finally {
             g.dispose();
         }

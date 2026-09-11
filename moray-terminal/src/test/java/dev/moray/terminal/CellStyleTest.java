@@ -1,8 +1,10 @@
 package dev.moray.terminal;
 
+import com.jediterm.terminal.HyperlinkStyle;
 import com.jediterm.terminal.TerminalColor;
 import com.jediterm.terminal.TextStyle;
 import com.jediterm.terminal.TextStyle.Option;
+import com.jediterm.terminal.model.hyperlinks.LinkInfo;
 import org.junit.jupiter.api.Test;
 
 import java.awt.Color;
@@ -50,5 +52,12 @@ class CellStyleTest {
         assertThat(s.bold()).isTrue();
         assertThat(s.italic()).isTrue();
         assertThat(s.underline()).isTrue();
+    }
+
+    @Test
+    void hyperlinksAreUnderlined() {
+        TextStyle link = new HyperlinkStyle(TextStyle.EMPTY, new LinkInfo(() -> { }));
+
+        assertThat(CellStyle.resolve(link, palette).underline()).isTrue();
     }
 }

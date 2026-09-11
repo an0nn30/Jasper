@@ -1,5 +1,6 @@
 package dev.moray.terminal;
 
+import com.jediterm.terminal.HyperlinkStyle;
 import com.jediterm.terminal.TextStyle;
 import com.jediterm.terminal.TextStyle.Option;
 
@@ -23,7 +24,8 @@ record CellStyle(Color foreground, Color background, boolean bold, boolean itali
             fg = bg;
         }
         return new CellStyle(fg, bg,
-            style.hasOption(Option.BOLD), style.hasOption(Option.ITALIC), style.hasOption(Option.UNDERLINED));
+            style.hasOption(Option.BOLD), style.hasOption(Option.ITALIC),
+            style.hasOption(Option.UNDERLINED) || style instanceof HyperlinkStyle);
     }
 
     static Color blend(Color from, Color to, float amount) {

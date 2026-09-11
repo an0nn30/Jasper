@@ -6,7 +6,7 @@ import java.awt.Color;
 import java.util.List;
 
 /** Terminal colors: theme defaults, the 16 ANSI colors, and the xterm 256-color table. */
-public record Palette(Color foreground, Color background, Color cursor, List<Color> ansi) {
+public record Palette(Color foreground, Color background, Color cursor, Color selection, List<Color> ansi) {
 
     public Palette {
         if (ansi.size() != 16) {
@@ -17,7 +17,7 @@ public record Palette(Color foreground, Color background, Color cursor, List<Col
 
     public static Palette morayDark() {
         return new Palette(
-            new Color(0xd7dae0), new Color(0x1e2127), new Color(0xd7dae0),
+            new Color(0xd7dae0), new Color(0x1e2127), new Color(0xd7dae0), new Color(0x3e4451),
             List.of(
                 new Color(0x282c34), new Color(0xe06c75), new Color(0x98c379), new Color(0xe5c07b),
                 new Color(0x61afef), new Color(0xc678dd), new Color(0x56b6c2), new Color(0xabb2bf),
