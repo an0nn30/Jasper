@@ -26,7 +26,7 @@
 **Consumes:** Current TerminalSession/snapshots/TerminalPainter, FakeConnector/Await.
 **Produces:** `public Palette TerminalView.palette()`, `public void TerminalView.setPalette(Palette)`, `public static Palette Palette.morayLight()`; update morayDark values as spec.
 
-- [ ] **Step 1: Add failing rendering/state regressions.** Use real FakeConnector session, EDT and BufferedImage. Test changed background/default/indexed colors vs retained explicit RGB; call font controls after switch to catch startup-palette reuse. Capture content, columns/rows, current selection, find result and font size around switch; they remain. A representative API assertion:
+- [x] **Step 1: Add failing rendering/state regressions.** Use real FakeConnector session, EDT and BufferedImage. Test changed background/default/indexed colors vs retained explicit RGB; call font controls after switch to catch startup-palette reuse. Capture content, columns/rows, current selection, find result and font size around switch; they remain. A representative API assertion:
 ```java
 SwingUtilities.invokeAndWait(() -> {
     view.setPalette(Palette.morayLight());
@@ -35,7 +35,7 @@ SwingUtilities.invokeAndWait(() -> {
 });
 ```
 Feed indexed and truecolor full-block glyphs for unambiguous pixels; repeat existing TerminalAppearanceTest style. Verify selection/search/dim overlay colors use new palette and null input fails atomically. Run `./gradlew :moray-terminal:test --tests '*TerminalPaletteTest'`; record expected RED missing API or stale rendered colors.
-- [ ] **Step 2: Implement current palette and built-ins.** Keep immutable startup options for fonts/input, add mutable `private Palette palette;`. Make search color fields mutable. All palette uses route through the current value. Setter body follows:
+- [x] **Step 2: Implement current palette and built-ins.** Keep immutable startup options for fonts/input, add mutable `private Palette palette;`. Make search color fields mutable. All palette uses route through the current value. Setter body follows:
 ```java
 Palette next = Objects.requireNonNull(value, "palette");
 if (next.equals(palette)) return;
@@ -48,7 +48,7 @@ currentMatchColor = CellStyle.blend(yellow, next.background(), 0.35f);
 repaint();
 ```
 Use shared initialization helper if it simplifies construction; do not invoke half-initialized view state. Add null/entry validation to Palette and exact colors from spec. No resize, buffer mutation or search reset in setPalette.
-- [ ] **Step 3: Run covering/module checks and commit.** `./gradlew :moray-terminal:check`; exact XML counts, RED/GREEN, lifecycle contracts and no-public-JediTerm check in task report. Commit only task source/tests.
+- [x] **Step 3: Run covering/module checks and commit.** `./gradlew :moray-terminal:check`; exact XML counts, RED/GREEN, lifecycle contracts and no-public-JediTerm check in task report. Commit only task source/tests.
 
 ### Task 2: Coordinated application themes
 
