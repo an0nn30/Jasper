@@ -276,17 +276,24 @@ public final class TerminalSession implements AutoCloseable {
             return List.of();
         }
         Pattern pattern = TerminalSearch.pattern(query, regex, caseSensitive);
+        int history;
+        long firstRow;
+        int width;
+        List<TerminalLine> lines;
         buffer.lock();
         try {
-            int history = buffer.getHistoryLinesCount();
-            List<TerminalLine> lines = new ArrayList<>(history + buffer.getHeight());
+            history = buffer.getHistoryLinesCount();
+            firstRow = absoluteRow(-history);
+            width = buffer.getWidth();
+            lines = new ArrayList<>(history + buffer.getHeight());
             for (int row = -history; row < buffer.getHeight(); row++) {
-                lines.add(buffer.getLine(row));
+                lines.add(buffer.getLine(row).copy());
             }
-            return TerminalSearch.find(pattern, absoluteRow(-history), lines, buffer.getWidth());
         } finally {
             buffer.unlock();
         }
+        // Run regex matching outside the lock so a slow pattern cannot stall the reader thread
+        return TerminalSearch.find(pattern, firstRow, lines, width);
     }
 
     /** The word at an absolute row and column, as a stream selection. */
