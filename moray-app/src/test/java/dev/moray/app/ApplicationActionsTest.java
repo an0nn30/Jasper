@@ -58,25 +58,40 @@ class ApplicationActionsTest {
     @Test void rootPaneBindingsExecuteGlobalActionsAndLeaveNativeTextBindingsFirst() throws Exception {
         Queue<Runnable> pending = new ArrayDeque<>();
         edt(() -> {
-            WindowContent owner = content(launcher(pending));
-            BindingRoot root = new BindingRoot(); root.setContentPane(owner);
-            owner.installRootBindings(root);
-            assertThat(root.activate(owner.bindings().strokeFor(ActionId.NEW_TAB).orElseThrow())).isTrue();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
-            BindingField field = new BindingField(); owner.add(field, java.awt.BorderLayout.WEST);
-            int[] edits = {0};
-            // Override the installed native editor actions, retaining the real focused input map.
-            field.getActionMap().put(javax.swing.text.DefaultEditorKit.copyAction, new AbstractAction() {
-                public void actionPerformed(java.awt.event.ActionEvent event) { edits[0]++; }
-            });
-            field.getActionMap().put(javax.swing.text.DefaultEditorKit.pasteAction, new AbstractAction() {
-                public void actionPerformed(java.awt.event.ActionEvent event) { edits[0]++; }
-            });
-            assertThat(field.activate(KeyStroke.getKeyStroke("ctrl C"))).isTrue();
-            assertThat(field.activate(KeyStroke.getKeyStroke("ctrl V"))).isTrue();
-            assertThat(edits[0]).isEqualTo(2);
-            owner.close();
-            assertThat(root.activate(owner.bindings().strokeFor(ActionId.NEW_TAB).orElseThrow())).isFalse();
+            var original = UIManager.getLookAndFeel();
+            com.formdev.flatlaf.FlatDarkLaf.setup();
+            try {
+                WindowContent owner = content(launcher(pending));
+                BindingRoot root = new BindingRoot(); root.setContentPane(owner);
+                owner.installRootBindings(root);
+                assertThat(root.activate(owner.bindings().strokeFor(ActionId.NEW_TAB).orElseThrow())).isTrue();
+                assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+                BindingField field = new BindingField(); owner.add(field, java.awt.BorderLayout.WEST);
+                int[] edits = {0};
+                // Override the installed native editor actions, retaining the real focused input map.
+                field.getActionMap().put(javax.swing.text.DefaultEditorKit.copyAction, new AbstractAction() {
+                    public void actionPerformed(java.awt.event.ActionEvent event) { edits[0]++; }
+                });
+                field.getActionMap().put(javax.swing.text.DefaultEditorKit.pasteAction, new AbstractAction() {
+                    public void actionPerformed(java.awt.event.ActionEvent event) { edits[0]++; }
+                });
+                boolean mac = System.getProperty("os.name").startsWith("Mac");
+                int modifier = mac ? java.awt.event.InputEvent.META_DOWN_MASK : java.awt.event.InputEvent.CTRL_DOWN_MASK;
+                KeyStroke copy = KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_C, modifier);
+                KeyStroke paste = KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V, modifier);
+                if (mac) {
+                    assertThat(copy).isEqualTo(owner.bindings().strokeFor(ActionId.COPY).orElseThrow());
+                    assertThat(paste).isEqualTo(owner.bindings().strokeFor(ActionId.PASTE).orElseThrow());
+                }
+                assertThat(field.activate(copy)).isTrue();
+                assertThat(field.activate(paste)).isTrue();
+                assertThat(edits[0]).isEqualTo(2);
+                owner.close();
+                assertThat(root.activate(owner.bindings().strokeFor(ActionId.NEW_TAB).orElseThrow())).isFalse();
+            } finally {
+                try { UIManager.setLookAndFeel(original); }
+                catch (javax.swing.UnsupportedLookAndFeelException e) { throw new AssertionError(e); }
+            }
         });
     }
 

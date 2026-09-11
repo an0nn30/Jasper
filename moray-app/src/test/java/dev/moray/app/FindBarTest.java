@@ -85,7 +85,15 @@ class FindBarTest {
             } finally { if (bar[0] != null) edt(bar[0]::dispose); }
         }
     }
-    @Test void reparentDuringSearchDoesNotLeaveNavigationWaitingForCanceledCompletion() throws Exception {
+    @Test void reparentDuringSearchRetainsNavigationBeforeAndAfterDetach() throws Exception {
+        navigationAcrossReparent(true, 2);
+    }
+
+    @Test void reparentRestartsSearchAndAppliesRetainedNavigationWithoutAnotherKey() throws Exception {
+        navigationAcrossReparent(false, 1);
+    }
+
+    private void navigationAcrossReparent(boolean navigateAfterAttach, int expected) throws Exception {
         try (TerminalSession session = TerminalSession.start(java.util.List.of("/bin/sh", "-c",
             "printf 'alpha alpha\\n\\033]2;ready\\007'; read answer"),
             System.getenv(), HOME, 80, 24, 100)) {
@@ -101,10 +109,10 @@ class FindBarTest {
                     // Real split/tab reparenting calls removeNotify and cancels the view's pending find.
                     bar[0].removeNotify(); view[0].removeNotify();
                     view[0].addNotify(); bar[0].addNotify();
-                    bar[0].next();
+                    if (navigateAfterAttach) bar[0].next();
                 });
                 until(() -> bar[0].result().count() == 2);
-                edt(() -> assertThat(bar[0].result().current()).isEqualTo(1));
+                edt(() -> assertThat(bar[0].result().current()).isEqualTo(expected));
             } finally {
                 if (bar[0] != null) edt(() -> { bar[0].dispose(); bar[0].removeNotify(); view[0].removeNotify(); });
             }

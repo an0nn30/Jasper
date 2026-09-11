@@ -3,6 +3,7 @@ package dev.moray.app;
 import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.FlatLightLaf;
 import java.awt.Window;
+import java.awt.Dimension;
 import java.awt.event.*;
 import javax.swing.*;
 import javax.swing.event.MenuEvent;
@@ -12,7 +13,15 @@ import javax.swing.event.MenuListener;
 final class WindowChrome {
     private final WindowContent owner;
     private final JToolBar toolbar = new JToolBar();
-    private final JLabel status = new JLabel();
+    private final JLabel status = new JLabel() {
+        @Override public Dimension getMinimumSize() {
+            return new Dimension(0, super.getMinimumSize().height);
+        }
+        @Override public Dimension getPreferredSize() {
+            Dimension size = super.getPreferredSize();
+            return new Dimension(Math.min(640, size.width), size.height);
+        }
+    };
     private final JMenuBar menuBar = new JMenuBar();
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);

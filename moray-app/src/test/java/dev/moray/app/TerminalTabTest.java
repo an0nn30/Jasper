@@ -163,4 +163,34 @@ class TerminalTabTest {
             content.close();
         });
     }
+    @Test void longOscDirectoryAndTitlesDoNotInflateNativeWindowMinimum() throws Exception {
+        String directory = "/" + "long-directory-segment/".repeat(100);
+        String title = "long shell title ".repeat(100);
+        Queue<Runnable> pending = new ArrayDeque<>();
+        ShellLauncher launcher = new ShellLauncher(pending::add, path -> {
+            try {
+                return TerminalSession.start(List.of("/bin/sh", "-c",
+                    "read answer; printf '\\033]7;file://localhost" + directory + "\\007\\033]2;" + title + "\\007'; read answer"),
+                    System.getenv(), path, 80, 24, 100);
+            } catch (Exception e) { throw new RuntimeException(e); }
+        }, "sh");
+        WindowContent[] owner = new WindowContent[1];
+        javax.swing.JRootPane[] root = new javax.swing.JRootPane[1];
+        java.awt.Dimension[] minimum = new java.awt.Dimension[1];
+        edt(() -> owner[0] = content(launcher)); pending.remove().run();
+        edt(() -> {
+            root[0] = new javax.swing.JRootPane(); root[0].setContentPane(owner[0]); root[0].setJMenuBar(owner[0].menuBar());
+            minimum[0] = TerminalWindow.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2));
+            owner[0].currentPane().session().write("go\n");
+        });
+        until(() -> owner[0].currentPane().title().equals(title));
+        edt(() -> {
+            owner[0].update();
+            assertThat(owner[0].status().getText()).contains("long-directory-segment/");
+            assertThat(TerminalWindow.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2))).isEqualTo(minimum[0]);
+            owner[0].currentTab().rename("manual rename ".repeat(200));
+            assertThat(TerminalWindow.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2))).isEqualTo(minimum[0]);
+            owner[0].close();
+        });
+    }
 }

@@ -68,7 +68,7 @@ final class FindBar extends JPanel {
 
     @Override public void removeNotify() {
         dirty |= searching;
-        invalidateSearch();
+        cancelSearch(); // a temporary reparent cancels work, not the user's queued navigation
         super.removeNotify();
     }
 
@@ -121,8 +121,12 @@ final class FindBar extends JPanel {
         }
     }
 
+    private void cancelSearch() {
+        generation++; debounce.stop(); searching = false;
+    }
+
     private void invalidateSearch() {
-        generation++; debounce.stop(); searching = false; pendingNavigation = 0;
+        cancelSearch(); pendingNavigation = 0;
     }
 
     private void showResult(FindResult found) {

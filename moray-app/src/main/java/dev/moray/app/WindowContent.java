@@ -131,7 +131,13 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private JPanel tabHeader(TerminalTab tab) {
         JPanel header = new JPanel(new FlowLayout(FlowLayout.LEADING, 5, 0));
         header.setOpaque(false);
-        JLabel label = new JLabel(tab.title());
+        JLabel label = new JLabel(tab.title()) {
+            @Override public Dimension getPreferredSize() {
+                Dimension size = super.getPreferredSize();
+                return new Dimension(Math.min(200, size.width), size.height);
+            }
+        };
+        label.setToolTipText(tab.title());
         JButton close = new JButton("\u00d7");
         close.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
         close.setContentAreaFilled(false); close.setFocusable(false);
@@ -252,7 +258,10 @@ final class WindowContent extends JPanel implements AutoCloseable {
         for (int i = 0; i < tabs.getTabCount(); i++) {
             TerminalTab tab = (TerminalTab) tabs.getComponentAt(i);
             tabs.setTitleAt(i, tab.title());
-            if (tabs.getTabComponentAt(i) instanceof JPanel header) ((JLabel) header.getComponent(0)).setText(tab.title());
+            if (tabs.getTabComponentAt(i) instanceof JPanel header) {
+                JLabel label = (JLabel) header.getComponent(0);
+                label.setText(tab.title()); label.setToolTipText(tab.title());
+            }
             tab.setActive(active && tab == currentTab());
         }
         TerminalPane pane = currentPane();
