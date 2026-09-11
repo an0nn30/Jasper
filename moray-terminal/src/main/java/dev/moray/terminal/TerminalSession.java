@@ -59,6 +59,10 @@ public final class TerminalSession implements AutoCloseable {
         /** The scrollback was erased, so absolute rows held from before now name different lines (or none). */
         default void scrollbackReset() {
         }
+
+        /** The active terminal buffer changed, so absolute rows from the previous buffer are no longer meaningful. */
+        default void alternateBufferChanged(boolean alternate) {
+        }
     }
 
     private final TtyConnector connector;
@@ -73,7 +77,6 @@ public final class TerminalSession implements AutoCloseable {
     private volatile Path workingDirectory;
     private volatile int columns;
     private volatile int rows;
-    private volatile Thread reader;
 
     /** Starts {@code command} in a new pseudo-terminal and begins emulating its output. */
     public static TerminalSession start(List<String> command, Map<String, String> environment, Path workingDirectory,
@@ -102,7 +105,8 @@ public final class TerminalSession implements AutoCloseable {
         display = new SessionDisplay(
             title -> listeners.forEach(l -> l.titleChanged(title)),
             () -> listeners.forEach(Listener::bell),
-            () -> listeners.forEach(Listener::screenChanged));
+            () -> listeners.forEach(Listener::screenChanged),
+            alternate -> listeners.forEach(l -> l.alternateBufferChanged(alternate)));
         terminal = new JediTerminal(display, buffer, styleState);
         terminal.setTerminalOutput(new TerminalOutputStream() {
             @Override
@@ -123,6 +127,7 @@ public final class TerminalSession implements AutoCloseable {
             @Override
             public void linesDiscardedFromHistory(List<TerminalLine> lines) {
                 discardedLines += lines.size(); // reader thread, under the buffer lock
+                promptRows.removeIf(row -> row < discardedLines);
             }
 
             @Override
@@ -134,7 +139,7 @@ public final class TerminalSession implements AutoCloseable {
     }
 
     void startReading() {
-        reader = Thread.ofPlatform().name("moray-session-reader").daemon().start(this::readLoop);
+        Thread.ofPlatform().name("moray-session-reader").daemon().start(this::readLoop);
     }
 
     private void readLoop() {
@@ -204,6 +209,11 @@ public final class TerminalSession implements AutoCloseable {
         connector.resize(size);
     }
 
+    /** Clears saved history while preserving the live screen and notifying listeners that absolute rows were reset. */
+    public void clearScrollback() {
+        buffer.clearHistory();
+    }
+
     public int columns() {
         return columns;
     }
@@ -237,10 +247,6 @@ public final class TerminalSession implements AutoCloseable {
     @Override
     public void close() {
         connector.close();
-        Thread thread = reader;
-        if (thread != null) {
-            thread.interrupt();
-        }
     }
 
     ScreenSnapshot snapshot() {

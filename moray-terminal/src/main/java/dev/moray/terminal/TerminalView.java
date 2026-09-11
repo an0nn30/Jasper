@@ -33,8 +33,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.PatternSyntaxException;
 
@@ -46,11 +51,14 @@ public final class TerminalView extends JComponent {
     private static final int FRAME_MILLIS = 8;
     private static final int BLINK_MILLIS = 530;
     private static final int WHEEL_LINES = 3;
+    private static final float DEFAULT_FONT_SIZE = 14f;
+    private static final float MIN_FONT_SIZE = 6f;
+    private static final float MAX_FONT_SIZE = 72f;
 
     private final TerminalSession session;
     private final TerminalOptions options;
-    private final FontSet fonts;
-    private final TerminalPainter painter;
+    private FontSet fonts;
+    private TerminalPainter painter;
     private final KeyEncoder keys;
     private final boolean macOs;
     private final Viewport viewport = new Viewport();
@@ -67,6 +75,11 @@ public final class TerminalView extends JComponent {
 
         @Override
         public void scrollbackReset() {
+            SwingUtilities.invokeLater(TerminalView.this::forgetAbsoluteRows);
+        }
+
+        @Override
+        public void alternateBufferChanged(boolean alternate) {
             SwingUtilities.invokeLater(TerminalView.this::forgetAbsoluteRows);
         }
     };
@@ -88,10 +101,22 @@ public final class TerminalView extends JComponent {
     private double wheelRemainder;
     /** A ⌘-press on macOS opened a link; its drag and release are swallowed rather than reported to the program. */
     private boolean openingLink;
+    /** A right-click press that stayed local, retained because popup-trigger modifiers may differ on release. */
+    private boolean localPopupGesture;
+    private boolean popupShown;
     private List<TerminalSearch.Match> matches = List.of();
     private int currentMatch = -1;
+    private final Object searchLock = new Object();
+    private long searchGeneration;
+    private ThreadPoolExecutor searchExecutor;
+    private Future<?> pendingSearch;
     private volatile boolean exited;
+    private float fontSize;
+    private float inactiveDim;
     private Runnable onCloseRequest = () -> { };
+    private Predicate<KeyEvent> shortcutHandler;
+    private Consumer<MouseEvent> contextMenuHandler = event -> { };
+    private Consumer<FindResult> findResultListener = result -> { };
     private Supplier<String> clipboardReader = TerminalView::readSystemClipboard;
     private Consumer<String> clipboardWriter = TerminalView::writeSystemClipboard;
     private Consumer<String> linkOpener = TerminalView::openInBrowser;
@@ -99,7 +124,8 @@ public final class TerminalView extends JComponent {
     public TerminalView(TerminalSession session, TerminalOptions options) {
         this.session = session;
         this.options = options;
-        this.fonts = new FontSet(options.fontFamily(), options.fontSize(), options.fallbackFonts(), options.ligatures());
+        this.fontSize = options.fontSize();
+        this.fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures());
         this.painter = new TerminalPainter(fonts, options.palette());
         this.macOs = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac");
         this.keys = new KeyEncoder(options.optionAsMeta(), macOs);
@@ -166,6 +192,9 @@ public final class TerminalView extends JComponent {
             public void focusLost(FocusEvent e) {
                 leftAltHeld = false;
                 rightAltHeld = false;
+                openingLink = false;
+                localPopupGesture = false;
+                popupShown = false;
                 repaint();
             }
         });
@@ -188,6 +217,7 @@ public final class TerminalView extends JComponent {
         frameTimer.stop();
         blinkTimer.stop();
         session.removeListener(listener);
+        stopSearchWorker();
         super.removeNotify();
     }
 
@@ -214,8 +244,69 @@ public final class TerminalView extends JComponent {
         selectedText().filter(text -> !text.isEmpty()).ifPresent(clipboardWriter);
     }
 
+    /** Pastes the current clipboard contents, if text is available. Call on the Event Dispatch Thread. */
+    public void pasteClipboard() {
+        paste(clipboardReader.get());
+    }
+
+    /** Clears saved history without sending input to the child or changing the live screen. */
+    public void clearScrollback() {
+        session.clearScrollback();
+    }
+
+    /** Installs application key routing; {@code null} restores the standalone shortcuts. */
+    public void setShortcutHandler(Predicate<KeyEvent> handler) {
+        shortcutHandler = handler;
+    }
+
+    /** Installs the popup callback for right-click gestures owned locally by the view. */
+    public void setContextMenuHandler(Consumer<MouseEvent> handler) {
+        contextMenuHandler = handler == null ? event -> { } : handler;
+    }
+
+    /** Receives row-state invalidations on the Event Dispatch Thread. */
+    public void setFindResultListener(Consumer<FindResult> listener) {
+        findResultListener = listener == null ? result -> { } : listener;
+    }
+
+    /** The current terminal font size in points. */
+    public float fontSize() {
+        return fontSize;
+    }
+
+    /** Changes only this view's font size, clamped to 6–72 points, and refits its existing session. */
+    public void setFontSize(float size) {
+        float bounded = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, size));
+        if (!Float.isFinite(bounded) || bounded == fontSize) {
+            return;
+        }
+        fontSize = bounded;
+        fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures());
+        painter = new TerminalPainter(fonts, options.palette());
+        revalidate();
+        if (getWidth() > 0 && getHeight() > 0) {
+            resizeSessionToFit();
+        }
+        repaint();
+    }
+
+    /** Restores the Phase 1 default of 14 points. */
+    public void resetFontSize() {
+        setFontSize(DEFAULT_FONT_SIZE);
+    }
+
+    /** Sets a background overlay for inactive panes: 0 is clear and 1 is fully dimmed. */
+    public void setInactiveDim(float amount) {
+        float bounded = Float.isFinite(amount) ? Math.max(0f, Math.min(1f, amount)) : 0f;
+        if (bounded != inactiveDim) {
+            inactiveDim = bounded;
+            repaint();
+        }
+    }
+
     /** Finds matches in the scrollback and screen and shows the newest one. */
     public FindResult find(String query, boolean regex, boolean caseSensitive) {
+        invalidatePendingSearch();
         try {
             matches = session.search(query, regex, caseSensitive);
         } catch (PatternSyntaxException invalid) {
@@ -229,6 +320,25 @@ public final class TerminalView extends JComponent {
         return findResult();
     }
 
+    /**
+     * Searches away from the Event Dispatch Thread. At most one running and one queued request are retained; only the
+     * latest generation may change highlights or invoke its callback, and that callback always runs on the EDT.
+     */
+    public void findAsync(String query, boolean regex, boolean caseSensitive, Consumer<FindResult> callback) {
+        Consumer<FindResult> completion = callback == null ? result -> { } : callback;
+        long generation;
+        ThreadPoolExecutor executor;
+        synchronized (searchLock) {
+            generation = ++searchGeneration;
+            if (pendingSearch != null) {
+                pendingSearch.cancel(true);
+            }
+            executor = searchExecutor();
+            executor.getQueue().clear();
+            pendingSearch = executor.submit(() -> calculateFind(generation, query, regex, caseSensitive, completion));
+        }
+    }
+
     /** Moves to the next newer match, wrapping around. */
     public FindResult findNext() {
         return stepMatch(1);
@@ -240,9 +350,79 @@ public final class TerminalView extends JComponent {
     }
 
     public void clearFind() {
+        invalidatePendingSearch();
         matches = List.of();
         currentMatch = -1;
         repaint();
+    }
+
+    private void calculateFind(long generation, String query, boolean regex, boolean caseSensitive,
+                               Consumer<FindResult> callback) {
+        List<TerminalSearch.Match> found;
+        FindResult result;
+        try {
+            found = session.search(query, regex, caseSensitive);
+            result = new FindResult(found.size(), found.size(), null);
+        } catch (PatternSyntaxException invalid) {
+            found = List.of();
+            result = new FindResult(0, 0, invalid.getDescription());
+        }
+        List<TerminalSearch.Match> completedMatches = found;
+        FindResult completedResult = result;
+        SwingUtilities.invokeLater(() -> applyFind(generation, completedMatches, completedResult, callback));
+    }
+
+    private void applyFind(long generation, List<TerminalSearch.Match> found, FindResult result,
+                           Consumer<FindResult> callback) {
+        synchronized (searchLock) {
+            if (generation != searchGeneration) {
+                return;
+            }
+            pendingSearch = null;
+        }
+        matches = found;
+        currentMatch = found.size() - 1;
+        revealCurrentMatch();
+        callback.accept(result);
+    }
+
+    private ThreadPoolExecutor searchExecutor() {
+        if (searchExecutor == null || searchExecutor.isShutdown()) {
+            searchExecutor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(1), runnable -> {
+                    Thread thread = new Thread(runnable, "moray-terminal-search");
+                    thread.setDaemon(true);
+                    return thread;
+                }, new ThreadPoolExecutor.DiscardOldestPolicy());
+        }
+        return searchExecutor;
+    }
+
+    private void invalidatePendingSearch() {
+        synchronized (searchLock) {
+            searchGeneration++;
+            if (pendingSearch != null) {
+                pendingSearch.cancel(true);
+                pendingSearch = null;
+            }
+            if (searchExecutor != null) {
+                searchExecutor.getQueue().clear();
+            }
+        }
+    }
+
+    private void stopSearchWorker() {
+        synchronized (searchLock) {
+            searchGeneration++;
+            if (pendingSearch != null) {
+                pendingSearch.cancel(true);
+                pendingSearch = null;
+            }
+            if (searchExecutor != null) {
+                searchExecutor.shutdownNow();
+                searchExecutor = null;
+            }
+        }
     }
 
     /** Scrolls so the nearest prompt above the view is at the top. */
@@ -286,6 +466,12 @@ public final class TerminalView extends JComponent {
         boolean on = !blinks || !focused || blinkOn;
         painter.paint((Graphics2D) g, snapshot, new TerminalPainter.CursorLook(style, on, focused),
             highlights(snapshot), getWidth(), getHeight());
+        if (inactiveDim > 0f) {
+            Color background = options.palette().background();
+            int alpha = Math.round(255 * inactiveDim);
+            g.setColor(new Color(background.getRed(), background.getGreen(), background.getBlue(), alpha));
+            g.fillRect(0, 0, getWidth(), getHeight());
+        }
     }
 
     @Override
@@ -298,7 +484,7 @@ public final class TerminalView extends JComponent {
 
     void handleKey(KeyEvent e) {
         trackAltKeys(e);
-        if (e.getID() == KeyEvent.KEY_PRESSED && handleViewShortcut(e)) {
+        if (e.getID() == KeyEvent.KEY_PRESSED && handleShortcut(e)) {
             suppressNextTyped = true;
             e.consume();
             return;
@@ -341,6 +527,12 @@ public final class TerminalView extends JComponent {
         if (type == null || (type == Type.MOVED && !session.mouseReporting())) {
             return;
         }
+        if (type == Type.PRESSED) {
+            openingLink = false;
+            localPopupGesture = false;
+            popupShown = false;
+            requestFocusInWindow();
+        }
         if (macOs && type == Type.WHEEL && e.isShiftDown()) {
             return; // macOS sends horizontal trackpad scrolling (and Shift+wheel) this way; the terminal has no use for it
         }
@@ -363,16 +555,16 @@ public final class TerminalView extends JComponent {
         int column = Math.max(0, Math.min(snapshot.width() - 1, e.getX() / fonts.cellWidth()));
         int row = Math.max(0, Math.min(snapshot.height() - 1, e.getY() / fonts.cellHeight()));
         long absoluteRow = snapshot.firstRow() + row;
-        if (type == Type.PRESSED) {
-            requestFocusInWindow();
-        }
         boolean linkModifier = macOs ? e.isMetaDown() : e.isControlDown();
         MouseRouting.Action action = MouseRouting.decide(type, buttonOf(e), e.getClickCount(), e.isShiftDown(),
             linkModifier, session.mouseReporting(), snapshot.alternateBuffer());
         if (type == Type.PRESSED) {
+            localPopupGesture = SwingUtilities.isRightMouseButton(e) && action != MouseRouting.Action.REPORT;
             capturingSelection = action == MouseRouting.Action.START_SELECTION
                 || action == MouseRouting.Action.SELECT_WORD
                 || action == MouseRouting.Action.SELECT_LINE;
+        } else if (type == Type.RELEASED && localPopupGesture && SwingUtilities.isRightMouseButton(e)) {
+            action = MouseRouting.Action.NONE;
         } else if (capturingSelection && type == Type.DRAGGED) {
             action = MouseRouting.Action.EXTEND_SELECTION;
         } else if (capturingSelection && type == Type.RELEASED) {
@@ -419,6 +611,11 @@ public final class TerminalView extends JComponent {
                 // nothing to do locally
             }
         }
+        showContextMenuIfTriggered(e);
+        if (type == Type.RELEASED) {
+            localPopupGesture = false;
+            popupShown = false;
+        }
         repaint();
     }
 
@@ -437,12 +634,14 @@ public final class TerminalView extends JComponent {
      * for when those rows stop naming the same lines. Runs on the Event Dispatch Thread.
      */
     private void forgetAbsoluteRows() {
+        invalidatePendingSearch();
         selection = null;
         pendingAnchor = null;
         matches = List.of();
         currentMatch = -1;
         viewport.follow();
         repaint();
+        notifyFindResultListener(new FindResult(0, 0, null));
     }
 
     /** Opens the link at a mouse event's cell, if there is one; true when it did. */
@@ -453,6 +652,21 @@ public final class TerminalView extends JComponent {
         Optional<String> link = session.linkAt(snapshot.firstRow() + row, column);
         link.ifPresent(linkOpener);
         return link.isPresent();
+    }
+
+    private void showContextMenuIfTriggered(MouseEvent event) {
+        if (localPopupGesture && event.isPopupTrigger() && !popupShown) {
+            popupShown = true;
+            contextMenuHandler.accept(event);
+        }
+    }
+
+    private void notifyFindResultListener(FindResult result) {
+        if (SwingUtilities.isEventDispatchThread()) {
+            findResultListener.accept(result);
+        } else {
+            SwingUtilities.invokeLater(() -> findResultListener.accept(result));
+        }
     }
 
     void setClipboard(Supplier<String> reader, Consumer<String> writer) {
@@ -472,7 +686,21 @@ public final class TerminalView extends JComponent {
         return exited;
     }
 
-    /** Copy, paste, prompt jumps and page scrolling; plan 3 moves these into the configurable keymap. */
+    /** Application or standalone shortcuts plus page scrolling that always remains owned by the terminal view. */
+    private boolean handleShortcut(KeyEvent e) {
+        int code = e.getKeyCode();
+        if (e.isShiftDown() && code == KeyEvent.VK_PAGE_UP) {
+            scrollBy(-(session.rows() - 1));
+            return true;
+        }
+        if (e.isShiftDown() && code == KeyEvent.VK_PAGE_DOWN) {
+            scrollBy(session.rows() - 1);
+            return true;
+        }
+        return shortcutHandler != null ? shortcutHandler.test(e) : handleViewShortcut(e);
+    }
+
+    /** Copy, paste and prompt jumps for a TerminalView with no application owner. */
     private boolean handleViewShortcut(KeyEvent e) {
         int code = e.getKeyCode();
         boolean primary = macOs ? e.isMetaDown() : e.isControlDown() && e.isShiftDown();
@@ -481,7 +709,7 @@ public final class TerminalView extends JComponent {
             return true;
         }
         if (primary && code == KeyEvent.VK_V) {
-            paste(clipboardReader.get());
+            pasteClipboard();
             return true;
         }
         if (primary && code == KeyEvent.VK_UP) {
@@ -490,14 +718,6 @@ public final class TerminalView extends JComponent {
         }
         if (primary && code == KeyEvent.VK_DOWN) {
             scrollToNextPrompt();
-            return true;
-        }
-        if (!primary && e.isShiftDown() && code == KeyEvent.VK_PAGE_UP) {
-            scrollBy(-(session.rows() - 1));
-            return true;
-        }
-        if (!primary && e.isShiftDown() && code == KeyEvent.VK_PAGE_DOWN) {
-            scrollBy(session.rows() - 1);
             return true;
         }
         return false;

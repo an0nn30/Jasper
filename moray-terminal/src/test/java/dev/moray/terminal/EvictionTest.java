@@ -4,6 +4,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Lines pushed out of a full scrollback: absolute rows before them must read as gone, not as other lines. */
@@ -27,8 +30,11 @@ class EvictionTest {
     }
 
     @Test
-    void anEvictedPromptIsForgotten() {
+    void anEvictedPromptIsRemovedFromTheStoredPromptRows() throws Exception {
         assertThat(session.promptRows()).doesNotContain(0L).isEmpty();
+        Field promptRows = TerminalSession.class.getDeclaredField("promptRows");
+        promptRows.setAccessible(true);
+        assertThat((List<?>) promptRows.get(session)).isEmpty();
     }
 
     @Test

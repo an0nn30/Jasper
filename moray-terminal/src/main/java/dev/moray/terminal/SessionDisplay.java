@@ -16,6 +16,7 @@ final class SessionDisplay implements TerminalDisplay {
     private final Consumer<String> onTitle;
     private final Runnable onBell;
     private final Runnable onCursorChange;
+    private final Consumer<Boolean> onAlternateBufferChange;
     private volatile boolean cursorVisible = true;
     private volatile CursorShape cursorShape;
     private volatile String title = "";
@@ -23,10 +24,12 @@ final class SessionDisplay implements TerminalDisplay {
     private volatile MouseFormat mouseFormat;
     private volatile boolean bracketedPaste;
 
-    SessionDisplay(Consumer<String> onTitle, Runnable onBell, Runnable onCursorChange) {
+    SessionDisplay(Consumer<String> onTitle, Runnable onBell, Runnable onCursorChange,
+                   Consumer<Boolean> onAlternateBufferChange) {
         this.onTitle = onTitle;
         this.onBell = onBell;
         this.onCursorChange = onCursorChange;
+        this.onAlternateBufferChange = onAlternateBufferChange;
     }
 
     @Override
@@ -66,7 +69,8 @@ final class SessionDisplay implements TerminalDisplay {
 
     @Override
     public void useAlternateScreenBuffer(boolean useAlternateScreenBuffer) {
-        // TerminalTextBuffer tracks this itself.
+        // TerminalTextBuffer tracks the state itself; owners still need to discard row-based view state.
+        onAlternateBufferChange.accept(useAlternateScreenBuffer);
     }
 
     @Override

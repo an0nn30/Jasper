@@ -7,6 +7,10 @@ import org.junit.jupiter.api.condition.OS;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+import javax.swing.SwingUtilities;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -47,6 +51,30 @@ class PtyConnectorTest {
             session.write("abc\r");
             Await.until(() -> screenText(session).contains("got:abc"), "program echoes its input");
         }
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void closeReturnsOnTheEdtAndForciblyEndsAChildThatIgnoresHangup() throws Exception {
+        TerminalSession session = start(List.of("/bin/sh", "-c", "trap '' HUP TERM; while :; do :; done"));
+        AtomicLong closeMillis = new AtomicLong();
+
+        SwingUtilities.invokeAndWait(() -> {
+            long started = System.nanoTime();
+            session.close();
+            closeMillis.set(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+        });
+
+        assertThat(closeMillis.get()).isLessThan(100);
+        AtomicReference<Thread> cleanup = new AtomicReference<>();
+        Await.until(() -> Thread.getAllStackTraces().keySet().stream()
+            .filter(thread -> thread.isAlive() && thread.getName().equals("moray-pty-close"))
+            .findFirst().map(thread -> {
+                cleanup.set(thread);
+                return true;
+            }).orElse(false), "PTY close cleanup worker");
+        assertThat(cleanup.get().isDaemon()).isFalse();
+        assertThat(session.exitFuture().get(5, TimeUnit.SECONDS)).isNotZero();
     }
 
     private static TerminalSession start(List<String> command) throws Exception {
