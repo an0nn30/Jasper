@@ -4,6 +4,8 @@ Date: 2026-09-11
 Status: Execution design under the approved Phase 1 specification and user's Plan 3 go-ahead.
 Authority: `2026-09-10-moray-phase-1-terminal-design.md`, particularly §§3, 5, 5.1, 6 and 9.
 
+Execution update: newly merged AGENTS.md reserves GUI launches and benchmarks for the user. Agent verification remains headless. STATUS.md carryovers included here are lost link-gesture reset, alternate-screen row invalidation, pruning expired prompt marks, and reliable child termination on pane close. Other performance/selection refinements remain recorded for follow-up hardening.
+
 ## Outcome and scope
 
 Turn the existing single terminal pane into a daily-use terminal application: multiple windows, reorderable tabs, right/down splits, pane navigation and zoom, application shortcuts, menus, toolbar, find bar, status bar, and context menus. Keep the emulator, PTY and own renderer. No SSH, sidebar, plugin API, layout restoration, configuration parser or packaging in this plan.
@@ -50,6 +52,6 @@ Status shows focused shell, working directory, columns × rows and Built-in defa
 
 ## Verification and completion
 
-Tests first for model invariants, geometric navigation, zoom/ratios, tab naming/reordering, key parsing/collision detection, app-before-terminal routing, font/scrollback APIs, and asynchronous result invalidation. Headless Swing tests cover action dispatch, find bar lifecycle and menu/context behavior where practical; use real PTY integration tests for process lifecycle where appropriate. Run `./gradlew check --rerun-tasks` on the final branch. Run an automated GUI smoke and visually inspect the actual app if native UI automation is available. Record any manual checks that remain instead of claiming the Phase 1 two-week gate is complete.
+Tests first for model invariants, geometric navigation, zoom/ratios, tab naming/reordering, key parsing/collision detection, app-before-terminal routing, font/scrollback APIs, and asynchronous result invalidation. Headless Swing tests cover action dispatch, find bar lifecycle and menu/context behavior where practical; use real PTY integration tests for process lifecycle where appropriate. Run `./gradlew check --rerun-tasks` on the final branch. Hand the GUI smoke checklist to the user in accordance with AGENTS.md. Record any manual checks that remain instead of claiming the Phase 1 two-week gate is complete.
 
 Acceptance: multiple windows remain independent; tabs reorder/rename/close; nested splits retain shells, ratios and focus through zoom; commands reach the right pane; find/clipboard/links/mouse behavior stays intact; chrome controls are accessible; existing terminal tests pass. Plan 4 and the Phase 1 switch-over gate remain separate work.

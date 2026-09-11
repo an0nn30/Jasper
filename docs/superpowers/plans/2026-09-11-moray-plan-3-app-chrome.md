@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md`; parent `docs/superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md`.
 
+**Execution update (2026-09-11):** The newly merged AGENTS.md and docs/STATUS.md reserve GUI launches and benchmarks for the user. Root acceptance below is a handoff checklist, not agent-run UI validation. Task 2 also fixes lost-release link gestures, invalidates alternate-screen selections/search, prunes expired prompt marks and ensures pane close terminates its child. Remaining performance/selection refinements in STATUS §5 remain explicitly deferred to terminal hardening after Plan 3. New commits include a Co-Authored-By trailer.
+
 ## Global Constraints
 
 - Packages: `dev.moray.terminal` and `dev.moray.app`.
@@ -84,6 +86,7 @@ int extra = !macOs && binding.contains("cmd+shift") ? InputEvent.ALT_DOWN_MASK :
 **Files:**
 - Modify: `moray-terminal/src/main/java/dev/moray/terminal/TerminalView.java`
 - Modify: `moray-terminal/src/main/java/dev/moray/terminal/TerminalSession.java`
+- Modify: `moray-terminal/src/main/java/dev/moray/terminal/PtyConnector.java` and `SessionDisplay.java` as needed for close and alternate-buffer callbacks.
 - Test: `moray-terminal/src/test/java/dev/moray/terminal/TerminalAppIntegrationTest.java`
 - Test: `moray-terminal/src/test/java/dev/moray/terminal/TerminalAppearanceTest.java`
 - Modify existing interaction tests only where app-owned vs standalone behavior needs a new assertion.
@@ -95,7 +98,9 @@ int extra = !macOs && binding.contains("cmd+shift") ? InputEvent.ALT_DOWN_MASK :
 - `TerminalView.findAsync(String query, boolean regex, boolean caseSensitive, Consumer<FindResult>)`: capture/search without blocking EDT, latest result only, callback on EDT. Keep existing synchronous find for tests/backward compatibility. `clearFind` invalidates pending results; view detach/disposal must not leak worker threads. `setFindResultListener(Consumer<FindResult>)` informs bar when reflow/history reset invalidates count. Existing `findNext`/`findPrevious` remain usable.
 - `TerminalSession.clearScrollback()` clears only history under the buffer lock, preserves live screen, notifies through existing scrollback reset mechanism.
 
-- [ ] **Step 1: Write and run failing tests.** Use FakeConnector, Await and SwingUtilities. Prove an intercepted Ctrl+D does not reach the PTY while unintercepted input does; an app handler returning false prevents fallback copy shortcuts; standalone copy still works. Prove font resize preserves the session/text and changes metrics; reset returns 14. History clear preserves screen rows. Popup fires only for locally owned gestures. A cleared or superseded async query cannot restore stale highlights/count.
+- Additional carryovers: reset lost link-gesture capture on each new press and focus loss; clear selection, pending async results and matches on alternate-buffer transitions; prune evicted prompt rows during history eviction. Close owned PTY with hang-up where supported and bounded forced termination for an unresponsive child, without waiting on the EDT. Preserve final output on normal exit.
+
+- [ ] **Step 1: Write and run failing tests.** Add regressions for a link press with missing release followed by a reported gesture, alternate-screen row invalidation, prompt eviction, and a real non-GUI process that ignores normal termination. Use FakeConnector, Await and SwingUtilities. Prove an intercepted Ctrl+D does not reach the PTY while unintercepted input does; an app handler returning false prevents fallback copy shortcuts; standalone copy still works. Prove font resize preserves the session/text and changes metrics; reset returns 14. History clear preserves screen rows. Popup fires only for locally owned gestures. A cleared or superseded async query cannot restore stale highlights/count.
 
 ```java
 view.setShortcutHandler(event -> event.getKeyCode() == KeyEvent.VK_D);
@@ -177,7 +182,7 @@ Bundle Lucide SVG paths for seven toolbar icons and retain its ISC license/sourc
 
 - [ ] Task reviews approve spec compliance and quality; findings fixed and re-reviewed.
 - [ ] Full local check succeeds on final code.
-- [ ] GUI smoke: create second window, tabs, nested splits, focus/zoom/restore, rename/reorder, find, clipboard, font controls, close and independent window lifetime. Inspect actual rendered chrome.
-- [ ] Re-run benchmark after integration and record measured number; minimum 35 MB/s, target 45 MB/s.
+- [ ] User-run GUI smoke (agent must not launch it per AGENTS.md): create second window, tabs, nested splits, focus/zoom/restore, rename/reorder, find, clipboard, font controls, close and independent window lifetime. Inspect actual rendered chrome.
+- [ ] User-run benchmark after integration, only without a running game or VM; minimum 35 MB/s, target 45 MB/s.
 - [ ] Record remaining manual terminal checks and three-platform CI status; do not claim Phase 1 complete.
 - [ ] Final whole-branch review; retain completed code on feature branch for user review.
