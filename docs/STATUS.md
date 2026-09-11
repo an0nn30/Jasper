@@ -13,9 +13,12 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 1 — Terminal core | Complete on main (`6daa61f`..`d0ccbfb`) |
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
-| 4 — Config and packaging | Not written yet |
+| 3.5 — macOS chrome, themes and toolbar | Next priority; scope recorded, visual design and toolbar discussion precede implementation |
+| 4 — Config and packaging | Follows Plan 3.5; not written yet |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Continue from main; do not start Plan 3 again.
+
+Next milestone: [Plan 3.5 — macOS chrome, themes and toolbar](superpowers/plans/2026-09-11-moray-plan-3-5-chrome-and-themes.md). The user has tried Plan 3 during development and reports that it looks good overall; this is qualitative feedback, not a claim that every native checklist item or benchmark was completed.
 
 ## 2. Implemented behavior
 
@@ -32,7 +35,7 @@ Plan 3 adds:
 - Per-pane font controls, screen-preserving history clear, working-directory inheritance with launch-time validation.
 - Background shell launch with close-before-completion cleanup; native Quit routes through app cleanup.
 
-Settings and Reload config are visible but disabled; status says Built-in defaults. No configuration file is read or written. Chrome choices are session-only. Plan 4 owns configuration, persistence, automatic system appearance and packaging.
+Settings and Reload config are visible but disabled; status says Built-in defaults. No configuration file is read or written. Chrome choices are session-only. Plan 3.5 now owns coordinated built-in dark/light themes across FlatLaf chrome and terminal content. Plan 4 retains configuration, custom theme files, persistence, automatic system appearance and packaging.
 
 ## 3. Fixes included during Plan 3
 
@@ -75,9 +78,11 @@ These carried-over findings remain explicitly open; they were not silently count
 
 Retained coverage opportunities: astral search, edge/overlapping highlights, large-history indicator geometry, multi-row URL continuation lookup, empty-scrollback viewport, middle-button routing, copy-on-select, alternate-screen wheel/arrows, multi-notch reports, paste-to-live, Shift+PageDown and match colors. Add behavioral regressions when working in these areas, not tests that mirror source constants.
 
-## 6. Plan 4 and later
+## 6. Next: Plan 3.5, then Plan 4
 
-Plan 4: AppDirs/per-OS paths, TOML diagnostics with line numbers and last-good retention, live reload, themes, settings-file creation, --config, app logging and macOS .app bundling JBR. Carryovers:
+Plan 3.5 interrupts the previous next step: custom macOS title bar, Atom/One Dark- and One Light-inspired built-in themes using the existing FlatLaf foundation, then toolbar discussion and selected colored-icon artwork/layout. Exact palette, title-bar arrangement and toolbar design will be decided before implementation; see the linked roadmap amendment. Built-in palettes and live coordinated theme application move forward from Plan 4.
+
+Plan 4: AppDirs/per-OS paths, TOML diagnostics with line numbers and last-good retention, live reload, custom theme loading and persistence, automatic system appearance, settings-file creation, --config, app logging and macOS .app bundling JBR. Carryovers:
 
 - Replace printStackTrace/silent I/O catches with appropriate app logging/feedback.
 - Scrub launcher environment variables (TERM_PROGRAM, TMUX, iTerm variables) and provide UTF-8 LANG for Dock launch.
@@ -96,7 +101,7 @@ Any-time performance work: remove unused style-array allocation during text-only
 - macOS Command-click links takes precedence over program mouse reports; Shift provides local mouse behavior; horizontal Shift-wheel on macOS is ignored.
 - The user's approved Phase 1 direction and Plan 3 go-ahead were used for execution; a supplemental written design records concrete app contracts.
 - On Linux/Windows, cmd already means Ctrl+Shift. Defaults explicitly written cmd+shift add Alt to avoid collisions; user overrides parse literally and collisions are errors. macOS defaults are unchanged.
-- Settings/reload and persisted config remain Plan 4. Light/dark chrome selection works now; automatic system appearance waits for Plan 4.
+- Settings/reload and persisted config remain Plan 4. Plan 3.5 will supply coordinated built-in dark/light themes and macOS title-bar work; automatic system appearance waits for Plan 4.
 - Four direct multi-pane carryovers were included; the remaining hardening list above is follow-up scope.
 - Native acceptance is user-run per newly merged AGENTS.md. No agent GUI launch or benchmark followed discovery of that rule.
 - The user selected the local `~/projects/tabler-icons` repository. Seven outline assets and full MIT license are bundled; SOURCE.txt records the source commit and theme-color adaptation.
@@ -107,9 +112,11 @@ Superpowers spec/plan → task implementer with TDD → separate task review →
 
 Root final verification on `dda35e2`: all 8 Gradle tasks executed successfully in 8 seconds; 277 tests, zero failures/errors, one expected font skip. Source-hygiene and `git diff --check` passed. No compiler warnings. Final reviewer compared the exact default key catalog with the parent spec and found it aligned; selected shortcut regressions for live overrides belong in Plan 4, without duplicating source constants in tests.
 
-Next: run user acceptance from `/Users/dustin/projects/moray`, then implement Plan 4 and complete the daily-use gate. The user approved local integration; remove the completed feature worktree/branch after the merged checks pass.
+Plan 3 was merged locally and its feature worktree/branch removed after merged checks passed (277 tests, zero failures/errors, one expected skip). Next: design Plan 3.5's custom macOS title bar and coordinated Atom-inspired themes, discuss the colored toolbar, then implement that milestone before Plan 4. Continue native acceptance from `/Users/dustin/projects/moray` and retain the daily-use gate.
 
-## 9. Execution rulings preserved from the completed ledger
+## 9. Execution rulings preserved from the completed Plan 3 ledger
+
+These are historical Plan 3 scope decisions. The user's subsequent Plan 3.5 amendment above changes the sequencing of built-in theme work.
 
 - The existing approved Phase 1 design plus the user's Plan 3 go-ahead authorizes execution; use a supplemental execution design instead of restarting approval — avoids repeating settled layout decisions — costs rework if the detailed choices differ from user intent.
 - Non-mac defaults containing explicit cmd+shift add Alt because cmd already means Ctrl+Shift — prevents duplicate destructive shortcuts — costs non-mac shortcut familiarity; macOS unchanged.

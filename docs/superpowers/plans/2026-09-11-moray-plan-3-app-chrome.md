@@ -14,6 +14,8 @@
 
 **Execution update (2026-09-11):** The newly merged AGENTS.md and docs/STATUS.md reserve GUI launches and benchmarks for the user. Root acceptance below is a handoff checklist, not agent-run UI validation. Task 2 also fixes lost-release link gestures, invalidates alternate-screen selections/search, prunes expired prompt marks and ensures pane close terminates its child. Remaining performance/selection refinements in STATUS §5 remain explicitly deferred to terminal hardening after Plan 3. New commits include a Co-Authored-By trailer.
 
+**Follow-up amendment:** The user has requested [Plan 3.5 — macOS chrome, themes and toolbar](2026-09-11-moray-plan-3-5-chrome-and-themes.md) before Plan 4. This completed plan remains the implementation record; coordinated built-in themes and toolbar styling now have a separate follow-up milestone.
+
 ## Global Constraints
 
 - Packages: `dev.moray.terminal` and `dev.moray.app`.

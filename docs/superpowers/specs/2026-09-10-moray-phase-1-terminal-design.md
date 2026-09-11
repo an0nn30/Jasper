@@ -1,7 +1,7 @@
 # Moray — Phase 1: The Terminal — Design Spec
 
 **Date:** 2026-09-10
-**Status:** Approved (2026-09-10). Plans 1–2 of 4 implemented and merged (2026-09-11); plan 3 (app chrome, §5–§6) is in progress on branch `codex/plan-3-app-chrome`; plan 4 (config and packaging, §7) is not written yet. Current state: `docs/STATUS.md`.
+**Status:** Approved (2026-09-10). Plans 1–3 implemented and merged (2026-09-11). User-requested [Plan 3.5](../plans/2026-09-11-moray-plan-3-5-chrome-and-themes.md) adds custom macOS chrome, coordinated Atom-inspired themes and a colored-toolbar design discussion before Plan 4 (configuration and packaging). Current state: `docs/STATUS.md`.
 **Repo:** `~/projects/moray`
 
 ## 1. What Moray is
@@ -122,6 +122,8 @@ moray-app  ──►  moray-terminal  ──►  jediterm-core, pty4j
 
 ## 5. `moray-app`: the window
 
+Plan 3.5 amendment: build a custom macOS title-bar surface while preserving native window behavior. Its relationship to the tabs and toolbar will be selected during design; the current toolbar layout below is the implemented baseline, subject to the user-requested visual review. Preserve the action set, visibility modes and screen menu bar.
+
 From top to bottom:
 
 1. **Menu bar** — the macOS screen menu bar (`apple.laf.useScreenMenuBar`); an in-window `JMenuBar` on Linux and Windows. Every action appears in a menu.
@@ -169,9 +171,10 @@ Keybinding strings use `cmd` to mean the primary modifier: ⌘ on macOS, Ctrl+Sh
 
 ## 6. Look
 
+- Plan 3.5 establishes Atom/One Dark- and One Light-inspired built-ins spanning title bar, FlatLaf controls and terminal colors; exact palettes are selected during visual design. Live built-in theme application moves ahead of Plan 4.
 - FlatLaf with light and dark variants; `colors.appearance` selects `system`, `dark` or `light` for the app chrome.
 - The terminal colors come from the selected theme (§7.3).
-- Icons are bundled SVGs from a permissively licensed icon set (chosen in the plan, e.g. Tabler or Lucide).
+- Toolbar icons should have actual color rather than the current all-gray treatment. Discuss colored/filled and multicolor alternatives with the user before selecting layout and artwork. Bundle permissively licensed or original assets with attribution; local Tabler assets remain available. Preserve accessibility and readable states in both themes.
 
 ## 7. Configuration
 
