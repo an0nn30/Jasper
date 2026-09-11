@@ -1,6 +1,6 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11. Plan 3 implementation is on `codex/plan-3-app-chrome` in `.worktrees/plan-3`; final reviewed code `dda35e2`. All task reviews and final whole-branch/fix reviews passed, with no unresolved review findings. Root fresh `./gradlew check --rerun-tasks`: **277 tests, 0 failures/errors, 1 expected font skip** (276 passed; 46 app + 231 terminal). No merge to main or remote push has occurred.
+**As of:** 2026-09-11. Plan 3 is integrated into `main` following user approval; final reviewed code `dda35e2`. All task reviews and final whole-branch/fix reviews passed, with no unresolved review findings. Root fresh `./gradlew check --rerun-tasks`: **277 tests, 0 failures/errors, 1 expected font skip** (276 passed; 46 app + 231 terminal). Integration is local; no remote push has occurred.
 
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. GUI launches and benchmarks are user-run only.
 
@@ -12,12 +12,12 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 |---|---|
 | 1 — Terminal core | Complete on main (`6daa61f`..`d0ccbfb`) |
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
-| 3 — App chrome | Implemented and reviewed on feature branch; all automated checks passed; native acceptance pending |
+| 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
 | 4 — Config and packaging | Not written yet |
 
-Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Continue from this reviewed branch; do not start Plan 3 again.
+Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Continue from main; do not start Plan 3 again.
 
-## 2. Implemented behavior on the Plan 3 branch
+## 2. Implemented behavior
 
 The existing terminal retains ligatures, fallback fonts, wide characters, colors, cursor modes, Option input, mouse reporting, scrollback, selection, clipboard, bracketed paste, prompt jumps, OSC integration and clickable links.
 
@@ -52,11 +52,10 @@ Settings and Reload config are visible but disabled; status says Built-in defaul
 
 ## 4. Verification still required
 
-1. Choose whether to merge the reviewed feature branch locally after inspecting it. No remote exists; ask before configuring one or pushing.
-2. User-run [Plan 3 acceptance checklist](superpowers/plans/2026-09-11-moray-plan-3-manual-check.md): native windows/menu/Quit, split/zoom/focus/dividers, tab gestures, find, clipboard, links, mouse reporting, directory inheritance and chrome readability. Headless tests do not establish these native visual results.
-3. User-run benchmark after integration, only with no game or VM running. Historical Plan 1 result: 41.5 MB/s. A Plan 2 baseline measured during this session before newly added AGENTS restrictions were discovered: **35.9 MB/s** (105.5 MB in 2.94 s). No post-integration benchmark has run. Gate ≥35 MB/s, target ≥45 MB/s.
-4. CI has never run: no git remote exists. Workflow covers macOS, Ubuntu and Windows with JBR25. Ask before adding a remote or pushing. Windows ConPTY/forced-close and Linux desktop/font behavior remain unverified on their native systems.
-5. After Plan 4, satisfy the Phase 1 manual checklist and two-week Moray-only trial. Record every reason to reopen conch and fix the blockers before SSH begins.
+1. User-run [Plan 3 acceptance checklist](superpowers/plans/2026-09-11-moray-plan-3-manual-check.md): native windows/menu/Quit, split/zoom/focus/dividers, tab gestures, find, clipboard, links, mouse reporting, directory inheritance and chrome readability. Headless tests do not establish these native visual results.
+2. User-run benchmark after integration, only with no game or VM running. Historical Plan 1 result: 41.5 MB/s. A Plan 2 baseline measured during this session before newly added AGENTS restrictions were discovered: **35.9 MB/s** (105.5 MB in 2.94 s). No post-integration benchmark has run. Gate ≥35 MB/s, target ≥45 MB/s.
+3. CI has never run: no git remote exists. Workflow covers macOS, Ubuntu and Windows with JBR25. Ask before adding a remote or pushing. Windows ConPTY/forced-close and Linux desktop/font behavior remain unverified on their native systems.
+4. After Plan 4, satisfy the Phase 1 manual checklist and two-week Moray-only trial. Record every reason to reopen conch and fix the blockers before SSH begins.
 
 Known skip: `FontSetTest.fallsBackWhenPrimaryCannotDisplay` skips on this Mac because its probe finds no differentiating glyph. Nerd Font-specific fallback tests run with a suitable installed font and skip on systems lacking it.
 
@@ -108,7 +107,7 @@ Superpowers spec/plan → task implementer with TDD → separate task review →
 
 Root final verification on `dda35e2`: all 8 Gradle tasks executed successfully in 8 seconds; 277 tests, zero failures/errors, one expected font skip. Source-hygiene and `git diff --check` passed. No compiler warnings. Final reviewer compared the exact default key catalog with the parent spec and found it aligned; selected shortcut regressions for live overrides belong in Plan 4, without duplicating source constants in tests.
 
-Next: run user acceptance, choose whether to merge locally, then implement Plan 4 and complete the daily-use gate. Keep the feature worktree/branch until the user chooses integration.
+Next: run user acceptance from `/Users/dustin/projects/moray`, then implement Plan 4 and complete the daily-use gate. The user approved local integration; remove the completed feature worktree/branch after the merged checks pass.
 
 ## 9. Execution rulings preserved from the completed ledger
 

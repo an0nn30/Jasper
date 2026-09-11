@@ -2,7 +2,7 @@
 
 Status: pending user execution. AGENTS.md reserves GUI launches and benchmarks for the user. Run these checks on macOS and record failures; the automated suite does not prove the visual acceptance criteria.
 
-1. Launch from isolated worktree with ./gradlew :moray-app:run. Confirm shell prompt, SVG toolbar, tab strip, status.
+1. Launch from `/Users/dustin/projects/moray` on main with `./gradlew :moray-app:run`. Confirm shell prompt, SVG toolbar, tab strip, status.
 2. New tab (Cmd+T). Rename F2; emit OSC title; ensure explicit rename persists. Try a long shell title, tab name and OSC 7 directory; the window must still shrink normally and full tab titles remain available in tooltips.
 3. In a pane, emit OSC 7 for /tmp. Cmd+T and split should launch there; verify pwd.
 4. Cmd+D, Cmd+Shift+D creates nested splits with distinct shell sessions. Print distinct markers in each pane.

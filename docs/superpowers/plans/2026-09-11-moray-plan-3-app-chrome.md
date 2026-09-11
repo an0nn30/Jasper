@@ -187,4 +187,4 @@ Bundle Tabler outline SVGs from the user-supplied ~/projects/tabler-icons reposi
 - [ ] User-run GUI smoke (agent must not launch it per AGENTS.md): create second window, tabs, nested splits, focus/zoom/restore, rename/reorder, find, clipboard, font controls, close and independent window lifetime. Inspect actual rendered chrome.
 - [ ] User-run benchmark after integration, only without a running game or VM; minimum 35 MB/s, target 45 MB/s.
 - [x] Record remaining manual terminal checks and three-platform CI status; do not claim Phase 1 complete.
-- [x] Final whole-branch review; retain completed code on feature branch for user review.
+- [x] Final whole-branch review approved; user selected local integration into main.
