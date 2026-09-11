@@ -165,7 +165,7 @@ executor.execute(() -> {
 });
 ```
 
-- [ ] **Step 3: Implement action routing and all chrome.** Register each ActionId once per window; resolve current pane at invocation. Terminal shortcut handler uses KeyStroke.getKeyStrokeForEvent and the keybinding map. Register root pane bindings for focus outside the terminal while retaining native text-field copy/paste; avoid duplicate delivery. All executable actions have menu entries. Toolbar mode radio items switch icons+labels/icons/hidden, status visibility toggles, appearance switches light/dark. Status shows focused shell/directory/size. Context menu uses shared actions and obeys mouse routing. Main installs FlatLaf before creating UI and removes per-window System.exit; keep windowTitle helper tests.
+- [ ] **Step 3: Implement action routing and all chrome.** Resolve the Task 1 review minor in KeyBindings: F13–F24 Java keycodes are not contiguous with F1–F12; map from VK_F13 and test an override resolving the actual F13 stroke. Register each ActionId once per window; resolve current pane at invocation. Terminal shortcut handler uses KeyStroke.getKeyStrokeForEvent and the keybinding map. Register root pane bindings for focus outside the terminal while retaining native text-field copy/paste; avoid duplicate delivery. All executable actions have menu entries. Toolbar mode radio items switch icons+labels/icons/hidden, status visibility toggles, appearance switches light/dark. Status shows focused shell/directory/size. Context menu uses shared actions and obeys mouse routing. Main installs FlatLaf before creating UI and removes per-window System.exit; keep windowTitle helper tests.
 
 Add dependencies:
 ```kotlin
