@@ -173,7 +173,7 @@ implementation("com.formdev:flatlaf:3.7")
 implementation("com.formdev:flatlaf-extras:3.7")
 ```
 
-Bundle Lucide SVG paths for seven toolbar icons and retain its ISC license/source attribution. Use FlatSVGIcon to load resources with meaningful accessible names/tooltips. Add Settings and Reload config in toolbar/menus disabled, with Plan 4 tooltip; Built-in defaults status must be honest.
+Bundle Tabler outline SVGs from the user-supplied ~/projects/tabler-icons repository for seven toolbar icons and retain its MIT license/source attribution. Use FlatSVGIcon to load resources with meaningful accessible names/tooltips. Add Settings and Reload config in toolbar/menus disabled, with Plan 4 tooltip; Built-in defaults status must be honest.
 
 - [ ] **Step 4: Verify application tests and full check.** Run `./gradlew check --rerun-tasks`. Check `git diff --check`. Do not launch UI from subagent. Report exact commands, counts, warnings, remaining manual validation, resource license provenance, and any spec discrepancies.
 - [ ] **Step 5: Commit and report.** Root performs task review and actual GUI smoke, then final branch review. Update completion checkboxes only after reviewed success.

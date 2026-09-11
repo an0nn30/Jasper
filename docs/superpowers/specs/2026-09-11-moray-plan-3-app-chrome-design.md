@@ -48,7 +48,7 @@ The terminal offers a popup callback only when right-click is locally owned: app
 
 Render the split model as nested JSplitPanes, with proportional resizing and persisted divider ratios. Reuse terminal pane components when rebuilding; never restart processes for layout changes. Minimum pane dimensions prevent dividers from collapsing a terminal to zero cells. Mark the focused pane subtly, dim inactive panes, and avoid stealing keyboard focus when shell output/title updates arrive.
 
-Status shows focused shell, working directory, columns × rows and Built-in defaults. Updates follow pane/tab focus, directory events, resize and font changes. Every executable action appears in a menu, including direct tab selection and prompt navigation. View includes toolbar modes, status visibility, and light/dark appearance. SVG assets are bundled with their source/license; use the permissively licensed Lucide set and retain ISC attribution.
+Status shows focused shell, working directory, columns × rows and Built-in defaults. Updates follow pane/tab focus, directory events, resize and font changes. Every executable action appears in a menu, including direct tab selection and prompt navigation. View includes toolbar modes, status visibility, and light/dark appearance. SVG assets are bundled with their source/license; use the user-supplied Tabler Icons repository at ~/projects/tabler-icons and retain its MIT license attribution.
 
 ## Verification and completion
 
