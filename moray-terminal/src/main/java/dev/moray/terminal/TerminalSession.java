@@ -1,6 +1,7 @@
 package dev.moray.terminal;
 
 import com.jediterm.core.util.TermSize;
+import com.jediterm.terminal.ArrayTerminalDataStream;
 import com.jediterm.terminal.RequestOrigin;
 import com.jediterm.terminal.TerminalOutputStream;
 import com.jediterm.terminal.TtyBasedArrayDataStream;
@@ -135,7 +136,20 @@ public final class TerminalSession implements AutoCloseable {
             Thread.currentThread().interrupt();
             code = -1;
         }
+        writeExitMessage(code);
         exit.complete(code);
+    }
+
+    private void writeExitMessage(int code) {
+        char[] message = ("\r\n[process exited with code " + code + "]").toCharArray();
+        JediEmulator emulator = new JediEmulator(new ArrayTerminalDataStream(message), terminal);
+        try {
+            while (emulator.hasNext()) {
+                emulator.next();
+            }
+        } catch (IOException endOfMessage) {
+            // ArrayTerminalDataStream signals its end with EOF.
+        }
     }
 
     public void write(byte[] bytes) {
@@ -206,7 +220,17 @@ public final class TerminalSession implements AutoCloseable {
     }
 
     ScreenSnapshot snapshot() {
-        return ScreenSnapshot.capture(buffer, terminal, display);
+        return snapshot(ScreenSnapshot.FOLLOW_OUTPUT);
+    }
+
+    /** The rows starting at an absolute top row (clamped to the scrollback), or the live screen for FOLLOW_OUTPUT. */
+    ScreenSnapshot snapshot(long topRow) {
+        buffer.lock();
+        try {
+            return ScreenSnapshot.capture(buffer, terminal, display, discardedLines, topRow);
+        } finally {
+            buffer.unlock();
+        }
     }
 
     byte[] codeForKey(int keyCode, int modifiers) {
