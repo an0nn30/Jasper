@@ -70,6 +70,15 @@ final class WindowChrome {
             });
             themes.add(item); appearance.add(item);
         }
+        appearance.addMenuListener(new MenuListener() {
+            @Override public void menuSelected(MenuEvent event) {
+                boolean light = UIManager.getLookAndFeel() instanceof FlatLightLaf;
+                appearance.getItem(0).setSelected(light);
+                appearance.getItem(1).setSelected(!light);
+            }
+            @Override public void menuDeselected(MenuEvent event) {}
+            @Override public void menuCanceled(MenuEvent event) {}
+        });
         view.add(appearance);
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
         JButton split = addButton(ActionId.SPLIT_RIGHT, "columns-2");

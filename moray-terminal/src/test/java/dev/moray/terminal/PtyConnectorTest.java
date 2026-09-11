@@ -56,25 +56,40 @@ class PtyConnectorTest {
     @Test
     @DisabledOnOs(OS.WINDOWS)
     void closeReturnsOnTheEdtAndForciblyEndsAChildThatIgnoresHangup() throws Exception {
-        TerminalSession session = start(List.of("/bin/sh", "-c", "trap '' HUP TERM; while :; do :; done"));
-        AtomicLong closeMillis = new AtomicLong();
+        // Keep the process handle so failed assertions can still kill this intentionally immortal fixture.
+        var process = new com.pty4j.PtyProcessBuilder(new String[]{"/bin/sh", "-c",
+            "trap '' HUP TERM; printf 'moray-traps-ready\\n'; while :; do :; done"})
+            .setEnvironment(System.getenv())
+            .setDirectory(System.getProperty("user.home"))
+            .setInitialColumns(80).setInitialRows(24)
+            .setUnixOpenTtyToPreserveOutputAfterTermination(true).start();
+        TerminalSession session = new TerminalSession(new PtyConnector(process), 80, 24, 100);
+        try {
+            session.startReading();
+            Await.until(() -> screenText(session).contains("moray-traps-ready"), "shell signal traps installed");
+            AtomicLong closeMillis = new AtomicLong();
 
-        SwingUtilities.invokeAndWait(() -> {
-            long started = System.nanoTime();
+            SwingUtilities.invokeAndWait(() -> {
+                long started = System.nanoTime();
+                session.close();
+                closeMillis.set(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+            });
+
+            assertThat(closeMillis.get()).isLessThan(100);
+            AtomicReference<Thread> cleanup = new AtomicReference<>();
+            Await.until(() -> Thread.getAllStackTraces().keySet().stream()
+                .filter(thread -> thread.isAlive() && thread.getName().equals("moray-pty-close"))
+                .findFirst().map(thread -> {
+                    cleanup.set(thread);
+                    return true;
+                }).orElse(false), "PTY close cleanup worker");
+            assertThat(cleanup.get().isDaemon()).isFalse();
+            assertThat(session.exitFuture().get(5, TimeUnit.SECONDS)).isNotZero();
+        } finally {
             session.close();
-            closeMillis.set(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
-        });
-
-        assertThat(closeMillis.get()).isLessThan(100);
-        AtomicReference<Thread> cleanup = new AtomicReference<>();
-        Await.until(() -> Thread.getAllStackTraces().keySet().stream()
-            .filter(thread -> thread.isAlive() && thread.getName().equals("moray-pty-close"))
-            .findFirst().map(thread -> {
-                cleanup.set(thread);
-                return true;
-            }).orElse(false), "PTY close cleanup worker");
-        assertThat(cleanup.get().isDaemon()).isFalse();
-        assertThat(session.exitFuture().get(5, TimeUnit.SECONDS)).isNotZero();
+            if (process.isAlive()) process.destroyForcibly();
+            process.waitFor(5, TimeUnit.SECONDS);
+        }
     }
 
     private static TerminalSession start(List<String> command) throws Exception {
