@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md`; parent `docs/superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md`.
 
-**Implementation status (2026-09-11):** All three tasks implemented and individually reviewed, including terminal lifecycle and desktop fix rounds. Final branch review is in progress. Full headless check: 276 tests, zero failures/errors, one expected skip. Native GUI, benchmark and platform CI acceptance remain pending.
+**Implementation status (2026-09-11):** All three tasks implemented and individually reviewed, including terminal lifecycle and desktop fix rounds. Final whole-branch review and scoped fix re-review approved (`dda35e2`); no unresolved review findings. Root fresh full headless check: 277 tests, zero failures/errors, one expected skip. Native GUI, benchmark and platform CI acceptance remain pending.
 
 **Execution update (2026-09-11):** The newly merged AGENTS.md and docs/STATUS.md reserve GUI launches and benchmarks for the user. Root acceptance below is a handoff checklist, not agent-run UI validation. Task 2 also fixes lost-release link gestures, invalidates alternate-screen selections/search, prunes expired prompt marks and ensures pane close terminates its child. Remaining performance/selection refinements in STATUS §5 remain explicitly deferred to terminal hardening after Plan 3. New commits include a Co-Authored-By trailer.
 
@@ -183,8 +183,8 @@ Bundle Tabler outline SVGs from the user-supplied ~/projects/tabler-icons reposi
 ## Root acceptance and finish
 
 - [x] Task reviews approve spec compliance and quality; findings fixed and re-reviewed.
-- [ ] Full local check succeeds on final code.
+- [x] Full local check succeeds on final code.
 - [ ] User-run GUI smoke (agent must not launch it per AGENTS.md): create second window, tabs, nested splits, focus/zoom/restore, rename/reorder, find, clipboard, font controls, close and independent window lifetime. Inspect actual rendered chrome.
 - [ ] User-run benchmark after integration, only without a running game or VM; minimum 35 MB/s, target 45 MB/s.
-- [ ] Record remaining manual terminal checks and three-platform CI status; do not claim Phase 1 complete.
-- [ ] Final whole-branch review; retain completed code on feature branch for user review.
+- [x] Record remaining manual terminal checks and three-platform CI status; do not claim Phase 1 complete.
+- [x] Final whole-branch review; retain completed code on feature branch for user review.
