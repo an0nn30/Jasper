@@ -42,6 +42,29 @@ class TerminalViewInteractionTest {
     }
 
     @Test
+    void clicksOnRowsAboveTheLiveScreenAreNotReported() throws Exception {
+        tenLines();
+        enableSgrMouse();
+        view.handleKey(pressed(KeyEvent.VK_PAGE_UP, InputEvent.SHIFT_DOWN_MASK)); // scroll back 3 lines
+
+        view.handleMouse(new MouseEvent(view, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON3_DOWN_MASK,
+            x(1), y(0), 1, false, MouseEvent.BUTTON3));
+
+        assertThat(connector.written()).isEmpty();
+    }
+
+    @Test
+    void fractionalWheelMovementAddsUpToWholeNotches() throws Exception {
+        tenLines();
+
+        view.handleMouse(preciseWheel(-0.4));
+        assertThat(view.topRow()).isEqualTo(ScreenSnapshot.FOLLOW_OUTPUT);
+
+        view.handleMouse(preciseWheel(-0.7));
+        assertThat(session.snapshot(view.topRow()).scrollOffset()).isEqualTo(3);
+    }
+
+    @Test
     void theWheelScrollsBackIntoTheScrollback() throws Exception {
         tenLines();
 
@@ -272,6 +295,11 @@ class TerminalViewInteractionTest {
     private MouseWheelEvent wheel(int rotation) {
         return new MouseWheelEvent(view, MouseEvent.MOUSE_WHEEL, 0, 0, x(1), y(1), 0, false,
             MouseWheelEvent.WHEEL_UNIT_SCROLL, 1, rotation);
+    }
+
+    private MouseWheelEvent preciseWheel(double rotation) {
+        return new MouseWheelEvent(view, MouseEvent.MOUSE_WHEEL, 0, 0, x(1), y(1), 0, 0, 0, false,
+            MouseWheelEvent.WHEEL_UNIT_SCROLL, 1, 0, rotation);
     }
 
     private KeyEvent pressed(int keyCode, int modifiers) {

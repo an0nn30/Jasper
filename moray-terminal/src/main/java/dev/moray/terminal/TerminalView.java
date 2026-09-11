@@ -79,6 +79,8 @@ public final class TerminalView extends JComponent {
      * not guarantee a MOUSE_RELEASED carries the same modifiers as the MOUSE_PRESSED that started the drag.
      */
     private boolean capturingSelection;
+    /** Fractional wheel rotation carried over between events until it adds up to a whole notch. */
+    private double wheelRemainder;
     private List<TerminalSearch.Match> matches = List.of();
     private int currentMatch = -1;
     private volatile boolean exited;
@@ -332,6 +334,13 @@ public final class TerminalView extends JComponent {
         if (type == null || (type == Type.MOVED && !session.mouseReporting())) {
             return;
         }
+        int notches = 0;
+        if (type == Type.WHEEL) {
+            notches = notches((MouseWheelEvent) e);
+            if (notches == 0) {
+                return;
+            }
+        }
         ScreenSnapshot snapshot = session.snapshot(viewport.topRow());
         int column = Math.max(0, Math.min(snapshot.width() - 1, e.getX() / fonts.cellWidth()));
         int row = Math.max(0, Math.min(snapshot.height() - 1, e.getY() / fonts.cellHeight()));
@@ -353,7 +362,12 @@ public final class TerminalView extends JComponent {
             capturingSelection = false;
         }
         switch (action) {
-            case REPORT -> session.reportMouse(column, row - snapshot.scrollOffset(), jediEvent(e, type));
+            case REPORT -> {
+                int screenRow = row - snapshot.scrollOffset();
+                if (screenRow >= 0) {
+                    session.reportMouse(column, screenRow, jediEvent(e, type, notches));
+                }
+            }
             case START_SELECTION -> {
                 selection = null;
                 pendingAnchor = Selection.at(absoluteRow, column, e.isAltDown());
@@ -381,8 +395,8 @@ public final class TerminalView extends JComponent {
                 }
             }
             case OPEN_LINK -> session.linkAt(absoluteRow, column).ifPresent(linkOpener);
-            case SCROLL_VIEW -> scrollBy(((MouseWheelEvent) e).getWheelRotation() * WHEEL_LINES);
-            case SEND_ARROWS -> sendArrows(((MouseWheelEvent) e).getWheelRotation());
+            case SCROLL_VIEW -> scrollBy(notches * WHEEL_LINES);
+            case SEND_ARROWS -> sendArrows(notches);
             case NONE -> {
                 // nothing to do locally
             }
@@ -520,6 +534,19 @@ public final class TerminalView extends JComponent {
         repaint();
     }
 
+    /**
+     * Accumulates a wheel event's precise rotation and returns the whole notches it now adds up to (rounded toward
+     * zero), keeping the fractional remainder for the next event. Trackpads deliver many events whose precise
+     * rotation is well under one notch, and some events report an integer rotation of 0 despite a nonzero precise
+     * value, so acting on {@code getWheelRotation()} directly would under- or over-react.
+     */
+    private int notches(MouseWheelEvent e) {
+        wheelRemainder += e.getPreciseWheelRotation();
+        int whole = (int) wheelRemainder;
+        wheelRemainder -= whole;
+        return whole;
+    }
+
     private static boolean isModifierOnly(int keyCode) {
         return keyCode == KeyEvent.VK_SHIFT || keyCode == KeyEvent.VK_CONTROL || keyCode == KeyEvent.VK_ALT
             || keyCode == KeyEvent.VK_ALT_GRAPH || keyCode == KeyEvent.VK_META;
@@ -549,12 +576,12 @@ public final class TerminalView extends JComponent {
         return MouseRouting.Button.NONE;
     }
 
-    private static com.jediterm.core.input.MouseEvent jediEvent(MouseEvent e, Type type) {
+    private static com.jediterm.core.input.MouseEvent jediEvent(MouseEvent e, Type type, int notches) {
         int modifiers = (e.isShiftDown() ? MouseButtonModifierFlags.MOUSE_BUTTON_SHIFT_FLAG : 0)
             | (e.isAltDown() ? MouseButtonModifierFlags.MOUSE_BUTTON_META_FLAG : 0)
             | (e.isControlDown() ? MouseButtonModifierFlags.MOUSE_BUTTON_CTRL_FLAG : 0);
         if (e instanceof MouseWheelEvent wheel) {
-            int button = wheel.getWheelRotation() < 0 ? MouseButtonCodes.SCROLLUP : MouseButtonCodes.SCROLLDOWN;
+            int button = notches < 0 ? MouseButtonCodes.SCROLLUP : MouseButtonCodes.SCROLLDOWN;
             return new com.jediterm.core.input.MouseWheelEvent(button, modifiers, wheel.getUnitsToScroll());
         }
         int button = SwingUtilities.isLeftMouseButton(e) ? MouseButtonCodes.LEFT
