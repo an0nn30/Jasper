@@ -305,3 +305,9 @@ Logic lives in plain classes so most tests need no window.
 - **Rendering speed of runs with ligatures** on large windows: measured by the benchmark; glyph-layout caching per run is the first lever.
 - **Jackson TOML line numbers** (§7.5).
 - **Windows ConPTY and Linux fonts:** covered by CI tests; manual verification on those platforms is a phase-1 stretch goal.
+
+**Findings from plans 1–2 (2026-09-10):**
+- **Strikethrough (§4.2) is not shown.** jediterm-core 3.76's `TextStyle` has no strikethrough option, so SGR 9 is dropped before Moray sees it. Supporting it would mean tracking SGR 9 in the shell-integration filter; deferred.
+- **Font fallback on macOS.** The JetBrains Runtime reports `canDisplay` as true for CJK and emoji in any font, because the system font cascade draws them. The configured fallback list therefore takes effect only for glyphs the primary font truly lacks, in practice Nerd Font icons. Plan 4's config should make naming a Nerd Font fallback easy.
+- **Search matches do not span soft-wrapped rows** (§4.5); matching is per physical row.
+- **Shell integration (§4.6).** JediTerm ignores OSC 7 and OSC 133; Moray rewrites them, and DECSCUSR 0, into OSC 1341 custom commands so they arrive in emulator order.

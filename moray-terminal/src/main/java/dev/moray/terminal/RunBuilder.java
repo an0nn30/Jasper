@@ -15,6 +15,7 @@ import java.util.Map;
 /** Splits a terminal line into runs of identical style and font. Event Dispatch Thread only. */
 final class RunBuilder {
     private static final int MAX_CACHED_STYLES = 4096;
+    private static final char REPLACEMENT_CHARACTER = (char) 0xFFFD;
 
     private final FontSet fonts;
     private final Palette palette;
@@ -63,6 +64,8 @@ final class RunBuilder {
             } else {
                 if (first == CharUtils.DWC) {
                     first = ' ';
+                } else if (Character.isSurrogate(first)) {
+                    first = REPLACEMENT_CHARACTER; // half of a pair whose partner is missing
                 }
                 codePoint = first;
                 span = column + 1 < width && chars[column + 1] == CharUtils.DWC ? 2 : 1;

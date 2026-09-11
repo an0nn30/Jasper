@@ -7,10 +7,12 @@ import com.jediterm.terminal.model.TerminalLine;
 import com.jediterm.terminal.util.CharUtils;
 import org.junit.jupiter.api.Test;
 
+import java.awt.Font;
 import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class RunBuilderTest {
     private static final int WIDTH = 6;
@@ -115,5 +117,40 @@ class RunBuilderTest {
         TextStyle[] styles = new TextStyle[width];
         Arrays.fill(styles, style);
         return styles;
+    }
+
+    @Test
+    void aFontChangeStartsANewRun() {
+        String nerdFont = TestFonts.nerdFont().orElse(null);
+        assumeTrue(nerdFont != null, "no Nerd Font installed");
+        assumeTrue(!new Font("JetBrains Mono", Font.PLAIN, 14).canDisplay(TestFonts.GIT_ICON), "primary has the icon");
+        RunBuilder withFallback = new RunBuilder(new FontSet("JetBrains Mono", 14f, List.of(nerdFont), true), palette);
+        char gitIcon = (char) TestFonts.GIT_ICON;
+
+        List<Run> runs = withFallback.build(new char[] {'a', gitIcon, 'b'}, styles(TextStyle.EMPTY, 3), 3);
+
+        assertThat(runs).hasSize(3);
+        assertThat(runs.get(1).font().getFamily()).isEqualTo(nerdFont);
+    }
+
+    @Test
+    void loneSurrogatesRenderAsTheReplacementCharacter() {
+        char high = (char) 0xD83D;
+        char low = (char) 0xDE80;
+        String replacement = String.valueOf((char) 0xFFFD);
+
+        Run run = builder.build(new char[] {'a', high, 'b', low, ' ', ' '}, styles(TextStyle.EMPTY, WIDTH), WIDTH)
+            .getFirst();
+
+        assertThat(new String(run.text())).isEqualTo("a" + replacement + "b" + replacement + "  ");
+    }
+
+    @Test
+    void aHighSurrogateInTheLastColumnRendersAsTheReplacementCharacter() {
+        char high = (char) 0xD83D;
+
+        List<Run> runs = builder.build(new char[] {'a', 'b', 'c', 'd', 'e', high}, styles(TextStyle.EMPTY, WIDTH), WIDTH);
+
+        assertThat(new String(runs.getLast().text())).endsWith(String.valueOf((char) 0xFFFD));
     }
 }

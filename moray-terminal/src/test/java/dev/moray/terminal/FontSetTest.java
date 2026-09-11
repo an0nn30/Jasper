@@ -71,4 +71,16 @@ class FontSetTest {
     private static int[] glyphCodes(GlyphVector gv) {
         return gv.getGlyphCodes(0, gv.getNumGlyphs(), null);
     }
+
+    @Test
+    void aNerdFontIconFallsBackToAConfiguredNerdFont() {
+        String nerdFont = TestFonts.nerdFont().orElse(null);
+        assumeTrue(nerdFont != null, "no Nerd Font installed");
+        assumeTrue(!new Font(MONO, Font.PLAIN, 14).canDisplay(TestFonts.GIT_ICON), MONO + " already has the icon");
+
+        FontSet fonts = new FontSet(MONO, 14f, List.of(nerdFont), true);
+
+        assertThat(fonts.fontFor(TestFonts.GIT_ICON, false, false).getFamily()).isEqualTo(nerdFont);
+        assertThat(fonts.fontFor('a', false, false).getFamily()).isEqualTo(MONO);
+    }
 }
