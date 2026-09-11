@@ -7,6 +7,7 @@ public final class Main {
     private Main() {}
 
     public static void main(String[] args) {
+        System.setProperty("apple.awt.application.appearance", "system");
         System.setProperty("apple.laf.useScreenMenuBar", "true");
         SwingUtilities.invokeLater(() -> {
             new MorayApplication().newWindow(Path.of(System.getProperty("user.home")));

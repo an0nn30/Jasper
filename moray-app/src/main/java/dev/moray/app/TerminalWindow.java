@@ -1,5 +1,6 @@
 package dev.moray.app;
 
+import com.formdev.flatlaf.util.SystemInfo;
 import java.awt.Dimension;
 import java.awt.Insets;
 import java.awt.event.WindowAdapter;
@@ -12,19 +13,20 @@ final class TerminalWindow implements AutoCloseable {
     private final MorayApplication application;
     private final JFrame frame = new JFrame("Moray");
     private final WindowContent content;
+    private final MacTitleBar titleBar;
     private boolean closed;
     private final WindowAdapter events = new WindowAdapter() {
         @Override public void windowClosing(WindowEvent event) { close(); }
-        @Override public void windowActivated(WindowEvent event) { content.setActive(true); }
-        @Override public void windowDeactivated(WindowEvent event) { content.setActive(false); }
+        @Override public void windowActivated(WindowEvent event) { setActive(true); }
+        @Override public void windowDeactivated(WindowEvent event) { setActive(false); }
     };
 
     TerminalWindow(MorayApplication application, ShellLauncher launcher, Path directory, ThemeController themes) {
         this.application = application;
         content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes);
-        content.onTitle = title -> frame.setTitle(Main.windowTitle(title));
+        titleBar = MacTitleBar.install(frame.getRootPane(), content, SystemInfo.isMacFullWindowContentSupported, frame::setTitle);
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        frame.setContentPane(content); frame.setJMenuBar(content.menuBar());
+        frame.setJMenuBar(content.menuBar());
         content.installRootBindings(frame.getRootPane());
         content.onMinimumSizeChanged = this::updateMinimumSize;
         frame.addWindowListener(events); frame.pack(); frame.setLocationByPlatform(true);
@@ -42,11 +44,18 @@ final class TerminalWindow implements AutoCloseable {
         if (!frame.isMinimumSizeSet() || !minimum.equals(frame.getMinimumSize())) frame.setMinimumSize(minimum);
     }
 
+    private void setActive(boolean active) {
+        content.setActive(active);
+        if (titleBar != null) titleBar.setActive(active);
+    }
+
     void show() { frame.setVisible(true); if (content.currentTab() != null) content.currentTab().focusTerminal(); }
 
     @Override public void close() {
         if (closed) return;
-        closed = true; content.close(); frame.removeWindowListener(events); frame.dispose();
+        closed = true; content.close();
+        if (titleBar != null) titleBar.close();
+        frame.removeWindowListener(events); frame.dispose();
         application.windowClosed(this);
     }
 }
