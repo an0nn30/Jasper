@@ -1,6 +1,6 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11. Plan 3 implementation is on `codex/plan-3-app-chrome` in `.worktrees/plan-3`; desktop implementation `acfc79f` and review fixes `6fac903`. Task 3 re-review and final branch review are in progress. Latest full headless check: **274 tests, 0 failures/errors, 1 expected font skip** (273 passed). No merge to main or remote push has occurred.
+**As of:** 2026-09-11. Plan 3 implementation is on `codex/plan-3-app-chrome` in `.worktrees/plan-3`; desktop implementation `acfc79f` and review fixes `6fac903`/`dcc0b00`. All task reviews passed; final branch review is in progress. Latest full headless check: **276 tests, 0 failures/errors, 1 expected font skip** (275 passed). No merge to main or remote push has occurred.
 
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. GUI launches and benchmarks are user-run only.
 
@@ -12,7 +12,7 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 |---|---|
 | 1 — Terminal core | Complete on main (`6daa61f`..`d0ccbfb`) |
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
-| 3 — App chrome | Implemented on feature branch; Task 1/2 reviews passed, Task 3/final review in progress; native acceptance pending |
+| 3 — App chrome | Implemented on feature branch; all task reviews passed, final review in progress; native acceptance pending |
 | 4 — Config and packaging | Not written yet |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). Per-plan scratch ledger: `.superpowers/sdd/2026-09-11-moray-plan-3-app-chrome/progress.md` inside its worktree. Continue there; do not start Plan 3 again.
@@ -45,12 +45,13 @@ Settings and Reload config are visible but disabled; status says Built-in defaul
 - Find navigation requested during debounce/inflight search is retained; invalid regex errors persist until the query changes. Reparenting clears canceled search state.
 - Copy action enablement checks selection presence in constant time without extracting text or taking the buffer lock.
 - Font and nested-split minimum dimensions propagate to the native frame; PTY, view and emulator agree on the pinned JediTerm minimum of 5 columns × 2 rows.
+- Long directory/status text and tab names cannot inflate native minimum width; full tab titles remain in tooltips.
 - Global shortcuts are installed on the root pane, with native text-field editing retained.
 - F13–F24 override parsing uses Java's separate high-function-key range; actual F13/F24 strokes are regression-tested.
 
 ## 4. Verification still required
 
-1. Finish current task/final reviews and resolve blocking findings before marking implementation reviewed.
+1. Finish final branch review and resolve blocking findings before marking implementation reviewed.
 2. User-run [Plan 3 acceptance checklist](superpowers/plans/2026-09-11-moray-plan-3-manual-check.md): native windows/menu/Quit, split/zoom/focus/dividers, tab gestures, find, clipboard, links, mouse reporting, directory inheritance and chrome readability. Headless tests do not establish these native visual results.
 3. User-run benchmark after integration, only with no game or VM running. Historical Plan 1 result: 41.5 MB/s. A Plan 2 baseline measured during this session before newly added AGENTS restrictions were discovered: **35.9 MB/s** (105.5 MB in 2.94 s). No post-integration benchmark has run. Gate ≥35 MB/s, target ≥45 MB/s.
 4. CI has never run: no git remote exists. Workflow covers macOS, Ubuntu and Windows with JBR25. Ask before adding a remote or pushing. Windows ConPTY/forced-close and Linux desktop/font behavior remain unverified on their native systems.
@@ -102,6 +103,6 @@ Any-time performance work: remove unused style-array allocation during text-only
 
 ## 8. Workflow and next action
 
-Superpowers spec/plan → task implementer with TDD → separate task review → scoped fix/re-review → final branch review. Current commits: models `a75d5fa`; terminal hooks `56b251d`; lifecycle fixes `73f105c`; desktop `acfc79f`; desktop review fixes `6fac903`. Follow the live ledger until final review completes, then preserve this file and git history as the handoff record.
+Superpowers spec/plan → task implementer with TDD → separate task review → scoped fix/re-review → final branch review. Current commits: models `a75d5fa`; terminal hooks `56b251d`; lifecycle fixes `73f105c`; desktop `acfc79f`; desktop review fixes `6fac903`/`dcc0b00`. Follow the live ledger until final review completes, then preserve this file and git history as the handoff record.
 
 Next: finish Plan 3 review, run user acceptance, choose whether to merge locally, then implement Plan 4 and complete the daily-use gate. Keep the feature worktree/branch until the user chooses integration.

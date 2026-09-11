@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md`; parent `docs/superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md`.
 
+**Implementation status (2026-09-11):** All three tasks implemented and individually reviewed, including terminal lifecycle and desktop fix rounds. Final branch review is in progress. Full headless check: 276 tests, zero failures/errors, one expected skip. Native GUI, benchmark and platform CI acceptance remain pending.
+
 **Execution update (2026-09-11):** The newly merged AGENTS.md and docs/STATUS.md reserve GUI launches and benchmarks for the user. Root acceptance below is a handoff checklist, not agent-run UI validation. Task 2 also fixes lost-release link gestures, invalidates alternate-screen selections/search, prunes expired prompt marks and ensures pane close terminates its child. Remaining performance/selection refinements in STATUS §5 remain explicitly deferred to terminal hardening after Plan 3. New commits include a Co-Authored-By trailer.
 
 ## Global Constraints
@@ -142,7 +144,7 @@ SwingUtilities.invokeLater(() -> {
 - `TerminalPane` owns one asynchronously started session, view and find bar; close is idempotent and handles launch races. Tracks launch directory, current OSC directory and shell label. Launch failures must reach the user.
 - `FindBar` uses async find, debounce timer, count/error label, next/previous, Case/Regex, Escape/close; reset invalidation updates count.
 
-- [ ] **Step 1: Add tests and observe failure.** Headless Swing tests exercise find interactions with real terminal where practical, tab lifecycle/model rendering and shared action dispatch. Include closing one of multiple owners preserves the others, pending launch closed before completion closes the returned session, title override survives OSC changes, and tab reorder preserves active identity. Keep test injection as standard JDK functions/concrete objects, not new production interfaces with one real implementation. Tests should assert user-observable state and terminal bytes, not repeat implementation details.
+- [x] **Step 1: Add tests and observe failure.** Headless Swing tests exercise find interactions with real terminal where practical, tab lifecycle/model rendering and shared action dispatch. Include closing one of multiple owners preserves the others, pending launch closed before completion closes the returned session, title override survives OSC changes, and tab reorder preserves active identity. Keep test injection as standard JDK functions/concrete objects, not new production interfaces with one real implementation. Tests should assert user-observable state and terminal bytes, not repeat implementation details.
 
 ```java
 // Common setup for Swing interaction tests:
@@ -154,7 +156,7 @@ SwingUtilities.invokeAndWait(() -> {
 
 Run the named new tests to show missing behavior before coding. Window behavior that needs a real screen goes in the root agent's GUI smoke checklist, not fake JFrame mocks.
 
-- [ ] **Step 2: Implement ownership and tab/split UI.** Launch shells via the app-owned executor. Completion executes on EDT and checks owner disposal. Render proportional dividers only after layout gives a usable size; preserve ratios when components are rebuilt and suppress divider property writes during restoration. Selection/focus never recreate sessions. Tab strip supports close buttons, middle-click, drag reorder, and F2 rename with blank restoring automatic naming. Render find bar at top of pane; retain query state per pane.
+- [x] **Step 2: Implement ownership and tab/split UI.** Launch shells via the app-owned executor. Completion executes on EDT and checks owner disposal. Render proportional dividers only after layout gives a usable size; preserve ratios when components are rebuilt and suppress divider property writes during restoration. Selection/focus never recreate sessions. Tab strip supports close buttons, middle-click, drag reorder, and F2 rename with blank restoring automatic naming. Render find bar at top of pane; retain query state per pane.
 
 ```java
 executor.execute(() -> {
@@ -165,7 +167,7 @@ executor.execute(() -> {
 });
 ```
 
-- [ ] **Step 3: Implement action routing and all chrome.** Resolve the Task 1 review minor in KeyBindings: F13–F24 Java keycodes are not contiguous with F1–F12; map from VK_F13 and test an override resolving the actual F13 stroke. Register each ActionId once per window; resolve current pane at invocation. Terminal shortcut handler uses KeyStroke.getKeyStrokeForEvent and the keybinding map. Register root pane bindings for focus outside the terminal while retaining native text-field copy/paste; avoid duplicate delivery. All executable actions have menu entries. Toolbar mode radio items switch icons+labels/icons/hidden, status visibility toggles, appearance switches light/dark. Status shows focused shell/directory/size. Context menu uses shared actions and obeys mouse routing. Main installs FlatLaf before creating UI and removes per-window System.exit; keep windowTitle helper tests.
+- [x] **Step 3: Implement action routing and all chrome.** Resolve the Task 1 review minor in KeyBindings: F13–F24 Java keycodes are not contiguous with F1–F12; map from VK_F13 and test an override resolving the actual F13 stroke. Register each ActionId once per window; resolve current pane at invocation. Terminal shortcut handler uses KeyStroke.getKeyStrokeForEvent and the keybinding map. Register root pane bindings for focus outside the terminal while retaining native text-field copy/paste; avoid duplicate delivery. All executable actions have menu entries. Toolbar mode radio items switch icons+labels/icons/hidden, status visibility toggles, appearance switches light/dark. Status shows focused shell/directory/size. Context menu uses shared actions and obeys mouse routing. Main installs FlatLaf before creating UI and removes per-window System.exit; keep windowTitle helper tests.
 
 Add dependencies:
 ```kotlin
@@ -175,12 +177,12 @@ implementation("com.formdev:flatlaf-extras:3.7")
 
 Bundle Tabler outline SVGs from the user-supplied ~/projects/tabler-icons repository for seven toolbar icons and retain its MIT license/source attribution. Use FlatSVGIcon to load resources with meaningful accessible names/tooltips. Add Settings and Reload config in toolbar/menus disabled, with a tooltip explaining configuration support is unavailable (no internal plan number in product UI); Built-in defaults status must be honest.
 
-- [ ] **Step 4: Verify application tests and full check.** Run `./gradlew check --rerun-tasks`. Check `git diff --check`. Do not launch UI from subagent. Report exact commands, counts, warnings, remaining manual validation, resource license provenance, and any spec discrepancies.
-- [ ] **Step 5: Commit and report.** Root performs task review and final branch review; native GUI smoke is handed to the user per AGENTS.md. Update completion checkboxes only after reviewed success.
+- [x] **Step 4: Verify application tests and full check.** Run `./gradlew check --rerun-tasks`. Check `git diff --check`. Do not launch UI from subagent. Report exact commands, counts, warnings, remaining manual validation, resource license provenance, and any spec discrepancies.
+- [x] **Step 5: Commit and report.** Root performs task review and final branch review; native GUI smoke is handed to the user per AGENTS.md. Update completion checkboxes only after reviewed success.
 
 ## Root acceptance and finish
 
-- [ ] Task reviews approve spec compliance and quality; findings fixed and re-reviewed.
+- [x] Task reviews approve spec compliance and quality; findings fixed and re-reviewed.
 - [ ] Full local check succeeds on final code.
 - [ ] User-run GUI smoke (agent must not launch it per AGENTS.md): create second window, tabs, nested splits, focus/zoom/restore, rename/reorder, find, clipboard, font controls, close and independent window lifetime. Inspect actual rendered chrome.
 - [ ] User-run benchmark after integration, only without a running game or VM; minimum 35 MB/s, target 45 MB/s.
