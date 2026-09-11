@@ -134,4 +134,10 @@ class KeyBindingsTest {
                 InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
         assertThat(KeyBindings.parse("none", true)).isEmpty();
     }
+    @Test
+    void highFunctionKeyOverridesResolveActualAwtKeyEvents() {
+        KeyBindings bindings = KeyBindings.withOverrides(true, Map.of("new_tab", "F13", "new_window", "F24"));
+        assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_F13, 0))).contains(ActionId.NEW_TAB);
+        assertThat(bindings.actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_F24, 0))).contains(ActionId.NEW_WINDOW);
+    }
 }

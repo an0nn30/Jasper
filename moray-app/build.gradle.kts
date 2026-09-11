@@ -4,6 +4,8 @@ plugins {
 
 dependencies {
     implementation(project(":moray-terminal"))
+    implementation("com.formdev:flatlaf:3.7")
+    implementation("com.formdev:flatlaf-extras:3.7")
     runtimeOnly("org.slf4j:slf4j-nop:2.0.13")
 }
 

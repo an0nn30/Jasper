@@ -158,7 +158,7 @@ final class KeyBindings {
             try {
                 int number = Integer.parseInt(token.substring(1));
                 if (number >= 1 && number <= 24) {
-                    return KeyEvent.VK_F1 + number - 1;
+                    return number <= 12 ? KeyEvent.VK_F1 + number - 1 : KeyEvent.VK_F13 + number - 13;
                 }
             } catch (NumberFormatException ignored) {
                 // Report the complete token below.
