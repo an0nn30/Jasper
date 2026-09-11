@@ -138,4 +138,29 @@ class TerminalTabTest {
             owner[0].close();
         });
     }
+    @Test void layoutMinimumIncludesLargeFontsNestedSplitsAndVisibleChrome() throws Exception {
+        Queue<Runnable> pending = new ArrayDeque<>();
+        WindowContent[] owner = new WindowContent[1];
+        edt(() -> owner[0] = content(launcher(pending))); pending.remove().run();
+        edt(() -> owner[0].invoke(ActionId.SPLIT_RIGHT)); pending.remove().run();
+        edt(() -> owner[0].invoke(ActionId.SPLIT_DOWN)); pending.remove().run();
+        edt(() -> {
+            var content = owner[0];
+            for (TerminalPane pane : content.currentTab().panes()) pane.view().setFontSize(72);
+            var panes = content.currentTab().panes();
+            int twoColumns = panes.get(0).view().getMinimumSize().width + panes.get(1).view().getMinimumSize().width;
+            int twoRows = panes.get(1).view().getMinimumSize().height + panes.get(2).view().getMinimumSize().height;
+            assertThat(content.currentTab().getMinimumSize().width).isGreaterThan(twoColumns);
+            assertThat(content.currentTab().getMinimumSize().height).isGreaterThan(twoRows);
+            javax.swing.JRootPane root = new javax.swing.JRootPane();
+            root.setContentPane(content); root.setJMenuBar(content.menuBar());
+            var outer = TerminalWindow.minimumSize(root, new java.awt.Insets(30, 2, 2, 2));
+            assertThat(outer.height).isGreaterThan(content.currentTab().getMinimumSize().height + 32);
+            assertThat(outer.width).isGreaterThan(twoColumns + 4);
+            java.awt.Dimension previous = outer;
+            content.currentTab().toggleZoom();
+            assertThat(TerminalWindow.minimumSize(root, new java.awt.Insets(30, 2, 2, 2)).height).isLessThan(previous.height);
+            content.close();
+        });
+    }
 }

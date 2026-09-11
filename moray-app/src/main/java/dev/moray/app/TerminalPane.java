@@ -35,10 +35,14 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         super(new BorderLayout());
         this.launchDirectory = directory;
         this.launcher = launcher;
-        setMinimumSize(new Dimension(140, 90));
         setPreferredSize(new Dimension(960, 570));
         add(new JLabel("Starting terminal\u2026", SwingConstants.CENTER));
         setActive(false);
+    }
+
+    @Override public Dimension getMinimumSize() {
+        Dimension layout = super.getMinimumSize();
+        return new Dimension(Math.max(140, layout.width), Math.max(90, layout.height));
     }
 
     void start() {
@@ -56,6 +60,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
             view = new TerminalView(session, TerminalOptions.defaults());
             findBar = new FindBar(view);
             view.setOnCloseRequest(() -> onClose.run());
+            view.addPropertyChangeListener("minimumSize", event -> onChanged.run());
             trackFocus(view);
             trackFocus(findBar);
             view.addComponentListener(new ComponentAdapter() {

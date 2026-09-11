@@ -52,6 +52,42 @@ class TerminalAppIntegrationTest {
     }
 
     @Test
+    void selectionPresenceDoesNotWaitForBufferOrExtractSelectedText() throws Exception {
+        show("hello", 0, "hello");
+        selectByDragging(0, 0, 4, 0, 0);
+        TerminalTextBuffer buffer = terminalBuffer();
+        buffer.lock();
+        try {
+            var presence = new java.util.concurrent.FutureTask<>(view::hasSelection);
+            SwingUtilities.invokeLater(presence);
+            assertThat(presence.get(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        } finally { buffer.unlock(); }
+        onEdt(() -> view.handleKey(typed('a', 0)));
+        assertThat(view.hasSelection()).isFalse();
+    }
+
+    @Test
+    void smallPixelAreasAndDirectResizeKeepPtyAndEmulatorAtTheSameMinimum() throws Exception {
+        onEdt(() -> {
+            view.setFontSize(72);
+            java.awt.Dimension minimum = view.getMinimumSize();
+            view.setSize(minimum);
+            view.resizeSessionToFit();
+            assertThat(session.columns()).isEqualTo(5);
+            assertThat(session.rows()).isEqualTo(2);
+            view.setSize(1, 1);
+            view.resizeSessionToFit();
+            assertThat(session.columns()).isEqualTo(5);
+            assertThat(session.rows()).isEqualTo(2);
+            session.resize(1, 1);
+            assertThat(connector.lastResize().getColumns()).isEqualTo(5);
+            assertThat(connector.lastResize().getRows()).isEqualTo(2);
+            assertThat(session.snapshot().width()).isEqualTo(5);
+            assertThat(session.snapshot().height()).isEqualTo(2);
+        });
+    }
+
+    @Test
     void appShortcutsRunBeforeTerminalEncodingAndSuppressTheTypedEvent() {
         view.setShortcutHandler(event -> event.getKeyCode() == KeyEvent.VK_D);
 

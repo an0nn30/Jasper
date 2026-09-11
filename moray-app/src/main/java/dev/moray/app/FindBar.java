@@ -18,6 +18,10 @@ final class FindBar extends JPanel {
     private final Timer debounce;
     private FindResult result = new FindResult(0, 0, null);
     private boolean disposed;
+    private boolean searching;
+    private boolean dirty;
+    private long generation;
+    private long pendingNavigation;
 
     FindBar(TerminalView view) {
         super(new FlowLayout(FlowLayout.LEADING, 4, 3));
@@ -42,7 +46,10 @@ final class FindBar extends JPanel {
         getActionMap().put("close", new AbstractAction() {
             public void actionPerformed(ActionEvent event) { close(); }
         });
-        view.setFindResultListener(this::showResult);
+        view.setFindResultListener(found -> {
+            invalidateSearch(); dirty = true;
+            if (result.error() == null) showResult(found);
+        });
         setVisible(false);
     }
 
@@ -59,6 +66,17 @@ final class FindBar extends JPanel {
         });
     }
 
+    @Override public void removeNotify() {
+        dirty |= searching;
+        invalidateSearch();
+        super.removeNotify();
+    }
+
+    @Override public void addNotify() {
+        super.addNotify();
+        if (dirty && !disposed && isVisible()) debounce.restart();
+    }
+
     void open() {
         if (disposed) return;
         setVisible(true); query.requestFocusInWindow(); query.selectAll(); schedule();
@@ -67,25 +85,44 @@ final class FindBar extends JPanel {
     private void schedule() {
         if (isVisible() && !disposed) {
             // Cancel old matching immediately, including during the debounce interval.
+            invalidateSearch(); dirty = true;
             view.clearFind(); showResult(new FindResult(0, 0, null)); debounce.restart();
         }
     }
 
     private void search() {
-        if (!disposed && isVisible()) view.findAsync(query.getText(), regex.isSelected(),
-            caseSensitive.isSelected(), found -> {
-                if (!disposed && isVisible()) showResult(found);
-            });
+        if (disposed || !isVisible()) return;
+        searching = true; dirty = false;
+        long request = generation;
+        view.findAsync(query.getText(), regex.isSelected(), caseSensitive.isSelected(), found -> {
+            if (disposed || !isVisible() || request != generation) return;
+            searching = false;
+            FindResult navigated = found;
+            if (found.error() == null && found.count() > 0) {
+                long steps = pendingNavigation % found.count();
+                while (steps > 0) { navigated = view.findNext(); steps--; }
+                while (steps < 0) { navigated = view.findPrevious(); steps++; }
+            }
+            pendingNavigation = 0;
+            showResult(navigated);
+        });
     }
 
-    void next() {
-        if (debounce.isRunning()) { debounce.stop(); search(); }
-        else showResult(view.findNext());
+    void next() { navigate(1); }
+    void previous() { navigate(-1); }
+
+    private void navigate(int direction) {
+        if (disposed) return;
+        if (dirty || searching) {
+            pendingNavigation += direction;
+            if (!searching) { debounce.stop(); search(); }
+        } else if (result.error() == null) {
+            showResult(direction > 0 ? view.findNext() : view.findPrevious());
+        }
     }
 
-    void previous() {
-        if (debounce.isRunning()) { debounce.stop(); search(); }
-        else showResult(view.findPrevious());
+    private void invalidateSearch() {
+        generation++; debounce.stop(); searching = false; pendingNavigation = 0;
     }
 
     private void showResult(FindResult found) {
@@ -96,7 +133,7 @@ final class FindBar extends JPanel {
     }
 
     void close() {
-        debounce.stop(); view.clearFind(); showResult(new FindResult(0, 0, null));
+        invalidateSearch(); dirty = true; view.clearFind(); showResult(new FindResult(0, 0, null));
         setVisible(false); view.requestFocusInWindow();
     }
 

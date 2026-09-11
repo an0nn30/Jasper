@@ -226,6 +226,11 @@ public final class TerminalView extends JComponent {
     }
 
     @Override
+    public Dimension getMinimumSize() {
+        return new Dimension(GridSize.MIN_COLUMNS * fonts.cellWidth(), GridSize.MIN_ROWS * fonts.cellHeight());
+    }
+
+    @Override
     public Dimension getPreferredSize() {
         return new Dimension(session.columns() * fonts.cellWidth(), session.rows() * fonts.cellHeight());
     }
@@ -239,6 +244,9 @@ public final class TerminalView extends JComponent {
         session.paste(text);
         repaint();
     }
+
+    /** Whether this EDT-owned view has a selected cell range; does not read or lock terminal text. */
+    public boolean hasSelection() { return selection != null; }
 
     public Optional<String> selectedText() {
         return selection == null ? Optional.empty() : Optional.of(session.text(selection));
@@ -284,9 +292,11 @@ public final class TerminalView extends JComponent {
         if (!Float.isFinite(bounded) || bounded == fontSize) {
             return;
         }
+        Dimension previousMinimum = getMinimumSize();
         fontSize = bounded;
         fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures());
         painter = new TerminalPainter(fonts, options.palette());
+        firePropertyChange("minimumSize", previousMinimum, getMinimumSize());
         revalidate();
         if (getWidth() > 0 && getHeight() > 0) {
             resizeSessionToFit();

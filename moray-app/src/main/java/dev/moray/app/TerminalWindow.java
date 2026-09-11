@@ -1,5 +1,7 @@
 package dev.moray.app;
 
+import java.awt.Dimension;
+import java.awt.Insets;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.nio.file.Path;
@@ -23,8 +25,21 @@ final class TerminalWindow implements AutoCloseable {
         content.onTitle = title -> frame.setTitle(Main.windowTitle(title));
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.setContentPane(content); frame.setJMenuBar(content.menuBar());
+        content.installRootBindings(frame.getRootPane());
+        content.onMinimumSizeChanged = this::updateMinimumSize;
         frame.addWindowListener(events); frame.pack(); frame.setLocationByPlatform(true);
         content.update();
+    }
+
+    static Dimension minimumSize(JRootPane root, Insets decorations) {
+        Dimension contentMinimum = root.getMinimumSize();
+        return new Dimension(contentMinimum.width + decorations.left + decorations.right,
+            contentMinimum.height + decorations.top + decorations.bottom);
+    }
+
+    private void updateMinimumSize() {
+        Dimension minimum = minimumSize(frame.getRootPane(), frame.getInsets());
+        if (!frame.isMinimumSizeSet() || !minimum.equals(frame.getMinimumSize())) frame.setMinimumSize(minimum);
     }
 
     void show() { frame.setVisible(true); if (content.currentTab() != null) content.currentTab().focusTerminal(); }

@@ -20,6 +20,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private final EnumMap<ActionId, Action> actions = new EnumMap<>(ActionId.class);
     private final KeyBindings bindings = KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac"));
     private final WindowChrome chrome;
+    private JRootPane bindingRoot;
+    Runnable onMinimumSizeChanged = () -> {};
     private boolean closed;
     private boolean rearranging;
     private boolean active = true;
@@ -35,12 +37,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
             };
             bindings.strokeFor(id).ifPresent(stroke -> {
                 action.putValue(Action.ACCELERATOR_KEY, stroke);
-                getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(stroke, id.id());
-                getActionMap().put(id.id(), new AbstractAction() {
-                    @Override public void actionPerformed(ActionEvent event) {
-                        dispatchShortcut(stroke, KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner());
-                    }
-                });
+
             });
             actions.put(id, action);
         }
@@ -60,6 +57,28 @@ final class WindowContent extends JPanel implements AutoCloseable {
             }
         });
         newTab(directory);
+    }
+
+    void installRootBindings(JRootPane root) {
+        removeRootBindings();
+        bindingRoot = root;
+        for (ActionId id : ActionId.values()) bindings.strokeFor(id).ifPresent(stroke -> {
+            root.getInputMap(WHEN_IN_FOCUSED_WINDOW).put(stroke, id.id());
+            root.getActionMap().put(id.id(), new AbstractAction() {
+                @Override public void actionPerformed(ActionEvent event) {
+                    dispatchShortcut(stroke, KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner());
+                }
+            });
+        });
+    }
+
+    private void removeRootBindings() {
+        if (bindingRoot == null) return;
+        for (ActionId id : ActionId.values()) {
+            bindings.strokeFor(id).ifPresent(stroke -> bindingRoot.getInputMap(WHEN_IN_FOCUSED_WINDOW).remove(stroke));
+            bindingRoot.getActionMap().remove(id.id());
+        }
+        bindingRoot = null;
     }
 
     Action action(ActionId id) { return actions.get(id); }
@@ -216,7 +235,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                 case OPEN_SETTINGS, RELOAD_CONFIG -> false;
                 case NEW_TAB, NEW_WINDOW, QUIT -> true;
                 case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
-                case COPY -> ready && pane.view().selectedText().filter(text -> !text.isEmpty()).isPresent();
+                case COPY -> ready && pane.view().hasSelection();
                 case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
                      CLEAR_SCROLLBACK, FONT_BIGGER, FONT_SMALLER, FONT_RESET -> ready;
                 case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
@@ -242,19 +261,19 @@ final class WindowContent extends JPanel implements AutoCloseable {
         chrome.status().setText(pane == null ? "Built-in defaults" : pane.shellLabel() + "  |  " + pane.directory()
             + "  |  " + size + "  |  Built-in defaults");
         onTitle.accept(currentTab() == null ? "Moray" : currentTab().title());
-        updateActions();
+        updateActions(); onMinimumSizeChanged.run();
     }
 
     void setActive(boolean value) { active = value; update(); }
-    void setToolbarMode(ToolbarMode mode) { chrome.setToolbarMode(mode); revalidate(); }
-    void setStatusVisible(boolean visible) { chrome.setStatusVisible(visible); revalidate(); }
+    void setToolbarMode(ToolbarMode mode) { chrome.setToolbarMode(mode); revalidate(); onMinimumSizeChanged.run(); }
+    void setStatusVisible(boolean visible) { chrome.setStatusVisible(visible); revalidate(); onMinimumSizeChanged.run(); }
 
     @Override public void close() {
         if (closed) return;
         closed = true;
         for (int i = 0; i < tabs.getTabCount(); i++) ((TerminalTab) tabs.getComponentAt(i)).close();
-        tabs.removeAll(); getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).clear(); getActionMap().clear();
+        tabs.removeAll(); removeRootBindings();
         actions.values().forEach(action -> action.setEnabled(false));
-        onTitle = title -> {}; onError = message -> {};
+        onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
     }
 }

@@ -55,4 +55,44 @@ class ApplicationActionsTest {
             owner[0].close();
         });
     }
+    @Test void rootPaneBindingsExecuteGlobalActionsAndLeaveNativeTextBindingsFirst() throws Exception {
+        Queue<Runnable> pending = new ArrayDeque<>();
+        edt(() -> {
+            WindowContent owner = content(launcher(pending));
+            BindingRoot root = new BindingRoot(); root.setContentPane(owner);
+            owner.installRootBindings(root);
+            assertThat(root.activate(owner.bindings().strokeFor(ActionId.NEW_TAB).orElseThrow())).isTrue();
+            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            BindingField field = new BindingField(); owner.add(field, java.awt.BorderLayout.WEST);
+            int[] edits = {0};
+            // Override the installed native editor actions, retaining the real focused input map.
+            field.getActionMap().put(javax.swing.text.DefaultEditorKit.copyAction, new AbstractAction() {
+                public void actionPerformed(java.awt.event.ActionEvent event) { edits[0]++; }
+            });
+            field.getActionMap().put(javax.swing.text.DefaultEditorKit.pasteAction, new AbstractAction() {
+                public void actionPerformed(java.awt.event.ActionEvent event) { edits[0]++; }
+            });
+            assertThat(field.activate(KeyStroke.getKeyStroke("ctrl C"))).isTrue();
+            assertThat(field.activate(KeyStroke.getKeyStroke("ctrl V"))).isTrue();
+            assertThat(edits[0]).isEqualTo(2);
+            owner.close();
+            assertThat(root.activate(owner.bindings().strokeFor(ActionId.NEW_TAB).orElseThrow())).isFalse();
+        });
+    }
+
+    private static final class BindingRoot extends JRootPane {
+        boolean activate(KeyStroke stroke) {
+            return processKeyBinding(stroke, new java.awt.event.KeyEvent(this,
+                java.awt.event.KeyEvent.KEY_PRESSED, 0, stroke.getModifiers(), stroke.getKeyCode(),
+                java.awt.event.KeyEvent.CHAR_UNDEFINED), WHEN_IN_FOCUSED_WINDOW, true);
+        }
+    }
+
+    private static final class BindingField extends JTextField {
+        boolean activate(KeyStroke stroke) {
+            return processKeyBinding(stroke, new java.awt.event.KeyEvent(this,
+                java.awt.event.KeyEvent.KEY_PRESSED, 0, stroke.getModifiers(), stroke.getKeyCode(),
+                java.awt.event.KeyEvent.CHAR_UNDEFINED), WHEN_FOCUSED, true);
+        }
+    }
 }

@@ -84,6 +84,8 @@ public final class TerminalSession implements AutoCloseable {
     /** Starts {@code command} in a new pseudo-terminal and begins emulating its output. */
     public static TerminalSession start(List<String> command, Map<String, String> environment, Path workingDirectory,
                                         int columns, int rows, int scrollback) throws IOException {
+        GridSize initial = new GridSize(columns, rows);
+        columns = initial.columns(); rows = initial.rows();
         Map<String, String> env = new HashMap<>(environment);
         env.put("TERM", "xterm-256color");
         env.put("COLORTERM", "truecolor");
@@ -197,6 +199,8 @@ public final class TerminalSession implements AutoCloseable {
     }
 
     public void resize(int newColumns, int newRows) {
+        GridSize requested = new GridSize(newColumns, newRows);
+        newColumns = requested.columns(); newRows = requested.rows();
         if (newColumns == columns && newRows == rows) {
             return;
         }

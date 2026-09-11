@@ -12,7 +12,7 @@ class GridSizeTest {
     }
 
     @Test
-    void neverSmallerThanOneCell() {
-        assertThat(GridSize.fit(3, 0, 8, 17)).isEqualTo(new GridSize(1, 1));
+    void neverSmallerThanEmulatorMinimum() {
+        assertThat(GridSize.fit(3, 0, 8, 17)).isEqualTo(new GridSize(5, 2));
     }
 }
