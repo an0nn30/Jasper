@@ -13,7 +13,7 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 1 — Terminal core | Complete on main (`6daa61f`..`d0ccbfb`) |
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
-| 3.5 — macOS chrome, themes and toolbar | Title/themes in progress on codex/plan-3-5-chrome-themes; user selected two-tone toolbar B, added to implementation |
+| 3.5 — macOS chrome, themes and toolbar | Live terminal/app themes implemented and reviewed; macOS title bar and selected two-tone toolbar B in progress |
 | 4 — Config and packaging | Follows Plan 3.5; not written yet |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Continue from main; do not start Plan 3 again.
@@ -37,7 +37,7 @@ Plan 3 adds:
 - Per-pane font controls, screen-preserving history clear, working-directory inheritance with launch-time validation.
 - Background shell launch with close-before-completion cleanup; native Quit routes through app cleanup.
 
-Settings and Reload config are visible but disabled; status says Built-in defaults. No configuration file is read or written. Chrome choices are session-only. Plan 3.5 now owns coordinated built-in dark/light themes across FlatLaf chrome and terminal content. Plan 4 retains configuration, custom theme files, persistence, automatic system appearance and packaging.
+Settings and Reload config are visible but disabled; status says Built-in defaults. No configuration file is read or written. Chrome choices are session-only. The Plan 3.5 branch now has reviewed live dark/light palette updates and coordinated FlatLaf/app theme ownership (09e382e,6bdd298): existing hidden/zoomed panes, delayed launches and new windows use the selected theme while retaining sessions, font choices and split state. Latest integrated count:291 tests,zero failures/errors,one known skip. Native title-bar and selected toolbar work are next on that branch. Plan 4 retains configuration, custom theme files, persistence, automatic system appearance and packaging.
 
 ## 3. Fixes included during Plan 3
 
