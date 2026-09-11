@@ -13,12 +13,12 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 1 — Terminal core | Complete on main (`6daa61f`..`d0ccbfb`) |
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
-| 3.5 — macOS chrome, themes and toolbar | 3.5a title/themes in progress on codex/plan-3-5-chrome-themes; toolbar design discussion pending |
+| 3.5 — macOS chrome, themes and toolbar | Title/themes in progress on codex/plan-3-5-chrome-themes; user selected two-tone toolbar B, added to implementation |
 | 4 — Config and packaging | Follows Plan 3.5; not written yet |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Continue from main; do not start Plan 3 again.
 
-Active worktree: `.worktrees/plan-3-5`, branch `codex/plan-3-5-chrome-themes`. [Title/theme design](superpowers/specs/2026-09-11-moray-plan-3-5-titlebar-themes-design.md) and [execution plan](superpowers/plans/2026-09-11-moray-plan-3-5-titlebar-themes-implementation.md) cover the first runnable deliverable. [Toolbar study](design/plan-3-5-toolbar-study.html) is an illustrative discussion aid; final artwork/layout is not selected.
+Active worktree: `.worktrees/plan-3-5`, branch `codex/plan-3-5-chrome-themes`. [Title/theme design](superpowers/specs/2026-09-11-moray-plan-3-5-titlebar-themes-design.md) and [execution plan](superpowers/plans/2026-09-11-moray-plan-3-5-titlebar-themes-implementation.md) cover the first runnable deliverable. [Toolbar study](design/plan-3-5-toolbar-study.html) is an illustrative discussion aid; the user selected B (fuller, two-tone colored icons), now included as Task 4.
 
 Next milestone: [Plan 3.5 — macOS chrome, themes and toolbar](superpowers/plans/2026-09-11-moray-plan-3-5-chrome-and-themes.md). The user has tried Plan 3 during development and reports that it looks good overall; this is qualitative feedback, not a claim that every native checklist item or benchmark was completed.
 

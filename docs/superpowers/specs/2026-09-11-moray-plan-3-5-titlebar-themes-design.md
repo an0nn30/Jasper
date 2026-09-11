@@ -1,6 +1,6 @@
 # Moray Plan 3.5a — Coordinated Themes and macOS Title Bar
 
-Date: 2026-09-11. Execution design for the user's Plan 3.5 go-ahead. Authority: Phase 1 spec and the Plan 3.5 roadmap. This is the first runnable deliverable; toolbar artwork/layout remains a separate discussion in Plan 3.5b.
+Date: 2026-09-11. Execution design for the user's Plan 3.5 go-ahead. Authority: Phase 1 spec and the Plan 3.5 roadmap. The user selected toolbar study B (fuller, two-tone colored icons) during execution. The selected toolbar treatment is now included as Task 4 in this runnable deliverable.
 
 ## Outcome and visual direction
 
@@ -43,4 +43,8 @@ Set apple.awt.application.appearance=system before AWT initialization for native
 
 TDD for live palette rendering/retained state; multi-owner theme changes including hidden, zoomed and pending panes; close registration cleanup; theme resources/contrast; custom title panel sizing/metadata/active state and mac property configuration. Headless buffered-image previews of actual Swing components are allowed. No agent GUI/benchmark launch under AGENTS.md. User native acceptance must cover traffic lights, drag/double-click, full screen, safe spacing, scaling, light/dark system combinations, menu integration and multiple windows. No headless assertion proves those native behaviors.
 
-Toolbar remains functional with its existing icons during this deliverable. Next show colored icon/layout alternatives in context and record the user's choice before implementing Plan 3.5b. Config files, persistence, automatic appearance and packaging remain Plan 4. Terminal hardening backlog stays recorded.
+## Approved toolbar extension (user choice during execution)
+
+The user selected B — fuller, two-tone colored icons from docs/design/plan-3-5-toolbar-study.html. Implement that treatment using the existing licensed Tabler geometry: a soft rounded color field (18% alpha), enclosed icon-face fill (24% alpha where applicable), and clear colored strokes. Distinct action colors: new tab blue, new window green, split purple, zoom cyan, find amber, settings slate, reload red. Dark/light color pairs respectively: 61afef/315fc4,98c379/3d7d3b,c678dd/87218b,56b6c2/006b96,e5c07b/986801,a4adba/696c77,e06c75/ca4035.
+
+Use 28 logical-pixel icons, labels below, restrained button spacing and theme-aware hover. Keep existing action order and shared actions, Split popup, tooltips, accessible names and Icons and Labels / Icons Only / Hidden modes. Retain native-scale SVG rendering; packaged theme colors must change on live theme selection. Disabled Settings/Reload remain visibly muted and unavailable. Use real disabled rendering with clear labels/tooltips; do not enable placeholder actions for visual effect. No new icon library or licensing dependency; update SOURCE.txt with adaptations and preserve the full MIT license. This is the selected first toolbar treatment, subject to ordinary user visual refinement. Config files, persistence, automatic appearance and packaging remain Plan 4. Terminal hardening backlog stays recorded.

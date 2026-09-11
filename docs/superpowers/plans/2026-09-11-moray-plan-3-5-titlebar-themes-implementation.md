@@ -2,7 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A native-behaving custom macOS title surface and coordinated live Atom-inspired dark/light themes.
+**Goal:** A native-behaving custom macOS title surface, coordinated live Atom-inspired dark/light themes, and the user-selected two-tone toolbar.
+**Scope update:** The user selected toolbar study B during execution; Task 4 implements that choice in this same runnable deliverable.
 **Architecture:** TerminalView accepts live palettes; app-owned ThemeController updates every owner and its retained panes; MacTitleBar uses the decorated JFrame's macOS full-content area.
 **Tech Stack:** Java/JBR25, Gradle wrapper 9.7, FlatLaf/flatlaf-extras3.7, existing JUnit/AssertJ.
 **Spec:** `docs/superpowers/specs/2026-09-11-moray-plan-3-5-titlebar-themes-design.md`. Parent: Phase 1 spec and Plan 3.5 roadmap.
@@ -16,7 +17,7 @@
 - Preserve sessions, scrollback, selection/search, viewport, fonts, split ratios, zoom and shortcuts on theme changes.
 - Native macOS traffic lights/menu/drag/resize/full screen remain native; no undecorated frame or synthetic controls.
 - No GUI/benchmark launches by agents. Headless Swing/BufferedImage and PTY tests are allowed.
-- No config parser, persistence, automatic appearance selection, packaging, SSH or toolbar redesign in this deliverable.
+- No config parser, persistence, automatic appearance selection, packaging or SSH. Toolbar scope is the user-selected study B treatment only.
 - Source hygiene per AGENTS.md; commits end with Co-Authored-By trailer. Work on codex/plan-3-5-chrome-themes.
 
 ### Task 1: Live terminal palettes
@@ -96,10 +97,26 @@ root.putClientProperty("apple.awt.windowAppearance",
 Main sets startup system appearance before EDT/AWT initialization. Keep frame.setTitle for OSmetadata; forward same bounded display title to panel. Use FlatLaf FULL_WINDOW_CONTENT_BUTTONS_BOUNDS listener and pinned68×28 fallback beforeboundsavailable; account for scale via logical dimensions/UIScale, avoid double-scalingreportedbounds. Follow spec for 28-min height and centered title. Header must integrate above toolbar, independentof itsvisibility, and triggerexistingnative-minimum recalculation. No synthetic buttons/windowdraglisteners. Theme changes use onThemeChanged; activechanges followWindowAdapter. Otherplatforms keepnoheader andexistingdecorations.
 - [ ] **Step 3: Verify full integration and create reviewable preview.** Run `./gradlew check --rerun-tasks`, exact XML totals, sourcehygiene and gitdiffcheck. Render the actual header+WindowContent in BufferedImages headlessly for dark/light previews (native buttons absent in headless preview, clearly label limitation; no JFrame/loginGUI). Use real short-lived headless test PTY only if necessary, alwaysclose. Report previewpaths and remaining user-native checks. Commit source/tests/resources and report; no GUI/benchmark.
 
+### Task 4: User-selected two-tone colored toolbar
+
+**Files:** Modify AppIcons.java, WindowChrome.java, theme resources, packaged SVG icons/SOURCE.txt and AppIconsTest.java; add toolbar theme/mode regressions in WindowChromeTest.java as needed.
+**Consumes:** Task2 coordinated theme updates, existing seven ActionIds and icon names; approved study B and spec color pairs.
+**Produces:** 28px two-tone toolbar icons matching both themes, with unchanged shared-action routing/modes.
+
+- [ ] **Step 1: Add failing rendered-resource regressions.** Paint every real icon in dark/light into BufferedImage; check multiple opacity/color regions and contrasting per-theme strokes, not a uniform gray output. Verify no missing assets and accessible labels, modes, disabled Settings/Reload, Split behavior stay intact. Run `./gradlew :moray-app:test --tests '*AppIconsTest' --tests '*WindowChromeTest'` and record RED for existing20px/grayicons.
+- [ ] **Step 2: Adapt bundled SVGs to approved study B.** Preserve source Tabler paths, add soft rounded field behind geometry and translucent enclosed-face fill where appropriate. Example SVG shape order:
+```xml
+<rect x="1" y="1" width="22" height="22" rx="5"
+      fill="#61afef" fill-opacity="0.18" stroke="none"/>
+```
+Keep original foreground geometry after the backdrop. Replace hardcoded legacygray with theme-aware peractioncolor via FlatSVGIcon per-instance ColorFilter (verify pinned3.7 API) or separate packaged light/dark assets if simpler; avoid global filters that recolor unrelatedicons. Use full MITlicense and SOURCEchangeannotation. Set icon dimensions28×28 and retainbuttonlabelbelow. Apply normalFlatLafhover/disabled states and smallconsistent margins/spacing fromstudy. Theme updates must refresh icons immediately for allwindows; rebuilding toolbar must not duplicate listeners or remove actiontooltips/accessibility.
+- [ ] **Step 3: Verify integration and commit.** Run coveringappchecks; report renderedicon evidence, all sevenassets, license and live-switch/modes tests. Fullfinalcheck belongs to root afterreview. Commit only tasksource/resources/tests. Update actual Swing dark/light preview if existingtask3harnesscanbereused withoutGUI.
+
 ## Root acceptance
 
 - [ ] All task reviews and final whole-branch review approved; fix rounds as required.
 - [ ] Full final headless check passes; count skips and preserve warnings/limitations.
 - [ ] Update STATUS/README/roadmap for implemented 3.5a and pending 3.5b discussion.
 - [ ] User native title-bar/light-dark checks, including fullscreen/scaling/drag and screen menus.
-- [ ] Toolbar alternatives shown and direction discussed separately before 3.5b implementation.
+- [x] Toolbar alternatives shown; user selected B (fuller, two-tone colored icons).
+- [ ] Selected toolbar treatment implemented, reviewed and included in final verification.
