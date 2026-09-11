@@ -4,17 +4,20 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import javax.swing.SwingUtilities;
 import java.awt.Graphics2D;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.image.BufferedImage;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class TerminalViewInteractionTest {
     private static final boolean MAC = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac");
@@ -207,6 +210,83 @@ class TerminalViewInteractionTest {
     }
 
     @Test
+    void commandClickOpensALinkEvenWhenTheProgramWantsTheMouse() throws Exception {
+        assumeTrue(MAC);
+        AtomicReference<String> opened = new AtomicReference<>();
+        view.setLinkOpener(opened::set);
+        enableSgrMouse();
+        show("go https://m.dev x", 0, "go https://m.dev x");
+
+        view.handleMouse(press(8, 0, 1, InputEvent.META_DOWN_MASK));
+        view.handleMouse(new MouseEvent(view, MouseEvent.MOUSE_RELEASED, 0, InputEvent.META_DOWN_MASK,
+            x(8), y(0), 1, false, MouseEvent.BUTTON1));
+
+        assertThat(opened.get()).isEqualTo("https://m.dev");
+        assertThat(connector.written()).isEmpty();
+    }
+
+    @Test
+    void horizontalScrollingIsIgnoredOnMacOs() throws Exception {
+        assumeTrue(MAC);
+        tenLines();
+
+        view.handleMouse(shiftWheel(-1));
+        assertThat(view.topRow()).isEqualTo(ScreenSnapshot.FOLLOW_OUTPUT);
+
+        // Nor does it leave a fraction behind for the next vertical scroll to complete.
+        view.handleMouse(shiftPreciseWheel(-0.7));
+        view.handleMouse(preciseWheel(-0.4));
+        assertThat(view.topRow()).isEqualTo(ScreenSnapshot.FOLLOW_OUTPUT);
+    }
+
+    @Test
+    void horizontalScrollingSendsNothingFromTheAlternateScreenOnMacOs() throws Exception {
+        assumeTrue(MAC);
+        connector.feed("\033[?1049h");
+        Await.until(session::usingAlternateBuffer, "alternate screen");
+
+        view.handleMouse(shiftWheel(-1));
+
+        assertThat(connector.written()).isEmpty();
+    }
+
+    @Test
+    void erasingTheScrollbackClearsSelectionAndMatchesAndFollowsOutput() throws Exception {
+        tenLines();
+        view.handleMouse(wheel(-1));
+        selectByDragging(0, 0, 1, 0, 0);
+        assertThat(view.selectedText()).isPresent();
+        assertThat(view.find("1", false, false).count()).isPositive();
+        view.addNotify(); // registers the view's session listener; headless AWT cannot build mouse events after this
+        try {
+            connector.feed("\033[3J");
+
+            Await.until(() -> {
+                drainEventQueue();
+                return view.selectedText().isEmpty();
+            }, "selection cleared after the scrollback was erased");
+            assertThat(view.topRow()).isEqualTo(ScreenSnapshot.FOLLOW_OUTPUT);
+            assertThat(view.findNext()).isEqualTo(new FindResult(0, 0, null));
+        } finally {
+            view.removeNotify();
+        }
+    }
+
+    @Test
+    void aWidthChangeClearsSelectionAndMatches() throws Exception {
+        show("hello world", 0, "hello world");
+        selectByDragging(0, 0, 4, 0, 0);
+        view.find("hello", false, false);
+
+        view.setSize(30 * fonts.cellWidth(), 4 * fonts.cellHeight());
+        view.resizeSessionToFit();
+
+        assertThat(session.columns()).isEqualTo(30);
+        assertThat(view.selectedText()).isEmpty();
+        assertThat(view.findNext()).isEqualTo(new FindResult(0, 0, null));
+    }
+
+    @Test
     void findReportsAndStepsThroughMatches() throws Exception {
         show("foo\r\nbar foo", 1, "bar foo");
 
@@ -300,6 +380,27 @@ class TerminalViewInteractionTest {
     private MouseWheelEvent preciseWheel(double rotation) {
         return new MouseWheelEvent(view, MouseEvent.MOUSE_WHEEL, 0, 0, x(1), y(1), 0, 0, 0, false,
             MouseWheelEvent.WHEEL_UNIT_SCROLL, 1, 0, rotation);
+    }
+
+    private MouseWheelEvent shiftWheel(int rotation) {
+        return new MouseWheelEvent(view, MouseEvent.MOUSE_WHEEL, 0, InputEvent.SHIFT_DOWN_MASK, x(1), y(1), 0, false,
+            MouseWheelEvent.WHEEL_UNIT_SCROLL, 1, rotation);
+    }
+
+    private MouseWheelEvent shiftPreciseWheel(double rotation) {
+        return new MouseWheelEvent(view, MouseEvent.MOUSE_WHEEL, 0, InputEvent.SHIFT_DOWN_MASK, x(1), y(1), 0, 0, 0,
+            false, MouseWheelEvent.WHEEL_UNIT_SCROLL, 1, 0, rotation);
+    }
+
+    /** Runs everything already posted to the Event Dispatch Thread. */
+    private static void drainEventQueue() {
+        try {
+            SwingUtilities.invokeAndWait(() -> { });
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (InvocationTargetException e) {
+            throw new AssertionError(e.getCause());
+        }
     }
 
     private KeyEvent pressed(int keyCode, int modifiers) {

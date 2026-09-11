@@ -36,6 +36,19 @@ class SearchSessionTest {
     }
 
     @Test
+    void theAlternateScreenSearchesOnlyItsOwnRows() throws Exception {
+        connector.feed("\r\nneedle\r\nx\r\ny\r\nz\033[?1049h");
+        Await.until(() -> session.snapshot().alternateBuffer(), "alternate screen");
+
+        assertThat(session.search("needle", false, false)).isEmpty();
+
+        connector.feed("\033[Hhay needle");
+        Await.until(() -> session.snapshot().lineText(0).startsWith("hay needle"), "text on the alternate screen");
+        assertThat(session.search("needle", false, false))
+            .containsExactly(new TerminalSearch.Match(session.snapshot().firstRow(), 4, 9));
+    }
+
+    @Test
     void noMatchesIsAnEmptyList() {
         assertThat(session.search("zzz", false, false)).isEmpty();
     }

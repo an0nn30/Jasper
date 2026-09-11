@@ -1,5 +1,6 @@
 package dev.moray.terminal;
 
+import com.jediterm.terminal.TextStyle;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -88,6 +89,21 @@ class ScrollbackTest {
 
         assertThat(session.exitFuture().get(10, TimeUnit.SECONDS)).isZero();
         assertThat(String.join("", texts(session.snapshot()))).contains("[process exited with code 0]");
+    }
+
+    @Test
+    void theExitMessageIgnoresTheStyleTheProgramLeft() throws Exception {
+        connector.feed("a\033[31;8mbye");
+        connector.finish();
+
+        assertThat(session.exitFuture().get(10, TimeUnit.SECONDS)).isZero();
+        ScreenSnapshot snapshot = session.snapshot(0); // "abye" at the top, then the wrapped message
+        assertThat(snapshot.lineText(0)).isEqualTo("abye");
+        assertThat(snapshot.lineText(1)).startsWith("[process");
+        TextStyle plain = snapshot.lines().get(0).getStyleAt(0);
+        TextStyle message = snapshot.lines().get(1).getStyleAt(1);
+        assertThat(message.getForeground()).isEqualTo(plain.getForeground());
+        assertThat(message.hasOption(TextStyle.Option.HIDDEN)).isFalse();
     }
 
     private void fiveLines() throws Exception {

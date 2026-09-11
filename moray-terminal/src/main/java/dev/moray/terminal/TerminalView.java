@@ -64,6 +64,11 @@ public final class TerminalView extends JComponent {
         public void screenChanged() {
             dirty.set(true);
         }
+
+        @Override
+        public void scrollbackReset() {
+            SwingUtilities.invokeLater(TerminalView.this::forgetAbsoluteRows);
+        }
     };
     private boolean blinkOn = true;
     private boolean suppressNextTyped;
@@ -81,6 +86,8 @@ public final class TerminalView extends JComponent {
     private boolean capturingSelection;
     /** Fractional wheel rotation carried over between events until it adds up to a whole notch. */
     private double wheelRemainder;
+    /** A ⌘-press on macOS opened a link; its drag and release are swallowed rather than reported to the program. */
+    private boolean openingLink;
     private List<TerminalSearch.Match> matches = List.of();
     private int currentMatch = -1;
     private volatile boolean exited;
@@ -334,6 +341,17 @@ public final class TerminalView extends JComponent {
         if (type == null || (type == Type.MOVED && !session.mouseReporting())) {
             return;
         }
+        if (macOs && type == Type.WHEEL && e.isShiftDown()) {
+            return; // macOS sends horizontal trackpad scrolling (and Shift+wheel) this way; the terminal has no use for it
+        }
+        if (macOs && type == Type.PRESSED && SwingUtilities.isLeftMouseButton(e) && e.isMetaDown() && openLinkAt(e)) {
+            openingLink = true;
+            return;
+        }
+        if (openingLink && (type == Type.DRAGGED || type == Type.RELEASED)) {
+            openingLink = type != Type.RELEASED; // the rest of a ⌘-click that opened a link is not reported
+            return;
+        }
         int notches = 0;
         if (type == Type.WHEEL) {
             notches = notches((MouseWheelEvent) e);
@@ -406,8 +424,35 @@ public final class TerminalView extends JComponent {
 
     void resizeSessionToFit() {
         GridSize grid = GridSize.fit(getWidth(), getHeight(), fonts.cellWidth(), fonts.cellHeight());
+        boolean widthChanged = grid.columns() != session.columns();
         session.resize(grid.columns(), grid.rows());
+        if (widthChanged) {
+            forgetAbsoluteRows(); // JediTerm reflows soft-wrapped lines, moving them to other absolute rows
+        }
         dirty.set(true);
+    }
+
+    /**
+     * Drops everything that names lines by absolute row (selection, drag anchor, find matches, a scrolled-back view),
+     * for when those rows stop naming the same lines. Runs on the Event Dispatch Thread.
+     */
+    private void forgetAbsoluteRows() {
+        selection = null;
+        pendingAnchor = null;
+        matches = List.of();
+        currentMatch = -1;
+        viewport.follow();
+        repaint();
+    }
+
+    /** Opens the link at a mouse event's cell, if there is one; true when it did. */
+    private boolean openLinkAt(MouseEvent e) {
+        ScreenSnapshot snapshot = session.snapshot(viewport.topRow());
+        int column = Math.max(0, Math.min(snapshot.width() - 1, e.getX() / fonts.cellWidth()));
+        int row = Math.max(0, Math.min(snapshot.height() - 1, e.getY() / fonts.cellHeight()));
+        Optional<String> link = session.linkAt(snapshot.firstRow() + row, column);
+        link.ifPresent(linkOpener);
+        return link.isPresent();
     }
 
     void setClipboard(Supplier<String> reader, Consumer<String> writer) {
@@ -612,7 +657,8 @@ public final class TerminalView extends JComponent {
             if (Desktop.isDesktopSupported()) {
                 Desktop.getDesktop().browse(new URI(uri));
             }
-        } catch (IOException | URISyntaxException | UnsupportedOperationException e) {
+        } catch (IOException | URISyntaxException | RuntimeException e) {
+            // RuntimeException covers UnsupportedOperationException, IllegalArgumentException and SecurityException.
             // Nothing can open this link; plan 4 logs this.
         }
     }

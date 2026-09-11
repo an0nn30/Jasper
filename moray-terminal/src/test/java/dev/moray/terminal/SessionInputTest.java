@@ -80,6 +80,70 @@ class SessionInputTest {
     }
 
     @Test
+    void osc8LinksWithOtherSchemesAreRefused() throws Exception {
+        connector.feed("\033]8;;file:///Applications/Calculator.app\007calc\033]8;;\007 "
+            + "\033]8;;x-custom://thing\007odd\033]8;;\007");
+        Await.until(() -> "calc odd".equals(session.snapshot().lineText(0)), "linked text");
+
+        assertThat(session.linkAt(0, 1)).isEmpty();
+        assertThat(session.linkAt(0, 6)).isEmpty();
+    }
+
+    @Test
+    void aRefusedOsc8LinkIsNotReplacedByTheUrlInItsText() throws Exception {
+        connector.feed("\033]8;;x-custom://thing\007https://shown.dev\033]8;;\007");
+        Await.until(() -> "https://shown.dev".equals(session.snapshot().lineText(0)), "linked text");
+
+        assertThat(session.linkAt(0, 3)).isEmpty();
+    }
+
+    @Test
+    void osc8MailtoLinksAreFound() throws Exception {
+        connector.feed("\033]8;;mailto:someone@example.com\007mail\033]8;;\007");
+        Await.until(() -> "mail".equals(session.snapshot().lineText(0)), "linked text");
+
+        assertThat(session.linkAt(0, 1)).contains("mailto:someone@example.com");
+    }
+
+    @Test
+    void motionWithoutAButtonIsNotReportedInClickOnlyMode() throws Exception {
+        enableSgrMouse();
+
+        session.reportMouse(1, 1, new MouseEvent(MouseEvent.Type.MOVED, MouseButtonCodes.RELEASE, 0));
+
+        assertThat(connector.written()).isEmpty();
+    }
+
+    @Test
+    void draggingIsNotReportedInClickOnlyMode() throws Exception {
+        enableSgrMouse();
+
+        session.reportMouse(1, 1, new MouseEvent(MouseEvent.Type.DRAGGED, MouseButtonCodes.LEFT, 0));
+
+        assertThat(connector.written()).isEmpty();
+    }
+
+    @Test
+    void draggingIsReportedInButtonMotionMode() throws Exception {
+        connector.feed("\033[?1002h\033[?1006h");
+        Await.until(session::mouseReporting, "mouse reporting on");
+
+        session.reportMouse(1, 1, new MouseEvent(MouseEvent.Type.DRAGGED, MouseButtonCodes.LEFT, 0));
+
+        assertThat(connector.written()).isNotEmpty();
+    }
+
+    @Test
+    void motionIsReportedInAllMotionMode() throws Exception {
+        connector.feed("\033[?1003h\033[?1006h");
+        Await.until(session::mouseReporting, "mouse reporting on");
+
+        session.reportMouse(1, 1, new MouseEvent(MouseEvent.Type.MOVED, MouseButtonCodes.RELEASE, 0));
+
+        assertThat(connector.written()).isNotEmpty();
+    }
+
+    @Test
     void urlsInPlainTextAreFound() throws Exception {
         connector.feed("see https://moray.dev/docs.");
         Await.until(() -> session.snapshot().lineText(0).startsWith("see https"), "url text");

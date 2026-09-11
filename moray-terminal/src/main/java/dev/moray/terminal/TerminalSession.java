@@ -29,14 +29,18 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 
 /** A program running in a pseudo-terminal, emulated by JediTerm on a dedicated reader thread. */
 public final class TerminalSession implements AutoCloseable {
+    /** Schemes an OSC 8 hyperlink may open; anything else could launch an application or a custom handler. */
+    private static final Set<String> OSC8_SCHEMES = Set.of("http", "https", "ftp", "mailto");
 
     /** Callbacks arrive on the session's reader thread. */
     public interface Listener {
@@ -50,6 +54,10 @@ public final class TerminalSession implements AutoCloseable {
         }
 
         default void workingDirectoryChanged(Path directory) {
+        }
+
+        /** The scrollback was erased, so absolute rows held from before now name different lines (or none). */
+        default void scrollbackReset() {
         }
     }
 
@@ -120,6 +128,7 @@ public final class TerminalSession implements AutoCloseable {
             @Override
             public void historyCleared() {
                 promptRows.clear();
+                listeners.forEach(Listener::scrollbackReset);
             }
         });
     }
@@ -151,7 +160,8 @@ public final class TerminalSession implements AutoCloseable {
     }
 
     private void writeExitMessage(int code) {
-        char[] message = ("\r\n[process exited with code " + code + "]").toCharArray();
+        // Reset the style first so nothing the program left (hidden, colours) applies to the message.
+        char[] message = ("\033[0m\r\n[process exited with code " + code + "]").toCharArray();
         JediEmulator emulator = new JediEmulator(new ArrayTerminalDataStream(message), terminal);
         try {
             while (emulator.hasNext()) {
@@ -178,12 +188,16 @@ public final class TerminalSession implements AutoCloseable {
         if (newColumns == columns && newRows == rows) {
             return;
         }
+        boolean widthChanged = newColumns != columns;
         columns = newColumns;
         rows = newRows;
         TermSize size = new TermSize(newColumns, newRows);
         buffer.lock();
         try {
             terminal.resize(size, RequestOrigin.User);
+            if (widthChanged) {
+                promptRows.clear(); // JediTerm reflows soft-wrapped lines, so recorded rows now name other lines
+            }
         } finally {
             buffer.unlock();
         }
@@ -278,7 +292,10 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
-    /** Every match in the scrollback and on screen, oldest first; an empty query finds nothing. */
+    /**
+     * Every match in the scrollback and on screen, oldest first; an empty query finds nothing. On the alternate
+     * screen only its own rows are searched, since the scrollback behind it is not what the user is looking at.
+     */
     List<TerminalSearch.Match> search(String query, boolean regex, boolean caseSensitive) {
         if (query.isEmpty()) {
             return List.of();
@@ -290,7 +307,7 @@ public final class TerminalSession implements AutoCloseable {
         List<TerminalLine> lines;
         buffer.lock();
         try {
-            history = buffer.getHistoryLinesCount();
+            history = buffer.isUsingAlternateBuffer() ? 0 : buffer.getHistoryLinesCount();
             firstRow = absoluteRow(-history);
             width = buffer.getWidth();
             lines = new ArrayList<>(history + buffer.getHeight());
@@ -338,7 +355,11 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
-    /** The link at an absolute row and column: an OSC 8 hyperlink, or else a URL written in the text. */
+    /**
+     * The link at an absolute row and column: an OSC 8 hyperlink, or else a URL written in the text. A program chooses
+     * an OSC 8 target freely, so only web and mail schemes are opened; a cell whose OSC 8 target has any other scheme
+     * has no link at all, whatever its text says.
+     */
     Optional<String> linkAt(long absoluteRow, int column) {
         buffer.lock();
         try {
@@ -349,12 +370,18 @@ public final class TerminalSession implements AutoCloseable {
             if (column < line.length()
                 && line.getStyleAt(column) instanceof HyperlinkStyle hyperlink
                 && hyperlink.getLinkInfo() instanceof UriLink link) {
-                return Optional.of(link.uri());
+                return openableScheme(link.uri()) ? Optional.of(link.uri()) : Optional.empty();
             }
             return urlAcrossWrappedRows(absoluteRow, column);
         } finally {
             buffer.unlock();
         }
+    }
+
+    private static boolean openableScheme(String uri) {
+        int colon = uri.indexOf(':');
+        String scheme = colon < 0 ? "" : uri.substring(0, colon).toLowerCase(Locale.ROOT);
+        return OSC8_SCHEMES.contains(scheme);
     }
 
     /**

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,6 +70,40 @@ class ShellIntegrationSessionTest {
         long prompt = session.promptRows().getFirst();
         assertThat(prompt).isZero();
         assertThat(session.lineText(prompt)).isEqualTo("p0");
+    }
+
+    @Test
+    void aWidthChangeForgetsPromptRowsBecauseLinesReflow() throws Exception {
+        // jediterm-core reflows soft-wrapped lines on a width change: at 30 columns the wrapped line above the
+        // prompt becomes one row, so the prompt's recorded absolute row would then name the line above it.
+        String wrapped = "w".repeat(30) + "\r\n";
+        connector.feed(wrapped + "\033]133;A\007$ mark\r\n" + wrapped.repeat(4) + "end");
+        Await.until(() -> "end".equals(session.snapshot().lineText(3)), "scrolled output");
+        assertThat(session.lineText(session.promptRows().getFirst())).isEqualTo("$ mark");
+
+        session.resize(20, 6); // height only: no reflow, the mark stays
+        assertThat(session.lineText(session.promptRows().getFirst())).isEqualTo("$ mark");
+
+        session.resize(30, 6);
+        assertThat(session.promptRows()).isEmpty();
+    }
+
+    @Test
+    void erasingTheScrollbackForgetsPromptsAndTellsListeners() throws Exception {
+        AtomicBoolean reset = new AtomicBoolean();
+        session.addListener(new TerminalSession.Listener() {
+            @Override
+            public void scrollbackReset() {
+                reset.set(true);
+            }
+        });
+        connector.feed("\033]133;A\007$ one\r\n" + "x\r\n".repeat(6) + "end");
+        Await.until(() -> session.promptRows().size() == 1, "one prompt mark");
+
+        connector.feed("\033[3J");
+
+        Await.until(reset::get, "scrollback reset");
+        assertThat(session.promptRows()).isEmpty();
     }
 
     @Test
