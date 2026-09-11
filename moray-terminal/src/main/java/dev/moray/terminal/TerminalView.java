@@ -32,6 +32,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Future;
@@ -59,12 +60,13 @@ public final class TerminalView extends JComponent {
     private final TerminalSession session;
     private final TerminalOptions options;
     private FontSet fonts;
+    private Palette palette;
     private TerminalPainter painter;
     private final KeyEncoder keys;
     private final boolean macOs;
     private final Viewport viewport = new Viewport();
-    private final Color matchColor;
-    private final Color currentMatchColor;
+    private Color matchColor;
+    private Color currentMatchColor;
     private final AtomicBoolean dirty = new AtomicBoolean(true);
     private final Timer frameTimer;
     private final Timer blinkTimer;
@@ -129,12 +131,13 @@ public final class TerminalView extends JComponent {
         this.options = options;
         this.fontSize = options.fontSize();
         this.fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures());
-        this.painter = new TerminalPainter(fonts, options.palette());
+        this.palette = options.palette();
+        this.painter = new TerminalPainter(fonts, palette);
         this.macOs = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac");
         this.keys = new KeyEncoder(options.optionAsMeta(), macOs);
-        Color yellow = options.palette().ansi().get(3);
-        this.matchColor = CellStyle.blend(yellow, options.palette().background(), 0.7f);
-        this.currentMatchColor = CellStyle.blend(yellow, options.palette().background(), 0.35f);
+        Color yellow = palette.ansi().get(3);
+        this.matchColor = CellStyle.blend(yellow, palette.background(), 0.7f);
+        this.currentMatchColor = CellStyle.blend(yellow, palette.background(), 0.35f);
         this.frameTimer = new Timer(FRAME_MILLIS, e -> {
             if (dirty.getAndSet(false)) {
                 repaint();
@@ -148,7 +151,7 @@ public final class TerminalView extends JComponent {
         setOpaque(true);
         setFocusable(true);
         setFocusTraversalKeysEnabled(false);
-        setBackground(options.palette().background());
+        setBackground(palette.background());
         enableEvents(AWTEvent.KEY_EVENT_MASK);
         addComponentListener(new ComponentAdapter() {
             @Override
@@ -286,6 +289,26 @@ public final class TerminalView extends JComponent {
         return fontSize;
     }
 
+    /** The palette currently used to render this view. Event Dispatch Thread owned. */
+    public Palette palette() {
+        return palette;
+    }
+
+    /** Recolors this view without changing its session, fonts, scrollback, selection, search or viewport. */
+    public void setPalette(Palette value) {
+        Palette next = Objects.requireNonNull(value, "palette");
+        if (next.equals(palette)) {
+            return;
+        }
+        palette = next;
+        painter = new TerminalPainter(fonts, next);
+        setBackground(next.background());
+        Color yellow = next.ansi().get(3);
+        matchColor = CellStyle.blend(yellow, next.background(), 0.7f);
+        currentMatchColor = CellStyle.blend(yellow, next.background(), 0.35f);
+        repaint();
+    }
+
     /** Changes only this view's font size, clamped to 6–72 points, and refits its existing session. */
     public void setFontSize(float size) {
         float bounded = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, size));
@@ -295,7 +318,7 @@ public final class TerminalView extends JComponent {
         Dimension previousMinimum = getMinimumSize();
         fontSize = bounded;
         fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures());
-        painter = new TerminalPainter(fonts, options.palette());
+        painter = new TerminalPainter(fonts, palette);
         firePropertyChange("minimumSize", previousMinimum, getMinimumSize());
         revalidate();
         if (getWidth() > 0 && getHeight() > 0) {
@@ -468,7 +491,7 @@ public final class TerminalView extends JComponent {
         painter.paint((Graphics2D) g, snapshot, new TerminalPainter.CursorLook(style, on, focused),
             highlights(snapshot), getWidth(), getHeight());
         if (inactiveDim > 0f) {
-            Color background = options.palette().background();
+            Color background = palette.background();
             int alpha = Math.round(255 * inactiveDim);
             g.setColor(new Color(background.getRed(), background.getGreen(), background.getBlue(), alpha));
             g.fillRect(0, 0, getWidth(), getHeight());
@@ -748,7 +771,7 @@ public final class TerminalView extends JComponent {
                 int[] columns = selection.columnsOn(first + row, snapshot.width());
                 if (columns != null) {
                     highlights.add(new TerminalPainter.Highlight(row, columns[0], columns[1],
-                        options.palette().selection()));
+                        palette.selection()));
                 }
             }
         }
