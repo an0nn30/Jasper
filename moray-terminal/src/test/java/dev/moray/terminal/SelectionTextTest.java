@@ -33,7 +33,7 @@ class SelectionTextTest {
 
     @Test
     void wideCharactersAreKeptWhole() {
-        assertThat(extract(new Selection(0, 0, 0, 2, false), 4, line("日x", false))).isEqualTo("日x");
+        assertThat(extract(new Selection(0, 0, 0, 2, false), 4, line("日\uE000x", false))).isEqualTo("日x");
     }
 
     @Test

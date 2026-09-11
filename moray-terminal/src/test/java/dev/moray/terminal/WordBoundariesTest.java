@@ -26,7 +26,7 @@ class WordBoundariesTest {
 
     @Test
     void wideCharactersStayWhole() {
-        assertThat(WordBoundaries.wordAt(line("日本"), 4, 1)).containsExactly(0, 3);
+        assertThat(WordBoundaries.wordAt(line("日\uE000本\uE000"), 4, 1)).containsExactly(0, 3);
     }
 
     @Test
