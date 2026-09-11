@@ -1,6 +1,8 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11 · `main` at `0ce4add` · `./gradlew check`: 216 tests, 0 failures, 1 skipped (expected; see "Known skips")
+**As of:** 2026-09-11 · code on `main` last changed at `0ce4add` · `./gradlew check`: 216 tests, 0 failures, 1 skipped (expected; see "Known skips")
+
+> **Plan 3 is in progress elsewhere.** Branch `codex/plan-3-app-chrome`, checked out in the worktree `.worktrees/plan-3` (git-ignored), holds a plan-3 design (`docs/superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md`) and plan (`docs/superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md`, 3 tasks), with its subagent-driven ledger in that worktree's `.superpowers/sdd/`. At the time of writing, its Task 1 had started. Continue there rather than starting plan 3 again. Section 5 lists "Plan 3" items that its plan does not yet cover. Fold them in, or leave them for a follow-up plan.
 
 Read this first. It is written for whoever — person or coding agent — picks up the work next. Conventions for agents are in [`AGENTS.md`](../AGENTS.md); build and run instructions are in [`README.md`](../README.md).
 
@@ -16,7 +18,7 @@ Phase 1 is delivered as four implementation plans, each ending in software the u
 |---|---|---|
 | 1 — Terminal core | build, CI, renderer (ligatures, fallback fonts, colours, cursor), PTY session, keyboard, one-window app, benchmark | **Done**, merged (`6daa61f`..`d0ccbfb`) |
 | 2 — Terminal completeness | scrollback, mouse reporting, selection/copy/paste, search API, shell integration (OSC 7/133/8), exit message | **Done**, merged (`196e24d`..`0ce4add`) |
-| 3 — App chrome | spec §5–§6: menu bar, MobaXterm-style toolbar, tabs, split tree, find bar, status bar, configurable keymap (§5.1), FlatLaf look, context menu, `dim_inactive_panes` | **Not written yet** |
+| 3 — App chrome | spec §5–§6: menu bar, MobaXterm-style toolbar, tabs, split tree, find bar, status bar, configurable keymap (§5.1), FlatLaf look, context menu, `dim_inactive_panes` | **In progress** on `codex/plan-3-app-chrome` (see the banner above) |
 | 4 — Config and packaging | spec §7: per-OS paths (`AppDirs`), TOML config, themes, live reload, error reporting; app logging; macOS `.app` bundling the JBR (§9) | **Not written yet** |
 
 Documents: spec `docs/superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md` (binding authority); plans in `docs/superpowers/plans/`.
@@ -71,6 +73,8 @@ In recommended order:
 From the per-task and final reviews of plans 1 and 2. None blocks the current state.
 
 **Plan 3 (app chrome / view behaviour)**
+
+The `codex/plan-3-app-chrome` plan already covers several of these items: find off the Event Dispatch Thread, keeping find's regex error, and a minimum pane size. Shortcuts after exit move into the keymap. New tabs start in the OSC 7 directory, and an unusable directory shows an error. Its plan does **not** mention these: the gesture owner and the `openingLink` fix, clearing on an alternate-screen switch, stopping timers, hang-up on close, the bounded logical-line walk, and pruning `promptRows`.
 - Replace the two gesture flags (`capturingSelection`, `openingLink`) with a press-time gesture owner (NONE / LOCAL / REPORT). Closes: a reported press followed by a Shift drag/release is re-routed locally (program sees a stuck button); the release override does not check which button; ⌘-click on a non-link followed by a drag extends the existing selection; the `openingLink` sticking bug (item 3.1) if not already fixed.
 - Clear selection and matches on an alternate-screen switch (section 4).
 - One bounded shared "logical line" walk for `urlAcrossWrappedRows` and `lineSelection` (both walk unbounded under the buffer lock; one huge wrapped line stalls the reader thread on ⌘-click).
@@ -122,7 +126,7 @@ Each plan: brainstorming → spec → `superpowers:writing-plans` → `superpowe
 
 ## 8. Suggested next steps
 
-1. Fix item 3.1 on a branch, with its test.
+1. Fix item 3.1, with its test. It touches `TerminalView.handleMouse`, and plan 3's Task 2 also changes `TerminalView`. So either add the fix on `codex/plan-3-app-chrome`, or fix it on `main` and merge `main` into that branch.
 2. Hand the user the manual check (3.2) and the benchmark (3.3); ask about a remote for CI (3.4).
-3. Write plan 3 with `superpowers:writing-plans` from spec §5–§6 plus the "Plan 3" items in section 5, then execute it with `superpowers:subagent-driven-development`.
+3. Finish plan 3 on `codex/plan-3-app-chrome`, following its ledger in `.worktrees/plan-3/.superpowers/sdd/`. Then decide which uncovered "Plan 3" items from section 5 go into it or into a follow-up plan.
 4. Then plan 4 (spec §7 and the "Plan 4" items), then the §9 definition of done and the two-week switch-over test against conch.

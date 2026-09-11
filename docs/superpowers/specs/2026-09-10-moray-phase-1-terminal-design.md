@@ -1,7 +1,7 @@
 # Moray — Phase 1: The Terminal — Design Spec
 
 **Date:** 2026-09-10
-**Status:** Approved (2026-09-10). Plans 1–2 of 4 implemented and merged (2026-09-11); plan 3 (app chrome, §5–§6) and plan 4 (config and packaging, §7) are not written yet. Current state: `docs/STATUS.md`.
+**Status:** Approved (2026-09-10). Plans 1–2 of 4 implemented and merged (2026-09-11); plan 3 (app chrome, §5–§6) is in progress on branch `codex/plan-3-app-chrome`; plan 4 (config and packaging, §7) is not written yet. Current state: `docs/STATUS.md`.
 **Repo:** `~/projects/moray`
 
 ## 1. What Moray is
