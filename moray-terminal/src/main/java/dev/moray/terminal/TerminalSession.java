@@ -1,17 +1,23 @@
 package dev.moray.terminal;
 
+import com.jediterm.core.input.MouseEvent;
 import com.jediterm.core.util.TermSize;
 import com.jediterm.terminal.ArrayTerminalDataStream;
+import com.jediterm.terminal.HyperlinkStyle;
 import com.jediterm.terminal.RequestOrigin;
 import com.jediterm.terminal.TerminalOutputStream;
 import com.jediterm.terminal.TtyBasedArrayDataStream;
 import com.jediterm.terminal.TtyConnector;
 import com.jediterm.terminal.emulator.JediEmulator;
+import com.jediterm.terminal.emulator.mouse.MouseEventProcessingSettings;
+import com.jediterm.terminal.emulator.mouse.MouseMode;
 import com.jediterm.terminal.model.JediTerminal;
 import com.jediterm.terminal.model.StyleState;
 import com.jediterm.terminal.model.TerminalLine;
 import com.jediterm.terminal.model.TerminalTextBuffer;
 import com.jediterm.terminal.model.TextBufferChangesListener;
+import com.jediterm.terminal.model.hyperlinks.LinkResult;
+import com.jediterm.terminal.model.hyperlinks.LinkResultItem;
 import com.pty4j.PtyProcess;
 import com.pty4j.PtyProcessBuilder;
 
@@ -103,6 +109,8 @@ public final class TerminalSession implements AutoCloseable {
         });
         buffer.addModelListener(() -> listeners.forEach(Listener::screenChanged));
         terminal.addCustomCommandListener(this::onCustomCommand);
+        // Without a filter JediTerm drops OSC 8 links; one item spanning the whole URI makes it keep them.
+        terminal.setUrlHyperlinkFilter(uri -> new LinkResult(new LinkResultItem(0, uri.length(), new UriLink(uri))));
         buffer.addChangesListener(new TextBufferChangesListener() {
             @Override
             public void linesDiscardedFromHistory(List<TerminalLine> lines) {
@@ -294,6 +302,105 @@ public final class TerminalSession implements AutoCloseable {
         }
         // Run regex matching outside the lock so a slow pattern cannot stall the reader thread
         return TerminalSearch.find(pattern, firstRow, lines, width);
+    }
+
+    /** Whether the program asked for mouse reports, so clicks go to it instead of to local selection. */
+    boolean mouseReporting() {
+        return display.mouseMode() != MouseMode.MOUSE_REPORTING_NONE;
+    }
+
+    boolean usingAlternateBuffer() {
+        buffer.lock();
+        try {
+            return buffer.isUsingAlternateBuffer();
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    /** Reports a mouse event at a screen cell, clamped onto the screen; false when the program did not ask for it. */
+    boolean reportMouse(int column, int row, MouseEvent event) {
+        if (!mouseReporting()) {
+            return false;
+        }
+        int x = Math.max(0, Math.min(columns - 1, column));
+        int y = Math.max(0, Math.min(rows - 1, row));
+        return terminal.onMouseEvent(x, y, event, new MouseEventProcessingSettings(true, usingAlternateBuffer(), false));
+    }
+
+    /** Pastes text: newlines become carriage returns, wrapped in bracketed-paste markers when the program asked. */
+    void paste(String text) {
+        String normalized = text.replace("\r\n", "\r").replace('\n', '\r');
+        if (display.bracketedPaste()) {
+            write("\033[200~" + normalized.replace("\033[201~", "") + "\033[201~");
+        } else {
+            write(normalized);
+        }
+    }
+
+    /** The link at an absolute row and column: an OSC 8 hyperlink, or else a URL written in the text. */
+    Optional<String> linkAt(long absoluteRow, int column) {
+        buffer.lock();
+        try {
+            TerminalLine line = lineAtLocked(absoluteRow);
+            if (line == null) {
+                return Optional.empty();
+            }
+            if (column < line.length()
+                && line.getStyleAt(column) instanceof HyperlinkStyle hyperlink
+                && hyperlink.getLinkInfo() instanceof UriLink link) {
+                return Optional.of(link.uri());
+            }
+            return urlAcrossWrappedRows(absoluteRow, column);
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    /**
+     * A plain-text URL search that follows soft wraps: joins the wrapped screen rows around {@code absoluteRow}
+     * into one logical line (the same wrap-walking {@link #lineSelection} uses) before searching, so a URL split
+     * across a wrap boundary is still recognized as one link. Call with the buffer lock held.
+     */
+    private Optional<String> urlAcrossWrappedRows(long absoluteRow, int column) {
+        long first = absoluteRow;
+        while (true) {
+            TerminalLine above = lineAtLocked(first - 1);
+            if (above == null || !above.isWrapped()) {
+                break;
+            }
+            first--;
+        }
+        long last = absoluteRow;
+        while (true) {
+            TerminalLine line = lineAtLocked(last);
+            if (line == null || !line.isWrapped() || lineAtLocked(last + 1) == null) {
+                break;
+            }
+            last++;
+        }
+        int width = buffer.getWidth();
+        StringBuilder text = new StringBuilder();
+        List<Integer> columns = new ArrayList<>();
+        List<Integer> lastColumns = new ArrayList<>();
+        for (long row = first; row <= last; row++) {
+            TerminalLine line = lineAtLocked(row);
+            if (line == null) {
+                continue;
+            }
+            RowText rowText = RowText.of(line, width);
+            int offset = (int) ((row - first) * width);
+            for (int i = 0; i < rowText.text().length(); i++) {
+                text.append(rowText.text().charAt(i));
+                columns.add(offset + rowText.columns()[i]);
+                lastColumns.add(offset + rowText.lastColumns()[i]);
+            }
+        }
+        int virtualColumn = (int) ((absoluteRow - first) * width) + column;
+        RowText combined = new RowText(text.toString(),
+            columns.stream().mapToInt(Integer::intValue).toArray(),
+            lastColumns.stream().mapToInt(Integer::intValue).toArray());
+        return LinkDetector.urlAt(combined, virtualColumn);
     }
 
     /** The word at an absolute row and column, as a stream selection. */
