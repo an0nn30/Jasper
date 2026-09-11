@@ -8,16 +8,21 @@ import com.jediterm.terminal.TtyConnector;
 import com.jediterm.terminal.emulator.JediEmulator;
 import com.jediterm.terminal.model.JediTerminal;
 import com.jediterm.terminal.model.StyleState;
+import com.jediterm.terminal.model.TerminalLine;
 import com.jediterm.terminal.model.TerminalTextBuffer;
+import com.jediterm.terminal.model.TextBufferChangesListener;
 import com.pty4j.PtyProcess;
 import com.pty4j.PtyProcessBuilder;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -34,6 +39,9 @@ public final class TerminalSession implements AutoCloseable {
 
         default void bell() {
         }
+
+        default void workingDirectoryChanged(Path directory) {
+        }
     }
 
     private final TtyConnector connector;
@@ -42,6 +50,10 @@ public final class TerminalSession implements AutoCloseable {
     private final SessionDisplay display;
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
     private final CompletableFuture<Integer> exit = new CompletableFuture<>();
+    private final List<Long> promptRows = new CopyOnWriteArrayList<>();
+    /** Lines dropped off the top of the scrollback so far; the base of absolute row numbers. */
+    private volatile long discardedLines;
+    private volatile Path workingDirectory;
     private volatile int columns;
     private volatile int rows;
     private volatile Thread reader;
@@ -65,7 +77,7 @@ public final class TerminalSession implements AutoCloseable {
     }
 
     TerminalSession(TtyConnector connector, int columns, int rows, int scrollback) {
-        this.connector = connector;
+        this.connector = new ShellIntegrationConnector(connector);
         this.columns = columns;
         this.rows = rows;
         StyleState styleState = new StyleState();
@@ -87,6 +99,18 @@ public final class TerminalSession implements AutoCloseable {
             }
         });
         buffer.addModelListener(() -> listeners.forEach(Listener::screenChanged));
+        terminal.addCustomCommandListener(this::onCustomCommand);
+        buffer.addChangesListener(new TextBufferChangesListener() {
+            @Override
+            public void linesDiscardedFromHistory(List<TerminalLine> lines) {
+                discardedLines += lines.size(); // reader thread, under the buffer lock
+            }
+
+            @Override
+            public void historyCleared() {
+                promptRows.clear();
+            }
+        });
     }
 
     void startReading() {
@@ -167,6 +191,11 @@ public final class TerminalSession implements AutoCloseable {
         return exit.copy();
     }
 
+    /** The directory the shell last reported with OSC 7, if any. */
+    public Optional<Path> workingDirectory() {
+        return Optional.ofNullable(workingDirectory);
+    }
+
     @Override
     public void close() {
         connector.close();
@@ -186,5 +215,87 @@ public final class TerminalSession implements AutoCloseable {
 
     SessionDisplay display() {
         return display;
+    }
+
+    /** Absolute rows of the prompts the shell marked with OSC 133;A that are still in the scrollback, oldest first. */
+    List<Long> promptRows() {
+        long oldest = discardedLines;
+        return promptRows.stream().filter(row -> row >= oldest).toList();
+    }
+
+    /** The text of the line at an absolute row, or null when it is no longer in the scrollback. */
+    String lineText(long absoluteRow) {
+        buffer.lock();
+        try {
+            TerminalLine line = lineAtLocked(absoluteRow);
+            return line == null ? null : line.getText();
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    /**
+     * The absolute row of a buffer row (0 = top of the live screen, negative = scrollback). An absolute row stays
+     * attached to its line while output scrolls. Call with the buffer lock held.
+     */
+    private long absoluteRow(int bufferRow) {
+        return discardedLines + buffer.getHistoryLinesCount() + bufferRow;
+    }
+
+    /** The line at an absolute row, or null outside the scrollback and screen. Call with the buffer lock held. */
+    private TerminalLine lineAtLocked(long absoluteRow) {
+        int history = buffer.getHistoryLinesCount();
+        long bufferRow = absoluteRow - discardedLines - history;
+        if (bufferRow < -history || bufferRow >= buffer.getHeight()) {
+            return null;
+        }
+        return buffer.getLine((int) bufferRow);
+    }
+
+    private void onCustomCommand(List<String> args) {
+        if (args.size() < 2 || !"moray".equals(args.get(0))) {
+            return;
+        }
+        switch (args.get(1)) {
+            case "cwd" -> directoryFromUri(String.join(";", args.subList(2, args.size()))).ifPresent(directory -> {
+                workingDirectory = directory;
+                listeners.forEach(l -> l.workingDirectoryChanged(directory));
+            });
+            case "mark" -> {
+                if (args.size() > 2 && "A".equals(args.get(2))) {
+                    recordPrompt();
+                }
+            }
+            case "cursor-reset" -> display.resetCursorShape();
+            default -> {
+                // A command from a newer Moray shell-integration script; nothing to do.
+            }
+        }
+    }
+
+    private void recordPrompt() {
+        buffer.lock();
+        try {
+            long row = absoluteRow(terminal.getCursorY() - 1);
+            if (promptRows.isEmpty() || promptRows.getLast() != row) {
+                promptRows.add(row);
+            }
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    /** The local path of an OSC 7 {@code file://host/path} URI; the host is ignored. */
+    static Optional<Path> directoryFromUri(String uri) {
+        try {
+            URI parsed = new URI(uri);
+            String path = parsed.getPath();
+            if (!"file".equalsIgnoreCase(parsed.getScheme()) || path == null || path.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(Path.of(new URI("file", null, path, null)));
+        } catch (URISyntaxException | IllegalArgumentException e) {
+            return Optional.empty();
+        }
     }
 }

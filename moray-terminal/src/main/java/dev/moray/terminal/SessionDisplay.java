@@ -42,6 +42,12 @@ final class SessionDisplay implements TerminalDisplay {
         onCursorChange.run();
     }
 
+    /** DECSCUSR 0 (via the shell-integration filter): back to the configured cursor. */
+    void resetCursorShape() {
+        cursorShape = null;
+        onCursorChange.run();
+    }
+
     @Override
     public void beep() {
         onBell.run();
