@@ -21,7 +21,6 @@ public final class Main {
         System.setProperty("apple.laf.useScreenMenuBar", "true");
         TerminalOptions options = TerminalOptions.defaults();
         TerminalSession session = startShellOrExit(options);
-        session.exitFuture().thenAccept(code -> SwingUtilities.invokeLater(() -> System.exit(0)));
 
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("Moray");
@@ -34,6 +33,8 @@ public final class Main {
                     System.exit(0);
                 }
             });
+            // The shell has exited and the user pressed a key after reading the exit message.
+            view.setOnCloseRequest(frame::dispose);
             session.addListener(new TerminalSession.Listener() {
                 @Override
                 public void titleChanged(String title) {
