@@ -258,6 +258,57 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
+    /** The text of a selection: soft-wrapped rows joined, wide characters whole, trailing spaces trimmed. */
+    String text(Selection selection) {
+        buffer.lock();
+        try {
+            return SelectionText.extract(selection, this::lineAtLocked, buffer.getWidth());
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    /** The word at an absolute row and column, as a stream selection. */
+    Selection wordSelection(long row, int column) {
+        buffer.lock();
+        try {
+            TerminalLine line = lineAtLocked(row);
+            if (line == null) {
+                return Selection.at(row, column, false);
+            }
+            int[] word = WordBoundaries.wordAt(line, buffer.getWidth(), column);
+            return new Selection(row, word[0], row, word[1], false);
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    /** The whole logical line at an absolute row, soft-wrapped rows included. */
+    Selection lineSelection(long row) {
+        buffer.lock();
+        try {
+            long first = row;
+            while (true) {
+                TerminalLine above = lineAtLocked(first - 1);
+                if (above == null || !above.isWrapped()) {
+                    break;
+                }
+                first--;
+            }
+            long last = row;
+            while (true) {
+                TerminalLine line = lineAtLocked(last);
+                if (line == null || !line.isWrapped() || lineAtLocked(last + 1) == null) {
+                    break;
+                }
+                last++;
+            }
+            return new Selection(first, 0, last, buffer.getWidth() - 1, false);
+        } finally {
+            buffer.unlock();
+        }
+    }
+
     /**
      * The absolute row of a buffer row (0 = top of the live screen, negative = scrollback). An absolute row stays
      * attached to its line while output scrolls. Call with the buffer lock held.
