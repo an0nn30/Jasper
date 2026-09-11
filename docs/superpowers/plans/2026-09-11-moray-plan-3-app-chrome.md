@@ -48,7 +48,7 @@ App tests: SplitTreeTest.java, TabStateTest.java, KeyBindingsTest.java, and Swin
 - `ActionId` enum lists every parent §5.1 action, including SELECT_TAB_1 through SELECT_TAB_9; `String id()`, `String label()`, `String defaultBinding()`.
 - `KeyBindings.defaults(boolean macOs)`, `KeyBindings.withOverrides(boolean macOs, Map<String,String>)`, `Optional<ActionId> actionFor(KeyStroke)`, `Optional<KeyStroke> strokeFor(ActionId)`, `static Optional<KeyStroke> parse(String, boolean macOs)`. Invalid overrides throw IllegalArgumentException with action/key/collision context; unknown action names included. Plan 4 can translate them to diagnostics.
 
-- [ ] **Step 1: Write model tests and observe failure.** Include actual sequences like:
+- [x] **Step 1: Write model tests and observe failure.** Include actual sequences like:
 
 ```java
 UUID a = UUID.randomUUID(), b = UUID.randomUUID(), c = UUID.randomUUID();
@@ -69,7 +69,7 @@ Add ratio retention, asymmetric directional geometry, no-wrap navigation, last-c
 
 Run `./gradlew :moray-app:test --tests '*SplitTreeTest' --tests '*TabStateTest' --tests '*KeyBindingsTest'` and record missing-class failure.
 
-- [ ] **Step 2: Implement models.** Rebuild immutable tree nodes through recursive replacement. Traverse normalized unit rectangles according to branch ratios to select directional neighbors. Tie-break by forward edge distance then perpendicular center distance then stable traversal order. Keep focus valid after removing any leaf; prefer the surviving sibling subtree's first leaf when focused leaf is removed. For keys, expand cmd to META or CTRL|SHIFT; add ALT for non-mac defaults containing explicit cmd+shift. Parse overrides literally, remove their previous defaults before validating final collisions, and report both action names for a collision.
+- [x] **Step 2: Implement models.** Rebuild immutable tree nodes through recursive replacement. Traverse normalized unit rectangles according to branch ratios to select directional neighbors. Tie-break by forward edge distance then perpendicular center distance then stable traversal order. Keep focus valid after removing any leaf; prefer the surviving sibling subtree's first leaf when focused leaf is removed. For keys, expand cmd to META or CTRL|SHIFT; add ALT for non-mac defaults containing explicit cmd+shift. Parse overrides literally, remove their previous defaults before validating final collisions, and report both action names for a collision.
 
 ```java
 int primary = macOs ? InputEvent.META_DOWN_MASK
@@ -78,8 +78,8 @@ int primary = macOs ? InputEvent.META_DOWN_MASK
 int extra = !macOs && binding.contains("cmd+shift") ? InputEvent.ALT_DOWN_MASK : 0;
 ```
 
-- [ ] **Step 3: Run the covering tests and app check.** Expect all model tests to pass; examine the exact final shortcut map for collisions.
-- [ ] **Step 4: Commit and report.** Commit only this task's source/tests; report command/output and final APIs.
+- [x] **Step 3: Run the covering tests and app check.** Expect all model tests to pass; examine the exact final shortcut map for collisions.
+- [x] **Step 4: Commit and report.** Commit only this task's source/tests; report command/output and final APIs.
 
 ### Task 2: Terminal APIs for app ownership
 
@@ -100,7 +100,7 @@ int extra = !macOs && binding.contains("cmd+shift") ? InputEvent.ALT_DOWN_MASK :
 
 - Additional carryovers: reset lost link-gesture capture on each new press and focus loss; clear selection, pending async results and matches on alternate-buffer transitions; prune evicted prompt rows during history eviction. Close owned PTY with hang-up where supported and bounded forced termination for an unresponsive child, without waiting on the EDT. Preserve final output on normal exit.
 
-- [ ] **Step 1: Write and run failing tests.** Add regressions for a link press with missing release followed by a reported gesture, alternate-screen row invalidation, prompt eviction, and a real non-GUI process that ignores normal termination. Use FakeConnector, Await and SwingUtilities. Prove an intercepted Ctrl+D does not reach the PTY while unintercepted input does; an app handler returning false prevents fallback copy shortcuts; standalone copy still works. Prove font resize preserves the session/text and changes metrics; reset returns 14. History clear preserves screen rows. Popup fires only for locally owned gestures. A cleared or superseded async query cannot restore stale highlights/count.
+- [x] **Step 1: Write and run failing tests.** Add regressions for a link press with missing release followed by a reported gesture, alternate-screen row invalidation, prompt eviction, and a real non-GUI process that ignores normal termination. Use FakeConnector, Await and SwingUtilities. Prove an intercepted Ctrl+D does not reach the PTY while unintercepted input does; an app handler returning false prevents fallback copy shortcuts; standalone copy still works. Prove font resize preserves the session/text and changes metrics; reset returns 14. History clear preserves screen rows. Popup fires only for locally owned gestures. A cleared or superseded async query cannot restore stale highlights/count.
 
 ```java
 view.setShortcutHandler(event -> event.getKeyCode() == KeyEvent.VK_D);
@@ -111,7 +111,7 @@ assertThat(connector.written()).isEmpty();
 
 Run `./gradlew :moray-terminal:test --tests '*TerminalAppIntegrationTest' --tests '*TerminalAppearanceTest'` and record failure before implementation.
 
-- [ ] **Step 2: Implement the ownership hooks.** Intercept inside the existing key press path so key suppression remains centralized. Reconstruct FontSet/TerminalPainter using current palette/font options for size changes and resize existing session to fit. Apply dim overlay after painting. Use existing JediTerm buffer history clearing API discovered from the pinned jar, never inject a clear command into the shell. For async search use bounded execution and a monotonically increasing request generation; workers calculate only, EDT applies results if generation matches. Coalesce pending requests; do not queue unbounded queries or spawn a thread per keystroke.
+- [x] **Step 2: Implement the ownership hooks.** Intercept inside the existing key press path so key suppression remains centralized. Reconstruct FontSet/TerminalPainter using current palette/font options for size changes and resize existing session to fit. Apply dim overlay after painting. Use existing JediTerm buffer history clearing API discovered from the pinned jar, never inject a clear command into the shell. For async search use bounded execution and a monotonically increasing request generation; workers calculate only, EDT applies results if generation matches. Coalesce pending requests; do not queue unbounded queries or spawn a thread per keystroke.
 
 ```java
 long generation = ++searchGeneration;
@@ -123,8 +123,8 @@ SwingUtilities.invokeLater(() -> {
 });
 ```
 
-- [ ] **Step 3: Run terminal module check.** All previous tests and new integration tests must pass. Report worker lifecycle/cancellation limits explicitly.
-- [ ] **Step 4: Commit and report.** List exact public hooks consumed by Task 3, including thread/lifecycle contracts.
+- [x] **Step 3: Run terminal module check.** All previous tests and new integration tests must pass. Report worker lifecycle/cancellation limits explicitly.
+- [x] **Step 4: Commit and report.** List exact public hooks consumed by Task 3, including thread/lifecycle contracts.
 
 ### Task 3: Working multi-window application and desktop chrome
 
@@ -176,7 +176,7 @@ implementation("com.formdev:flatlaf-extras:3.7")
 Bundle Tabler outline SVGs from the user-supplied ~/projects/tabler-icons repository for seven toolbar icons and retain its MIT license/source attribution. Use FlatSVGIcon to load resources with meaningful accessible names/tooltips. Add Settings and Reload config in toolbar/menus disabled, with a tooltip explaining configuration support is unavailable (no internal plan number in product UI); Built-in defaults status must be honest.
 
 - [ ] **Step 4: Verify application tests and full check.** Run `./gradlew check --rerun-tasks`. Check `git diff --check`. Do not launch UI from subagent. Report exact commands, counts, warnings, remaining manual validation, resource license provenance, and any spec discrepancies.
-- [ ] **Step 5: Commit and report.** Root performs task review and actual GUI smoke, then final branch review. Update completion checkboxes only after reviewed success.
+- [ ] **Step 5: Commit and report.** Root performs task review and final branch review; native GUI smoke is handed to the user per AGENTS.md. Update completion checkboxes only after reviewed success.
 
 ## Root acceptance and finish
 

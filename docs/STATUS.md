@@ -1,6 +1,6 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11. Plan 3 implementation is on `codex/plan-3-app-chrome` in `.worktrees/plan-3`; desktop implementation commit `acfc79f`. Task 3 review and final branch review are in progress. Latest full headless check: **265 tests, 0 failures/errors, 1 expected font skip** (264 passed). No merge to main or remote push has occurred.
+**As of:** 2026-09-11. Plan 3 implementation is on `codex/plan-3-app-chrome` in `.worktrees/plan-3`; desktop implementation `acfc79f` and review fixes `6fac903`. Task 3 re-review and final branch review are in progress. Latest full headless check: **274 tests, 0 failures/errors, 1 expected font skip** (273 passed). No merge to main or remote push has occurred.
 
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. GUI launches and benchmarks are user-run only.
 
@@ -42,6 +42,10 @@ Settings and Reload config are visible but disabled; status says Built-in defaul
 - Search keeps one bounded per-view executor through reparenting; its thread retires after idle. New requests supersede queued work; cancellation cannot multiply workers on repeated zoom/reparent.
 - Expired prompt rows are physically pruned during history eviction.
 - PTY close returns promptly to the EDT, sends Unix hangup, applies a bounded force fallback, and closes acquired streams. A non-daemon cleanup worker survives final-window disposal long enough to perform fallback. A real headless child ignoring HUP/TERM is covered on Unix.
+- Find navigation requested during debounce/inflight search is retained; invalid regex errors persist until the query changes. Reparenting clears canceled search state.
+- Copy action enablement checks selection presence in constant time without extracting text or taking the buffer lock.
+- Font and nested-split minimum dimensions propagate to the native frame; PTY, view and emulator agree on the pinned JediTerm minimum of 5 columns × 2 rows.
+- Global shortcuts are installed on the root pane, with native text-field editing retained.
 - F13–F24 override parsing uses Java's separate high-function-key range; actual F13/F24 strokes are regression-tested.
 
 ## 4. Verification still required
@@ -98,6 +102,6 @@ Any-time performance work: remove unused style-array allocation during text-only
 
 ## 8. Workflow and next action
 
-Superpowers spec/plan → task implementer with TDD → separate task review → scoped fix/re-review → final branch review. Current commits: models `a75d5fa`; terminal hooks `56b251d`; lifecycle fixes `73f105c`; desktop `acfc79f`. Follow the live ledger until final review completes, then preserve this file and git history as the handoff record.
+Superpowers spec/plan → task implementer with TDD → separate task review → scoped fix/re-review → final branch review. Current commits: models `a75d5fa`; terminal hooks `56b251d`; lifecycle fixes `73f105c`; desktop `acfc79f`; desktop review fixes `6fac903`. Follow the live ledger until final review completes, then preserve this file and git history as the handoff record.
 
 Next: finish Plan 3 review, run user acceptance, choose whether to merge locally, then implement Plan 4 and complete the daily-use gate. Keep the feature worktree/branch until the user chooses integration.
