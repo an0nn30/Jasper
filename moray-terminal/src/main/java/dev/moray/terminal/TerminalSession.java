@@ -20,12 +20,14 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.regex.Pattern;
 
 /** A program running in a pseudo-terminal, emulated by JediTerm on a dedicated reader thread. */
 public final class TerminalSession implements AutoCloseable {
@@ -263,6 +265,25 @@ public final class TerminalSession implements AutoCloseable {
         buffer.lock();
         try {
             return SelectionText.extract(selection, this::lineAtLocked, buffer.getWidth());
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    /** Every match in the scrollback and on screen, oldest first; an empty query finds nothing. */
+    List<TerminalSearch.Match> search(String query, boolean regex, boolean caseSensitive) {
+        if (query.isEmpty()) {
+            return List.of();
+        }
+        Pattern pattern = TerminalSearch.pattern(query, regex, caseSensitive);
+        buffer.lock();
+        try {
+            int history = buffer.getHistoryLinesCount();
+            List<TerminalLine> lines = new ArrayList<>(history + buffer.getHeight());
+            for (int row = -history; row < buffer.getHeight(); row++) {
+                lines.add(buffer.getLine(row));
+            }
+            return TerminalSearch.find(pattern, absoluteRow(-history), lines, buffer.getWidth());
         } finally {
             buffer.unlock();
         }
