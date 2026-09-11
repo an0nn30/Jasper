@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 /** A program running in a pseudo-terminal, emulated by JediTerm on a dedicated reader thread. */
@@ -72,6 +73,8 @@ public final class TerminalSession implements AutoCloseable {
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
     private final CompletableFuture<Integer> exit = new CompletableFuture<>();
     private final List<Long> promptRows = new CopyOnWriteArrayList<>();
+    /** Generation of resets that make previously captured absolute rows obsolete. */
+    private final AtomicLong absoluteRowEpoch = new AtomicLong();
     /** Lines dropped off the top of the scrollback so far; the base of absolute row numbers. */
     private volatile long discardedLines;
     private volatile Path workingDirectory;
@@ -106,7 +109,10 @@ public final class TerminalSession implements AutoCloseable {
             title -> listeners.forEach(l -> l.titleChanged(title)),
             () -> listeners.forEach(Listener::bell),
             () -> listeners.forEach(Listener::screenChanged),
-            alternate -> listeners.forEach(l -> l.alternateBufferChanged(alternate)));
+            alternate -> {
+                absoluteRowEpoch.incrementAndGet();
+                listeners.forEach(l -> l.alternateBufferChanged(alternate));
+            });
         terminal = new JediTerminal(display, buffer, styleState);
         terminal.setTerminalOutput(new TerminalOutputStream() {
             @Override
@@ -132,6 +138,7 @@ public final class TerminalSession implements AutoCloseable {
 
             @Override
             public void historyCleared() {
+                absoluteRowEpoch.incrementAndGet();
                 promptRows.clear();
                 listeners.forEach(Listener::scrollbackReset);
             }
@@ -201,6 +208,7 @@ public final class TerminalSession implements AutoCloseable {
         try {
             terminal.resize(size, RequestOrigin.User);
             if (widthChanged) {
+                absoluteRowEpoch.incrementAndGet();
                 promptRows.clear(); // JediTerm reflows soft-wrapped lines, so recorded rows now name other lines
             }
         } finally {
@@ -269,6 +277,11 @@ public final class TerminalSession implements AutoCloseable {
 
     SessionDisplay display() {
         return display;
+    }
+
+    /** Monotonic generation for history, reflow and alternate-buffer changes that invalidate absolute rows. */
+    long absoluteRowEpoch() {
+        return absoluteRowEpoch.get();
     }
 
     /** Absolute rows of the prompts the shell marked with OSC 133;A that are still in the scrollback, oldest first. */

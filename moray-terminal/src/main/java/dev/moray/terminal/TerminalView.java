@@ -51,6 +51,7 @@ public final class TerminalView extends JComponent {
     private static final int FRAME_MILLIS = 8;
     private static final int BLINK_MILLIS = 530;
     private static final int WHEEL_LINES = 3;
+    private static final long SEARCH_IDLE_MILLIS = 1_000;
     private static final float DEFAULT_FONT_SIZE = 14f;
     private static final float MIN_FONT_SIZE = 6f;
     private static final float MAX_FONT_SIZE = 72f;
@@ -75,12 +76,12 @@ public final class TerminalView extends JComponent {
 
         @Override
         public void scrollbackReset() {
-            SwingUtilities.invokeLater(TerminalView.this::forgetAbsoluteRows);
+            SwingUtilities.invokeLater(TerminalView.this::reconcileAbsoluteRows);
         }
 
         @Override
         public void alternateBufferChanged(boolean alternate) {
-            SwingUtilities.invokeLater(TerminalView.this::forgetAbsoluteRows);
+            SwingUtilities.invokeLater(TerminalView.this::reconcileAbsoluteRows);
         }
     };
     private boolean blinkOn = true;
@@ -108,6 +109,7 @@ public final class TerminalView extends JComponent {
     private int currentMatch = -1;
     private final Object searchLock = new Object();
     private long searchGeneration;
+    private long observedAbsoluteRowEpoch;
     private ThreadPoolExecutor searchExecutor;
     private Future<?> pendingSearch;
     private volatile boolean exited;
@@ -123,6 +125,7 @@ public final class TerminalView extends JComponent {
 
     public TerminalView(TerminalSession session, TerminalOptions options) {
         this.session = session;
+        this.observedAbsoluteRowEpoch = session.absoluteRowEpoch();
         this.options = options;
         this.fontSize = options.fontSize();
         this.fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures());
@@ -208,6 +211,7 @@ public final class TerminalView extends JComponent {
     public void addNotify() {
         super.addNotify();
         session.addListener(listener);
+        reconcileAbsoluteRows();
         frameTimer.start();
         blinkTimer.start();
     }
@@ -217,7 +221,7 @@ public final class TerminalView extends JComponent {
         frameTimer.stop();
         blinkTimer.stop();
         session.removeListener(listener);
-        stopSearchWorker();
+        invalidatePendingSearch();
         super.removeNotify();
     }
 
@@ -388,12 +392,13 @@ public final class TerminalView extends JComponent {
 
     private ThreadPoolExecutor searchExecutor() {
         if (searchExecutor == null || searchExecutor.isShutdown()) {
-            searchExecutor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
+            searchExecutor = new ThreadPoolExecutor(1, 1, SEARCH_IDLE_MILLIS, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(1), runnable -> {
                     Thread thread = new Thread(runnable, "moray-terminal-search");
                     thread.setDaemon(true);
                     return thread;
                 }, new ThreadPoolExecutor.DiscardOldestPolicy());
+            searchExecutor.allowCoreThreadTimeOut(true);
         }
         return searchExecutor;
     }
@@ -407,20 +412,6 @@ public final class TerminalView extends JComponent {
             }
             if (searchExecutor != null) {
                 searchExecutor.getQueue().clear();
-            }
-        }
-    }
-
-    private void stopSearchWorker() {
-        synchronized (searchLock) {
-            searchGeneration++;
-            if (pendingSearch != null) {
-                pendingSearch.cancel(true);
-                pendingSearch = null;
-            }
-            if (searchExecutor != null) {
-                searchExecutor.shutdownNow();
-                searchExecutor = null;
             }
         }
     }
@@ -634,6 +625,7 @@ public final class TerminalView extends JComponent {
      * for when those rows stop naming the same lines. Runs on the Event Dispatch Thread.
      */
     private void forgetAbsoluteRows() {
+        observedAbsoluteRowEpoch = session.absoluteRowEpoch();
         invalidatePendingSearch();
         selection = null;
         pendingAnchor = null;
@@ -642,6 +634,13 @@ public final class TerminalView extends JComponent {
         viewport.follow();
         repaint();
         notifyFindResultListener(new FindResult(0, 0, null));
+    }
+
+    /** Reconciles row-state changes that may have happened while this view had no session listener. */
+    private void reconcileAbsoluteRows() {
+        if (observedAbsoluteRowEpoch != session.absoluteRowEpoch()) {
+            forgetAbsoluteRows();
+        }
     }
 
     /** Opens the link at a mouse event's cell, if there is one; true when it did. */

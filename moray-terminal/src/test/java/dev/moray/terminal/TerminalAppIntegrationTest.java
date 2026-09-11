@@ -1,16 +1,22 @@
 package dev.moray.terminal;
 
+import com.jediterm.terminal.model.TerminalTextBuffer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import javax.swing.SwingUtilities;
-import java.awt.event.InputEvent;
 import java.awt.event.FocusEvent;
+import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -137,19 +143,99 @@ class TerminalAppIntegrationTest {
     }
 
     @Test
+    void alternateBufferTransitionWhileDetachedIsReconciledOnReattach() throws Exception {
+        show("hello", 0, "hello");
+        selectByDragging(0, 0, 4, 0, 0);
+        assertThat(view.find("hello", false, false).count()).isOne();
+        onEdt(() -> {
+            view.addNotify();
+            view.removeNotify();
+        });
+
+        connector.feed("\033[?1049h");
+        Await.until(session::usingAlternateBuffer, "alternate screen while detached");
+        onEdt(view::addNotify);
+        try {
+            assertThat(view.selectedText()).isEmpty();
+            assertThat(view.findNext()).isEqualTo(new FindResult(0, 0, null));
+        } finally {
+            onEdt(view::removeNotify);
+        }
+    }
+
+    @Test
+    void historyResetWhileDetachedIsReconciledOnReattach() throws Exception {
+        connector.feed("1\r\n2\r\n3\r\n4\r\n5\r\n6");
+        Await.until(() -> "6".equals(session.snapshot().lineText(3)), "six lines on a four-row screen");
+        selectByDragging(0, 0, 0, 1, 0);
+        assertThat(view.find("1", false, false).count()).isOne();
+        onEdt(() -> {
+            view.addNotify();
+            view.removeNotify();
+        });
+
+        session.clearScrollback();
+        onEdt(view::addNotify);
+        try {
+            assertThat(view.selectedText()).isEmpty();
+            assertThat(view.findNext()).isEqualTo(new FindResult(0, 0, null));
+        } finally {
+            onEdt(view::removeNotify);
+        }
+    }
+
+    @Test
     void aClearedAsyncFindCannotRestoreStaleResults() throws Exception {
         show("alpha alpha", 0, "alpha alpha");
         AtomicBoolean callbackRan = new AtomicBoolean();
-
-        onEdt(() -> {
-            view.findAsync("alpha", false, false, result -> callbackRan.set(true));
-            view.clearFind();
-        });
-        Thread.sleep(100);
+        TerminalTextBuffer buffer = terminalBuffer();
+        buffer.lock();
+        ThreadPoolExecutor executor;
+        try {
+            onEdt(() -> view.findAsync("alpha", false, false, result -> callbackRan.set(true)));
+            executor = searchExecutor();
+            Await.until(() -> executor.getActiveCount() == 1, "asynchronous find blocked on the buffer");
+            onEdt(view::clearFind);
+        } finally {
+            buffer.unlock();
+        }
+        Await.until(() -> executor.getActiveCount() == 0, "cleared asynchronous find finished");
         drainEventQueue();
 
         assertThat(callbackRan).isFalse();
         assertThat(view.findNext()).isEqualTo(new FindResult(0, 0, null));
+    }
+
+    @Test
+    void repeatedTemporaryDetachesKeepBlockedSearchWorkerAllocationBounded() throws Exception {
+        TerminalTextBuffer buffer = terminalBuffer();
+        List<ThreadPoolExecutor> seenExecutors = new ArrayList<>();
+        buffer.lock();
+        try {
+            onEdt(view::addNotify);
+            for (int i = 0; i < 4; i++) {
+                onEdt(() -> view.findAsync("blocked", false, false, result -> { }));
+                ThreadPoolExecutor executor = searchExecutor();
+                seenExecutors.add(executor);
+                Await.until(() -> executor.getActiveCount() == 1, "search worker blocked on the buffer");
+                onEdt(() -> {
+                    view.removeNotify();
+                    view.addNotify();
+                });
+            }
+
+            Set<ThreadPoolExecutor> distinct = new HashSet<>(seenExecutors);
+            int liveWorkers = distinct.stream().mapToInt(ThreadPoolExecutor::getActiveCount).sum();
+            assertThat(liveWorkers).isOne();
+        } finally {
+            buffer.unlock();
+            onEdt(view::removeNotify);
+        }
+        Set<ThreadPoolExecutor> distinct = new HashSet<>(seenExecutors);
+        Await.until(() -> distinct.stream().allMatch(executor -> executor.getActiveCount() == 0),
+            "blocked search workers finished");
+        Await.until(() -> distinct.stream().allMatch(executor -> executor.getPoolSize() == 0),
+            "detached search worker reached its idle timeout");
     }
 
     @Test
@@ -296,5 +382,17 @@ class TerminalAppIntegrationTest {
         } catch (InvocationTargetException e) {
             throw new AssertionError(e.getCause());
         }
+    }
+
+    private TerminalTextBuffer terminalBuffer() throws ReflectiveOperationException {
+        var field = TerminalSession.class.getDeclaredField("buffer");
+        field.setAccessible(true);
+        return (TerminalTextBuffer) field.get(session);
+    }
+
+    private ThreadPoolExecutor searchExecutor() throws ReflectiveOperationException {
+        var field = TerminalView.class.getDeclaredField("searchExecutor");
+        field.setAccessible(true);
+        return (ThreadPoolExecutor) field.get(view);
     }
 }
