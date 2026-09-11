@@ -1,7 +1,7 @@
 # Moray — Phase 1: The Terminal — Design Spec
 
 **Date:** 2026-09-10
-**Status:** Approved in brainstorming, awaiting written-spec review
+**Status:** Approved (2026-09-10). Plans 1–2 of 4 implemented and merged (2026-09-11); plan 3 (app chrome, §5–§6) is in progress on branch `codex/plan-3-app-chrome`; plan 4 (config and packaging, §7) is not written yet. Current state: `docs/STATUS.md`.
 **Repo:** `~/projects/moray`
 
 ## 1. What Moray is
@@ -296,6 +296,9 @@ Logic lives in plain classes so most tests need no window.
 - Keybindings that send arbitrary text
 - Linux and Windows installers
 - Importing conch's `config.toml`
+- Autoscroll while drag-selecting past the edge of the view
+- A draggable scrollbar (plan 2 shows a display-only scroll indicator)
+- Search matches that span soft-wrapped rows
 - Everything in phases 2–5; plugins; the editor
 
 ## 11. Risks and items the plan must verify

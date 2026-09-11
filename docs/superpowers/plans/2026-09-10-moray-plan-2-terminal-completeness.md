@@ -1,5 +1,14 @@
 # Moray Plan 2 — Terminal Completeness Implementation Plan
 
+> **Status (2026-09-11): complete and merged to `main`** (commits `196e24d`..`0ce4add`; 216 tests, 1 expected skip). Where the code differs from this plan's text:
+> - Task 4 — the wide-character test strings use the Java escape for U+E000 (`234cd17`).
+> - Task 5 — the search regex runs outside the buffer lock; lines are copied under it (`cb591ab`).
+> - Task 7 — URL detection joins soft-wrapped rows (`urlAcrossWrappedRows`), because a wrapped URL was only half-detected.
+> - Task 9 — `capturingSelection` keeps a started local selection local through its release; clicks on rows above the live screen are not reported; wheel movement is counted in whole notches from `getPreciseWheelRotation()` (`537471f`).
+> - Final-review fix wave (`273f5a4`, `0ce4add`) — OSC 8 targets limited to http/https/ftp/mailto; macOS Shift+wheel ignored; `Listener.scrollbackReset` plus clearing of selection, matches and prompt marks on scrollback erase and on width change (jediterm-core reflows); exit message prefixed with `ESC[0m`; alternate-screen search covers only that screen; macOS ⌘-click opens a link before mouse-report routing (`openingLink`); `EvictionTest`; click-only-mode motion tests; spec §11 findings.
+>
+> Known open bug from the final re-review: the `openingLink` flag can stick (fix recipe in `docs/STATUS.md` §3). The benchmark was not re-run for this plan.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make Moray's single terminal pane complete for daily use: scrollback viewing, mouse reporting, selection with copy and paste, search with highlighting, shell integration (OSC 7 working directory, OSC 133 prompt marks and jumps, OSC 8 and detected links with ⌘-click), cursor reset via DECSCUSR 0, and an in-pane exit message.

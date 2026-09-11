@@ -1,5 +1,7 @@
 # Moray Plan 1 — Terminal Core Implementation Plan
 
+> **Status (2026-09-11): complete and merged to `main`** (commits `6daa61f`..`d0ccbfb`; benchmark 41.5 MB/s). Where the code differs from this plan's text: Task 7 — Meta+Shift+Tab no longer gets a doubled ESC (`b294d31`); Task 9 — the window title is seeded from the shell's first title and a shell that fails to start shows an error dialog (`ee29efa`); final review — cursor-only changes trigger a repaint, Ctrl+J/H/I/M/[ chords are sent, the cursor is drawn in the pending-wrap column (`d76b84e`..`d0ccbfb`). Plan 2 later replaced `TerminalView` and `Main`. Current state and open items: `docs/STATUS.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A single-window, single-pane Moray terminal that runs your login shell, renders with Moray's own Swing view (ligatures, fallback fonts, 256/truecolor, cursor shapes) on top of `jediterm-core` + pty4j, accepts keyboard input including Option-as-Meta, and has a throughput benchmark and three-OS CI.
