@@ -35,6 +35,11 @@ final class DesktopTestSupport {
         OWNERS.add(owner);
         return owner;
     }
+    static WindowContent content(ShellLauncher launcher, ThemeController themes) {
+        WindowContent owner = new WindowContent(launcher, HOME, path -> {}, () -> {}, () -> {}, themes);
+        OWNERS.add(owner);
+        return owner;
+    }
     static void closeOwners() throws Exception {
         edt(() -> { OWNERS.forEach(WindowContent::close); OWNERS.clear(); });
     }

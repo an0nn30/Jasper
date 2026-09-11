@@ -1,8 +1,5 @@
 package dev.moray.app;
 
-import com.formdev.flatlaf.FlatDarkLaf;
-import com.formdev.flatlaf.FlatLightLaf;
-import java.awt.Window;
 import java.awt.Dimension;
 import java.awt.event.*;
 import javax.swing.*;
@@ -23,6 +20,7 @@ final class WindowChrome {
         }
     };
     private final JMenuBar menuBar = new JMenuBar();
+    private final java.util.EnumMap<BuiltinTheme, JRadioButtonMenuItem> themeItems = new java.util.EnumMap<>(BuiltinTheme.class);
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
 
@@ -55,27 +53,15 @@ final class WindowChrome {
         statusVisible.addActionListener(event -> owner.setStatusVisible(statusVisible.isSelected()));
         JMenu appearance = new JMenu("Appearance");
         ButtonGroup themes = new ButtonGroup();
-        for (String name : new String[]{"Light", "Dark"}) {
-            JRadioButtonMenuItem item = new JRadioButtonMenuItem(name,
-                UIManager.getLookAndFeel().isNativeLookAndFeel() ? name.equals("Dark") :
-                    UIManager.getLookAndFeel() instanceof FlatLightLaf == name.equals("Light"));
-            item.addActionListener(event -> {
-                if (name.equals("Light")) FlatLightLaf.setup(); else FlatDarkLaf.setup();
-                for (Window window : Window.getWindows()) {
-                    SwingUtilities.updateComponentTreeUI(window);
-                    if (window instanceof JFrame frame && frame.getContentPane() instanceof WindowContent content) {
-                        content.update();
-                    }
-                }
+        for (BuiltinTheme theme : new BuiltinTheme[]{BuiltinTheme.LIGHT, BuiltinTheme.DARK}) {
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(theme.label(), owner.theme() == theme);
+            item.setAction(new AbstractAction(theme.label()) {
+                @Override public void actionPerformed(ActionEvent event) { owner.selectTheme(theme); }
             });
-            themes.add(item); appearance.add(item);
+            themeItems.put(theme, item); themes.add(item); appearance.add(item);
         }
         appearance.addMenuListener(new MenuListener() {
-            @Override public void menuSelected(MenuEvent event) {
-                boolean light = UIManager.getLookAndFeel() instanceof FlatLightLaf;
-                appearance.getItem(0).setSelected(light);
-                appearance.getItem(1).setSelected(!light);
-            }
+            @Override public void menuSelected(MenuEvent event) { refreshTheme(); }
             @Override public void menuDeselected(MenuEvent event) {}
             @Override public void menuCanceled(MenuEvent event) {}
         });
@@ -132,6 +118,7 @@ final class WindowChrome {
         }
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
+    void refreshTheme() { themeItems.forEach((theme, item) -> item.setSelected(owner.theme() == theme)); }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }
     JToolBar toolbar() { return toolbar; }
     JLabel status() { return status; }

@@ -1,6 +1,5 @@
 package dev.moray.app;
 
-import com.formdev.flatlaf.FlatDarkLaf;
 import java.nio.file.Path;
 import javax.swing.SwingUtilities;
 
@@ -10,7 +9,6 @@ public final class Main {
     public static void main(String[] args) {
         System.setProperty("apple.laf.useScreenMenuBar", "true");
         SwingUtilities.invokeLater(() -> {
-            FlatDarkLaf.setup();
             new MorayApplication().newWindow(Path.of(System.getProperty("user.home")));
         });
     }

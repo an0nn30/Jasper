@@ -17,9 +17,9 @@ class WindowChromeTest {
             WindowContent first = null;
             WindowContent second = null;
             try {
-                FlatDarkLaf.setup();
-                first = content(launcher(new ArrayDeque<>()));
-                second = content(launcher(new ArrayDeque<>()));
+                var themes = new ThemeController();
+                first = content(launcher(new ArrayDeque<>()), themes);
+                second = content(launcher(new ArrayDeque<>()), themes);
                 JMenu firstAppearance = appearance(first);
                 JMenu secondAppearance = appearance(second);
                 firstAppearance.getItem(0).doClick();

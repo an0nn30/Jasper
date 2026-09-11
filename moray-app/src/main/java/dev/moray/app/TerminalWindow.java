@@ -19,9 +19,9 @@ final class TerminalWindow implements AutoCloseable {
         @Override public void windowDeactivated(WindowEvent event) { content.setActive(false); }
     };
 
-    TerminalWindow(MorayApplication application, ShellLauncher launcher, Path directory) {
+    TerminalWindow(MorayApplication application, ShellLauncher launcher, Path directory, ThemeController themes) {
         this.application = application;
-        content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close);
+        content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes);
         content.onTitle = title -> frame.setTitle(Main.windowTitle(title));
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.setContentPane(content); frame.setJMenuBar(content.menuBar());

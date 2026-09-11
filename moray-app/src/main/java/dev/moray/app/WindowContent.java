@@ -20,16 +20,24 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private final EnumMap<ActionId, Action> actions = new EnumMap<>(ActionId.class);
     private final KeyBindings bindings = KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac"));
     private final WindowChrome chrome;
+    private final ThemeController themes;
     private JRootPane bindingRoot;
     Runnable onMinimumSizeChanged = () -> {};
     private boolean closed;
     private boolean rearranging;
     private boolean active = true;
+    Consumer<BuiltinTheme> onThemeChanged = theme -> {};
     Consumer<String> onTitle = title -> {};
     Consumer<String> onError = message -> JOptionPane.showMessageDialog(this, message, "Moray", JOptionPane.ERROR_MESSAGE);
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty) {
+        this(launcher, directory, newWindow, quit, onEmpty, new ThemeController());
+    }
+
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+                  ThemeController themes) {
         super(new BorderLayout());
+        this.themes = themes;
         this.launcher = launcher; this.newWindow = newWindow; this.quit = quit; this.onEmpty = onEmpty;
         for (ActionId id : ActionId.values()) {
             Action action = new AbstractAction(id.label()) {
@@ -56,6 +64,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                 if (index >= 0 && SwingUtilities.isMiddleMouseButton(event)) closeTab((TerminalTab) tabs.getComponentAt(index));
             }
         });
+        themes.register(this);
         newTab(directory);
     }
 
@@ -104,6 +113,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
+        pane.applyTheme(themes.current());
         pane.view().setShortcutHandler(event -> dispatchShortcut(KeyStroke.getKeyStrokeForEvent(event), pane.view()));
         pane.view().setContextMenuHandler(event -> {
             selectTab(tab); tab.focus(pane); pane.focusTerminal(); update();
@@ -273,6 +283,36 @@ final class WindowContent extends JPanel implements AutoCloseable {
         updateActions(); onMinimumSizeChanged.run();
     }
 
+    BuiltinTheme theme() { return themes.current(); }
+
+    void selectTheme(BuiltinTheme theme) {
+        if (closed) return;
+        try { themes.select(theme); }
+        catch (IllegalStateException failure) { onError.accept(failure.getMessage()); }
+        finally { chrome.refreshTheme(); }
+    }
+
+    /** Updates all retained panes without reparenting them; the native boundary hooks in last. */
+    void applyTheme(BuiltinTheme theme) {
+        if (closed) return;
+        var retained = new ArrayList<TerminalTab>();
+        for (int i = 0; i < tabs.getTabCount(); i++) retained.add((TerminalTab) tabs.getComponentAt(i));
+        retained.forEach(TerminalTab::beginThemeUpdate);
+        try {
+            SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
+            if (bindingRoot == null || menuBar().getParent() == null) SwingUtilities.updateComponentTreeUI(menuBar());
+            for (TerminalTab tab : retained) {
+                for (TerminalPane pane : tab.panes()) {
+                    // Zoom detaches sibling panes from the visible component hierarchy.
+                    if (!SwingUtilities.isDescendingFrom(pane, this)) SwingUtilities.updateComponentTreeUI(pane);
+                    pane.applyTheme(theme);
+                }
+            }
+            chrome.refreshTheme(); onThemeChanged.accept(theme); update();
+            revalidate(); repaint();
+        } finally { retained.forEach(TerminalTab::endThemeUpdate); }
+    }
+
     void setActive(boolean value) { active = value; update(); }
     void setToolbarMode(ToolbarMode mode) { chrome.setToolbarMode(mode); revalidate(); onMinimumSizeChanged.run(); }
     void setStatusVisible(boolean visible) { chrome.setStatusVisible(visible); revalidate(); onMinimumSizeChanged.run(); }
@@ -280,9 +320,11 @@ final class WindowContent extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        themes.unregister(this);
         for (int i = 0; i < tabs.getTabCount(); i++) ((TerminalTab) tabs.getComponentAt(i)).close();
         tabs.removeAll(); removeRootBindings();
         actions.values().forEach(action -> action.setEnabled(false));
+        onThemeChanged = theme -> {};
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
     }
 }

@@ -13,6 +13,7 @@ import javax.swing.SwingUtilities;
 
 /** Application-level window and shell ownership; closing a window never exits sibling windows. */
 final class MorayApplication {
+    private final ThemeController themes = new ThemeController();
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     private final ExecutorService launches = Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("moray-shell-launch-", 0).factory());
@@ -35,7 +36,7 @@ final class MorayApplication {
 
     void newWindow(Path directory) {
         if (quitting) return;
-        TerminalWindow window = new TerminalWindow(this, launcher, directory);
+        TerminalWindow window = new TerminalWindow(this, launcher, directory, themes);
         windows.add(window); window.show();
     }
 

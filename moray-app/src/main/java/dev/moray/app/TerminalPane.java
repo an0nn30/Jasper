@@ -108,6 +108,11 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         if (view != null) view.setInactiveDim(selected ? 0 : 0.3f);
     }
 
+    void applyTheme(BuiltinTheme theme) {
+        if (view != null) view.setPalette(theme.palette());
+        setActive(active);
+    }
+
     @Override public void close() {
         if (closed) return;
         closed = true;

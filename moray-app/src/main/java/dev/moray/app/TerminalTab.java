@@ -14,6 +14,9 @@ final class TerminalTab extends JPanel implements AutoCloseable {
     private final TabState state = new TabState();
     private final Map<UUID, TerminalPane> panes = new LinkedHashMap<>();
     private final SplitTree tree;
+    private final Map<UUID, JSplitPane> splits = new LinkedHashMap<>();
+    private long themeGeneration;
+    private boolean updatingTheme;
     private long renderGeneration;
     private boolean closed;
     private boolean active = true;
@@ -92,7 +95,7 @@ final class TerminalTab extends JPanel implements AutoCloseable {
 
     private void render() {
         long generation = ++renderGeneration;
-        removeAll();
+        removeAll(); splits.clear();
         if (!panes.isEmpty()) add(tree.zoomed() ? focusedPane() : renderNode(tree.root().orElseThrow(), generation));
         refreshActive(); revalidate(); repaint();
     }
@@ -103,6 +106,7 @@ final class TerminalTab extends JPanel implements AutoCloseable {
         JSplitPane split = new JSplitPane(branch.axis() == SplitTree.Axis.RIGHT
             ? JSplitPane.HORIZONTAL_SPLIT : JSplitPane.VERTICAL_SPLIT,
             renderNode(branch.first(), generation), renderNode(branch.second(), generation));
+        splits.put(branch.id(), split);
         split.setContinuousLayout(true); split.setBorder(null);
         split.setResizeWeight(branch.ratio());
         boolean[] restoring = {true};
@@ -111,7 +115,7 @@ final class TerminalTab extends JPanel implements AutoCloseable {
             int size = split.getOrientation() == JSplitPane.HORIZONTAL_SPLIT ? split.getWidth() : split.getHeight();
             if (size <= split.getDividerSize()) return;
             restoring[0] = true;
-            split.setDividerLocation(branch.ratio());
+            split.setDividerLocation(currentRatio(tree.root().orElseThrow(), branch.id()));
             restoring[0] = false;
         };
         split.addComponentListener(new ComponentAdapter() {
@@ -120,7 +124,7 @@ final class TerminalTab extends JPanel implements AutoCloseable {
             }
         });
         split.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, event -> {
-            if (closed || generation != renderGeneration || restoring[0]) return;
+            if (closed || generation != renderGeneration || restoring[0] || updatingTheme) return;
             int size = (split.getOrientation() == JSplitPane.HORIZONTAL_SPLIT ? split.getWidth() : split.getHeight())
                 - split.getDividerSize();
             if (size > 0) {
@@ -132,10 +136,42 @@ final class TerminalTab extends JPanel implements AutoCloseable {
         return split;
     }
 
+    void beginThemeUpdate() { updatingTheme = true; ++themeGeneration; }
+
+    void endThemeUpdate() {
+        long generation = themeGeneration;
+        restoreThemeDividers();
+        // FlatLaf replacement and validation can queue another layout on the EDT.
+        SwingUtilities.invokeLater(() -> {
+            if (closed || generation != themeGeneration) return;
+            restoreThemeDividers(); updatingTheme = false;
+        });
+    }
+
+    private void restoreThemeDividers() {
+        for (var entry : splits.entrySet()) {
+            JSplitPane split = entry.getValue();
+            double ratio = currentRatio(tree.root().orElseThrow(), entry.getKey());
+            split.setResizeWeight(ratio);
+            split.doLayout();
+            int size = split.getOrientation() == JSplitPane.HORIZONTAL_SPLIT ? split.getWidth() : split.getHeight();
+            if (size > split.getDividerSize()) split.setDividerLocation(ratio);
+        }
+    }
+
+    private static double currentRatio(SplitTree.Node node, UUID id) {
+        if (node instanceof SplitTree.Branch branch) {
+            if (branch.id().equals(id)) return branch.ratio();
+            double first = currentRatio(branch.first(), id);
+            return Double.isNaN(first) ? currentRatio(branch.second(), id) : first;
+        }
+        return Double.NaN;
+    }
+
     @Override public void close() {
         if (closed) return;
         closed = true; ++renderGeneration;
-        panes.values().forEach(TerminalPane::close); panes.clear(); removeAll();
+        panes.values().forEach(TerminalPane::close); panes.clear(); splits.clear(); removeAll();
         onChanged = () -> {}; onEmpty = () -> {}; configure = pane -> {}; onError = message -> {};
     }
 }
