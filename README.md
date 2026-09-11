@@ -1,35 +1,45 @@
 # Moray
 
-A cross-platform (macOS, Linux, Windows) terminal workstation written in Java Swing, laid out like MobaXterm. Phase 1 — a local terminal good enough to replace iTerm2 / Alacritty — is in progress: two of its four implementation plans are done. Today Moray is a single window running your login shell with ligatures, fallback fonts, truecolour, mouse reporting, scrollback, selection, copy/paste, search (API), shell integration and clickable links. Status and next steps: [`docs/STATUS.md`](docs/STATUS.md).
+A cross-platform terminal workstation written in Java Swing, with macOS as the immediate daily-use target and a MobaXterm-style layout. Phase 1 builds the terminal before SSH sessions, credential vault, SFTP, tunnels and plugins.
+
+Moray has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status.
+
+Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). Plan 3's desktop acceptance remains a [user-run checklist](docs/superpowers/plans/2026-09-11-moray-plan-3-manual-check.md). Passing the headless tests is not the Phase 1 daily-use gate.
 
 ## Requirements
 
-- **JetBrains Runtime 25** (a JDK build; download a `jbrsdk` from the [JetBrainsRuntime releases](https://github.com/JetBrains/JetBrainsRuntime/releases)). Gradle's toolchain looks for vendor JetBrains, language version 25; on macOS it finds JBRs registered under `~/Library/Java/JavaVirtualMachines`.
-- Nothing else: the Gradle wrapper (9.7.0) downloads Gradle, and dependencies come from Maven Central and JetBrains' `intellij-dependencies` repository.
+Java 25 on the **JetBrains Runtime** (JBR JDK). Gradle requires vendor JetBrains and discovers the runtime automatically on the development Mac. Use the wrapper, not a system Gradle installation.
 
-## Build, test, run
+## Build and run
 
 ```bash
 ./gradlew check
-```
-
-```bash
 ./gradlew :moray-app:run
 ```
+
+`check` is headless. `run` opens windows and starts your login shell. Coding agents must follow [AGENTS.md](AGENTS.md) and leave GUI checks to the user.
+
+For the throughput benchmark, when no game or VM is running:
 
 ```bash
 ./gradlew :moray-app:bench
 ```
 
-`check` runs all tests headless. `run` opens a window with your login shell. `bench` generates ~100 MB of ANSI-coloured text once, `cat`s it through a Moray window and prints MB/s (41.5 MB/s on an Apple M5 Max at the end of plan 1; the gate is 35 MB/s).
+The benchmark opens a temporary window and measures ~100 MB of ANSI output. Minimum acceptance is 35 MB/s; target 45 MB/s. See STATUS for recorded measurements and pending verification.
+
+## Using the application
+
+On macOS: Cmd+T new tab, Cmd+N new window, Cmd+D split right, Cmd+Shift+D split down, Cmd+Option+arrows focus a pane, Cmd+Shift+Enter zoom, Cmd+F find, F2 rename, Cmd+W close tab, Cmd+Shift+W close pane. Tabs have close controls, support middle-click close and drag reorder. A blank rename restores the shell/directory title.
+
+Cmd+= / Cmd+- / Cmd+0 changes or resets the focused pane's font. Cmd+K clears history while retaining the live screen. Menus expose the full action list. View controls toolbar labels/visibility, status visibility and light/dark chrome. Configuration files and persistence arrive in Plan 4; Settings/Reload are visibly disabled for now.
+
+On Linux/Windows, `cmd` maps to Ctrl+Shift. Defaults written with an additional explicit Shift add Alt to remain distinct (for example split down is Ctrl+Alt+Shift+D). Ordinary Ctrl remains available to terminal programs.
+
+Working-directory inheritance and prompt navigation use OSC 7 and OSC 133 emitted by your shell. Without those sequences, a pane retains its launch-directory fallback. Search currently matches each physical row, so matches do not span a soft wrap.
 
 ## Layout
 
-```
-moray-terminal/   the terminal component (dev.moray.terminal): session, emulator wiring, view, painter, input, selection, search, shell integration
-moray-app/        the application (dev.moray.app): Main, DefaultShell, Bench
-docs/STATUS.md    where things stand — start here
-docs/superpowers/specs/   design spec (binding authority)
-docs/superpowers/plans/   implementation plans (1 and 2 done)
-AGENTS.md         conventions for coding agents (CLAUDE.md imports it)
-```
+- `moray-terminal/`: sessions, emulator integration, terminal rendering/input, selection, search and shell integration.
+- `moray-app/`: window/pane ownership, app models, actions, tabs/splits, find and desktop chrome.
+- `docs/STATUS.md`: completed work, open items and deferred findings.
+- `docs/superpowers/specs/` and `docs/superpowers/plans/`: specifications and implementation plans.
