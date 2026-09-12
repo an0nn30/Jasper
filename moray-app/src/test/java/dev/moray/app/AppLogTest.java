@@ -192,20 +192,48 @@ class AppLogTest {
     }
 
     @Test
-    void unwritableDestinationReturnsDisabledCloseable() throws Exception {
+    void unwritableDestinationRetainsPrivateRoutingForDiagnosticsAndUncaughtFailures() throws Exception {
         Path file = temporary.resolve("not-a-directory");
         Files.writeString(file, "occupied");
         PrintStream original = System.err;
         var captured = new ByteArrayOutputStream();
+        var parentRecords = new RecordingHandler();
+        Logger root = Logger.getLogger("");
+        Logger namespace = Logger.getLogger("dev.moray");
+        boolean parentBefore = namespace.getUseParentHandlers();
+        AppLog failed = null;
+        root.addHandler(parentRecords);
         try {
             System.setErr(new PrintStream(captured, true, StandardCharsets.UTF_8));
-            try (var log = AppLog.open(file)) {
-                assertThat(log.enabled()).isFalse();
+            failed = AppLog.open(file);
+            assertThat(failed.enabled()).isFalse();
+            assertThat(namespace.getUseParentHandlers()).isFalse();
+            System.getLogger("dev.moray.app.Test").log(System.Logger.Level.ERROR,
+                "Failed-open diagnostic {0}", "SECRET_FAILED_PARAMETER");
+            try (var exceptions = Main.installUnexpectedExceptionHandler()) {
+                assertThat(exceptions).isNotNull();
+                Thread failure = Thread.ofPlatform().unstarted(() -> {
+                    throw new IllegalStateException("SECRET_FAILED_UNCAUGHT");
+                });
+                failure.start();
+                failure.join();
+            }
+            try (var normal = AppLog.open(temporary.resolve("normal-alongside-disabled"), 64 * 1024, 3, 8)) {
+                assertThat(normal.enabled()).isTrue();
+                failed.close();
+                assertThat(namespace.getUseParentHandlers()).isFalse();
+                System.getLogger("dev.moray.app.Test").log(System.Logger.Level.ERROR,
+                    "Overlapping installation diagnostic", new IOException("SECRET_OVERLAP"));
             }
         } finally {
+            if (failed != null) failed.close();
             System.setErr(original);
+            root.removeHandler(parentRecords);
         }
         assertThat(captured.toString(StandardCharsets.UTF_8)).isEqualTo("Moray diagnostics are unavailable.\n");
+        assertThat(String.join("", parentRecords.records))
+            .doesNotContain("SECRET_FAILED_PARAMETER", "SECRET_FAILED_UNCAUGHT", "SECRET_OVERLAP");
+        assertThat(namespace.getUseParentHandlers()).isEqualTo(parentBefore);
     }
 
     private static String contents(Path directory) throws IOException {

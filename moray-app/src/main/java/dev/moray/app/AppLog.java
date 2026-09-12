@@ -59,7 +59,10 @@ final class AppLog implements AutoCloseable {
             if (handler != null) handler.close();
             else if (files != null) files.close();
             System.err.println("Moray diagnostics are unavailable.");
-            return new AppLog(null, false);
+            AsyncHandler disabled = new AsyncHandler(new DiscardingHandler(), DEFAULT_QUEUE_SIZE, CLOSE_MILLIS);
+            disabled.start();
+            attach(disabled);
+            return new AppLog(disabled, false);
         }
     }
 
@@ -220,6 +223,13 @@ final class AppLog implements AutoCloseable {
         @Override public String format(LogRecord record) {
             return record.getMessage();
         }
+    }
+
+    /** Keeps privacy routing active without retaining records or touching disk after file setup fails. */
+    private static final class DiscardingHandler extends Handler {
+        @Override public void publish(LogRecord record) {}
+        @Override public void flush() {}
+        @Override public void close() {}
     }
 
     private static final class FixedErrorManager extends ErrorManager {
