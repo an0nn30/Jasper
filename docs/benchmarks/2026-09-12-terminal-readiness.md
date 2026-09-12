@@ -1,5 +1,7 @@
 # Terminal readiness measurements — 2026-09-12
 
+**Revision boundary:** The baseline/final comparison below measures `8e81040` against `10cc444`, before the last review fix. The shipped readiness package is now `8d84e7d`; its separate validation is recorded at the end. The full memory matrix was not repeated for that hidden-search lifecycle fix.
+
 The progressive nine-configuration workload's median cumulative allocation fell **10.0%** (299.27 → 269.20 GiB), and median peak parent RSS fell **2.9%** (6.51 → 6.33 GiB). Fresh idle process memory is essentially unchanged. This is a modest stress-workload improvement, not a general 10% reduction in application memory.
 
 The standalone throughput median decreased **3.0%**, from 39.09 to 37.94 MB/s. All final runs exceeded the **35 MB/s streaming minimum**; the **45 MB/s target remains unmet**. Output EDT scheduling p95 increased from a median 6.94 to 8.76 ms (about 1.82 ms); startup-inclusive throughput changed by -0.6%. Retain these trade-offs when assessing the hardening changes.
@@ -115,3 +117,14 @@ Baseline JFR attributed 12.06% of sampled allocation weight to stacks containing
 The implementation target was to eliminate the unused text-only style arrays while retaining rendering, configured history and the throughput floor. No fixed heap cap, periodic collection policy, default-history reduction or backend change was introduced. The mixed per-case RSS results and unchanged idle footprint do not justify a blanket memory-saving claim or additional architectural changes in this slice.
 
 JFR environment and system-property events were disabled and verified to have zero events in both recordings. Raw recordings, process-exit records, JSON samples, profile probes, image manifests and protocol scripts remain local under `moray-app/build/benchmarks/readiness/` in the readiness worktree. Preserve that directory before `clean` or worktree removal; the checked-in JSON files are compact aggregates, not substitutes for raw samples.
+
+
+## Post-review package validation
+
+Final review identified and fixed hidden-tab search/debounce cancellation and resume (`8d84e7d5ed8d679000992f8b96d9a97e99bef5e2`). The scoped re-review approved without further findings. A fresh forced build/package passed 576 tests (575 passed, one known skip) and native image/DMG verification. The [post-review JSON](2026-09-12-post-review.json) records exact JAR/DMG checksums, test counts and metrics.
+
+Three new full 100 MiB throughput runs used the preserved final image and the same protocol. Streaming median was **37.05 MB/s (36.91–37.28)**, about 5.2% below the original baseline median; startup-inclusive median was 29.46 MB/s (29.42–29.49). Output EDT p95 median was **10.30 ms (8.89–10.34)**. Peak parent RSS median was 1055.09 MiB (1030.14–1199.77); cumulative allocation median was 6.59 GiB (6.58–7.16). All three actual processes returned 0, reported complete and left no reported fixture children. All passed the 35 MB/s streaming floor; the 45 MB/s target remains unmet. These short sequential samples still do not isolate causality or establish significance.
+
+A separate small-payload native smoke covered all nine pane/history configurations, search/resize/font changes, one open/close cycle per configuration, and cleanup. It used a 65536-byte target and 100 ms warmup/settles; it is instrumentation/lifecycle validation, not memory or throughput acceptance evidence. Its process returned 0 and no reported fixture children survived. Prerequisites were checked before each new invocation.
+
+The full repeated matrix, fresh idle series and JFR/native profiles above remain measurements of `10cc444`. Do not transfer those memory-reduction percentages to the final revision as a newly measured result. Raw final validation lives in the local artifact directory's `post-review/` subdirectory.

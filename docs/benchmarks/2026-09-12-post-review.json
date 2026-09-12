@@ -1,0 +1,64 @@
+{
+  "build": {
+    "revision": "8d84e7d5ed8d679000992f8b96d9a97e99bef5e2",
+    "tests": {
+      "tests": 576,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1
+    },
+    "dmgBytes": 82157741,
+    "dmgSha256": "456da609ffb397f3bcfde56ec99893965a3f4844d4d6c86b765d03c3ef9949f2",
+    "image": "/Users/dustin/projects/moray/.worktrees/terminal-memory-plan/moray-app/build/benchmarks/readiness/images/post-review-8d84e7d/Moray.app",
+    "jarSha256": {
+      "moray-app.jar": "60c757f039f897fdf5471ccc7556423f9dd2c01fb4c953620bb53453ea4787fb",
+      "moray-terminal.jar": "c7d2bf5ae8863a1a071295965855e3aa75807a2f0f7d25b3a2fc12b8cd875b96"
+    }
+  },
+  "throughput": {
+    "streamMBps": {
+      "median": 37.050878812092066,
+      "min": 36.91408732940838,
+      "max": 37.27514308868943,
+      "count": 3
+    },
+    "startupInclusiveMBps": {
+      "median": 29.46212492527176,
+      "min": 29.42164232473497,
+      "max": 29.489235278038905,
+      "count": 3
+    },
+    "outputEdtP95Millis": {
+      "median": 10.301125,
+      "min": 8.894083,
+      "max": 10.343209,
+      "count": 3
+    },
+    "residentBytesPeak": {
+      "median": 1106345984,
+      "min": 1080180736,
+      "max": 1258045440,
+      "count": 3
+    },
+    "allocatedBytes": {
+      "median": 7072185808,
+      "min": 7060956464,
+      "max": 7683770288,
+      "count": 3
+    }
+  },
+  "memorySmoke": {
+    "configurations": 9,
+    "bytesPerPaneTarget": 65536,
+    "cycles": 1,
+    "warmupMillis": 100,
+    "settleMillis": 100,
+    "status": "complete",
+    "performanceClaim": false
+  },
+  "processValidation": {
+    "acceptedInvocations": 4,
+    "allReturnCodeZero": true,
+    "survivingReportedChildren": 0
+  }
+}

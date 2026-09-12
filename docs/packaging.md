@@ -77,6 +77,6 @@ acceptance remain unexecuted on macOS.
 
 ## Terminal readiness verification
 
-The readiness branch's macOS arm64 package at runtime revision `10cc444` passed a fresh `./gradlew build :moray-app:packageDist --rerun-tasks`: 572 tests, 571 passed and one known font skip, zero failures/errors; all 16 tasks executed. Native image/runtime/dependency checks, strict bundle seal and DMG integrity passed. This automated verification and controlled fixture benchmarking do not complete the interactive checklist above.
+The readiness branch's macOS arm64 package at runtime revision `8d84e7d` passed a fresh `./gradlew build :moray-app:packageDist --rerun-tasks`: 576 tests, 575 passed and one known font skip, zero failures/errors; all 16 tasks executed. Native image/runtime/dependency checks, strict bundle seal and DMG integrity passed. This automated verification and controlled fixture benchmarking do not complete the interactive checklist above.
 
 See the [readiness ledger](terminal-readiness.md) for the exact artifact checksum, measurement report and pending CI/macOS/Windows gates. After installing, also check modifier changes during tmux mouse drags, multiple mouse buttons, multi-notch scrolling, whole-word dragging, CJK/emoji selection edges, browser opening, and blinking after hide/show or pane reparenting. Leave the two-week trial unstarted until the acceptance gates are resolved.
