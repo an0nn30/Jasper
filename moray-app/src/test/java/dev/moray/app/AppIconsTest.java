@@ -58,6 +58,31 @@ class AppIconsTest {
         });
     }
 
+    @Test void enclosedIconFacesPaintMoreStronglyThanTheirSoftFields() throws Exception {
+        edt(() -> {
+            var original = UIManager.getLookAndFeel();
+            try {
+                new ThemeController();
+                for (FaceCase item : new FaceCase[]{
+                    new FaceCase("square-plus", 7, 7),
+                    new FaceCase("app-window", 14, 14),
+                    new FaceCase("columns-2", 8, 14),
+                    new FaceCase("settings", 14, 7)
+                }) {
+                    BufferedImage image = paintImage(AppIcons.icon(item.name()));
+                    int fieldAlpha = alphaAtLogical(image, 14, 26);
+                    int faceAlpha = alphaAtLogical(image, item.x(), item.y());
+                    assertThat(fieldAlpha).as(item.name() + " 18% field").isBetween(35, 60);
+                    assertThat(faceAlpha).as(item.name() + " 24% face over field")
+                        .isGreaterThan(fieldAlpha + 25);
+                }
+            } finally {
+                try { UIManager.setLookAndFeel(original); }
+                catch (javax.swing.UnsupportedLookAndFeelException e) { throw new AssertionError(e); }
+            }
+        });
+    }
+
     private static Set<Integer> paintAndVerify(IconCase[] cases, boolean dark) {
         Set<Integer> strokes = new LinkedHashSet<>();
         for (IconCase item : cases) {
@@ -77,9 +102,7 @@ class AppIconsTest {
     }
 
     private static Painted paint(FlatSVGIcon icon) {
-        BufferedImage image = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
-        var graphics = image.createGraphics();
-        try { icon.paintIcon(null, graphics, 0, 0); } finally { graphics.dispose(); }
+        BufferedImage image = paintImage(icon);
         Set<Integer> opaqueRgb = new LinkedHashSet<>();
         int translucent = 0;
         int opaque = 0;
@@ -93,6 +116,20 @@ class AppIconsTest {
         return new Painted(opaqueRgb, translucent, opaque);
     }
 
+    private static BufferedImage paintImage(FlatSVGIcon icon) {
+        BufferedImage image = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { icon.paintIcon(null, graphics, 0, 0); } finally { graphics.dispose(); }
+        return image;
+    }
+
+    private static int alphaAtLogical(BufferedImage image, int x, int y) {
+        int scaledX = Math.min(image.getWidth() - 1, Math.round(x * image.getWidth() / 28f));
+        int scaledY = Math.min(image.getHeight() - 1, Math.round(y * image.getHeight() / 28f));
+        return image.getRGB(scaledX, scaledY) >>> 24;
+    }
+
     private record IconCase(String name, int darkRgb, int lightRgb) {}
+    private record FaceCase(String name, int x, int y) {}
     private record Painted(Set<Integer> opaqueRgb, int translucentPixels, int opaquePixels) {}
 }
