@@ -313,6 +313,26 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
+    /** Cursor eligibility without copying terminal lines; called only while a view can actually blink. */
+    boolean blinkingCursorInView(long requestedTopRow, boolean configuredBlink) {
+        buffer.lock();
+        try {
+            if (!display.cursorVisible() || !CursorStyle.effectiveBlink(display.cursorShape(), configuredBlink)) {
+                return false;
+            }
+            int history = buffer.getHistoryLinesCount();
+            long liveTop = discardedLines + history;
+            long offset = requestedTopRow == ScreenSnapshot.FOLLOW_OUTPUT ? 0
+                : Math.max(0, Math.min(buffer.isUsingAlternateBuffer() ? 0 : history, liveTop - requestedTopRow));
+            long row = terminal.getCursorY() - 1L + offset;
+            // Like TerminalPainter, pin a pending-wrap cursor to the final cell.
+            int column = Math.min(terminal.getCursorX() - 1, buffer.getWidth() - 1);
+            return row >= 0 && row < buffer.getHeight() && column >= 0;
+        } finally {
+            buffer.unlock();
+        }
+    }
+
     byte[] codeForKey(int keyCode, int modifiers) {
         return terminal.getCodeForKey(keyCode, modifiers);
     }

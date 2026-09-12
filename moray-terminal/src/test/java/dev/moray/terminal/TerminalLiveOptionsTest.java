@@ -200,6 +200,7 @@ class TerminalLiveOptionsTest {
         onEdt(() -> KeyboardFocusManager.setCurrentKeyboardFocusManager(focus));
         try {
             onEdt(() -> {
+                view.addNotify(); // blinking requires a showing attachment
                 tickBlink(); // use the actual callback, leaving the focused cursor in its off phase
                 assertCursorVisible(false);
                 view.applyOptions(options(defaults.fontFamily(), 14f, defaults.fallbackFonts(), true, 1f,

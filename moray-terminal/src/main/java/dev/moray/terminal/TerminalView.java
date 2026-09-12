@@ -22,6 +22,7 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.awt.event.HierarchyEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -37,6 +38,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -71,6 +73,8 @@ public final class TerminalView extends JComponent {
     private Color matchColor;
     private Color currentMatchColor;
     private final AtomicBoolean dirty = new AtomicBoolean(true);
+    private volatile AtomicBoolean pendingFrame = new AtomicBoolean();
+    private volatile boolean renderingActive;
     private final Timer frameTimer;
     private final Timer blinkTimer;
     private final Timer bellTimer;
@@ -139,14 +143,14 @@ public final class TerminalView extends JComponent {
         Color yellow = palette.ansi().get(3);
         this.matchColor = CellStyle.blend(yellow, palette.background(), 0.7f);
         this.currentMatchColor = CellStyle.blend(yellow, palette.background(), 0.35f);
-        this.frameTimer = new Timer(FRAME_MILLIS, e -> {
-            if (dirty.getAndSet(false)) {
+        this.frameTimer = new Timer(FRAME_MILLIS, e -> frameTimerFinished());
+        this.frameTimer.setRepeats(false);
+        this.blinkTimer = new Timer(BLINK_MILLIS, e -> {
+            reconcileBlink();
+            if (((Timer) e.getSource()).isRunning()) {
+                blinkOn = !blinkOn;
                 repaint();
             }
-        });
-        this.blinkTimer = new Timer(BLINK_MILLIS, e -> {
-            blinkOn = !blinkOn;
-            repaint();
         });
 
         this.bellTimer = new Timer(BELL_MILLIS, e -> clearVisualBell());
@@ -157,6 +161,9 @@ public final class TerminalView extends JComponent {
         setFocusTraversalKeysEnabled(false);
         setBackground(palette.background());
         enableEvents(AWTEvent.KEY_EVENT_MASK);
+        addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0) refreshRendering();
+        });
         addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
@@ -204,12 +211,13 @@ public final class TerminalView extends JComponent {
                 rightAltHeld = false;
                 // A lost command-click release must not swallow a later gesture. Other buttons keep ownership.
                 gestures.entrySet().removeIf(entry -> entry.getValue().action == MouseRouting.Action.OPEN_LINK);
+                reconcileBlink();
                 repaint();
             }
         });
         session.exitFuture().thenAccept(code -> {
             exited = true;
-            dirty.set(true);
+            markDirty(attachmentGeneration);
         });
     }
 
@@ -220,13 +228,14 @@ public final class TerminalView extends JComponent {
         listener = listenerFor(++attachmentGeneration);
         session.addListener(listener);
         reconcileAbsoluteRows();
-        frameTimer.start();
-        blinkTimer.start();
+        refreshRendering();
     }
 
     @Override
     public void removeNotify() {
         ++attachmentGeneration;
+        renderingActive = false;
+        pendingFrame = new AtomicBoolean();
         pendingBell = null;
         clearVisualBell();
         frameTimer.stop();
@@ -342,6 +351,7 @@ public final class TerminalView extends JComponent {
                 resizeSessionToFit();
             }
         }
+        reconcileBlink();
         repaint();
     }
 
@@ -549,7 +559,8 @@ public final class TerminalView extends JComponent {
         CursorStyle style = CursorStyle.effective(snapshot.cursorShape(), options.cursorStyle());
         boolean blinks = CursorStyle.effectiveBlink(snapshot.cursorShape(), options.cursorBlink());
         boolean focused = isFocusOwner();
-        boolean on = !blinks || !focused || blinkOn;
+        reconcileBlink();
+        boolean on = exited || !blinks || !focused || blinkOn;
         painter.paint((Graphics2D) g, snapshot, new TerminalPainter.CursorLook(style, on, focused),
             highlights(snapshot), getWidth(), getHeight());
         if (visualBell) {
@@ -754,7 +765,7 @@ public final class TerminalView extends JComponent {
         if (widthChanged) {
             forgetAbsoluteRows(); // JediTerm reflows soft-wrapped lines, moving them to other absolute rows
         }
-        dirty.set(true);
+        markDirty(attachmentGeneration);
     }
 
     /**
@@ -802,17 +813,21 @@ public final class TerminalView extends JComponent {
         return new TerminalSession.Listener() {
             @Override
             public void screenChanged() {
-                dirty.set(true);
+                markDirty(generation);
             }
 
             @Override
             public void scrollbackReset() {
-                SwingUtilities.invokeLater(TerminalView.this::reconcileAbsoluteRows);
+                SwingUtilities.invokeLater(() -> {
+                    if (generation == attachmentGeneration) reconcileAbsoluteRows();
+                });
             }
 
             @Override
             public void alternateBufferChanged(boolean alternate) {
-                SwingUtilities.invokeLater(TerminalView.this::reconcileAbsoluteRows);
+                SwingUtilities.invokeLater(() -> {
+                    if (generation == attachmentGeneration) reconcileAbsoluteRows();
+                });
             }
 
             @Override
@@ -904,12 +919,18 @@ public final class TerminalView extends JComponent {
         List<TerminalPainter.Highlight> highlights = new ArrayList<>();
         long first = snapshot.firstRow();
         long last = first + snapshot.height() - 1;
-        for (int i = 0; i < matches.size(); i++) {
+        // Search results are sorted by row and column; skip the offscreen prefix in logarithmic time.
+        int low = 0;
+        int high = matches.size();
+        while (low < high) {
+            int middle = low + (high - low) / 2;
+            if (matches.get(middle).row() < first) low = middle + 1; else high = middle;
+        }
+        for (int i = low; i < matches.size(); i++) {
             TerminalSearch.Match match = matches.get(i);
-            if (match.row() >= first && match.row() <= last) {
-                highlights.add(new TerminalPainter.Highlight((int) (match.row() - first), match.startColumn(),
-                    match.endColumn(), i == currentMatch ? currentMatchColor : matchColor));
-            }
+            if (match.row() > last) break;
+            highlights.add(new TerminalPainter.Highlight((int) (match.row() - first), match.startColumn(),
+                match.endColumn(), i == currentMatch ? currentMatchColor : matchColor));
         }
         if (selection != null) {
             for (int row = 0; row < snapshot.height(); row++) {
@@ -972,8 +993,51 @@ public final class TerminalView extends JComponent {
 
     private void restartBlink() {
         blinkOn = true;
-        blinkTimer.restart();
+        reconcileBlink();
+        if (blinkTimer.isRunning()) blinkTimer.restart();
         repaint();
+    }
+
+    /** Reader-thread calls retain one dirty bit and at most one queued EDT delivery per attachment. */
+    private void markDirty(long generation) {
+        if (generation != attachmentGeneration) return;
+        dirty.set(true);
+        AtomicBoolean pending = pendingFrame;
+        if (!renderingActive || !pending.compareAndSet(false, true)) return;
+        SwingUtilities.invokeLater(() -> {
+            if (generation == attachmentGeneration && pending == pendingFrame && renderingActive) {
+                frameTimer.start();
+            }
+        });
+    }
+
+    private void frameTimerFinished() {
+        frameTimer.stop();
+        pendingFrame.set(false);
+        if (!renderingActive) return;
+        if (dirty.getAndSet(false)) {
+            reconcileAbsoluteRows();
+            reconcileBlink();
+            repaint();
+        }
+    }
+
+    /** Hidden tabs keep session/application metadata flowing, but schedule no view frames or cursor ticks. */
+    private void refreshRendering() {
+        renderingActive = listener != null && isShowing();
+        if (renderingActive) {
+            markDirty(attachmentGeneration);
+        } else {
+            pendingFrame = new AtomicBoolean();
+            frameTimer.stop();
+        }
+        reconcileBlink();
+    }
+
+    private void reconcileBlink() {
+        boolean eligible = renderingActive && isFocusOwner() && !exited
+            && session.blinkingCursorInView(viewport.topRow(), options.cursorBlink());
+        if (eligible) blinkTimer.start(); else blinkTimer.stop();
     }
 
     /**
@@ -1058,13 +1122,47 @@ public final class TerminalView extends JComponent {
     }
 
     private static void openInBrowser(String uri) {
-        try {
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(new URI(uri));
+        dispatchBrowserAction(() -> {
+            try {
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().browse(new URI(uri));
+                } else {
+                    LOG.log(System.Logger.Level.WARNING, "Browser opening is unsupported");
+                }
+            } catch (IOException | URISyntaxException failure) {
+                // Desktop exceptions can contain the URI. Keep diagnostics fixed and free of terminal content.
+                LOG.log(System.Logger.Level.WARNING, "Browser open failed");
             }
-        } catch (IOException | URISyntaxException | RuntimeException e) {
-            // RuntimeException covers UnsupportedOperationException, IllegalArgumentException and SecurityException.
-            LOG.log(System.Logger.Level.WARNING, "Browser open failed", e);
+        });
+    }
+
+    private static void dispatchBrowserAction(Runnable action) {
+        try {
+            BrowserWorker.EXECUTOR.execute(() -> {
+                try {
+                    action.run();
+                } catch (RuntimeException failure) {
+                    LOG.log(System.Logger.Level.WARNING, "Browser open failed");
+                }
+            });
+        } catch (RejectedExecutionException busy) {
+            LOG.log(System.Logger.Level.WARNING, "Browser request dropped: pending request limit reached");
+        }
+    }
+
+    /** Shared across views, lazily created, and never falls back to running Desktop calls on the EDT. */
+    private static final class BrowserWorker {
+        static final ThreadPoolExecutor EXECUTOR = createExecutor();
+
+        private static ThreadPoolExecutor createExecutor() {
+            var executor = new ThreadPoolExecutor(1, 1, 1_000, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(8), action -> {
+                    var thread = new Thread(action, "moray-terminal-browser");
+                    thread.setDaemon(true);
+                    return thread;
+                }, new ThreadPoolExecutor.AbortPolicy());
+            executor.allowCoreThreadTimeOut(true);
+            return executor;
         }
     }
 }
