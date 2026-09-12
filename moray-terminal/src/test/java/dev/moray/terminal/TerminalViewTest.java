@@ -10,6 +10,7 @@ import java.awt.Graphics2D;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
+import javax.swing.SwingUtilities;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,14 +41,16 @@ class TerminalViewTest {
     }
 
     @Test
-    void resizingTheViewResizesTheSession() {
-        view.setSize(10 * fonts.cellWidth() + 3, 2 * fonts.cellHeight() + 1);
+    void resizingTheViewResizesTheSession() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            view.setSize(10 * fonts.cellWidth() + 3, 2 * fonts.cellHeight() + 1);
 
-        view.resizeSessionToFit();
+            view.resizeSessionToFit();
 
-        assertThat(session.columns()).isEqualTo(10);
-        assertThat(session.rows()).isEqualTo(2);
-        assertThat(connector.lastResize()).isEqualTo(new TermSize(10, 2));
+            assertThat(session.columns()).isEqualTo(10);
+            assertThat(session.rows()).isEqualTo(2);
+            assertThat(connector.lastResize()).isEqualTo(new TermSize(10, 2));
+        });
     }
 
     @Test
