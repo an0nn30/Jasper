@@ -21,7 +21,6 @@ final class WindowChrome {
         this.owner = owner;
         toolbar.setFloatable(false);
         toolbar.setBorder(BorderFactory.createEmptyBorder());
-        status.setToolTipText("Using built-in defaults. Configuration files are not loaded yet.");
         JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
             ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
@@ -137,11 +136,18 @@ final class WindowChrome {
             if (id != ActionId.NEW_TAB || !labels()) return "";
             Object value = getAction().getValue(Action.ACCELERATOR_KEY);
             if (!(value instanceof KeyStroke stroke)) return "";
-            if ((stroke.getModifiers() & InputEvent.META_DOWN_MASK) != 0)
-                return "\u2318" + KeyEvent.getKeyText(stroke.getKeyCode());
-            return KeyEvent.getModifiersExText(stroke.getModifiers() &
-                (InputEvent.META_DOWN_MASK | InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK))
-                + "+" + KeyEvent.getKeyText(stroke.getKeyCode());
+            int modifiers = stroke.getModifiers();
+            String key = KeyEvent.getKeyText(stroke.getKeyCode());
+            if ((modifiers & InputEvent.META_DOWN_MASK) != 0) {
+                String prefix = "";
+                if ((modifiers & InputEvent.CTRL_DOWN_MASK) != 0) prefix += "\u2303";
+                if ((modifiers & InputEvent.ALT_DOWN_MASK) != 0) prefix += "\u2325";
+                if ((modifiers & InputEvent.SHIFT_DOWN_MASK) != 0) prefix += "\u21e7";
+                return prefix + "\u2318" + key;
+            }
+            String prefix = KeyEvent.getModifiersExText(modifiers &
+                (InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
+            return prefix.isEmpty() ? key : prefix + "+" + key;
         }
         private Font chromeFont() {
             Font font = UIManager.getFont("Label.font").deriveFont(Font.PLAIN, UIScale.scale(11.5f));
