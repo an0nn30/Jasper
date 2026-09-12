@@ -63,8 +63,11 @@ blink = true
 # MY_VARIABLE = "a value with spaces"
 
 [colors]
-# Live across all windows. Options: "moray-dark" or "moray-light".
+# System switches both chrome and the built-in palette; custom palettes stay fixed.
+appearance = "system"
+# Either built-in ID follows appearance. A custom basename is loaded from themes/.
 theme = "moray-dark"
+# theme = "my-theme.toml"
 
 [keybindings]
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.

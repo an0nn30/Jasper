@@ -1,6 +1,7 @@
 package dev.moray.app;
 
 import com.formdev.flatlaf.util.UIScale;
+import dev.moray.terminal.Palette;
 import java.awt.*;
 import javax.swing.*;
 
@@ -14,6 +15,7 @@ final class WindowStatusBar extends JPanel {
     private String configColor = "Moray.configSuccessForeground";
     private String shell = "", directory = "", dimensions = "";
     private boolean running;
+    private Palette palette = Palette.morayDark();
     private String text = "Built-in defaults";
 
     WindowStatusBar() {
@@ -54,13 +56,36 @@ final class WindowStatusBar extends JPanel {
     }
     JButton configButton() { return configButton; }
     String getText() { return text; }
+    void applyPalette(Palette next) { palette = java.util.Objects.requireNonNull(next); refreshTheme(); }
+    private boolean custom() { return (!palette.equals(Palette.morayDark()) && !palette.equals(Palette.morayLight()))
+        || !palette.background().equals(UIManager.getColor("Panel.background")); }
+    private Color readable(Color color) {
+        return custom() && contrast(color, palette.background()) < 3 ? palette.foreground() : color;
+    }
+    private Color muted() {
+        return custom() ? readable(blend(palette.foreground(), palette.background(), .8)) : UIManager.getColor("Moray.mutedForeground");
+    }
+    private static Color blend(Color foreground, Color background, double weight) {
+        return new Color((int) Math.round(foreground.getRed() * weight + background.getRed() * (1 - weight)),
+            (int) Math.round(foreground.getGreen() * weight + background.getGreen() * (1 - weight)),
+            (int) Math.round(foreground.getBlue() * weight + background.getBlue() * (1 - weight)));
+    }
+    static double contrast(Color a, Color b) {
+        double first = luminance(a), second = luminance(b);
+        return (Math.max(first, second) + .05) / (Math.min(first, second) + .05);
+    }
+    private static double luminance(Color color) {
+        double[] rgb = {color.getRed() / 255.0, color.getGreen() / 255.0, color.getBlue() / 255.0};
+        for (int i = 0; i < rgb.length; i++) rgb[i] = rgb[i] <= .04045 ? rgb[i] / 12.92 : Math.pow((rgb[i] + .055) / 1.055, 2.4);
+        return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
+    }
     void refreshTheme() {
-        setBackground(UIManager.getColor("Panel.background"));
+        setBackground(palette.background());
         left.refreshTheme(); right.refreshTheme();
-        configButton.setForeground(UIManager.getColor(configColor));
+        configButton.setForeground(readable(UIManager.getColor(configColor)));
     }
 
-    private static final class Segment extends JPanel {
+    private final class Segment extends JPanel {
         private final JLabel first = new JLabel(), slash = new JLabel("/", SwingConstants.CENTER);
         private final JComponent last;
         Segment(JComponent last) {
@@ -76,7 +101,8 @@ final class WindowStatusBar extends JPanel {
         }
         void refreshTheme() {
             for (JComponent label : new JComponent[]{first, slash, last}) {
-                label.setForeground(UIManager.getColor(label == slash ? "Separator.foreground" : "Moray.mutedForeground"));
+                label.setForeground(label == slash ? (custom() ? blend(palette.foreground(), palette.background(), .25)
+                    : UIManager.getColor("Separator.foreground")) : muted());
                 label.setFont(UIManager.getFont("Label.font").deriveFont(UIScale.scale(10f)));
             }
         }
@@ -103,7 +129,7 @@ final class WindowStatusBar extends JPanel {
     }
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(UIManager.getColor(running ? "Moray.runningForeground" : "Moray.mutedForeground"));
+        g.setColor(running ? readable(UIManager.getColor("Moray.runningForeground")) : muted());
         var copy = (Graphics2D) g.create();
         try {
             copy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);

@@ -141,9 +141,9 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         setActive(active);
     }
 
-    void applyTheme(BuiltinTheme theme) {
-        setBackground(theme.palette().background());
-        if (view != null) view.setPalette(theme.palette());
+    void applyTheme(dev.moray.terminal.Palette palette) {
+        setBackground(palette.background());
+        if (view != null) view.setPalette(palette);
         setActive(active);
     }
 

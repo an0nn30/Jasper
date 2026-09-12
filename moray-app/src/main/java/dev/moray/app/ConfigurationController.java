@@ -11,6 +11,8 @@ import javax.swing.SwingUtilities;
 /** EDT-owned join between saved configuration and retained window contents. */
 final class ConfigurationController implements AutoCloseable {
     private final ThemeController themes;
+    private final SystemAppearance source;
+    private String appearanceWarning = "";
     private final ConfigService service;
     private final Set<WindowContent> owners = new LinkedHashSet<>();
     private final Consumer<Path> editor;
@@ -22,11 +24,20 @@ final class ConfigurationController implements AutoCloseable {
     }
 
     ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor) {
+        this(themes, service, SystemAppearance.fixed(BuiltinTheme.DARK), editor);
+    }
+
+    ConfigurationController(ThemeController themes, ConfigService service, SystemAppearance source) {
+        this(themes, service, source, new ConfigEditor()::open);
+    }
+
+    ConfigurationController(ThemeController themes, ConfigService service, SystemAppearance source, Consumer<Path> editor) {
         requireEdt();
-        this.themes = themes; this.service = service; this.editor = editor;
+        this.themes = themes; this.service = service; this.editor = editor; this.source = source;
         state = service.initialState();
-        themes.select(selected(state.snapshot()));
+        themes.configure(state.snapshot().colors(), state.palette());
         service.start(this::accept);
+        source.start(this::appearanceChanged);
     }
 
     ConfigSnapshot snapshot() {
@@ -40,7 +51,7 @@ final class ConfigurationController implements AutoCloseable {
         owner.connectConfiguration(() -> reportFailure(owner, service.openSettings(editor)),
             () -> reportFailure(owner, service.reload()), () -> unregister(owner));
         owner.applyConfiguration(state.snapshot(), service.macOs());
-        owner.setConfigurationState(state);
+        owner.setConfigurationState(displayed());
     }
 
     private void reportFailure(WindowContent owner, CompletableFuture<?> result) {
@@ -59,27 +70,40 @@ final class ConfigurationController implements AutoCloseable {
     void accept(ConfigService.State next) {
         requireEdt();
         if (closed) return;
-        if (selected(state.snapshot()) != selected(next.snapshot())) {
-            try { themes.select(selected(next.snapshot())); }
-            catch (IllegalStateException failure) {
-                for (WindowContent owner : List.copyOf(owners)) owner.onError.accept(failure.getMessage());
-            }
-        }
+        try { themes.configure(next.snapshot().colors(), next.palette()); }
+        catch (ThemeController.InstallationFailure failure) { reportThemeFailure(failure); }
         state = next;
         for (WindowContent owner : List.copyOf(owners)) {
             owner.applyConfiguration(next.snapshot(), service.macOs());
-            owner.setConfigurationState(next);
+            owner.setConfigurationState(displayed());
         }
     }
 
-    private static BuiltinTheme selected(ConfigSnapshot snapshot) {
-        return snapshot.colors().appearance() == Appearance.LIGHT ? BuiltinTheme.LIGHT : BuiltinTheme.DARK;
+    private void appearanceChanged(SystemAppearance.Reading reading) {
+        requireEdt();
+        if (closed) return;
+        appearanceWarning = reading.warning();
+        try { themes.systemChanged(reading.theme()); }
+        catch (ThemeController.InstallationFailure failure) { reportThemeFailure(failure); }
+        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(displayed());
+    }
+
+    private void reportThemeFailure(ThemeController.InstallationFailure failure) {
+        for (WindowContent owner : List.copyOf(owners)) owner.onError.accept(failure.getMessage());
+    }
+
+    private ConfigService.State displayed() {
+        var diagnostics = new java.util.ArrayList<>(state.diagnostics());
+        if (!appearanceWarning.isEmpty()) diagnostics.add(new ConfigDiagnostic(
+            ConfigDiagnostic.Severity.WARNING, state.file(), 0, 0, "colors.appearance", appearanceWarning));
+        return new ConfigService.State(state.snapshot(), diagnostics, state.file(), state.present(), state.palette());
     }
 
     @Override public void close() {
         requireEdt();
         if (closed) return;
         closed = true;
+        source.close();
         for (WindowContent owner : List.copyOf(owners)) unregister(owner);
         service.close();
     }

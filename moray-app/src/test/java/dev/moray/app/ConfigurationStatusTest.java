@@ -15,6 +15,7 @@ class ConfigurationStatusTest {
             for (BuiltinTheme theme : BuiltinTheme.values()) {
                 themes.select(theme);
                 var status = new WindowStatusBar();
+                status.applyPalette(theme.palette());
                 for (var severity : ConfigDiagnostic.Severity.values()) {
                     Path file = Path.of("fixture", "settings.toml");
                     status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(
@@ -36,6 +37,21 @@ class ConfigurationStatusTest {
             }
         });
     }
+    @Test void customPalettePersistsAcrossConfigurationRefreshAndOppositeChromeIsReadable() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController(); themes.select(BuiltinTheme.LIGHT);
+            var status = new WindowStatusBar();
+            for (var palette : List.of(dev.moray.terminal.Palette.morayDark(),
+                    new dev.moray.terminal.Palette(Color.WHITE, new Color(0x101820), Color.YELLOW,
+                        Color.GRAY, dev.moray.terminal.Palette.morayDark().ansi()))) {
+                status.applyPalette(palette);
+                status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));
+                assertThat(status.getBackground()).isEqualTo(palette.background());
+                assertThat(contrast(status.configButton().getForeground(), palette.background())).isGreaterThanOrEqualTo(3);
+            }
+        });
+    }
+
     private static void layout(Container parent) {
         parent.doLayout();
         for (Component child : parent.getComponents()) if (child instanceof Container container) layout(container);

@@ -15,9 +15,16 @@ final class ThemeController {
     // FlatLaf appends registrations, so register this package once rather than once per switch.
     static { FlatLaf.registerCustomDefaultsSource("dev.moray.app.themes"); }
 
+    static final class InstallationFailure extends IllegalStateException {
+        InstallationFailure(BuiltinTheme theme, RuntimeException cause) {
+            super("Could not apply theme: " + theme.label(), cause);
+        }
+    }
+
     private final Set<WindowContent> owners = new LinkedHashSet<>();
     private final Predicate<BuiltinTheme> installer;
-    private BuiltinTheme current = BuiltinTheme.DARK;
+    private ThemeState state = ThemeState.defaults();
+    private BuiltinTheme latestSystem = BuiltinTheme.DARK;
 
     ThemeController() { this(ThemeController::install); }
 
@@ -25,22 +32,39 @@ final class ThemeController {
     ThemeController(Predicate<BuiltinTheme> installer) {
         requireEdt();
         this.installer = Objects.requireNonNull(installer);
-        installOrThrow(current);
+        installOrThrow(state.resolve().chrome());
     }
 
-    BuiltinTheme current() { requireEdt(); return current; }
+    ResolvedTheme current() { requireEdt(); return state.resolve(); }
+    Appearance choice() { requireEdt(); return state.choice(); }
 
+    void configure(ColorsConfig colors, dev.moray.terminal.Palette loaded) {
+        requireEdt(); apply(state.systemChanged(latestSystem).configure(colors, loaded));
+    }
+    void selectAppearance(Appearance choice) {
+        requireEdt(); apply(state.systemChanged(latestSystem).choose(choice));
+    }
     void select(BuiltinTheme theme) {
-        requireEdt(); Objects.requireNonNull(theme);
-        if (theme == current) return;
-        installOrThrow(theme);
-        current = theme;
-        for (WindowContent owner : List.copyOf(owners)) owner.applyTheme(theme);
+        Objects.requireNonNull(theme);
+        selectAppearance(theme == BuiltinTheme.LIGHT ? Appearance.LIGHT : Appearance.DARK);
+    }
+    void systemChanged(BuiltinTheme system) {
+        requireEdt(); latestSystem = Objects.requireNonNull(system);
+        apply(state.systemChanged(system));
+    }
+    private void apply(ThemeState candidate) {
+        ResolvedTheme previous = state.resolve(), next = candidate.resolve();
+        boolean chromeChanged = previous.chrome() != next.chrome();
+        boolean choiceChanged = state.choice() != candidate.choice();
+        if (chromeChanged) installOrThrow(next.chrome());
+        state = candidate;
+        if (!previous.equals(next) || choiceChanged)
+            for (WindowContent owner : List.copyOf(owners)) owner.applyTheme(next, chromeChanged);
     }
 
     void register(WindowContent owner) {
         requireEdt();
-        if (owners.add(Objects.requireNonNull(owner))) owner.applyTheme(current);
+        if (owners.add(Objects.requireNonNull(owner))) owner.applyTheme(current(), true);
     }
 
     void unregister(WindowContent owner) { requireEdt(); owners.remove(owner); }
@@ -55,7 +79,7 @@ final class ThemeController {
                 try { UIManager.setLookAndFeel(previous); }
                 catch (UnsupportedLookAndFeelException | RuntimeException restoreFailure) { failure.addSuppressed(restoreFailure); }
             }
-            throw new IllegalStateException("Could not apply theme: " + theme.label(), failure);
+            throw new InstallationFailure(theme, failure);
         }
     }
 

@@ -36,7 +36,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private boolean closed;
     private boolean rearranging;
     private boolean active = true;
-    Consumer<BuiltinTheme> onThemeChanged = theme -> {};
+    Consumer<ResolvedTheme> onThemeChanged = theme -> {};
     private Runnable openSettings, reloadConfiguration;
     private Runnable unregisterConfiguration = () -> {};
     Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
@@ -202,16 +202,21 @@ final class WindowContent extends JPanel implements AutoCloseable {
     void newTab(Path directory) {
         if (closed) return;
         TerminalTab tab = new TerminalTab(directory, launcher);
-        tab.onChanged = this::update;
+        tab.onChanged = () -> {
+            for (TerminalPane pane : tab.panes()) if (pane.view() == null) pane.applyTheme(themes.current().palette());
+            update();
+        };
         tab.onEmpty = () -> closeTab(tab);
         tab.onError = message -> onError.accept(message);
         tab.configure = pane -> configurePane(tab, pane);
+        tab.setBackground(themes.current().palette().background());
+        for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current().palette());
         tabs.addTab(tab.title(), tab);
         tabs.setSelectedComponent(tab); update(); tab.start();
     }
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
-        pane.applyTheme(themes.current());
+        pane.applyTheme(themes.current().palette());
         if (configured == null) {
             pane.view().setFontSize(configuredFontSize);
         } else {
@@ -351,32 +356,42 @@ final class WindowContent extends JPanel implements AutoCloseable {
         updateActions(); windowTabs.refresh(); onMinimumSizeChanged.run();
     }
 
-    BuiltinTheme theme() { return themes.current(); }
+    ResolvedTheme theme() { return themes.current(); }
+
+    Appearance appearance() { return themes.choice(); }
 
     void selectTheme(BuiltinTheme theme) {
+        selectAppearance(theme == BuiltinTheme.LIGHT ? Appearance.LIGHT : Appearance.DARK);
+    }
+
+    void selectAppearance(Appearance appearance) {
         if (closed) return;
-        try { themes.select(theme); }
-        catch (IllegalStateException failure) { onError.accept(failure.getMessage()); }
+        try { themes.selectAppearance(appearance); }
+        catch (ThemeController.InstallationFailure failure) { onError.accept(failure.getMessage()); }
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
 
     /** Updates all retained panes without reparenting them; the native boundary hooks in last. */
-    void applyTheme(BuiltinTheme theme) {
+    void applyTheme(ResolvedTheme theme, boolean updateDelegates) {
         if (closed) return;
         var retained = new ArrayList<TerminalTab>();
         for (int i = 0; i < tabs.getTabCount(); i++) retained.add((TerminalTab) tabs.getComponentAt(i));
         retained.forEach(TerminalTab::beginThemeUpdate);
         try {
-            SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
-            if (bindingRoot == null || menuBar().getParent() == null) SwingUtilities.updateComponentTreeUI(menuBar());
+            if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
+            if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
             for (TerminalTab tab : retained) {
+                tab.setBackground(theme.palette().background());
                 for (TerminalPane pane : tab.panes()) {
                     // Zoom detaches sibling panes from the visible component hierarchy.
-                    if (!SwingUtilities.isDescendingFrom(pane, this)) SwingUtilities.updateComponentTreeUI(pane);
-                    pane.applyTheme(theme);
+                    if (updateDelegates && !SwingUtilities.isDescendingFrom(pane, this)) SwingUtilities.updateComponentTreeUI(pane);
+                    pane.applyTheme(theme.palette());
                 }
             }
-            chrome.refreshTheme(); chrome.status().refreshTheme(); onThemeChanged.accept(theme); update();
+            setBackground(theme.palette().background());
+            tabs.setBackground(theme.palette().background());
+            chrome.status().applyPalette(theme.palette());
+            chrome.refreshTheme(); onThemeChanged.accept(theme); update();
             revalidate(); repaint();
         } finally { retained.forEach(TerminalTab::endThemeUpdate); }
     }

@@ -43,7 +43,7 @@ final class ConfigTemplate {
             # line_height = 1.0
             # Font size in points, 6-72; changes update all panes live.
             # Reset Font Size restores this saved default.
-            # Temporary size/theme choices survive reloads until their respective saved value changes.
+            # Temporary size/appearance choices survive reloads until their respective saved value changes.
             # size = 16.0
 
             [terminal]
@@ -83,8 +83,11 @@ final class ConfigTemplate {
             # This table does not change which default login shell is selected.
 
             [colors]
-            # Built-in theme: "moray-dark" or "moray-light"; updates all windows live.
-            # theme = "moray-dark"
+            # System switches both chrome and the built-in palette; custom palettes stay fixed.
+            appearance = "system"
+            # Either built-in ID follows appearance. A custom basename is loaded from themes/.
+            theme = "moray-dark"
+            # theme = "my-theme.toml"
 
             [keybindings]
             # Shortcuts update live. Use "none" to disable an action; shortcuts must be unique.

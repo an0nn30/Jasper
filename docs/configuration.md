@@ -60,7 +60,11 @@ blink = true
 # MY_VARIABLE = "value"
 
 [colors]
+# System switches both chrome and the built-in palette; custom palettes stay fixed.
+appearance = "system"
+# Either built-in ID follows appearance. A custom basename is loaded from themes/.
 theme = "moray-dark"
+# theme = "my-theme.toml"
 
 [keybindings]
 # Optional action overrides; see examples below.
@@ -89,14 +93,15 @@ theme = "moray-dark"
 | `terminal.copy_on_select` | `false` | Boolean | Live |
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
-| `colors.theme` | `"moray-dark"` | `"moray-dark"`, `"moray-light"` | Live, shared across windows |
+| `colors.appearance` | `"system"` | `"system"`, `"light"`, `"dark"` | Live, shared across windows |
+| `colors.theme` | `"moray-dark"` | Either built-in ID or custom basename | Live, shared across windows |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Live settings and temporary choices
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size. A manually selected global theme remains shared until the saved theme changes. The Tab height dialog's reset button restores the built-in 38px value.
+View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary global appearance remains shared until the parsed saved appearance changes. Theme-file edits and unrelated reloads preserve it. The Tab height dialog's reset button restores the built-in 38px value.
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
@@ -187,4 +192,48 @@ Syntax errors, wrong types, unreadable files, invalid UTF-8 and files larger tha
 
 ## Remaining configuration work
 
-Custom theme files, automatic system appearance, app logging, launcher environment cleanup and macOS app packaging remain planned. Unsupported keys warn. Native font rendering, keyboard behavior, audio, screen sizing and editor integration still require the user-run [terminal configuration checklist](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md), alongside the acceptance checks linked from the README.
+App logging, launcher environment cleanup and macOS app packaging remain planned. Unsupported keys warn. Native font rendering, keyboard behavior, audio, screen sizing and editor integration still require the user-run [terminal configuration checklist](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md), alongside the acceptance checks linked from the README.
+
+
+## Appearance and custom themes
+
+View → Appearance offers Light, Dark and Follow System across all windows. Choices are temporary and never rewrite the configuration. OS readings are remembered during a manual choice; Follow System applies the latest reading immediately. System initially uses Dark until the asynchronous reading arrives. Unsupported desktops or detector failures use Dark with a diagnostic; explicit choices remain usable.
+
+| Saved values | Chrome | Terminal palette |
+|---|---|---|
+| System + either built-in ID | OS appearance | Corresponding built-in palette |
+| Light or Dark + either built-in ID | Saved appearance | Corresponding built-in palette |
+| Any appearance + custom file | Saved/system appearance | Fixed custom palette |
+| Appearance omitted + explicit moray-light | Light | Built-in Light (legacy behavior) |
+| Appearance omitted + explicit moray-dark | Dark | Built-in Dark (legacy behavior) |
+| Both omitted | System | Following built-in pair |
+| Appearance omitted + custom file | System | Fixed custom palette |
+
+Explicit appearance takes precedence over a built-in ID's suffix. Changing the parsed saved appearance clears the temporary override; rewriting the same value does not. Custom palettes retain their colors as chrome changes. Terminal padding and status match the palette background; toolbar, menus, find controls and native title follow chrome.
+
+Theme files live only in Moray's `themes/` directory beside its default configuration directory (macOS: `~/.config/moray/themes/`). `--config` does not relocate themes. Select one basename, with an optional `.toml` extension. Spaces and Unicode are allowed; paths, separators, control characters, Windows-reserved filename characters, `.` and `..` are rejected. The selected file must be a regular file contained within the real theme directory; escaping symlinks are rejected. Loading creates no files or directories.
+
+The [complete twenty-color example](examples/themes/moray-custom.toml) uses this supported Alacritty TOML subset:
+
+| Table | Supported keys |
+|---|---|
+| `colors.primary` | `foreground`, `background` |
+| `colors.cursor` | `cursor` |
+| `colors.selection` | `background` |
+| `colors.normal` | `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white` |
+| `colors.bright` | Same eight ANSI names |
+
+Values are quoted `#RRGGBB` or `0xRRGGBB`. Files must be strict UTF-8 and at most 256 KiB. At least one supported color is required; omitted colors inherit fixed Moray Dark, independent of the OS. Unsupported keys warn and are ignored. Invalid supported colors/types, duplicate definitions, syntax errors and symbolic cell references reject the candidate. Selection foreground, cursor text, dim/indexed colors, imports and other Alacritty features are unsupported.
+
+To try the example on macOS, choose an absent destination (change the name if already used):
+
+```sh
+mkdir -p ~/.config/moray/themes
+cp -n docs/examples/themes/moray-custom.toml ~/.config/moray/themes/my-theme.toml
+```
+
+Then edit your own config's colors block to set `theme = "my-theme.toml"` and your desired appearance. `cp -n` preserves an existing destination; inspect it or choose another name rather than assuming it was copied. To start a main configuration from the root example, likewise copy only to an absent target or a user-chosen filename; do not replace your live settings inadvertently.
+
+The selected theme is checked on the existing one-second reload cadence even without main-config changes. Reload config forces both reads. Deletion, bad edits or I/O errors retain the last successfully loaded saved palette (Dark if none); repair replaces it and clears theme diagnostics. Valid unrelated settings still apply. A main-config syntax error keeps the last good selection while its theme file continues reloading. The status diagnostic viewer identifies the actual failing file and positions. System-source warnings clear independently of configuration/theme errors. A failed chrome installation keeps the previous effective theme/menu and can be retried with Follow System or Reload config.
+
+See the [system/custom theme native checklist](superpowers/plans/2026-09-12-moray-plan-4c-manual-check.md). Native detection, display scaling and title controls require user-run acceptance.

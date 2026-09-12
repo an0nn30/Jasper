@@ -10,9 +10,10 @@ public final class Main {
         int result = start(args, System.out, System.err, service -> {
             System.setProperty("apple.awt.application.appearance", "system");
             System.setProperty("apple.laf.useScreenMenuBar", "true");
+            SystemAppearance source = SystemAppearance.production();
             SwingUtilities.invokeLater(() -> {
-                try { new MorayApplication(service).newWindow(Path.of(System.getProperty("user.home"))); }
-                catch (RuntimeException failure) { service.close(); throw failure; }
+                try { new MorayApplication(service, source).newWindow(Path.of(System.getProperty("user.home"))); }
+                catch (RuntimeException failure) { source.close(); service.close(); throw failure; }
             });
         });
         if (result != 0) System.exit(result);

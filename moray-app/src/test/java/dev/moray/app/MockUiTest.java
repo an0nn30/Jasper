@@ -60,6 +60,32 @@ class MockUiTest {
         });
     }
 
+    @Test void customSurfacePixelsAndNativeChromePropertyRemainIndependent() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController();
+            var owner = content(launcher(new ArrayDeque<>()), themes);
+            var root = new JRootPane();
+            try (var title = MacTitleBar.install(root, owner, true, value -> {})) {
+                owner.installRootBindings(root);
+                var palette = new dev.moray.terminal.Palette(Color.WHITE, new Color(0x101820),
+                    Color.YELLOW, Color.GRAY, BuiltinTheme.DARK.palette().ansi());
+                themes.configure(new ColorsConfig(Appearance.SYSTEM, "custom"), palette);
+                themes.systemChanged(BuiltinTheme.LIGHT);
+                owner.setConfigurationState(new ConfigService.State(ConfigSnapshot.defaults(), java.util.List.of(),
+                    java.nio.file.Path.of("config.toml"), true));
+                root.setSize(958, 958); layoutTree(root);
+                var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
+                var g = image.createGraphics(); root.printAll(g); g.dispose();
+                assertThat(image.getRGB(1, 700) & 0xffffff).isEqualTo(0x101820);
+                assertThat(image.getRGB(500, 940) & 0xffffff).isEqualTo(0x101820);
+                assertThat(owner.currentPane().getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
+                assertThat(owner.toolbar().getBackground()).isEqualTo(BuiltinTheme.LIGHT.palette().background());
+                assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
+                assertThat(title.getBackground()).isNotEqualTo(palette.background());
+            }
+        });
+    }
+
     @Test void statusClipsLongMetadataWithoutMovingRightSegmentOrGrowingMinimumWidth() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));

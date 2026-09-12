@@ -51,9 +51,9 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
             nativeTitle.accept(displayTitle);
             if (!displayTitle.equals(bar.title.getText())) { bar.title.setText(displayTitle); bar.revalidate(); }
         };
-        content.onThemeChanged = bar::applyTheme;
+        content.onThemeChanged = theme -> bar.applyTheme(theme.chrome());
         content.onTabHeightChanged = bar::refreshHeight;
-        bar.applyTheme(content.theme());
+        bar.applyTheme(content.theme().chrome());
         content.update();
         return bar;
     }

@@ -49,7 +49,7 @@ class ConfigurationControllerTest {
             assertThat(first.tabHeight()).isEqualTo(44);
             assertThat(((JButton) first.toolbar().getComponent(0)).getText()).isNull();
             assertThat(first.status().isVisible()).isFalse();
-            assertThat(first.theme()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
             assertThat(retained.view().fontSize()).isEqualTo(19);
             retained.findBar().open(); retained.findBar().queryField().setText("alpha");
             first.newTab(HOME); // pending and hides the retained terminal
@@ -81,11 +81,11 @@ class ConfigurationControllerTest {
         reload("# comment\n[font]\nsize=19\nunknown=1\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(60); assertThat(first.toolbar().isVisible()).isFalse();
-            assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
             assertThat(first.currentPane().view().fontSize()).isEqualTo(28);
             var next = owner(); assertThat(next.tabHeight()).isEqualTo(38);
             assertThat(next.toolbar().isVisible()).isTrue(); assertThat(next.status().isVisible()).isTrue();
-            assertThat(first.theme()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
         }); launchAll();
         edt(() -> assertThat(owners.get(1).currentPane().view().fontSize()).isEqualTo(19));
         reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=20\n[colors]\ntheme='moray-light'\n");
@@ -209,9 +209,21 @@ class ConfigurationControllerTest {
                 18, BuiltinTheme.LIGHT, Map.of()), List.of(), directory.resolve("config.toml"), true);
             controller.accept(state);
             assertThat(owners.getFirst().tabHeight()).isEqualTo(53);
-            assertThat(owners.getFirst().theme()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(owners.getFirst().theme().chrome()).isEqualTo(BuiltinTheme.DARK);
             assertThat(owners.getFirst().status().getText()).contains("Config loaded");
             assertThat(errors).singleElement().asString().contains("Could not apply theme");
+        });
+    }
+
+    @Test void applicationCallbackFailuresAreNotReportedAsInstallationFailures() throws Exception {
+        start("");
+        edt(() -> {
+            var owner = owner();
+            owner.onThemeChanged = ignored -> { throw new IllegalStateException("application callback"); };
+            var next = new ConfigService.State(new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS_AND_LABELS,
+                true, 16, BuiltinTheme.LIGHT, Map.of()), List.of(), directory.resolve("config.toml"), true);
+            assertThatThrownBy(() -> controller.accept(next)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("application callback");
         });
     }
 
@@ -437,6 +449,76 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(first.currentPane().shellLabel()).isEqualTo("second-shell");
             assertThat(first.currentPane().view().fontSize()).isEqualTo(22);
+        });
+    }
+
+    @Test void syntheticAppearanceWarningsJoinAndClearIndependentlyAndCloseDropsQueuedEvents() throws Exception {
+        var callbacks = new java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<Boolean>>();
+        var published = new java.util.concurrent.ConcurrentLinkedQueue<Runnable>();
+        var broken = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var worker = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var source = new SystemAppearance(() -> new SystemAppearance.Binding(() -> {
+            if (broken.get()) throw new IllegalStateException("synthetic unavailable");
+            return false;
+        }, callbacks::add, callbacks::remove), worker, published::add);
+        service = new ConfigService(directory.resolve("config.toml"), false);
+        edt(() -> {
+            themes = new ThemeController(); controller = new ConfigurationController(themes, service, source);
+            owner(); owner();
+        });
+        until(() -> !published.isEmpty()); edt(() -> published.remove().run());
+        edt(() -> {
+            var initial = service.initialState();
+            controller.accept(new ConfigService.State(initial.snapshot(), List.of(new ConfigDiagnostic(
+                ConfigDiagnostic.Severity.WARNING, initial.file(), 1, 1, "test", "config warning")), initial.file(), true, initial.palette()));
+            var shown = new ArrayList<JComponent>(); owners.getFirst().showConfigDiagnostics = shown::add;
+            owners.getFirst().status().configButton().doClick();
+            var text = (JTextArea) ((JScrollPane) shown.getFirst()).getViewport().getView();
+            assertThat(text.getText()).contains("synthetic unavailable", "config warning");
+            controller.accept(initial);
+            assertThat(owners.getFirst().status().getText()).contains("Config warnings");
+        });
+        broken.set(false); callbacks.getFirst().accept(false);
+        until(() -> !published.isEmpty()); edt(() -> published.remove().run());
+        edt(() -> {
+            assertThat(owners.getFirst().status().getText()).contains("Built-in defaults");
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(ThemeControllerTest.appearance(owners.get(1)).getItem(2).isSelected()).isTrue();
+        });
+        broken.set(true); callbacks.getFirst().accept(true);
+        until(() -> !published.isEmpty());
+        edt(() -> {
+            controller.close();
+            published.remove().run(); controller.accept(service.initialState());
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(owners.getFirst().status().getText()).contains("Built-in defaults");
+        });
+        until(callbacks::isEmpty);
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void initialCustomConfigurationAndPaletteOnlyChangesReachPendingAndNewOwners() throws Exception {
+        Path themesDirectory = directory.resolve("themes"); Files.createDirectory(themesDirectory);
+        Files.writeString(themesDirectory.resolve("night.toml"), "[colors.primary]\nbackground='#101820'\n");
+        Files.writeString(directory.resolve("config.toml"), "[colors]\nappearance='system'\ntheme='night'\n");
+        service = new ConfigService(directory.resolve("config.toml"), themesDirectory, false);
+        edt(() -> {
+            themes = new ThemeController(); controller = new ConfigurationController(themes, service);
+            owner();
+            assertThat(owners.getFirst().currentPane().getBackground()).isEqualTo(new java.awt.Color(0x101820));
+        });
+        launchAll();
+        var first = owners.getFirst(); var session = first.currentPane().session();
+        edt(() -> { first.selectAppearance(Appearance.LIGHT); first.newTab(HOME); });
+        Files.writeString(themesDirectory.resolve("night.toml"), "[colors.primary]\nbackground='#202830'\n");
+        service.reload().get(); edt(() -> { owner(); assertThat(themes.choice()).isEqualTo(Appearance.LIGHT); });
+        launchAll();
+        edt(() -> {
+            assertThat(((TerminalTab) first.tabStrip().getComponentAt(0)).panes().getFirst().session()).isSameAs(session);
+            for (var owner : owners) {
+                assertThat(owner.currentPane().view().palette().background()).isEqualTo(new java.awt.Color(0x202830));
+                assertThat(owner.status().getBackground()).isEqualTo(new java.awt.Color(0x202830));
+            }
         });
     }
 

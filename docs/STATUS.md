@@ -16,9 +16,15 @@
 
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. GUI launches and benchmarks are user-run only.
 
-## Plan 4c preparation — custom themes and system appearance
+## Plan 4c implementation — custom themes and system appearance
 
-The next runnable slice is prepared, not implemented: [design](superpowers/specs/2026-09-12-moray-plan-4c-themes-design.md) and [implementation plan](superpowers/plans/2026-09-12-moray-plan-4c-themes.md). The user selected switching both chrome and the built-in terminal palette when system appearance changes; custom palettes remain fixed. The plan preserves legacy built-in-only configs, adds local theme-file reload with last-good recovery, and separates chrome from terminal/status colors. Preparation lives in `.worktrees/plan-4c` on `codex/plan-4c-themes`, based on `b92221f`; the main checkout's local example-config edit is preserved. Baseline headless `./gradlew check` passed with all eight tasks executed: 463 tests, 462 passed, one known font skip, no failures/errors. Logging/launcher cleanup and packaging follow this slice; native and daily-use acceptance remain pending.
+Implemented in `.worktrees/plan-4c` on `codex/plan-4c-themes`; not integrated on main. Tasks 1–3 are independently reviewed through `f4555d5`; Task 4 implementation and headless evidence are ready for per-task review, followed by whole-branch review. See [design](superpowers/specs/2026-09-12-moray-plan-4c-themes-design.md), [implementation plan](superpowers/plans/2026-09-12-moray-plan-4c-themes.md), [configuration](configuration.md), [headless comparison](design/plan-4c-themes/comparison.md) and [native checklist](superpowers/plans/2026-09-12-moray-plan-4c-manual-check.md). Main's user-owned example edit remains untouched and must be preserved during integration.
+
+Resolved themes separate chrome from custom terminal/padding/status colors. Follow System, explicit choices, accepted config palettes and source warnings now reach retained/hidden/zoomed/pending/new views. Palette-only updates preserve delegates and sessions; configuration refresh preserves custom status colors. Main alone creates the deferred production source, and controller close removes its listener and guards late callbacks. Headless source tests use synthetic bindings only.
+
+Task 4 deviations: remember latest OS reading outside the committed reducer so failed LAF installation preserves effective theme/menu while Follow System can retry without a second event (controller-approved). Native title callback stays at the existing `MacTitleBar.install` ownership boundary and extracts resolved chrome. Pending panes receive palette backgrounds before attachment. Status palette-derived readability also applies when a custom palette equals the opposite built-in palette. Installation-specific exceptions keep arbitrary application callback errors outside the theme failure-reporting catch, proven by a focused RED/GREEN regression. The existing Task 1 configuration bridge is removed. The detector-only JNA exclusion is retained because pty4j supplies both JNA 5.14.0 modules.
+
+Fresh `./gradlew check --rerun-tasks` passed with all eight tasks executed: 502 tests, 501 passed, one known `FontSetTest.fallsBackWhenPrimaryCannotDisplay()` skip, zero failures/errors. Both modules passed source hygiene (152 Java files) and `git diff --check` passed. Native detector/GUI/physical screens/benchmark remain unrun; all native checklist items are unchecked. Logging/launcher cleanup and packaging remain pending. Deferred test portability note from Task 2: ConfigServiceTest's same-size rewrite relies on mtime resolution; not changed in Task 4.
 
 ## 1. Goal and delivery phases
 
@@ -33,7 +39,8 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | Screenshot UI revision | Implemented and fully reviewed; compact/motion follow-up implemented and fully reviewed; native acceptance pending; integrated on main |
 | 4a — Saved settings and live reload | Integrated on main and fully reviewed; native acceptance pending |
 | 4b — Full terminal configuration | Integrated on main and fully reviewed; native acceptance pending |
-| Remaining Plan 4 | Custom themes/system appearance, logging/launcher and .app packaging remain |
+| 4c — Custom themes/system appearance | Implemented in worktree; Task 4 and whole-branch review pending; native acceptance pending |
+| Remaining Plan 4 | Logging/launcher and .app packaging remain |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart completed plans; Plan 4a is integrated; Plan 4b is integrated on main. Do not restart it. Subsequent Plan 4 work covers custom themes/system appearance, logging/launcher cleanup and packaging.
 

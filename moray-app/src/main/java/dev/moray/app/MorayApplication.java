@@ -23,8 +23,11 @@ final class MorayApplication {
 
     MorayApplication() { this(null); }
 
-    MorayApplication(ConfigService service) {
-        configuration = service == null ? null : new ConfigurationController(themes, service);
+    MorayApplication(ConfigService service) { this(service, SystemAppearance.fixed(BuiltinTheme.DARK)); }
+
+    MorayApplication(ConfigService service, SystemAppearance source) {
+        configuration = service == null ? null : new ConfigurationController(themes, service, source);
+        if (service == null) source.close();
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler((event, response) -> {
             // Cancel the native immediate JVM exit; pane close owns bounded child cleanup.
             response.cancelQuit(); SwingUtilities.invokeLater(this::quit);

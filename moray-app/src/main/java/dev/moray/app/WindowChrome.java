@@ -13,7 +13,7 @@ final class WindowChrome {
     private final JToolBar toolbar = new ReferenceToolbar();
     private final WindowStatusBar status = new WindowStatusBar();
     private final JMenuBar menuBar = new JMenuBar();
-    private final java.util.EnumMap<BuiltinTheme, JRadioButtonMenuItem> themeItems = new java.util.EnumMap<>(BuiltinTheme.class);
+    private final java.util.EnumMap<Appearance, JRadioButtonMenuItem> themeItems = new java.util.EnumMap<>(Appearance.class);
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
 
@@ -44,10 +44,11 @@ final class WindowChrome {
         statusVisible.addActionListener(event -> owner.setStatusVisible(statusVisible.isSelected()));
         JMenu appearance = new JMenu("Appearance");
         ButtonGroup themes = new ButtonGroup();
-        for (BuiltinTheme theme : new BuiltinTheme[]{BuiltinTheme.LIGHT, BuiltinTheme.DARK}) {
-            JRadioButtonMenuItem item = new JRadioButtonMenuItem(theme.label(), owner.theme() == theme);
-            item.setAction(new AbstractAction(theme.label()) {
-                @Override public void actionPerformed(ActionEvent event) { owner.selectTheme(theme); }
+        for (Appearance theme : new Appearance[]{Appearance.LIGHT, Appearance.DARK, Appearance.SYSTEM}) {
+            String label = theme == Appearance.SYSTEM ? "Follow System" : theme == Appearance.LIGHT ? "Light" : "Dark";
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(label, owner.appearance() == theme);
+            item.setAction(new AbstractAction(label) {
+                @Override public void actionPerformed(ActionEvent event) { owner.selectAppearance(theme); }
             });
             themeItems.put(theme, item); themes.add(item); appearance.add(item);
         }
@@ -269,11 +270,11 @@ final class WindowChrome {
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
-        toolbar.setBackground(owner.theme().palette().background());
+        toolbar.setBackground(owner.theme().chrome().palette().background());
         for (Component child : toolbar.getComponents()) if (child instanceof JButton button)
             button.setFont(((ReferenceButton) button).chromeFont());
         status.setBackground(owner.theme().palette().background());
-        themeItems.forEach((theme, item) -> item.setSelected(owner.theme() == theme));
+        themeItems.forEach((theme, item) -> item.setSelected(owner.appearance() == theme));
     }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }
     JToolBar toolbar() { return toolbar; }

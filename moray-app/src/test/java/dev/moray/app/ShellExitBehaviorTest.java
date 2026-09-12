@@ -97,7 +97,7 @@ class ShellExitBehaviorTest {
         TerminalPane retained = owner.currentPane(); TerminalView retainedView = retained.view();
         edt(() -> { exit(retained, 0); owner.newTab(directory); }); deliver();
         TerminalPane running = owner.currentPane();
-        edt(() -> { running.view().setFontSize(23f); running.applyTheme(BuiltinTheme.LIGHT); });
+        edt(() -> { running.view().setFontSize(23f); running.applyTheme(BuiltinTheme.LIGHT.palette()); });
         var options = running.view().options(); var session = running.session();
         reload("close_on_success");
         edt(() -> {

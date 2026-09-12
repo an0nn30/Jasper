@@ -43,12 +43,12 @@ The root [config.example.toml](config.example.toml) is a copyable file containin
 
 ```bash
 mkdir -p ~/.config/moray
-cp -i config.example.toml ~/.config/moray/config.toml
+cp -n config.example.toml ~/.config/moray/config.toml
 ```
 
-If `config.toml` already exists, `cp -i` prompts before replacing it; answer `n` to keep the existing file.
+If `config.toml` already exists, `cp -n` leaves it unchanged. Choose another filename to inspect the example separately.
 
-Custom theme files, automatic system appearance, logging and app packaging remain planned. Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md).
+Custom TOML palettes reload live and System appearance follows the OS across windows; custom terminal/status colors stay fixed as chrome changes. See [theme configuration](docs/configuration.md#appearance-and-custom-themes) and the [native theme checklist](docs/superpowers/plans/2026-09-12-moray-plan-4c-manual-check.md). Logging, launcher cleanup and app packaging remain planned. Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md).
 
 On Linux/Windows, Ctrl+1–9 selects an existing tab and Ctrl+Shift+[ / Ctrl+Shift+] selects the previous/next tab. For other actions, `cmd` maps to Ctrl+Shift. Those defaults written with an additional explicit Shift add Alt to remain distinct (for example split down is Ctrl+Alt+Shift+D). Other ordinary Ctrl combinations remain available to terminal programs. Keybinding overrides also accept `{` and `}` as Shift+[ and Shift+].
 

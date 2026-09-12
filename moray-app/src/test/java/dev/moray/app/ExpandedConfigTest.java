@@ -201,6 +201,7 @@ class ExpandedConfigTest {
 
     @Test void templateUncommentsToEverySupportedSetting() {
         String uncommented = ConfigTemplate.text(true).lines()
+            .filter(line -> !line.contains("my-theme.toml"))
             .map(line -> line.matches("# ([a-z_0-9]+ = .*|\\[.*])") ? line.substring(2) : line)
             .collect(java.util.stream.Collectors.joining("\n"));
         var toml = Toml.parse(uncommented);
