@@ -6,7 +6,7 @@
 
 Deliver application diagnostics, reproducible memory/throughput tools, targeted terminal hardening, and a verified native package with an honest acceptance ledger. Keep the existing Swing/JediTerm/pty4j architecture, Java 25 JetBrains toolchain and module boundaries. Do not add SSH or later-phase features. Work on `codex/terminal-readiness` in the existing `.worktrees/terminal-memory-plan` checkout. Main remains untouched until integration is approved.
 
-Sequence: (1) logging, (2) benchmark instrumentation and baseline, (3) interaction/resource-lifetime hardening and measured optimizations, (4) repeat measurements, package verification and pre-trial handoff. Each implementation task receives an independent review; the final branch receives a whole-branch review.
+Sequence: (1) logging, (2) benchmark instrumentation and baseline, (3) interaction/resource-lifetime hardening and measured optimizations, (4) repeat measurements, package verification and pre-trial handoff. The hardening stage is split into reset/logical-line, mouse/selection, and rendering/desktop-action tasks. Each implementation task receives an independent review; the final branch receives a whole-branch review.
 
 ## Application diagnostics
 

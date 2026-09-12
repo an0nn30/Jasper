@@ -68,24 +68,46 @@ Production startup is the only logging installation boundary; `--help` and inval
 - [ ] Memory: scenario matrix 1/4/8 panes; scrollback 0/10k/100k; cold/warm idle, output peak/settle, repeated tab/split/window cycles and search/resize/font workload. Sample heap/GC, process PID/RSS or footprint with explicit source/units, allocation if supported and separate child PIDs. Capture JVM vendor/version/options, OS/arch, app revision, font/grid, warmup/sample timings. Metrics collection and report writes stay off EDT. Prefer JDK management/JFR and system process tools; avoid profiler dependency or changing JVM default heap settings. Label optional forced-GC diagnostics separately from normal measurements. Bound run duration and report unsuccessful runs explicitly.
 - [ ] Document Mac/Windows packaged runtime commands, instrumentation overhead, equivalent-run comparison protocol, repeated samples and native safety/acceptance constraints. `check` must not depend on either benchmark. Run focused tests and full check, build `packageApp`/`verifyPackage` without launching GUI, self-review and commit. Controller runs native baseline if permitted before Task 3; otherwise preserve the baseline package outside task-owned rebuild paths and document pending measurements.
 
-### Task 3: Terminal interaction and resource-lifetime hardening
+### Task 3a: Reset synchronization and bounded logical lines
 
-**Files:** terminal `TerminalView.java`, `TerminalSession.java`, `ScreenSnapshot.java`, selection/logical-line/search helpers as needed, relevant existing test classes plus narrowly named regressions. Modify app lifecycle only if a concrete retention bug crosses that boundary. Do not alter supported feature scope, config defaults or scrollback limits.
+**Files:** terminal `TerminalSession.java`, `ScreenSnapshot.java`, logical-line helpers as needed, focused session/snapshot/link/selection tests.
 
-**Interfaces:** Preserve existing public API and injection seams. Mouse ownership is press-time state per button; logical-line traversal produces a bounded range shared by link/selection code; repaint scheduling is coalesced and attachment-aware. Benchmark interfaces/metadata from Task 2 remain stable for comparison. Logger from Task 1 is available through JDK System.Logger.
+**Interfaces:** Preserve public API and module boundaries. Shared bounded traversal is consumed by URL lookup and line selection. Baseline benchmark interfaces stay stable. Consult the controller's pinned-source investigation; it is a hypothesis until regression evidence confirms it.
 
-- [ ] Reproduce each issue with focused tests before fixes. Capture exact RIS/snapshot failure stack and fix synchronization/model snapshot boundary rather than swallowing exceptions. Check library source where necessary; buffer locking must cover mutation/read consistency. Keep the original cursor-reset expectation and add deterministic concurrent reset/read coverage without a flaky timed assertion.
-- [ ] Mouse regressions: reported press → Shift drag/release still reports matching button; local Shift selection → modifier-free release remains local; right popup ownership; command-link drag suppression; multiple button interactions; every wheel notch plus fractional remainder; double-click drag expands whole words; wide/supplementary endpoint integrity. Use existing FakeConnector and handleMouse seam.
-- [ ] Implement per-button ownership with explicit press state. Ensure report modifiers do not let JediTerm drop the matching release when Shift changes later. Handle drag events whose button is NOBUTTON using held-mask/owner state. Never repaint/rebuild full screen snapshots for pure reports when only viewport coordinates/mode are required. Browser's default implementation runs off EDT with bounded executor/queue and fixed diagnostics; injected callbacks remain predictable in tests.
-- [ ] Replace unbounded duplicate soft-wrap walks with one bounded shared helper. Cap at 4096 rows and 1 MiB of cell/text work per lookup; if URL context is truncated return no link rather than open a partial URL. Select the bounded visible logical range at the limit and document that extreme-line fallback. Ensure width/multiplication overflow cannot exceed the cap.
-- [ ] Drive frame repaint from dirty changes with one coalesced pending event/timer; idle panes have no perpetual frame polling. Blink runs only while attached/showing/focused with an effective blinking visible cursor; reconcile on options/program state/exit/focus/attachment. Invalidate queued callbacks on detach; closed/hidden panes release listeners and search workers. Tests assert observable repaint/lifecycle behavior and cursor correctness, not implementation field names alone. Search highlighting binary-searches sorted matches into the visible row range. Profile-guided allocation removals may be included if semantics are unchanged and evidence/tests support them.
-- [ ] Run focused regressions, full check and source hygiene. Document intentional bounds and any genuinely unresolved library limitation. Self-review and commit. Report profiling evidence separately from inferred improvements; never claim measured savings if native runs remain blocked.
+- [ ] Reproduce the RIS/snapshot failure with focused tests. Capture failure evidence and fix the actual reset mutation boundary. Never lock around a potentially blocking emulator read, swallow nulls, or weaken the cursor-reset expectation. Cover deterministic reset/read concurrency and existing resize/alternate-buffer behavior.
+- [ ] Replace duplicate unbounded soft-wrap walks with one shared bounded helper: cap at 4096 rows and 1 MiB of cell/text work. URL lookup returns no link when context is truncated, and line selection returns a bounded range containing the clicked row. Guard width/multiplication overflow; document the extreme-line fallback.
+- [ ] Remove unused style storage in text-only extraction only when supported by the baseline allocation evidence; otherwise leave it as a measured follow-up. All buffer reads remain locked and bounded.
+- [ ] Focused RED/GREEN, full check once, source hygiene/diff checks, self-review, commit and independent task review before Task 3b.
+
+### Task 3b: Mouse gesture and selection correctness
+
+**Files:** `TerminalView.java`, `MouseRouting.java`, selection helpers/session methods as needed, focused mouse/selection/clipboard tests.
+
+**Interfaces:** Preserve public API and deterministic clipboard/link injection. A press establishes ownership per button until its matching release. Consume bounded logical-line behavior from 3a. Browser threading belongs to 3c; do not mix unrelated timer changes into this task.
+
+- [ ] Regressions before fixes: reported press followed by Shift drag/release still reports; local Shift selection followed by modifier-free release stays local; right popup ownership; command-link drag suppression; multiple buttons; NOBUTTON drag dispatch; full wheel notches and fractional remainder; double-click word dragging; wide and supplementary endpoint integrity.
+- [ ] Implement per-button ownership, retaining the modifiers necessary for JediTerm to emit a matching release. Resolve drag button from held masks/owner state. Report every complete wheel notch without losing fractional remainder. Command-click on a non-link retains deliberate local selection semantics and cannot swallow a later gesture.
+- [ ] Double-click dragging extends whole words. Selection endpoints do not copy half a wide/supplementary character. Clear selections when selected live content is overwritten while preserving selections under unrelated output and normal scrollback movement; add regressions for those distinctions. Keep copy-on-select and popup ownership intact.
+- [ ] Pure mouse reporting uses grid/viewport metadata without copying a full screen or repainting for every motion. Existing selection/link gestures may snapshot only where content is actually required.
+- [ ] Focused RED/GREEN, full check once, source hygiene/diff checks, self-review, commit and independent review before 3c.
+
+### Task 3c: Idle rendering and asynchronous desktop actions
+
+**Files:** `TerminalView.java`, view lifecycle/search helpers and focused lifecycle/render/search tests; app lifecycle only for a proven cross-boundary retention issue.
+
+**Interfaces:** Preserve public API, benchmark metadata and earlier interaction behavior. JDK logger from Task1 is available for fixed browser diagnostics.
+
+- [ ] Add observable lifecycle/repaint regressions before changes. Replace perpetual frame polling with dirty-driven coalesced scheduling. Blink only while attached/showing/focused with an effective visible blinking cursor; reconcile options/program state/exit/focus/attachment. Invalidate queued callbacks on detach and release listeners/search resources on close. Tests verify observable behavior and cursor rendering rather than private field names alone.
+- [ ] Binary-search sorted search matches into the visible row range for painting. Cover large offscreen result sets, overlapping/edge matches and supplementary characters where relevant.
+- [ ] Default Desktop.browse dispatches off EDT through a bounded executor/queue with fixed error diagnostics. Injected link callbacks remain synchronous/predictable for tests. Do not add a new notification or configuration subsystem.
+- [ ] Profile-guided allocation improvements require baseline evidence and unchanged semantics. Record inferred work reduction separately from measured memory savings; keep default options/scrollback behavior unchanged.
+- [ ] Focused RED/GREEN, full check once, source hygiene/diff checks, self-review, commit and independent review before final measurement.
 
 ### Task 4: Final measurements, packages and trial-readiness ledger
 
 **Files:** `docs/benchmarks.md`, checked-in compact result summaries under `docs/benchmarks/` (raw large recordings ignored/build output), `docs/STATUS.md`, `docs/packaging.md`, README, `docs/terminal-readiness.md`; CI workflow only for demonstrated compatibility gaps. Avoid blanket dependency upgrades.
 
-**Interfaces:** Consume Task 2 tools and Task 3 final implementation. All evidence records the exact build/revision/host; baseline vs final share runtime options/config/workload. Each prerequisite labelled passed, failed or pending.
+**Interfaces:** Consume Task 2 tools and Task 3a–3c final implementation. All evidence records the exact build/revision/host; baseline vs final share runtime options/config/workload. Each prerequisite labelled passed, failed or pending.
 
 - [ ] Controller executes permitted benchmark runs, repeating equivalent baseline/final scenarios. Analyze large contributors and make a single reviewed optimization follow-up if evidence supports it; additional architectural changes require a new concrete spec, not speculative churn. Retain at least the 35 MB/s minimum and report 45 MB/s target status plus frame/EDT responsiveness. Record memory results and limits honestly.
 - [ ] Fresh `./gradlew build :moray-app:packageDist --rerun-tasks`; count XML results, check source hygiene/diff and package integrity. Preserve final package in a clear output path.
