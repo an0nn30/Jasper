@@ -7,10 +7,11 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.function.LongSupplier;
 import javax.swing.*;
 
 /** A single visible tab row over WindowContent's retained Swing selection model. */
-final class WindowTabs extends JPanel {
+final class WindowTabs extends JPanel implements AutoCloseable {
     private final WindowContent owner;
     private final IdentityHashMap<TerminalTab, Entry> entries = new IdentityHashMap<>();
     private final List<TerminalTab> order = new ArrayList<>();
@@ -20,19 +21,31 @@ final class WindowTabs extends JPanel {
     private int layoutWidth = -1;
     private boolean revealSelection = true;
     private boolean active = true;
+    private final LongSupplier clock;
+    final Timer animationTimer;
+    private final TabMotion underlineX = new TabMotion(0);
+    private final TabMotion underlineWidth = new TabMotion(0);
+    private boolean laidOut, settleOnLayout, disposed;
+    private int layoutHeight = -1, tabRegionLeft, tabRegionRight;
 
-    WindowTabs(WindowContent owner) {
+    WindowTabs(WindowContent owner, LongSupplier clock) {
         super(null);
         this.owner = owner;
+        this.clock = clock;
+        animationTimer = new Timer(16, event -> animateFrame());
+        animationTimer.setCoalesce(true);
+        addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && !isShowing()) settleMotion();
+        });
         setName("windowTabs");
         plus = button("newTab", "New tab", "plus");
         plus.addActionListener(event -> owner.action(ActionId.NEW_TAB).actionPerformed(event));
         previous = button("previousTabs", "Previous tabs", null);
         previous.setText("\u2039");
-        previous.addActionListener(event -> { firstVisible = Math.max(0, firstVisible - 1); revalidate(); repaint(); });
+        previous.addActionListener(event -> { firstVisible = Math.max(0, firstVisible - 1); settleOnLayout = true; revalidate(); repaint(); });
         next = button("nextTabs", "Next tabs", null);
         next.setText("\u203a");
-        next.addActionListener(event -> { firstVisible = Math.min(order.size() - 1, firstVisible + 1); revalidate(); repaint(); });
+        next.addActionListener(event -> { firstVisible = Math.min(order.size() - 1, firstVisible + 1); settleOnLayout = true; revalidate(); repaint(); });
         add(plus); add(previous); add(next);
     }
 
@@ -40,6 +53,9 @@ final class WindowTabs extends JPanel {
         var updated = new ArrayList<TerminalTab>();
         for (int i = 0; i < owner.tabStrip().getTabCount(); i++) updated.add((TerminalTab) owner.tabStrip().getComponentAt(i));
         if (!updated.equals(order)) {
+            // Removal and reorder invalidate the old visual coordinates. Additions retain them.
+            if (!updated.containsAll(order) || !updated.stream().filter(order::contains).toList().equals(order))
+                settleOnLayout = true;
             entries.entrySet().removeIf(item -> {
                 if (updated.contains(item.getKey())) return false;
                 remove(item.getValue()); return true;
@@ -66,7 +82,12 @@ final class WindowTabs extends JPanel {
     }
 
     @Override public void doLayout() {
-        if (layoutWidth != getWidth()) { layoutWidth = getWidth(); revealSelection = true; }
+        long now = clock.getAsLong();
+        boolean settle = !laidOut || settleOnLayout || disposed;
+        if (layoutWidth != getWidth() || layoutHeight != getHeight()) {
+            layoutWidth = getWidth(); layoutHeight = getHeight(); revealSelection = true; settle = true;
+        }
+        int oldFirstVisible = firstVisible;
         int width = getWidth(), tabWidth = UIScale.scale(160), plusWidth = Math.min(width, UIScale.scale(32));
         boolean overflow = order.size() * tabWidth + plusWidth > width;
         int navigation = overflow ? Math.min(UIScale.scale(24), Math.max(0, (width - plusWidth) / 3)) : 0;
@@ -79,23 +100,74 @@ final class WindowTabs extends JPanel {
             if (selectedIndex >= firstVisible + count) firstVisible = selectedIndex - count + 1;
             revealSelection = false;
         }
-        int x = navigation;
+        if (firstVisible != oldFirstVisible) settle = true;
+        if (overflow && entries.values().stream().anyMatch(entry -> entry.entering)) settle = true;
+        int x = navigation, targetX = navigation;
+        int selectedX = 0, selectedWidth = 0;
+        tabRegionLeft = navigation;
         for (int i = 0; i < order.size(); i++) {
             Entry entry = entries.get(order.get(i));
             boolean visible = i >= firstVisible && i < firstVisible + count;
             entry.setVisible(visible);
             if (visible) {
                 int actualWidth = Math.min(tabWidth, space);
-                entry.setBounds(x, 0, actualWidth, getHeight());
-                x += actualWidth; space -= actualWidth;
+                if (entry.entering) {
+                    entry.width = new TabMotion(Math.min(UIScale.scale(64), actualWidth));
+                    entry.entering = false;
+                }
+                entry.width.target(actualWidth, now, settle);
+                int shownWidth = Math.min(space, Math.max(0, (int) Math.round(entry.width.value(now))));
+                entry.setBounds(x, 0, shownWidth, getHeight());
+                entry.doLayout();
+                if (order.get(i) == selected) { selectedX = targetX; selectedWidth = actualWidth; }
+                x += shownWidth; targetX += actualWidth; space -= shownWidth;
+            } else {
+                // Offscreen arrivals need no reveal; retaining one would suppress later visible motion.
+                entry.entering = false;
+                entry.width.target(tabWidth, now, true);
             }
         }
+        tabRegionRight = x;
+        int inset = UIScale.scale(14);
+        underlineX.target(selectedX + inset, now, settle);
+        underlineWidth.target(Math.max(0, selectedWidth - 2 * inset), now, settle);
+        laidOut = true; settleOnLayout = false;
         plus.setBounds(x, 0, plusWidth, getHeight());
         previous.setVisible(overflow); next.setVisible(overflow);
         previous.setBounds(0, 0, navigation, getHeight());
         next.setBounds(x + plusWidth, 0, navigation, getHeight());
         previous.setEnabled(firstVisible > 0);
         next.setEnabled(firstVisible + count < order.size());
+        boolean moving = underlineX.moving(now) || underlineWidth.moving(now)
+            || entries.values().stream().anyMatch(entry -> entry.width.moving(now));
+        if (moving && isShowing() && !disposed) animationTimer.start();
+        else animationTimer.stop();
+    }
+
+    /** A frame changes only title-strip bounds; it never revalidates the terminal deck. */
+    private void animateFrame() { doLayout(); repaint(); }
+
+    private void settleMotion() {
+        animationTimer.stop();
+        underlineX.settle(); underlineWidth.settle();
+        entries.values().forEach(entry -> { entry.entering = false; entry.width.settle(); });
+        settleOnLayout = true;
+    }
+
+    @Override public void addNotify() { super.addNotify(); settleMotion(); }
+    @Override public void removeNotify() { settleMotion(); super.removeNotify(); }
+    @Override public void close() { disposed = true; settleMotion(); }
+
+    @Override protected void paintChildren(Graphics graphics) {
+        super.paintChildren(graphics);
+        Graphics g = graphics.create();
+        try {
+            g.clipRect(tabRegionLeft, 0, Math.max(0, tabRegionRight - tabRegionLeft), getHeight());
+            g.setColor(UIManager.getColor("Moray.tabUnderline"));
+            long now = clock.getAsLong();
+            g.fillRect((int) Math.round(underlineX.value(now)), getHeight() - UIScale.scale(1),
+                (int) Math.round(underlineWidth.value(now)), UIScale.scale(1));
+        } finally { g.dispose(); }
     }
 
     @Override protected void paintComponent(Graphics g) {
@@ -130,6 +202,8 @@ final class WindowTabs extends JPanel {
         private final TerminalTab tab;
         private final JButton select, close;
         private Point origin;
+        private boolean entering = laidOut && !disposed;
+        private TabMotion width = new TabMotion(UIScale.scale(160));
 
         Entry(TerminalTab tab) {
             super(null);
@@ -195,9 +269,6 @@ final class WindowTabs extends JPanel {
             if (tab == selected) {
                 graphics.setColor(UIManager.getColor("Moray.tabSelectedBackground"));
                 graphics.fillRect(0, 0, getWidth(), getHeight());
-                graphics.setColor(UIManager.getColor("Moray.tabUnderline"));
-                int inset = UIScale.scale(14);
-                graphics.fillRect(inset, getHeight() - UIScale.scale(1), Math.max(0, getWidth() - 2 * inset), UIScale.scale(1));
             }
             super.paintComponent(graphics);
         }

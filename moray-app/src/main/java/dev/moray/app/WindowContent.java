@@ -50,6 +50,11 @@ final class WindowContent extends JPanel implements AutoCloseable {
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings) {
+        this(launcher, directory, newWindow, quit, onEmpty, themes, bindings, System::nanoTime);
+    }
+
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+                  ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock) {
         super(new BorderLayout());
         this.bindings = bindings;
         this.themes = themes;
@@ -68,7 +73,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         action(ActionId.OPEN_SETTINGS).putValue(Action.SHORT_DESCRIPTION, unavailable);
         action(ActionId.RELOAD_CONFIG).putValue(Action.SHORT_DESCRIPTION, unavailable);
         chrome = new WindowChrome(this);
-        windowTabs = new WindowTabs(this);
+        windowTabs = new WindowTabs(this, animationClock);
         var north = new JPanel(new BorderLayout());
         north.add(windowTabs, BorderLayout.NORTH); north.add(chrome.toolbar(), BorderLayout.CENTER);
         add(north, BorderLayout.NORTH); add(tabs); add(chrome.status(), BorderLayout.SOUTH);
@@ -307,6 +312,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        windowTabs.close();
         themes.unregister(this);
         for (int i = 0; i < tabs.getTabCount(); i++) ((TerminalTab) tabs.getComponentAt(i)).close();
         tabs.removeAll(); removeRootBindings();
