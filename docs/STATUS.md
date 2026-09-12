@@ -16,6 +16,10 @@
 
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. GUI launches and benchmarks are user-run only.
 
+## Plan 4c preparation — custom themes and system appearance
+
+The next runnable slice is prepared, not implemented: [design](superpowers/specs/2026-09-12-moray-plan-4c-themes-design.md) and [implementation plan](superpowers/plans/2026-09-12-moray-plan-4c-themes.md). The user selected switching both chrome and the built-in terminal palette when system appearance changes; custom palettes remain fixed. The plan preserves legacy built-in-only configs, adds local theme-file reload with last-good recovery, and separates chrome from terminal/status colors. Preparation lives in `.worktrees/plan-4c` on `codex/plan-4c-themes`, based on `b92221f`; the main checkout's local example-config edit is preserved. Baseline headless `./gradlew check` passed with all eight tasks executed: 463 tests, 462 passed, one known font skip, no failures/errors. Logging/launcher cleanup and packaging follow this slice; native and daily-use acceptance remain pending.
+
 ## 1. Goal and delivery phases
 
 Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built to replace `~/projects/conch` as the daily terminal. Product phases: terminal → SSH session management → credential vault → SFTP → tunnels → plugins and editor. Reuse tested non-UI Java from `~/projects/termlab-bundle` in later phases. Do not redesign the terminal foundation before the Phase 1 switch-over test.
