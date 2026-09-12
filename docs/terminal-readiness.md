@@ -1,6 +1,6 @@
 # Terminal readiness handoff — 2026-09-12
 
-Local implementation and measurements are complete on `codex/terminal-readiness` in `.worktrees/terminal-memory-plan`. All task reviews approved. Whole-branch review (`d3b5d11..5f4f804`) identified one hidden-search lifecycle gap; fix `8d84e7d` passed scoped re-review with no remaining findings. This branch is **unmerged and unpushed**. The **two-week trial has not started**; CI and human native acceptance still precede it.
+Local implementation and measurements are complete on `codex/terminal-readiness` in `.worktrees/terminal-memory-plan`. All task reviews approved. Whole-branch review (`d3b5d11..5f4f804`) identified one hidden-search lifecycle gap; fix `8d84e7d` passed scoped re-review with no remaining findings. This branch is **published and unmerged** after user authorization. The [three-platform CI run](https://github.com/an0nn30/moray/actions/runs/34724855954) passed on macOS, Ubuntu and Windows at `c793925`. The **two-week trial has not started**; human native acceptance still precedes it.
 
 ## Delivered
 
@@ -29,14 +29,14 @@ The final hidden-search fix (`8d84e7d`) received three fresh full throughput run
 | Headless build/tests and macOS package | Passed locally on measured runtime above |
 | Controlled native benchmark / fixture cleanup | Passed; all accepted processes returned 0, no reported fixture PIDs survived |
 | Throughput | 35 MB/s floor passed; 45 MB/s target unmet |
-| Three-platform CI | Pending publication; remote has no refs and Actions has zero runs at last check |
+| Three-platform CI | Passed on macOS, Ubuntu and Windows at `c793925`; [three-platform CI run](https://github.com/an0nn30/moray/actions/runs/34724855954) |
 | Normal macOS desktop acceptance | Pending user checks below; benchmark windows do not substitute |
 | Windows build and native acceptance | Pending user execution on Windows |
 | Two-week daily-use trial | Not started; no timer or automation created |
 
 ## Native handoff
 
-Use this worktree for the new code; main remains the earlier packaging milestone. [Build/package commands and native checklist](packaging.md) cover DMG and Windows ZIP creation. On Windows use JBR SDK 25, run `gradlew.bat build :moray-app:packageDist`, then test the extracted native image. Run CI on the reviewed branch after push authorization; successful local tests do not imply Windows/Linux CI results.
+Use this worktree for the new code; main remains the earlier packaging milestone. [Build/package commands and native checklist](packaging.md) cover DMG and Windows ZIP creation. On Windows use JBR SDK 25, run `gradlew.bat build :moray-app:packageDist`, then test the extracted native image. Three-platform headless CI is now verified; it does not build or exercise native Windows packaging. The user still owns Windows package and interactive acceptance.
 
 Before starting the trial, record normal macOS Finder/Dock launch, title controls/tab animation, clipboard and shortcuts, font/IME behavior, theme/config reload, shell exits and tmux/vim/htop interaction. Exercise Shift-changing mouse gestures, multi-notch wheel reports, overwritten/word/wide-character selection, links, hidden tabs, split zoom/reparenting and closed-window cleanup. Existing [terminal configuration checks](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md), [theme checks](superpowers/plans/2026-09-12-moray-plan-4c-manual-check.md) and packaging checklist remain the detailed acceptance record. Record Windows equivalents on the user's Windows machine. Never mark an unexecuted check passed.
 
@@ -54,3 +54,11 @@ These preserve the controller's rulings, in order, from the execution ledger:
 6. Use a small production-used publication helper and immutable attachment token to test resumed stale requests deterministically. Cost: a small helper; no test-only suspension hook or timing-dependent regression.
 
 No further optimization wave was justified by mixed RSS/throughput results. Remaining opportunities include deeper retained-wrapper/root investigation, dependency allocation, font-cell rounding and cosmetic shell-integration prefix counting. Physical-row search, best-effort regex cancellation and existing width-reflow invalidation remain documented limitations. No backend rewrite, forced periodic GC or heap cap was introduced.
+
+## Publication and CI follow-up
+
+The initial authorized push of `6b712af` passed macOS/Linux CI but exposed three Windows test assumptions. Commit `a5f4dc1` matches the logger assertion to the host line separator and excludes only two `/bin/sh`-fixture test methods on Windows, consistent with the existing Unix-fixture tests. Assertions and production code are unchanged; shell-independent UI/theme checks remain enabled. Focused local tests passed 15/15; forced full check passed 575 with one known skip. The next Windows run passed app tests and exposed an off-EDT resize-test race. Commit `c793925` confines that test’s resize and unchanged immediate grid/connector assertions to one Swing event-thread turn; all eight focused tests passed. The confirming CI run linked above then passed all three platforms. Native Windows testing remains required.
+
+The agent service rejected both a fresh reviewer and a reviewer follow-up because its thread limit was reached. The controller, who did not implement the patch, independently reviewed the three changed app test files and the subsequent terminal resize test and their production/fixture context and approved with no findings. Cost of this workflow substitution: no fresh isolated reviewer context for this small test-only correction. Prior whole-branch production reviews remain unchanged.
+
+The first push made `codex/terminal-readiness` GitHub's default branch because the remote was empty. Local main remains unchanged; neither a merge nor changing the default branch was authorized.
