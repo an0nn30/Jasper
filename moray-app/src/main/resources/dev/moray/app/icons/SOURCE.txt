@@ -2,6 +2,8 @@ Tabler Icons outline set: https://tabler.io/icons
 Source: https://github.com/tabler/tabler-icons
 Source commit: 6d128ed935d4546607b1e4d5d08c8b27bdbe7758.
 Copied from /Users/dustin/projects/tabler-icons/icons/outline on 2026-09-11.
-Only modification: currentColor stroke replaced by #6e6e6e for FlatLaf theme-aware recoloring.
+Adaptations: currentColor stroke replaced by #6e6e6e for per-icon FlatLaf theme recoloring;
+each icon has a rounded 18%-opacity color field, and enclosed faces use a 24%-opacity fill where applicable.
+Original Tabler path geometry is preserved.
 Seven icons: square-plus, app-window, columns-2, maximize, search, settings, refresh.
 License: MIT; see LICENSE.txt.

@@ -1,6 +1,7 @@
 package dev.moray.app;
 
 import java.awt.Dimension;
+import java.awt.Insets;
 import java.awt.event.*;
 import javax.swing.*;
 import javax.swing.event.MenuEvent;
@@ -27,7 +28,7 @@ final class WindowChrome {
     WindowChrome(WindowContent owner) {
         this.owner = owner;
         toolbar.setFloatable(false);
-        toolbar.setBorder(BorderFactory.createEmptyBorder(3, 5, 3, 5));
+        toolbar.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
         status.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         status.setToolTipText("Using built-in defaults. Configuration files are not loaded yet.");
         JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
@@ -96,6 +97,7 @@ final class WindowChrome {
     private JButton addButton(ActionId id, String icon) {
         JButton button = toolbar.add(owner.action(id));
         button.setIcon(AppIcons.icon(icon)); button.setFocusable(false);
+        button.setMargin(new Insets(4, 8, 4, 8));
         button.setVerticalTextPosition(SwingConstants.BOTTOM); button.setHorizontalTextPosition(SwingConstants.CENTER);
         button.getAccessibleContext().setAccessibleName(id.label());
         if (button.getToolTipText() == null) button.setToolTipText(id.label());
