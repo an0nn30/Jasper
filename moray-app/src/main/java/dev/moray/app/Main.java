@@ -27,8 +27,9 @@ public final class Main {
         if (options.help()) { out.println(AppArguments.USAGE); return 0; }
         String os = System.getProperty("os.name");
         Path home = Path.of(System.getProperty("user.home"));
-        Path file = options.configOverride() == null ? AppDirs.resolve(os, System.getenv(), home).configFile() : options.configOverride();
-        ConfigService service = new ConfigService(file, os.startsWith("Mac"));
+        AppDirs dirs = AppDirs.resolve(os, System.getenv(), home);
+        Path file = options.configOverride() == null ? dirs.configFile() : options.configOverride();
+        ConfigService service = new ConfigService(file, dirs.themes(), os.startsWith("Mac"));
         try { launch.accept(service); }
         catch (RuntimeException failure) { service.close(); throw failure; }
         return 0;

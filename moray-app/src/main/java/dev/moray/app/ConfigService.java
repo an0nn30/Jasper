@@ -1,5 +1,7 @@
 package dev.moray.app;
 
+import dev.moray.terminal.Palette;
+
 import javax.swing.SwingUtilities;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -10,6 +12,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -24,11 +27,22 @@ import java.util.function.Consumer;
 
 /** Application-owned config I/O. Construct off EDT; subsequent work is serialized on one worker. */
 final class ConfigService implements AutoCloseable {
-    record State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present) {
+    record State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present,
+                 Palette palette) {
         State {
             Objects.requireNonNull(snapshot, "snapshot");
             Objects.requireNonNull(file, "file");
+            Objects.requireNonNull(palette, "palette");
             diagnostics = List.copyOf(diagnostics);
+        }
+
+        State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present) {
+            this(snapshot, diagnostics, file, present, seed(snapshot));
+        }
+
+        private static Palette seed(ConfigSnapshot snapshot) {
+            return snapshot.colors().theme().equals("moray-light")
+                ? Palette.morayLight() : Palette.morayDark();
         }
     }
 
@@ -37,6 +51,7 @@ final class ConfigService implements AutoCloseable {
     private static final Fingerprint MISSING = new Fingerprint(false, null, 0);
 
     private final Path file;
+    private final ThemeFiles themeFiles;
     private final boolean macOs;
     private final ScheduledExecutorService worker;
     private final Consumer<Runnable> publisher;
@@ -46,22 +61,35 @@ final class ConfigService implements AutoCloseable {
     // The fingerprint is confined to construction/the worker; lifecycle guards all other mutable state.
     private Fingerprint fingerprint;
     private State state;
+    private State lastConfig;
     private Consumer<State> listener;
     private long revision;
     private boolean closed;
 
     ConfigService(Path file, boolean macOs) {
-        this(file, macOs, newWorker(), SwingUtilities::invokeLater);
+        this(file, file.toAbsolutePath().getParent().resolve("themes"), macOs);
+    }
+
+    ConfigService(Path file, Path themes, boolean macOs) {
+        this(file, themes, macOs, newWorker(), SwingUtilities::invokeLater);
     }
 
     /** The supplied single-thread scheduled worker is owned by this service, including shutdown. */
     ConfigService(Path file, boolean macOs, ScheduledExecutorService worker, Consumer<Runnable> publisher) {
+        this(file, file.toAbsolutePath().getParent().resolve("themes"), macOs, worker, publisher);
+    }
+
+    /** The supplied single-thread scheduled worker is owned by this service, including shutdown. */
+    ConfigService(Path file, Path themes, boolean macOs, ScheduledExecutorService worker,
+                  Consumer<Runnable> publisher) {
         requireOffEdt();
         this.file = Objects.requireNonNull(file, "file");
+        this.themeFiles = new ThemeFiles(Objects.requireNonNull(themes, "themes"));
         this.macOs = macOs;
         this.worker = Objects.requireNonNull(worker, "worker");
         this.publisher = Objects.requireNonNull(publisher, "publisher");
-        initialState = readState(ConfigSnapshot.defaults(), true);
+        lastConfig = readState(ConfigSnapshot.defaults(), true);
+        initialState = join(lastConfig, true);
         state = initialState;
     }
 
@@ -98,12 +126,11 @@ final class ConfigService implements AutoCloseable {
     }
 
     private State refresh(boolean force) {
-        ConfigSnapshot lastGood;
         synchronized (lifecycle) {
             if (closed) return state;
-            lastGood = state.snapshot();
         }
-        State next = readState(lastGood, force);
+        lastConfig = readState(lastConfig.snapshot(), force);
+        State next = join(lastConfig, force);
         synchronized (lifecycle) {
             if (!closed && !next.equals(state)) {
                 state = next;
@@ -118,7 +145,7 @@ final class ConfigService implements AutoCloseable {
         try {
             BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
             Fingerprint next = new Fingerprint(true, attributes.lastModifiedTime(), attributes.size());
-            if (!force && next.equals(fingerprint)) return currentState();
+            if (!force && next.equals(fingerprint)) return lastConfig;
             fingerprint = next;
             if (!attributes.isRegularFile()) {
                 return readError(lastGood, "Configuration must be a readable regular file; check the configured path.");
@@ -165,10 +192,11 @@ final class ConfigService implements AutoCloseable {
         return new State(ConfigSnapshot.defaults(), List.of(), file, false);
     }
 
-    private State currentState() {
-        synchronized (lifecycle) {
-            return state;
-        }
+    private State join(State config, boolean force) {
+        ThemeFiles.Result selected = themeFiles.refresh(config.snapshot().colors(), force);
+        var diagnostics = new ArrayList<>(config.diagnostics());
+        diagnostics.addAll(selected.diagnostics());
+        return new State(config.snapshot(), diagnostics, config.file(), config.present(), selected.palette());
     }
 
     private State readError(ConfigSnapshot lastGood, String message) {

@@ -1,9 +1,11 @@
 package dev.moray.app;
 
+import dev.moray.terminal.Palette;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.swing.SwingUtilities;
+import java.awt.Color;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -97,6 +99,58 @@ class ConfigServiceTest {
             var state = service.reload().get(5, TimeUnit.SECONDS);
             assertThat(state.snapshot().tabHeight()).isEqualTo(45);
             assertThat(delivered).hasSize(2);
+        }
+    }
+
+    @Test void pollingReloadsThemeWhileConfigMetadataStaysUntouchedAndRetainsLastGood() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Path themes = Files.createDirectory(directory.resolve("themes"));
+        Path theme = themes.resolve("night.toml");
+        Files.writeString(file, "colors.theme='night'");
+        String configText = Files.readString(file);
+        FileTime configTime = Files.getLastModifiedTime(file);
+        Files.writeString(theme, "[colors.primary]\nbackground='#101820'");
+        var worker = new PollWorker();
+        var delivered = new ArrayList<ConfigService.State>();
+        try (var service = new ConfigService(file, themes, true, worker, Runnable::run)) {
+            service.start(delivered::add);
+            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0x101820));
+            Files.writeString(theme, "[colors.primary]\nbackground='#fafafa'");
+            worker.poll();
+            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0xfafafa));
+            Files.writeString(theme, "[colors.primary]\nbackground='broken'");
+            worker.poll();
+            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0xfafafa));
+            assertThat(delivered.getLast().diagnostics()).isNotEmpty();
+            assertThat(Files.readString(file)).isEqualTo(configText);
+            assertThat(Files.getLastModifiedTime(file)).isEqualTo(configTime);
+            Files.writeString(file, "colors.theme='night'\nwindow.tab_height=45");
+            worker.poll();
+            assertThat(delivered.getLast().snapshot().tabHeight()).isEqualTo(45);
+            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0xfafafa));
+        }
+    }
+
+    @Test void forcedReloadPublishesEqualMetadataThemeContentAndDropsStalePublication() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Path themes = Files.createDirectory(directory.resolve("themes"));
+        Path theme = themes.resolve("night.toml");
+        Files.writeString(file, "colors.theme='night'");
+        Files.writeString(theme, "[colors.primary]\nbackground='#101820'");
+        FileTime modified = Files.getLastModifiedTime(theme);
+        var queued = new ConcurrentLinkedQueue<Runnable>();
+        var delivered = new ArrayList<ConfigService.State>();
+        try (var service = new ConfigService(file, themes, true, new PollWorker(), queued::add)) {
+            service.start(delivered::add);
+            Files.writeString(theme, "[colors.primary]\nbackground='#fafafa'");
+            Files.setLastModifiedTime(theme, modified);
+            service.reload().get(5, TimeUnit.SECONDS);
+            assertThat(queued).hasSize(2);
+            queued.remove().run();
+            assertThat(delivered).isEmpty();
+            queued.remove().run();
+            assertThat(delivered).singleElement().satisfies(state ->
+                assertThat(state.palette().background()).isEqualTo(new Color(0xfafafa)));
         }
     }
 
@@ -367,6 +421,7 @@ class ConfigServiceTest {
         diagnostics.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, file, 0, 0, "", "Failure"));
         assertThat(state.diagnostics()).isEmpty();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> state.diagnostics().clear());
+        assertThat(state.palette()).isEqualTo(Palette.morayDark());
     }
 
     private static void assertError(ConfigService.State state) {
