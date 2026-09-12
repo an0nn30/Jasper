@@ -1,6 +1,5 @@
 package dev.moray.terminal;
 
-import com.jediterm.terminal.TextStyle;
 import com.jediterm.terminal.model.TerminalLine;
 import com.jediterm.terminal.util.CharUtils;
 
@@ -14,8 +13,7 @@ record RowText(String text, int[] columns, int[] lastColumns) {
 
     static RowText of(TerminalLine line, int width) {
         char[] chars = new char[width];
-        TextStyle[] styles = new TextStyle[width];
-        RunBuilder.readCells(line, width, chars, styles);
+        RunBuilder.readCells(line, width, chars, null);
         StringBuilder text = new StringBuilder(width);
         int[] columns = new int[width];
         int[] lastColumns = new int[width];
@@ -32,6 +30,7 @@ record RowText(String text, int[] columns, int[] lastColumns) {
             lastColumns[count] = column;
             count++;
         }
-        return new RowText(text.toString(), Arrays.copyOf(columns, count), Arrays.copyOf(lastColumns, count));
+        return new RowText(text.toString(), count == width ? columns : Arrays.copyOf(columns, count),
+            count == width ? lastColumns : Arrays.copyOf(lastColumns, count));
     }
 }

@@ -33,9 +33,10 @@ final class RunBuilder {
         return build(chars, styles, width);
     }
 
+    /** Pass null for styles when extracting only text, avoiding unused per-cell style storage. */
     static void readCells(TerminalLine line, int width, char[] chars, TextStyle[] styles) {
         Arrays.fill(chars, 0, width, ' ');
-        Arrays.fill(styles, 0, width, TextStyle.EMPTY);
+        if (styles != null) Arrays.fill(styles, 0, width, TextStyle.EMPTY);
         int column = 0;
         for (TerminalLine.TextEntry entry : line.getEntries()) {
             CharBuffer text = entry.getText();
@@ -43,7 +44,7 @@ final class RunBuilder {
             for (int i = 0; i < text.length() && column < width; i++, column++) {
                 char c = text.charAt(i);
                 chars[column] = c == CharUtils.NUL_CHAR ? ' ' : c;
-                styles[column] = style;
+                if (styles != null) styles[column] = style;
             }
         }
     }

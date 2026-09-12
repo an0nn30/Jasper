@@ -116,7 +116,21 @@ public final class TerminalSession implements AutoCloseable {
                 absoluteRowEpoch.incrementAndGet();
                 listeners.forEach(l -> l.alternateBufferChanged(alternate));
             });
-        terminal = new JediTerminal(display, buffer, styleState);
+        terminal = new JediTerminal(display, buffer, styleState) {
+            @Override
+            public void reset(boolean fullReset) {
+                // JediTerm 3.76 clears its row storages without locking during RIS. Protect the whole
+                // reset (including cursor home), never emulator.next(), which can block on PTY input.
+                // The superclass initializes this buffer before invoking reset in its constructor.
+                TerminalTextBuffer resetBuffer = getTerminalTextBuffer();
+                resetBuffer.lock();
+                try {
+                    super.reset(fullReset);
+                } finally {
+                    resetBuffer.unlock();
+                }
+            }
+        };
         terminal.setTerminalOutput(new TerminalOutputStream() {
             @Override
             public void sendBytes(byte[] bytes, boolean userInput) {
@@ -393,6 +407,7 @@ public final class TerminalSession implements AutoCloseable {
     Optional<String> linkAt(long absoluteRow, int column) {
         buffer.lock();
         try {
+            if (column < 0 || column >= buffer.getWidth()) return Optional.empty();
             TerminalLine line = lineAtLocked(absoluteRow);
             if (line == null) {
                 return Optional.empty();
@@ -420,43 +435,27 @@ public final class TerminalSession implements AutoCloseable {
      * across a wrap boundary is still recognized as one link. Call with the buffer lock held.
      */
     private Optional<String> urlAcrossWrappedRows(long absoluteRow, int column) {
-        long first = absoluteRow;
-        while (true) {
-            TerminalLine above = lineAtLocked(first - 1);
-            if (above == null || !above.isWrapped()) {
-                break;
-            }
-            first--;
-        }
-        long last = absoluteRow;
-        while (true) {
-            TerminalLine line = lineAtLocked(last);
-            if (line == null || !line.isWrapped() || lineAtLocked(last + 1) == null) {
-                break;
-            }
-            last++;
-        }
         int width = buffer.getWidth();
-        StringBuilder text = new StringBuilder();
-        List<Integer> columns = new ArrayList<>();
-        List<Integer> lastColumns = new ArrayList<>();
-        for (long row = first; row <= last; row++) {
-            TerminalLine line = lineAtLocked(row);
-            if (line == null) {
-                continue;
-            }
+        LogicalLine range = LogicalLine.around(absoluteRow, width, this::lineAtLocked);
+        if (range.truncated()) return Optional.empty();
+        // The shared traversal bounds this multiplication to at most MAX_CELLS.
+        int cells = range.rowCount() * width;
+        StringBuilder text = new StringBuilder(cells);
+        int[] columns = new int[cells];
+        int[] lastColumns = new int[cells];
+        for (int rowIndex = 0; rowIndex < range.rowCount(); rowIndex++) {
+            TerminalLine line = lineAtLocked(range.firstRow() + rowIndex);
             RowText rowText = RowText.of(line, width);
-            int offset = (int) ((row - first) * width);
+            int offset = rowIndex * width;
             for (int i = 0; i < rowText.text().length(); i++) {
+                int index = text.length();
                 text.append(rowText.text().charAt(i));
-                columns.add(offset + rowText.columns()[i]);
-                lastColumns.add(offset + rowText.lastColumns()[i]);
+                columns[index] = offset + rowText.columns()[i];
+                lastColumns[index] = offset + rowText.lastColumns()[i];
             }
         }
-        int virtualColumn = (int) ((absoluteRow - first) * width) + column;
-        RowText combined = new RowText(text.toString(),
-            columns.stream().mapToInt(Integer::intValue).toArray(),
-            lastColumns.stream().mapToInt(Integer::intValue).toArray());
+        int virtualColumn = (int) ((absoluteRow - range.firstRow()) * width) + column;
+        RowText combined = new RowText(text.toString(), columns, lastColumns);
         return LinkDetector.urlAt(combined, virtualColumn);
     }
 
@@ -475,27 +474,12 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
-    /** The whole logical line at an absolute row, soft-wrapped rows included. */
+    /** A logical line, bounded by {@link LogicalLine}'s extreme-line fallback, always including the clicked row. */
     Selection lineSelection(long row) {
         buffer.lock();
         try {
-            long first = row;
-            while (true) {
-                TerminalLine above = lineAtLocked(first - 1);
-                if (above == null || !above.isWrapped()) {
-                    break;
-                }
-                first--;
-            }
-            long last = row;
-            while (true) {
-                TerminalLine line = lineAtLocked(last);
-                if (line == null || !line.isWrapped() || lineAtLocked(last + 1) == null) {
-                    break;
-                }
-                last++;
-            }
-            return new Selection(first, 0, last, buffer.getWidth() - 1, false);
+            LogicalLine range = LogicalLine.around(row, buffer.getWidth(), this::lineAtLocked);
+            return new Selection(range.firstRow(), 0, range.lastRow(), range.columns() - 1, false);
         } finally {
             buffer.unlock();
         }
