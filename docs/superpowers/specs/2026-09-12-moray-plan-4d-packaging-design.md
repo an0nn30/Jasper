@@ -1,6 +1,6 @@
 # Plan 4d — macOS and Windows packaging
 
-**Status:** Proposed design, awaiting user review. Packaging is not implemented yet.
+**Status:** Approved by the user on 2026-09-12; implementation in progress.
 
 **Scope:** The user requested `jpackage` builds for macOS and Windows, with Windows desktop acceptance performed manually by the user. This advances packaging ahead of the broader app-logging cleanup. It extends the Phase 1 design's macOS `.app` deliverable to Windows without changing the terminal-first product scope.
 
@@ -15,7 +15,7 @@ Proposed first outputs:
 | macOS Apple Silicon or Intel, with matching JBR SDK | `Moray.app` | `.dmg` containing the application |
 | Windows x64, with matching JBR SDK | `Moray/`, including `Moray.exe` and its runtime | Portable ZIP containing the whole `Moray/` directory |
 
-Portable Windows ZIP is the proposed default, pending the user's packaging-format reply. It avoids an installer dependency and permits testing by extraction and double-click. If an installer is selected, add an explicit Windows installer task using `jpackage` and document its WiX prerequisite. Do not silently replace the portable output or require WiX for portable builds. Windows ARM64 and Linux packaging are outside this first deliverable; ordinary Linux compilation and headless tests must remain available.
+The approved first Windows output is a portable ZIP. It avoids an installer dependency and permits testing by extraction and double-click. If an installer is selected, add an explicit Windows installer task using `jpackage` and document its WiX prerequisite. Do not silently replace the portable output or require WiX for portable builds. Windows ARM64 and Linux packaging are outside this first deliverable; ordinary Linux compilation and headless tests must remain available.
 
 The first packages are development builds without Developer ID signing, Apple notarization or Windows certificate signing. Signing and release publication are separate follow-ups. Keep jpackage's default application icon for this first packaging deliverable; Moray branding can replace it later without changing the build architecture.
 
