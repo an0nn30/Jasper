@@ -40,7 +40,9 @@ Use the same Java 25 JetBrains toolchain for compilation, runtime generation and
 
 Generate the runtime from that SDK using jpackage's non-modular application support. Preserve service bindings explicitly with `--bind-services` in the jlink options: JDK 25 no longer includes them by default. Do not use a hand-pruned jdeps module list in this first version; reflective/native dependencies need verification before size optimization. Confirm the resulting runtime identifies as JetBrains and includes desktop/native support.
 
-Metadata: application name `Moray`, initial package version `0.1.0`, macOS identifier `dev.moray.app`. Permit `-PmorayVersion=X.Y.Z`; reject values incompatible with native package versions before calling jpackage. Include OS and architecture in distribution filenames. Put all generated staging, application images and distributions under `moray-app/build/packaging/`.
+Native version correction: the selected macOS jpackage rejects a zero major version. Use a positive major version on both hosts rather than rewriting generated bundle metadata. This is package metadata for development builds, not a declaration of product completeness.
+
+Metadata: application name `Moray`, initial package version `1.0.0`, macOS identifier `dev.moray.app`. Permit `-PmorayVersion=X.Y.Z`; reject values incompatible with native package versions before calling jpackage. Include OS and architecture in distribution filenames. Put all generated staging, application images and distributions under `moray-app/build/packaging/`.
 
 Task inputs cover dependency files, the application JAR, bundled docs/config, version, platform, toolchain and launch options. Rebuilding must not retain removed dependencies or mistake a prior failed image for success. Any cleanup is limited to task-owned output directories. Use argument lists rather than shell command strings so repository paths containing spaces work on both platforms. Unsupported hosts or missing SDK tools fail with a direct message, without affecting ordinary `check`.
 

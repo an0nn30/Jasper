@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-12-moray-plan-4d-packaging-design.md` (approved).
 
-**Status:** Ready for execution. Worktree `.worktrees/plan-4d-packaging`, branch `codex/plan-4d-packaging`, baseline `dbf75d9`. Both task gates and whole-branch review are required. The user approved portable Windows ZIP as part of the proposed design; no installer is included.
+**Status:** Executing. Native validation correction: macOS jpackage requires a positive major version; default changed to 1.0.0 on both hosts, with no post-generation bundle metadata rewriting. Worktree `.worktrees/plan-4d-packaging`, branch `codex/plan-4d-packaging`, baseline `dbf75d9`. Both task gates and whole-branch review are required. The user approved portable Windows ZIP as part of the proposed design; no installer is included.
 
 ## Global Constraints
 
@@ -38,7 +38,7 @@
 
 **Interfaces:**
 - Consumes: `JavaApplication.mainClass`, `applicationDefaultJvmArgs`, `JavaPluginExtension.toolchain`, `jar.archiveFile`, `configurations.runtimeClasspath` from `moray-app`.
-- Produces: `:moray-app:packageApp`, `:moray-app:packageDist`, `:moray-app:verifyPackage`; property `-PmorayVersion=X.Y.Z` default `0.1.0`.
+- Produces: `:moray-app:packageApp`, `:moray-app:packageDist`, `:moray-app:verifyPackage`; property `-PmorayVersion=X.Y.Z` default `1.0.0`.
 - Output root: `moray-app/build/packaging/`; `input/` for Sync staging, `image/` for the application image, `dist/` for archives. Artifact names: `Moray-<version>-macos-<aarch64|x64>.dmg` and `Moray-<version>-windows-x64.zip`.
 
 - [ ] **Step 1: Prove the task boundary is missing.**
@@ -68,7 +68,7 @@ def app = extensions.getByType(JavaApplication)
 def toolchains = extensions.getByType(JavaToolchainService)
 def java = extensions.getByType(JavaPluginExtension)
 def launcher = toolchains.launcherFor(java.toolchain)
-def version = providers.gradleProperty('morayVersion').orElse('0.1.0')
+def version = providers.gradleProperty('morayVersion').orElse('1.0.0')
 def jarTask = tasks.named('jar')
 def stage = tasks.register('stagePackage', Sync) {
     from(jarTask.flatMap { it.archiveFile })
@@ -82,7 +82,7 @@ def stage = tasks.register('stagePackage', Sync) {
 
 Host names: use `os.name` normalized with Locale.ROOT, macOS starts `mac`, Windows starts `windows`; architecture aliases `aarch64/arm64` → `aarch64`, `amd64/x86_64/x64` → `x64`. Only macOS x64/aarch64 and Windows x64 pass packaging preflight. Validate the selected toolchain architecture matches the process host; fail with a clear instruction to use a matching SDK if not. Do not fail merely evaluating the script during `check` on Linux.
 
-Version validator: exactly three decimal components with no leading zeroes except `0`; major/minor 0..255, patch 0..65535, not all zero. Bound lengths before parsing to avoid overflow. Throw `GradleException` naming `-PmorayVersion` and the accepted form on error. Ensure version validation precedes native packaging execution and output cleanup. Missing SDK jpackage is an actionable failure naming that SDK path.
+Version validator: exactly three decimal components with no leading zeroes except `0`; major 1..255, minor 0..255, patch 0..65535. Bound lengths before parsing to avoid overflow. Throw `GradleException` naming `-PmorayVersion` and the accepted form on error. Ensure version validation precedes native packaging execution and output cleanup. Missing SDK jpackage is an actionable failure naming that SDK path.
 
 - [ ] **Step 3: Invoke jpackage to create the image.**
 
@@ -119,7 +119,7 @@ Verify each staged file is present and byte-identical, the cfg main class and ea
 ```bash
 ./gradlew check :moray-app:packageDist
 ./gradlew :moray-app:verifyPackage
-./gradlew :moray-app:packageDist -PmorayVersion=0.1.1
+./gradlew :moray-app:packageDist -PmorayVersion=1.0.1
 ```
 
 ```powershell
@@ -134,7 +134,7 @@ Run locally:
 ```bash
 ./gradlew check :moray-app:packageDist
 ./gradlew :moray-app:packageDist
-./gradlew :moray-app:packageDist -PmorayVersion=0.1.1
+./gradlew :moray-app:packageDist -PmorayVersion=1.0.1
 ./gradlew :moray-app:packageDist -PmorayVersion=bad
 ./gradlew :moray-app:packageDist
 ```
