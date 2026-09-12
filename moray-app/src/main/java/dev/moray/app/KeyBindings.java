@@ -29,15 +29,17 @@ final class KeyBindings {
     static KeyBindings defaults(boolean macOs) {
         EnumMap<ActionId, KeyStroke> strokes = new EnumMap<>(ActionId.class);
         for (ActionId action : ActionId.values()) {
-            String binding = action.defaultBinding(macOs);
+            String binding = effectiveDefaultBinding(action, macOs);
             KeyStroke stroke = parse(binding, macOs).orElseThrow();
-            if (!macOs && binding.contains("cmd+shift")) {
-                stroke = KeyStroke.getKeyStroke(
-                    stroke.getKeyCode(), stroke.getModifiers() | InputEvent.ALT_DOWN_MASK);
-            }
             putWithoutCollision(strokes, action, stroke, binding);
         }
         return new KeyBindings(strokes);
+    }
+
+    /** Text that round-trips the effective default, including non-macOS compatibility modifiers. */
+    static String effectiveDefaultBinding(ActionId action, boolean macOs) {
+        String binding = action.defaultBinding(macOs);
+        return !macOs && binding.contains("cmd+shift") ? "alt+" + binding : binding;
     }
 
     static KeyBindings withOverrides(boolean macOs, Map<String, String> overrides) {
