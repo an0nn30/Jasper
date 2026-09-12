@@ -13,7 +13,18 @@ public final class Main {
             AppDirs dirs = AppDirs.resolve(System.getProperty("os.name"), System.getenv(),
                 Path.of(System.getProperty("user.home")));
             AppLog log = AppLog.open(dirs.logs());
-            Thread shutdown = Thread.ofPlatform().name("moray-log-shutdown").unstarted(log::close);
+            UnexpectedExceptions exceptions;
+            try { exceptions = installUnexpectedExceptionHandler(); }
+            catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
+                service.close();
+                log.close();
+                return;
+            }
+            Thread shutdown = Thread.ofPlatform().name("moray-log-shutdown").unstarted(() -> {
+                exceptions.close();
+                log.close();
+            });
             try {
                 Runtime.getRuntime().addShutdownHook(shutdown);
                 System.setProperty("apple.awt.application.appearance", "system");
@@ -23,21 +34,66 @@ public final class Main {
                     try { new MorayApplication(service, source).newWindow(Path.of(System.getProperty("user.home"))); }
                     catch (RuntimeException failure) {
                         LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
-                        source.close(); service.close(); log.close();
-                        try { Runtime.getRuntime().removeShutdownHook(shutdown); }
-                        catch (IllegalStateException shutdownInProgress) { /* The hook owns the concurrent close. */ }
-                        throw failure;
+                        source.close(); service.close();
+                        closeLogAfterStartupFailure(log, () -> {
+                            exceptions.close();
+                            removeShutdownHook(shutdown);
+                        });
                     }
                 });
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
+                service.close();
+                exceptions.close();
                 log.close();
-                try { Runtime.getRuntime().removeShutdownHook(shutdown); }
-                catch (IllegalStateException shutdownInProgress) { /* The hook owns the concurrent close. */ }
-                throw failure;
+                removeShutdownHook(shutdown);
             }
         });
         if (result != 0) System.exit(result);
+    }
+
+    static UnexpectedExceptions installUnexpectedExceptionHandler() {
+        synchronized (Main.class) {
+            Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+            Thread.UncaughtExceptionHandler installed = (thread, failure) ->
+                LOG.log(System.Logger.Level.ERROR, "Unexpected application failure", failure);
+            Thread.setDefaultUncaughtExceptionHandler(installed);
+            return new UnexpectedExceptions(previous, installed);
+        }
+    }
+
+    static void closeLogAfterStartupFailure(AppLog log, Runnable after) {
+        Thread.ofPlatform().name("moray-startup-cleanup").daemon().start(() -> {
+            try { log.close(); }
+            finally { after.run(); }
+        });
+    }
+
+    private static void removeShutdownHook(Thread shutdown) {
+        try { Runtime.getRuntime().removeShutdownHook(shutdown); }
+        catch (IllegalStateException shutdownInProgress) { /* The hook owns the concurrent close. */ }
+    }
+
+    static final class UnexpectedExceptions implements AutoCloseable {
+        private final Thread.UncaughtExceptionHandler previous;
+        private final Thread.UncaughtExceptionHandler installed;
+        private boolean closed;
+
+        private UnexpectedExceptions(Thread.UncaughtExceptionHandler previous,
+                                     Thread.UncaughtExceptionHandler installed) {
+            this.previous = previous;
+            this.installed = installed;
+        }
+
+        @Override public void close() {
+            synchronized (Main.class) {
+                if (closed) return;
+                closed = true;
+                if (Thread.getDefaultUncaughtExceptionHandler() == installed) {
+                    Thread.setDefaultUncaughtExceptionHandler(previous);
+                }
+            }
+        }
     }
 
     /** Startup boundary: parsing and the first read finish before the desktop callback runs. */

@@ -24,6 +24,9 @@ final class AppLog implements AutoCloseable {
     private static final int MAX_RECORD_BYTES = 8 * 1024;
     private static final long CLOSE_MILLIS = 2_000;
     private static final Logger NAMESPACE = Logger.getLogger("dev.moray");
+    private static final Object ROUTING_LOCK = new Object();
+    private static int activeInstallations;
+    private static boolean previousParentHandlers;
 
     private final AsyncHandler handler;
     private final boolean enabled;
@@ -48,16 +51,39 @@ final class AppLog implements AutoCloseable {
             files.setEncoding(StandardCharsets.UTF_8.name());
             files.setFormatter(new EncodedFormatter());
             files.setErrorManager(new FixedErrorManager());
-            handler = new AsyncHandler(files, queueSize);
-            NAMESPACE.addHandler(handler);
+            handler = new AsyncHandler(files, queueSize, CLOSE_MILLIS);
             handler.start();
+            attach(handler);
             return new AppLog(handler, true);
         } catch (IOException | RuntimeException failure) {
-            if (handler != null) NAMESPACE.removeHandler(handler);
             if (handler != null) handler.close();
             else if (files != null) files.close();
             System.err.println("Moray diagnostics are unavailable.");
             return new AppLog(null, false);
+        }
+    }
+
+    static AppLog install(Handler sink, int queueSize, long closeMillis) {
+        AsyncHandler handler = new AsyncHandler(sink, queueSize, closeMillis);
+        handler.start();
+        attach(handler);
+        return new AppLog(handler, true);
+    }
+
+    private static void attach(AsyncHandler handler) {
+        synchronized (ROUTING_LOCK) {
+            boolean first = activeInstallations == 0;
+            if (first) {
+                previousParentHandlers = NAMESPACE.getUseParentHandlers();
+                NAMESPACE.setUseParentHandlers(false);
+            }
+            try {
+                NAMESPACE.addHandler(handler);
+                activeInstallations++;
+            } catch (RuntimeException failure) {
+                if (first) NAMESPACE.setUseParentHandlers(previousParentHandlers);
+                throw failure;
+            }
         }
     }
 
@@ -67,19 +93,25 @@ final class AppLog implements AutoCloseable {
 
     @Override public void close() {
         if (!closed.compareAndSet(false, true) || handler == null) return;
-        NAMESPACE.removeHandler(handler);
+        synchronized (ROUTING_LOCK) {
+            NAMESPACE.removeHandler(handler);
+            activeInstallations--;
+            if (activeInstallations == 0) NAMESPACE.setUseParentHandlers(previousParentHandlers);
+        }
         handler.close();
     }
 
     private static final class AsyncHandler extends Handler {
-        private final FileHandler files;
+        private final Handler sink;
         private final ArrayBlockingQueue<String> queue;
         private final AtomicLong dropped = new AtomicLong();
         private final AtomicBoolean accepting = new AtomicBoolean(true);
         private final Thread writer;
+        private final long closeMillis;
 
-        AsyncHandler(FileHandler files, int queueSize) {
-            this.files = files;
+        AsyncHandler(Handler sink, int queueSize, long closeMillis) {
+            this.sink = sink;
+            this.closeMillis = closeMillis;
             queue = new ArrayBlockingQueue<>(queueSize);
             setLevel(java.util.logging.Level.ALL);
             writer = Thread.ofPlatform().name("moray-log-writer").daemon().unstarted(this::writeLoop);
@@ -107,6 +139,9 @@ final class AppLog implements AutoCloseable {
                 while (!queue.isEmpty()) write(queue.poll());
                 writeDropped();
                 Thread.currentThread().interrupt();
+            } finally {
+                try { sink.flush(); }
+                finally { sink.close(); }
             }
         }
 
@@ -117,7 +152,7 @@ final class AppLog implements AutoCloseable {
 
         private void write(String encoded) {
             LogRecord copy = new LogRecord(java.util.logging.Level.INFO, encoded);
-            files.publish(copy);
+            sink.publish(copy);
         }
 
         @Override public void flush() {
@@ -128,12 +163,10 @@ final class AppLog implements AutoCloseable {
             if (!accepting.compareAndSet(true, false)) return;
             writer.interrupt();
             try {
-                writer.join(CLOSE_MILLIS);
+                writer.join(closeMillis);
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
             }
-            files.flush();
-            files.close();
         }
     }
 
