@@ -18,7 +18,10 @@
     "toolbar": "#292c34",
     "primaryButton": "#3a404b",
     "separator": "#353940",
-    "status": "#292c34"
+    "status": "#292c34",
+    "ansiGreen": "#a8c58d",
+    "ansiBlue": "#80b4df",
+    "cursor": "#b3bbc7"
   },
   "rowBoundariesSourcePixels": {
     "titleBottom": 139,
@@ -38,5 +41,18 @@
     "native controls, frame corners and desktop shadow",
     "font rasterization and monitor-profile rounding",
     "live shell content, username, working directory and terminal dimensions"
-  ]
+  ],
+  "toolbarRefinement": {
+    "fontLogical": 11.5,
+    "primaryButtonLogical": [
+      15,
+      65,
+      104,
+      30
+    ],
+    "separatorCentersLogical": [
+      231,
+      484.5
+    ]
+  }
 }
