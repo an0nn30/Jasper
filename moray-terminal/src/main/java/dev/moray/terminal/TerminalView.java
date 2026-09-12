@@ -1000,9 +1000,15 @@ public final class TerminalView extends JComponent {
 
     /** Reader-thread calls retain one dirty bit and at most one queued EDT delivery per attachment. */
     private void markDirty(long generation) {
-        if (generation != attachmentGeneration) return;
-        dirty.set(true);
+        // Capture before validation: an old callback must never claim a newer attachment's token.
         AtomicBoolean pending = pendingFrame;
+        if (generation != attachmentGeneration) return;
+        publishDirty(generation, pending);
+    }
+
+    /** An already validated reader request may resume here after its attachment has been replaced. */
+    private void publishDirty(long generation, AtomicBoolean pending) {
+        dirty.set(true);
         if (!renderingActive || !pending.compareAndSet(false, true)) return;
         SwingUtilities.invokeLater(() -> {
             if (generation == attachmentGeneration && pending == pendingFrame && renderingActive) {

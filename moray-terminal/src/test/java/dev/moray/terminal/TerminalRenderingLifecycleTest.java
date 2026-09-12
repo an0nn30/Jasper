@@ -175,6 +175,35 @@ class TerminalRenderingLifecycleTest {
         });
     }
 
+    @Test void anOldFramePublicationCannotClaimTheReattachedViewsToken() throws Exception {
+        onEdt(() -> tick("frameTimer"));
+        var generationField = TerminalView.class.getDeclaredField("attachmentGeneration");
+        generationField.setAccessible(true);
+        long oldGeneration = generationField.getLong(view);
+        var tokenField = TerminalView.class.getDeclaredField("pendingFrame");
+        tokenField.setAccessible(true);
+        var oldToken = (java.util.concurrent.atomic.AtomicBoolean) tokenField.get(view);
+
+        // Resume the publication half of an already validated reader request after the new initial frame.
+        // The review established the precise volatile-read interleaving; no thread suspension is needed here.
+        onEdt(() -> { view.removeNotify(); view.addNotify(); });
+        onEdt(() -> { tick("frameTimer"); repaints.set(0); });
+        var publish = TerminalView.class.getDeclaredMethod("publishDirty", long.class,
+            java.util.concurrent.atomic.AtomicBoolean.class);
+        publish.setAccessible(true);
+        publish.invoke(view, oldGeneration, oldToken);
+        onEdt(() -> assertThat(repaints).hasValue(0));
+
+        connector.feed("current output");
+        Await.until(() -> session.snapshot().lineText(0).equals("current output"), "current output parsed");
+        onEdt(() -> {
+            assertThat(timer("frameTimer").isRunning() || repaints.get() > 0)
+                .as("current output still schedules a frame after stale publication").isTrue();
+            if (timer("frameTimer").isRunning()) tick("frameTimer");
+            assertThat(repaints.get()).isPositive();
+        });
+    }
+
     @Test void detachedCallbacksCannotRepaintOrDeliverRowInvalidations() throws Exception {
         var invalidations = new AtomicInteger();
         onEdt(() -> {
