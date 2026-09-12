@@ -112,13 +112,12 @@ Retained coverage opportunities: astral search, edge/overlapping highlights, lar
 
 The screenshot revision supersedes Plan 3.5 geometry and artwork. User visual/native acceptance remains open; the user approved integration and starting Plan 4. The integrated UI baseline runs from `/Users/dustin/projects/moray` with `./gradlew :moray-app:run`. That checkout now includes Plan 4a configuration and live reload. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
 
-Plan 4a supplies per-OS paths, positioned TOML diagnostics, last-good retention, live reload, Settings creation and --config. Remaining Plan 4 work includes additional terminal settings, custom theme files, automatic system appearance, app logging and macOS .app packaging with JBR. Carryovers:
+Plan 4a supplies per-OS paths, positioned TOML diagnostics, last-good retention, live reload, Settings creation and --config. Plan 4b supplies the remaining terminal settings, including font family/fallbacks, ligatures, line height, Option-as-Meta, cursor defaults, copy-on-select, inactive dimming, bells, shell executable/arguments/environment, scrollback and new-window grid. Remaining Plan 4 work includes custom theme files, automatic system appearance, app logging and macOS .app packaging with JBR. Carryovers:
 
 - Replace printStackTrace/silent I/O catches with appropriate app logging/feedback.
 - Scrub launcher environment variables (TERM_PROGRAM, TMUX, iTerm variables) and provide UTF-8 LANG for Dock launch.
-- Implement line_height; revisit logical-pixel font-cell rounding.
+- Revisit logical-pixel font-cell rounding.
 - Implement custom palette/theme loading; Palette now validates required colors and exactly 16 non-null ANSI entries.
-- Make selecting installed Nerd Font fallbacks and copy-on-select easy through config.
 - ShellIntegrationFilter hold-limit prefix counting is cosmetic cleanup.
 
 Any-time performance work: remove unused style-array allocation during text-only extraction; reduce font-cache autoboxing; benchmark shell integration filtering; add frames-painted evidence to Bench (MB/s alone measures ingestion, not frame latency); review Windows cmd/type path quoting.
