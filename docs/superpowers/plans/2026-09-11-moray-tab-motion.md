@@ -56,5 +56,5 @@ Clamp elapsed0..1; keep entrywidth nonnegative/withinclip. Capture renderedcurre
 
 ## Root acceptance
 - [ ] Separate reviews aftereach task; finalwholebranch review overthisfollowup range.
-- [ ] Fresh finalcheck/sourcehygiene; inspect actualpreviews; document nativeanimation acceptancepending.
-- [ ] STATUS/README/spec reflect followup and preserveddecisions. No mergerwithoutuserapproval.
+- [x] Fresh finalcheck/sourcehygiene; inspect actualpreviews; document nativeanimation acceptancepending.
+- [x] STATUS/README/spec reflect followup and preserveddecisions. No mergerwithoutuserapproval.
