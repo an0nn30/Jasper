@@ -1,5 +1,8 @@
 # Moray — screenshot-matched Swing chrome
 
+**Follow-up amendment:** The user subsequently requested a shorter configurable title/tab row and animated tab entry/underline. The [tab motion design](2026-09-11-moray-tab-motion-design.md) supersedes fixed54px geometry and adds platform tab shortcuts; remaining visual styling is retained.
+
+
 ## Authority and scope
 The user's supplied mock and explicit request to match it exactly are the visual design and approval to implement. They supersede Plan 3.5's separate centered title bar and two-tone toolbar. This is an architectural layout revision, retaining the terminal, session ownership, actions, FlatLaf and both appearances. No SSH/configuration features. Reference: `docs/design/mock-ui-reference.png`, unchanged original 1970×1986 screenshot, 144dpi with BenQ RD320UA ICC profile. Treat it as a 2× image: inner window approximately 958×958 logical pixels. Outer desktop/shadow is native presentation, not app content.
 
