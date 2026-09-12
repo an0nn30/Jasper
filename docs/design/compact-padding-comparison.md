@@ -1,8 +1,8 @@
 # Compact terminal padding
 
-The September12 iTerm comparison supersedes the earlier24px terminal margin. Terminal panes now use4logical pixels on every side; initial window sizing derives its padding from the same constant.
+The September 12 iTerm comparison supersedes the earlier 24px terminal margin. Terminal panes now use 4 logical pixels on every side; initial window sizing derives its padding from the same constant.
 
-These renders paint the actual Swing components headlessly at958×958logical pixels,2×scale. The terminal pane measures958×837; its view is at(4,4) and measures950×829. Title38, toolbar53 and status30 retain their existing heights. The prompt is a controlled test fixture. No native frame, traffic lights or login shell is created.
+These renders paint the actual Swing components headlessly at 958×958 logical pixels, 2× scale. The terminal pane measures 958×837; its view is at (4,4) and measures 950×829. Title 38, toolbar 53 and status 30 retain their existing heights. The prompt is a controlled test fixture. No native frame, traffic lights or login shell is created.
 
 - [Dark preview](compact-padding-dark.png)
 - [Light preview](compact-padding-light.png)
