@@ -4,6 +4,8 @@
 
 > Tab follow-up amendment, 2026-09-11: the user requested a shorter configurable title/tab row, quick entry/underline motion, and Cmd/Ctrl tab navigation. The [tab motion design](2026-09-11-moray-tab-motion-design.md) supersedes the fixed mock height and tab-specific defaults below: numbered tabs use Cmd on Mac / plain Ctrl elsewhere; previous/next use that modifier plus Shift+[ / ]. Unrelated `cmd` shortcut semantics remain unchanged.
 
+> Plan 4 sequencing amendment: the user approved starting with saved settings and live reload. [Plan 4a](2026-09-11-moray-plan-4a-config-design.md) delivers existing live controls first; its template includes only supported options. Remaining §7 options, custom themes/system appearance and packaging follow as separate runnable deliverables. Its explicit parser/error policy and runtime override policy govern that first slice.
+
 **Date:** 2026-09-10
 **Status:** Approved (2026-09-10). Plans 1–3 implemented and merged (2026-09-11). User-requested [Plan 3.5](../plans/2026-09-11-moray-plan-3-5-chrome-and-themes.md) adds custom macOS chrome, coordinated Atom-inspired themes and a colored-toolbar design discussion before Plan 4 (configuration and packaging). Current state: `docs/STATUS.md`.
 **Repo:** `~/projects/moray`
