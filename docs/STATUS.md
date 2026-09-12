@@ -1,6 +1,8 @@
 # Moray — Status and Handoff
 
-**Memory benchmarking amendment (2026-09-12):** The user added memory measurement and investigation of possible reductions to the terminal hardening work after app logging. Establish repeatable baselines for the packaged app, identify the largest contributors, and validate worthwhile improvements against responsiveness, rendering and throughput. No measurements or memory savings are claimed yet. See the [benchmark scope](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md#memory-benchmarking-and-optimization).
+**Current readiness work (2026-09-12):** Logging, terminal hardening and repeated packaged memory/throughput measurements are implemented on `codex/terminal-readiness` in `.worktrees/terminal-memory-plan`; main remains `d3b5d11`. All task reviews approved; final whole-branch review is pending. Fresh final build/package: 572 tests, 571 passed, one known skip; native image and DMG verification passed. Stress-matrix allocation fell 10.0% and peak RSS 2.9%; idle RSS is unchanged. Throughput fell 3.0% but all final runs passed 35 MB/s; the 45 MB/s target remains unmet. [Readiness handoff, evidence, decisions and remaining gates](terminal-readiness.md). CI, normal Mac/Windows native acceptance and the two-week trial remain pending. No merge/push or trial start is implied. Preserve local benchmark artifacts and DMG before cleaning/removing this worktree.
+
+The following dated milestone notes describe earlier verification; the readiness handoff above is the current state.
 
 **Plan 4d implementation:** The approved macOS and Windows packaging work is fully reviewed, verified and integrated locally on `main` through `0162293`, including direct README build/DMG instructions. Continue from `/Users/dustin/projects/moray`; the merged feature worktree is being cleaned up. [Build commands and native checklist](packaging.md), [design](superpowers/specs/2026-09-12-moray-plan-4d-packaging-design.md), [implementation plan](superpowers/plans/2026-09-12-moray-plan-4d-packaging.md). Gradle creates and verifies a native image with JBR 25, then a macOS DMG or portable Windows ZIP. Native macOS metadata, runtime, dependency payloads, strict bundle seal and DMG integrity were verified, including alternate version and paths with spaces. Windows/unsupported-host execution and desktop acceptance remain unrun. The initial package version is `1.0.0` because macOS jpackage rejects a zero major version; this remains a development build. No generated bundle metadata is changed to satisfy verification: vendor and architecture are read from the bundled runtime and native files. The launcher now removes inherited terminal identity variables before explicit configuration overlays and supplies absent/blank macOS LANG with `en_US.UTF-8`. The example and configuration documentation are updated. `origin` is configured at `https://github.com/an0nn30/moray.git`; no push has been performed. Broader app logging remains pending.
 
@@ -18,7 +20,7 @@
 
 **Active revision:** The user's exact mock supersedes the earlier separate title and two-tone toolbar choices. Implemented title-bar tabs, horizontal neutral toolbar, and seamless terminal/status surface. See the [design](superpowers/specs/2026-09-11-moray-mock-ui-design.md), [implementation plan](superpowers/plans/2026-09-11-moray-mock-ui.md), [original reference](design/mock-ui-reference.png), and [measured comparison](design/mock-ui-comparison.md). The current compact height supersedes the original mock geometry; measured colors are retained. Font metrics, real grid dimensions, native window appearance and motion still require visual acceptance.
 
-Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. GUI launches and benchmarks are user-run only.
+Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. Normal GUI acceptance is user-run. The user explicitly authorized controlled readiness benchmarks; game/VM prerequisites were checked before every run.
 
 ## Plan 4c implementation — custom themes and system appearance
 
@@ -45,10 +47,10 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 4b — Full terminal configuration | Integrated on main and fully reviewed; native acceptance pending |
 | 4c — Custom themes/system appearance | Integrated on main and fully reviewed; native acceptance pending |
 | 4d — Native packaging/launcher environment | Integrated locally on main and fully reviewed; native acceptance pending |
-| Remaining Plan 4 | App logging remains |
-| Terminal hardening | Memory benchmarking/optimization, recorded interaction/performance fixes, native acceptance and daily-use gate |
+| Remaining Plan 4 | App logging implemented and task-reviewed on readiness branch |
+| Terminal hardening | Implemented, task-reviewed and measured on readiness branch; CI/native acceptance/daily-use gate pending |
 
-Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart completed plans: Plans 4a–4d are integrated on main. App logging comes next, followed by terminal hardening including memory benchmarking and optimization, native acceptance and the daily-use gate.
+Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart completed plans: Plans 4a–4d are integrated on main. Logging and hardening are now implemented on the readiness branch. Next are final branch review, authorized publication for CI, native acceptance and then the daily-use gate.
 
 Plan 3.5 was developed on `codex/plan-3-5-chrome-themes` and merged locally. That milestone is available in `/Users/dustin/projects/moray` on `main`; Plan 4a is also integrated there. [Title/theme design](superpowers/specs/2026-09-11-moray-plan-3-5-titlebar-themes-design.md) and [execution plan](superpowers/plans/2026-09-11-moray-plan-3-5-titlebar-themes-implementation.md) cover the first runnable deliverable. [Toolbar study](design/plan-3-5-toolbar-study.html) is an illustrative discussion aid; the user selected B (fuller, two-tone colored icons), now included as Task 4.
 
@@ -115,33 +117,22 @@ Known skip: `FontSetTest.fallsBackWhenPrimaryCannotDisplay` skips on this Mac be
 
 ## 5. Remaining terminal hardening
 
-These carried-over findings remain explicitly open; they were not silently counted as implemented by Plan 3:
+The readiness branch resolves the carried-over gesture ownership, bounded logical-line traversal, idle frame/blink work, pure mouse-report snapshots, visible search scanning, EDT browser dispatch, multi-notch wheel and selection integrity findings. See the [handoff](terminal-readiness.md) for evidence. Remaining limitations:
 
-- Replace gesture flags with a press-time owner for the whole gesture. A reported press followed by Shift drag/release can still change routing; matching release to the correct button needs stronger handling. Command-click on non-link selection behavior also needs review.
-- Share and bound the logical-line walk for URL lookup and line selection; a huge wrapped line can hold the buffer lock too long.
-- Stop unnecessary frame/blink timer wakeups per idle pane; avoid full snapshots/repaints for every mouse motion; binary-search visible search highlights instead of scanning all matches each frame.
-- Move Desktop.browse off the EDT; report every notch of a multi-notch reported wheel event.
-- Selection refinements: overwritten live content, word-wise drag after double-click, and selections ending on half a wide character.
 - Search does not span physical soft-wrapped rows. Java regex cancellation remains best effort; a pathological running regex can delay the next request in that pane, although queued work and worker allocation are bounded.
 - Width reflow or history erase clears row-based selection/matches/prompts and returns to live. This is intentional with JediTerm's row model.
 - Strikethrough is unsupported by jediterm-core 3.76 TextStyle.
 - macOS font fallback uses JBR/system cascading for CJK/emoji; explicit fallback chiefly affects missing Nerd Font glyphs.
 
-Retained coverage opportunities: astral search, edge/overlapping highlights, large-history indicator geometry, multi-row URL continuation lookup, empty-scrollback viewport, middle-button routing, copy-on-select, alternate-screen wheel/arrows, multi-notch reports, paste-to-live, Shift+PageDown and match colors. Add behavioral regressions when working in these areas, not tests that mirror source constants.
+Readiness added astral/edge/overlapping search, bounded wrapped continuation, button ownership and multi-notch regressions. Retained coverage opportunities include large-history indicator geometry, empty-scrollback viewport, copy-on-select, alternate-screen wheel/arrows, paste-to-live, Shift+PageDown and match colors. Add behavioral regressions when working in these areas, not tests that mirror source constants.
 
 ## 6. Native acceptance and remaining Plan 4 work
 
 The screenshot revision supersedes Plan 3.5 geometry and artwork. User visual/native acceptance remains open; the user approved integration and starting Plan 4. The integrated UI baseline runs from `/Users/dustin/projects/moray` with `./gradlew :moray-app:run`. That checkout now includes Plan 4a live reload and Plan 4b full terminal configuration. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
 
-Plans 4a–4d now supply saved settings, full terminal configuration, custom themes/system appearance, launcher-environment cleanup and native packaging. App logging is the remaining Plan 4 implementation item. Terminal hardening includes the new memory benchmark below and these carryovers:
+Plans 4a–4d supply saved settings, full terminal configuration, custom themes/system appearance, launcher cleanup and native packaging. The readiness branch adds logging and the recorded interaction/performance hardening. [Measurements](benchmarks/2026-09-12-terminal-readiness.md) report baseline/final memory, allocation, GC, throughput, EDT delay, cleanup and diagnostic limits. The controlled Java fixture uses argument lists on both platforms; Windows execution remains unverified.
 
-- Replace printStackTrace/silent I/O catches with appropriate app logging/feedback.
-- Revisit logical-pixel font-cell rounding.
-- ShellIntegrationFilter hold-limit prefix counting is cosmetic cleanup.
-
-Memory work: measure startup and warmed idle footprint, per-pane growth, scrollback/output load, and retention after repeated pane/window open-close cycles. Record application process footprint, heap use/commitment, allocation and GC behavior, and child-process memory separately. Investigate retained session/listener/timer resources, scrollback representation and rendering/font caches based on evidence. Compare the same scenarios before and after improvements while retaining configured behavior and the existing throughput target. Numeric reduction targets follow the baseline rather than being assumed in advance. Native benchmark runs remain user-run; this amendment only adds planned work.
-
-Other performance candidates to assess through profiling: remove unused style-array allocation during text-only extraction; reduce font-cache autoboxing; benchmark shell integration filtering; add frames-painted evidence to Bench (MB/s alone measures ingestion, not frame latency); review Windows cmd/type path quoting.
+Remaining opportunities: logical-pixel font-cell rounding, cosmetic ShellIntegrationFilter hold-limit prefix counting, and deeper retention/dependency/font-cache profiling if real usage warrants it. No speculative heap or backend change is part of this slice. Normal native acceptance and CI remain necessary before the two-week trial.
 
 ## 7. Decisions and implementation deviations
 
@@ -259,4 +250,4 @@ Ruling: Explicit Reload publishes one accepted state through the existing revisi
 
 ## Packaging verification notes
 
-Task 1 was independently approved with no required fixes. Task 2 added RED/GREEN environment regressions; full `./gradlew check` passed with 508 tests, 507 passed and one known font skip. Final forced `./gradlew check :moray-app:packageDist --rerun-tasks` passed all 13 tasks in 44 seconds: 508 tests, 507 passed, one known font skip, zero failures/errors; package and DMG checks passed. Whole-branch review fixes in `de4ec8c` were approved by scoped re-review with no open findings. [Verification, artifact checksum and execution decisions](superpowers/plans/2026-09-12-moray-plan-4d-verification.md). One intermediate forced run observed a concurrent RIS snapshot NPE in `TerminalLiveOptionsTest` in unchanged terminal source/tests; targeted and subsequent full runs passed. Keep this as a test-reliability follow-up, distinct from the known font skip. No claim of Windows or desktop runtime acceptance is made.
+Task 1 was independently approved with no required fixes. Task 2 added RED/GREEN environment regressions; full `./gradlew check` passed with 508 tests, 507 passed and one known font skip. Final forced `./gradlew check :moray-app:packageDist --rerun-tasks` passed all 13 tasks in 44 seconds: 508 tests, 507 passed, one known font skip, zero failures/errors; package and DMG checks passed. Whole-branch review fixes in `de4ec8c` were approved by scoped re-review with no open findings. [Verification, artifact checksum and execution decisions](superpowers/plans/2026-09-12-moray-plan-4d-verification.md). One intermediate forced run observed a concurrent RIS snapshot NPE in `TerminalLiveOptionsTest` in unchanged terminal source/tests; targeted and subsequent full runs passed. The readiness branch reproduced and fixed this reset-lock race with a deterministic concurrent-reset regression, distinct from the known font skip. No claim of Windows or desktop runtime acceptance is made.

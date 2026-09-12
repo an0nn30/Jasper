@@ -1,0 +1,959 @@
+{
+  "revision": "10cc444adcac498db8f3f3f5917c9780f1d6a423",
+  "jarSha256": {
+    "moray-app.jar": "1ea9471036d79394994bb85d2c899e9bf0b4cb348d177724e6cd2ae0a3285a6b",
+    "moray-terminal.jar": "1f6bdd12b103d3d82bc6481acce0b4813288620623c3de97c17bc0e4a33ca094"
+  },
+  "summary": {
+    "throughput": {
+      "streamMBps": {
+        "median": 37.93601199200182,
+        "min": 35.607190344788535,
+        "max": 38.79891386864812,
+        "count": 3
+      },
+      "startupInclusiveMBps": {
+        "median": 29.92835436495921,
+        "min": 28.53558195089469,
+        "max": 30.08313161242025,
+        "count": 3
+      },
+      "heapUsedBytesPeak": {
+        "median": 417098600,
+        "min": 401608952,
+        "max": 544618224,
+        "count": 3
+      },
+      "heapUsedBytesSettled": {
+        "median": 216818016,
+        "min": 185352080,
+        "max": 401243760,
+        "count": 3
+      },
+      "heapCommittedBytesPeak": {
+        "median": 939524096,
+        "min": 905969664,
+        "max": 947912704,
+        "count": 3
+      },
+      "heapCommittedBytesSettled": {
+        "median": 939524096,
+        "min": 905969664,
+        "max": 947912704,
+        "count": 3
+      },
+      "residentBytesPeak": {
+        "median": 1107361792,
+        "min": 1083539456,
+        "max": 1114963968,
+        "count": 3
+      },
+      "residentBytesSettled": {
+        "median": 1107296256,
+        "min": 1083539456,
+        "max": 1114963968,
+        "count": 3
+      },
+      "allocatedBytes": {
+        "median": 7323592184,
+        "min": 7091120072,
+        "max": 7432142216,
+        "count": 3
+      },
+      "outputEdtP95Millis": {
+        "median": 8.756167,
+        "min": 8.15625,
+        "max": 8.959667,
+        "count": 3
+      }
+    },
+    "idle": {
+      "1": {
+        "heapUsedBytes": {
+          "median": 9214688,
+          "min": 9155528,
+          "max": 9299648,
+          "count": 3
+        },
+        "heapCommittedBytes": {
+          "median": 41943040,
+          "min": 41943040,
+          "max": 41943040,
+          "count": 3
+        },
+        "residentBytes": {
+          "median": 260603904,
+          "min": 260325376,
+          "max": 261160960,
+          "count": 3
+        }
+      },
+      "4": {
+        "heapUsedBytes": {
+          "median": 9589752,
+          "min": 9528200,
+          "max": 10040232,
+          "count": 3
+        },
+        "heapCommittedBytes": {
+          "median": 41943040,
+          "min": 41943040,
+          "max": 41943040,
+          "count": 3
+        },
+        "residentBytes": {
+          "median": 263995392,
+          "min": 250871808,
+          "max": 265076736,
+          "count": 3
+        }
+      },
+      "8": {
+        "heapUsedBytes": {
+          "median": 18050432,
+          "min": 17946976,
+          "max": 18278664,
+          "count": 3
+        },
+        "heapCommittedBytes": {
+          "median": 41943040,
+          "min": 41943040,
+          "max": 41943040,
+          "count": 3
+        },
+        "residentBytes": {
+          "median": 270729216,
+          "min": 268877824,
+          "max": 271204352,
+          "count": 3
+        }
+      }
+    },
+    "matrix": {
+      "1p-0": {
+        "streamMBps": {
+          "median": 41.23825233638366,
+          "min": 41.15615309501565,
+          "max": 41.91262525980054,
+          "count": 3
+        },
+        "cold-ready": {
+          "heapUsedBytes": {
+            "median": 8392824,
+            "min": 7902480,
+            "max": 9111632,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 41943040,
+            "min": 41943040,
+            "max": 41943040,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 253689856,
+            "min": 244695040,
+            "max": 257048576,
+            "count": 3
+          }
+        },
+        "warm-idle": {
+          "heapUsedBytes": {
+            "median": 9111632,
+            "min": 8392824,
+            "max": 9483416,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 41943040,
+            "min": 41943040,
+            "max": 41943040,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 254443520,
+            "min": 250183680,
+            "max": 257671168,
+            "count": 3
+          }
+        },
+        "output-settle": {
+          "heapUsedBytes": {
+            "median": 477498168,
+            "min": 293386912,
+            "max": 486005256,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 905969664,
+            "min": 905969664,
+            "max": 939524096,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 1087406080,
+            "min": 1066352640,
+            "max": 1109884928,
+            "count": 3
+          }
+        },
+        "final-settle": {
+          "heapUsedBytes": {
+            "median": 46421496,
+            "min": 46270512,
+            "max": 46537448,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 100663296,
+            "min": 100663296,
+            "max": 100663296,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 404324352,
+            "min": 394117120,
+            "max": 419479552,
+            "count": 3
+          }
+        }
+      },
+      "1p-10000": {
+        "streamMBps": {
+          "median": 40.056413727536466,
+          "min": 39.92924718631922,
+          "max": 40.561019770627574,
+          "count": 3
+        },
+        "cold-ready": {
+          "heapUsedBytes": {
+            "median": 12813632,
+            "min": 12715512,
+            "max": 13083384,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 100663296,
+            "min": 100663296,
+            "max": 100663296,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 410796032,
+            "min": 398049280,
+            "max": 423673856,
+            "count": 3
+          }
+        },
+        "warm-idle": {
+          "heapUsedBytes": {
+            "median": 12813632,
+            "min": 12715512,
+            "max": 13083384,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 100663296,
+            "min": 100663296,
+            "max": 100663296,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 410681344,
+            "min": 398049280,
+            "max": 423591936,
+            "count": 3
+          }
+        },
+        "output-settle": {
+          "heapUsedBytes": {
+            "median": 353625680,
+            "min": 235863440,
+            "max": 461897568,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 1174405120,
+            "min": 1098907648,
+            "max": 1207959552,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 1396031488,
+            "min": 1344749568,
+            "max": 1432453120,
+            "count": 3
+          }
+        },
+        "final-settle": {
+          "heapUsedBytes": {
+            "median": 504298896,
+            "min": 50346184,
+            "max": 630449744,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 1174405120,
+            "min": 1098907648,
+            "max": 1207959552,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 1398620160,
+            "min": 1347174400,
+            "max": 1434910720,
+            "count": 3
+          }
+        }
+      },
+      "1p-100000": {
+        "streamMBps": {
+          "median": 40.359188656681724,
+          "min": 40.22187877857047,
+          "max": 41.02040322734838,
+          "count": 3
+        },
+        "cold-ready": {
+          "heapUsedBytes": {
+            "median": 521076112,
+            "min": 67123400,
+            "max": 647226960,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 1174405120,
+            "min": 1098907648,
+            "max": 1207959552,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 1399111680,
+            "min": 1347518464,
+            "max": 1435369472,
+            "count": 3
+          }
+        },
+        "warm-idle": {
+          "heapUsedBytes": {
+            "median": 521076112,
+            "min": 67123400,
+            "max": 647226960,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 1174405120,
+            "min": 1098907648,
+            "max": 1207959552,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 1399046144,
+            "min": 1347469312,
+            "max": 1435303936,
+            "count": 3
+          }
+        },
+        "output-settle": {
+          "heapUsedBytes": {
+            "median": 322918848,
+            "min": 272322736,
+            "max": 530663672,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 1694498816,
+            "min": 1593835520,
+            "max": 1744830464,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 1931001856,
+            "min": 1857683456,
+            "max": 1983463424,
+            "count": 3
+          }
+        },
+        "final-settle": {
+          "heapUsedBytes": {
+            "median": 841491992,
+            "min": 726632920,
+            "max": 981935936,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 1744830464,
+            "min": 1694498816,
+            "max": 1912602624,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 1985462272,
+            "min": 1934802944,
+            "max": 2180464640,
+            "count": 3
+          }
+        }
+      },
+      "4p-0": {
+        "streamMBps": {
+          "median": 118.57257909544686,
+          "min": 118.3297782917378,
+          "max": 120.01845583182323,
+          "count": 3
+        },
+        "cold-ready": {
+          "heapUsedBytes": {
+            "median": 883435032,
+            "min": 768575960,
+            "max": 1032267584,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 1744830464,
+            "min": 1694498816,
+            "max": 1912602624,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 1987182592,
+            "min": 1936310272,
+            "max": 2182004736,
+            "count": 3
+          }
+        },
+        "warm-idle": {
+          "heapUsedBytes": {
+            "median": 883435032,
+            "min": 768575960,
+            "max": 1032267584,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 1744830464,
+            "min": 1694498816,
+            "max": 1912602624,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 1987035136,
+            "min": 1936179200,
+            "max": 2182119424,
+            "count": 3
+          }
+        },
+        "output-settle": {
+          "heapUsedBytes": {
+            "median": 1210842304,
+            "min": 203553304,
+            "max": 1990886352,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 3774873600,
+            "min": 3707764736,
+            "max": 3833593856,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 4031561728,
+            "min": 3989192704,
+            "max": 4088037376,
+            "count": 3
+          }
+        },
+        "final-settle": {
+          "heapUsedBytes": {
+            "median": 1470889152,
+            "min": 471988760,
+            "max": 2242544592,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 3774873600,
+            "min": 3707764736,
+            "max": 3833593856,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 4034641920,
+            "min": 3992272896,
+            "max": 4091609088,
+            "count": 3
+          }
+        }
+      },
+      "4p-10000": {
+        "streamMBps": {
+          "median": 106.86524817312356,
+          "min": 106.27994221069524,
+          "max": 107.03725838226674,
+          "count": 3
+        },
+        "cold-ready": {
+          "heapUsedBytes": {
+            "median": 555874840,
+            "min": 99451072,
+            "max": 1554775232,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 3774873600,
+            "min": 3707764736,
+            "max": 3833593856,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 4035330048,
+            "min": 3992551424,
+            "max": 4091985920,
+            "count": 3
+          }
+        },
+        "warm-idle": {
+          "heapUsedBytes": {
+            "median": 555874840,
+            "min": 99451072,
+            "max": 1554775232,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 3774873600,
+            "min": 3707764736,
+            "max": 3833593856,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 4035166208,
+            "min": 3992453120,
+            "max": 4091871232,
+            "count": 3
+          }
+        },
+        "output-settle": {
+          "heapUsedBytes": {
+            "median": 636563120,
+            "min": 149999432,
+            "max": 1658333608,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 4143972352,
+            "min": 4076863488,
+            "max": 4202692608,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 4410064896,
+            "min": 4363157504,
+            "max": 4462870528,
+            "count": 3
+          }
+        },
+        "final-settle": {
+          "heapUsedBytes": {
+            "median": 1181822640,
+            "min": 686870344,
+            "max": 2203593128,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 4143972352,
+            "min": 4076863488,
+            "max": 4202692608,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 4411899904,
+            "min": 4364943360,
+            "max": 4464787456,
+            "count": 3
+          }
+        }
+      },
+      "4p-100000": {
+        "streamMBps": {
+          "median": 103.08315916995603,
+          "min": 101.44665305538653,
+          "max": 103.49071644958997,
+          "count": 3
+        },
+        "cold-ready": {
+          "heapUsedBytes": {
+            "median": 1265708720,
+            "min": 762367816,
+            "max": 2287479208,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 4143972352,
+            "min": 4076863488,
+            "max": 4202692608,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 4412194816,
+            "min": 4365402112,
+            "max": 4465229824,
+            "count": 3
+          }
+        },
+        "warm-idle": {
+          "heapUsedBytes": {
+            "median": 1265708720,
+            "min": 762367816,
+            "max": 2287479208,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 4143972352,
+            "min": 4076863488,
+            "max": 4202692608,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 4412194816,
+            "min": 4365271040,
+            "max": 4465115136,
+            "count": 3
+          }
+        },
+        "output-settle": {
+          "heapUsedBytes": {
+            "median": 1301803272,
+            "min": 430954216,
+            "max": 2805773728,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 4982833152,
+            "min": 4940890112,
+            "max": 5209325568,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5371215872,
+            "min": 5236555776,
+            "max": 5571493888,
+            "count": 3
+          }
+        },
+        "final-settle": {
+          "heapUsedBytes": {
+            "median": 795311400,
+            "min": 478368608,
+            "max": 1569283496,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 4982833152,
+            "min": 4940890112,
+            "max": 5209325568,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5372313600,
+            "min": 5313609728,
+            "max": 5572460544,
+            "count": 3
+          }
+        }
+      },
+      "8p-0": {
+        "streamMBps": {
+          "median": 132.71859994626303,
+          "min": 131.6885543497989,
+          "max": 132.7654607999472,
+          "count": 3
+        },
+        "cold-ready": {
+          "heapUsedBytes": {
+            "median": 937917736,
+            "min": 595809120,
+            "max": 1711889832,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 4982833152,
+            "min": 4940890112,
+            "max": 5209325568,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5373607936,
+            "min": 5315133440,
+            "max": 5574033408,
+            "count": 3
+          }
+        },
+        "warm-idle": {
+          "heapUsedBytes": {
+            "median": 937917736,
+            "min": 595809120,
+            "max": 1711889832,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 4982833152,
+            "min": 4940890112,
+            "max": 5209325568,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5373607936,
+            "min": 5315051520,
+            "max": 5573967872,
+            "count": 3
+          }
+        },
+        "output-settle": {
+          "heapUsedBytes": {
+            "median": 2362183720,
+            "min": 844547368,
+            "max": 2619479472,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 5209325568,
+            "min": 4940890112,
+            "max": 5301600256,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5574721536,
+            "min": 5316689920,
+            "max": 5693734912,
+            "count": 3
+          }
+        },
+        "final-settle": {
+          "heapUsedBytes": {
+            "median": 2630619176,
+            "min": 1121371432,
+            "max": 2879526320,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 5209325568,
+            "min": 4940890112,
+            "max": 5301600256,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5576802304,
+            "min": 5317787648,
+            "max": 5695832064,
+            "count": 3
+          }
+        }
+      },
+      "8p-10000": {
+        "streamMBps": {
+          "median": 129.90690576701445,
+          "min": 128.27768838927923,
+          "max": 129.98363484763755,
+          "count": 3
+        },
+        "cold-ready": {
+          "heapUsedBytes": {
+            "median": 2790002728,
+            "min": 1280754984,
+            "max": 3038909872,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 5209325568,
+            "min": 4940890112,
+            "max": 5301600256,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5577080832,
+            "min": 5318246400,
+            "max": 5696258048,
+            "count": 3
+          }
+        },
+        "warm-idle": {
+          "heapUsedBytes": {
+            "median": 2790002728,
+            "min": 1280754984,
+            "max": 3038909872,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 5209325568,
+            "min": 4940890112,
+            "max": 5301600256,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5576998912,
+            "min": 5318115328,
+            "max": 5696176128,
+            "count": 3
+          }
+        },
+        "output-settle": {
+          "heapUsedBytes": {
+            "median": 2235589144,
+            "min": 1064557760,
+            "max": 2873502928,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 5209325568,
+            "min": 4940890112,
+            "max": 5301600256,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5577293824,
+            "min": 5318279168,
+            "max": 5696372736,
+            "count": 3
+          }
+        },
+        "final-settle": {
+          "heapUsedBytes": {
+            "median": 1718869184,
+            "min": 443938112,
+            "max": 2915066392,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 5209325568,
+            "min": 4940890112,
+            "max": 5301600256,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5578309632,
+            "min": 5319049216,
+            "max": 5697159168,
+            "count": 3
+          }
+        }
+      },
+      "8p-100000": {
+        "streamMBps": {
+          "median": 122.85188238684022,
+          "min": 122.77188843700392,
+          "max": 124.78542097925083,
+          "count": 3
+        },
+        "cold-ready": {
+          "heapUsedBytes": {
+            "median": 1869864128,
+            "min": 594933056,
+            "max": 3066061336,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 5209325568,
+            "min": 4940890112,
+            "max": 5301600256,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5578489856,
+            "min": 5319327744,
+            "max": 5697437696,
+            "count": 3
+          }
+        },
+        "warm-idle": {
+          "heapUsedBytes": {
+            "median": 1869864128,
+            "min": 594933056,
+            "max": 3066061336,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 5209325568,
+            "min": 4940890112,
+            "max": 5301600256,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 5578473472,
+            "min": 5319245824,
+            "max": 5697372160,
+            "count": 3
+          }
+        },
+        "output-settle": {
+          "heapUsedBytes": {
+            "median": 2368797248,
+            "min": 1832543224,
+            "max": 4343684136,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 6408896512,
+            "min": 6366953472,
+            "max": 6425673728,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 6790955008,
+            "min": 6739197952,
+            "max": 6824460288,
+            "count": 3
+          }
+        },
+        "final-settle": {
+          "heapUsedBytes": {
+            "median": 2729458040,
+            "min": 1780964392,
+            "max": 3300920416,
+            "count": 3
+          },
+          "heapCommittedBytes": {
+            "median": 6408896512,
+            "min": 6366953472,
+            "max": 6425673728,
+            "count": 3
+          },
+          "residentBytes": {
+            "median": 6791888896,
+            "min": 6740000768,
+            "max": 6825558016,
+            "count": 3
+          }
+        }
+      }
+    },
+    "matrixProcess": {
+      "heapUsedBytesPeak": {
+        "median": 4110421088,
+        "min": 3871976600,
+        "max": 4343684136,
+        "count": 3
+      },
+      "residentBytesPeak": {
+        "median": 6792888320,
+        "min": 6741082112,
+        "max": 6826590208,
+        "count": 3
+      },
+      "jvmAllocatedBytesDelta": {
+        "median": 289052227248,
+        "min": 287724676448,
+        "max": 292587458600,
+        "count": 3
+      },
+      "gcTimeMillisDelta": {
+        "median": 2029,
+        "min": 2027,
+        "max": 2037,
+        "count": 3
+      },
+      "gcCountDelta": {
+        "median": 163,
+        "min": 161,
+        "max": 168,
+        "count": 3
+      }
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 These opt-in tools open native Moray windows and controlled Java fixture children. They never call production `Main`, load user configuration, or start a login shell. Normal startup and `./gradlew check` do not run them. **Before every native run, the controller must confirm the user has permitted benchmarking and no game or VM is active.** Stop interacting with the benchmark windows while collecting samples. Closing a benchmark window aborts its run and reports failure. Unrelated Moray processes are not closed.
 
-The implementation is headlessly tested. Native numbers and Windows execution must be recorded separately; this document claims no baseline or performance improvement. The throughput acceptance floor remains **35 MB/s**, with a **45 MB/s** target, using the streaming metric below. Small smoke workloads cannot establish acceptance.
+The implementation is headlessly tested. [Recorded macOS baseline/final measurements](benchmarks/2026-09-12-terminal-readiness.md) include mixed memory/performance outcomes and explicit limits. Windows execution remains pending. The throughput acceptance floor remains **35 MB/s**, with a **45 MB/s** target, using the streaming metric below. Small smoke workloads cannot establish acceptance.
 
 ## Preserve and invoke a packaged image
 
@@ -50,6 +50,13 @@ For source-tree development only, the equivalent opt-in tasks accept arguments:
 ```sh
 ./gradlew :moray-app:bench --args='--revision REVISION --output /absolute/results/dev-throughput.json'
 ./gradlew :moray-app:memoryBench --args='--revision REVISION --output /absolute/results/dev-memory.json'
+```
+
+For an independent cold idle measurement, launch a fresh process for each pane count (1, 4, 8) and repeat each three times. The small payload is staged but not emitted in the idle-only scenario:
+
+```sh
+./tools/benchmarks/run-macos.sh /absolute/benchmark-baselines/pre-hardening/Moray.app memory REVISION /absolute/results/idle-1p-1.json \
+  --panes 1 --scrollback 10000 --scenario idle --bytes 65536
 ```
 
 ## Smoke, matrix, and timing controls

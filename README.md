@@ -28,13 +28,9 @@ On Windows, use `.\gradlew.bat build` and `.\gradlew.bat :moray-app:run` from Po
 
 `check` is headless. `run` opens windows and starts your login shell. Coding agents must follow [AGENTS.md](AGENTS.md) and leave GUI checks to the user.
 
-For the throughput benchmark, when no game or VM is running:
+The opt-in `:moray-app:bench` and `:moray-app:memoryBench` tasks require explicit revision and output arguments. They open temporary windows with controlled fixture children; run them only when no game or VM is active. Use the [benchmark guide](docs/benchmarks.md) for source-tree commands, preserved macOS/Windows package commands, and the repeatable comparison protocol. The full workload targets 100 MiB; streaming acceptance is 35 MB/s, with a 45 MB/s target. Startup-inclusive timing is reported separately.
 
-```bash
-./gradlew :moray-app:bench
-```
-
-The benchmark opens a temporary window and measures ~100 MB of ANSI output. Minimum acceptance is 35 MB/s; target 45 MB/s. See STATUS for recorded measurements and pending verification.
+The [terminal readiness report](docs/terminal-readiness.md) records hardening, final build evidence, memory results and the remaining native/CI gates. The two-week trial has not started.
 
 ## Build a macOS app and DMG
 

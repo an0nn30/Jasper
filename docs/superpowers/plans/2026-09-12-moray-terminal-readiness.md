@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-12-moray-terminal-readiness-design.md` plus the parent Phase 1 memory amendment.
 
-**Status:** User-authorized execution. Baseline main `d3b5d11`, memory amendment `c773d77`, branch `codex/terminal-readiness` in `.worktrees/terminal-memory-plan`. The user will close active VM/game processes before native benchmarking; verify that prerequisite at the benchmark stage. Work proceeds through all independent tasks without intermediate approval menus.
+**Status:** Tasks 1, 2 and 3a–3c complete with independent reviews through `10cc444`. Task 4 build, package, baseline/final native runs, profiles and handoff documentation complete; final whole-branch review pending. The game/VM prerequisite was resolved and rechecked before each invocation. Branch `codex/terminal-readiness` remains unmerged/unpushed in `.worktrees/terminal-memory-plan`, based on main `d3b5d11`. [Evidence, execution deviations and remaining CI/native/trial gates](../../terminal-readiness.md).
 
 ## Global Constraints
 
@@ -32,7 +32,7 @@
 
 **Interfaces:** Consume `AppDirs.logs()` and JDK `System.Logger`/JUL bridge. Produce package-private `AppLog implements AutoCloseable`, `static AppLog open(Path logs)` (nonthrowing fallback), owned handler/writer with bounded shutdown. An overload with small file/queue bounds may be package-private for meaningful temp-file tests. `Main.start` headless callback tests keep their no-real-files behavior; only production `main` installs logs after accepted argument parsing. Main owns a shutdown hook; startup failure closes resources. Terminal uses `System.getLogger("dev.moray.terminal.<Class>")` only, with fixed operation descriptions.
 
-- [ ] Add temp-directory tests first for persisted warning, UTF-8, rotating with small byte threshold, safe exception summary, queue overflow/drain, independent concurrent installations, close idempotence and unwritable destination fallback. Include a sentinel secret in Throwable message/parameters and assert it never appears. Verify default handlers are restored and no real user path is touched.
+- [x] Add temp-directory tests first for persisted warning, UTF-8, rotating with small byte threshold, safe exception summary, queue overflow/drain, independent concurrent installations, close idempotence and unwritable destination fallback. Include a sentinel secret in Throwable message/parameters and assert it never appears. Verify default handlers are restored and no real user path is touched.
 
 ```java
 try (var log = AppLog.open(tempDir)) {
@@ -43,7 +43,7 @@ try (var log = AppLog.open(tempDir)) {
 // SECRET_SENTINEL absent; no lock left by the closed handler.
 ```
 
-- [ ] Run focused test to establish RED, then implement using JUL FileHandler for its rotation/process-lock semantics and an owned queue/writer. Defaults: three 1 MiB files, queue 256, bounded encoded record <=8 KiB, bounded stack/cause summary, daemon writer, <=2s close/drain bound. Copy/encode record before queueing so exceptions cannot retain arbitrarily large object graphs. File creation/setup runs before EDT; publishing on EDT does not perform disk I/O. Drop overflow records with one bounded count summary, not blocking producers.
+- [x] Run focused test to establish RED, then implement using JUL FileHandler for its rotation/process-lock semantics and an owned queue/writer. Defaults: three 1 MiB files, queue 256, bounded encoded record <=8 KiB, bounded stack/cause summary, daemon writer, <=2s close/drain bound. Copy/encode record before queueing so exceptions cannot retain arbitrarily large object graphs. File creation/setup runs before EDT; publishing on EDT does not perform disk I/O. Drop overflow records with one bounded count summary, not blocking producers.
 
 ```java
 private static final System.Logger LOG = System.getLogger(TerminalSession.class.getName());
@@ -53,8 +53,8 @@ LOG.log(System.Logger.Level.ERROR, "Terminal emulation failed", emulatorFailure)
 
 Production startup is the only logging installation boundary; `--help` and invalid args return before the launch callback. Install the logger inside that callback before native source/UI construction and retain its shutdown hook. Do not add a config UI, global logging framework dependency or stdout/terminal capture. Ensure a failed open is a disabled closeable result plus a single concise fallback diagnostic; shell startup still proceeds.
 
-- [ ] Replace Moray-owned raw stacktrace/unexpected silent I/O diagnostics with fixed descriptions and levels. Expected EOF/normal closed streams are not errors. Preserve already visible shell/config errors. Log failures without untrusted values. Browser threading is Task 3. Tests that deliberately provoke errors must capture/contain logger output.
-- [ ] Run focused tests and one full `./gradlew check`. Document log paths/rotation/privacy/failure behavior and distinction from terminal transcript recording. Self-review and `git diff --check`; commit `feat: add bounded application diagnostics` with trailer. Report exact RED/GREEN output and any intentional deviations.
+- [x] Replace Moray-owned raw stacktrace/unexpected silent I/O diagnostics with fixed descriptions and levels. Expected EOF/normal closed streams are not errors. Preserve already visible shell/config errors. Log failures without untrusted values. Browser threading is Task 3. Tests that deliberately provoke errors must capture/contain logger output.
+- [x] Run focused tests and one full `./gradlew check`. Document log paths/rotation/privacy/failure behavior and distinction from terminal transcript recording. Self-review and `git diff --check`; commit `feat: add bounded application diagnostics` with trailer. Report exact RED/GREEN output and any intentional deviations.
 
 ### Task 2: Reproducible benchmark tooling and baseline
 
@@ -62,11 +62,11 @@ Production startup is the only logging installation boundary; `--help` and inval
 
 **Interfaces:** Keep `:moray-app:bench` opt-in. Add `:moray-app:memoryBench` opt-in; provide equivalent commands using the generated package's bundled Java/classpath. Structured result file includes schema/version, environment metadata, scenario/sample timestamps, units/sources, nullable unavailable metrics and completion/failure status. Fixture child is argument-safe on Mac/Windows, deterministic, bounded and does not start the user's login shell. Native runs require controller approval after active-game/VM constraint resolves; worker performs headless tests only.
 
-- [ ] Add failing tests for argument parsing/bounds, workload generation, summary aggregation, nullable unsupported metrics, timeout/cleanup paths via fakes and report serialization. Preserve actual file byte count (UTF-8), not Java character count, for throughput.
-- [ ] Implement deterministic fixture child mode in a dedicated benchmark class: idle/wait, bounded generated output and termination controlled by explicit arguments. Start using a Java executable + argument list, avoiding `cmd /c type` quoting. Do not pipe terminal secrets or inherit user config. Use real session/view/app ownership where measured and label core-only runs separately.
-- [ ] Throughput: generate before timing; record startup-inclusive and steady-stream timing separately, bytes/seconds/MB/s, painted frame count and EDT scheduling delay/frame pacing. Await the relevant reader/render completion, always close owned sessions/views/frames with bounded waits. Keep 100 MiB deterministic workload and seeded content; allow bounded smaller workloads for tests. No production System.exit shortcuts that skip cleanup.
-- [ ] Memory: scenario matrix 1/4/8 panes; scrollback 0/10k/100k; cold/warm idle, output peak/settle, repeated tab/split/window cycles and search/resize/font workload. Sample heap/GC, process PID/RSS or footprint with explicit source/units, allocation if supported and separate child PIDs. Capture JVM vendor/version/options, OS/arch, app revision, font/grid, warmup/sample timings. Metrics collection and report writes stay off EDT. Prefer JDK management/JFR and system process tools; avoid profiler dependency or changing JVM default heap settings. Label optional forced-GC diagnostics separately from normal measurements. Bound run duration and report unsuccessful runs explicitly.
-- [ ] Document Mac/Windows packaged runtime commands, instrumentation overhead, equivalent-run comparison protocol, repeated samples and native safety/acceptance constraints. `check` must not depend on either benchmark. Run focused tests and full check, build `packageApp`/`verifyPackage` without launching GUI, self-review and commit. Controller runs native baseline if permitted before Task 3; otherwise preserve the baseline package outside task-owned rebuild paths and document pending measurements.
+- [x] Add failing tests for argument parsing/bounds, workload generation, summary aggregation, nullable unsupported metrics, timeout/cleanup paths via fakes and report serialization. Preserve actual file byte count (UTF-8), not Java character count, for throughput.
+- [x] Implement deterministic fixture child mode in a dedicated benchmark class: idle/wait, bounded generated output and termination controlled by explicit arguments. Start using a Java executable + argument list, avoiding `cmd /c type` quoting. Do not pipe terminal secrets or inherit user config. Use real session/view/app ownership where measured and label core-only runs separately.
+- [x] Throughput: generate before timing; record startup-inclusive and steady-stream timing separately, bytes/seconds/MB/s, painted frame count and EDT scheduling delay/frame pacing. Await the relevant reader/render completion, always close owned sessions/views/frames with bounded waits. Keep 100 MiB deterministic workload and seeded content; allow bounded smaller workloads for tests. No production System.exit shortcuts that skip cleanup.
+- [x] Memory: scenario matrix 1/4/8 panes; scrollback 0/10k/100k; cold/warm idle, output peak/settle, repeated tab/split/window cycles and search/resize/font workload. Sample heap/GC, process PID/RSS or footprint with explicit source/units, allocation if supported and separate child PIDs. Capture JVM vendor/version/options, OS/arch, app revision, font/grid, warmup/sample timings. Metrics collection and report writes stay off EDT. Prefer JDK management/JFR and system process tools; avoid profiler dependency or changing JVM default heap settings. Label optional forced-GC diagnostics separately from normal measurements. Bound run duration and report unsuccessful runs explicitly.
+- [x] Document Mac/Windows packaged runtime commands, instrumentation overhead, equivalent-run comparison protocol, repeated samples and native safety/acceptance constraints. `check` must not depend on either benchmark. Run focused tests and full check, build `packageApp`/`verifyPackage` without launching GUI, self-review and commit. Controller runs native baseline if permitted before Task 3; otherwise preserve the baseline package outside task-owned rebuild paths and document pending measurements.
 
 ### Task 3a: Reset synchronization and bounded logical lines
 
@@ -74,10 +74,10 @@ Production startup is the only logging installation boundary; `--help` and inval
 
 **Interfaces:** Preserve public API and module boundaries. Shared bounded traversal is consumed by URL lookup and line selection. Baseline benchmark interfaces stay stable. Consult the controller's pinned-source investigation; it is a hypothesis until regression evidence confirms it.
 
-- [ ] Reproduce the RIS/snapshot failure with focused tests. Capture failure evidence and fix the actual reset mutation boundary. Never lock around a potentially blocking emulator read, swallow nulls, or weaken the cursor-reset expectation. Cover deterministic reset/read concurrency and existing resize/alternate-buffer behavior.
-- [ ] Replace duplicate unbounded soft-wrap walks with one shared bounded helper: cap at 4096 rows and 1 MiB of cell/text work. URL lookup returns no link when context is truncated, and line selection returns a bounded range containing the clicked row. Guard width/multiplication overflow; document the extreme-line fallback.
-- [ ] Remove unused style storage in text-only extraction only when supported by the baseline allocation evidence; otherwise leave it as a measured follow-up. All buffer reads remain locked and bounded.
-- [ ] Focused RED/GREEN, full check once, source hygiene/diff checks, self-review, commit and independent task review before Task 3b.
+- [x] Reproduce the RIS/snapshot failure with focused tests. Capture failure evidence and fix the actual reset mutation boundary. Never lock around a potentially blocking emulator read, swallow nulls, or weaken the cursor-reset expectation. Cover deterministic reset/read concurrency and existing resize/alternate-buffer behavior.
+- [x] Replace duplicate unbounded soft-wrap walks with one shared bounded helper: cap at 4096 rows and 1 MiB of cell/text work. URL lookup returns no link when context is truncated, and line selection returns a bounded range containing the clicked row. Guard width/multiplication overflow; document the extreme-line fallback.
+- [x] Remove unused style storage in text-only extraction only when supported by the baseline allocation evidence; otherwise leave it as a measured follow-up. All buffer reads remain locked and bounded.
+- [x] Focused RED/GREEN, full check once, source hygiene/diff checks, self-review, commit and independent task review before Task 3b.
 
 ### Task 3b: Mouse gesture and selection correctness
 
@@ -85,11 +85,11 @@ Production startup is the only logging installation boundary; `--help` and inval
 
 **Interfaces:** Preserve public API and deterministic clipboard/link injection. A press establishes ownership per button until its matching release. Consume bounded logical-line behavior from 3a. Browser threading belongs to 3c; do not mix unrelated timer changes into this task.
 
-- [ ] Regressions before fixes: reported press followed by Shift drag/release still reports; local Shift selection followed by modifier-free release stays local; right popup ownership; command-link drag suppression; multiple buttons; NOBUTTON drag dispatch; full wheel notches and fractional remainder; double-click word dragging; wide and supplementary endpoint integrity.
-- [ ] Implement per-button ownership, retaining the modifiers necessary for JediTerm to emit a matching release. Resolve drag button from held masks/owner state. Report every complete wheel notch without losing fractional remainder. Command-click on a non-link retains deliberate local selection semantics and cannot swallow a later gesture.
-- [ ] Double-click dragging extends whole words. Selection endpoints do not copy half a wide/supplementary character. Clear selections when selected live content is overwritten while preserving selections under unrelated output and normal scrollback movement; add regressions for those distinctions. Keep copy-on-select and popup ownership intact.
-- [ ] Pure mouse reporting uses grid/viewport metadata without copying a full screen or repainting for every motion. Existing selection/link gestures may snapshot only where content is actually required.
-- [ ] Focused RED/GREEN, full check once, source hygiene/diff checks, self-review, commit and independent review before 3c.
+- [x] Regressions before fixes: reported press followed by Shift drag/release still reports; local Shift selection followed by modifier-free release stays local; right popup ownership; command-link drag suppression; multiple buttons; NOBUTTON drag dispatch; full wheel notches and fractional remainder; double-click word dragging; wide and supplementary endpoint integrity.
+- [x] Implement per-button ownership, retaining the modifiers necessary for JediTerm to emit a matching release. Resolve drag button from held masks/owner state. Report every complete wheel notch without losing fractional remainder. Command-click on a non-link retains deliberate local selection semantics and cannot swallow a later gesture.
+- [x] Double-click dragging extends whole words. Selection endpoints do not copy half a wide/supplementary character. Clear selections when selected live content is overwritten while preserving selections under unrelated output and normal scrollback movement; add regressions for those distinctions. Keep copy-on-select and popup ownership intact.
+- [x] Pure mouse reporting uses grid/viewport metadata without copying a full screen or repainting for every motion. Existing selection/link gestures may snapshot only where content is actually required.
+- [x] Focused RED/GREEN, full check once, source hygiene/diff checks, self-review, commit and independent review before 3c.
 
 ### Task 3c: Idle rendering and asynchronous desktop actions
 
@@ -97,11 +97,11 @@ Production startup is the only logging installation boundary; `--help` and inval
 
 **Interfaces:** Preserve public API, benchmark metadata and earlier interaction behavior. JDK logger from Task1 is available for fixed browser diagnostics.
 
-- [ ] Add observable lifecycle/repaint regressions before changes. Replace perpetual frame polling with dirty-driven coalesced scheduling. Blink only while attached/showing/focused with an effective visible blinking cursor; reconcile options/program state/exit/focus/attachment. Invalidate queued callbacks on detach and release listeners/search resources on close. Tests verify observable behavior and cursor rendering rather than private field names alone.
-- [ ] Binary-search sorted search matches into the visible row range for painting. Cover large offscreen result sets, overlapping/edge matches and supplementary characters where relevant.
-- [ ] Default Desktop.browse dispatches off EDT through a bounded executor/queue with fixed error diagnostics. Injected link callbacks remain synchronous/predictable for tests. Do not add a new notification or configuration subsystem.
-- [ ] Profile-guided allocation improvements require baseline evidence and unchanged semantics. Record inferred work reduction separately from measured memory savings; keep default options/scrollback behavior unchanged.
-- [ ] Focused RED/GREEN, full check once, source hygiene/diff checks, self-review, commit and independent review before final measurement.
+- [x] Add observable lifecycle/repaint regressions before changes. Replace perpetual frame polling with dirty-driven coalesced scheduling. Blink only while attached/showing/focused with an effective visible blinking cursor; reconcile options/program state/exit/focus/attachment. Invalidate queued callbacks on detach and release listeners/search resources on close. Tests verify observable behavior and cursor rendering rather than private field names alone.
+- [x] Binary-search sorted search matches into the visible row range for painting. Cover large offscreen result sets, overlapping/edge matches and supplementary characters where relevant.
+- [x] Default Desktop.browse dispatches off EDT through a bounded executor/queue with fixed error diagnostics. Injected link callbacks remain synchronous/predictable for tests. Do not add a new notification or configuration subsystem.
+- [x] Profile-guided allocation improvements require baseline evidence and unchanged semantics. Record inferred work reduction separately from measured memory savings; keep default options/scrollback behavior unchanged.
+- [x] Focused RED/GREEN, full check once, source hygiene/diff checks, self-review, commit and independent review before final measurement.
 
 ### Task 4: Final measurements, packages and trial-readiness ledger
 
@@ -109,7 +109,7 @@ Production startup is the only logging installation boundary; `--help` and inval
 
 **Interfaces:** Consume Task 2 tools and Task 3a–3c final implementation. All evidence records the exact build/revision/host; baseline vs final share runtime options/config/workload. Each prerequisite labelled passed, failed or pending.
 
-- [ ] Controller executes permitted benchmark runs, repeating equivalent baseline/final scenarios. Analyze large contributors and make a single reviewed optimization follow-up if evidence supports it; additional architectural changes require a new concrete spec, not speculative churn. Retain at least the 35 MB/s minimum and report 45 MB/s target status plus frame/EDT responsiveness. Record memory results and limits honestly.
-- [ ] Fresh `./gradlew build :moray-app:packageDist --rerun-tasks`; count XML results, check source hygiene/diff and package integrity. Preserve final package in a clear output path.
-- [ ] Update native checklist with results actually observed. Windows manual checks remain user-owned. CI workflow already covers three OSes; do not claim CI green without run evidence. Prepare reviewed commits/artifacts before requesting any necessary push authorization.
+- [x] Controller executes permitted benchmark runs, repeating equivalent baseline/final scenarios. Analyze large contributors and make a single reviewed optimization follow-up if evidence supports it; additional architectural changes require a new concrete spec, not speculative churn. Retain at least the 35 MB/s minimum and report 45 MB/s target status plus frame/EDT responsiveness. Record memory results and limits honestly.
+- [x] Fresh `./gradlew build :moray-app:packageDist --rerun-tasks`; count XML results, check source hygiene/diff and package integrity. Preserve final package in a clear output path.
+- [x] Update native checklist with results actually observed. Windows manual checks remain user-owned. CI workflow already covers three OSes; do not claim CI green without run evidence. Prepare reviewed commits/artifacts before requesting any necessary push authorization.
 - [ ] Create one concise readiness report listing logging, hardening, memory, throughput, package, CI, Mac/Windows manual checks and the two-week trial (not started). Link exact evidence and runnable follow-up commands. Commit docs, request final whole-branch review, apply one combined fix wave and scoped re-review, rerun affected verification. Stop at the pre-trial handoff; do not start the two-week clock.

@@ -26,7 +26,7 @@ Record metadata (commit/JBR/OS/architecture/JVM options/font/grid/scrollback/wor
 
 Repair the throughput benchmark's measurement and cleanup: stage input before timing, distinguish startup-inclusive throughput from streaming throughput, record bytes and units precisely, wait for rendered output/end-of-stream correctly, expose frame/EDT responsiveness evidence, and replace shell-sensitive Windows `cmd /c type <path>` composition with a controlled argument-safe fixture. Preserve the 35 MB/s minimum and 45 MB/s target from the parent spec. Benchmarks exit after their owned work; they do not close unrelated Moray windows.
 
-Native benchmarks are temporarily blocked by observed active Parallels VM/Minecraft processes under AGENTS.md. The user will close these before benchmarking; verify that prerequisite before native runs. Continue tools/headless verification meanwhile. Do not fabricate a measured baseline or claim optimization percentages without actual comparable runs. Changes that remove demonstrably unnecessary allocation/work can be validated behaviorally while quantitative claims remain pending.
+At preparation, native benchmarks were blocked by active Parallels VM/Minecraft processes under AGENTS.md. The user closed them; the controller verified prerequisites before every accepted baseline/final invocation. The [measurement report](../../benchmarks/2026-09-12-terminal-readiness.md) records actual results. Continue to verify this prerequisite for future runs. Do not fabricate a measured baseline or claim optimization percentages without actual comparable runs. Changes that remove demonstrably unnecessary allocation/work can be validated behaviorally while quantitative claims remain pending.
 
 ## Targeted terminal hardening
 
