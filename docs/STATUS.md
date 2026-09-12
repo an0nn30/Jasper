@@ -1,6 +1,6 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11. Plan 3 is integrated into `main` at `942f5f7`. Plan 3.5 is implemented on `codex/plan-3-5-chrome-themes`, worktree `.worktrees/plan-3-5`; final reviewed code/tests `f487631`. All four task reviews, final branch review and scoped fix review approved, with no unresolved findings. Root fresh `./gradlew check --rerun-tasks`: **299 tests, 0 failures/errors, 1 expected font skip** (298 passed; 63 app + 236 terminal). Native acceptance and integration remain pending; no GUI, benchmark or remote push occurred for this milestone.
+**As of:** 2026-09-11. Plan 3 is integrated into `main` at `942f5f7`. Plan 3.5 is integrated into `main` following the user’s approval; final reviewed code/tests `f487631`. All four task reviews, final branch review and scoped fix review approved, with no unresolved findings. Root fresh `./gradlew check --rerun-tasks`: **299 tests, 0 failures/errors, 1 expected font skip** (298 passed; 63 app + 236 terminal). Native acceptance remains pending; no GUI, benchmark or remote push occurred for this milestone.
 
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. GUI launches and benchmarks are user-run only.
 
@@ -13,12 +13,12 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 1 — Terminal core | Complete on main (`6daa61f`..`d0ccbfb`) |
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
-| 3.5 — macOS chrome, themes and toolbar | Implemented and fully reviewed; native acceptance and integration pending |
+| 3.5 — macOS chrome, themes and toolbar | Integrated on main and fully reviewed; native acceptance pending |
 | 4 — Config and packaging | Follows Plan 3.5; not written yet |
 
-Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not start Plan 3 again; active Plan 3.5 work is isolated below.
+Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart Plan 3 or Plan 3.5; continue from main.
 
-Active worktree: `.worktrees/plan-3-5`, branch `codex/plan-3-5-chrome-themes`. [Title/theme design](superpowers/specs/2026-09-11-moray-plan-3-5-titlebar-themes-design.md) and [execution plan](superpowers/plans/2026-09-11-moray-plan-3-5-titlebar-themes-implementation.md) cover the first runnable deliverable. [Toolbar study](design/plan-3-5-toolbar-study.html) is an illustrative discussion aid; the user selected B (fuller, two-tone colored icons), now included as Task 4.
+Plan 3.5 was developed on `codex/plan-3-5-chrome-themes` and merged locally. Continue from `/Users/dustin/projects/moray` on `main`. [Title/theme design](superpowers/specs/2026-09-11-moray-plan-3-5-titlebar-themes-design.md) and [execution plan](superpowers/plans/2026-09-11-moray-plan-3-5-titlebar-themes-implementation.md) cover the first runnable deliverable. [Toolbar study](design/plan-3-5-toolbar-study.html) is an illustrative discussion aid; the user selected B (fuller, two-tone colored icons), now included as Task 4.
 
 Active milestone: [Plan 3.5 — macOS chrome, themes and toolbar](superpowers/plans/2026-09-11-moray-plan-3-5-chrome-and-themes.md). The user has tried Plan 3 during development and reports that it looks good overall; this is qualitative feedback, not a claim that every native checklist item or benchmark was completed.
 
@@ -88,7 +88,7 @@ Retained coverage opportunities: astral search, edge/overlapping highlights, lar
 
 ## 6. Next: native acceptance, then Plan 4
 
-Plan 3.5 interrupted the previous next step and now supplies the custom macOS title surface, Atom-inspired built-in themes and selected two-tone toolbar. Code review is complete; native acceptance and the user’s integration decision are next. Run the branch from `.worktrees/plan-3-5` with `./gradlew :moray-app:run`. Built-in palettes and live theme application have moved forward from Plan 4.
+Plan 3.5 interrupted the previous next step and now supplies the custom macOS title surface, Atom-inspired built-in themes and selected two-tone toolbar. Code review and approved local integration are complete; native acceptance is next. Run from `/Users/dustin/projects/moray` with `./gradlew :moray-app:run`. Built-in palettes and live theme application have moved forward from Plan 4.
 
 Plan 4: AppDirs/per-OS paths, TOML diagnostics with line numbers and last-good retention, live reload, custom theme loading and persistence, automatic system appearance, settings-file creation, --config, app logging and macOS .app bundling JBR. Carryovers:
 
@@ -120,7 +120,7 @@ Superpowers spec/plan → task implementer with TDD → separate task review →
 
 Root final verification on `dda35e2`: all 8 Gradle tasks executed successfully in 8 seconds; 277 tests, zero failures/errors, one expected font skip. Source-hygiene and `git diff --check` passed. No compiler warnings. Final reviewer compared the exact default key catalog with the parent spec and found it aligned; selected shortcut regressions for live overrides belong in Plan 4, without duplicating source constants in tests.
 
-Plan 3 was merged locally and its feature worktree/branch removed after merged checks passed (277 tests, zero failures/errors, one expected skip). Plan 3.5 implementation now lives in `.worktrees/plan-3-5`; continue native acceptance there, retaining the daily-use gate.
+Plan 3 was merged locally and its feature worktree/branch removed after merged checks passed (277 tests, zero failures/errors, one expected skip). Plan 3.5 is now integrated on main; continue native acceptance from `/Users/dustin/projects/moray`, retaining the daily-use gate.
 
 ## 9. Execution rulings preserved from the completed Plan 3 ledger
 
@@ -147,4 +147,4 @@ Task reviews: palettes `09e382e`, application themes `6bdd298`, title surface `7
 
 Root final verification on `f487631`: `./gradlew check --rerun-tasks` ran all eight tasks in 11 seconds, with 299 tests, zero failures/errors and one known font skip. Source hygiene and `git diff --check` passed; no compiler warnings. Production code/resources are unchanged since `116709b`. The plan-specific scratch workspace is removed after final review; this handoff, plan checkboxes, committed previews and git history preserve the result.
 
-The branch and worktree remain available pending the user's choice to integrate. No GUI or benchmark was launched and no remote is configured. Native title-bar/appearance checks and the terminal daily-use gate remain open.
+The user selected local integration. The completed feature worktree and branch are cleaned up after merged verification succeeds. No GUI or benchmark was launched and no remote is configured. Native title-bar/appearance checks and the terminal daily-use gate remain open.

@@ -2,7 +2,7 @@
 
 Pending user execution. Automated headless checks cannot establish native window behavior or subjective visual quality. The user's earlier positive Plan 3 feedback remains recorded separately.
 
-Run from the active Plan 3.5 checkout with `./gradlew :moray-app:run`.
+Run from `/Users/dustin/projects/moray` on `main` with `./gradlew :moray-app:run`.
 
 - [ ] Dark and light appearance change the terminal, title bar, tabs, toolbar, menus, find controls, dividers and status together. Check both with macOS set to the opposite appearance.
 - [ ] Create two windows, several tabs and nested splits; change appearance with some tabs hidden and a pane zoomed. Restore everything: colors match, content/find/selection/fonts and split ratios remain.

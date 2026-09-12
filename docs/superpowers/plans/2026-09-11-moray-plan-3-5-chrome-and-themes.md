@@ -1,6 +1,6 @@
 # Moray Plan 3.5 — macOS Chrome, Themes and Toolbar
 
-**Status:** Roadmap amendment requested by the user on 2026-09-11. Implemented ahead of Plan 4 configuration and packaging; all code reviews and headless checks pass; native acceptance and integration are pending. This roadmap is complemented by the concrete design and execution plan linked below.
+**Status:** Roadmap amendment requested by the user on 2026-09-11. Implemented ahead of Plan 4 configuration and packaging; all code reviews and headless checks pass; integrated into main with user approval; native acceptance remains pending. This roadmap is complemented by the concrete design and execution plan linked below.
 **Authority:** User feedback after trying Plan 3: the app looks good overall; next build a custom macOS title bar, fix theming using FlatLaf, aim for Atom-style dark/light themes, and discuss a toolbar with actual colored icons.
 **Parent:** [Phase 1 design](../specs/2026-09-10-moray-phase-1-terminal-design.md), especially §§5–7. This amendment supersedes the earlier sequencing that deferred all theme work to Plan 4 and the assumption that the current toolbar presentation is final.
 

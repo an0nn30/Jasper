@@ -3,7 +3,7 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A native-behaving custom macOS title surface, coordinated live Atom-inspired dark/light themes, and the user-selected two-tone toolbar.
-**Status:** All four tasks, final whole-branch review and scoped fix review complete; final code/tests f487631. Full headless check passes (299 tests, zero failures/errors, one known skip). Native acceptance and user integration choice pending.
+**Status:** All four tasks, final whole-branch review and scoped fix review complete; final code/tests f487631. Full headless check passes (299 tests, zero failures/errors, one known skip). Integrated locally into main with user approval. Native acceptance remains pending.
 **Scope update:** The user selected toolbar study B during execution; Task 4 implements that choice in this same runnable deliverable.
 **Architecture:** TerminalView accepts live palettes; app-owned ThemeController updates every owner and its retained panes; MacTitleBar uses the decorated JFrame's macOS full-content area.
 **Tech Stack:** Java/JBR25, Gradle wrapper 9.7, FlatLaf/flatlaf-extras3.7, existing JUnit/AssertJ.
