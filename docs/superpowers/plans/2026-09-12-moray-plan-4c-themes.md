@@ -26,7 +26,7 @@
 
 ---
 
-**Preparation status:** Not implemented. Planning worktree `.worktrees/plan-4c`, branch `codex/plan-4c-themes`, base `b92221f`. Main's local `config.example.toml` edit is outside this worktree and must not be overwritten during later integration. Baseline `./gradlew check` executed all eight tasks successfully: 463 tests, 462 passed, one known font skip, zero failures/errors. Native detection and visual acceptance were not run.
+**Execution status:** Authorized by the user on 2026-09-12. All four tasks implemented and independently reviewed through `fd6811b`; whole-branch review pending. One minor test-portability finding is recorded for final review. Planning worktree `.worktrees/plan-4c`, branch `codex/plan-4c-themes`, base `b92221f`. Main's local `config.example.toml` edit is outside this worktree and must not be overwritten during later integration. Baseline `./gradlew check` executed all eight tasks successfully: 463 tests, 462 passed, one known font skip, zero failures/errors. Native detection and visual acceptance were not run.
 
 ## File responsibilities and contracts
 
@@ -89,7 +89,7 @@ Only `ThemeState.override` may be null, meaning no runtime override. Palette lis
 
 **Interfaces:** Produces the four records/enums above. Existing six-argument and full old `ConfigSnapshot` constructors remain overloads, converting `BuiltinTheme.LIGHT/DARK` to explicit Light/Dark `ColorsConfig`; `defaults()` must directly use `ColorsConfig.defaults()` so it remains System.
 
-- [ ] **1. Write resolution and migration tests.** Add these complete test bodies with the normal JUnit/AssertJ imports:
+- [x] **1. Write resolution and migration tests.** Add these complete test bodies with the normal JUnit/AssertJ imports:
 
 ```java
 @Test void automaticBuiltinsFollowSystemButCustomColorsStayFixed() {
@@ -124,9 +124,9 @@ Only `ThemeState.override` may be null, meaning no runtime override. Palette lis
 
 Also parameterize selector acceptance/rejection: `night`, `night.toml`, `My Theme`, Unicode names; reject `../night`, `/night`, backslash, colon, `.`/`..`, control characters and blank names. Cover invalid appearance string/default versus wrong-type/rejected, and order-independent TOML fields.
 
-- [ ] **2. Run RED.** `./gradlew :moray-app:test --tests '*ThemeStateTest' --tests '*ExpandedConfigTest' --tests '*ConfigLoaderTest'`; missing model types/accessors should fail compilation.
+- [x] **2. Run RED.** `./gradlew :moray-app:test --tests '*ThemeStateTest' --tests '*ExpandedConfigTest' --tests '*ConfigLoaderTest'`; missing model types/accessors should fail compilation.
 
-- [ ] **3. Implement models and parser migration.** Use these complete model bodies (imports `java.util.Objects`, `dev.moray.terminal.Palette`):
+- [x] **3. Implement models and parser migration.** Use these complete model bodies (imports `java.util.Objects`, `dev.moray.terminal.Palette`):
 
 ```java
 record ColorsConfig(Appearance appearance, String theme) {
@@ -193,7 +193,7 @@ BuiltinTheme selected = snapshot.colors().appearance() == Appearance.LIGHT
     ? BuiltinTheme.LIGHT : BuiltinTheme.DARK;
 ```
 
-- [ ] **4. Run GREEN and commit.** Run the RED command then `./gradlew check`. Stage the four model files, changed snapshot/loader and exact migrated caller/test files (inspect `git diff --name-only` first). Commit `feat: model saved and effective appearance` with the required coauthor trailer. Review before Task 2.
+- [x] **4. Run GREEN and commit.** Run the RED command then `./gradlew check`. Stage the four model files, changed snapshot/loader and exact migrated caller/test files (inspect `git diff --name-only` first). Commit `feat: model saved and effective appearance` with the required coauthor trailer. Review before Task 2.
 
 ## Task 2: Custom palette parsing and independent live file reload
 
@@ -201,7 +201,7 @@ BuiltinTheme selected = snapshot.colors().appearance() == Appearance.LIGHT
 
 **Interfaces:** `ThemeLoader.parse` and `ThemeFiles.refresh` from contracts. Add `ConfigService(Path file, Path themes, boolean macOs)` and the corresponding injected-worker/publisher overload. Existing test overloads delegate to a sibling fixture `file.toAbsolutePath().getParent().resolve("themes")`; production `Main.start` explicitly supplies `AppDirs.themes()`. `ConfigService.State` adds `Palette palette`, never null; compatibility four-argument constructor uses the snapshot's saved built-in seed or Dark for custom intent.
 
-- [ ] **1. Write parser and last-good lifecycle tests.**
+- [x] **1. Write parser and last-good lifecycle tests.**
 
 ```java
 @Test void parsesSupportedColorsAndKeepsFixedDefaults() {
@@ -235,9 +235,9 @@ BuiltinTheme selected = snapshot.colors().appearance() == Appearance.LIGHT
 
 Add fixtures for every supported field and ANSI ordering, unknown-key warning with source position, invalid supported value/type, symbolic color rejection, duplicate/syntax errors, no supported keys, Unicode selectors, 256 KiB limit, invalid UTF-8, nonregular file, missing directory, in-root/escaping symlinks (conditional where platform permissions require it). Service-level tests must actually leave config content/mtime unchanged while editing a theme; assert delivery, last-good palette, continued unrelated config updates, stale publication rejection and forced reload of equal-size/equal-mtime content. Use existing injected executor/publisher rather than sleeping one second.
 
-- [ ] **2. Run RED.** `./gradlew :moray-app:test --tests '*ThemeLoaderTest' --tests '*ThemeFilesTest' --tests '*ConfigServiceTest' --tests '*MainConfigurationTest'`; absent loader/files types and new state accessors must fail.
+- [x] **2. Run RED.** `./gradlew :moray-app:test --tests '*ThemeLoaderTest' --tests '*ThemeFilesTest' --tests '*ConfigServiceTest' --tests '*MainConfigurationTest'`; absent loader/files types and new state accessors must fail.
 
-- [ ] **3. Implement pure parsing.** Build a `LinkedHashMap<List<String>,Color>` from `Palette.morayDark()` using the field table below. Traverse tables recursively with component lists (not dotted-string splitting) to preserve quoted-key semantics. TOML syntax errors return `rejected=true`. Unknown tables/keys produce a warning at `toml.inputPositionOf(path)`. Any wrong type at a supported table/leaf or malformed supported value produces an error; at least one supported leaf is required. Return the entire Dark candidate on rejection; callers retain last-good.
+- [x] **3. Implement pure parsing.** Build a `LinkedHashMap<List<String>,Color>` from `Palette.morayDark()` using the field table below. Traverse tables recursively with component lists (not dotted-string splitting) to preserve quoted-key semantics. TOML syntax errors return `rejected=true`. Unknown tables/keys produce a warning at `toml.inputPositionOf(path)`. Any wrong type at a supported table/leaf or malformed supported value produces an error; at least one supported leaf is required. Return the entire Dark candidate on rejection; callers retain last-good.
 
 The field map and candidate assembly code are:
 
@@ -299,7 +299,7 @@ private static void visit(TomlParseResult root, TomlTable table, List<String> pa
 
 `parse` initializes the map, translates `toml.errors()` exactly as `ConfigLoader` does, invokes `visit` with `new int[1]`, adds an error at 0/0 if its count is zero, and returns `Result(candidate, diagnostics, any ERROR)`. Sort diagnostics by line/column; copy lists in record constructors.
 
-- [ ] **4. Implement file cache and join.** `ThemeFiles` owns directory, previous successful palette (initial Dark), last key and cached Result. Its key record is `Key(Path requested, Path real, FileTime modified, long size)`; only successful metadata resolution creates a key. Missing/access errors clear the key so later creation can recover. Resolve selectors with `directory.resolve(name.endsWith(".toml") ? name : name + ".toml")`. Resolve both directory and target to real paths and require the target starts with the real directory. Read attributes from the real target and reject nonregular or oversized files before opening. Catch only I/O, invalid path and security exceptions and translate them to file-position 0/0 diagnostics.
+- [x] **4. Implement file cache and join.** `ThemeFiles` owns directory, previous successful palette (initial Dark), last key and cached Result. Its key record is `Key(Path requested, Path real, FileTime modified, long size)`; only successful metadata resolution creates a key. Missing/access errors clear the key so later creation can recover. Resolve selectors with `directory.resolve(name.endsWith(".toml") ? name : name + ".toml")`. Resolve both directory and target to real paths and require the target starts with the real directory. Read attributes from the real target and reject nonregular or oversized files before opening. Catch only I/O, invalid path and security exceptions and translate them to file-position 0/0 diagnostics.
 
 Use this bounded reading code after those checks:
 
@@ -330,7 +330,7 @@ State joined = new State(config.snapshot(), diagnostics, config.file(), config.p
 
 Use `joined` for existing equality/revision/publication logic and initialState; `lastConfig` is private worker-owned state. Preserve current failure/rejected-snapshot semantics, startup constructor off-EDT, queued-close guards and future completion rules. In Main resolve `AppDirs dirs` once and pass both chosen config path and `dirs.themes()`.
 
-- [ ] **5. Run GREEN and commit.** Repeat RED command and `./gradlew check`. Stage exact changed files and commit `feat: load and reload custom terminal palettes` with coauthor. Review before Task 3.
+- [x] **5. Run GREEN and commit.** Repeat RED command and `./gradlew check`. Stage exact changed files and commit `feat: load and reload custom terminal palettes` with coauthor. Review before Task 3.
 
 ## Task 3: Application-owned system appearance source
 
@@ -352,7 +352,7 @@ record Reading(BuiltinTheme theme, String warning) {} // warning empty when heal
 
 This source may own one daemon executor for initialization/event serialization; it does not poll themes/config and never creates one source per window. Initial effective appearance is Dark until the first asynchronous reading. Unsupported/failing native detection produces Dark with one diagnostic. Existing fixed Light/Dark config still applies immediately. Do not claim the asynchronous source eliminates all startup recoloring.
 
-- [ ] **1. Write a synthetic callback lifecycle test.** Use the existing test `edt`/`until` helpers; this test uses no detector factory or native state:
+- [x] **1. Write a synthetic callback lifecycle test.** Use the existing test `edt`/`until` helpers; this test uses no detector factory or native state:
 
 ```java
 @Test void serializesReadAndEventsAndDropsQueuedPublicationAfterClose() throws Exception {
@@ -381,9 +381,9 @@ This source may own one daemon executor for initialization/event serialization; 
 
 Add tests for duplicate readings, unsupported factory, linkage/runtime initialization failure, register-before-read event race, callback after close, close before initialization, repeated close and registration failure cleanup. An initial read failure must not discard a successfully registered listener; a later valid event clears its warning.
 
-- [ ] **2. Run RED.** `./gradlew :moray-app:test --tests '*SystemAppearanceTest'`; missing adapter must fail compilation.
+- [x] **2. Run RED.** `./gradlew :moray-app:test --tests '*SystemAppearanceTest'`; missing adapter must fail compilation.
 
-- [ ] **3. Add pinned dependency and deferred factory.** Root `subprojects.repositories` adds this restricted repository:
+- [x] **3. Add pinned dependency and deferred factory.** Root `subprojects.repositories` adds this restricted repository:
 
 ```kotlin
 exclusiveContent {
@@ -445,7 +445,7 @@ Close must enqueue cleanup directly (not via the closed-guarded enqueue helper),
 
 Do not invoke the upstream source in tests, change host appearance or launch a GUI. Resolve and inspect runtime dependencies with `./gradlew :moray-app:dependencies --configuration runtimeClasspath`; confirm no downgrade of existing JNA or SLF4J selections. Preserve the existing native-access JVM option. The upstream process-wide observer remains alive after removeListener; record that limitation rather than adding unsupported teardown.
 
-- [ ] **4. Run GREEN and commit.** Repeat RED and `./gradlew check`. Commit exact adapter/test/build paths as `feat: observe system appearance outside the EDT`, with coauthor; review before Task 4.
+- [x] **4. Run GREEN and commit.** Repeat RED and `./gradlew check`. Commit exact adapter/test/build paths as `feat: observe system appearance outside the EDT`, with coauthor; review before Task 4.
 
 ## Task 4: Apply resolved themes across the application and document usage
 
@@ -471,7 +471,7 @@ Do not invoke the upstream source in tests, change host appearance or launch a G
 // existing service-only/test constructors delegate to SystemAppearance.fixed(DARK).
 ```
 
-- [ ] **1. Write tests against actual retained components.** Add this integration test using `DesktopTestSupport` static imports, ArrayDeque and the existing owner cleanup after each test:
+- [x] **1. Write tests against actual retained components.** Add this integration test using `DesktopTestSupport` static imports, ArrayDeque and the existing owner cleanup after each test:
 
 ```java
 @Test void customPaletteSurvivesSystemChangeWithoutReplacingSession() throws Exception {
@@ -505,9 +505,9 @@ Do not invoke the upstream source in tests, change host appearance or launch a G
 
 Extend existing retained/zoomed/late-pane and failed-installation tests with resolved themes. Do not replace those tests with reducer-only assertions. Verify status background equals the exact custom color, all owner menus reflect Follow System, explicit choices ignore OS changes, file changes preserve manual appearance, and changing saved appearance clears the override. Verify initial configuration reaches pending views and new windows. Count installer calls: custom palette edits must not call it. Make a failed LAF installation preserve the effective theme and selected menu, while retry succeeds. Synthetic source warnings must appear alongside config/theme diagnostics and clear independently; queued source/config callbacks after close must be ignored.
 
-- [ ] **2. Run RED.** `./gradlew :moray-app:test --tests '*SystemThemeIntegrationTest' --tests '*ThemeControllerTest' --tests '*ConfigurationControllerTest' --tests '*ConfigurationStatusTest'`; missing resolved UI APIs should fail compilation.
+- [x] **2. Run RED.** `./gradlew :moray-app:test --tests '*SystemThemeIntegrationTest' --tests '*ThemeControllerTest' --tests '*ConfigurationControllerTest' --tests '*ConfigurationStatusTest'`; missing resolved UI APIs should fail compilation.
 
-- [ ] **3. Replace ThemeController's current field with the immutable reducer.** Retain `Predicate<BuiltinTheme> installer`, existing `installOrThrow`, owner registry and EDT checks. Use this implementation for transition entry points and candidate application:
+- [x] **3. Replace ThemeController's current field with the immutable reducer.** Retain `Predicate<BuiltinTheme> installer`, existing `installOrThrow`, owner registry and EDT checks. Use this implementation for transition entry points and candidate application:
 
 ```java
 private ThemeState state = ThemeState.defaults();
@@ -536,7 +536,7 @@ private void apply(ThemeState candidate) {
 
 Constructor installs `state.resolve().chrome()`. Registration applies `current()` with `updateDelegates=true`; unregister retains existing behavior. A successful no-pixel-change choice still refreshes the menu, so System → manual Dark is visible on a dark OS. Keep the existing LAF restoration and error reporting, without catching arbitrary errors from application code.
 
-- [ ] **4. Join configuration, native events and UI lifecycle.** `ConfigurationController` uses the palette from every accepted State, even when ColorsConfig itself compares equal:
+- [x] **4. Join configuration, native events and UI lifecycle.** `ConfigurationController` uses the palette from every accepted State, even when ColorsConfig itself compares equal:
 
 ```java
 themes.configure(next.snapshot().colors(), next.palette());
@@ -556,7 +556,7 @@ owner.setConfigurationState(displayed);
 
 Initialize `appearanceWarning` to the empty string. Reuse this join for registration, source changes and config changes. `close()` sets closed first, closes source, unregisters owners and closes ConfigService. `Main` alone constructs `SystemAppearance.production()` for actual startup and passes it into the new MorayApplication overload; tests/preview constructors retain `fixed(DARK)`. If creating the application fails, close both source and service. `--help`/CLI errors must never allocate a source.
 
-- [ ] **5. Apply chrome and palette to their own surfaces.** Keep the full existing `WindowContent.applyTheme` retained-tab traversal and `beginThemeUpdate`/`endThemeUpdate` guards. Wrap its `SwingUtilities.updateComponentTreeUI` calls in `if (updateDelegates)`; use `theme.palette()` for view/pane updates and `theme.chrome()` for the native title property. Do not recreate or reparent split children. The view attachment hook uses `snapshot.viewOptions(effectiveSize, themes.current().palette())` at attachment time.
+- [x] **5. Apply chrome and palette to their own surfaces.** Keep the full existing `WindowContent.applyTheme` retained-tab traversal and `beginThemeUpdate`/`endThemeUpdate` guards. Wrap its `SwingUtilities.updateComponentTreeUI` calls in `if (updateDelegates)`; use `theme.palette()` for view/pane updates and `theme.chrome()` for the native title property. Do not recreate or reparent split children. The view attachment hook uses `snapshot.viewOptions(effectiveSize, themes.current().palette())` at attachment time.
 
 The pane conversion is:
 
@@ -582,7 +582,7 @@ Use weight `.8` for custom muted text, `.25` for separators; use palette foregro
 
 Change the Appearance radio map to `EnumMap<Appearance,JRadioButtonMenuItem>`. Keep Light at index 0 and Dark at index 1 for existing tests; append Follow System at index 2. Bind each item to `owner.selectAppearance(choice)` and synchronize from `themes.choice()`, not effective chrome. `WindowContent.selectAppearance` retains the existing error/menu-reset path used by `selectTheme`; keep `selectTheme(BuiltinTheme)` delegating for existing tests/callers. No new shortcut or toolbar control is necessary.
 
-- [ ] **6. Finish copyable configuration and native checklist.** In ConfigTemplate, root example and configuration guide, place this text in the colors block:
+- [x] **6. Finish copyable configuration and native checklist.** In ConfigTemplate, root example and configuration guide, place this text in the colors block:
 
 ```toml
 [colors]
@@ -625,10 +625,16 @@ white = "#ffffff"
 
 The actual-file test must parse this fixture with no diagnostics. Extend the existing root-example parse test to check System default without overwriting any user-owned main edit during integration. README and STATUS should link configuration and the native checklist, and keep logging/launcher/packaging pending. The checklist contains unchecked items from spec §6, records JBR/OS/screens tested and distinguishes automated proof from user-run results.
 
-- [ ] **7. Run GREEN, full validation and review.** Repeat the RED command, then `./gradlew check --rerun-tasks`. Read XML counts and record any skip rather than saying all tests ran. Run `git diff --check` and AGENTS source-hygiene scan over both modules. Use headless component renders for dark/light plus one high-contrast custom theme, inspect images, and verify the status/padding surface visually; do not run GUI or benchmark. Commit explicit changed paths as `feat: apply system and custom themes across windows` with coauthor. Per-task review then whole-branch review must pass before proposing local integration. Resolve the main-checkout example edit with the user’s changes preserved, never by replacing that file wholesale.
+- [x] **7. Run GREEN, full validation and review.** Repeat the RED command, then `./gradlew check --rerun-tasks`. Read XML counts and record any skip rather than saying all tests ran. Run `git diff --check` and AGENTS source-hygiene scan over both modules. Use headless component renders for dark/light plus one high-contrast custom theme, inspect images, and verify the status/padding surface visually; do not run GUI or benchmark. Commit explicit changed paths as `feat: apply system and custom themes across windows` with coauthor. Per-task review then whole-branch review must pass before proposing local integration. Resolve the main-checkout example edit with the user’s changes preserved, never by replacing that file wholesale.
 
 ## Self-review and execution handoff
 
 Preparation self-review mapping: spec §2 → Tasks 1/4; §3 → Task 2; §4 → Tasks 2/3/4; §5 → Tasks 3/4; §6 → all test cycles and Task 4 native checklist; §7 remains future work. Parent full-Alacritty compatibility is explicitly narrowed in the design instead of silently promised. No source implementation is included in the preparation commit.
 
-Execution uses the established subagent-driven workflow: one task implementer and review gate at a time, then final whole-branch review. This preparation request stops at the reviewable spec/plan. Inline execution with `superpowers:executing-plans` remains an alternative if the user changes that preference.
+Execution uses the established subagent-driven workflow: one task implementer and review gate at a time, then final whole-branch review. The user subsequently authorized execution; all task gates are complete, with whole-branch review and native acceptance tracked separately. Inline execution with `superpowers:executing-plans` remains an alternative if the user changes that preference.
+
+## Execution rulings
+
+Ruling: Exclude the detector dependency’s transitive net.java.dev.jna group while retaining existing pty4j-provided JNA and JNA-platform 5.14.0 — detector metadata requested an unpublished jpms variant during Gradle test resolution; this avoids replacing the established runtime — costs revisiting the exclusion if native dependency requirements change. Implementer must include runtime dependency evidence.
+
+Ruling: Keep the latest OS appearance reading separately from the committed effective theme and use it when retrying selection/configuration — the plan’s transactional pseudocode otherwise forgets an OS change when LAF installation fails — costs one extra state field, but preserves visual rollback and permits Follow System retry without another OS event. Task 4 implements and tests it.

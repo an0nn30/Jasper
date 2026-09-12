@@ -1,6 +1,6 @@
 # Moray Plan 4c — Custom themes and system appearance
 
-**Status:** Prepared for review, 2026-09-12. No implementation started. Based on main `b92221f`, after Plan 4b, compact padding and shell-exit policy. The user requested preparation of the next plan and selected automatic switching of **both chrome and built-in terminal palette**, with custom palettes fixed.
+**Status:** Implemented and task-reviewed through `fd6811b`, 2026-09-12; whole-branch review pending and native acceptance user-run. Based on main `b92221f`, after Plan 4b, compact padding and shell-exit policy. The user requested preparation of the next plan and selected automatic switching of **both chrome and built-in terminal palette**, with custom palettes fixed.
 
 **Parent:** [Phase 1 design](2026-09-10-moray-phase-1-terminal-design.md), especially configuration and themes. This document amends those sections where stated below; completed terminal, window and configuration behavior remains the baseline.
 
