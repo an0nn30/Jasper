@@ -1,6 +1,6 @@
 # Plan 4d — macOS and Windows packaging
 
-**Status:** Approved by the user on 2026-09-12; implementation in progress.
+**Status:** Approved by the user on 2026-09-12; implemented and reviewed through `de4ec8c`. Final forced full-suite/package verification passed. Integration and native desktop/Windows execution remain pending. See [verification](../plans/2026-09-12-moray-plan-4d-verification.md).
 
 **Scope:** The user requested `jpackage` builds for macOS and Windows, with Windows desktop acceptance performed manually by the user. This advances packaging ahead of the broader app-logging cleanup. It extends the Phase 1 design's macOS `.app` deliverable to Windows without changing the terminal-first product scope.
 
