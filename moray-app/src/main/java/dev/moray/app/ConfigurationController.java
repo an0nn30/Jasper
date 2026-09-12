@@ -29,6 +29,11 @@ final class ConfigurationController implements AutoCloseable {
         service.start(this::accept);
     }
 
+    ConfigSnapshot snapshot() {
+        requireEdt();
+        return state.snapshot();
+    }
+
     void register(WindowContent owner) {
         requireEdt();
         if (closed || !owners.add(owner)) return;

@@ -16,6 +16,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     private final Path launchDirectory;
     private final ShellLauncher launcher;
     private final AtomicBoolean updateQueued = new AtomicBoolean();
+    private String shellLabel;
     private TerminalSession session;
     private TerminalView view;
     private FindBar findBar;
@@ -36,6 +37,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         super(new BorderLayout());
         this.launchDirectory = directory;
         this.launcher = launcher;
+        this.shellLabel = launcher.label();
         setPreferredSize(new Dimension(958, 821));
         add(new JLabel("Starting terminal\u2026", SwingConstants.CENTER));
         setBackground(UIManager.getColor("Panel.background"));
@@ -48,7 +50,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     }
 
     void start() {
-        launcher.launch(launchDirectory, (created, failure) -> {
+        shellLabel = launcher.launch(launchDirectory, (created, failure) -> {
             if (closed) { if (created != null) created.close(); return; }
             if (failure != null) {
                 Throwable cause = failure;
@@ -108,7 +110,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     boolean running() { return !closed && session != null && !session.exitFuture().isDone(); }
     Path directory() { return session == null ? launchDirectory : session.workingDirectory().orElse(launchDirectory); }
     String title() { return session == null ? "" : session.title(); }
-    String shellLabel() { return launcher.label(); }
+    String shellLabel() { return shellLabel; }
     void focusTerminal() { if (view != null) view.requestFocusInWindow(); }
     void setActive(boolean selected) {
         active = selected;
