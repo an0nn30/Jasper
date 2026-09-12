@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
+**Status:** Implementation and both task reviews complete; final whole-branch review approved (`182b9fb..be39bbf`), no actionable findings. Root fresh check: 308 total, 307 passed, one known skip. Native visual acceptance and integration approval remain pending.
+
 **Goal:** Match the user's screenshot with integrated native title tabs, horizontal toolbar and seamless terminal/status surface.
 **Architecture:** Retain JTabbedPane selection/content ownership, add a shared WindowTabs surface, integrate JBR native title height, then align remaining chrome and render real Swing previews.
 **Tech Stack:** JBR25, Gradle9.7, FlatLaf/extras3.7, jbr-api1.9.0, JUnit/AssertJ.
@@ -75,7 +77,7 @@ tasks.register<JavaExec>("mockUiPreview") {
 Use deterministicclose/waitforPTYoutput, noappGUI. Comparegeometry/background samples toreference withICCnormalization. InspectPNGwithview_image and iterateactualcomponentsuntil reference match; report font/native exclusions and actual differences honestly. Run fullcheck oncefinal, sourcehygiene/diffchecks, commit/report.
 
 ## Root acceptance
-- [ ] Task reviews and final whole-branch review complete, fixes verified.
+- [x] Task reviews and final whole-branch review complete, fixes verified.
 - [x] Fresh full headlesscheck and visualcomparison artifacts inspected; reportmeasurabledifferences.
 - [x] UpdateSTATUS/README/manualcheck fornewreference overridingearlierlayout, preserve decisions.
 - [ ] User-run nativeacceptance/subjective pixelcomparison (no GUIlaunch byagents).

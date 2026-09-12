@@ -1,6 +1,6 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11. Screenshot UI revision implemented on `codex/mock-ui` in `.worktrees/mock-ui`, code/tests `63a3325`. Both task reviews approved without findings; final whole-branch review pending. Root fresh `./gradlew check --rerun-tasks`: **308 tests, 307 passed, 1 known font skip**, zero failures/errors. Source hygiene and diff checks pass. Main remains the integrated Plan 3.5 baseline `182b9fb`; this new revision awaits integration approval. No GUI, benchmark or remote push occurred.
+**As of:** 2026-09-11. Screenshot UI revision implemented on `codex/mock-ui` in `.worktrees/mock-ui`, code/tests `63a3325`. Both task reviews and final whole-branch review (`182b9fb..be39bbf`) approved without actionable findings. Root fresh `./gradlew check --rerun-tasks`: **308 tests, 307 passed, 1 known font skip**, zero failures/errors. Source hygiene and diff checks pass. Main remains the integrated Plan 3.5 baseline `182b9fb`; this new revision awaits integration approval. No GUI, benchmark or remote push occurred.
 
 **Active revision:** The user's exact mock supersedes the earlier separate title and two-tone toolbar choices. Implemented title-bar tabs, horizontal neutral toolbar, and seamless terminal/status surface. See the [design](superpowers/specs/2026-09-11-moray-mock-ui-design.md), [implementation plan](superpowers/plans/2026-09-11-moray-mock-ui.md), [original reference](design/mock-ui-reference.png), and [measured comparison](design/mock-ui-comparison.md). The measured surfaces and row boundaries match; font metrics, real grid dimensions and native window appearance still require visual acceptance.
 
@@ -16,7 +16,7 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
 | 3.5 — macOS chrome, themes and toolbar | Integrated on main and fully reviewed; native acceptance pending |
-| Screenshot UI revision | Implemented and task-reviewed on codex/mock-ui; final review and native acceptance pending |
+| Screenshot UI revision | Implemented and fully reviewed on codex/mock-ui; integration approval and native acceptance pending |
 | 4 — Config and packaging | Follows screenshot UI acceptance; not written yet |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart Plan 3 or Plan 3.5; the active revision is in `.worktrees/mock-ui`.
@@ -98,7 +98,7 @@ Retained coverage opportunities: astral search, edge/overlapping highlights, lar
 
 ## 6. Next: native acceptance, then Plan 4
 
-The screenshot revision supersedes Plan 3.5 geometry and artwork. Complete final review, then user visual/native acceptance and approved integration. Run from `/Users/dustin/projects/moray/.worktrees/mock-ui` with `./gradlew :moray-app:run`. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
+The screenshot revision supersedes Plan 3.5 geometry and artwork. User visual/native acceptance and approved integration are next. Run from `/Users/dustin/projects/moray/.worktrees/mock-ui` with `./gradlew :moray-app:run`. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
 
 Plan 4: AppDirs/per-OS paths, TOML diagnostics with line numbers and last-good retention, live reload, custom theme loading and persistence, automatic system appearance, settings-file creation, --config, app logging and macOS .app bundling JBR. Carryovers:
 
@@ -165,3 +165,5 @@ The user selected local integration. The completed feature worktree and branch a
 - Interpret the144dpi screenshot as2x and convert its monitor ICC colors to sRGB for Swing values — aligns logical sizes and displayed colors — costs refinement if the mock's intended logical scale differs.
 - Add public jbr-api1.9.0 native title-height integration with fallback — exact54px native-control placement needs more than oldfullcontentproperties — costs native-platform validation and a small app dependency.
 - Use sampled visible green/blue/cursor colors and refine toolbar text to11.5px after actual-render comparison — user’s exact mock takes precedence over the initial retain-ANSI/12px approximation — costs changing those built-in dark ANSI accents and potential font refinement on other systems.
+
+Both task reviews and the final whole-branch review (`182b9fb..be39bbf`) approved without actionable findings. Final production/test commit remains `63a3325`; subsequent commits update documentation only. Fresh root verification and independent reviewer XML checks confirm 308 total tests, 307 passed, one known skip. This plan’s scratch workspace is removed after review; the committed plan, comparison report, previews and this handoff retain the evidence and rulings. The feature worktree remains available for user inspection and integration approval.
