@@ -163,8 +163,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
             || liveBehaviorChanged(previous.terminal(), next.terminal());
         boolean dimChanged = previous == null
             || previous.terminal().dimInactivePanes() != next.terminal().dimInactivePanes();
+        boolean exitChanged = previous == null || previous.terminal().onExit() != next.terminal().onExit();
         configuredFontSize = next.fontSize();
-        if (optionsChanged || dimChanged) {
+        if (optionsChanged || dimChanged || exitChanged) {
             for (int i = 0; i < tabs.getTabCount(); i++) {
                 for (TerminalPane pane : ((TerminalTab) tabs.getComponentAt(i)).panes()) {
                     if (optionsChanged && pane.view() != null) {
@@ -172,6 +173,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                         pane.view().applyOptions(next.viewOptions(size, pane.view().palette()));
                     }
                     if (dimChanged) pane.setConfiguredDim(next.terminal().dimInactivePanes());
+                    if (exitChanged) pane.setShellExitBehavior(next.terminal().onExit());
                 }
             }
         }
@@ -215,6 +217,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         } else {
             pane.view().applyOptions(configured.viewOptions(configuredFontSize, themes.current().palette()));
             pane.setConfiguredDim(configured.terminal().dimInactivePanes());
+            pane.setShellExitBehavior(configured.terminal().onExit());
         }
         pane.view().setShortcutHandler(event -> dispatchShortcut(KeyStroke.getKeyStrokeForEvent(event), pane.view()));
         pane.view().setContextMenuHandler(event -> {

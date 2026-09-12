@@ -46,6 +46,7 @@ option_as_meta = "left"
 dim_inactive_panes = 0.3
 copy_on_select = false
 bell = "visual"
+on_exit = "keep_open"
 
 [terminal.shell]
 program = ""
@@ -87,6 +88,7 @@ theme = "moray-dark"
 | `terminal.dim_inactive_panes` | `0.3` | Finite number 0–1; 0 disables dimming, 1 fully dims | Live |
 | `terminal.copy_on_select` | `false` | Boolean | Live |
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
+| `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `colors.theme` | `"moray-dark"` | `"moray-dark"`, `"moray-light"` | Live, shared across windows |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
@@ -123,6 +125,23 @@ PROJECT_LABEL = "a value with spaces"
 Arguments containing spaces stay single arguments, and an empty string remains an empty argument. To ask a shell to interpret a command, explicitly name that shell and pass its command flag and command text as separate arguments. Nested tables above and inline tables such as `shell = { program = "/bin/zsh", args = ["-l"] }` under `[terminal]` are both supported; the same applies to `cursor` and `env`.
 
 Environment entries overlay the inherited child environment. This table does not change which default login shell is selected: setting `SHELL` here only changes the child's environment. `TERM` and `COLORTERM` are reserved; configured entries warn and are ignored. Moray always passes `TERM=xterm-256color` and `COLORTERM=truecolor`. Invalid environment entries are omitted individually. Diagnostics do not echo environment values or shell arguments. Setting scrollback to zero disables retained history for future sessions.
+
+### Shell exit behavior
+
+`terminal.on_exit` controls what happens when the pane's shell process (or explicitly configured process) exits. Finishing a command that returns to a still-running shell does not trigger it.
+
+- `"keep_open"` is the default, including when the key is missing. It retains the stopped terminal, its output and the process-exit marker; it does not restart the shell.
+- `"close_on_success"` closes the pane only after a normal exit with code 0. Nonzero or abnormal exits retain the output.
+- `"close"` closes the pane after any process exit, including nonzero or abnormal exits.
+
+Only the exited pane closes. Its tab closes when its final pane closes, and its window closes when its final tab closes. Sibling panes and tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and remove the failed pane.
+
+To opt into closing successful exits, add or edit this setting in the existing `[terminal]` table:
+
+```toml
+[terminal]
+on_exit = "close_on_success"
+```
 
 ### Initial window grid
 

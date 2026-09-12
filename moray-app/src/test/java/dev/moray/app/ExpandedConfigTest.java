@@ -84,7 +84,7 @@ class ExpandedConfigTest {
                 "terminal.shell.program=[]", "terminal.shell.args=7", "terminal.shell.args=['secret', true]",
                 "terminal.env.EXAMPLE=7", "terminal.scrollback=10.0", "terminal.option_as_meta=[]",
                 "terminal.cursor.shape=7", "terminal.cursor.blink='secret'", "terminal.dim_inactive_panes='secret'",
-                "terminal.copy_on_select=7", "terminal.bell=[]")) {
+                "terminal.copy_on_select=7", "terminal.bell=[]", "terminal.on_exit=7")) {
             var result = parse(assignment);
             assertThat(result.rejected()).as(assignment).isTrue();
             assertThat(result.diagnostics()).singleElement().satisfies(d -> {
@@ -103,7 +103,7 @@ class ExpandedConfigTest {
                 "terminal.shell.args=['secret', \"bad\\u0000arg\"]", "terminal.scrollback=-1", "terminal.scrollback=1000001",
                 "terminal.option_as_meta='secret'", "terminal.cursor.shape='secret'", "terminal.dim_inactive_panes=-0.1",
                 "terminal.dim_inactive_panes=1.1", "terminal.dim_inactive_panes=nan", "terminal.dim_inactive_panes=inf",
-                "terminal.bell='secret'")) {
+                "terminal.bell='secret'", "terminal.on_exit='secret'", "terminal.on_exit='CLOSE'")) {
             var result = parse(assignment + "\nwindow.tab_height=44");
             assertThat(result.rejected()).as(assignment).isFalse();
             assertThat(result.snapshot()).isEqualTo(new ConfigSnapshot(44, WindowContent.ToolbarMode.ICONS_AND_LABELS,
@@ -142,6 +142,16 @@ class ExpandedConfigTest {
         assertThat(result.diagnostics()).allSatisfy(d -> assertThat(d.message()).doesNotContain("secret"));
     }
 
+    @Test void shellExitChoiceDefaultsAndDiagnosticsUseTheExactSettingPosition() {
+        assertThat(parse("").snapshot().terminal().onExit()).isEqualTo(ShellExitBehavior.KEEP_OPEN);
+        assertPosition(parse("[terminal]\n  on_exit='CLOSE'"), "terminal.on_exit", 2, 3, ConfigDiagnostic.Severity.ERROR);
+        assertPosition(parse("[terminal]\n  on_exit=7"), "terminal.on_exit", 2, 3, ConfigDiagnostic.Severity.ERROR);
+        var terminal = TerminalConfig.defaults();
+        assertThatNullPointerException().isThrownBy(() -> new TerminalConfig(terminal.shell(), terminal.env(),
+            terminal.scrollback(), terminal.optionAsMeta(), terminal.cursorShape(), terminal.cursorBlink(),
+            terminal.dimInactivePanes(), terminal.copyOnSelect(), terminal.bell(), null));
+    }
+
     @Test void nestedTableAndArrayErrorsUseTheExactSettingPosition() {
         assertPosition(parse("[terminal]\n  shell=7"), "terminal.shell", 2, 3, ConfigDiagnostic.Severity.ERROR);
         assertPosition(parse("[terminal]\n  cursor=[]"), "terminal.cursor", 2, 3, ConfigDiagnostic.Severity.ERROR);
@@ -159,7 +169,7 @@ class ExpandedConfigTest {
         for (String key : List.of("window.columns", "window.lines", "font.family", "font.fallback", "font.ligatures",
                 "font.line_height", "terminal.shell.program", "terminal.shell.args", "terminal.env", "terminal.scrollback",
                 "terminal.option_as_meta", "terminal.cursor.shape", "terminal.cursor.blink", "terminal.dim_inactive_panes",
-                "terminal.copy_on_select", "terminal.bell")) {
+                "terminal.copy_on_select", "terminal.bell", "terminal.on_exit")) {
             assertThat(toml.contains(key)).as(key).isTrue();
         }
     }

@@ -57,6 +57,10 @@ final class ConfigTemplate {
             # copy_on_select = false
             # Bell: "visual", "sound", or "none"; updates live.
             # bell = "visual"
+            # Shell process exit: "keep_open", "close_on_success" (code 0), or "close" (any exit).
+            # Only the exited pane closes; its tab/window closes when empty. Live for future exits.
+            # "keep_open" retains output from the stopped shell; reload never closes retained output.
+            # on_exit = "keep_open"
 
             [terminal.shell]
             # New panes only. Empty program resolves the default shell and appends configured args.

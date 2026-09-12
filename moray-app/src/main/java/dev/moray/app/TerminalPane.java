@@ -24,6 +24,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     private boolean closed;
     private boolean active;
     private float configuredDim = .3f;
+    private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
     Runnable onChanged = () -> {};
     Runnable onFocused = () -> {};
     Runnable onClose = () -> {};
@@ -73,7 +74,17 @@ final class TerminalPane extends JPanel implements AutoCloseable {
                 @Override public void componentResized(ComponentEvent event) { queueUpdate(); }
             });
             session.addListener(listener);
-            session.exitFuture().whenComplete((code, error) -> queueUpdate());
+            // Always defer: the process may already have exited before launch delivery.
+            // Read the policy on the EDT after onReady has applied the latest configuration.
+            created.exitFuture().whenComplete((code, error) -> SwingUtilities.invokeLater(() -> {
+                if (closed || session != created) return;
+                if (onExit == ShellExitBehavior.CLOSE
+                    || (onExit == ShellExitBehavior.CLOSE_ON_SUCCESS && error == null && Integer.valueOf(0).equals(code))) {
+                    onClose.run();
+                } else {
+                    onChanged.run();
+                }
+            }));
             removeAll(); add(findBar, BorderLayout.NORTH); add(view, BorderLayout.CENTER);
             onReady.accept(view); setActive(active);
             revalidate(); repaint(); onChanged.run();
@@ -118,6 +129,11 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         active = selected;
         setBorder(BorderFactory.createEmptyBorder(PADDING, PADDING, PADDING, PADDING));
         if (view != null) view.setInactiveDim(selected ? 0 : configuredDim);
+    }
+
+    /** Only future exit deliveries use this policy; retained output is never closed retroactively. */
+    void setShellExitBehavior(ShellExitBehavior behavior) {
+        onExit = java.util.Objects.requireNonNull(behavior);
     }
 
     void setConfiguredDim(float amount) {
