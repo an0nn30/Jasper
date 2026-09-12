@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-12-moray-plan-4d-packaging-design.md` (approved).
 
-**Status:** Executing. Native validation correction: macOS jpackage requires a positive major version; default changed to 1.0.0 on both hosts, with no post-generation bundle metadata rewriting. Worktree `.worktrees/plan-4d-packaging`, branch `codex/plan-4d-packaging`, baseline `dbf75d9`. Both task gates and whole-branch review are required. The user approved portable Windows ZIP as part of the proposed design; no installer is included.
+**Status:** Both task reviews complete; whole-branch review and final artifact rebuild pending. Native validation correction: macOS jpackage requires a positive major version; default changed to 1.0.0 on both hosts, with no post-generation bundle metadata rewriting. Worktree `.worktrees/plan-4d-packaging`, branch `codex/plan-4d-packaging`, baseline `dbf75d9`. Both task gates and whole-branch review are required. The user approved portable Windows ZIP as part of the proposed design; no installer is included.
 
 ## Global Constraints
 
@@ -41,7 +41,7 @@
 - Produces: `:moray-app:packageApp`, `:moray-app:packageDist`, `:moray-app:verifyPackage`; property `-PmorayVersion=X.Y.Z` default `1.0.0`.
 - Output root: `moray-app/build/packaging/`; `input/` for Sync staging, `image/` for the application image, `dist/` for archives. Artifact names: `Moray-<version>-macos-<aarch64|x64>.dmg` and `Moray-<version>-windows-x64.zip`.
 
-- [ ] **Step 1: Prove the task boundary is missing.**
+- [x] **Step 1: Prove the task boundary is missing.**
 
 ```bash
 ./gradlew :moray-app:packageApp :moray-app:verifyPackage
@@ -49,7 +49,7 @@
 
 Expected RED: task not found, with no GUI launch. This is build integration, so the behavioral acceptance is the real generated package. Do not add a buildSrc plugin or Gradle TestKit framework just to test fixed command strings.
 
-- [ ] **Step 2: Register staging and host preflight in the applied script.**
+- [x] **Step 2: Register staging and host preflight in the applied script.**
 
 Add to the end of the app build:
 
@@ -84,7 +84,7 @@ Host names: use `os.name` normalized with Locale.ROOT, macOS starts `mac`, Windo
 
 Version validator: exactly three decimal components with no leading zeroes except `0`; major 1..255, minor 0..255, patch 0..65535. Bound lengths before parsing to avoid overflow. Throw `GradleException` naming `-PmorayVersion` and the accepted form on error. Ensure version validation precedes native packaging execution and output cleanup. Missing SDK jpackage is an actionable failure naming that SDK path.
 
-- [ ] **Step 3: Invoke jpackage to create the image.**
+- [x] **Step 3: Invoke jpackage to create the image.**
 
 Construct argument lists, never a shell string. Use Gradle's `ProviderFactory.exec` (available through `providers`) or an injected public `ExecOperations` API; Gradle 9 does not support the old `project.exec`. Propagate nonzero exits and report native output, including on failure.
 
@@ -104,7 +104,7 @@ Keep native Java commands in the runtime (omit `--strip-native-commands`) so ver
 
 Register task inputs for the staged directory, toolchain installation identity/release, launch arguments/main class, OS/architecture and version. Give each task its own output directory. Delete only that task's old image before execution; write a completion marker only after successful native generation. A failure deletes partial image/marker, with native failure preserved. Repeated runs may be up-to-date when inputs and outputs are intact; verification itself must execute when requested. Removed dependencies are removed by Sync, not accumulated.
 
-- [ ] **Step 4: Verify real images and create distributions.**
+- [x] **Step 4: Verify real images and create distributions.**
 
 `verifyPackage` depends on `packageApp` and checks actual output, not a cached success marker alone. On macOS the image is `image/Moray.app`, the app directory `Contents/app`, runtime home `Contents/runtime/Contents/Home`, launcher `Contents/MacOS/Moray`, metadata `Contents/Info.plist`. On Windows these are `image/Moray`, `app`, `runtime`, and `Moray.exe`.
 
@@ -112,7 +112,7 @@ Verify each staged file is present and byte-identical, the cfg main class and ea
 
 `packageDist` depends on `verifyPackage`, so a broken image is not distributed. macOS: invoke jpackage `--type dmg --app-image <existing image> --dest <task-owned temporary dist directory>` and move the resulting DMG to the version/OS/architecture filename; `hdiutil verify` checks integrity without mounting. Windows: Gradle Zip includes the whole image under top-level `Moray/`, with destination `dist/`, preserving structure. ZIP and DMG task graph must select only the host operation. Keep stale distribution cleanup inside its owned directory and do not erase another task's output.
 
-- [ ] **Step 5: Add usable instructions and perform host acceptance.**
+- [x] **Step 5: Add usable instructions and perform host acceptance.**
 
 `packaging/README.txt` explains macOS drag-to-Applications and Windows extracting the complete folder, config locations and the included example (not automatically installed), no external Java required, current development signing/icon status. `docs/packaging.md` documents both native-host commands:
 
@@ -141,7 +141,7 @@ Run locally:
 
 Expect valid builds, up-to-date behavior when unchanged, distinct versioned filename, early invalid-version failure, restored default build. Exercise a real packaging path containing spaces using an isolated copied fixture or build-directory override scoped to this worktree; avoid copying generated build outputs or creating another Git checkout. Record command and artifact evidence in the report. Check unsupported host validation at a safe build-only boundary; do not spoof `os.name` on the JVM because that changes unrelated Java native behavior. Record Windows as unexecuted.
 
-- [ ] **Step 6: Self-review, diff check and commit.**
+- [x] **Step 6: Self-review, diff check and commit.**
 
 ```bash
 git diff --check
@@ -160,7 +160,7 @@ git commit -m "build: package Moray for macOS and Windows" -m "Co-Authored-By: C
 - Produces sanitized inherited child environment with configured overlays, reserved TERM/COLORTERM and a macOS-only fallback LANG.
 - Task 1 packaging includes the current app JAR and example automatically; final package must be rebuilt after this task.
 
-- [ ] **Step 1: Add behavioral regressions before production changes.**
+- [x] **Step 1: Add behavioral regressions before production changes.**
 
 Add to existing LaunchSettingsTest, using its `snapshot` helper:
 
@@ -199,7 +199,7 @@ Add to existing LaunchSettingsTest, using its `snapshot` helper:
 
 Also cover an explicit blank configured LANG on Mac using the same helper: it receives the fallback after overlay. Preserve existing shell argument/immutability assertions.
 
-- [ ] **Step 2: Verify RED.**
+- [x] **Step 2: Verify RED.**
 
 ```bash
 ./gradlew :moray-app:test --tests dev.moray.app.LaunchSettingsTest
@@ -207,7 +207,7 @@ Also cover an explicit blank configured LANG on Mac using the same helper: it re
 
 Expected failures on retained inherited terminal keys and missing macOS LANG.
 
-- [ ] **Step 3: Implement at the existing environment assembly boundary.**
+- [x] **Step 3: Implement at the existing environment assembly boundary.**
 
 Import Locale; between inherited copy and configured overlay insert removal. After overlay and before reserved values insert fallback:
 
@@ -224,7 +224,7 @@ if (osName.toLowerCase(Locale.ROOT).startsWith("mac")
 
 Do not duplicate the existing `putAll`. Keep default-shell resolution, reserved values and return/copy semantics unchanged. No new public API or environment abstraction.
 
-- [ ] **Step 4: Verify GREEN and document behavior.**
+- [x] **Step 4: Verify GREEN and document behavior.**
 
 ```bash
 ./gradlew :moray-app:test --tests dev.moray.app.LaunchSettingsTest
@@ -233,7 +233,7 @@ Do not duplicate the existing `putAll`. Keep default-shell resolution, reserved 
 
 Add the same concise rules to guide/template/example comments: inherited terminal identity variables removed before overlay, intentional configured overrides permitted, Mac LANG only defaults if absent/blank, LC_* preserved, TERM/COLORTERM reserved. No new config option is introduced. Change configuration guide's future-work sentence to leave app logging and refer to packaging guide.
 
-- [ ] **Step 5: Diff/source hygiene, self-review and commit.**
+- [x] **Step 5: Diff/source hygiene, self-review and commit.**
 
 ```bash
 git diff --check
