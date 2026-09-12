@@ -7,11 +7,31 @@ public final class Main {
     private Main() {}
 
     public static void main(String[] args) {
-        System.setProperty("apple.awt.application.appearance", "system");
-        System.setProperty("apple.laf.useScreenMenuBar", "true");
-        SwingUtilities.invokeLater(() -> {
-            new MorayApplication().newWindow(Path.of(System.getProperty("user.home")));
+        int result = start(args, System.out, System.err, service -> {
+            System.setProperty("apple.awt.application.appearance", "system");
+            System.setProperty("apple.laf.useScreenMenuBar", "true");
+            SwingUtilities.invokeLater(() -> {
+                try { new MorayApplication(service).newWindow(Path.of(System.getProperty("user.home"))); }
+                catch (RuntimeException failure) { service.close(); throw failure; }
+            });
         });
+        if (result != 0) System.exit(result);
+    }
+
+    /** Startup boundary: parsing and the first read finish before the desktop callback runs. */
+    static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error,
+                     java.util.function.Consumer<ConfigService> launch) {
+        AppArguments options;
+        try { options = AppArguments.parse(args, Path.of(System.getProperty("user.dir"))); }
+        catch (IllegalArgumentException failure) { error.println(failure.getMessage()); return 2; }
+        if (options.help()) { out.println(AppArguments.USAGE); return 0; }
+        String os = System.getProperty("os.name");
+        Path home = Path.of(System.getProperty("user.home"));
+        Path file = options.configOverride() == null ? AppDirs.resolve(os, System.getenv(), home).configFile() : options.configOverride();
+        ConfigService service = new ConfigService(file, os.startsWith("Mac"));
+        try { launch.accept(service); }
+        catch (RuntimeException failure) { service.close(); throw failure; }
+        return 0;
     }
 
     /** The window title for a shell-reported title; "Moray" when the shell has not set one. */

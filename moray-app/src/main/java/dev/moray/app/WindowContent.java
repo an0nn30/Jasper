@@ -19,7 +19,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private final JTabbedPane tabs = new TerminalDeck();
     private final WindowTabs windowTabs;
     private final EnumMap<ActionId, Action> actions = new EnumMap<>(ActionId.class);
-    private final KeyBindings bindings;
+    private KeyBindings bindings;
+    private ConfigSnapshot configured;
+    private float configuredFontSize = TerminalPane.DEFAULT_FONT_SIZE;
     private final WindowChrome chrome;
     private final ThemeController themes;
     private JRootPane bindingRoot;
@@ -35,6 +37,10 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private boolean rearranging;
     private boolean active = true;
     Consumer<BuiltinTheme> onThemeChanged = theme -> {};
+    private Runnable openSettings, reloadConfiguration;
+    private Runnable unregisterConfiguration = () -> {};
+    Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
+        this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
     Consumer<String> onTitle = title -> {};
     Consumer<String> onError = message -> JOptionPane.showMessageDialog(this, message, "Moray", JOptionPane.ERROR_MESSAGE);
 
@@ -69,7 +75,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
             });
             actions.put(id, action);
         }
-        String unavailable = "Configuration support is not available yet";
+        String unavailable = "Configuration is not connected";
         action(ActionId.OPEN_SETTINGS).putValue(Action.SHORT_DESCRIPTION, unavailable);
         action(ActionId.RELOAD_CONFIG).putValue(Action.SHORT_DESCRIPTION, unavailable);
         chrome = new WindowChrome(this);
@@ -106,6 +112,61 @@ final class WindowContent extends JPanel implements AutoCloseable {
         bindingRoot = null;
     }
 
+    void setBindings(KeyBindings replacement) {
+        JRootPane root = bindingRoot;
+        removeRootBindings();
+        bindings = Objects.requireNonNull(replacement);
+        for (ActionId id : ActionId.values())
+            action(id).putValue(Action.ACCELERATOR_KEY, bindings.strokeFor(id).orElse(null));
+        if (root != null) installRootBindings(root);
+        toolbar().revalidate(); toolbar().repaint();
+    }
+
+    void connectConfiguration(Runnable settings, Runnable reload, Runnable unregister) {
+        if (closed) return;
+        openSettings = settings; reloadConfiguration = reload; unregisterConfiguration = unregister;
+        action(ActionId.OPEN_SETTINGS).putValue(Action.SHORT_DESCRIPTION, "Open configuration file");
+        action(ActionId.RELOAD_CONFIG).putValue(Action.SHORT_DESCRIPTION, "Reload configuration file");
+        updateActions();
+    }
+
+    void disconnectConfiguration() {
+        openSettings = null; reloadConfiguration = null; unregisterConfiguration = () -> {};
+        status().onConfigurationDetails = () -> {};
+        status().configButton().setEnabled(false);
+        updateActions();
+    }
+
+    void setConfigurationState(ConfigService.State state) {
+        if (closed) return;
+        status().setConfiguration(state);
+        status().onConfigurationDetails = () -> {
+            String details = state.file() + "\n\n" + (state.diagnostics().isEmpty()
+                ? (state.present() ? "Configuration loaded successfully." : "Using built-in defaults. Open Settings to create this file.")
+                : String.join("\n", state.diagnostics().stream().map(ConfigDiagnostic::formatted).toList()));
+            JTextArea text = new JTextArea(details, 12, 64);
+            text.setEditable(false); text.setLineWrap(true); text.setWrapStyleWord(true); text.setCaretPosition(0);
+            text.getAccessibleContext().setAccessibleName("Configuration details");
+            showConfigDiagnostics.accept(new JScrollPane(text));
+        };
+    }
+
+    void applyConfiguration(ConfigSnapshot next, boolean macOs) {
+        if (closed) return;
+        ConfigSnapshot previous = configured;
+        configured = next;
+        if (previous == null || previous.tabHeight() != next.tabHeight()) setTabHeight(next.tabHeight());
+        if (previous == null || previous.toolbar() != next.toolbar()) setToolbarMode(next.toolbar());
+        if (previous == null || previous.statusBar() != next.statusBar()) setStatusVisible(next.statusBar());
+        if (previous == null || previous.fontSize() != next.fontSize()) {
+            configuredFontSize = next.fontSize();
+            for (int i = 0; i < tabs.getTabCount(); i++)
+                for (TerminalPane pane : ((TerminalTab) tabs.getComponentAt(i)).panes())
+                    if (pane.view() != null) pane.view().setFontSize(configuredFontSize);
+        }
+        if (previous == null || !previous.keybindings().equals(next.keybindings())) setBindings(next.bindings(macOs));
+    }
+
     Action action(ActionId id) { return actions.get(id); }
     KeyBindings bindings() { return bindings; }
     JToolBar toolbar() { return chrome.toolbar(); }
@@ -130,6 +191,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
         pane.applyTheme(themes.current());
+        pane.view().setFontSize(configuredFontSize);
         pane.view().setShortcutHandler(event -> dispatchShortcut(KeyStroke.getKeyStrokeForEvent(event), pane.view()));
         pane.view().setContextMenuHandler(event -> {
             selectTab(tab); tab.focus(pane); pane.focusTerminal(); update();
@@ -212,8 +274,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
             case CLEAR_SCROLLBACK -> view.clearScrollback();
             case FONT_BIGGER -> view.setFontSize(view.fontSize() + 1);
             case FONT_SMALLER -> view.setFontSize(view.fontSize() - 1);
-            case FONT_RESET -> view.setFontSize(TerminalPane.DEFAULT_FONT_SIZE);
-            case OPEN_SETTINGS, RELOAD_CONFIG -> { /* visibly disabled until configuration exists */ }
+            case FONT_RESET -> view.setFontSize(configuredFontSize);
+            case OPEN_SETTINGS -> openSettings.run();
+            case RELOAD_CONFIG -> reloadConfiguration.run();
         }
         update();
     }
@@ -229,7 +292,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
         boolean running = present && pane.running();
         for (ActionId id : ActionId.values()) {
             boolean enabled = !closed && switch (id) {
-                case OPEN_SETTINGS, RELOAD_CONFIG -> false;
+                case OPEN_SETTINGS -> openSettings != null;
+                case RELOAD_CONFIG -> reloadConfiguration != null;
                 case NEW_TAB, NEW_WINDOW, QUIT -> true;
                 case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
                 case COPY -> ready && pane.view().hasSelection();
@@ -312,6 +376,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        unregisterConfiguration.run(); disconnectConfiguration();
+        showConfigDiagnostics = control -> {};
         windowTabs.close();
         themes.unregister(this);
         for (int i = 0; i < tabs.getTabCount(); i++) ((TerminalTab) tabs.getComponentAt(i)).close();

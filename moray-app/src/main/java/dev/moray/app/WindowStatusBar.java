@@ -6,43 +6,76 @@ import javax.swing.*;
 
 /** Bounded status segments: long shell/path metadata never displaces dimensions/defaults. */
 final class WindowStatusBar extends JPanel {
-    private final Segment left = new Segment();
-    private final Segment right = new Segment();
+    private final Segment left = new Segment(new JLabel());
+    private final JButton configButton = new JButton("Built-in defaults");
+    private final Segment right = new Segment(configButton);
+    Runnable onConfigurationDetails = () -> {};
+    private String configText = "Built-in defaults";
+    private String configColor = "Moray.configSuccessForeground";
+    private String shell = "", directory = "", dimensions = "";
     private boolean running;
     private String text = "Built-in defaults";
 
     WindowStatusBar() {
         super(null);
+        configButton.setBorder(BorderFactory.createEmptyBorder());
+        configButton.setContentAreaFilled(false); configButton.setOpaque(false);
+        configButton.setEnabled(false); configButton.putClientProperty("html.disable", true);
+        configButton.addActionListener(event -> onConfigurationDetails.run());
         add(left); add(right); refreshTheme();
         getAccessibleContext().setAccessibleName("Terminal status");
     }
 
     void setMetadata(String shell, String directory, String dimensions, boolean running) {
-        this.running = running;
+        this.running = running; this.shell = shell; this.directory = directory; this.dimensions = dimensions;
         left.setParts(shell, directory);
-        right.setParts(dimensions, "Built-in defaults");
-        text = shell.isEmpty() ? "Built-in defaults" : shell + "  |  " + directory + "  |  " + dimensions + "  |  Built-in defaults";
-        left.setToolTipText(directory); getAccessibleContext().setAccessibleDescription(text);
+        left.setToolTipText(directory);
+        updateText();
+    }
+
+    void setConfiguration(ConfigService.State state) {
+        boolean error = state.diagnostics().stream().anyMatch(d -> d.severity() == ConfigDiagnostic.Severity.ERROR);
+        boolean warning = !state.diagnostics().isEmpty();
+        configText = error ? "Config error" : warning ? "Config warnings" : state.present() ? "Config loaded" : "Built-in defaults";
+        if (warning) state.diagnostics().stream().filter(d -> d.line() > 0).findFirst()
+            .ifPresent(d -> configText += " (line " + d.line() + ")");
+        configColor = error ? "Moray.configErrorForeground" : warning ? "Moray.configWarningForeground" : "Moray.configSuccessForeground";
+        configButton.setToolTipText(state.file().toString());
+        configButton.setEnabled(true);
+        updateText(); refreshTheme();
+    }
+
+    private void updateText() {
+        right.setParts(dimensions, configText);
+        configButton.getAccessibleContext().setAccessibleName(configText);
+        text = shell.isEmpty() ? configText : shell + "  |  " + directory + "  |  " + dimensions + "  |  " + configText;
+        getAccessibleContext().setAccessibleDescription(text);
         revalidate(); repaint();
     }
+    JButton configButton() { return configButton; }
     String getText() { return text; }
     void refreshTheme() {
         setBackground(UIManager.getColor("Panel.background"));
         left.refreshTheme(); right.refreshTheme();
+        configButton.setForeground(UIManager.getColor(configColor));
     }
 
     private static final class Segment extends JPanel {
-        private final JLabel first = new JLabel(), slash = new JLabel("/", SwingConstants.CENTER), last = new JLabel();
-        Segment() {
-            super(null); setOpaque(false);
+        private final JLabel first = new JLabel(), slash = new JLabel("/", SwingConstants.CENTER);
+        private final JComponent last;
+        Segment(JComponent last) {
+            super(null); setOpaque(false); this.last = last;
             first.putClientProperty("html.disable", true); last.putClientProperty("html.disable", true);
             add(first); add(slash); add(last);
         }
         void setParts(String first, String last) {
-            this.first.setText(first); this.last.setText(last); slash.setVisible(!first.isEmpty());
+            this.first.setText(first);
+            if (this.last instanceof JLabel label) label.setText(last);
+            else ((JButton) this.last).setText(last);
+            slash.setVisible(!first.isEmpty());
         }
         void refreshTheme() {
-            for (JLabel label : new JLabel[]{first, slash, last}) {
+            for (JComponent label : new JComponent[]{first, slash, last}) {
                 label.setForeground(UIManager.getColor(label == slash ? "Separator.foreground" : "Moray.mutedForeground"));
                 label.setFont(UIManager.getFont("Label.font").deriveFont(UIScale.scale(10f)));
             }
@@ -62,7 +95,7 @@ final class WindowStatusBar extends JPanel {
     @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(30)); }
     @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(30)); }
     @Override public void doLayout() {
-        int edge = UIScale.scale(14), leftInset = UIScale.scale(26);
+        int edge = Math.min(UIScale.scale(14), getWidth() / 2), leftInset = Math.min(getWidth(), UIScale.scale(26));
         int available = Math.max(0, getWidth() - edge * 2);
         int rightWidth = Math.min(available, right.getPreferredSize().width);
         right.setBounds(Math.max(edge, getWidth() - edge - rightWidth), 0, rightWidth, getHeight());

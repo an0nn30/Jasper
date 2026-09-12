@@ -18,9 +18,13 @@ final class MorayApplication {
     private final ExecutorService launches = Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("moray-shell-launch-", 0).factory());
     private final ShellLauncher launcher;
+    private final ConfigurationController configuration;
     private boolean quitting;
 
-    MorayApplication() {
+    MorayApplication() { this(null); }
+
+    MorayApplication(ConfigService service) {
+        configuration = service == null ? null : new ConfigurationController(themes, service);
         var command = DefaultShell.command(System.getProperty("os.name"), System.getenv());
         launcher = new ShellLauncher(launches, directory -> {
             try {
@@ -36,7 +40,7 @@ final class MorayApplication {
 
     void newWindow(Path directory) {
         if (quitting) return;
-        TerminalWindow window = new TerminalWindow(this, launcher, directory, themes);
+        TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration);
         windows.add(window); window.show();
     }
 
@@ -54,6 +58,7 @@ final class MorayApplication {
     private void shutdown() {
         quitting = true;
         launches.shutdown();
+        if (configuration != null) configuration.close();
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler(null);
     }
 

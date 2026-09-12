@@ -22,8 +22,14 @@ final class TerminalWindow implements AutoCloseable {
     };
 
     TerminalWindow(MorayApplication application, ShellLauncher launcher, Path directory, ThemeController themes) {
+        this(application, launcher, directory, themes, null);
+    }
+
+    TerminalWindow(MorayApplication application, ShellLauncher launcher, Path directory, ThemeController themes,
+                   ConfigurationController configuration) {
         this.application = application;
         content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes);
+        if (configuration != null) configuration.register(content);
         titleBar = MacTitleBar.install(frame.getRootPane(), content, SystemInfo.isMacFullWindowContentSupported, frame::setTitle);
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.setJMenuBar(content.menuBar());
