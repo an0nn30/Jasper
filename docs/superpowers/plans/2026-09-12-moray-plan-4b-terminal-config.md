@@ -4,7 +4,7 @@
 
 **Execution clarification:** Array validation points to the containing key’s exact source position; TomlJ element positions include preceding whitespace/comments.
 
-**Status:** Implemented and fully reviewed through `7ab277b`; no open findings. Fresh full verification: 442 tests, 441 passed, one known font skip, all eight tasks executed. Native acceptance and integration remain pending. The per-plan scratch workspace is removed after preserving its decisions in STATUS.
+**Status:** Implemented and fully reviewed through `7ab277b`; no open findings. Fresh full verification: 442 tests, 441 passed, one known font skip, all eight tasks executed. Merged locally into main at `b25ebaf`; fresh merged verification reproduced these results. Native acceptance remains pending. The per-plan scratch workspace is removed after preserving its decisions in STATUS.
 
 **Goal:** Configurable typography, terminal behavior, session defaults and initial window size using the existing live reload system.
 **Architecture:** Immutable expanded snapshots feed retained terminal views; immutable launch settings capture new-process defaults before worker dispatch. Shared font metrics drive every coordinate calculation.

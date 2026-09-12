@@ -1,6 +1,6 @@
 # Plan 4b native acceptance
 
-Pending user execution after implementation. Agents do not launch native windows, login shells, editors, benchmarks or audio. During development use `/Users/dustin/projects/moray/.worktrees/plan-4b`; after integration use the main checkout. Start with `./gradlew :moray-app:run`.
+Pending user execution after implementation. Agents do not launch native windows, login shells, editors, benchmarks or audio. Plan 4b is integrated; use the main checkout at `/Users/dustin/projects/moray`. Start with `./gradlew :moray-app:run`.
 
 - [ ] Keep existing terminals and a long-running program open while editing config. Unrelated changes must not restart shells, lose find controls, change manual font size or reset a manually selected global theme.
 - [ ] Change font family, fallbacks, ligatures and line height. Check ordinary text, ligatures, Nerd Font icons, emoji and CJK in normal/hidden tabs and zoomed splits. A missing family should follow JBR fallback behavior. Font size reset uses the saved size.
