@@ -2,6 +2,8 @@
 
 **As of:** 2026-09-11. Plan 3 is integrated into `main` at `942f5f7`. Plan 3.5 is integrated into `main` following the user’s approval; final reviewed code/tests `f487631`. All four task reviews, final branch review and scoped fix review approved, with no unresolved findings. Root fresh `./gradlew check --rerun-tasks`: **299 tests, 0 failures/errors, 1 expected font skip** (298 passed; 63 app + 236 terminal). Native acceptance remains pending; no GUI, benchmark or remote push occurred for this milestone.
 
+**Active revision:** The user supplied an exact visual mock after the Plan 3.5 merge. Its tabs-in-title-bar layout, horizontal neutral toolbar, and seamless terminal/status surface supersede the earlier separate title and two-tone toolbar choices. Work is isolated on `codex/mock-ui` in `.worktrees/mock-ui`; see the [new design](superpowers/specs/2026-09-11-moray-mock-ui-design.md), [implementation plan](superpowers/plans/2026-09-11-moray-mock-ui.md), and [original reference](design/mock-ui-reference.png). Main remains the reviewed Plan 3.5 baseline until the new revision is approved for integration.
+
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. GUI launches and benchmarks are user-run only.
 
 ## 1. Goal and delivery phases

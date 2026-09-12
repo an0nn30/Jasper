@@ -1,5 +1,7 @@
 # Moray — Phase 1: The Terminal — Design Spec
 
+> Visual amendment, 2026-09-11: the user's supplied screenshot and [mock UI design](2026-09-11-moray-mock-ui-design.md) supersede earlier title/tab/toolbar geometry and app font defaults. Terminal-library defaults and behavior remain unchanged except the coordinated dark background specified there.
+
 **Date:** 2026-09-10
 **Status:** Approved (2026-09-10). Plans 1–3 implemented and merged (2026-09-11). User-requested [Plan 3.5](../plans/2026-09-11-moray-plan-3-5-chrome-and-themes.md) adds custom macOS chrome, coordinated Atom-inspired themes and a colored-toolbar design discussion before Plan 4 (configuration and packaging). Current state: `docs/STATUS.md`.
 **Repo:** `~/projects/moray`

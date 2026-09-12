@@ -1,0 +1,42 @@
+{
+  "sourceSize": [
+    1970,
+    1986
+  ],
+  "sourceProfile": "BenQ RD320UA",
+  "assumedDeviceScale": 2,
+  "contentRectPixels": [
+    31,
+    31,
+    1916,
+    1916
+  ],
+  "colors": {
+    "terminal": "#292c34",
+    "title": "#23262c",
+    "selectedTab": "#262a2f",
+    "toolbar": "#292c34",
+    "primaryButton": "#3a404b",
+    "separator": "#353940",
+    "status": "#292c34"
+  },
+  "rowBoundariesSourcePixels": {
+    "titleBottom": 138,
+    "toolbarBottom": 245,
+    "bottomInnerEdge": 1947
+  },
+  "targetLogicalSize": [
+    958,
+    958
+  ],
+  "targetRowsLogical": {
+    "title": 54,
+    "toolbar": 54,
+    "status": 30
+  },
+  "exclusions": [
+    "native controls, frame corners and desktop shadow",
+    "font rasterization and monitor-profile rounding",
+    "live shell content, username, working directory and terminal dimensions"
+  ]
+}

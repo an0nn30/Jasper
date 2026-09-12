@@ -56,14 +56,14 @@ Set scaledlogicalheight based on actualheader, account nativeleft/rightinsets; a
 **Produces:** Exact measured toolbar/status/content appearance and reproducible headless comparison artifacts; unchanged interaction contracts.
 - [ ] Add failing actual-component/rendered tests for54px toolbar,16px outline icons, inline sentence-case labels, new-tab hint, separators/flexible rightalignment; toolbar mode/disabled/accessibility/action behavior. Status textleft/right splitandclip, backgroundcontinuity and terminal24px padding, appfont16/reset16. Example geometry assertions using actual layout:
 ```java
-owner.setSize(959,959); layoutTree(owner);
+owner.setSize(958,958); layoutTree(owner);
 assertThat(owner.toolbar().getHeight()).isEqualTo(54);
 assertThat(owner.status().getBackground()).isEqualTo(owner.currentPane().view().palette().background());
 ```
 Run focusedtests recordRED. Replace two-tone tests deliberately supersededbyuser with outline/live-neutraltheme tests.
 - [ ] Implement horizontal toolbar with16px plain Tabler SVGs,8pxgap,12pxfont,54pxheight,12pxsidepadding,30pxbuttons. New tab roundedprimary background #3a404b, trailingCmd+T mutedhint; Splitdropdownchevron; rightanchoredSettings/Reload; separators. Set sentence-case display label independentlyofsharedActions. No disappearingcommands atnarrowwidth: compactbuttonsorhorizontaloverflow whilemenusremainfunctional. Icons-onlyhideshint/chevronlabelappropriately; Hiddenremovestoolbarheight only. Use small focused custombuttonpaint ifneededforsecondaryhint, notpaintedfakebuttons. PreservefullMIT/provenance.
 - [ ] WindowStatusBar holds left/rightmetadata with0minwidth and30pxheight; greenrunningdot, slashseparators,10pxmutedtext. WindowContent.update passes shell/path/grid/runningstate directly, getText() compatibility for existingtest. TerminalPane uses empty24pxcontentinsets/samebackground, nofocusoutlinearoundsolepane; viewoptionscopydefaultswithfont16 soreset16, allotherterminaloptionssame. Applytheme updatespaddingbackgroundandpalette. Dark palettebackground #292c34 and themes per spec; lightlayoutretainedandcontrasting. Do not touch renderercoordinate/inputlogic.
-- [ ] Create testfixture headless actualUI at959×959logical 2× raster. Render MacTitleBar+WindowContent and controlledPTYtestprompt, actual tabs/toolbar/status. Nativecontrolsnotfabricated; metadatafixtures onlyinpreview. Add explicit Gradletask:
+- [ ] Create testfixture headless actualUI at958×958logical 2× raster. Render MacTitleBar+WindowContent and controlledPTYtestprompt, actual tabs/toolbar/status. Nativecontrolsnotfabricated; metadatafixtures onlyinpreview. Add explicit Gradletask:
 ```kotlin
 tasks.register<JavaExec>("mockUiPreview") {
     dependsOn(tasks.testClasses)
