@@ -1,5 +1,7 @@
 # Plan 4d verification and handoff
 
+## Feature-branch verification (before integration)
+
 Verified on 2026-09-12, macOS aarch64, feature code through `de4ec8c` on `codex/plan-4d-packaging`. Worktree: `.worktrees/plan-4d-packaging`. Main remains `dbf75d9`; no merge or push was performed.
 
 ## Final automated verification
@@ -74,3 +76,37 @@ App logging remains the next implementation deliverable. Developer ID signing,
 notarization, final app artwork and CI/release publication remain separate work.
 The configured origin is `https://github.com/an0nn30/moray.git`; the remote was empty
 when configured. No commits were pushed during this task.
+
+
+## Approved local integration and README update
+
+On 2026-09-12 the user approved local integration and requested build instructions
+in README, including macOS DMG compilation. Main fast-forwarded to `beb0322`, then
+to `0162293` for the README update. Documentation commits were made on the feature
+branch and fast-forwarded into main; no commit was made directly on main.
+
+Fresh verification from `/Users/dustin/projects/moray`:
+
+```text
+./gradlew build :moray-app:packageDist --rerun-tasks
+BUILD SUCCESSFUL in 55s
+16 actionable tasks: 16 executed
+```
+
+XML totals: 508 tests, 507 passed, one known font skip, zero failures/errors.
+Application image verification and DMG integrity checks passed. README now contains
+SDK requirements, source build/run commands, macOS app/DMG commands and paths,
+version overrides, and Windows portable ZIP commands and paths.
+
+The fresh main-checkout DMG is
+`moray-app/build/packaging/dist/Moray-1.0.0-macos-aarch64.dmg` (82,099,724 bytes).
+Its SHA-256 is:
+
+```text
+d14777d5c0412e70448de6ea0c6c532bd3f0d8f408918a90b505cd09b9f2d829
+```
+
+The prior feature-worktree artifact/checksum above remains historical evidence;
+the usable current artifact is in the main checkout. The merged feature branch and
+worktree are being cleaned up after successful verification. Nothing was pushed,
+and Windows/native desktop acceptance remains user-run.

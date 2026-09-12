@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-12-moray-plan-4d-packaging-design.md` (approved).
 
-**Status:** Both task reviews and final scoped review complete; all findings resolved through de4ec8c. Final forced check/packageDist passed all 13 tasks: 508 tests, 507 passed, one known skip. Integration and native acceptance pending. See [verification](2026-09-12-moray-plan-4d-verification.md). Native validation correction: macOS jpackage requires a positive major version; default changed to 1.0.0 on both hosts, with no post-generation bundle metadata rewriting. Worktree `.worktrees/plan-4d-packaging`, branch `codex/plan-4d-packaging`, baseline `dbf75d9`. Both task gates and whole-branch review are required. The user approved portable Windows ZIP as part of the proposed design; no installer is included.
+**Status:** Both task reviews and final scoped review complete; all findings resolved through de4ec8c. Final forced check/packageDist passed all 13 tasks: 508 tests, 507 passed, one known skip. Integrated locally on main after user approval; merged build/package verification passed all 16 tasks in 55 seconds with the same test totals. Native acceptance remains pending. See [verification](2026-09-12-moray-plan-4d-verification.md). Native validation correction: macOS jpackage requires a positive major version; default changed to 1.0.0 on both hosts, with no post-generation bundle metadata rewriting. Developed in `.worktrees/plan-4d-packaging` on `codex/plan-4d-packaging`, baseline `dbf75d9`; continue from the main checkout. Both task gates and whole-branch review are required. The user approved portable Windows ZIP as part of the proposed design; no installer is included.
 
 ## Global Constraints
 
