@@ -21,7 +21,7 @@
     "status": "#292c34"
   },
   "rowBoundariesSourcePixels": {
-    "titleBottom": 138,
+    "titleBottom": 139,
     "toolbarBottom": 245,
     "bottomInnerEdge": 1947
   },
@@ -31,7 +31,7 @@
   ],
   "targetRowsLogical": {
     "title": 54,
-    "toolbar": 54,
+    "toolbar": 53,
     "status": 30
   },
   "exclusions": [
