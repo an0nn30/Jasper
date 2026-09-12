@@ -1,8 +1,8 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11. Plan 3 is integrated into `main` at `942f5f7`. Plan 3.5 is integrated into `main` following the user’s approval; final reviewed code/tests `f487631`. All four task reviews, final branch review and scoped fix review approved, with no unresolved findings. Root fresh `./gradlew check --rerun-tasks`: **299 tests, 0 failures/errors, 1 expected font skip** (298 passed; 63 app + 236 terminal). Native acceptance remains pending; no GUI, benchmark or remote push occurred for this milestone.
+**As of:** 2026-09-11. Screenshot UI revision implemented on `codex/mock-ui` in `.worktrees/mock-ui`, code/tests `63a3325`. Both task reviews approved without findings; final whole-branch review pending. Root fresh `./gradlew check --rerun-tasks`: **308 tests, 307 passed, 1 known font skip**, zero failures/errors. Source hygiene and diff checks pass. Main remains the integrated Plan 3.5 baseline `182b9fb`; this new revision awaits integration approval. No GUI, benchmark or remote push occurred.
 
-**Active revision:** The user supplied an exact visual mock after the Plan 3.5 merge. Its tabs-in-title-bar layout, horizontal neutral toolbar, and seamless terminal/status surface supersede the earlier separate title and two-tone toolbar choices. Work is isolated on `codex/mock-ui` in `.worktrees/mock-ui`; see the [new design](superpowers/specs/2026-09-11-moray-mock-ui-design.md), [implementation plan](superpowers/plans/2026-09-11-moray-mock-ui.md), and [original reference](design/mock-ui-reference.png). Main remains the reviewed Plan 3.5 baseline until the new revision is approved for integration.
+**Active revision:** The user's exact mock supersedes the earlier separate title and two-tone toolbar choices. Implemented title-bar tabs, horizontal neutral toolbar, and seamless terminal/status surface. See the [design](superpowers/specs/2026-09-11-moray-mock-ui-design.md), [implementation plan](superpowers/plans/2026-09-11-moray-mock-ui.md), [original reference](design/mock-ui-reference.png), and [measured comparison](design/mock-ui-comparison.md). The measured surfaces and row boundaries match; font metrics, real grid dimensions and native window appearance still require visual acceptance.
 
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. GUI launches and benchmarks are user-run only.
 
@@ -16,13 +16,14 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
 | 3.5 — macOS chrome, themes and toolbar | Integrated on main and fully reviewed; native acceptance pending |
-| 4 — Config and packaging | Follows Plan 3.5; not written yet |
+| Screenshot UI revision | Implemented and task-reviewed on codex/mock-ui; final review and native acceptance pending |
+| 4 — Config and packaging | Follows screenshot UI acceptance; not written yet |
 
-Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart Plan 3 or Plan 3.5; continue from main.
+Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart Plan 3 or Plan 3.5; the active revision is in `.worktrees/mock-ui`.
 
 Plan 3.5 was developed on `codex/plan-3-5-chrome-themes` and merged locally. Continue from `/Users/dustin/projects/moray` on `main`. [Title/theme design](superpowers/specs/2026-09-11-moray-plan-3-5-titlebar-themes-design.md) and [execution plan](superpowers/plans/2026-09-11-moray-plan-3-5-titlebar-themes-implementation.md) cover the first runnable deliverable. [Toolbar study](design/plan-3-5-toolbar-study.html) is an illustrative discussion aid; the user selected B (fuller, two-tone colored icons), now included as Task 4.
 
-Active milestone: [Plan 3.5 — macOS chrome, themes and toolbar](superpowers/plans/2026-09-11-moray-plan-3-5-chrome-and-themes.md). The user has tried Plan 3 during development and reports that it looks good overall; this is qualitative feedback, not a claim that every native checklist item or benchmark was completed.
+Previous milestone: [Plan 3.5 — macOS chrome, themes and toolbar](superpowers/plans/2026-09-11-moray-plan-3-5-chrome-and-themes.md). The user has tried Plan 3 during development and reports that it looks good overall; this is qualitative feedback, not a claim that every native checklist item or benchmark was completed.
 
 ## 2. Implemented behavior
 
@@ -39,13 +40,20 @@ Plan 3 adds:
 - Per-pane font controls, screen-preserving history clear, working-directory inheritance with launch-time validation.
 - Background shell launch with close-before-completion cleanup; native Quit routes through app cleanup.
 
-Settings and Reload config are visible but disabled; status says Built-in defaults. No configuration file is read or written. Appearance choices are session-only. Plan 3.5 implements:
+Settings and Reload config are visible but disabled; status says Built-in defaults. No configuration file is read or written. Appearance choices are session-only. The earlier Plan 3.5 implementation (visual geometry superseded below) includes:
 
 - Live dark/light terminal palettes and coordinated FlatLaf themes (`09e382e`, `6bdd298`). Existing hidden/zoomed panes, delayed launches and new windows use the selected theme while retaining sessions, fonts, selection/find state and split ratios. Explicit terminal truecolor remains unchanged.
 - A slim macOS title surface (`7833692`) using the decorated frame and supported public properties. Native traffic lights and window behavior remain owned by macOS; separate tabs and toolbar sit beneath the title. Other platforms retain their existing decorations.
 - The user's selected toolbar B (`116709b`): 28-pixel two-tone Tabler icons, distinct action colors in both themes, labels and visibility modes retained. Settings/Reload remain muted while disabled.
 
 Actual headless Swing previews: [dark](design/plan-3-5-titlebar-dark.png) and [light](design/plan-3-5-titlebar-light.png). Native traffic lights are absent from these renders. Native acceptance remains user-run; Plan 4 retains configuration, custom theme files, persistence, automatic system appearance and packaging.
+
+The screenshot revision now supplies:
+
+- A single 54px title/tab row with native traffic-light space, persistent tab controls, overflow navigation and a clipped trailing title. Public JBR title-height integration retains native decoration with a fallback.
+- A 53px horizontal toolbar using 16px neutral Tabler outlines, inline labels, highlighted New tab, separators and right-aligned Settings/Reload. Existing actions, menus and visibility modes remain functional.
+- A 30px status bar that shares the terminal background, live shell/path/grid metadata and running dot; 24px terminal padding and app default/reset font size 16.
+- Measured dark surface and visible ANSI accent colors, with equivalent light geometry. Actual headless previews: [dark](design/mock-ui-dark.png), [light](design/mock-ui-light.png). Reproduce with `./gradlew :moray-app:mockUiPreview`.
 
 ## 3. Fixes included during Plan 3
 
@@ -65,7 +73,7 @@ Actual headless Swing previews: [dark](design/plan-3-5-titlebar-dark.png) and [l
 
 ## 4. Verification still required
 
-1. User-run [Plan 3.5 title bar/theme checklist](superpowers/plans/2026-09-11-moray-plan-3-5-manual-check.md): native controls, dragging/double-click, fullscreen, scaling, appearance and colored toolbar in real windows. Also retain the [Plan 3 acceptance checklist](superpowers/plans/2026-09-11-moray-plan-3-manual-check.md): native windows/menu/Quit, split/zoom/focus/dividers, tab gestures, find, clipboard, links, mouse reporting, directory inheritance and chrome readability. Headless tests do not establish these native visual results.
+1. User-run [screenshot UI checklist](superpowers/plans/2026-09-11-moray-mock-ui-manual-check.md): native controls, title-tab hit testing, dragging/double-click, fullscreen, scaling and exact visual comparison in real windows. The earlier Plan 3.5 appearance checklist is superseded by this reference. Also retain the [Plan 3 acceptance checklist](superpowers/plans/2026-09-11-moray-plan-3-manual-check.md): native windows/menu/Quit, split/zoom/focus/dividers, tab gestures, find, clipboard, links, mouse reporting, directory inheritance and chrome readability. Headless tests do not establish these native visual results.
 2. User-run benchmark after integration, only with no game or VM running. Historical Plan 1 result: 41.5 MB/s. A Plan 2 baseline measured during this session before newly added AGENTS restrictions were discovered: **35.9 MB/s** (105.5 MB in 2.94 s). No post-integration benchmark has run. Gate ≥35 MB/s, target ≥45 MB/s.
 3. CI has never run: no git remote exists. Workflow covers macOS, Ubuntu and Windows with JBR25. Ask before adding a remote or pushing. Windows ConPTY/forced-close and Linux desktop/font behavior remain unverified on their native systems.
 4. After Plan 4, satisfy the Phase 1 manual checklist and two-week Moray-only trial. Record every reason to reopen conch and fix the blockers before SSH begins.
@@ -90,7 +98,7 @@ Retained coverage opportunities: astral search, edge/overlapping highlights, lar
 
 ## 6. Next: native acceptance, then Plan 4
 
-Plan 3.5 interrupted the previous next step and now supplies the custom macOS title surface, Atom-inspired built-in themes and selected two-tone toolbar. Code review and approved local integration are complete; native acceptance is next. Run from `/Users/dustin/projects/moray` with `./gradlew :moray-app:run`. Built-in palettes and live theme application have moved forward from Plan 4.
+The screenshot revision supersedes Plan 3.5 geometry and artwork. Complete final review, then user visual/native acceptance and approved integration. Run from `/Users/dustin/projects/moray/.worktrees/mock-ui` with `./gradlew :moray-app:run`. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
 
 Plan 4: AppDirs/per-OS paths, TOML diagnostics with line numbers and last-good retention, live reload, custom theme loading and persistence, automatic system appearance, settings-file creation, --config, app logging and macOS .app bundling JBR. Carryovers:
 
@@ -143,10 +151,17 @@ These are historical Plan 3 scope decisions. The user's subsequent Plan 3.5 amen
 - Deliver title/themes as 3.5a and discuss toolbar artwork as 3.5b before implementing that selection — honors the explicit request to discuss toolbar appearance — costs leaving existing icons during the first deliverable.
 - Reuse supported decorated-frame macOS full-content properties and FlatLaf bounds rather than add JBR API/native dependencies — verified in pinned source and retains native behavior — costs revisiting integration if native user checks reveal a platform limitation.
 
-The third ruling was superseded when the user selected toolbar B: Task 4 delivers the chosen artwork in this same milestone. The optional title-layout answer has not arrived; the slim title surface with separate tabs remains the initial layout.
+The third ruling was superseded when the user selected toolbar B: Task 4 delivers the chosen artwork in this same milestone. The later screenshot explicitly resolves the title layout: integrated title-bar tabs replace that initial layout.
 
 Task reviews: palettes `09e382e`, application themes `6bdd298`, title surface `7833692`, toolbar `116709b` approved. Final whole-branch review covered `942f5f7..0b8461b`. Its only minor finding was closed by `f487631`: the rendered icon test now distinguishes soft fields from enclosed face fills. A mutation removing the four face fills failed the new test while the earlier aggregate test still passed; all resources were restored. The scoped fix review approved with no residual findings. The alpha-specific test runs in dark mode against shared SVG opacity layers; existing color tests cover both themes.
 
 Root final verification on `f487631`: `./gradlew check --rerun-tasks` ran all eight tasks in 11 seconds, with 299 tests, zero failures/errors and one known font skip. Source hygiene and `git diff --check` passed; no compiler warnings. Production code/resources are unchanged since `116709b`. The plan-specific scratch workspace is removed after final review; this handoff, plan checkboxes, committed previews and git history preserve the result.
 
 The user selected local integration. The completed feature worktree and branch are cleaned up after merged verification succeeds. No GUI or benchmark was launched and no remote is configured. Native title-bar/appearance checks and the terminal daily-use gate remain open.
+
+## 11. Screenshot revision execution rulings
+
+- Treat the supplied mock and explicit exact-match instruction as the approved visual design, superseding earlier colored-toolbar and separate-title decisions — avoids asking approval for the mock the user just selected — costs rework for any mistaken measurements.
+- Interpret the144dpi screenshot as2x and convert its monitor ICC colors to sRGB for Swing values — aligns logical sizes and displayed colors — costs refinement if the mock's intended logical scale differs.
+- Add public jbr-api1.9.0 native title-height integration with fallback — exact54px native-control placement needs more than oldfullcontentproperties — costs native-platform validation and a small app dependency.
+- Use sampled visible green/blue/cursor colors and refine toolbar text to11.5px after actual-render comparison — user’s exact mock takes precedence over the initial retain-ANSI/12px approximation — costs changing those built-in dark ANSI accents and potential font refinement on other systems.

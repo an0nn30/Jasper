@@ -1,6 +1,6 @@
 # Screenshot-matched Moray UI Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Match the user's screenshot with integrated native title tabs, horizontal toolbar and seamless terminal/status surface.
 **Architecture:** Retain JTabbedPane selection/content ownership, add a shared WindowTabs surface, integrate JBR native title height, then align remaining chrome and render real Swing previews.
@@ -54,16 +54,16 @@ Set scaledlogicalheight based on actualheader, account nativeleft/rightinsets; a
 **Files:** Modify WindowChrome.java, AppIcons.java, WindowContent.java, TerminalPane.java, WindowTabs.java/MacTitleBar.java appearance details, theme properties, original seven toolbar SVGs/SOURCE.txt; Palette.java background and directly affected palette tests. Create WindowStatusBar.java, MockUiTest.java and test-only MockUiPreview.java; add moray-app Gradle headless preview task. Update AppIconsTest/WindowChromeTest and any obsolete appearance assertions. Commit actual previews docs/design/mock-ui-{dark,light}.png and measured comparison report.
 **Consumes:** Task1 WindowTabs54px and nativeheader/deck model; existing WindowContent actions/themes/statusmetadata and TerminalPane lifecycle.
 **Produces:** Exact measured toolbar/status/content appearance and reproducible headless comparison artifacts; unchanged interaction contracts.
-- [ ] Add failing actual-component/rendered tests for53px toolbar,16px outline icons, inline sentence-case labels, new-tab hint, separators/flexible rightalignment; toolbar mode/disabled/accessibility/action behavior. Status textleft/right splitandclip, backgroundcontinuity and terminal24px padding, appfont16/reset16. Example geometry assertions using actual layout:
+- [x] Add failing actual-component/rendered tests for53px toolbar,16px outline icons, inline sentence-case labels, new-tab hint, separators/flexible rightalignment; toolbar mode/disabled/accessibility/action behavior. Status textleft/right splitandclip, backgroundcontinuity and terminal24px padding, appfont16/reset16. Example geometry assertions using actual layout:
 ```java
 owner.setSize(958,958); layoutTree(owner);
 assertThat(owner.toolbar().getHeight()).isEqualTo(53);
 assertThat(owner.status().getBackground()).isEqualTo(owner.currentPane().view().palette().background());
 ```
 Run focusedtests recordRED. Replace two-tone tests deliberately supersededbyuser with outline/live-neutraltheme tests.
-- [ ] Implement horizontal toolbar with16px plain Tabler SVGs,5pxSVGboxgap(approximately8pxvisiblegap),11.5pxfont,53pxheight,15pxsidepadding,30pxbuttons. New tab roundedprimary background #3a404b, trailingCmd+T mutedhint; Splitdropdownchevron; rightanchoredSettings/Reload; separators. Set sentence-case display label independentlyofsharedActions. No disappearingcommands atnarrowwidth: compactbuttonsorhorizontaloverflow whilemenusremainfunctional. Icons-onlyhideshint/chevronlabelappropriately; Hiddenremovestoolbarheight only. Use small focused custombuttonpaint ifneededforsecondaryhint, notpaintedfakebuttons. PreservefullMIT/provenance.
-- [ ] WindowStatusBar holds left/rightmetadata with0minwidth and30pxheight; greenrunningdot, slashseparators,10pxmutedtext. WindowContent.update passes shell/path/grid/runningstate directly, getText() compatibility for existingtest. TerminalPane initially prefers958×821 logical pixels (the remaining137px is54title+53toolbar+30status), uses empty24pxcontentinsets/samebackground, nofocusoutlinearoundsolepane; viewoptionscopydefaultswithfont16 soreset16, allotherterminaloptionssame. Applytheme updatespaddingbackgroundandpalette. Set selectedtabtext/icon #d3d7df, inactivetab/close/plus/rightwindowtitle #848c9b, selectedunderline #abb2bf throughseparatesemantickeys asneeded; thinheaderbottomseparator #313439. Dark palettebackground #292c34, sampledANSIgreen(index2)#a8c58d/blue(index4)#80b4df, cursor#b3bbc7 andstatusrunningdot#a8c58d; otherANSI/truecolor unchanged; themes per spec; lightlayoutretainedandcontrasting. Do not touch renderercoordinate/inputlogic.
-- [ ] Create testfixture headless actualUI at958×958logical 2× raster. Render MacTitleBar+WindowContent and controlledPTYtestprompt, actual tabs/toolbar/status. Nativecontrolsnotfabricated; metadatafixtures onlyinpreview. Add explicit Gradletask:
+- [x] Implement horizontal toolbar with16px plain Tabler SVGs,5pxSVGboxgap(approximately8pxvisiblegap),11.5pxfont,53pxheight,15pxsidepadding,30pxbuttons. New tab roundedprimary background #3a404b, trailingCmd+T mutedhint; Splitdropdownchevron; rightanchoredSettings/Reload; separators. Set sentence-case display label independentlyofsharedActions. No disappearingcommands atnarrowwidth: compactbuttonsorhorizontaloverflow whilemenusremainfunctional. Icons-onlyhideshint/chevronlabelappropriately; Hiddenremovestoolbarheight only. Use small focused custombuttonpaint ifneededforsecondaryhint, notpaintedfakebuttons. PreservefullMIT/provenance.
+- [x] WindowStatusBar holds left/rightmetadata with0minwidth and30pxheight; greenrunningdot, slashseparators,10pxmutedtext. WindowContent.update passes shell/path/grid/runningstate directly, getText() compatibility for existingtest. TerminalPane initially prefers958×821 logical pixels (the remaining137px is54title+53toolbar+30status), uses empty24pxcontentinsets/samebackground, nofocusoutlinearoundsolepane; viewoptionscopydefaultswithfont16 soreset16, allotherterminaloptionssame. Applytheme updatespaddingbackgroundandpalette. Set selectedtabtext/icon #d3d7df, inactivetab/close/plus/rightwindowtitle #848c9b, selectedunderline #abb2bf throughseparatesemantickeys asneeded; thinheaderbottomseparator #313439. Dark palettebackground #292c34, sampledANSIgreen(index2)#a8c58d/blue(index4)#80b4df, cursor#b3bbc7 andstatusrunningdot#a8c58d; otherANSI/truecolor unchanged; themes per spec; lightlayoutretainedandcontrasting. Do not touch renderercoordinate/inputlogic.
+- [x] Create testfixture headless actualUI at958×958logical 2× raster. Render MacTitleBar+WindowContent and controlledPTYtestprompt, actual tabs/toolbar/status. Nativecontrolsnotfabricated; metadatafixtures onlyinpreview. Add explicit Gradletask:
 ```kotlin
 tasks.register<JavaExec>("mockUiPreview") {
     dependsOn(tasks.testClasses)
@@ -76,6 +76,6 @@ Use deterministicclose/waitforPTYoutput, noappGUI. Comparegeometry/background sa
 
 ## Root acceptance
 - [ ] Task reviews and final whole-branch review complete, fixes verified.
-- [ ] Fresh full headlesscheck and visualcomparison artifacts inspected; reportmeasurabledifferences.
-- [ ] UpdateSTATUS/README/manualcheck fornewreference overridingearlierlayout, preserve decisions.
+- [x] Fresh full headlesscheck and visualcomparison artifacts inspected; reportmeasurabledifferences.
+- [x] UpdateSTATUS/README/manualcheck fornewreference overridingearlierlayout, preserve decisions.
 - [ ] User-run nativeacceptance/subjective pixelcomparison (no GUIlaunch byagents).
