@@ -146,7 +146,10 @@ class SessionInputTest {
     @Test
     void urlsInPlainTextAreFound() throws Exception {
         connector.feed("see https://moray.dev/docs.");
-        Await.until(() -> session.snapshot().lineText(0).startsWith("see https"), "url text");
+        Await.until(() -> {
+            var snapshot = session.snapshot();
+            return (snapshot.lineText(0) + snapshot.lineText(1)).equals("see https://moray.dev/docs.");
+        }, "complete wrapped url text");
 
         assertThat(session.linkAt(0, 10)).contains("https://moray.dev/docs");
     }
