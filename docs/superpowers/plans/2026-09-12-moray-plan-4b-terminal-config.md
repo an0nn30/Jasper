@@ -4,6 +4,8 @@
 
 **Execution clarification:** Array validation points to the containing key’s exact source position; TomlJ element positions include preceding whitespace/comments.
 
+**Status:** Implemented and fully reviewed through `7ab277b`; no open findings. Fresh full verification: 442 tests, 441 passed, one known font skip, all eight tasks executed. Native acceptance and integration remain pending. The per-plan scratch workspace is removed after preserving its decisions in STATUS.
+
 **Goal:** Configurable typography, terminal behavior, session defaults and initial window size using the existing live reload system.
 **Architecture:** Immutable expanded snapshots feed retained terminal views; immutable launch settings capture new-process defaults before worker dispatch. Shared font metrics drive every coordinate calculation.
 **Tech Stack:** JBR25, Swing/FlatLaf, TomlJ1.1.1, Gradle/JUnit/AssertJ.
@@ -158,6 +160,6 @@ pane.setConfiguredDim(next.terminal().dimInactivePanes());
 - [x] Run covering RED/GREEN tests, full ./gradlew check and hygiene, self-review and commit/report. Root performs final independent checks/review and handoff.
 
 ## Root acceptance
-- [ ] Verify per-task reviews and final whole-branch review, resolving findings under the SDD fix rules.
+- [x] Verify per-task reviews and final whole-branch review, resolving findings under the SDD fix rules.
 - [x] Fresh full check, XML counts and source/diff hygiene; native GUI/audio/platform acceptance stays user-run.
-- [ ] Record full Plan4b scope, remaining theme/packaging work, all rulings and actual verification in STATUS. Clean only this plan's scratch workspace after preserving its decisions.
+- [x] Record full Plan4b scope, remaining theme/packaging work, all rulings and actual verification in STATUS. Clean only this plan's scratch workspace after preserving its decisions.
