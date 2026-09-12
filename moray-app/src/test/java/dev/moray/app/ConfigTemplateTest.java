@@ -36,6 +36,10 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().toolbar()).isEqualTo(WindowContent.ToolbarMode.ICONS_AND_LABELS);
             assertThat(all.snapshot().statusBar()).isTrue();
             assertThat(all.snapshot().fontSize()).isEqualTo(16f);
+            assertThat(all.snapshot().columns()).isEqualTo(150);
+            assertThat(all.snapshot().lines()).isEqualTo(45);
+            assertThat(all.snapshot().font()).isEqualTo(FontConfig.defaults());
+            assertThat(all.snapshot().terminal()).isEqualTo(TerminalConfig.defaults());
             assertThat(all.snapshot().theme()).isEqualTo(BuiltinTheme.DARK);
             assertThat(all.snapshot().keybindings()).hasSize(ActionId.values().length);
             var defaults = KeyBindings.defaults(macOs);
