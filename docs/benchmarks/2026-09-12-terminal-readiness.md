@@ -116,7 +116,7 @@ Baseline JFR attributed 12.06% of sampled allocation weight to stacks containing
 
 The implementation target was to eliminate the unused text-only style arrays while retaining rendering, configured history and the throughput floor. No fixed heap cap, periodic collection policy, default-history reduction or backend change was introduced. The mixed per-case RSS results and unchanged idle footprint do not justify a blanket memory-saving claim or additional architectural changes in this slice.
 
-JFR environment and system-property events were disabled and verified to have zero events in both recordings. Raw recordings, process-exit records, JSON samples, profile probes, image manifests and protocol scripts remain local under `moray-app/build/benchmarks/readiness/` in the readiness worktree. Preserve that directory before `clean` or worktree removal; the checked-in JSON files are compact aggregates, not substitutes for raw samples.
+JFR environment and system-property events were disabled and verified to have zero events in both recordings. Raw recordings, process-exit records, JSON samples, profile probes, image manifests and protocol scripts were preserved and checksum-verified under main `build/readiness-2026-09-12/benchmarks/` before feature-worktree cleanup. Raw metadata retains original collection paths. Preserve that archive before `clean`; the checked-in JSON files are compact aggregates, not substitutes for raw samples.
 
 
 ## Post-review package validation

@@ -1,6 +1,6 @@
 # Terminal readiness handoff — 2026-09-12
 
-Local implementation and measurements are complete on `codex/terminal-readiness` in `.worktrees/terminal-memory-plan`. All task reviews approved. Whole-branch review (`d3b5d11..5f4f804`) identified one hidden-search lifecycle gap; fix `8d84e7d` passed scoped re-review with no remaining findings. This branch is **published and unmerged** after user authorization. The [three-platform CI run](https://github.com/an0nn30/moray/actions/runs/34724855954) passed on macOS, Ubuntu and Windows at `c793925`. The **two-week trial has not started**; human native acceptance still precedes it.
+Local implementation and measurements are complete and integrated into `main` after user approval. Continue from `/Users/dustin/projects/moray`. All task reviews approved. Whole-branch review (`d3b5d11..5f4f804`) identified one hidden-search lifecycle gap; fix `8d84e7d` passed scoped re-review with no remaining findings. The reviewed branch was published, then merged locally with existing main-checkout files preserved. The [three-platform CI run](https://github.com/an0nn30/moray/actions/runs/34724855954) passed on macOS, Ubuntu and Windows at `c793925`. The **two-week trial has not started**; human native acceptance still precedes it.
 
 ## Delivered
 
@@ -14,7 +14,7 @@ Local implementation and measurements are complete on `codex/terminal-readiness`
 
 Fresh `./gradlew build :moray-app:packageDist --rerun-tasks` on runtime commit `8d84e7d5ed8d679000992f8b96d9a97e99bef5e2` executed all 16 tasks successfully in 38 seconds. XML records **576 tests: 575 passed, one known font fallback skip, zero failures/errors**. Source hygiene passed for 172 Java files. Native image metadata, bundled runtime/dependencies, strict bundle seal and DMG integrity passed.
 
-The packaged DMG is `moray-app/build/packaging/dist/Moray-1.0.0-macos-aarch64.dmg` in the readiness worktree (82,157,741 bytes). SHA-256:
+The preserved packaged DMG is `build/readiness-2026-09-12/Moray-1.0.0-macos-aarch64.dmg` in the main checkout (82,157,741 bytes). SHA-256:
 
 ```text
 456da609ffb397f3bcfde56ec99893965a3f4844d4d6c86b765d03c3ef9949f2
@@ -36,11 +36,11 @@ The final hidden-search fix (`8d84e7d`) received three fresh full throughput run
 
 ## Native handoff
 
-Use this worktree for the new code; main remains the earlier packaging milestone. [Build/package commands and native checklist](packaging.md) cover DMG and Windows ZIP creation. On Windows use JBR SDK 25, run `gradlew.bat build :moray-app:packageDist`, then test the extracted native image. Three-platform headless CI is now verified; it does not build or exercise native Windows packaging. The user still owns Windows package and interactive acceptance.
+Use the main checkout for the integrated code. [Build/package commands and native checklist](packaging.md) cover DMG and Windows ZIP creation. On Windows use JBR SDK 25, run `gradlew.bat build :moray-app:packageDist`, then test the extracted native image. Three-platform headless CI is now verified; it does not build or exercise native Windows packaging. The user still owns Windows package and interactive acceptance.
 
 Before starting the trial, record normal macOS Finder/Dock launch, title controls/tab animation, clipboard and shortcuts, font/IME behavior, theme/config reload, shell exits and tmux/vim/htop interaction. Exercise Shift-changing mouse gestures, multi-notch wheel reports, overwritten/word/wide-character selection, links, hidden tabs, split zoom/reparenting and closed-window cleanup. Existing [terminal configuration checks](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md), [theme checks](superpowers/plans/2026-09-12-moray-plan-4c-manual-check.md) and packaging checklist remain the detailed acceptance record. Record Windows equivalents on the user's Windows machine. Never mark an unexecuted check passed.
 
-Raw reports, exit records, JFR/NMT/footprint diagnostics, protocol scripts and preserved baseline/final images are local under `moray-app/build/benchmarks/readiness/`. Preserve that directory and the DMG before `clean` or removing this worktree. Committed aggregate JSON and this report preserve conclusions, not every raw sample.
+Raw reports, exit records, JFR/NMT/footprint diagnostics, protocol scripts and preserved baseline/final images were copied and checksum-verified under `build/readiness-2026-09-12/benchmarks/` in the main checkout before feature-worktree cleanup. Preserve that archive and the adjacent DMG before `clean`; raw metadata retains original collection paths. Committed aggregate JSON and this report preserve conclusions, not every raw sample.
 
 ## Execution decisions
 
@@ -61,4 +61,10 @@ The initial authorized push of `6b712af` passed macOS/Linux CI but exposed three
 
 The agent service rejected both a fresh reviewer and a reviewer follow-up because its thread limit was reached. The controller, who did not implement the patch, independently reviewed the three changed app test files and the subsequent terminal resize test and their production/fixture context and approved with no findings. Cost of this workflow substitution: no fresh isolated reviewer context for this small test-only correction. Prior whole-branch production reviews remain unchanged.
 
-The first push made `codex/terminal-readiness` GitHub's default branch because the remote was empty. Local main remains unchanged; neither a merge nor changing the default branch was authorized.
+The first push made `codex/terminal-readiness` GitHub's default branch because the remote was empty. The user subsequently authorized local integration; changing the remote default branch or publishing main is still separate.
+
+## Local integration verification
+
+The user authorized merging while preserving existing main changes. Fast-forward integration preserved all 312 pre-existing untracked icon-option files byte-for-byte and with unchanged permissions. The first forced merged check exposed a test-readiness race: `urlsInPlainTextAreFound` proceeded after `see https` before the wrapped suffix arrived. Test-only `7481114` waits for the complete two-row input while retaining the exact link assertion. Independent controller review approved the focused correction; 15 focused tests passed. Fresh `./gradlew check --rerun-tasks` on the merged result executed all eight tasks in 15 seconds: **576 tests, 575 passed, one known skip, zero failures/errors**. Production code and the verified DMG remain unchanged.
+
+The URL-test correction and integration bookkeeping are local; the last published branch commit remains `cc3f957`, whose three-platform CI passed. Main has not been pushed. Native acceptance and the two-week trial remain pending. The completed local feature branch/worktree are cleaned up after preservation and verification.
