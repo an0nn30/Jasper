@@ -50,6 +50,25 @@ class SelectionSessionTest {
         assertThat(session.text(new Selection(0, 0, 0, 3, false))).isEqualTo("keep");
     }
 
+    @Test
+    void eitherCellOfAWideCharacterCopiesTheWholeCharacter() throws Exception {
+        show("\u754c\uD83D\uDE80", 0, "\u754c\uE000\uD83D\uDE80");
+        for (boolean block : new boolean[] {false, true}) {
+            assertThat(session.text(Selection.at(0, 0, block))).isEqualTo("\u754c");
+            assertThat(session.text(Selection.at(0, 1, block))).isEqualTo("\u754c");
+
+        }
+    }
+
+    @Test
+    void eitherCellOfASupplementaryCharacterCopiesTheWholeCharacter() throws Exception {
+        show("\uD83D\uDE80", 0, "\uD83D\uDE80");
+        for (boolean block : new boolean[] {false, true}) {
+            assertThat(session.text(Selection.at(0, 0, block))).isEqualTo("\uD83D\uDE80");
+            assertThat(session.text(Selection.at(0, 1, block))).isEqualTo("\uD83D\uDE80");
+        }
+    }
+
     private void show(String output, int row, String expected) throws Exception {
         connector.feed(output);
         Await.until(() -> expected.equals(session.snapshot().lineText(row)), "\"" + expected + "\" on row " + row);

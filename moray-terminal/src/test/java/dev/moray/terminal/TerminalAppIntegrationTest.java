@@ -169,7 +169,7 @@ class TerminalAppIntegrationTest {
 
             Await.until(() -> {
                 drainEventQueue();
-                return view.selectedText().isEmpty();
+                return view.selectedText().isEmpty() && invalidation.get() != null;
             }, "alternate screen invalidated absolute-row state");
             assertThat(view.findNext()).isEqualTo(new FindResult(0, 0, null));
             assertThat(invalidation.get()).isEqualTo(new FindResult(0, 0, null));

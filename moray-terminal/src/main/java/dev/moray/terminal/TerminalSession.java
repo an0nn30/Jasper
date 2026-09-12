@@ -296,6 +296,23 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
+    /** Geometry only: mouse reports do not need copied lines or cursor/style data. */
+    record MouseGeometry(int width, int height, long firstRow, int scrollOffset, boolean alternateBuffer) { }
+
+    MouseGeometry mouseGeometry(long requestedTopRow) {
+        buffer.lock();
+        try {
+            int history = buffer.getHistoryLinesCount();
+            boolean alternate = buffer.isUsingAlternateBuffer();
+            long liveTop = discardedLines + history;
+            int offset = requestedTopRow == ScreenSnapshot.FOLLOW_OUTPUT ? 0
+                : (int) Math.max(0, Math.min(alternate ? 0 : history, liveTop - requestedTopRow));
+            return new MouseGeometry(buffer.getWidth(), buffer.getHeight(), liveTop - offset, offset, alternate);
+        } finally {
+            buffer.unlock();
+        }
+    }
+
     byte[] codeForKey(int keyCode, int modifiers) {
         return terminal.getCodeForKey(keyCode, modifiers);
     }
@@ -334,6 +351,66 @@ public final class TerminalSession implements AutoCloseable {
         } finally {
             buffer.unlock();
         }
+    }
+
+    /** Only the selected intersection with the live grid is retained, never a copy of selected scrollback. */
+    record SelectedCells(long row, int column, String cells) { }
+
+    List<SelectedCells> selectedLiveCells(Selection selection) {
+        buffer.lock();
+        try {
+            int width = buffer.getWidth();
+            long liveTop = absoluteRow(0);
+            long first = Math.max(liveTop, selection.startRow());
+            long last = Math.min(liveTop + buffer.getHeight() - 1, selection.endRow());
+            List<SelectedCells> cells = new ArrayList<>();
+            char[] chars = new char[width];
+            for (long row = first; row <= last; row++) {
+                RunBuilder.readCells(lineAtLocked(row), width, chars, null);
+                int[] columns = SelectionText.wholeCharacterColumns(selection.columnsOn(row, width), chars);
+                if (columns[0] <= columns[1]) {
+                    cells.add(new SelectedCells(row, columns[0], new String(chars, columns[0], columns[1] - columns[0] + 1)));
+                }
+            }
+            return List.copyOf(cells);
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    boolean selectionUnchanged(List<SelectedCells> cells) {
+        buffer.lock();
+        try {
+            return selectionUnchangedLocked(cells);
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    /** Validation and extraction share a lock so Copy cannot pick up an overwrite between the two. */
+    Optional<String> selectedText(Selection selection, List<SelectedCells> cells) {
+        buffer.lock();
+        try {
+            return selectionUnchangedLocked(cells)
+                ? Optional.of(SelectionText.extract(selection, this::lineAtLocked, buffer.getWidth())) : Optional.empty();
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    private boolean selectionUnchangedLocked(List<SelectedCells> cells) {
+        if (cells.isEmpty()) return true;
+        int width = buffer.getWidth();
+        char[] chars = new char[width];
+        for (SelectedCells selected : cells) {
+            TerminalLine line = lineAtLocked(selected.row());
+            if (line == null || selected.column() + selected.cells().length() > width) return false;
+            RunBuilder.readCells(line, width, chars, null);
+            for (int i = 0; i < selected.cells().length(); i++) {
+                if (chars[selected.column() + i] != selected.cells().charAt(i)) return false;
+            }
+        }
+        return true;
     }
 
     /**

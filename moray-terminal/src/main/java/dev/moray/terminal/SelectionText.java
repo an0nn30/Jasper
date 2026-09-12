@@ -21,7 +21,7 @@ final class SelectionText {
                 continue;
             }
             RunBuilder.readCells(line, width, chars, styles);
-            int[] columns = selection.columnsOn(row, width);
+            int[] columns = wholeCharacterColumns(selection.columnsOn(row, width), chars);
             StringBuilder rowText = new StringBuilder();
             for (int column = columns[0]; column <= columns[1]; column++) {
                 if (chars[column] != CharUtils.DWC) {
@@ -38,6 +38,17 @@ final class SelectionText {
             }
         }
         return out.toString();
+    }
+
+    /** Expand inclusive UTF-16 cell endpoints to include both halves of a displayed character. */
+    static int[] wholeCharacterColumns(int[] columns, char[] chars) {
+        int from = columns[0];
+        int to = columns[1];
+        if (from > 0 && from < chars.length && (chars[from] == CharUtils.DWC
+            || (Character.isLowSurrogate(chars[from]) && Character.isHighSurrogate(chars[from - 1])))) from--;
+        if (to >= 0 && to + 1 < chars.length && (chars[to + 1] == CharUtils.DWC
+            || (Character.isHighSurrogate(chars[to]) && Character.isLowSurrogate(chars[to + 1])))) to++;
+        return new int[] {from, to};
     }
 
     private static void stripTrailingSpaces(StringBuilder text) {

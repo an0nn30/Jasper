@@ -341,6 +341,131 @@ class TerminalViewInteractionTest {
             .isEqualTo(options.palette().selection().getRGB() & 0xFFFFFF);
     }
 
+    @Test
+    void reportedGestureRetainsOwnershipWhenShiftIsAdded() throws Exception {
+        show("\033[?1002h\033[?1006hready", 0, "ready");
+        view.handleMouse(press(0, 0, 1, 0));
+        view.handleMouse(mouse(MouseEvent.MOUSE_DRAGGED, MouseEvent.NOBUTTON, 2,
+            InputEvent.BUTTON1_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, false));
+        view.handleMouse(mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, 2,
+            InputEvent.SHIFT_DOWN_MASK, false));
+        assertThat(connector.written()).isEqualTo("\033[<0;1;1M\033[<32;3;1M\033[<0;3;1m");
+        assertThat(view.hasSelection()).isFalse();
+    }
+
+    @Test
+    void localLeftAndReportedRightHaveIndependentReleases() throws Exception {
+        show("hello", 0, "hello");
+        enableSgrMouse();
+        view.handleMouse(press(0, 0, 1, InputEvent.SHIFT_DOWN_MASK));
+        view.handleMouse(mouse(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON3, 1, InputEvent.BUTTON3_DOWN_MASK, false));
+        view.handleMouse(mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON3, 1, 0, true));
+        view.handleMouse(mouse(MouseEvent.MOUSE_DRAGGED, MouseEvent.NOBUTTON, 4, InputEvent.BUTTON1_DOWN_MASK, false));
+        view.handleMouse(release(4, 0));
+        assertThat(connector.written()).isEqualTo("\033[<2;2;1M\033[<2;2;1m");
+        assertThat(view.selectedText()).contains("hello");
+    }
+
+    @Test
+    void popupOwnerSurvivesAnotherButtonGesture() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger popups = new java.util.concurrent.atomic.AtomicInteger();
+        view.setContextMenuHandler(e -> popups.incrementAndGet());
+        enableSgrMouse();
+        view.handleMouse(mouse(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON3, 1,
+            InputEvent.BUTTON3_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, false));
+        view.handleMouse(press(0, 0, 1, 0));
+        view.handleMouse(release(0, 0));
+        view.handleMouse(mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON3, 1, 0, true));
+        assertThat(popups.get()).isEqualTo(1);
+        assertThat(connector.written()).isEqualTo("\033[<0;1;1M\033[<0;1;1m");
+    }
+
+    @Test
+    void reportedWheelEmitsEveryNotchAndRetainsTheFraction() throws Exception {
+        enableSgrMouse();
+        view.handleMouse(preciseWheel(-2.4));
+        view.handleMouse(preciseWheel(-0.7));
+        assertThat(connector.written()).isEqualTo("\033[<64;2;2M".repeat(3));
+    }
+
+    @Test
+    void doubleClickDraggingExtendsWholeWordsInEitherDirection() throws Exception {
+        show("one two three", 0, "one two three");
+        view.handleMouse(press(5, 0, 2, 0));
+        view.handleMouse(mouse(MouseEvent.MOUSE_DRAGGED, MouseEvent.NOBUTTON, 9, InputEvent.BUTTON1_DOWN_MASK, false));
+        assertThat(view.selectedText()).contains("two three");
+        view.handleMouse(mouse(MouseEvent.MOUSE_DRAGGED, MouseEvent.NOBUTTON, 1, InputEvent.BUTTON1_DOWN_MASK, false));
+        assertThat(view.selectedText()).contains("one two");
+    }
+
+    @Test
+    void commandNonLinkStartsLocalSelectionAndFollowingGestureStillReports() throws Exception {
+        assumeTrue(MAC);
+        show("hello", 0, "hello");
+        enableSgrMouse();
+        selectByDragging(0, 0, 4, 0, InputEvent.META_DOWN_MASK);
+        assertThat(view.selectedText()).contains("hello");
+        assertThat(connector.written()).isEmpty();
+        view.handleMouse(press(0, 0, 1, 0));
+        view.handleMouse(release(0, 0));
+        assertThat(connector.written()).isEqualTo("\033[<0;1;1M\033[<0;1;1m");
+    }
+
+    @Test
+    void commandLinkOwnsItsDragAcrossAnotherButtonPress() throws Exception {
+        assumeTrue(MAC);
+        show("https://m.dev", 0, "https://m.dev");
+        enableSgrMouse();
+        AtomicReference<String> opened = new AtomicReference<>();
+        view.setLinkOpener(opened::set);
+        view.handleMouse(press(2, 0, 1, InputEvent.META_DOWN_MASK));
+        view.handleMouse(mouse(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON3, 1, InputEvent.BUTTON3_DOWN_MASK, false));
+        view.handleMouse(mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON3, 1, 0, false));
+        view.handleMouse(mouse(MouseEvent.MOUSE_DRAGGED, MouseEvent.NOBUTTON, 4, InputEvent.BUTTON1_DOWN_MASK, false));
+        view.handleMouse(release(4, 0));
+        assertThat(opened.get()).isEqualTo("https://m.dev");
+        assertThat(connector.written()).isEqualTo("\033[<2;2;1M\033[<2;2;1m");
+        assertThat(view.hasSelection()).isFalse();
+    }
+
+    @Test
+    void selectedLiveOverwriteClearsBeforeCopyEvenWithoutPainting() throws Exception {
+        show("hello world", 0, "hello world");
+        view.handleMouse(press(1, 0, 2, 0));
+        AtomicReference<String> copied = new AtomicReference<>();
+        view.setClipboard(() -> null, copied::set);
+        show("\033[1;1Hjello", 0, "jello world");
+        view.copySelection();
+        assertThat(copied.get()).isNull();
+        assertThat(view.hasSelection()).isFalse();
+    }
+
+    @Test
+    void unrelatedOutputAndNormalScrollPreserveSelection() throws Exception {
+        show("hello world", 0, "hello world");
+        view.handleMouse(press(1, 0, 2, 0));
+        show("\033[1;7Hearth", 0, "hello earth");
+        assertThat(view.selectedText()).contains("hello");
+        show("\r\n" + "x\r\n".repeat(6) + "end", 3, "end");
+        assertThat(view.selectedText()).contains("hello");
+    }
+
+    @Test
+    void focusLossDoesNotChangeAReportedButtonsOwner() throws Exception {
+        enableSgrMouse();
+        view.handleMouse(press(0, 0, 1, 0));
+        for (var listener : view.getFocusListeners()) {
+            listener.focusLost(new java.awt.event.FocusEvent(view, java.awt.event.FocusEvent.FOCUS_LOST));
+        }
+        view.handleMouse(mouse(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, 0,
+            InputEvent.SHIFT_DOWN_MASK, false));
+        assertThat(connector.written()).isEqualTo("\033[<0;1;1M\033[<0;1;1m");
+    }
+
+    private MouseEvent mouse(int type, int button, int column, int modifiers, boolean popup) {
+        return new MouseEvent(view, type, 0, modifiers, x(column), y(0), 1, popup, button);
+    }
+
     private void tenLines() throws Exception {
         connector.feed("1\r\n2\r\n3\r\n4\r\n5\r\n6\r\n7\r\n8\r\n9\r\n10");
         Await.until(() -> "10".equals(session.snapshot().lineText(3)), "ten lines on a four-row screen");
