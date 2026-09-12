@@ -206,9 +206,9 @@ class ConfigLoaderTest {
 
     @Test void diagnosticsFormatPositionAndHandleUnavailableLocation() {
         assertThat(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, FILE, 4, 3, "font.size", "Expected a number.").formatted())
-            .contains("/fixture/config.toml:4:3", "font.size", "Expected a number.");
+            .contains(FILE.toString() + ":4:3", "font.size", "Expected a number.");
         assertThat(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, FILE, 0, 0, "", "Cannot read file.").formatted())
-            .contains("/fixture/config.toml", "Cannot read file.").doesNotContain(":0");
+            .contains(FILE.toString(), "Cannot read file.").doesNotContain(":0");
     }
 
     private void assertDiagnostic(ConfigLoader.Result result, String key, int line, int column, ConfigDiagnostic.Severity severity) {

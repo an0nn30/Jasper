@@ -16,10 +16,10 @@ class ConfigurationStatusTest {
                 themes.select(theme);
                 var status = new WindowStatusBar();
                 for (var severity : ConfigDiagnostic.Severity.values()) {
-                    Path file = Path.of("/tmp/<html>settings.toml");
+                    Path file = Path.of("fixture", "settings.toml");
                     status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(
-                        new ConfigDiagnostic(severity, file, 1234567, 1, "window.tab_height", "Check this key")), file, true));
-                    status.setMetadata("very long shell".repeat(80), "/a/long/directory/".repeat(80), "120 × 36", true);
+                        new ConfigDiagnostic(severity, file, 1234567, 1, "window.tab_height", "<html>Check this key")), file, true));
+                    status.setMetadata("<html>very long shell".repeat(80), "/a/long/directory/".repeat(80), "120 × 36", true);
                     assertThat(status.getMinimumSize().width).isZero();
                     assertThat(status.getPreferredSize().width).isZero();
                     assertThat(status.getBackground()).isEqualTo(theme.palette().background());
