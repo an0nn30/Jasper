@@ -1,6 +1,6 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11. Compact tab follow-up implemented on `codex/mock-ui`, code/tests `0f4cd74`; prior motion reviews and reverse-close review approved. Root fresh `./gradlew check --rerun-tasks`: **332 tests, 331 passed, 1 known font skip**, zero failures/errors, all eight tasks executed. Source hygiene/diff checks pass; regenerated dark/light previews inspected. The user approved local integration of all UI work and starting Plan 4. This revision is being integrated into main; merged verification follows. No GUI, benchmark or push occurred.
+**As of:** 2026-09-11. All UI work is merged into main at `1bd8b49`; merged verification passed332 tests (331 passed, one known font skip), all eight tasks executed. The completed mock-ui worktree/branch were removed. Plan4a is active on `codex/plan-4-config` in `.worktrees/plan-4`, with the same clean332-test baseline. See [config design](superpowers/specs/2026-09-11-moray-plan-4a-config-design.md) and [implementation plan](superpowers/plans/2026-09-11-moray-plan-4a-config.md). Native UI, benchmark and daily-use acceptance remain open.
 
 **Current follow-up:** Default title/tab height is now 38px, configurable from 28–72 through View → Tab height… for the current window. Both Swing and native height use the same value; reset restores 38, cancellation preserves the previous value. Height survives theme changes but is session-only. Opening and closing tabs and the selected underline animate with a shared 180ms eased settle; selection/focus/launch remain immediate and timers stop when idle/hidden/disposed. The existing shortcut engine now provides Cmd/Ctrl+1–9 and Cmd/Ctrl+{ / } (Shift+brackets), with plain Ctrl for tab navigation outside macOS. Unrelated shortcut behavior is retained. [Design](superpowers/specs/2026-09-11-moray-tab-motion-design.md), [plan](superpowers/plans/2026-09-11-moray-tab-motion.md), [native checks](superpowers/plans/2026-09-11-moray-tab-motion-manual-check.md).
 
@@ -19,9 +19,10 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
 | 3.5 — macOS chrome, themes and toolbar | Integrated on main and fully reviewed; native acceptance pending |
 | Screenshot UI revision | Implemented and fully reviewed; compact/motion follow-up implemented and fully reviewed; native acceptance pending; local integration approved |
-| 4 — Config and packaging | Follows screenshot UI acceptance; not written yet |
+| 4a — Saved settings and live reload | Active: paths/parser, file service, live UI integration |
+| 4b onward — Remaining configuration and packaging | Additional terminal options, custom themes/system appearance, logging/launcher and .app packaging remain |
 
-Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart Plan 3 or Plan 3.5; the active revision is in `.worktrees/mock-ui`.
+Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart Plan 3 or Plan 3.5; the active configuration work is in `.worktrees/plan-4`.
 
 Plan 3.5 was developed on `codex/plan-3-5-chrome-themes` and merged locally. Continue from `/Users/dustin/projects/moray` on `main`. [Title/theme design](superpowers/specs/2026-09-11-moray-plan-3-5-titlebar-themes-design.md) and [execution plan](superpowers/plans/2026-09-11-moray-plan-3-5-titlebar-themes-implementation.md) cover the first runnable deliverable. [Toolbar study](design/plan-3-5-toolbar-study.html) is an illustrative discussion aid; the user selected B (fuller, two-tone colored icons), now included as Task 4.
 
@@ -189,3 +190,5 @@ Four new real MacTitleBar/JRootPane regressions cover active/inactive closes, cl
 ## 14. Approved integration and Plan 4 start
 
 The user explicitly approved merging all current UI work into main and beginning Plan 4 with saved settings and live reload. The reviewed code remains `0f4cd74`; only documentation followed. Main receives the complete branch, then a fresh merged check; the completed mock-ui worktree/branch will be removed after it passes. Plan 4 starts in a new isolated worktree. Native UI/benchmark/daily-use acceptance remains open and is not implied by merge approval.
+
+Plan4a starts with existing live controls only: tab height, toolbar/status, font size, built-in theme and shortcut overrides. Runtime View choices remain temporary; saved defaults are in the user-edited file. Extra terminal options/customthemes/systemappearance/packaging follow in separate runnable slices. TomlJ1.1.1 is selected for precise TOML source positions.
