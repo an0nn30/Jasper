@@ -77,6 +77,11 @@ final class TerminalWindow implements AutoCloseable {
         if (titleBar != null) titleBar.setActive(active);
     }
 
+    WindowContent content() { return content; }
+    boolean closed() { return closed; }
+    Dimension size() { return frame.getSize(); }
+    void resize(Dimension size) { frame.setSize(size); }
+
     void show() { frame.setVisible(true); if (content.currentTab() != null) content.currentTab().focusTerminal(); }
 
     @Override public void close() {

@@ -29,13 +29,15 @@ tasks.test {
     systemProperty("moray.projectDir", rootProject.layout.projectDirectory.asFile.absolutePath)
 }
 
-tasks.register<JavaExec>("bench") {
-    group = "verification"
-    description = "Pipes ~100 MB of ANSI-colored text through a Moray terminal window and prints MB/s."
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass = "dev.moray.app.Bench"
-    jvmArgs("--enable-native-access=ALL-UNNAMED")
-    args(layout.buildDirectory.file("bench/ansi-100mb.txt").get().asFile.absolutePath)
+// Explicit opt-in; check never depends on these native tasks. Use --args for exact reproducible inputs.
+for ((taskName, entryPoint) in listOf("bench" to "Bench", "memoryBench" to "MemoryBench")) {
+    tasks.register<JavaExec>(taskName) {
+        group = "verification"
+        description = "Opt-in native ${if (taskName == "bench") "throughput" else "memory"} benchmark; requires --args with --output and --revision."
+        classpath = sourceSets["main"].runtimeClasspath
+        mainClass = "dev.moray.app.$entryPoint"
+        jvmArgs("--enable-native-access=ALL-UNNAMED", "-Dapple.awt.application.name=Moray benchmark")
+    }
 }
 
 // Actual application components and controlled PTY fixture; this never creates a JFrame.

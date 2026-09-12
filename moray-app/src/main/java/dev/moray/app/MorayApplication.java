@@ -21,12 +21,17 @@ final class MorayApplication {
         Thread.ofPlatform().name("moray-shell-launch-", 0).factory());
     private final ConfigurationController configuration;
     private boolean quitting;
+    private final ShellLauncher suppliedLauncher;
 
     MorayApplication() { this(null); }
 
     MorayApplication(ConfigService service) { this(service, SystemAppearance.fixed(BuiltinTheme.DARK)); }
 
-    MorayApplication(ConfigService service, SystemAppearance source) {
+    MorayApplication(ConfigService service, SystemAppearance source) { this(service, source, null); }
+
+    /** Isolated launch ownership for controlled tools; production still resolves captured settings. */
+    MorayApplication(ConfigService service, SystemAppearance source, ShellLauncher suppliedLauncher) {
+        this.suppliedLauncher = suppliedLauncher;
         configuration = service == null ? null : new ConfigurationController(themes, service, source);
         if (service == null) source.close();
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler((event, response) -> {
@@ -35,12 +40,13 @@ final class MorayApplication {
         });
     }
 
-    void newWindow(Path directory) {
-        if (quitting) return;
-        ShellLauncher launcher = windowLauncher(launches,
+    TerminalWindow newWindow(Path directory) {
+        if (quitting) return null;
+        ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot, MorayApplication::startSession);
         TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration);
         windows.add(window); window.show();
+        return window;
     }
 
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
