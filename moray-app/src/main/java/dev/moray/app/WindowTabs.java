@@ -26,7 +26,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     private final TabMotion underlineX = new TabMotion(0);
     private final TabMotion underlineWidth = new TabMotion(0);
     private boolean laidOut, settleOnLayout, disposed;
-    private int layoutHeight = -1, tabRegionLeft, tabRegionRight;
+    private int layoutHeight = -1, layoutTabWidth = -1, tabRegionLeft, tabRegionRight;
 
     WindowTabs(WindowContent owner, LongSupplier clock) {
         super(null);
@@ -84,14 +84,19 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     @Override public void doLayout() {
         long now = clock.getAsLong();
         boolean settle = !laidOut || settleOnLayout || disposed;
-        if (layoutWidth != getWidth() || layoutHeight != getHeight()) {
-            layoutWidth = getWidth(); layoutHeight = getHeight(); revealSelection = true; settle = true;
-        }
+        boolean widthChanged = layoutWidth != getWidth();
+        if (widthChanged) { layoutWidth = getWidth(); revealSelection = true; }
+        if (layoutHeight != getHeight()) { layoutHeight = getHeight(); settle = true; }
         int oldFirstVisible = firstVisible;
         int width = getWidth(), tabWidth = UIScale.scale(160), plusWidth = Math.min(width, UIScale.scale(32));
         boolean overflow = order.size() * tabWidth + plusWidth > width;
         int navigation = overflow ? Math.min(UIScale.scale(24), Math.max(0, (width - plusWidth) / 3)) : 0;
         int space = Math.max(0, width - plusWidth - 2 * navigation);
+        int slotWidth = Math.min(tabWidth, space);
+        // The active window title can change this allocation without moving any tab.
+        // Preserve motion until the navigation inset, tab slot or visible origin changes.
+        if (widthChanged && (navigation != tabRegionLeft || slotWidth != layoutTabWidth)) settle = true;
+        layoutTabWidth = slotWidth;
         int count = Math.min(order.size(), Math.max(1, space / tabWidth));
         firstVisible = Math.max(0, Math.min(firstVisible, order.size() - count));
         int selectedIndex = order.indexOf(selected);

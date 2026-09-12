@@ -214,17 +214,104 @@ class TabMotionTest {
         });
     }
 
+    @Test void realHeaderTitleAllocationPreservesSelectionSlide() throws Exception {
+        edt(() -> {
+            try (var fixture = new Fixture()) {
+                var owner = fixture.owner; var strip = owner.windowTabs();
+                var first = owner.currentTab(); first.rename("short");
+                owner.newTab(HOME); owner.currentTab().rename("a much longer title"); owner.update();
+                fixture.installHeader();
+                int beforeWidth = strip.getWidth();
+                Rectangle before = underline(strip);
+                owner.selectTab(first); fixture.layoutHeader();
+                assertThat(strip.getWidth()).isGreaterThan(beforeWidth);
+                assertThat(owner.currentTab()).isSameAs(first);
+                assertThat(underline(strip)).isEqualTo(before);
+                assertThat(strip.animationTimer.isRunning()).isTrue();
+                fixture.frame(60);
+                assertThat(underline(strip).x).isBetween(15, 173);
+                fixture.frame(180);
+                assertThat(underline(strip)).isEqualTo(new Rectangle(14, 37, 132, 1));
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+            }
+        });
+    }
+
+    @Test void realHeaderNewTabExpandsDespiteActiveTitleAllocationChange() throws Exception {
+        edt(() -> {
+            try (var fixture = new Fixture()) {
+                var owner = fixture.owner; var strip = owner.windowTabs();
+                owner.currentTab().rename("a much longer title"); owner.update(); fixture.installHeader();
+                int beforeWidth = strip.getWidth();
+                owner.newTab(HOME); var second = owner.currentTab(); second.rename("short"); owner.update();
+                fixture.layoutHeader();
+                assertThat(strip.getWidth()).isGreaterThan(beforeWidth);
+                assertThat(entry(strip, second).getWidth()).isEqualTo(64);
+                assertThat(strip.animationTimer.isRunning()).isTrue();
+                fixture.frame(90);
+                assertThat(entry(strip, second).getWidth()).isBetween(100, 159);
+                fixture.frame(180);
+                assertThat(entry(strip, second).getWidth()).isEqualTo(160);
+                assertThat(underline(strip)).isEqualTo(new Rectangle(174, 37, 132, 1));
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+            }
+        });
+    }
+
+    @Test void realHeaderMetadataAllocationPreservesEntryAndUnderlineDeadline() throws Exception {
+        edt(() -> {
+            try (var fixture = new Fixture()) {
+                var owner = fixture.owner; var strip = owner.windowTabs();
+                fixture.installHeader();
+                owner.newTab(HOME); var second = owner.currentTab(); second.rename("short"); owner.update();
+                fixture.layoutHeader(); fixture.frame(60);
+                int beforeWidth = strip.getWidth();
+                int entryWidth = entry(strip, second).getWidth();
+                Rectangle before = underline(strip);
+                second.rename("a much longer shell title"); owner.update(); fixture.layoutHeader();
+                assertThat(strip.getWidth()).isLessThan(beforeWidth);
+                assertThat(entry(strip, second).getWidth()).isEqualTo(entryWidth);
+                assertThat(underline(strip)).isEqualTo(before);
+                assertThat(strip.animationTimer.isRunning()).isTrue();
+                fixture.frame(180);
+                assertThat(entry(strip, second).getWidth()).isEqualTo(160);
+                assertThat(underline(strip)).isEqualTo(new Rectangle(174, 37, 132, 1));
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+                owner.newTab(HOME); owner.currentTab().rename("third"); owner.update();
+                fixture.layoutHeader(); fixture.frame(210);
+                layout(fixture.host, 400, 958);
+                assertThat(entry(strip, owner.currentTab()).isVisible()).isTrue();
+                assertThat(named(strip, "newTab").getBounds().getMaxX()).isLessThanOrEqualTo(strip.getWidth());
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+            }
+        });
+    }
+
     private static final class Fixture implements AutoCloseable {
         final AtomicLong time = new AtomicLong();
         final WindowContent owner = new WindowContent(launcher(new ArrayDeque<>()), HOME,
             path -> {}, () -> {}, () -> {}, new ThemeController(), KeyBindings.defaults(true), time::get);
+        JPanel host;
+        MacTitleBar header;
+        void installHeader() {
+            var root = new JRootPane();
+            header = MacTitleBar.install(root, owner, true, title -> {});
+            host = new JPanel(new BorderLayout()); host.add(root);
+            host.addNotify(); layout(host, 958, 958);
+        }
+        void layoutHeader() { layoutTree(host); }
         void frame(long milliseconds) {
             time.set(milliseconds * 1_000_000);
             Timer timer = owner.windowTabs().animationTimer;
             for (var listener : timer.getActionListeners())
                 listener.actionPerformed(new ActionEvent(timer, ActionEvent.ACTION_PERFORMED, "frame"));
         }
-        @Override public void close() { owner.close(); if (owner.isDisplayable()) owner.removeNotify(); }
+        @Override public void close() {
+            if (header != null) header.close();
+            owner.close();
+            if (host != null) host.removeNotify();
+            else if (owner.isDisplayable()) owner.removeNotify();
+        }
     }
 
     static Container entry(WindowTabs strip, TerminalTab tab) {
