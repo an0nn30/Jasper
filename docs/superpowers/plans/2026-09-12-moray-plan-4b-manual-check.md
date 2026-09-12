@@ -1,5 +1,7 @@
 # Plan 4b native acceptance
 
+> **Geometry update (2026-09-12):** The current compact terminal inset is 4px per side, superseding the old 24px geometry.
+
 Pending user execution after implementation. Agents do not launch native windows, login shells, editors, benchmarks or audio. Plan 4b is integrated; use the main checkout at `/Users/dustin/projects/moray`. Start with `./gradlew :moray-app:run`.
 
 - [ ] Keep existing terminals and a long-running program open while editing config. Unrelated changes must not restart shells, lose find controls, change manual font size or reset a manually selected global theme.
@@ -11,7 +13,7 @@ Pending user execution after implementation. Agents do not launch native windows
 - [ ] Exercise visual, sound and none bell modes deliberately. Repeated bells should not leave a stuck overlay; closing or reparenting a view must not produce late effects. Visual strength/duration and sound are native acceptance, not claims from headless tests.
 - [ ] Configure a shell executable and arguments with spaces. New panes receive exact arguments, environment overrides and scrollback defaults; existing sessions continue unchanged. Restore an empty executable and check default login-shell behavior. Invalid executables/directories report useful launch errors.
 - [ ] Change session settings while a shell launch is queued. The pending request retains the settings captured when requested; the next pane gets the new defaults. Each pane's shell label remains accurate.
-- [ ] Set window.columns/lines and open a new window. The initial desired grid uses configured fonts/padding/chrome and is constrained by the available display. Existing windows keep their size; delayed launches and subsequent reloads do not repack them. Move between displays and check native decorations/minimum dimensions.
+- [ ] Set window.columns/lines and open a new window. The initial desired grid uses configured fonts, 4px pane padding on every side and existing chrome, and is constrained by the available display. Existing windows keep their size; delayed launches and subsequent reloads do not repack them. Move between displays and check native decorations/minimum dimensions.
 - [ ] Introduce wrong types, invalid values and unknown nested fields. Confirm positioned diagnostics, last-good retention for type errors and per-field fallback for invalid values. Correct the file and confirm recovery. Existing files must never be rewritten by Settings.
 
 Custom themes, automatic system appearance, logging/launcher cleanup and packaging remain subsequent Plan4 work. Retain the Phase1 benchmark, platform CI and two-week daily-use acceptance gates.

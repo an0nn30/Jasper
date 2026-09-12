@@ -2,6 +2,8 @@
 
 Moray reads UTF-8 TOML at startup and watches it for changes once per second. Starting Moray does not create directories or files. Click **Settings** to create a commented template if the file is absent, then open it in your operating system's editor. Moray tries Edit, then Open, then revealing the file in Finder/Explorer when supported. If all attempts fail, Moray shows the error. Existing files are never overwritten by Settings.
 
+For a copyable starting point, use the root [config.example.toml](../config.example.toml). It contains every supported non-shortcut setting as an explicit built-in default, an empty environment table and optional platform-specific shortcut examples.
+
 ## Location and startup options
 
 | Platform | Default file |
@@ -124,7 +126,7 @@ Environment entries overlay the inherited child environment. This table does not
 
 ### Initial window grid
 
-Columns and lines specify the desired first terminal grid of a new window. Moray derives the initial pixel area from the saved font metrics and adds 24px pane padding on each side; Swing adds chrome and window decorations. The packed window respects its minimum constraints and is capped to the current display's usable area. If the display is smaller than those constraints, its usable area is the cap. Thus a large requested grid may not fit exactly, and native minimums may enlarge a small request.
+Columns and lines specify the desired first terminal grid of a new window. Moray derives the initial pixel area from the saved font metrics and adds 4px pane padding on each side (8px total per dimension); Swing adds chrome and window decorations. The packed window respects its minimum constraints and is capped to the current display's usable area. If the display is smaller than those constraints, its usable area is the cap. Thus a large requested grid may not fit exactly, and native minimums may enlarge a small request.
 
 A window captures its grid defaults once. Later reloads do not resize or repack it, and a delayed shell does not repack it when ready. New tabs and splits in that window use its captured launch grid and then resize to the available layout. A newly opened window uses the latest saved grid. Changing live typography can change how many cells fit in the existing window.
 

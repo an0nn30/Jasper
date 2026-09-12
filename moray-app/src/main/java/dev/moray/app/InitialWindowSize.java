@@ -11,8 +11,9 @@ final class InitialWindowSize {
     static Dimension terminalArea(ConfigSnapshot snapshot) {
         FontConfig f = snapshot.font();
         FontSet fonts = new FontSet(f.family(), f.size(), f.fallback(), f.ligatures(), f.lineHeight());
-        return new Dimension(snapshot.columns() * fonts.cellWidth() + 48,
-            snapshot.lines() * fonts.cellHeight() + 48);
+        int panePadding = TerminalPane.PADDING * 2;
+        return new Dimension(snapshot.columns() * fonts.cellWidth() + panePadding,
+            snapshot.lines() * fonts.cellHeight() + panePadding);
     }
 
     static Dimension fit(Dimension packed, Dimension minimum, Rectangle usableBounds) {

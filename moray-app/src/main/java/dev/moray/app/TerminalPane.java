@@ -12,6 +12,7 @@ import javax.swing.*;
 /** Exactly one asynchronously launched shell and its retained output. Owned on the EDT. */
 final class TerminalPane extends JPanel implements AutoCloseable {
     static final float DEFAULT_FONT_SIZE = 16f;
+    static final int PADDING = 4;
     private final UUID id = UUID.randomUUID();
     private final Path launchDirectory;
     private final ShellLauncher launcher;
@@ -115,7 +116,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     void focusTerminal() { if (view != null) view.requestFocusInWindow(); }
     void setActive(boolean selected) {
         active = selected;
-        setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        setBorder(BorderFactory.createEmptyBorder(PADDING, PADDING, PADDING, PADDING));
         if (view != null) view.setInactiveDim(selected ? 0 : configuredDim);
     }
 

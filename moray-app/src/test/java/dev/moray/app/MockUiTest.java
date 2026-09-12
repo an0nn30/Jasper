@@ -31,7 +31,7 @@ class MockUiTest {
         });
     }
 
-    @Test void terminalPaddingAndFontResetUseTheApplicationDefaults() throws Exception {
+    @Test void terminalLayoutKeepsCompactInsetsAcrossThemeChanges() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owners = new WindowContent[1];
         edt(() -> owners[0] = content(launcher(pending)));
@@ -39,15 +39,24 @@ class MockUiTest {
         edt(() -> {
             var owner = owners[0]; var pane = owner.currentPane();
             owner.setSize(958, 958); layoutTree(owner);
-            assertThat(pane.view().getX()).isEqualTo(24);
-            assertThat(pane.view().getY()).isEqualTo(24);
-            assertThat(pane.view().getWidth()).isEqualTo(910);
+            assertThat(pane.getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
+            assertThat(pane.view().getBounds()).isEqualTo(new Rectangle(4, 4,
+                pane.getWidth() - 8, pane.getHeight() - 8));
             assertThat(pane.view().fontSize()).isEqualTo(16);
             owner.action(ActionId.FONT_BIGGER).actionPerformed(null);
             owner.action(ActionId.FONT_RESET).actionPerformed(null);
             assertThat(pane.view().fontSize()).isEqualTo(16);
             owner.selectTheme(BuiltinTheme.LIGHT);
+            layoutTree(owner);
             assertThat(pane.getBackground()).isEqualTo(pane.view().palette().background());
+            assertThat(pane.getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
+            assertThat(pane.view().getBounds()).isEqualTo(new Rectangle(4, 4,
+                pane.getWidth() - 8, pane.getHeight() - 8));
+            owner.selectTheme(BuiltinTheme.DARK);
+            layoutTree(owner);
+            assertThat(pane.getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
+            assertThat(pane.view().getBounds()).isEqualTo(new Rectangle(4, 4,
+                pane.getWidth() - 8, pane.getHeight() - 8));
         });
     }
 
