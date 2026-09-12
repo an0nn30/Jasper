@@ -124,6 +124,23 @@ class BenchmarkTest {
         }
     }
 
+    @Test void preparationModeStagesSeededBytesWithoutStartingTheFixtureWaitLoop() throws Exception {
+        Path prepared = temp.resolve("preparation output.txt");
+        BenchmarkFixture.main(new String[]{"--generate", prepared.toString(), "--bytes", "4097"});
+        assertThat(Files.size(prepared)).isBetween(4097L, 4609L);
+    }
+
+    @Test void preparationAllocatesInASeparateExitedJvmAndHasBoundedFailureCleanup() throws Exception {
+        Path prepared = temp.resolve("isolated staging.txt");
+        Map<String, Object> info = BenchmarkFixture.prepare(prepared, 4097, 4000);
+        long pid = ((Number) info.get("pid")).longValue();
+        assertThat(pid).isNotEqualTo(ProcessHandle.current().pid());
+        assertThat(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)).isFalse();
+        assertThat(info).containsEntry("stagedBytes", Files.size(prepared)).containsEntry("exitCode", 0);
+        assertThatThrownBy(() -> BenchmarkFixture.prepare(temp.resolve("timeout.txt"), 104857600, 0))
+            .isInstanceOf(TimeoutException.class).hasMessageContaining("preparation");
+    }
+
     private BenchmarkOptions options(String... extra) {
         List<String> args = new ArrayList<>(List.of("--output", temp.resolve("results.json").toString(), "--revision", "test-revision"));
         args.addAll(List.of(extra)); return BenchmarkOptions.parse(true, args.toArray(String[]::new));

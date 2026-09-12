@@ -70,7 +70,8 @@ final class BenchmarkRun implements AutoCloseable {
         try {
             if (GraphicsEnvironment.isHeadless()) throw new IllegalStateException("Native benchmarks require a display; check is headless");
             Path data = temporary.resolve("seed42-ansi-utf8.txt");
-            long bytes = BenchmarkFixture.generate(data, options.bytes());
+            report.put("preparation", BenchmarkFixture.prepare(data, options.bytes(), Math.min(120000L, options.maxSeconds() * 1000L)));
+            long bytes = Files.size(data);
             report.put("workload", Map.of("seed", 42, "encoding", "UTF-8", "stagedBytesPerPane", bytes,
                 "timingBoundary", "OSC title markers parsed on reader thread; payload excludes markers and PTY newline expansion"));
             for (int repeat = 1; repeat <= options.repeats(); repeat++) for (int panes : options.panes()) for (int scrollback : options.scrollbacks()) {
@@ -78,7 +79,7 @@ final class BenchmarkRun implements AutoCloseable {
                 if (remaining <= 0) throw new TimeoutException("Total benchmark deadline");
                 Map<String, Object> run = new LinkedHashMap<>(); runs.add(run);
                 run.put("repeat", repeat); run.put("panes", panes); run.put("scrollbackPerPane", scrollback);
-                run.put("coldScope", runs.size() == 1 ? "first window in this JVM, after payload staging" : "new window in already warm JVM");
+                run.put("coldScope", runs.size() == 1 ? "first application window in this JVM; payload prepared by exited child" : "new window in already warm JVM");
                 run.put("startedAt", Instant.now().toString()); run.put("status", "running");
                 BenchmarkReport.write(options.output(), report);
                 try (BenchmarkRun owned = new BenchmarkRun(options, temporary, data, scrollback, remaining)) {
@@ -188,12 +189,8 @@ final class BenchmarkRun implements AutoCloseable {
         try {
             if (closing.get()) throw new IllegalStateException("Benchmark closing");
             child = new Child(Files.createTempDirectory(directory, "child-")); children.add(child);
-            Map<String, String> env = new HashMap<>();
-            for (String key : List.of("PATH", "SystemRoot", "WINDIR", "TEMP", "TMP", "TMPDIR"))
-                if (System.getenv(key) != null) env.put(key, System.getenv(key));
-            env.put("TERM", "xterm-256color"); env.put("COLORTERM", "truecolor"); env.put("LANG", "en_US.UTF-8");
             TerminalSession session = TerminalSession.start(BenchmarkFixture.command(data, child.control, options.timeoutSeconds()),
-                env, directory, 120, 36, scrollback);
+                BenchmarkFixture.environment(), directory, 120, 36, scrollback);
             Child captured = child;
             session.addListener(new TerminalSession.Listener() {
                 @Override public void titleChanged(String title) {

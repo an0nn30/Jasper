@@ -27,15 +27,56 @@ public final class BenchmarkFixture {
         return Files.size(file);
     }
 
-    static List<String> command(Path data, Path control, int timeoutSeconds) {
+    private static List<String> javaCommand() {
         boolean windows = System.getProperty("os.name").startsWith("Windows");
-        return List.of(Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString(),
+        return new ArrayList<>(List.of(Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString(),
             "-cp", String.join(File.pathSeparator, Arrays.stream(System.getProperty("java.class.path").split(java.util.regex.Pattern.quote(File.pathSeparator)))
-                .map(entry -> Path.of(entry).toAbsolutePath().toString()).toList()), BenchmarkFixture.class.getName(),
-            "--data", data.toString(), "--control", control.toString(), "--timeout-seconds", Integer.toString(timeoutSeconds));
+                .map(entry -> Path.of(entry).toAbsolutePath().toString()).toList()), BenchmarkFixture.class.getName()));
+    }
+
+    static List<String> command(Path data, Path control, int timeoutSeconds) {
+        List<String> command = javaCommand();
+        command.addAll(List.of("--data", data.toString(), "--control", control.toString(), "--timeout-seconds", Integer.toString(timeoutSeconds)));
+        return List.copyOf(command);
+    }
+
+    static Map<String, String> environment() {
+        Map<String, String> env = new HashMap<>();
+        for (String key : List.of("PATH", "SystemRoot", "WINDIR", "TEMP", "TMP", "TMPDIR"))
+            if (System.getenv(key) != null) env.put(key, System.getenv(key));
+        env.put("TERM", "xterm-256color"); env.put("COLORTERM", "truecolor"); env.put("LANG", "en_US.UTF-8");
+        return env;
+    }
+
+    /** Staging allocations belong to an exited preparation JVM, not the measured application JVM. */
+    static Map<String, Object> prepare(Path data, long bytes, long timeoutMillis) throws Exception {
+        List<String> command = javaCommand();
+        command.addAll(List.of("--generate", data.toString(), "--bytes", Long.toString(bytes)));
+        ProcessBuilder builder = new ProcessBuilder(command).redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectError(ProcessBuilder.Redirect.DISCARD);
+        builder.environment().clear(); builder.environment().putAll(environment());
+        long started = System.nanoTime();
+        Process process = builder.start();
+        try {
+            if (!process.waitFor(timeoutMillis, java.util.concurrent.TimeUnit.MILLISECONDS))
+                throw new java.util.concurrent.TimeoutException("Payload preparation child deadline");
+            if (process.exitValue() != 0) throw new IOException("Payload preparation child exited " + process.exitValue());
+            return Map.of("pid", process.pid(), "elapsedMillis", (System.nanoTime() - started) / 1e6,
+                "stagedBytes", Files.size(data), "exitCode", process.exitValue());
+        } finally {
+            if (process.isAlive()) {
+                process.destroyForcibly();
+                if (!process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS))
+                    throw new java.util.concurrent.TimeoutException("Payload preparation child cleanup");
+            }
+        }
     }
 
     public static void main(String[] args) throws Exception {
+        if (args.length == 4 && args[0].equals("--generate") && args[2].equals("--bytes")) {
+            generate(Path.of(args[1]), Long.parseLong(args[3]));
+            return;
+        }
         if (args.length != 6 || !args[0].equals("--data") || !args[2].equals("--control") || !args[4].equals("--timeout-seconds"))
             throw new IllegalArgumentException("Expected --data PATH --control PATH --timeout-seconds N");
         Path data = Path.of(args[1]), control = Path.of(args[3]);
