@@ -18,7 +18,7 @@
 **Files:** WindowContent.java, WindowChrome.java, WindowTabs.java (height only), MacTitleBar.java, KeyBindings.java, ActionId.java if needed; existing KeyBindingsTest/MacTitleBarTest/WindowTabsTest/MockUiTest and new focused height tests under moray-app/src/test/java/dev/moray/app.
 **Consumes:** Existing actions, theme callback pattern, native attachment/minimum propagation.
 **Produces:** WindowContent.tabHeight():int and setTabHeight(int), default38; WindowTabs dimensions and MacTitleBar native/swing geometry derive from it; live numeric View control. Existing signatures remain compatible.
-- [ ] Write failing tests for38px initial geometry; setter changes title/strip height together, preserves tab/session/theme/font state; invalid values rejected; menu/action uses current owner height. Use actual headless root layout. Example:
+- [x] Write failing tests for38px initial geometry; setter changes title/strip height together, preserves tab/session/theme/font state; invalid values rejected; menu/action uses current owner height. Use actual headless root layout. Example:
 ```java
 owner.setTabHeight(44);
 MockUiTest.layoutTree(root);
@@ -26,13 +26,13 @@ assertThat(owner.windowTabs().getHeight()).isEqualTo(44);
 assertThat(header.getHeight()).isEqualTo(44);
 assertThatThrownBy(() -> owner.setTabHeight(27)).isInstanceOf(IllegalArgumentException.class);
 ```
-- [ ] Add failing platform shortcut regressions for Ctrl+2, Ctrl+Shift+[ / ] and MacMeta equivalents; brace overrides normalize and collisions still reject. Test real dispatch selecting tabs, wrapping and absent tab. Example:
+- [x] Add failing platform shortcut regressions for Ctrl+2, Ctrl+Shift+[ / ] and MacMeta equivalents; brace overrides normalize and collisions still reject. Test real dispatch selecting tabs, wrapping and absent tab. Example:
 ```java
 assertThat(KeyBindings.parse("ctrl+{", false)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
 ```
 Run focusedtests RED; change obsolete54 default assertions intentionally.
-- [ ] Implement validated current-window height in WindowContent, update both surfaces through an explicit lifecycle-cleared geometry callback or property change listener, revalidate root/minimum and native height. View numeric dialog JSpinner28..72, apply onlyonOK, default/reset38. Preserve themes. WindowTabs uses UIScale.scale(owner.tabHeight()). MacTitleBar uses same height and immediately updates attachednativebar onlivechange. Set callback cleanup onclose. No persistent settings subsystem.
-- [ ] Extend defaults with platform-aware strings for tab actions only; normalize brace tokens to bracket keycodes plusSHIFT, retain othercmd defaults/override behavior. Use explicit ActionId.defaultBinding(boolean macOs) if useful; no ordinal classification beyond existing numbered actions. Existing shared Actions/root bindings automatically receive newstrokes. Run coveringtests, update README and report RED/GREEN; commit withcoauthor.
+- [x] Implement validated current-window height in WindowContent, update both surfaces through an explicit lifecycle-cleared geometry callback or property change listener, revalidate root/minimum and native height. View numeric dialog JSpinner28..72, apply onlyonOK, default/reset38. Preserve themes. WindowTabs uses UIScale.scale(owner.tabHeight()). MacTitleBar uses same height and immediately updates attachednativebar onlivechange. Set callback cleanup onclose. No persistent settings subsystem.
+- [x] Extend defaults with platform-aware strings for tab actions only; normalize brace tokens to bracket keycodes plusSHIFT, retain othercmd defaults/override behavior. Use explicit ActionId.defaultBinding(boolean macOs) if useful; no ordinal classification beyond existing numbered actions. Existing shared Actions/root bindings automatically receive newstrokes. Run coveringtests, update README and report RED/GREEN; commit withcoauthor.
 
 ### Task 2: Tab entry and underline animation
 **Files:** WindowTabs.java, small package-private TabMotion.java if interpolation state warrants separation; WindowContent close lifecycle if needed; WindowTabsTest.java/new TabMotionTest.java, MockUiPreview.java and comparison docs as needed.
