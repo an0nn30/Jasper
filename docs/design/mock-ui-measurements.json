@@ -21,7 +21,8 @@
     "status": "#292c34",
     "ansiGreen": "#a8c58d",
     "ansiBlue": "#80b4df",
-    "cursor": "#b3bbc7"
+    "cursor": "#b3bbc7",
+    "titleSeparator": "#313439"
   },
   "rowBoundariesSourcePixels": {
     "titleBottom": 139,
