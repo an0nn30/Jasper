@@ -105,9 +105,9 @@ Retained coverage opportunities: astral search, edge/overlapping highlights, lar
 
 ## 6. Native acceptance and remaining Plan 4 work
 
-The screenshot revision supersedes Plan 3.5 geometry and artwork. User visual/native acceptance remains open; the user approved integration and starting Plan 4. Run from `/Users/dustin/projects/moray` with `./gradlew :moray-app:run`. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
+The screenshot revision supersedes Plan 3.5 geometry and artwork. User visual/native acceptance remains open; the user approved integration and starting Plan 4. The integrated UI baseline runs from `/Users/dustin/projects/moray` with `./gradlew :moray-app:run`. To try Plan 4a before integration, run that command from `/Users/dustin/projects/moray/.worktrees/plan-4`. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
 
-Plan 4: AppDirs/per-OS paths, TOML diagnostics with line numbers and last-good retention, live reload, custom theme loading and persistence, automatic system appearance, settings-file creation, --config, app logging and macOS .app bundling JBR. Carryovers:
+Plan 4a supplies per-OS paths, positioned TOML diagnostics, last-good retention, live reload, Settings creation and --config. Remaining Plan 4 work includes additional terminal settings, custom theme files, automatic system appearance, app logging and macOS .app packaging with JBR. Carryovers:
 
 - Replace printStackTrace/silent I/O catches with appropriate app logging/feedback.
 - Scrub launcher environment variables (TERM_PROGRAM, TMUX, iTerm variables) and provide UTF-8 LANG for Dock launch.
@@ -126,12 +126,12 @@ Any-time performance work: remove unused style-array allocation during text-only
 - macOS Command-click links takes precedence over program mouse reports; Shift provides local mouse behavior; horizontal Shift-wheel on macOS is ignored.
 - The user's approved Phase 1 direction and Plan 3 go-ahead were used for execution; a supplemental written design records concrete app contracts.
 - On Linux/Windows, cmd already means Ctrl+Shift. Defaults explicitly written cmd+shift add Alt to avoid collisions; user overrides parse literally and collisions are errors. macOS defaults are unchanged.
-- Settings/reload and persisted config remain Plan 4. Plan 3.5 supplies coordinated built-in dark/light themes and macOS title-bar work; automatic system appearance waits for Plan 4.
+- Settings/reload and saved configuration were deferred from Plan 3 to Plan 4a and are now implemented. Plan 3.5 supplied coordinated built-in themes and macOS title-bar work; automatic system appearance remains a later Plan 4 deliverable.
 - Four direct multi-pane carryovers were included; the remaining hardening list above is follow-up scope.
 - Native acceptance is user-run per newly merged AGENTS.md. No agent GUI launch or benchmark followed discovery of that rule.
 - The user selected the local `~/projects/tabler-icons` repository. Seven outline assets and full MIT license are bundled; SOURCE.txt records the source commit and theme-color adaptation.
 
-## 8. Workflow and next action
+## 8. Workflow and historical Plan 3 verification
 
 Superpowers spec/plan → task implementer with TDD → separate task review → scoped fix/re-review → final branch review. Reviewed commits: models `a75d5fa`; terminal hooks `56b251d`; lifecycle fixes `73f105c`; desktop `acfc79f`; desktop review fixes `6fac903`/`dcc0b00`; final minor fixes `dda35e2`. Task reviews and final whole-branch review approved. Final fixes synchronize appearance menu state and make the forced-close test wait for installed signal traps. A mutation check confirmed that removing force fallback makes the latter test fail; production cleanup was restored before verification.
 
@@ -183,7 +183,7 @@ Task 1 (`0c4ab43`) approved without findings: shared live native/Swing height, c
 - Default to 38px height and 180ms motion with 3.5% overshoot — makes the row materially shorter and movement quick with a small settle — costs tuning after native viewing.
 - Provide a live current-window height control; persistence stays Plan 4 — keeps existing session-only appearance behavior consistent — costs reapplying height after restart.
 
-Final whole-branch review (`182b9fb..7449ac4`) found one integration issue: the active title’s preferred width changed tab-strip allocation and prematurely settled animation. The single fix wave `20764b3` preserves motion when allocation changes leave tab coordinates valid, and adds three real MacTitleBar/JRootPane regressions. Scoped review (`7449ac4..20764b3`) marked it addressed with no new findings. Twelve motion tests now pass; root fresh final verification is 328 total, 327 passed, one known skip. Native smoothness, controls and physical keyboard-layout acceptance remain user-run. The plan scratch workspace is removed after review; committed reports, plan, source and this handoff preserve the result. The unmerged feature worktree remains at `.worktrees/mock-ui`.
+Final whole-branch review (`182b9fb..7449ac4`) found one integration issue: the active title’s preferred width changed tab-strip allocation and prematurely settled animation. The single fix wave `20764b3` preserves motion when allocation changes leave tab coordinates valid, and adds three real MacTitleBar/JRootPane regressions. Scoped review (`7449ac4..20764b3`) marked it addressed with no new findings. Twelve motion tests now pass; root fresh final verification is 328 total, 327 passed, one known skip. Native smoothness, controls and physical keyboard-layout acceptance remain user-run. The plan scratch workspace is removed after review; committed reports, plan, source and this handoff preserve the result. At that milestone the feature remained in `.worktrees/mock-ui`; section 14 records its subsequent integration and removal.
 
 ## 13. Reverse close animation
 
@@ -193,9 +193,9 @@ Four new real MacTitleBar/JRootPane regressions cover active/inactive closes, cl
 
 ## 14. Approved integration and Plan 4 start
 
-The user explicitly approved merging all current UI work into main and beginning Plan 4 with saved settings and live reload. The reviewed code remains `0f4cd74`; only documentation followed. Main receives the complete branch, then a fresh merged check; the completed mock-ui worktree/branch will be removed after it passes. Plan 4 starts in a new isolated worktree. Native UI/benchmark/daily-use acceptance remains open and is not implied by merge approval.
+The user explicitly approved merging all current UI work into main and beginning Plan 4 with saved settings and live reload. Main received the complete UI branch at `1bd8b49`. Fresh merged verification passed 332 tests (331 passed, one known font skip), and the completed mock-ui worktree/branch were removed. Plan 4a then started in the isolated `.worktrees/plan-4` worktree. Native UI/benchmark/daily-use acceptance remains open and is not implied by merge approval.
 
-Plan4a starts with existing live controls only: tab height, toolbar/status, font size, built-in theme and shortcut overrides. Runtime View choices remain temporary; saved defaults are in the user-edited file. Extra terminal options/customthemes/systemappearance/packaging follow in separate runnable slices. TomlJ1.1.1 is selected for precise TOML source positions.
+Plan 4a covers existing live controls only: tab height, toolbar/status, font size, built-in theme and shortcut overrides. Runtime View choices remain temporary; saved defaults are in the user-edited file. Additional terminal options, custom themes, system appearance and packaging follow in separate runnable slices. TomlJ 1.1.1 is selected for precise TOML source positions.
 
 ## 15. Plan 4a implementation and execution rulings
 
