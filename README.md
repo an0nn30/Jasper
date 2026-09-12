@@ -2,9 +2,9 @@
 
 A cross-platform terminal workstation written in Java Swing, with macOS as the immediate daily-use target and a MobaXterm-style layout. Phase 1 builds the terminal before SSH sessions, credential vault, SFTP, tunnels and plugins.
 
-Moray has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status. Plan 3.5 adds a custom macOS title surface with native window controls, coordinated Atom-inspired dark/light themes, and two-tone colored Tabler toolbar icons.
+Moray has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status. The screenshot UI revision puts tabs beside native macOS window controls, with a horizontal Tabler toolbar below and a status bar that shares the terminal background. Coordinated Atom-inspired dark/light themes update the complete window.
 
-Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). Desktop acceptance remains user-run: [Plan 3](docs/superpowers/plans/2026-09-11-moray-plan-3-manual-check.md) and [Plan 3.5 title bar/themes](docs/superpowers/plans/2026-09-11-moray-plan-3-5-manual-check.md). Passing the headless tests is not the Phase 1 daily-use gate.
+Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). Desktop acceptance remains user-run: [Plan 3](docs/superpowers/plans/2026-09-11-moray-plan-3-manual-check.md) and [screenshot UI](docs/superpowers/plans/2026-09-11-moray-mock-ui-manual-check.md). Passing the headless tests is not the Phase 1 daily-use gate.
 
 ## Requirements
 
@@ -31,7 +31,7 @@ The benchmark opens a temporary window and measures ~100 MB of ANSI output. Mini
 
 On macOS: Cmd+T new tab, Cmd+N new window, Cmd+D split right, Cmd+Shift+D split down, Cmd+Option+arrows focus a pane, Cmd+Shift+Enter zoom, Cmd+F find, F2 rename, Cmd+W close tab, Cmd+Shift+W close pane. Tabs have close controls, support middle-click close and drag reorder. A blank rename restores the shell/directory title.
 
-Cmd+= / Cmd+- / Cmd+0 changes or resets the focused pane's font. Cmd+K clears history while retaining the live screen. Menus expose the full action list. View controls toolbar labels/visibility, status visibility and light/dark appearance across all windows and terminals, including hidden panes. Theme changes retain shells, scrollback, split ratios and font choices. The macOS title surface sits above separate tabs and toolbar. Configuration files and persistence arrive in Plan 4; Settings/Reload are visibly disabled for now.
+Cmd+= / Cmd+- / Cmd+0 changes or resets the focused pane's font. Cmd+K clears history while retaining the live screen. Menus expose the full action list. View controls toolbar labels/visibility, status visibility and light/dark appearance across all windows and terminals, including hidden panes. Theme changes retain shells, scrollback, split ratios and font choices. On macOS the tabs share the title surface, with the toolbar immediately below. The initial app terminal font is16px; Cmd+0 restores it. Configuration files and persistence arrive in Plan 4; Settings/Reload are visibly disabled for now.
 
 On Linux/Windows, `cmd` maps to Ctrl+Shift. Defaults written with an additional explicit Shift add Alt to remain distinct (for example split down is Ctrl+Alt+Shift+D). Ordinary Ctrl remains available to terminal programs.
 
