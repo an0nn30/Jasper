@@ -46,7 +46,7 @@ Reject invalid direct snapshot construction; copy all maps/lists. Result.snapsho
 assertThat(AppDirs.resolve("Mac OS X", Map.of(), Path.of("/home/test")).configFile())
     .isEqualTo(Path.of("/home/test/.config/moray/config.toml"));
 ```
-- [x] Write parser RED tests for all supported fields, quoted keys and keybinding brace/none swaps; precise syntax/type/unknown/value source lines including empty unknown tables and wrong-type known tables. Unknown action warns and ignores; collisions/invalidbinding map defaults witherror. Duplicatekey/malformedsyntax reject; invalidvalues fall back perkey, validothersapply.
+- [x] Write parser RED tests for all supported fields, quoted keys and keybinding brace/none swaps; precise syntax/type/unknown/value source lines including empty unknown tables and wrong-type known tables. Unknown action warns and ignores; collisions/invalidbinding map defaults witherror. Duplicatekey/malformedsyntax reject; invalid values fall back per key, other valid fields apply.
 ```java
 var result = ConfigLoader.parse(Path.of("config.toml"), "[window]\ntab_height = 44\n[font]\nsize = 900", true);
 assertThat(result.rejected()).isFalse();
@@ -54,11 +54,11 @@ assertThat(result.snapshot().tabHeight()).isEqualTo(44);
 assertThat(result.snapshot().fontSize()).isEqualTo(16f);
 assertThat(result.diagnostics().getFirst().line()).isEqualTo(4);
 ```
-- [x] Add TomlJ and implement typed validation using Toml.parse(text), inputPositionOf(List<String>), table key-path APIs and explicit expected types. Known container tables checked before leaves; dynamic keybindings entries handled separately. Preserve quoted dotted unknown keys in diagnostics. Error messages describe required type/range/action without echoing values. Invalidbinding wholemapfallback is distinct from fatal type rejection. Parse only; no I/O or Swing setup. Default bindings use actual existingplatformengine.
-- [x] Run focused tests RED/GREEN, app check and hygiene; commit Task1 files with coauthor and write report to plan scratch dir. Root owns STATUS/spec/plan.
+- [x] Add TomlJ and implement typed validation using Toml.parse(text), inputPositionOf(List<String>), table key-path APIs and explicit expected types. Known container tables checked before leaves; dynamic keybindings entries handled separately. Preserve quoted dotted unknown keys in diagnostics. Error messages describe required type/range/action without echoing values. Invalid binding whole-map fallback is distinct from fatal type rejection. Parse only; no I/O or Swing setup. Default bindings use actual existing platform engine.
+- [x] Run focused tests RED/GREEN, app check and hygiene; commit Task1 files with coauthor and write report to plan scratch dir. Root owns STATUS, spec and plan.
 
 ### Task 2: Safe file lifecycle, generated template and background reload
-**Files:** Create ConfigService.java, ConfigTemplate.java and ConfigServiceTest/ConfigTemplateTest; touch KeyBindings helper only if needed to share effective default string formatting. No WindowContent/GUI integration yet.
+**Files:** Create ConfigService.java, ConfigTemplate.java and ConfigServiceTest/ConfigTemplateTest; touch KeyBindings helper only if needed to share effective default string formatting. No WindowContent or GUI integration yet.
 **Consumes:** Task1 contracts. **Produces:**
 ```java
 final class ConfigService implements AutoCloseable {
@@ -76,8 +76,8 @@ final class ConfigTemplate {
     static void ensureExists(Path file, boolean macOs) throws IOException;
 }
 ```
-A package-private constructor may accept ScheduledExecutorService and Consumer<Runnable> publisher for deterministic lifecycle tests; do not add a custom interface. Service owns supplied worker and shuts it down onclose. State defensively copies diagnostics. Default constructor/initial read called only offEDT.
-- [ ] Write filesystem RED tests with @TempDir: initial missing defaults/no creation, valid load, invalid file retainslastgood, recovery, delete defaults, same-mtime forced reload, unchanged poll no duplicatepublication, unreadable/oversized (>1MiB) rejection. Test callbackdelivery on EDT, openeroffEDT and close drops alreadyqueuedpublication. Use futures/latches/manualpublisher, no sleeps/timing guesses.
+A package-private constructor may accept ScheduledExecutorService and Consumer<Runnable> publisher for deterministic lifecycle tests; do not add a custom interface. Service owns supplied worker and shuts it down on close. State defensively copies diagnostics. Default constructor/initial read called only off EDT.
+- [ ] Write filesystem RED tests with @TempDir: initial missing defaults/no creation, valid load, invalid file retainslast-good, recovery, delete defaults, same-mtime forced reload, unchanged poll with no duplicate publication, unreadable/oversized (>1MiB) rejection. Test callback delivery on EDT, opener off EDT and close drops already queued publication. Use futures/latches/manual publisher, no sleeps/timing guesses.
 ```java
 Files.writeString(file, "[window]\ntab_height=44");
 try (var service = new ConfigService(file, true)) {
@@ -86,13 +86,13 @@ try (var service = new ConfigService(file, true)) {
     assertThat(service.reload().get(5, TimeUnit.SECONDS).snapshot().tabHeight()).isEqualTo(44);
 }
 ```
-- [ ] Template RED tests: generatedtemplate parses clean on bothplatforms, comments document every supportedkey/default/livebehavior andeveryactionID, uncommented individual defaultkeybindings roundtrip actualeffectiveplatformdefaults (including nonMacAltcompatibility). Existingfile bytes survive repeated/concurrentensureExists; parentdirectoriescreatedonlywhenexplicitlyrequested; reader errors reported ratherthanoverwriting. Coveractualfunctions, notsource-text mirroring.
-- [ ] Implement bounded UTF8 read via readNBytes(1MiB+1), immutableState and last-goodretention. Poll every1second on one scheduledworker; fingerprintmtime+size, forceReloadbypass; missingfiledefaults; parse/I/Oerrorspublishdiagnostics; changedstateonlypublication. Every queued EDT callbackchecksclosed. Initialstate available beforeUI; startsinglelistener once. No service-ownedUI or applicationlaunch. Requestsafterclose fail/ignore coherently withoutqueuedleaks.
-- [ ] Implement documented template and CREATE_NEW only, catchFileAlreadyExists withoutrewriting. openSettings executesensureExists then injectedopener offEDT and reloadscreatedtemplate; exception completesfuture exceptionally soapplicationcanreport. Neveropen actualdesktop in tests. Runfocusedtests/appcheck/hygiene, commit/report.
+- [ ] Template RED tests: generated template parses clean on both platforms, comments document every supported key, default and live behavior andevery action ID, uncommented individual default keybindings roundtrip actual effective platform defaults (including nonMacAltcompatibility). Existing file bytes survive repeated/concurrent ensureExists; parent directories created only when explicitly requested; reader errors reported rather than overwriting. Cover actual functions, notsource-text mirroring.
+- [ ] Implement bounded UTF8 read via readNBytes(1MiB+1), immutable State and last-good retention. Poll every 1 second on one scheduled worker; fingerprint mtime + size, forced reload bypass; missing file defaults; parse/I/O errors publish diagnostics; publish changed state only. Every queued EDT callback checks closed. Initial state available before UI; start a single listener once. No service-owned UI or application launch. Requests after close fail/ignore coherently without queued leaks.
+- [ ] Implement documented template and CREATE_NEW only, catch FileAlreadyExists without rewriting. openSettings executes ensureExists then the injected opener off EDT and reloads the created template; an exception completes the future exceptionally so the application can report it. Never open the actual desktop in tests. Run focused tests, app check and hygiene, commit/report.
 
 ### Task 3: Live application settings, actions and status diagnostics
-**Files:** Create ConfigurationController.java, ConfigEditor.java and integrationtests. Modify Main.java, MorayApplication.java, TerminalWindow.java, WindowContent.java, WindowChrome.java, WindowStatusBar.java and themeproperties; README/docs/configuration.md. TerminalPane only if required for pending-configuredfont handling, no terminalmodulechanges.
-**Consumes:** Task1/2 contracts. **Produces:** Actual runnablefile-backed app. Suggested coordinatorboundary:
+**Files:** Create ConfigurationController.java, ConfigEditor.java and integration tests. Modify Main.java, MorayApplication.java, TerminalWindow.java, WindowContent.java, WindowChrome.java, WindowStatusBar.java and theme properties; README/docs/configuration.md. TerminalPane only if required to apply configured fonts to pending launches; no terminal-module changes.
+**Consumes:** Task1/2 contracts. **Produces:** Actual runnable file-backed app. Suggested coordinator boundary:
 ```java
 final class ConfigurationController implements AutoCloseable {
     ConfigurationController(ThemeController themes, ConfigService service); // EDT
@@ -102,20 +102,20 @@ final class ConfigurationController implements AutoCloseable {
     public void close();
 }
 ```
-Controller uses service.macOs() whenever it materializes snapshot bindings; the parse and application platforms must match. Controllerselectsinitialtheme once and changedconfiguredtheme thereafter, not on eachnewownerregistration. It ownsservice lifecycle. Existingownerconstructors staycompatible for fixtures; configactionsenabled onlywhenconnected. New WindowContent.bindings becomesreplaceable; store lastconfiguredsnapshot/fontresetdefault, callbacksforSettings/Reload/diagnostics/unregister. No duplicate shortcut engine.
+Controller uses service.macOs() whenever it materializes snapshot bindings; the parse and application platforms must match. Select the initial theme once and update it when the configured theme changes. Registering a new owner must preserve the current global theme. The controller owns the service lifecycle. Existing owner constructors remain compatible with fixtures; configuration actions are enabled only when connected. Make WindowContent.bindings replaceable, store the configured snapshot and font reset default, and provide callbacks for Settings, Reload, diagnostics and unregister. Keep the existing shortcut engine.
 - [ ] Write failing actualWindowContent/JRootPane tests withtemporaryConfigService: initialsnapshot, liveheight/toolbar/status/font/theme acrossmultipleowners/hiddenviews, no sessionreplacement, pendinglaunch inheritsnewconfiguredfont, fontresetusesconfiguredsize. Unrelatedfilefieldchangespreservemanualfont/height/theme/visibility; changedfieldreapplies; newownergetsconfigureddefaultswithoutresettingglobalmanualtheme. Useexistingcontrolledtestlaunchers, nocallingrealGUI.
-- [ ] Write failing livebindingtests: oldrootstroke removed, newstroke dispatchesactualaction, none clearsaccelerator, nativefindfieldcopy/paste retainsediting, toolbarhint updated throughAction. Configinvalidsyntax updatesstatus whilelastgoodbehaviorretained; warnings/errorsclick opensselectableplaintextdetails withpath/line; rightlabel remainsboundedatnarrowwidth. Settings/Reload enableanddispatch; close unregistersandlatepublicationcannotmutateclosedowner.
+- [ ] Write failing livebindingtests: oldrootstroke removed, newstroke dispatchesactualaction, none clearsaccelerator, nativefindfieldcopy/paste retainsediting, toolbarhint updated throughAction. Configinvalidsyntax updatesstatus whilelast-goodbehaviorretained; warnings/errorsclick opensselectableplaintextdetails withpath/line; rightlabel remainsboundedatnarrowwidth. Settings/Reload enableanddispatch; close unregistersandlatepublicationcannotmutateclosedowner.
 ```java
 // After an actual file reload removing NEW_TAB:
 assertThat(root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(oldStroke)).isNull();
 assertThat(owner.action(ActionId.NEW_TAB).getValue(Action.ACCELERATOR_KEY)).isNull();
 ```
-- [ ] Wire Main.parseargs offEDT, help/error exitswithoutUI, resolvepath+constructserviceinitialread beforeSwing invoke. ConstructMorayApplication withservice thenConfigurationController usingexistingThemeController. RegisterWindowContent beforeframebinding/show; new/pendingpanes configuredviaexistingonReady path. Closecontroller/service atapplicationshutdown; ownercloseunregisters. Preserveall existingconstructors/callers throughoverloads.
+- [ ] Wire Main.parseargs off EDT, help/error exitswithoutUI, resolvepath+constructserviceinitialread beforeSwing invoke. ConstructMorayApplication withservice thenConfigurationController usingexistingThemeController. RegisterWindowContent beforeframebinding/show; new/pendingpanes configuredviaexistingonReady path. Closecontroller/service atapplicationshutdown; ownercloseunregisters. Preserveall existingconstructors/callers throughoverloads.
 - [ ] Apply per-field differences only. Initialregister appliesheight/toolbar/status/font/bindings; futurefilefont changesapplyallviews andstoreddefault, newviews readlatestdefault; FONT_RESET usesconfigureddefault. setBindings removesoldrootmaps, clearsallactionaccelerators and reinstalls newset; handlers continue consultingcurrentengine. ThemeController ownsglobaltheme andlivepalette application. No shellrestart orterminalstateclearing.
-- [ ] ConfigEditor defaultopen/edit thenreveal usesDesktop APIs on serviceworker; injectedConsumers forfailure/fallbacktests. No actualDesktop tests. Settings failures reportedthroughowner.onError onEDT. Status getsrealaccessibleconfigbutton (green/amber/red semanticcolors), label/pathtooltip andplainselectabledialog. Preserve existing shell/path/grid andbackground/minimumwidthcontracts; noHTML fromuntrustedstrings. Disablecallbacks afterclose.
-- [ ] AddREADME/configurationguide withsupportedkeys, configpath/--config, settingscreation, reload/errorsemantics, current-windowoverridepolicy, examplesactualmac/nonMackeybindings andexplicitremainingPlan4scope. Manualchecksfornativeeditor/reload/shortcuts preserved rootownsSTATUS. Runcoveringtests, fullcheck/hygiene, commit/report.
+- [ ] ConfigEditor defaultopen/edit thenreveal usesDesktop APIs on serviceworker; injectedConsumers forfailure/fallbacktests. No actualDesktop tests. Settings failures reportedthroughowner.onError on EDT. Status getsrealaccessibleconfigbutton (green/amber/red semanticcolors), label/pathtooltip andplainselectabledialog. Preserve existing shell/path/grid andbackground/minimumwidthcontracts; noHTML fromuntrustedstrings. Disablecallbacks afterclose.
+- [ ] AddREADME/configurationguide withsupportedkeys, configpath/--config, settingscreation, reload/errorsemantics, current-windowoverridepolicy, examplesactualmac/nonMackeybindings andexplicitremainingPlan4scope. Manualchecksfornativeeditor/reload/shortcuts preserved root owns STATUS. Runcoveringtests, fullcheck/hygiene, commit/report.
 
 ## Root acceptance
-- [ ] Independent taskreviews, finalwholebranchreview, fixesverified.
-- [ ] Freshfullcheck, sourcehygiene/diffchecks; inspectactualheadlessstatusgeometry wherechanged.
-- [ ] STATUS records mergedUI baseline, Plan4a delivery/remaining4b scope, allrulings andnativeacceptancepending.
+- [ ] Independent task reviews, final whole-branch review and verified fixes.
+- [ ] Fresh full check, source hygiene and diff checks; inspect actual headless status geometry where changed.
+- [ ] STATUS records the merged UI baseline, Plan 4a delivery, remaining Plan 4 scope, all rulings and pending native acceptance.
