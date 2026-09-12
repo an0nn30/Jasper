@@ -8,14 +8,23 @@ Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). 
 
 ## Requirements
 
-Java 25 on the **JetBrains Runtime** (JBR JDK). Gradle requires vendor JetBrains and discovers the runtime automatically on the development Mac. Use the wrapper, not a system Gradle installation.
+Install the **JetBrains Runtime SDK 25 (JBR SDK)**, including `jpackage`; a JRE or a JDK from another vendor is insufficient. Gradle requires vendor JetBrains and discovers the SDK automatically on the development Mac. If discovery fails, set `JAVA_HOME` to the SDK and add its `bin` directory to `PATH`, or set `org.gradle.java.installations.paths` in Gradle properties. Use the checked-in Gradle wrapper, not a system Gradle installation. The first build downloads Gradle and dependencies.
 
 ## Build and run
 
+From the repository root, compile and run the headless tests:
+
 ```bash
-./gradlew check
+./gradlew build
+```
+
+To run from source:
+
+```bash
 ./gradlew :moray-app:run
 ```
+
+On Windows, use `.\gradlew.bat build` and `.\gradlew.bat :moray-app:run` from PowerShell. To run only the headless checks, use `./gradlew check` (Windows: `.\gradlew.bat check`).
 
 `check` is headless. `run` opens windows and starts your login shell. Coding agents must follow [AGENTS.md](AGENTS.md) and leave GUI checks to the user.
 
@@ -26,6 +35,53 @@ For the throughput benchmark, when no game or VM is running:
 ```
 
 The benchmark opens a temporary window and measures ~100 MB of ANSI output. Minimum acceptance is 35 MB/s; target 45 MB/s. See STATUS for recorded measurements and pending verification.
+
+## Build a macOS app and DMG
+
+Run this **on macOS**, with a JBR SDK matching the build architecture: Apple Silicon (`aarch64`) or Intel (`x64`). From the repository root:
+
+```bash
+./gradlew check :moray-app:packageDist
+```
+
+This compiles Moray, runs the headless tests, creates `Moray.app` with its own JBR runtime, verifies the application image, and builds and verifies the DMG. It does not launch Moray.
+
+With the default package version `1.0.0`, the outputs are:
+
+| Output | Path |
+|---|---|
+| Application | `moray-app/build/packaging/image/Moray.app` |
+| Apple Silicon DMG | `moray-app/build/packaging/dist/Moray-1.0.0-macos-aarch64.dmg` |
+| Intel DMG | `moray-app/build/packaging/dist/Moray-1.0.0-macos-x64.dmg` |
+
+Each build produces the DMG for its own architecture. Open the DMG and drag `Moray.app` to Applications to install it. The packaged app needs no separately installed Java runtime. Current development builds are ad-hoc signed; Developer ID signing and notarization are not included.
+
+To build only the `.app`, or verify the image without opening the desktop:
+
+```bash
+./gradlew :moray-app:packageApp
+./gradlew :moray-app:verifyPackage
+```
+
+To set a package version:
+
+```bash
+./gradlew check :moray-app:packageDist -PmorayVersion=1.0.1
+```
+
+Versions use `X.Y.Z`: major 1–255, minor 0–255, patch 0–65535, with no leading zeroes. The native macOS packager requires a positive major version.
+
+## Build a Windows portable ZIP
+
+Run this **on Windows x64**, with a JBR SDK 25 x64 installation. From the repository root in PowerShell:
+
+```powershell
+.\gradlew.bat check :moray-app:packageDist
+```
+
+The default output is `moray-app\build\packaging\dist\Moray-1.0.0-windows-x64.zip`. Extract the complete `Moray` folder and run `Moray.exe`; keep the launcher, `app` and `runtime` together. No external Java or WiX installation is needed to use the ZIP; building it requires the JBR SDK. The unpacked build image is at `moray-app\build\packaging\image\Moray`.
+
+`jpackage` builds packages on their target operating system; the Mac build cannot produce the Windows ZIP. Windows packaging and desktop behavior still need manual verification on Windows. See the [packaging guide](docs/packaging.md) for the separate macOS and Windows acceptance checklists.
 
 ## Using the application
 
