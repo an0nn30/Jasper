@@ -2,7 +2,7 @@
 
 **As of:** 2026-09-11. All UI work is merged into main at `1bd8b49`; merged verification passed 332 tests (331 passed, one known font skip), all eight tasks executed. The completed mock-ui worktree/branch were removed. Plan 4a is active on `codex/plan-4-config` in `.worktrees/plan-4`, with the same clean 332-test baseline. See [config design](superpowers/specs/2026-09-11-moray-plan-4a-config-design.md) and [implementation plan](superpowers/plans/2026-09-11-moray-plan-4a-config.md). Native UI, benchmark and daily-use acceptance remain open.
 
-**Plan 4a progress:** Paths, CLI parsing and immutable TOML validation are implemented and reviewed (`8c6fa0e`). The background file service, create-only settings template and reload/shutdown lifecycle are implemented and reviewed (`e25b4c8`), with 142 app tests passing. Application integration is active: Settings/Reload controls, live application of changed fields, shortcut replacement and status diagnostics. Full-branch and native acceptance are not yet complete.
+**Plan 4a progress:** Saved settings and live reload are implemented on `codex/plan-4-config`, with all three task reviews complete through `9c0ae64`. Fresh full verification: 394 tests, 393 passed and one known font skip, no failures/errors. Actual status renders passed visual inspection in dark/light at normal/narrow widths. Final whole-branch review is pending. See [configuration usage](configuration.md), [status renders](design/config-status-comparison.md) and [native acceptance](superpowers/plans/2026-09-11-moray-plan-4a-manual-check.md).
 
 **Current follow-up:** Default title/tab height is now 38px, configurable from 28–72 through View → Tab height… for the current window. Both Swing and native height use the same value; reset restores 38, cancellation preserves the previous value. Height survives theme changes but is session-only. Opening and closing tabs and the selected underline animate with a shared 180ms eased settle; selection/focus/launch remain immediate and timers stop when idle/hidden/disposed. The existing shortcut engine now provides Cmd/Ctrl+1–9 and Cmd/Ctrl+{ / } (Shift+brackets), with plain Ctrl for tab navigation outside macOS. Unrelated shortcut behavior is retained. [Design](superpowers/specs/2026-09-11-moray-tab-motion-design.md), [plan](superpowers/plans/2026-09-11-moray-tab-motion.md), [native checks](superpowers/plans/2026-09-11-moray-tab-motion-manual-check.md).
 
@@ -21,7 +21,7 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
 | 3.5 — macOS chrome, themes and toolbar | Integrated on main and fully reviewed; native acceptance pending |
 | Screenshot UI revision | Implemented and fully reviewed; compact/motion follow-up implemented and fully reviewed; native acceptance pending; integrated on main |
-| 4a — Saved settings and live reload | Active: paths/parser, file service, live UI integration |
+| 4a — Saved settings and live reload | Implemented with task reviews complete; final branch review and native acceptance pending |
 | 4b onward — Remaining configuration and packaging | Additional terminal options, custom themes/system appearance, logging/launcher and .app packaging remain |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart Plan 3 or Plan 3.5; the active configuration work is in `.worktrees/plan-4`.
@@ -45,7 +45,9 @@ Plan 3 adds:
 - Per-pane font controls, screen-preserving history clear, working-directory inheritance with launch-time validation.
 - Background shell launch with close-before-completion cleanup; native Quit routes through app cleanup.
 
-Settings and Reload config are visible but disabled; status says Built-in defaults. No configuration file is read or written. Appearance choices are session-only. The earlier Plan 3.5 implementation (visual geometry superseded below) includes:
+Plan 4a now reads saved TOML settings, polls for changes, enables Settings/Reload and exposes positioned diagnostics through status. Configured height, toolbar/status visibility, font size, built-in theme and shortcuts apply live across owners. Unrelated reloads preserve temporary View/font overrides; Settings creates a template only when absent. The integrated UI baseline on main predates this configuration behavior.
+
+The earlier Plan 3.5 implementation (visual geometry superseded below) includes:
 
 - Live dark/light terminal palettes and coordinated FlatLaf themes (`09e382e`, `6bdd298`). Existing hidden/zoomed panes, delayed launches and new windows use the selected theme while retaining sessions, fonts, selection/find state and split ratios. Explicit terminal truecolor remains unchanged.
 - A slim macOS title surface (`7833692`) using the decorated frame and supported public properties. Native traffic lights and window behavior remain owned by macOS; separate tabs and toolbar sit beneath the title. Other platforms retain their existing decorations.
@@ -101,7 +103,7 @@ These carried-over findings remain explicitly open; they were not silently count
 
 Retained coverage opportunities: astral search, edge/overlapping highlights, large-history indicator geometry, multi-row URL continuation lookup, empty-scrollback viewport, middle-button routing, copy-on-select, alternate-screen wheel/arrows, multi-notch reports, paste-to-live, Shift+PageDown and match colors. Add behavioral regressions when working in these areas, not tests that mirror source constants.
 
-## 6. Next: native acceptance, then Plan 4
+## 6. Native acceptance and remaining Plan 4 work
 
 The screenshot revision supersedes Plan 3.5 geometry and artwork. User visual/native acceptance remains open; the user approved integration and starting Plan 4. Run from `/Users/dustin/projects/moray` with `./gradlew :moray-app:run`. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
 
@@ -194,3 +196,16 @@ Four new real MacTitleBar/JRootPane regressions cover active/inactive closes, cl
 The user explicitly approved merging all current UI work into main and beginning Plan 4 with saved settings and live reload. The reviewed code remains `0f4cd74`; only documentation followed. Main receives the complete branch, then a fresh merged check; the completed mock-ui worktree/branch will be removed after it passes. Plan 4 starts in a new isolated worktree. Native UI/benchmark/daily-use acceptance remains open and is not implied by merge approval.
 
 Plan4a starts with existing live controls only: tab height, toolbar/status, font size, built-in theme and shortcut overrides. Runtime View choices remain temporary; saved defaults are in the user-edited file. Extra terminal options/customthemes/systemappearance/packaging follow in separate runnable slices. TomlJ1.1.1 is selected for precise TOML source positions.
+
+## 15. Plan 4a implementation and execution rulings
+
+Parser/paths/CLI: `8c6fa0e`. File service/template: `e25b4c8`. Live application integration: `a18de61`. Review fixes: `9c0ae64` (all modifiers in rendered toolbar hints and removal of obsolete configuration tooltip). Task reviews are complete with no open findings. Full check after fixes executed all eight Gradle tasks: app 158 passed; terminal 235 passed and one known skip. Source hygiene and diff checks passed. No terminal-module changes were needed.
+
+The configuration service retains its parse platform for application of shortcuts. Existing Action-backed toolbar hints and pending-pane hooks were reused; the toolbar formatter was corrected after review exposed its omission of extra macOS modifiers. Native editor, real window and daily-use acceptance remain user-run. The implementation remains in the Plan 4 worktree until separately integrated.
+
+- Ruling: The user approved local UI merge and starting the proposed first Plan4 deliverable; execute without repeating design approval — follows explicit go-ahead — costs rework if detailed choices differ from intent.
+- Ruling: Split Plan4 into runnable stages, first covering existing live controls and config lifecycle — follows the accepted saved-settings/live-reload first step and repository one-deliverable-per-plan rule — costs waiting for additional terminal options, custom themes, automatic appearance and packaging.
+- Ruling: Saved defaults are file contents; runtime View choices remain temporary and unrelated reloads preserve them — respects the parent prohibition on unasked config writes — costs editing the file to persist a menu adjustment.
+- Ruling: Select TomlJ1.1.1 for positioned diagnostics instead of Jackson binding — upstream API provides parser and key positions directly, an alternative allowed by the parent — costs one parser dependency and validation code.
+- Ruling: Invalid or colliding shortcut values fall back to the entire default binding map, while unknown action names warn and are ignored — bindings are mutually constrained and per-action fallbacks can introduce collisions — costs resetting valid custom bindings in the same invalid map until corrected.
+- Ruling: Expose the service’s immutable parse platform to the controller and use it to materialize snapshot bindings — resolves the task review’s cross-platform collision concern without changing immutable snapshot data — costs a small package-private accessor.
