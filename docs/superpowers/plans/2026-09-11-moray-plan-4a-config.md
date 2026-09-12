@@ -41,12 +41,12 @@ final class ConfigLoader {
 }
 ```
 Reject invalid direct snapshot construction; copy all maps/lists. Result.snapshot is candidate/defaults when rejected, and callers must retain prior snapshot on rejected=true. Diagnostics positions1-based, line0 only when unavailable. No raw arbitrary values in messages.
-- [ ] Write failing real-input tests for all platform path fallbacks/override normalization, help/unknown/missing/duplicate args; no directories created. Cases include relative XDG path and missing APPDATA.
+- [x] Write failing real-input tests for all platform path fallbacks/override normalization, help/unknown/missing/duplicate args; no directories created. Cases include relative XDG path and missing APPDATA.
 ```java
 assertThat(AppDirs.resolve("Mac OS X", Map.of(), Path.of("/home/test")).configFile())
     .isEqualTo(Path.of("/home/test/.config/moray/config.toml"));
 ```
-- [ ] Write parser RED tests for all supported fields, quoted keys and keybinding brace/none swaps; precise syntax/type/unknown/value source lines including empty unknown tables and wrong-type known tables. Unknown action warns and ignores; collisions/invalidbinding map defaults witherror. Duplicatekey/malformedsyntax reject; invalidvalues fall back perkey, validothersapply.
+- [x] Write parser RED tests for all supported fields, quoted keys and keybinding brace/none swaps; precise syntax/type/unknown/value source lines including empty unknown tables and wrong-type known tables. Unknown action warns and ignores; collisions/invalidbinding map defaults witherror. Duplicatekey/malformedsyntax reject; invalidvalues fall back perkey, validothersapply.
 ```java
 var result = ConfigLoader.parse(Path.of("config.toml"), "[window]\ntab_height = 44\n[font]\nsize = 900", true);
 assertThat(result.rejected()).isFalse();
@@ -54,8 +54,8 @@ assertThat(result.snapshot().tabHeight()).isEqualTo(44);
 assertThat(result.snapshot().fontSize()).isEqualTo(16f);
 assertThat(result.diagnostics().getFirst().line()).isEqualTo(4);
 ```
-- [ ] Add TomlJ and implement typed validation using Toml.parse(text), inputPositionOf(List<String>), table key-path APIs and explicit expected types. Known container tables checked before leaves; dynamic keybindings entries handled separately. Preserve quoted dotted unknown keys in diagnostics. Error messages describe required type/range/action without echoing values. Invalidbinding wholemapfallback is distinct from fatal type rejection. Parse only; no I/O or Swing setup. Default bindings use actual existingplatformengine.
-- [ ] Run focused tests RED/GREEN, app check and hygiene; commit Task1 files with coauthor and write report to plan scratch dir. Root owns STATUS/spec/plan.
+- [x] Add TomlJ and implement typed validation using Toml.parse(text), inputPositionOf(List<String>), table key-path APIs and explicit expected types. Known container tables checked before leaves; dynamic keybindings entries handled separately. Preserve quoted dotted unknown keys in diagnostics. Error messages describe required type/range/action without echoing values. Invalidbinding wholemapfallback is distinct from fatal type rejection. Parse only; no I/O or Swing setup. Default bindings use actual existingplatformengine.
+- [x] Run focused tests RED/GREEN, app check and hygiene; commit Task1 files with coauthor and write report to plan scratch dir. Root owns STATUS/spec/plan.
 
 ### Task 2: Safe file lifecycle, generated template and background reload
 **Files:** Create ConfigService.java, ConfigTemplate.java and ConfigServiceTest/ConfigTemplateTest; touch KeyBindings helper only if needed to share effective default string formatting. No WindowContent/GUI integration yet.
@@ -65,6 +65,7 @@ final class ConfigService implements AutoCloseable {
     record State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present) {}
     ConfigService(Path file, boolean macOs); // initial read off EDT, owns one background scheduled worker
     State initialState();
+    boolean macOs(); // stable parse platform, also used when applying bindings
     void start(Consumer<State> listener); // one listener, published on EDT by default
     CompletableFuture<State> reload(); // forced read, serialized with polling
     CompletableFuture<Path> openSettings(Consumer<Path> opener); // background create-if-absent then open
@@ -101,7 +102,7 @@ final class ConfigurationController implements AutoCloseable {
     public void close();
 }
 ```
-Controllerselectsinitialtheme once and changedconfiguredtheme thereafter, not on eachnewownerregistration. It ownsservice lifecycle. Existingownerconstructors staycompatible for fixtures; configactionsenabled onlywhenconnected. New WindowContent.bindings becomesreplaceable; store lastconfiguredsnapshot/fontresetdefault, callbacksforSettings/Reload/diagnostics/unregister. No duplicate shortcut engine.
+Controller uses service.macOs() whenever it materializes snapshot bindings; the parse and application platforms must match. Controllerselectsinitialtheme once and changedconfiguredtheme thereafter, not on eachnewownerregistration. It ownsservice lifecycle. Existingownerconstructors staycompatible for fixtures; configactionsenabled onlywhenconnected. New WindowContent.bindings becomesreplaceable; store lastconfiguredsnapshot/fontresetdefault, callbacksforSettings/Reload/diagnostics/unregister. No duplicate shortcut engine.
 - [ ] Write failing actualWindowContent/JRootPane tests withtemporaryConfigService: initialsnapshot, liveheight/toolbar/status/font/theme acrossmultipleowners/hiddenviews, no sessionreplacement, pendinglaunch inheritsnewconfiguredfont, fontresetusesconfiguredsize. Unrelatedfilefieldchangespreservemanualfont/height/theme/visibility; changedfieldreapplies; newownergetsconfigureddefaultswithoutresettingglobalmanualtheme. Useexistingcontrolledtestlaunchers, nocallingrealGUI.
 - [ ] Write failing livebindingtests: oldrootstroke removed, newstroke dispatchesactualaction, none clearsaccelerator, nativefindfieldcopy/paste retainsediting, toolbarhint updated throughAction. Configinvalidsyntax updatesstatus whilelastgoodbehaviorretained; warnings/errorsclick opensselectableplaintextdetails withpath/line; rightlabel remainsboundedatnarrowwidth. Settings/Reload enableanddispatch; close unregistersandlatepublicationcannotmutateclosedowner.
 ```java
