@@ -11,7 +11,7 @@ Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferr
 ## Never do these without the user
 
 - **Do not launch the GUI** (`./gradlew :moray-app:run`, or anything that opens a window and starts the user's login shell on their desktop) from an unattended agent. Hand GUI checks to the user. The benchmark (`./gradlew :moray-app:bench`) opens a window for a few seconds; run it only when asked, and skip it while a game or VM is running (the user's Mac once froze while Minecraft was running — unrelated, but be careful).
-- Do not commit directly on `main`: work on a branch and merge when the user agrees. End commit messages with a `Co-Authored-By:` trailer. There is no git remote; ask before adding one or pushing.
+- Do not commit directly on `main`: work on a branch and merge when the user agrees. End commit messages with a `Co-Authored-By:` trailer. The user authorized `origin` at `https://github.com/an0nn30/moray.git`; ask before pushing unless the session already authorizes it.
 
 ## Architecture rules (from the spec and the plans' Global Constraints)
 
