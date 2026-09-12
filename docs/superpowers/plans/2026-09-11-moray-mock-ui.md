@@ -19,7 +19,7 @@
 **Files:** Create WindowTabs.java and TerminalDeck.java under moray-app/src/main/java/dev/moray/app; modify WindowContent.java, MacTitleBar.java, TerminalWindow.java and moray-app/build.gradle.kts. Add WindowTabsTest.java and revise MacTitleBarTest.java. Add plain terminal-2.svg/x.svg/plus.svg assets with attribution as needed, isolated from Task2's toolbar assets.
 **Consumes:** WindowContent.tabStrip(), selectTab(TerminalTab), closeTab(TerminalTab), reorderTab(int,int), action(NEW_TAB), update callbacks; protected FlatTabbedPaneUI.hideTabArea().
 **Produces:** WindowContent.windowTabs(): WindowTabs; WindowTabs.refresh(), setActive(boolean); retained JTabbedPane deck with hidden header; MacTitleBar hosts WindowTabs on supportedMac. Native attachment method on MacTitleBar receives actual JFrame, used only by TerminalWindow; headless install remains testable.
-- [ ] Write EDT failures for selection/close/middle-click/reorder against actual model, overflow/long labels, plus action, new54px title geometry/native insets and single visible header. Existing component identities must remain across refresh/theme. Example:
+- [x] Write EDT failures for selection/close/middle-click/reorder against actual model, overflow/long labels, plus action, new54px title geometry/native insets and single visible header. Existing component identities must remain across refresh/theme. Example:
 ```java
 owner.newTab(HOME);
 TerminalTab selected=owner.currentTab();
@@ -30,7 +30,7 @@ assertThat(owner.currentTab()).isSameAs(selected);
 assertThat(owner.windowTabs().getPreferredSize().height).isEqualTo(54);
 ```
 Run focused WindowTabsTest/MacTitleBarTest, record RED. Replace superseded symmetric28px centered-title expectations.
-- [ ] Implement TerminalDeck updateUI with FlatTabbedPaneUI override:
+- [x] Implement TerminalDeck updateUI with FlatTabbedPaneUI override:
 ```java
 setUI(new FlatTabbedPaneUI() {
     @Override protected boolean hideTabArea() { return true; }
@@ -38,7 +38,7 @@ setUI(new FlatTabbedPaneUI() {
 });
 ```
 Use WRAP layout, no per-tab visual headers. Keep model APIs. WindowTabs uses actual controls (tab icon/title/close, plus, overflow navigation), identity-based entries and bounded sizing. Update WindowContent layout north container to WindowTabs then toolbar; refresh metadata without rebuilding controls per terminal output. MacTitleBar moves that same strip into54px native header with98px safeleftminimum and bounded trailing title, removes old duplicate header. Native titlemetadata `<title> — Moray` atthisboundary (keep Main.windowTitle existing contract). Accessible titles literal, HTMLdisabled.
-- [ ] Add app dependency jbr-api1.9.0 and supported native attachment:
+- [x] Add app dependency jbr-api1.9.0 and supported native attachment:
 ```java
 if (JBR.isWindowDecorationsSupported()) {
     var decorations=JBR.getWindowDecorations();
@@ -48,7 +48,7 @@ if (JBR.isWindowDecorationsSupported()) {
 }
 ```
 Set scaledlogicalheight based on actualheader, account nativeleft/rightinsets; attach/detach lifecycle, refresh bounds after peer/fullscreen/layout. Use verifiedpublicAPI; graceful root-property fallback. Interactive tab mouse listeners provide JBRclient hit testing; blank title has no mouse listeners. Retain native decoration minimum propagation. Verify pinned source for integration details rather than assumptions.
-- [ ] Run appcheck, report exact counts/RED/GREEN and limits; commit task files withcoauthor. Taskreview beforeTask2.
+- [x] Run appcheck, report exact counts/RED/GREEN and limits; commit task files withcoauthor. Taskreview beforeTask2.
 
 ### Task 2: Reference toolbar, terminal/status surface and visual verification
 **Files:** Modify WindowChrome.java, AppIcons.java, WindowContent.java, TerminalPane.java, WindowTabs.java/MacTitleBar.java appearance details, theme properties, original seven toolbar SVGs/SOURCE.txt; Palette.java background and directly affected palette tests. Create WindowStatusBar.java, MockUiTest.java and test-only MockUiPreview.java; add moray-app Gradle headless preview task. Update AppIconsTest/WindowChromeTest and any obsolete appearance assertions. Commit actual previews docs/design/mock-ui-{dark,light}.png and measured comparison report.
