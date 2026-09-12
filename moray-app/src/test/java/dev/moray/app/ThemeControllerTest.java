@@ -84,7 +84,7 @@ class ThemeControllerTest {
             owners[0].selectTab(retained[0]);
             assertThat(first[0].view().getBackground()).isEqualTo(new Color(0xfafafa));
             appearance(owners[1]).getItem(1).doClick();
-            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0x282c34));
+            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0x292c34));
             assertThat(first[0].findBar().result().error()).isNotNull();
         });
     }
@@ -174,7 +174,7 @@ class ThemeControllerTest {
             assertThatThrownBy(() -> themes.select(BuiltinTheme.LIGHT)).isInstanceOf(IllegalStateException.class);
             assertThat(UIManager.getLookAndFeel()).isSameAs(before);
             assertThat(themes.current()).isEqualTo(BuiltinTheme.DARK);
-            assertThat(owner.getBackground()).isEqualTo(new Color(0x282c34));
+            assertThat(owner.getBackground()).isEqualTo(new Color(0x292c34));
             assertThat(changed).isEmpty();
         });
     }
@@ -226,7 +226,7 @@ class ThemeControllerTest {
             for (BuiltinTheme theme : BuiltinTheme.values()) {
                 themes.select(theme);
                 assertThat(owner.getBackground()).isEqualTo(theme.palette().background());
-                assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Moray.titleBackground"));
+                assertThat(owner.toolbar().getBackground()).isEqualTo(theme.palette().background());
                 assertThat(UIManager.getColor("TabbedPane.selectedBackground")).isEqualTo(theme.palette().background());
                 for (String prefix : new String[]{"Panel", "TextField", "MenuItem", "PopupMenu", "Button"}) {
                     assertThat(contrast(UIManager.getColor(prefix + ".foreground"), UIManager.getColor(prefix + ".background")))

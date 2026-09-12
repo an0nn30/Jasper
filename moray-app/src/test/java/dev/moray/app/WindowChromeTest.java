@@ -43,7 +43,7 @@ class WindowChromeTest {
         });
     }
 
-    @Test void coloredToolbarKeepsLabelsAccessibilityDisabledActionsAndVisibilityModes() throws Exception {
+    @Test void referenceToolbarKeepsLabelsAccessibilityDisabledActionsAndVisibilityModes() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.updateActions();
@@ -51,10 +51,10 @@ class WindowChromeTest {
                 .filter(JButton.class::isInstance).map(JButton.class::cast).toList();
 
             assertThat(buttons).extracting(JButton::getText)
-                .containsExactly("New Tab", "New Window", "Split", "Zoom Pane", "Find", "Settings", "Reload Config");
+                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find", "Settings", "Reload config");
             assertThat(buttons).allSatisfy(button -> {
-                assertThat(button.getIcon().getIconWidth()).isEqualTo(28);
-                assertThat(button.getIcon().getIconHeight()).isEqualTo(28);
+                assertThat(button.getIcon().getIconWidth()).isEqualTo(16);
+                assertThat(button.getIcon().getIconHeight()).isEqualTo(16);
                 assertThat(button.getAccessibleContext().getAccessibleName()).isNotBlank();
                 assertThat(button.getToolTipText()).isNotBlank();
             });
@@ -71,7 +71,7 @@ class WindowChromeTest {
             owner.setToolbarMode(WindowContent.ToolbarMode.ICONS_AND_LABELS);
             assertThat(owner.toolbar().isVisible()).isTrue();
             assertThat(buttons).extracting(JButton::getText)
-                .containsExactly("New Tab", "New Window", "Split", "Zoom Pane", "Find", "Settings", "Reload Config");
+                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find", "Settings", "Reload config");
         });
     }
 

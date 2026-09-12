@@ -23,8 +23,8 @@ class ApplicationActionsTest {
         edt(() -> {
             WindowContent ui = owner[0];
             ui.invoke(ActionId.FONT_BIGGER);
-            assertThat(ui.currentPane().view().fontSize()).isEqualTo(15);
-            assertThat(first[0].view().fontSize()).isEqualTo(14);
+            assertThat(ui.currentPane().view().fontSize()).isEqualTo(17);
+            assertThat(first[0].view().fontSize()).isEqualTo(16);
             ui.invoke(ActionId.FOCUS_PANE_LEFT); ui.invoke(ActionId.FIND);
             assertThat(first[0].findBar().isVisible()).isTrue();
             assertThat(ui.action(ActionId.OPEN_SETTINGS).isEnabled()).isFalse();
@@ -51,7 +51,7 @@ class ApplicationActionsTest {
             java.awt.event.FocusEvent event = new java.awt.event.FocusEvent(field, java.awt.event.FocusEvent.FOCUS_GAINED);
             for (var listener : field.getFocusListeners()) listener.focusGained(event);
             owner[0].invoke(ActionId.FONT_BIGGER);
-            assertThat(first[0].view().fontSize()).isEqualTo(15);
+            assertThat(first[0].view().fontSize()).isEqualTo(17);
             owner[0].close();
         });
     }

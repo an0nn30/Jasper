@@ -98,6 +98,12 @@ final class WindowTabs extends JPanel {
         next.setEnabled(firstVisible + count < order.size());
     }
 
+    @Override protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        g.setColor(UIManager.getColor("Moray.titleSeparator"));
+        g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
+    }
+
     private JButton button(String name, String accessible, String icon) {
         JButton button = new JButton();
         button.setName(name);
@@ -105,8 +111,8 @@ final class WindowTabs extends JPanel {
         button.setBorder(BorderFactory.createEmptyBorder());
         button.setContentAreaFilled(false); button.setFocusable(false);
         button.setToolTipText(accessible); button.getAccessibleContext().setAccessibleName(accessible);
-        if (icon != null) button.setIcon(new FlatSVGIcon("dev/moray/app/icons/title/" + icon + ".svg", 16, 16)
-            .setColorFilter(new FlatSVGIcon.ColorFilter(source -> foreground())));
+        if (icon != null) button.setIcon(new FlatSVGIcon("dev/moray/app/icons/title/" + icon + ".svg", icon.equals("x") ? 12 : 16, icon.equals("x") ? 12 : 16)
+            .setColorFilter(new FlatSVGIcon.ColorFilter(source -> button.getForeground())));
         style(button);
         return button;
     }
@@ -174,11 +180,14 @@ final class WindowTabs extends JPanel {
             }
             select.setSelected(tab == selected);
             style(select); style(close);
+            select.setFont(select.getFont().deriveFont(java.util.Map.of(java.awt.font.TextAttribute.WEIGHT,
+                java.awt.font.TextAttribute.WEIGHT_SEMIBOLD)));
+            if (tab == selected && active) select.setForeground(UIManager.getColor("Moray.tabSelectedForeground"));
         }
 
         @Override public void doLayout() {
-            int inset = UIScale.scale(14), closeWidth = Math.min(UIScale.scale(20), getWidth());
-            close.setBounds(Math.max(0, getWidth() - inset - closeWidth), 0, closeWidth, getHeight());
+            int inset = UIScale.scale(14), closeWidth = Math.min(UIScale.scale(16), getWidth());
+            close.setBounds(Math.max(0, getWidth() - UIScale.scale(10) - closeWidth), 0, closeWidth, getHeight());
             select.setBounds(Math.min(inset, getWidth()), 0, Math.max(0, getWidth() - inset * 2 - closeWidth), getHeight());
         }
 
@@ -186,7 +195,7 @@ final class WindowTabs extends JPanel {
             if (tab == selected) {
                 graphics.setColor(UIManager.getColor("Moray.tabSelectedBackground"));
                 graphics.fillRect(0, 0, getWidth(), getHeight());
-                graphics.setColor(foreground());
+                graphics.setColor(UIManager.getColor("Moray.tabUnderline"));
                 int inset = UIScale.scale(14);
                 graphics.fillRect(inset, getHeight() - UIScale.scale(1), Math.max(0, getWidth() - 2 * inset), UIScale.scale(1));
             }

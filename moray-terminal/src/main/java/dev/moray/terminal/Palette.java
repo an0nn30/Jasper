@@ -26,10 +26,10 @@ public record Palette(Color foreground, Color background, Color cursor, Color se
 
     public static Palette morayDark() {
         return new Palette(
-            new Color(0xabb2bf), new Color(0x282c34), new Color(0xabb2bf), new Color(0x3e4451),
+            new Color(0xabb2bf), new Color(0x292c34), new Color(0xb3bbc7), new Color(0x3e4451),
             List.of(
-                new Color(0x282c34), new Color(0xe06c75), new Color(0x98c379), new Color(0xe5c07b),
-                new Color(0x61afef), new Color(0xc678dd), new Color(0x56b6c2), new Color(0xabb2bf),
+                new Color(0x282c34), new Color(0xe06c75), new Color(0xa8c58d), new Color(0xe5c07b),
+                new Color(0x80b4df), new Color(0xc678dd), new Color(0x56b6c2), new Color(0xabb2bf),
                 new Color(0x5c6370), new Color(0xef7b85), new Color(0xa9d48a), new Color(0xf0cc8c),
                 new Color(0x74bff8), new Color(0xd68bee), new Color(0x67c7d3), new Color(0xe6e9ef)));
     }

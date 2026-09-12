@@ -26,3 +26,14 @@ tasks.register<JavaExec>("bench") {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     args(layout.buildDirectory.file("bench/ansi-100mb.txt").get().asFile.absolutePath)
 }
+
+// Actual application components and controlled PTY fixture; this never creates a JFrame.
+tasks.register<JavaExec>("mockUiPreview") {
+    group = "verification"
+    description = "Renders reference-sized dark/light Swing previews headlessly."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.moray.app.MockUiPreview"
+    jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
+    args(rootProject.layout.projectDirectory.dir("docs/design").asFile.absolutePath)
+}

@@ -90,7 +90,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     Action action(ActionId id) { return actions.get(id); }
     KeyBindings bindings() { return bindings; }
     JToolBar toolbar() { return chrome.toolbar(); }
-    JLabel status() { return chrome.status(); }
+    WindowStatusBar status() { return chrome.status(); }
     JMenuBar menuBar() { return chrome.menuBar(); }
     JTabbedPane tabStrip() { return tabs; }
     WindowTabs windowTabs() { return windowTabs; }
@@ -193,7 +193,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
             case CLEAR_SCROLLBACK -> view.clearScrollback();
             case FONT_BIGGER -> view.setFontSize(view.fontSize() + 1);
             case FONT_SMALLER -> view.setFontSize(view.fontSize() - 1);
-            case FONT_RESET -> view.resetFontSize();
+            case FONT_RESET -> view.setFontSize(TerminalPane.DEFAULT_FONT_SIZE);
             case OPEN_SETTINGS, RELOAD_CONFIG -> { /* visibly disabled until configuration exists */ }
         }
         update();
@@ -235,8 +235,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
         TerminalPane pane = currentPane();
         String size = pane == null || pane.session() == null ? "Starting terminal" :
             pane.session().columns() + " \u00d7 " + pane.session().rows();
-        chrome.status().setText(pane == null ? "Built-in defaults" : pane.shellLabel() + "  |  " + pane.directory()
-            + "  |  " + size + "  |  Built-in defaults");
+        chrome.status().setMetadata(pane == null ? "" : pane.shellLabel(), pane == null ? "" : pane.directory().toString(),
+            pane == null ? "" : size, pane != null && pane.running());
         onTitle.accept(currentTab() == null ? "Moray" : currentTab().title());
         updateActions(); windowTabs.refresh(); onMinimumSizeChanged.run();
     }
@@ -247,7 +247,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return;
         try { themes.select(theme); }
         catch (IllegalStateException failure) { onError.accept(failure.getMessage()); }
-        finally { chrome.refreshTheme(); }
+        finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
 
     /** Updates all retained panes without reparenting them; the native boundary hooks in last. */
@@ -266,7 +266,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                     pane.applyTheme(theme);
                 }
             }
-            chrome.refreshTheme(); onThemeChanged.accept(theme); update();
+            chrome.refreshTheme(); chrome.status().refreshTheme(); onThemeChanged.accept(theme); update();
             revalidate(); repaint();
         } finally { retained.forEach(TerminalTab::endThemeUpdate); }
     }

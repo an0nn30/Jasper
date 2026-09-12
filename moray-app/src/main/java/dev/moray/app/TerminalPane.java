@@ -11,6 +11,7 @@ import javax.swing.*;
 
 /** Exactly one asynchronously launched shell and its retained output. Owned on the EDT. */
 final class TerminalPane extends JPanel implements AutoCloseable {
+    static final float DEFAULT_FONT_SIZE = 16f;
     private final UUID id = UUID.randomUUID();
     private final Path launchDirectory;
     private final ShellLauncher launcher;
@@ -35,8 +36,9 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         super(new BorderLayout());
         this.launchDirectory = directory;
         this.launcher = launcher;
-        setPreferredSize(new Dimension(960, 570));
+        setPreferredSize(new Dimension(958, 821));
         add(new JLabel("Starting terminal\u2026", SwingConstants.CENTER));
+        setBackground(UIManager.getColor("Panel.background"));
         setActive(false);
     }
 
@@ -57,7 +59,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
                 return;
             }
             session = created;
-            view = new TerminalView(session, TerminalOptions.defaults());
+            view = new TerminalView(session, applicationOptions());
             findBar = new FindBar(view);
             view.setOnCloseRequest(() -> onClose.run());
             view.addPropertyChangeListener("minimumSize", event -> onChanged.run());
@@ -74,6 +76,13 @@ final class TerminalPane extends JPanel implements AutoCloseable {
             // A shell finishing its launch must not steal focus from a newer pane or a find field.
             if (active && isShowing()) focusTerminal();
         });
+    }
+
+    private static TerminalOptions applicationOptions() {
+        TerminalOptions defaults = TerminalOptions.defaults();
+        return new TerminalOptions(defaults.fontFamily(), DEFAULT_FONT_SIZE, defaults.fallbackFonts(), defaults.ligatures(),
+            defaults.palette(), defaults.cursorStyle(), defaults.cursorBlink(), defaults.optionAsMeta(),
+            defaults.scrollback(), defaults.copyOnSelect());
     }
 
     private void trackFocus(Component component) {
@@ -103,12 +112,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     void focusTerminal() { if (view != null) view.requestFocusInWindow(); }
     void setActive(boolean selected) {
         active = selected;
-        Color color = selected ? UIManager.getColor("Component.focusColor") : UIManager.getColor("Panel.background");
-        setBorder(BorderFactory.createLineBorder(color == null ? Color.GRAY : color, 1));
+        setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
         if (view != null) view.setInactiveDim(selected ? 0 : 0.3f);
     }
 
     void applyTheme(BuiltinTheme theme) {
+        setBackground(theme.palette().background());
         if (view != null) view.setPalette(theme.palette());
         setActive(active);
     }

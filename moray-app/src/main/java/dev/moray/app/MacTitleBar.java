@@ -134,6 +134,12 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
         repaint();
     }
 
+    @Override protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        g.setColor(UIManager.getColor("Moray.titleSeparator"));
+        g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
+    }
+
     @Override public void close() {
         if (closed) return;
         closed = true;

@@ -8,18 +8,10 @@ import javax.swing.UIManager;
 final class AppIcons {
     private AppIcons() {}
     static FlatSVGIcon icon(String name) {
-        String colorKey = switch (name) {
-            case "square-plus" -> "Moray.icon.newTab";
-            case "app-window" -> "Moray.icon.newWindow";
-            case "columns-2" -> "Moray.icon.split";
-            case "maximize" -> "Moray.icon.zoom";
-            case "search" -> "Moray.icon.find";
-            case "settings" -> "Moray.icon.settings";
-            case "refresh" -> "Moray.icon.reload";
-            default -> throw new IllegalArgumentException("Unknown application icon: " + name);
-        };
-        FlatSVGIcon icon = new FlatSVGIcon("dev/moray/app/icons/" + name + ".svg", 28, 28);
-        return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed(colorKey, source)));
+        if (!java.util.Set.of("square-plus", "app-window", "columns-2", "maximize", "search", "settings", "refresh").contains(name))
+            throw new IllegalArgumentException("Unknown application icon: " + name);
+        FlatSVGIcon icon = new FlatSVGIcon("dev/moray/app/icons/" + name + ".svg", 16, 16);
+        return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Moray.chromeForeground", source)));
     }
 
     private static Color themed(String key, Color source) {
