@@ -112,7 +112,31 @@ class SystemAppearanceTest {
         }
     }
 
-    @Test void callbackAfterCloseAndCloseBeforeInitializationPublishNothing() throws Exception {
+    @Test void callbackAfterCloseDoesNotReadOrPublish() throws Exception {
+        var callbacks = new CopyOnWriteArrayList<Consumer<Boolean>>();
+        var received = new CopyOnWriteArrayList<SystemAppearance.Reading>();
+        var reads = new AtomicInteger();
+        var source = source(() -> new SystemAppearance.Binding(() -> {
+            reads.incrementAndGet();
+            return false;
+        }, callbacks::add, callbacks::remove), Runnable::run);
+        try {
+            source.start(received::add);
+            until(() -> received.size() == 1);
+            Consumer<Boolean> callback = callbacks.getFirst();
+            source.close();
+            until(callbacks::isEmpty);
+
+            callback.accept(true);
+
+            assertThat(reads).hasValue(1);
+            assertThat(received).containsExactly(new SystemAppearance.Reading(BuiltinTheme.LIGHT, ""));
+        } finally {
+            source.close();
+        }
+    }
+
+    @Test void closeBeforeInitializationPublishesNothing() throws Exception {
         var callbacks = new CopyOnWriteArrayList<Consumer<Boolean>>();
         var queue = new ConcurrentLinkedQueue<Runnable>();
         var received = new CopyOnWriteArrayList<SystemAppearance.Reading>();
