@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /** Immutable process inputs captured before a shell request leaves the EDT. */
@@ -27,7 +28,14 @@ record LaunchSettings(List<String> command, Map<String, String> environment,
             ? DefaultShell.command(osName, inherited) : List.of(terminal.shell().program()));
         command.addAll(terminal.shell().args());
         var environment = new HashMap<>(inherited);
+        environment.keySet().removeIf(name -> name.equals("TERM_PROGRAM") || name.equals("TERM_PROGRAM_VERSION")
+            || name.equals("TERM_SESSION_ID") || name.equals("TMUX") || name.equals("TMUX_PANE")
+            || name.startsWith("ITERM_"));
         environment.putAll(terminal.env());
+        if (osName.toLowerCase(Locale.ROOT).startsWith("mac")
+                && environment.getOrDefault("LANG", "").isBlank()) {
+            environment.put("LANG", "en_US.UTF-8");
+        }
         environment.put("TERM", "xterm-256color");
         environment.put("COLORTERM", "truecolor");
         return new LaunchSettings(command, environment, windowColumns, windowLines, terminal.scrollback());

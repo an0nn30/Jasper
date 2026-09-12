@@ -129,7 +129,7 @@ PROJECT_LABEL = "a value with spaces"
 
 Arguments containing spaces stay single arguments, and an empty string remains an empty argument. To ask a shell to interpret a command, explicitly name that shell and pass its command flag and command text as separate arguments. Nested tables above and inline tables such as `shell = { program = "/bin/zsh", args = ["-l"] }` under `[terminal]` are both supported; the same applies to `cursor` and `env`.
 
-Environment entries overlay the inherited child environment. This table does not change which default login shell is selected: setting `SHELL` here only changes the child's environment. `TERM` and `COLORTERM` are reserved; configured entries warn and are ignored. Moray always passes `TERM=xterm-256color` and `COLORTERM=truecolor`. Invalid environment entries are omitted individually. Diagnostics do not echo environment values or shell arguments. Setting scrollback to zero disables retained history for future sessions.
+Environment entries overlay the inherited child environment. Desktop launches remove inherited terminal identity variables (`TERM_PROGRAM*`, `TERM_SESSION_ID`, `TMUX*` and `ITERM_*`) before applying this overlay, so configured values intentionally override them. On macOS, `LANG` defaults to `en_US.UTF-8` only when absent or blank; `LC_*` values are preserved. This table does not change which default login shell is selected: setting `SHELL` here only changes the child's environment. `TERM` and `COLORTERM` are reserved; configured entries warn and are ignored. Moray always passes `TERM=xterm-256color` and `COLORTERM=truecolor`. Invalid environment entries are omitted individually. Diagnostics do not echo environment values or shell arguments. Setting scrollback to zero disables retained history for future sessions.
 
 ### Shell exit behavior
 
@@ -192,7 +192,7 @@ Syntax errors, wrong types, unreadable files, invalid UTF-8 and files larger tha
 
 ## Remaining configuration work
 
-App logging, launcher environment cleanup and macOS app packaging remain planned. Unsupported keys warn. Native font rendering, keyboard behavior, audio, screen sizing and editor integration still require the user-run [terminal configuration checklist](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md), alongside the acceptance checks linked from the README.
+App logging remains planned; see the [packaging guide](packaging.md) for desktop launcher details. Unsupported keys warn. Native font rendering, keyboard behavior, audio, screen sizing and editor integration still require the user-run [terminal configuration checklist](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md), alongside the acceptance checks linked from the README.
 
 
 ## Appearance and custom themes

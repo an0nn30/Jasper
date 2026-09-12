@@ -60,6 +60,9 @@ blink = true
 # Names must match [A-Za-z_][A-Za-z0-9_]* and values must contain no NUL. TERM and COLORTERM are
 # reserved: Moray always sets TERM=xterm-256color and COLORTERM=truecolor. This table does not
 # choose the default login shell; setting SHELL here only changes the child's environment.
+# Desktop launches remove inherited terminal identity variables (TERM_PROGRAM*, TERM_SESSION_ID,
+# TMUX*, and ITERM_*) before applying this overlay, so configured values intentionally override them.
+# On macOS, LANG defaults to en_US.UTF-8 only when absent or blank; LC_* values are preserved.
 # MY_VARIABLE = "a value with spaces"
 
 [colors]

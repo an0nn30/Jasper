@@ -44,6 +44,40 @@ class LaunchSettingsTest {
             .containsExactly("powershell.exe", "-NoLogo", "-x", "two words");
     }
 
+    @Test void dropsInheritedTerminalIdentityButKeepsExplicitOverrides() {
+        var inherited = new HashMap<>(Map.of("TERM_PROGRAM", "iTerm.app", "TERM_PROGRAM_VERSION", "1",
+            "TERM_SESSION_ID", "old", "TMUX", "socket", "TMUX_PANE", "%1",
+            "ITERM_SESSION_ID", "old", "ITERM_PROFILE", "old", "PATH", "/bin"));
+        var result = LaunchSettings.resolve(ConfigSnapshot.defaults(), "Mac OS X", inherited, 80, 24);
+        assertThat(result.environment()).doesNotContainKeys("TERM_PROGRAM", "TERM_PROGRAM_VERSION",
+            "TERM_SESSION_ID", "TMUX", "TMUX_PANE", "ITERM_SESSION_ID", "ITERM_PROFILE");
+        assertThat(result.environment()).containsEntry("PATH", "/bin");
+        assertThat(inherited).containsEntry("TMUX", "socket").containsEntry("ITERM_PROFILE", "old");
+        var config = snapshot("", List.of(), Map.of("TERM_PROGRAM", "custom", "ITERM_PROFILE", "chosen"), 100, 80, 24);
+        assertThat(LaunchSettings.resolve(config, "Mac OS X", inherited, 80, 24).environment())
+            .containsEntry("TERM_PROGRAM", "custom").containsEntry("ITERM_PROFILE", "chosen")
+            .containsEntry("TERM", "xterm-256color").containsEntry("COLORTERM", "truecolor");
+    }
+
+    @Test void macLocaleFallbackPreservesExplicitLocaleAndDoesNotAffectOtherPlatforms() {
+        var defaults = ConfigSnapshot.defaults();
+        for (var inherited : List.of(Map.<String,String>of(), Map.of("LANG", " "))) {
+            assertThat(LaunchSettings.resolve(defaults, "Mac OS X", inherited, 80, 24).environment())
+                .containsEntry("LANG", "en_US.UTF-8");
+        }
+        var config = snapshot("", List.of(), Map.of("LANG", "fr_FR.UTF-8"), 100, 80, 24);
+        assertThat(LaunchSettings.resolve(config, "Mac OS X", Map.of("LANG", "de_DE.UTF-8", "LC_ALL", "C"), 80, 24).environment())
+            .containsEntry("LANG", "fr_FR.UTF-8").containsEntry("LC_ALL", "C");
+        var blankConfig = snapshot("", List.of(), Map.of("LANG", " "), 100, 80, 24);
+        assertThat(LaunchSettings.resolve(blankConfig, "Mac OS X", Map.of("LANG", "de_DE.UTF-8"), 80, 24).environment())
+            .containsEntry("LANG", "en_US.UTF-8");
+        assertThat(LaunchSettings.resolve(defaults, "Mac OS X", Map.of("LANG", "C", "LC_CTYPE", "UTF-8"), 80, 24).environment())
+            .containsEntry("LANG", "C").containsEntry("LC_CTYPE", "UTF-8");
+        for (String os : List.of("Windows 11", "Linux")) {
+            assertThat(LaunchSettings.resolve(defaults, os, Map.of(), 80, 24).environment()).doesNotContainKey("LANG");
+        }
+    }
+
     @Test void directConstructionCopiesCollectionsAndBadInheritedPathStillHasAnErrorLabel() {
         var command = new ArrayList<>(List.of("/bin/custom")); var environment = new HashMap<>(Map.of("A", "one"));
         var settings = new LaunchSettings(command, environment, 5, 2, 0);
