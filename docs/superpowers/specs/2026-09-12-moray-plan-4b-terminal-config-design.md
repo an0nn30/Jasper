@@ -61,3 +61,5 @@ InitialWindowSize computes the first terminal pane's preferred pixel area from c
 ## Verification and limits
 
 Four sequential tasks with TDD and separate reviews: terminal live API/metrics/bell; immutable config/parser/template; launch capture/initial sizing; live owner integration/documentation. Exact cross-task APIs are defined in the plan. Tests exercise real TerminalView/FakeConnector behavior, actual TOML files and WindowContent/JRootPane integration, queued launches, no session replacement, override preservation, native text editing and shutdown. Full checks, source hygiene and final whole-branch review follow. No GUI/benchmark/editor, actual audio, real user config writes, merge or push without existing authorization. Native and cross-platform acceptance remain explicitly unverified until run. Do not commit directly on main; include coauthor trailers.
+
+Implementation clarification: array validation points to the containing key’s exact source position. TomlJ element positions include preceding whitespace/comments, so they are not used as token locations. No custom source scanner is introduced.

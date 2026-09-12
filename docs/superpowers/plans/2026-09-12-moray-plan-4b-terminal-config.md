@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development task-by-task, with TDD and separate scoped reviews.
 
+**Execution clarification:** Array validation points to the containing key’s exact source position; TomlJ element positions include preceding whitespace/comments.
+
 **Goal:** Configurable typography, terminal behavior, session defaults and initial window size using the existing live reload system.
 **Architecture:** Immutable expanded snapshots feed retained terminal views; immutable launch settings capture new-process defaults before worker dispatch. Shared font metrics drive every coordinate calculation.
 **Tech Stack:** JBR25, Swing/FlatLaf, TomlJ1.1.1, Gradle/JUnit/AssertJ.
@@ -36,7 +38,7 @@ public void applyOptions(TerminalOptions next);
 // Package-private test seam, default production Runnable is Toolkit.getDefaultToolkit()::beep:
 void setBellSound(Runnable sound);
 ```
-- [ ] Write real RED tests for typography updates, option/meta/copy/cursor changes, no session replacement and unchanged state on equal options. Use FakeConnector/session/view helpers. Pin existing1.0 metrics and test1.5 metrics, hit testing/report coordinates and resized grid using actual FontSet, not duplicated renderer arithmetic. Retain program cursor override/RIS cases.
+- [x] Write real RED tests for typography updates, option/meta/copy/cursor changes, no session replacement and unchanged state on equal options. Use FakeConnector/session/view helpers. Pin existing1.0 metrics and test1.5 metrics, hit testing/report coordinates and resized grid using actual FontSet, not duplicated renderer arithmetic. Retain program cursor override/RIS cases.
 ```java
 var natural = new FontSet("JetBrains Mono", 16f, List.of(), true);
 var spaced = new FontSet("JetBrains Mono", 16f, List.of(), true, 1.5f);
@@ -44,16 +46,16 @@ assertThat(spaced.cellWidth()).isEqualTo(natural.cellWidth());
 assertThat(spaced.cellHeight()).isEqualTo((int)Math.ceil(natural.cellHeight() * 1.5));
 assertThat(spaced.ascent()).isEqualTo(natural.ascent() + (spaced.cellHeight()-natural.cellHeight())/2);
 ```
-- [ ] Extend the immutable options record with defensive validation (non-null enums/palette, valid font/fallback strings, finite size/lineHeight ranges, scrollback range); preserve all old constructor call sites. Implement the FontSet overload with naturalHeight then scaled height/centered baseline as the spec defines. Keep existing cell width logic. No independent line-height fields in coordinate consumers.
-- [ ] Implement applyOptions: compare old/current typography; rebuild FontSet/painter only as needed, replace KeyEncoder when optionAsMeta changes, update configured cursor/copy/bell fields, and delegate palette updating through existing highlight/color behavior. Store coherent options after direct setFontSize/setPalette. Refit the same session only when metrics change; fire minimum-size change/revalidate/repaint as existing font controls do. Scrollback is creation-only and must not mutate the session. Do not clear selection/find for behavior-only changes.
+- [x] Extend the immutable options record with defensive validation (non-null enums/palette, valid font/fallback strings, finite size/lineHeight ranges, scrollback range); preserve all old constructor call sites. Implement the FontSet overload with naturalHeight then scaled height/centered baseline as the spec defines. Keep existing cell width logic. No independent line-height fields in coordinate consumers.
+- [x] Implement applyOptions: compare old/current typography; rebuild FontSet/painter only as needed, replace KeyEncoder when optionAsMeta changes, update configured cursor/copy/bell fields, and delegate palette updating through existing highlight/color behavior. Store coherent options after direct setFontSize/setPalette. Refit the same session only when metrics change; fire minimum-size change/revalidate/repaint as existing font controls do. Scrollback is creation-only and must not mutate the session. Do not clear selection/find for behavior-only changes.
 ```java
 // Shared metric calculation inside FontSet after natural metrics are known:
 cellHeight = Math.max(naturalHeight, (int)Math.ceil(naturalHeight * lineHeight));
 ascent = naturalAscent + (cellHeight - naturalHeight) / 2;
 ```
-- [ ] Write RED bell tests with real BEL input and attached lightweight components. Verify visual paint changes and settles, SOUND calls injected Runnable, NONE ignores, bursts coalesce and detach/reattach rejects stale events. No real beep, native window or sleeps. A package-private deterministic timer completion helper is allowed if tests drive the actual callback.
-- [ ] Implement the existing session bell listener with an attachment-generation guard and AtomicBoolean coalescing before EDT publication. Visual overlay is foreground at15% opacity for150ms on one nonrepeating timer; repeated events restart it. Mode change/detach clears and stops it. Sound uses the injected callback, never from reader thread. Keep existing frame/blink lifecycle otherwise unchanged.
-- [ ] Run focused RED/GREEN tests then :moray-terminal:check and source hygiene; self-review and commit/report exact APIs and results. Root owns spec/plan/STATUS.
+- [x] Write RED bell tests with real BEL input and attached lightweight components. Verify visual paint changes and settles, SOUND calls injected Runnable, NONE ignores, bursts coalesce and detach/reattach rejects stale events. No real beep, native window or sleeps. A package-private deterministic timer completion helper is allowed if tests drive the actual callback.
+- [x] Implement the existing session bell listener with an attachment-generation guard and AtomicBoolean coalescing before EDT publication. Visual overlay is foreground at15% opacity for150ms on one nonrepeating timer; repeated events restart it. Mode change/detach clears and stops it. Sound uses the injected callback, never from reader thread. Keep existing frame/blink lifecycle otherwise unchanged.
+- [x] Run focused RED/GREEN tests then :moray-terminal:check and source hygiene; self-review and commit/report exact APIs and results. Root owns spec/plan/STATUS.
 
 ### Task 2: Expanded immutable settings, positioned parsing and template
 **Files:** Create moray-app/src/main/java/dev/moray/app/{FontConfig,TerminalConfig}.java. Modify ConfigSnapshot,ConfigLoader,ConfigTemplate and focused app tests. Reuse Task1 TerminalOptions/BellMode.
