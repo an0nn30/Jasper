@@ -283,6 +283,26 @@ Logic lives in plain classes so most tests need no window.
 
 **CI** — GitHub Actions runs all tests on macOS, Linux and Windows. Windows is required because ConPTY is a separate code path in pty4j.
 
+### Memory benchmarking and optimization
+
+User amendment, 2026-09-12: add memory benchmarking to the terminal hardening work after app logging, to determine whether Moray's memory usage can be reduced before the Phase 1 switch-over gate.
+
+Use the packaged application for process-footprint measurements. Record its PID separately from Gradle, the profiler and child shells/programs. Record the OS and measurement definition, CPU architecture, JBR build/JVM options, application commit, font, grid dimensions, pane count and scrollback configuration so comparisons can be repeated on the same platform.
+
+Measure these scenarios with fixed input and timing:
+
+- Cold startup and warmed idle with one terminal pane.
+- One, four and eight panes to quantify incremental memory per session/view.
+- Sustained ANSI output and scrollback at 0, 10,000 and 100,000 lines, including peak and settled usage.
+- Repeated tab, split and window creation/closure, followed by an idle settling period, to identify resources that remain retained.
+- Representative interactive use, including search, resizing and font/glyph rendering, to expose cache and allocation growth.
+
+Capture OS-reported application footprint/resident memory, Java heap used and committed, peak usage, allocation rate and GC pauses. Investigate native memory where supported. Distinguish live retained objects from reserved/committed JVM memory and report child-process usage separately. Keep startup, warm-up and steady-state observations distinct; repeat runs and report variability.
+
+Profile the largest contributors before choosing changes. Candidates include scrollback storage, snapshot/run allocations, rendering/font caches, and session/listener/timer cleanup. Compare each worthwhile change against the same baseline scenarios and retain configured scrollback, rendering correctness and responsiveness. Record throughput and frame/interaction responsiveness alongside memory; preserve the 35 MB/s minimum and 45 MB/s target.
+
+Deliver a baseline report, evidence-backed findings and before/after results for any implemented reductions. Set numerical memory targets after the baseline; a reduction is an investigation outcome, not a promised percentage. Record limitations and deferred opportunities if a proposed saving would compromise terminal behavior. This amendment schedules the work; native benchmark execution remains user-run under the existing repository rules.
+
 ## 9. Definition of done
 
 1. **Manual checklist on macOS passes:**
@@ -295,6 +315,7 @@ Logic lives in plain classes so most tests need no window.
 2. **Throughput** ≥ 35 MB/s on the benchmark (the `jediterm-ui` result); target ≥ 45 MB/s.
 3. **CI green** on macOS, Linux and Windows. `./gradlew run` works on all three. A macOS `.app` bundling JBR is produced (via `jpackage`) so Moray launches from the Dock.
 4. **Switch-over test:** Moray is the only terminal used for two weeks, with conch still installed. Each time conch gets opened, the reason is recorded; those become fixes before phase 2 starts.
+5. **Memory evaluation:** the repeatable baseline and optimization findings above are recorded, with before/after results for implemented changes and any responsiveness/throughput trade-offs made explicit.
 
 ## 10. Later (explicitly not phase 1)
 
