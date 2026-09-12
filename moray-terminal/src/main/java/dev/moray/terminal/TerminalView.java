@@ -51,6 +51,7 @@ import java.util.regex.PatternSyntaxException;
 public final class TerminalView extends JComponent {
     private static final int FRAME_MILLIS = 8;
     private static final int BLINK_MILLIS = 530;
+    private static final int BELL_MILLIS = 150;
     private static final int WHEEL_LINES = 3;
     private static final long SEARCH_IDLE_MILLIS = 1_000;
     private static final float DEFAULT_FONT_SIZE = 14f;
@@ -58,11 +59,11 @@ public final class TerminalView extends JComponent {
     private static final float MAX_FONT_SIZE = 72f;
 
     private final TerminalSession session;
-    private final TerminalOptions options;
+    private TerminalOptions options;
     private FontSet fonts;
     private Palette palette;
     private TerminalPainter painter;
-    private final KeyEncoder keys;
+    private KeyEncoder keys;
     private final boolean macOs;
     private final Viewport viewport = new Viewport();
     private Color matchColor;
@@ -70,22 +71,13 @@ public final class TerminalView extends JComponent {
     private final AtomicBoolean dirty = new AtomicBoolean(true);
     private final Timer frameTimer;
     private final Timer blinkTimer;
-    private final TerminalSession.Listener listener = new TerminalSession.Listener() {
-        @Override
-        public void screenChanged() {
-            dirty.set(true);
-        }
-
-        @Override
-        public void scrollbackReset() {
-            SwingUtilities.invokeLater(TerminalView.this::reconcileAbsoluteRows);
-        }
-
-        @Override
-        public void alternateBufferChanged(boolean alternate) {
-            SwingUtilities.invokeLater(TerminalView.this::reconcileAbsoluteRows);
-        }
-    };
+    private final Timer bellTimer;
+    private TerminalSession.Listener listener;
+    private volatile long attachmentGeneration;
+    /** A fresh coalescing token on attachment or mode change also invalidates queued deliveries. */
+    private volatile AtomicBoolean pendingBell;
+    private boolean visualBell;
+    private Runnable bellSound = Toolkit.getDefaultToolkit()::beep;
     private boolean blinkOn = true;
     private boolean suppressNextTyped;
     private boolean leftAltHeld;
@@ -130,7 +122,8 @@ public final class TerminalView extends JComponent {
         this.observedAbsoluteRowEpoch = session.absoluteRowEpoch();
         this.options = options;
         this.fontSize = options.fontSize();
-        this.fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures());
+        this.fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures(),
+            options.lineHeight());
         this.palette = options.palette();
         this.painter = new TerminalPainter(fonts, palette);
         this.macOs = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac");
@@ -147,6 +140,9 @@ public final class TerminalView extends JComponent {
             blinkOn = !blinkOn;
             repaint();
         });
+
+        this.bellTimer = new Timer(BELL_MILLIS, e -> clearVisualBell());
+        this.bellTimer.setRepeats(false);
 
         setOpaque(true);
         setFocusable(true);
@@ -213,6 +209,8 @@ public final class TerminalView extends JComponent {
     @Override
     public void addNotify() {
         super.addNotify();
+        pendingBell = new AtomicBoolean();
+        listener = listenerFor(++attachmentGeneration);
         session.addListener(listener);
         reconcileAbsoluteRows();
         frameTimer.start();
@@ -221,9 +219,15 @@ public final class TerminalView extends JComponent {
 
     @Override
     public void removeNotify() {
+        ++attachmentGeneration;
+        pendingBell = null;
+        clearVisualBell();
         frameTimer.stop();
         blinkTimer.stop();
-        session.removeListener(listener);
+        if (listener != null) {
+            session.removeListener(listener);
+            listener = null;
+        }
         invalidatePendingSearch();
         super.removeNotify();
     }
@@ -284,6 +288,52 @@ public final class TerminalView extends JComponent {
         findResultListener = listener == null ? result -> { } : listener;
     }
 
+    /** Current appearance and behavior, owned by the Event Dispatch Thread. */
+    public TerminalOptions options() { return options; }
+
+    /** Applies live settings on the EDT. Scrollback remains a default for future sessions. */
+    public void applyOptions(TerminalOptions next) {
+        Objects.requireNonNull(next, "options");
+        if (options.equals(next)) {
+            return;
+        }
+        boolean typographyChanged = !options.fontFamily().equals(next.fontFamily())
+            || options.fontSize() != next.fontSize()
+            || !options.fallbackFonts().equals(next.fallbackFonts())
+            || options.ligatures() != next.ligatures()
+            || options.lineHeight() != next.lineHeight();
+        Dimension previousMinimum = getMinimumSize();
+        int previousWidth = fonts.cellWidth();
+        int previousHeight = fonts.cellHeight();
+        if (typographyChanged) {
+            fonts = new FontSet(next.fontFamily(), next.fontSize(), next.fallbackFonts(), next.ligatures(),
+                next.lineHeight());
+        }
+        if (options.optionAsMeta() != next.optionAsMeta()) {
+            keys = new KeyEncoder(next.optionAsMeta(), macOs);
+        }
+        if (options.bell() != next.bell()) {
+            pendingBell = listener == null ? null : new AtomicBoolean();
+            clearVisualBell();
+        }
+        options = next;
+        fontSize = next.fontSize();
+        if (!palette.equals(next.palette())) {
+            updatePalette(next.palette());
+        } else if (typographyChanged) {
+            painter = new TerminalPainter(fonts, palette);
+        }
+        if (typographyChanged) {
+            firePropertyChange("minimumSize", previousMinimum, getMinimumSize());
+            revalidate();
+            if ((previousWidth != fonts.cellWidth() || previousHeight != fonts.cellHeight())
+                && getWidth() > 0 && getHeight() > 0) {
+                resizeSessionToFit();
+            }
+        }
+        repaint();
+    }
+
     /** The current terminal font size in points. */
     public float fontSize() {
         return fontSize;
@@ -300,6 +350,12 @@ public final class TerminalView extends JComponent {
         if (next.equals(palette)) {
             return;
         }
+        applyOptions(new TerminalOptions(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures(),
+            next, options.cursorStyle(), options.cursorBlink(), options.optionAsMeta(), options.scrollback(),
+            options.copyOnSelect(), options.lineHeight(), options.bell()));
+    }
+
+    private void updatePalette(Palette next) {
         palette = next;
         painter = new TerminalPainter(fonts, next);
         setBackground(next.background());
@@ -315,16 +371,9 @@ public final class TerminalView extends JComponent {
         if (!Float.isFinite(bounded) || bounded == fontSize) {
             return;
         }
-        Dimension previousMinimum = getMinimumSize();
-        fontSize = bounded;
-        fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures());
-        painter = new TerminalPainter(fonts, palette);
-        firePropertyChange("minimumSize", previousMinimum, getMinimumSize());
-        revalidate();
-        if (getWidth() > 0 && getHeight() > 0) {
-            resizeSessionToFit();
-        }
-        repaint();
+        applyOptions(new TerminalOptions(options.fontFamily(), bounded, options.fallbackFonts(), options.ligatures(),
+            palette, options.cursorStyle(), options.cursorBlink(), options.optionAsMeta(), options.scrollback(),
+            options.copyOnSelect(), options.lineHeight(), options.bell()));
     }
 
     /** Restores the Phase 1 default of 14 points. */
@@ -490,6 +539,12 @@ public final class TerminalView extends JComponent {
         boolean on = !blinks || !focused || blinkOn;
         painter.paint((Graphics2D) g, snapshot, new TerminalPainter.CursorLook(style, on, focused),
             highlights(snapshot), getWidth(), getHeight());
+        if (visualBell) {
+            Color foreground = palette.foreground();
+            g.setColor(new Color(foreground.getRed(), foreground.getGreen(), foreground.getBlue(),
+                Math.round(255 * .15f)));
+            g.fillRect(0, 0, getWidth(), getHeight());
+        }
         if (inactiveDim > 0f) {
             Color background = palette.background();
             int alpha = Math.round(255 * inactiveDim);
@@ -704,6 +759,63 @@ public final class TerminalView extends JComponent {
     void setClipboard(Supplier<String> reader, Consumer<String> writer) {
         this.clipboardReader = reader;
         this.clipboardWriter = writer;
+    }
+
+    void setBellSound(Runnable sound) {
+        bellSound = Objects.requireNonNull(sound, "sound");
+    }
+
+    private TerminalSession.Listener listenerFor(long generation) {
+        return new TerminalSession.Listener() {
+            @Override
+            public void screenChanged() {
+                dirty.set(true);
+            }
+
+            @Override
+            public void scrollbackReset() {
+                SwingUtilities.invokeLater(TerminalView.this::reconcileAbsoluteRows);
+            }
+
+            @Override
+            public void alternateBufferChanged(boolean alternate) {
+                SwingUtilities.invokeLater(TerminalView.this::reconcileAbsoluteRows);
+            }
+
+            @Override
+            public void bell() {
+                AtomicBoolean pending = pendingBell;
+                if (generation != attachmentGeneration || pending == null || !pending.compareAndSet(false, true)) {
+                    return;
+                }
+                SwingUtilities.invokeLater(() -> {
+                    pending.set(false);
+                    if (generation == attachmentGeneration && pending == pendingBell) {
+                        ringBell();
+                    }
+                });
+            }
+        };
+    }
+
+    private void ringBell() {
+        switch (options.bell()) {
+            case VISUAL -> {
+                visualBell = true;
+                bellTimer.restart();
+                repaint();
+            }
+            case SOUND -> bellSound.run();
+            case NONE -> { }
+        }
+    }
+
+    private void clearVisualBell() {
+        bellTimer.stop();
+        if (visualBell) {
+            visualBell = false;
+            repaint();
+        }
     }
 
     void setLinkOpener(Consumer<String> opener) {

@@ -1,16 +1,21 @@
 package dev.moray.app;
 
+import dev.moray.terminal.Palette;
+import dev.moray.terminal.TerminalOptions;
+
 import java.util.Map;
 import java.util.Objects;
 
 /** Validated saved defaults; runtime View choices are kept separately by each owner. */
 record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
-                      float fontSize, BuiltinTheme theme, Map<String, String> keybindings) {
+                      FontConfig font, BuiltinTheme theme, Map<String, String> keybindings,
+                      int columns, int lines, TerminalConfig terminal) {
     ConfigSnapshot {
         if (tabHeight < 28 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 28–72.");
-        if (!Float.isFinite(fontSize) || fontSize < 6 || fontSize > 72) {
-            throw new IllegalArgumentException("Font size must be a finite number from 6–72.");
-        }
+        if (columns < 5 || columns > 500) throw new IllegalArgumentException("Columns must be 5–500.");
+        if (lines < 2 || lines > 200) throw new IllegalArgumentException("Lines must be 2–200.");
+        Objects.requireNonNull(font, "font");
+        Objects.requireNonNull(terminal, "terminal");
         Objects.requireNonNull(toolbar, "toolbar");
         Objects.requireNonNull(theme, "theme");
         keybindings = Map.copyOf(keybindings);
@@ -25,6 +30,22 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
                 throw new IllegalArgumentException("Keybindings must name known actions and valid, noncolliding shortcuts.");
             }
         }
+    }
+
+    ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
+                   float fontSize, BuiltinTheme theme, Map<String, String> keybindings) {
+        this(tabHeight, toolbar, statusBar, FontConfig.defaults().withSize(fontSize), theme,
+            keybindings, 150, 45, TerminalConfig.defaults());
+    }
+
+    float fontSize() {
+        return font.size();
+    }
+
+    TerminalOptions viewOptions(float effectiveSize, Palette effectivePalette) {
+        return new TerminalOptions(font.family(), effectiveSize, font.fallback(), font.ligatures(),
+            effectivePalette, terminal.cursorShape(), terminal.cursorBlink(), terminal.optionAsMeta(),
+            terminal.scrollback(), terminal.copyOnSelect(), font.lineHeight(), terminal.bell());
     }
 
     static ConfigSnapshot defaults() {

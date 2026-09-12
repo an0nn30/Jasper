@@ -3,6 +3,8 @@ package dev.moray.app;
 import com.formdev.flatlaf.util.SystemInfo;
 import java.awt.Dimension;
 import java.awt.Insets;
+import java.awt.Rectangle;
+import java.awt.Toolkit;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.nio.file.Path;
@@ -29,14 +31,22 @@ final class TerminalWindow implements AutoCloseable {
                    ConfigurationController configuration) {
         this.application = application;
         content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes);
-        if (configuration != null) configuration.register(content);
+        if (configuration != null) {
+            content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(configuration.snapshot()));
+            configuration.register(content);
+        }
         titleBar = MacTitleBar.install(frame.getRootPane(), content, SystemInfo.isMacFullWindowContentSupported, frame::setTitle);
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.setJMenuBar(content.menuBar());
         content.installRootBindings(frame.getRootPane());
         content.onMinimumSizeChanged = this::updateMinimumSize;
         if (titleBar != null) titleBar.attach(frame);
-        frame.addWindowListener(events); frame.pack(); frame.setLocationByPlatform(true);
+        frame.addWindowListener(events); frame.pack();
+        if (configuration != null) {
+            updateMinimumSize();
+            frame.setSize(InitialWindowSize.fit(frame.getSize(), frame.getMinimumSize(), usableBounds()));
+        }
+        frame.setLocationByPlatform(true);
         content.update();
     }
 
@@ -48,7 +58,18 @@ final class TerminalWindow implements AutoCloseable {
 
     private void updateMinimumSize() {
         Dimension minimum = minimumSize(frame.getRootPane(), frame.getInsets());
+        minimum = InitialWindowSize.fit(minimum, minimum, usableBounds());
         if (!frame.isMinimumSizeSet() || !minimum.equals(frame.getMinimumSize())) frame.setMinimumSize(minimum);
+    }
+
+    private Rectangle usableBounds() {
+        var graphics = frame.getGraphicsConfiguration();
+        Rectangle bounds = new Rectangle(graphics.getBounds());
+        Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(graphics);
+        bounds.x += insets.left; bounds.y += insets.top;
+        bounds.width -= insets.left + insets.right;
+        bounds.height -= insets.top + insets.bottom;
+        return bounds;
     }
 
     private void setActive(boolean active) {

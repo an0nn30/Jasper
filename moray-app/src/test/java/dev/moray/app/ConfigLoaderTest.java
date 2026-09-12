@@ -125,7 +125,7 @@ class ConfigLoaderTest {
             tab_height=44
             future=9
             [font]
-            family='secret-value'
+            future_font='secret-value'
             [unknown]
             [keybindings]
             "future.action"='secret-value'
@@ -135,7 +135,7 @@ class ConfigLoaderTest {
         assertThat(result.snapshot().keybindings()).isEmpty();
         assertThat(result.diagnostics()).hasSize(4);
         assertDiagnostic(result, "window.future", 3, 1, ConfigDiagnostic.Severity.WARNING);
-        assertDiagnostic(result, "font.family", 5, 1, ConfigDiagnostic.Severity.WARNING);
+        assertDiagnostic(result, "font.future_font", 5, 1, ConfigDiagnostic.Severity.WARNING);
         assertDiagnostic(result, "unknown", 6, 1, ConfigDiagnostic.Severity.WARNING);
         assertDiagnostic(result, "keybindings.\"future.action\"", 8, 1, ConfigDiagnostic.Severity.WARNING);
         assertThat(result.diagnostics()).allSatisfy(d -> assertThat(d.message()).doesNotContain("secret-value"));

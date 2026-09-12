@@ -28,6 +28,10 @@ public final class FontSet {
     private final int ascent;
 
     public FontSet(String family, float size, List<String> fallbackFamilies, boolean ligatures) {
+        this(family, size, fallbackFamilies, ligatures, 1f);
+    }
+
+    public FontSet(String family, float size, List<String> fallbackFamilies, boolean ligatures, float lineHeight) {
         this.ligatures = ligatures;
         List<String> families = new ArrayList<>();
         families.add(family);
@@ -41,8 +45,10 @@ public final class FontSet {
         Font primary = fonts[0][0];
         cellWidth = Math.max(1, Math.round(primary.createGlyphVector(FRC, "M").getGlyphMetrics(0).getAdvance()));
         LineMetrics metrics = primary.getLineMetrics("Mg", FRC);
-        ascent = (int) Math.ceil(metrics.getAscent());
-        cellHeight = Math.max(1, (int) Math.ceil(metrics.getAscent() + metrics.getDescent() + metrics.getLeading()));
+        int naturalAscent = (int) Math.ceil(metrics.getAscent());
+        int naturalHeight = Math.max(1, (int) Math.ceil(metrics.getAscent() + metrics.getDescent() + metrics.getLeading()));
+        cellHeight = Math.max(naturalHeight, (int) Math.ceil(naturalHeight * lineHeight));
+        ascent = naturalAscent + (cellHeight - naturalHeight) / 2;
     }
 
     public Font fontFor(int codePoint, boolean bold, boolean italic) {

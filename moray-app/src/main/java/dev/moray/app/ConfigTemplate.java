@@ -14,9 +14,10 @@ final class ConfigTemplate {
     static String text(boolean macOs) {
         var text = new StringBuilder("""
             # Moray settings
-            # Uncomment a setting to change its saved default. Changes reload live across windows.
+            # Uncomment a setting to change its saved default. Live settings reload across windows.
             # View menu choices are temporary overrides until that saved setting changes.
-            # New windows and panes inherit saved defaults. Reload Config forces a fresh read.
+            # Session and grid defaults affect new panes/windows as described below.
+            # Reload Config forces a fresh read.
             # Invalid syntax or types keep the last valid settings; diagnostics explain errors.
 
             [window]
@@ -27,10 +28,55 @@ final class ConfigTemplate {
             # Show the status bar; updates live.
             # status_bar = true
 
+            # Initial terminal grid for new windows only; existing windows keep their size.
+            # columns = 150
+            # lines = 45
+            # Columns: 5-500; lines: 2-200. The window is clamped to the usable screen.
+
             [font]
+            # Font family and ordered fallbacks update live. Missing fonts use JBR/system fallback.
+            # family = "JetBrains Mono"
+            # fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
+            # Fallback names must be nonblank; an empty fallback list is allowed.
+            # ligatures = true
+            # Line height multiplier, 1.0-3.0; updates live.
+            # line_height = 1.0
             # Font size in points, 6-72; changes update all panes live.
             # Reset Font Size restores this saved default.
+            # Temporary size/theme choices survive reloads until their respective saved value changes.
             # size = 16.0
+
+            [terminal]
+            # Scrollback lines, 0-1000000; new panes only. Existing sessions keep their capacity.
+            # scrollback = 10000
+            # Option key sending Meta: "left", "right", "both", or "none"; updates live.
+            # option_as_meta = "left"
+            # Inactive pane dimming, 0.0-1.0; updates live.
+            # dim_inactive_panes = 0.3
+            # Copy a completed selection to the clipboard; updates live.
+            # copy_on_select = false
+            # Bell: "visual", "sound", or "none"; updates live.
+            # bell = "visual"
+
+            [terminal.shell]
+            # New panes only. Empty program resolves the default shell and appends configured args.
+            # An explicit program gets only configured args, with no implicit login flag.
+            # program = ""
+            # Arguments are exact strings, without shell parsing; preserve each argument separately.
+            # args = []
+            # Program and arguments must not contain NUL; a nonempty program cannot be blank.
+
+            [terminal.cursor]
+            # Live fallback when the running program has not set its own cursor style.
+            # Shape: "block", "beam", or "underline".
+            # shape = "block"
+            # blink = true
+
+            [terminal.env]
+            # New panes only: add string values to the inherited environment.
+            # Names use letters, digits and underscore, starting with a letter or underscore.
+            # Values must not contain NUL. Moray forces TERM=xterm-256color and COLORTERM=truecolor.
+            # This table does not change which default login shell is selected.
 
             [colors]
             # Built-in theme: "moray-dark" or "moray-light"; updates all windows live.
