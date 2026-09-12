@@ -1,6 +1,6 @@
 # Moray Plan 3.5 — macOS Chrome, Themes and Toolbar
 
-**Status:** Roadmap amendment requested by the user on 2026-09-11. Next priority, ahead of Plan 4 configuration and packaging. This records scope and design work; it is not yet an executable implementation plan.
+**Status:** Roadmap amendment requested by the user on 2026-09-11. Implemented ahead of Plan 4 configuration and packaging; final review, native acceptance and integration are pending. This roadmap is complemented by the concrete design and execution plan linked below.
 **Authority:** User feedback after trying Plan 3: the app looks good overall; next build a custom macOS title bar, fix theming using FlatLaf, aim for Atom-style dark/light themes, and discuss a toolbar with actual colored icons.
 **Parent:** [Phase 1 design](../specs/2026-09-10-moray-phase-1-terminal-design.md), especially §§5–7. This amendment supersedes the earlier sequencing that deferred all theme work to Plan 4 and the assumption that the current toolbar presentation is final.
 
@@ -10,7 +10,7 @@
 
 Give the working terminal a coherent macOS window and Atom/One Dark- and One Light-inspired appearance, then refine the toolbar with the user. Preserve the terminal functionality and ownership contracts delivered in Plan 3.
 
-## Current implementation
+## Baseline before Plan 3.5
 
 - FlatLaf and flatlaf-extras 3.7 are already application dependencies. Main installs FlatDarkLaf; the Appearance menu switches between stock FlatLightLaf and FlatDarkLaf.
 - Appearance switching currently updates Swing chrome, while terminal views retain their creation-time palette. Coordinated light/dark theming therefore requires terminal palette updates as well as FlatLaf styling.
@@ -51,14 +51,14 @@ Keep the existing shared action routing, tooltips, accessible names, keyboard sh
 4. Discuss toolbar alternatives in the context of the new title bar and both themes. Record the chosen icon style and layout before writing its implementation tasks.
 5. Implement and review the selected toolbar; perform the user-run native acceptance checks below. Continue to Plan 4 after this visual milestone.
 
-The scope and priority above are requested. Exact title-bar geometry, native integration mechanism, color values and toolbar artwork/layout still require design work; they are not implied approvals for implementation.
+The concrete design records the chosen native integration, initial palette and title geometry. The user approved execution and selected toolbar B; all four tasks are now implemented. See STATUS for review and native acceptance progress.
 
 ## Acceptance
 
 - [ ] Native macOS title-bar behavior works with multiple windows, full screen, activation changes and display scaling; input controls do not accidentally drag the window.
-- [ ] Dark and light themes cover both FlatLaf chrome and the terminal, with coherent title bars and readable ANSI/search/selection colors.
-- [ ] Live theme changes preserve sessions, content, split ratios, zoom and per-pane fonts, including hidden panes and newly opened windows.
-- [ ] The user has reviewed and selected toolbar layout and colored artwork in both themes.
+- [x] Dark and light themes cover both FlatLaf chrome and the terminal, with coherent title bars and readable ANSI/search/selection colors.
+- [x] Live theme changes preserve sessions, content, split ratios, zoom and per-pane fonts, including hidden panes and newly opened windows.
+- [x] The user has reviewed and selected toolbar layout and colored artwork in both themes.
 - [ ] Toolbar actions, shortcuts, accessibility, hover/disabled states and visibility modes still work.
 - [ ] Appropriate headless regression tests, full Gradle checks, task reviews and final review pass.
 - [ ] The user checks native behavior and visual appearance; headless results are not presented as native validation.

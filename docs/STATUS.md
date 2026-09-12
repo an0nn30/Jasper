@@ -1,6 +1,6 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11. Plan 3 is integrated into `main` following user approval; final reviewed code `dda35e2`. All task reviews and final whole-branch/fix reviews passed, with no unresolved review findings. Root fresh `./gradlew check --rerun-tasks`: **277 tests, 0 failures/errors, 1 expected font skip** (276 passed; 46 app + 231 terminal). Integration is local; no remote push has occurred.
+**As of:** 2026-09-11. Plan 3 is integrated into `main` at `942f5f7`. Plan 3.5 is implemented on `codex/plan-3-5-chrome-themes`, worktree `.worktrees/plan-3-5`; latest code `116709b`. All four task reviews approved; final branch review is underway. Root fresh `./gradlew check --rerun-tasks`: **298 tests, 0 failures/errors, 1 expected font skip** (297 passed; 62 app + 236 terminal). Native acceptance and integration remain pending; no GUI, benchmark or remote push occurred for this milestone.
 
 Read [AGENTS.md](../AGENTS.md) for repository rules, [README.md](../README.md) for running, and the [Phase 1 design](superpowers/specs/2026-09-10-moray-phase-1-terminal-design.md) for binding product requirements. GUI launches and benchmarks are user-run only.
 
@@ -13,14 +13,14 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 1 — Terminal core | Complete on main (`6daa61f`..`d0ccbfb`) |
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
-| 3.5 — macOS chrome, themes and toolbar | Live terminal/app themes and macOS title surface implemented and reviewed; selected two-tone toolbar B in progress |
+| 3.5 — macOS chrome, themes and toolbar | Implemented and task-reviewed; final review, native acceptance and integration pending |
 | 4 — Config and packaging | Follows Plan 3.5; not written yet |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Continue from main; do not start Plan 3 again.
 
 Active worktree: `.worktrees/plan-3-5`, branch `codex/plan-3-5-chrome-themes`. [Title/theme design](superpowers/specs/2026-09-11-moray-plan-3-5-titlebar-themes-design.md) and [execution plan](superpowers/plans/2026-09-11-moray-plan-3-5-titlebar-themes-implementation.md) cover the first runnable deliverable. [Toolbar study](design/plan-3-5-toolbar-study.html) is an illustrative discussion aid; the user selected B (fuller, two-tone colored icons), now included as Task 4.
 
-Next milestone: [Plan 3.5 — macOS chrome, themes and toolbar](superpowers/plans/2026-09-11-moray-plan-3-5-chrome-and-themes.md). The user has tried Plan 3 during development and reports that it looks good overall; this is qualitative feedback, not a claim that every native checklist item or benchmark was completed.
+Active milestone: [Plan 3.5 — macOS chrome, themes and toolbar](superpowers/plans/2026-09-11-moray-plan-3-5-chrome-and-themes.md). The user has tried Plan 3 during development and reports that it looks good overall; this is qualitative feedback, not a claim that every native checklist item or benchmark was completed.
 
 ## 2. Implemented behavior
 
@@ -37,7 +37,13 @@ Plan 3 adds:
 - Per-pane font controls, screen-preserving history clear, working-directory inheritance with launch-time validation.
 - Background shell launch with close-before-completion cleanup; native Quit routes through app cleanup.
 
-Settings and Reload config are visible but disabled; status says Built-in defaults. No configuration file is read or written. Chrome choices are session-only. The Plan 3.5 branch now has reviewed live dark/light palette updates and coordinated FlatLaf/app theme ownership (09e382e,6bdd298): existing hidden/zoomed panes, delayed launches and new windows use the selected theme while retaining sessions, font choices and split state. The native title surface is also implemented and reviewed (7833692). Latest full check: 296 tests, zero failures/errors, one known skip. Selected toolbar artwork is in progress; native acceptance remains user-run. Plan 4 retains configuration, custom theme files, persistence, automatic system appearance and packaging.
+Settings and Reload config are visible but disabled; status says Built-in defaults. No configuration file is read or written. Appearance choices are session-only. Plan 3.5 implements:
+
+- Live dark/light terminal palettes and coordinated FlatLaf themes (`09e382e`, `6bdd298`). Existing hidden/zoomed panes, delayed launches and new windows use the selected theme while retaining sessions, fonts, selection/find state and split ratios. Explicit terminal truecolor remains unchanged.
+- A slim macOS title surface (`7833692`) using the decorated frame and supported public properties. Native traffic lights and window behavior remain owned by macOS; separate tabs and toolbar sit beneath the title. Other platforms retain their existing decorations.
+- The user's selected toolbar B (`116709b`): 28-pixel two-tone Tabler icons, distinct action colors in both themes, labels and visibility modes retained. Settings/Reload remain muted while disabled.
+
+Actual headless Swing previews: [dark](design/plan-3-5-titlebar-dark.png) and [light](design/plan-3-5-titlebar-light.png). Native traffic lights are absent from these renders. Native acceptance remains user-run; Plan 4 retains configuration, custom theme files, persistence, automatic system appearance and packaging.
 
 ## 3. Fixes included during Plan 3
 
@@ -57,7 +63,7 @@ Settings and Reload config are visible but disabled; status says Built-in defaul
 
 ## 4. Verification still required
 
-1. User-run [Plan 3 acceptance checklist](superpowers/plans/2026-09-11-moray-plan-3-manual-check.md): native windows/menu/Quit, split/zoom/focus/dividers, tab gestures, find, clipboard, links, mouse reporting, directory inheritance and chrome readability. Headless tests do not establish these native visual results.
+1. User-run [Plan 3.5 title bar/theme checklist](superpowers/plans/2026-09-11-moray-plan-3-5-manual-check.md): native controls, dragging/double-click, fullscreen, scaling, appearance and colored toolbar in real windows. Also retain the [Plan 3 acceptance checklist](superpowers/plans/2026-09-11-moray-plan-3-manual-check.md): native windows/menu/Quit, split/zoom/focus/dividers, tab gestures, find, clipboard, links, mouse reporting, directory inheritance and chrome readability. Headless tests do not establish these native visual results.
 2. User-run benchmark after integration, only with no game or VM running. Historical Plan 1 result: 41.5 MB/s. A Plan 2 baseline measured during this session before newly added AGENTS restrictions were discovered: **35.9 MB/s** (105.5 MB in 2.94 s). No post-integration benchmark has run. Gate ≥35 MB/s, target ≥45 MB/s.
 3. CI has never run: no git remote exists. Workflow covers macOS, Ubuntu and Windows with JBR25. Ask before adding a remote or pushing. Windows ConPTY/forced-close and Linux desktop/font behavior remain unverified on their native systems.
 4. After Plan 4, satisfy the Phase 1 manual checklist and two-week Moray-only trial. Record every reason to reopen conch and fix the blockers before SSH begins.
@@ -80,16 +86,16 @@ These carried-over findings remain explicitly open; they were not silently count
 
 Retained coverage opportunities: astral search, edge/overlapping highlights, large-history indicator geometry, multi-row URL continuation lookup, empty-scrollback viewport, middle-button routing, copy-on-select, alternate-screen wheel/arrows, multi-notch reports, paste-to-live, Shift+PageDown and match colors. Add behavioral regressions when working in these areas, not tests that mirror source constants.
 
-## 6. Next: Plan 3.5, then Plan 4
+## 6. Next: native acceptance, then Plan 4
 
-Plan 3.5 interrupts the previous next step: custom macOS title bar, Atom/One Dark- and One Light-inspired built-in themes using the existing FlatLaf foundation, then toolbar discussion and selected colored-icon artwork/layout. Exact palette, title-bar arrangement and toolbar design will be decided before implementation; see the linked roadmap amendment. Built-in palettes and live coordinated theme application move forward from Plan 4.
+Plan 3.5 interrupted the previous next step and now supplies the custom macOS title surface, Atom-inspired built-in themes and selected two-tone toolbar. Review and native acceptance precede integration. Run the branch from `.worktrees/plan-3-5` with `./gradlew :moray-app:run`. Built-in palettes and live theme application have moved forward from Plan 4.
 
 Plan 4: AppDirs/per-OS paths, TOML diagnostics with line numbers and last-good retention, live reload, custom theme loading and persistence, automatic system appearance, settings-file creation, --config, app logging and macOS .app bundling JBR. Carryovers:
 
 - Replace printStackTrace/silent I/O catches with appropriate app logging/feedback.
 - Scrub launcher environment variables (TERM_PROGRAM, TMUX, iTerm variables) and provide UTF-8 LANG for Dock launch.
 - Implement line_height; revisit logical-pixel font-cell rounding.
-- Validate palette color/index inputs and implement palette/theme loading.
+- Implement custom palette/theme loading; Palette now validates required colors and exactly 16 non-null ANSI entries.
 - Make selecting installed Nerd Font fallbacks and copy-on-select easy through config.
 - ShellIntegrationFilter hold-limit prefix counting is cosmetic cleanup.
 
@@ -103,7 +109,7 @@ Any-time performance work: remove unused style-array allocation during text-only
 - macOS Command-click links takes precedence over program mouse reports; Shift provides local mouse behavior; horizontal Shift-wheel on macOS is ignored.
 - The user's approved Phase 1 direction and Plan 3 go-ahead were used for execution; a supplemental written design records concrete app contracts.
 - On Linux/Windows, cmd already means Ctrl+Shift. Defaults explicitly written cmd+shift add Alt to avoid collisions; user overrides parse literally and collisions are errors. macOS defaults are unchanged.
-- Settings/reload and persisted config remain Plan 4. Plan 3.5 will supply coordinated built-in dark/light themes and macOS title-bar work; automatic system appearance waits for Plan 4.
+- Settings/reload and persisted config remain Plan 4. Plan 3.5 supplies coordinated built-in dark/light themes and macOS title-bar work; automatic system appearance waits for Plan 4.
 - Four direct multi-pane carryovers were included; the remaining hardening list above is follow-up scope.
 - Native acceptance is user-run per newly merged AGENTS.md. No agent GUI launch or benchmark followed discovery of that rule.
 - The user selected the local `~/projects/tabler-icons` repository. Seven outline assets and full MIT license are bundled; SOURCE.txt records the source commit and theme-color adaptation.
@@ -114,7 +120,7 @@ Superpowers spec/plan → task implementer with TDD → separate task review →
 
 Root final verification on `dda35e2`: all 8 Gradle tasks executed successfully in 8 seconds; 277 tests, zero failures/errors, one expected font skip. Source-hygiene and `git diff --check` passed. No compiler warnings. Final reviewer compared the exact default key catalog with the parent spec and found it aligned; selected shortcut regressions for live overrides belong in Plan 4, without duplicating source constants in tests.
 
-Plan 3 was merged locally and its feature worktree/branch removed after merged checks passed (277 tests, zero failures/errors, one expected skip). Next: design Plan 3.5's custom macOS title bar and coordinated Atom-inspired themes, discuss the colored toolbar, then implement that milestone before Plan 4. Continue native acceptance from `/Users/dustin/projects/moray` and retain the daily-use gate.
+Plan 3 was merged locally and its feature worktree/branch removed after merged checks passed (277 tests, zero failures/errors, one expected skip). Plan 3.5 implementation now lives in `.worktrees/plan-3-5`; continue its review and native acceptance there, retaining the daily-use gate.
 
 ## 9. Execution rulings preserved from the completed Plan 3 ledger
 
@@ -127,3 +133,14 @@ These are historical Plan 3 scope decisions. The user's subsequent Plan 3.5 amen
 - Fold four immediate STATUS carryovers into Task 2 (lost link gesture, alternate-buffer invalidation, prompt pruning, child termination), retain remaining performance/selection findings for follow-up — these directly affect reliable multiple panes — costs additional Task 2 work and later hardening before Phase 1 acceptance.
 - GUI smoke and final benchmark are user-run under newly added AGENTS.md — respects desktop-operation restriction — costs leaving visual/performance acceptance pending after headless completion.
 - Keep disabled Settings/Reload tooltips user-facing, without internal Plan 4 numbers — developer instructions exclude implementation details from product flows and implementation already explains unavailable config — costs losing an internal milestone reference in tooltips, which remains in docs. Corrected ambiguous plan phrase before re-review.
+
+## 10. Plan 3.5 execution rulings
+
+- The user's go-ahead authorizes implementation of the requested title/theme direction with reviewable initial colors — avoids repeated approval of the already requested milestone — costs visual rework if the initial palette differs from intent.
+- Start with slim custom title surface and separate tabs unless the pending optional layout answer changes it — limits geometry changes before toolbar discussion — costs a later layout revision if tabs should be integrated.
+- Deliver title/themes as 3.5a and discuss toolbar artwork as 3.5b before implementing that selection — honors the explicit request to discuss toolbar appearance — costs leaving existing icons during the first deliverable.
+- Reuse supported decorated-frame macOS full-content properties and FlatLaf bounds rather than add JBR API/native dependencies — verified in pinned source and retains native behavior — costs revisiting integration if native user checks reveal a platform limitation.
+
+The third ruling was superseded when the user selected toolbar B: Task 4 delivers the chosen artwork in this same milestone. The optional title-layout answer has not arrived; the slim title surface with separate tabs remains the initial layout.
+
+Task reviews: palettes `09e382e`, application themes `6bdd298`, title surface `7833692`, toolbar `116709b` approved. Task 4 noted one non-blocking coverage gap: rendered tests do not independently pin the 24% face-fill layer; final review will triage it. Root full check on `116709b` ran all eight tasks successfully, without compiler warnings.

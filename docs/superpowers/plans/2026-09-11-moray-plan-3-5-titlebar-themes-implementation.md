@@ -1,8 +1,9 @@
-# Moray Plan 3.5a — Title Bar and Themes Implementation Plan
+# Moray Plan 3.5 — Title Bar, Themes and Toolbar Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A native-behaving custom macOS title surface, coordinated live Atom-inspired dark/light themes, and the user-selected two-tone toolbar.
+**Status:** All four tasks implemented and task-reviewed; full headless check passes (298 tests, one known skip). Final branch review and native acceptance pending.
 **Scope update:** The user selected toolbar study B during execution; Task 4 implements that choice in this same runnable deliverable.
 **Architecture:** TerminalView accepts live palettes; app-owned ThemeController updates every owner and its retained panes; MacTitleBar uses the decorated JFrame's macOS full-content area.
 **Tech Stack:** Java/JBR25, Gradle wrapper 9.7, FlatLaf/flatlaf-extras3.7, existing JUnit/AssertJ.
@@ -103,20 +104,20 @@ Main sets startup system appearance before EDT/AWT initialization. Keep frame.se
 **Consumes:** Task2 coordinated theme updates, existing seven ActionIds and icon names; approved study B and spec color pairs.
 **Produces:** 28px two-tone toolbar icons matching both themes, with unchanged shared-action routing/modes.
 
-- [ ] **Step 1: Add failing rendered-resource regressions.** Paint every real icon in dark/light into BufferedImage; check multiple opacity/color regions and contrasting per-theme strokes, not a uniform gray output. Verify no missing assets and accessible labels, modes, disabled Settings/Reload, Split behavior stay intact. Run `./gradlew :moray-app:test --tests '*AppIconsTest' --tests '*WindowChromeTest'` and record RED for existing20px/grayicons.
-- [ ] **Step 2: Adapt bundled SVGs to approved study B.** Preserve source Tabler paths, add soft rounded field behind geometry and translucent enclosed-face fill where appropriate. Example SVG shape order:
+- [x] **Step 1: Add failing rendered-resource regressions.** Paint every real icon in dark/light into BufferedImage; check multiple opacity/color regions and contrasting per-theme strokes, not a uniform gray output. Verify no missing assets and accessible labels, modes, disabled Settings/Reload, Split behavior stay intact. Run `./gradlew :moray-app:test --tests '*AppIconsTest' --tests '*WindowChromeTest'` and record RED for existing20px/grayicons.
+- [x] **Step 2: Adapt bundled SVGs to approved study B.** Preserve source Tabler paths, add soft rounded field behind geometry and translucent enclosed-face fill where appropriate. Example SVG shape order:
 ```xml
 <rect x="1" y="1" width="22" height="22" rx="5"
       fill="#61afef" fill-opacity="0.18" stroke="none"/>
 ```
 Keep original foreground geometry after the backdrop. Replace hardcoded legacygray with theme-aware peractioncolor via FlatSVGIcon per-instance ColorFilter (verify pinned3.7 API) or separate packaged light/dark assets if simpler; avoid global filters that recolor unrelatedicons. Use full MITlicense and SOURCEchangeannotation. Set icon dimensions28×28 and retainbuttonlabelbelow. Apply normalFlatLafhover/disabled states and smallconsistent margins/spacing fromstudy. Theme updates must refresh icons immediately for allwindows; rebuilding toolbar must not duplicate listeners or remove actiontooltips/accessibility.
-- [ ] **Step 3: Verify integration and commit.** Run coveringappchecks; report renderedicon evidence, all sevenassets, license and live-switch/modes tests. Fullfinalcheck belongs to root afterreview. Commit only tasksource/resources/tests. Update actual Swing dark/light preview if existingtask3harnesscanbereused withoutGUI.
+- [x] **Step 3: Verify integration and commit.** Run coveringappchecks; report renderedicon evidence, all sevenassets, license and live-switch/modes tests. Fullfinalcheck belongs to root afterreview. Commit only tasksource/resources/tests. Update actual Swing dark/light preview if existingtask3harnesscanbereused withoutGUI.
 
 ## Root acceptance
 
 - [ ] All task reviews and final whole-branch review approved; fix rounds as required.
-- [ ] Full final headless check passes; count skips and preserve warnings/limitations.
+- [x] Full final headless check passes; count skips and preserve warnings/limitations.
 - [ ] Update STATUS/README/roadmap for implemented title/themes and selected two-tone toolbar; record native acceptance pending.
 - [ ] User native title-bar/light-dark checks, including fullscreen/scaling/drag and screen menus.
 - [x] Toolbar alternatives shown; user selected B (fuller, two-tone colored icons).
-- [ ] Selected toolbar treatment implemented, reviewed and included in final verification.
+- [x] Selected toolbar treatment implemented, reviewed and included in final verification.
