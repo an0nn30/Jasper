@@ -1,0 +1,265 @@
+import java.nio.file.Files
+import java.util.Locale
+import java.util.zip.ZipFile
+import org.gradle.api.plugins.JavaApplication
+import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.jvm.toolchain.JavaToolchainService
+
+def app = extensions.getByType(JavaApplication)
+def toolchains = extensions.getByType(JavaToolchainService)
+def java = extensions.getByType(JavaPluginExtension)
+def launcher = toolchains.launcherFor(java.toolchain)
+def version = providers.gradleProperty('morayVersion').orElse('1.0.0')
+def jarTask = tasks.named('jar')
+def packagingRoot = layout.buildDirectory.dir('packaging')
+def inputDirectory = packagingRoot.map { it.dir('input') }
+def imageDirectory = packagingRoot.map { it.dir('image') }
+def distributionDirectory = packagingRoot.map { it.dir('dist') }
+def markerFile = packagingRoot.map { it.file('image.complete') }
+
+def normalizedHost = {
+    String os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+    String architecture = System.getProperty('os.arch').toLowerCase(Locale.ROOT)
+    String normalizedArchitecture = switch (architecture) {
+        case ['aarch64', 'arm64'] -> 'aarch64'
+        case ['amd64', 'x86_64', 'x64'] -> 'x64'
+        default -> architecture
+    }
+    if (os.startsWith('mac')) return [os: 'macos', architecture: normalizedArchitecture]
+    if (os.startsWith('windows')) return [os: 'windows', architecture: normalizedArchitecture]
+    return [os: os, architecture: normalizedArchitecture]
+}
+
+def validatedVersion = {
+    String value = version.get()
+    def match = value =~ /^(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,4})$/
+    if (!match.matches()) {
+        throw new GradleException("Invalid -PmorayVersion '${value}'; expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
+    }
+    List<Integer> components = [match.group(1), match.group(2), match.group(3)].collect { Integer.parseInt(it) }
+    if (components[0] < 1 || components[0] > 255 || components[1] > 255 || components[2] > 65535) {
+        throw new GradleException("Invalid -PmorayVersion '${value}'; expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
+    }
+    value
+}
+
+def nativeContext = {
+    String packageVersion = validatedVersion()
+    def host = normalizedHost()
+    if (!(host.os == 'macos' && host.architecture in ['aarch64', 'x64']) &&
+            !(host.os == 'windows' && host.architecture == 'x64')) {
+        throw new GradleException("Native packaging supports only macOS aarch64/x64 and Windows x64; this host is ${System.getProperty('os.name')} ${System.getProperty('os.arch')}")
+    }
+    def selectedLauncher = launcher.get()
+    File sdkHome = selectedLauncher.metadata.installationPath.asFile
+    File sdkRelease = new File(sdkHome, 'release')
+    String sdkReleaseText = sdkRelease.isFile() ? sdkRelease.getText('UTF-8') : ''
+    def sdkArchitectureMatcher = sdkReleaseText =~ /(?m)^OS_ARCH="([^"]+)"/
+    String toolchainArchitecture = sdkArchitectureMatcher.find() ? sdkArchitectureMatcher.group(1) : ''
+    toolchainArchitecture = toolchainArchitecture.toLowerCase(Locale.ROOT)
+    toolchainArchitecture = toolchainArchitecture in ['aarch64', 'arm64'] ? 'aarch64' :
+            (toolchainArchitecture in ['amd64', 'x86_64', 'x64'] ? 'x64' : toolchainArchitecture)
+    if (toolchainArchitecture != host.architecture) {
+        throw new GradleException("The selected JBR SDK architecture (${toolchainArchitecture}) does not match the host (${host.architecture}); configure a matching JBR SDK 25")
+    }
+    File jpackage = new File(sdkHome, "bin/jpackage${host.os == 'windows' ? '.exe' : ''}")
+    if (!jpackage.isFile()) {
+        throw new GradleException("The selected JBR SDK has no jpackage at ${jpackage}; configure a matching JBR SDK 25, not a JRE")
+    }
+    [version: packageVersion, host: host, launcher: selectedLauncher, sdkHome: sdkHome, jpackage: jpackage]
+}
+
+def executeNative = { List<String> command, String purpose ->
+    def result = providers.exec {
+        commandLine(command)
+        ignoreExitValue = true
+    }
+    String standardOutput = result.standardOutput.asText.get()
+    String errorOutput = result.standardError.asText.get()
+    int exitCode = result.result.get().exitValue
+    if (exitCode != 0) {
+        throw new GradleException("${purpose} failed with exit code ${exitCode}\n${standardOutput}${errorOutput}")
+    }
+    [stdout: standardOutput, stderr: errorOutput]
+}
+
+def stage = tasks.register('stagePackage', Sync) {
+    group = 'distribution'
+    description = 'Stages the application JAR, runtime dependencies, configuration example and package guide.'
+    dependsOn(jarTask)
+    from(jarTask.flatMap { it.archiveFile })
+    from(configurations.runtimeClasspath)
+    from(rootProject.file('config.example.toml'))
+    from(rootProject.file('packaging/README.txt'))
+    into(inputDirectory)
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+}
+
+def packageApp = tasks.register('packageApp') {
+    group = 'distribution'
+    description = 'Builds a native Moray application image for the current host.'
+    dependsOn(stage)
+    inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.property('mainClass', app.mainClass)
+    inputs.property('jvmArgs', providers.provider { app.applicationDefaultJvmArgs.collect { it.toString() } })
+    inputs.property('version', version)
+    inputs.property('host', providers.provider { normalizedHost().toString() })
+    inputs.property('toolchainHome', launcher.map { it.metadata.installationPath.asFile.absolutePath })
+    inputs.file(launcher.map { it.metadata.installationPath.file('release') })
+    outputs.dir(imageDirectory)
+    outputs.file(markerFile)
+    doLast {
+        def context = nativeContext()
+        File imageDir = imageDirectory.get().asFile
+        File marker = markerFile.get().asFile
+        delete(imageDir, marker)
+        imageDir.mkdirs()
+        List<String> args = [context.jpackage.absolutePath, '--type', 'app-image',
+            '--name', 'Moray', '--app-version', context.version,
+            '--description', 'Moray terminal', '--vendor', 'Moray',
+            '--input', inputDirectory.get().asFile.absolutePath, '--dest', imageDir.absolutePath,
+            '--main-jar', jarTask.get().archiveFile.get().asFile.name,
+            '--main-class', app.mainClass.get(),
+            '--jlink-options', '--strip-debug --no-man-pages --no-header-files --bind-services']
+        app.applicationDefaultJvmArgs.each { args.addAll(['--java-options', it.toString()]) }
+        if (context.host.os == 'macos') {
+            args.addAll(['--mac-package-identifier', 'dev.moray.app', '--mac-package-name', 'Moray'])
+        }
+        try {
+            executeNative(args, 'jpackage app-image')
+            marker.text = "${context.version} ${context.host.os} ${context.host.architecture}\n"
+        } catch (Exception failure) {
+            delete(imageDir, marker)
+            throw failure
+        }
+    }
+}
+
+def verifyPackage = tasks.register('verifyPackage') {
+    group = 'verification'
+    description = 'Verifies the generated native image and bundled runtime without launching Moray.'
+    dependsOn(packageApp)
+    inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.upToDateWhen { false }
+    doLast {
+        def context = nativeContext()
+        File image = new File(imageDirectory.get().asFile, context.host.os == 'macos' ? 'Moray.app' : 'Moray')
+        File appDir = context.host.os == 'macos' ? new File(image, 'Contents/app') : new File(image, 'app')
+        File runtimeHome = context.host.os == 'macos' ? new File(image, 'Contents/runtime/Contents/Home') : new File(image, 'runtime')
+        File nativeLauncher = context.host.os == 'macos' ? new File(image, 'Contents/MacOS/Moray') : new File(image, 'Moray.exe')
+        File config = new File(appDir, 'Moray.cfg')
+        [image, appDir, runtimeHome, nativeLauncher, config].each { candidate ->
+            if (!candidate.exists()) throw new GradleException("Package verification failed: missing ${candidate}")
+        }
+        inputDirectory.get().asFile.eachFile { staged ->
+            File packaged = new File(appDir, staged.name)
+            if (!packaged.isFile() || !Arrays.equals(Files.readAllBytes(staged.toPath()), Files.readAllBytes(packaged.toPath()))) {
+                throw new GradleException("Package verification failed: staged file differs or is missing: ${staged.name}")
+            }
+        }
+        String cfg = config.getText('UTF-8')
+        if (!cfg.contains("app.mainclass=${app.mainClass.get()}")) throw new GradleException('Package verification failed: wrong main class in Moray.cfg')
+        if (!cfg.contains('--enable-native-access=ALL-UNNAMED') || !cfg.contains('-Dapple.awt.application.name=Moray')) {
+            throw new GradleException('Package verification failed: required JVM options are missing from Moray.cfg')
+        }
+        configurations.runtimeClasspath.files.findAll { it.name.endsWith('.jar') }.each { dependency ->
+            if (!cfg.contains("\$APPDIR/${dependency.name}")) throw new GradleException("Package verification failed: classpath omits ${dependency.name}")
+        }
+        File release = new File(runtimeHome, 'release')
+        String releaseText = release.getText('UTF-8')
+        if (!(releaseText =~ /(?m)^JAVA_VERSION="25(?:\.|\")/)) {
+            throw new GradleException('Package verification failed: bundled runtime release is not Java 25')
+        }
+        def releaseArchitectureMatcher = releaseText =~ /(?m)^OS_ARCH="([^"]+)"/
+        String releaseArchitecture = releaseArchitectureMatcher.find() ? releaseArchitectureMatcher.group(1) : ''
+        String normalizedReleaseArchitecture = releaseArchitecture in ['aarch64', 'arm64'] ? 'aarch64' :
+                (releaseArchitecture in ['amd64', 'x86_64', 'x64'] ? 'x64' : releaseArchitecture)
+        if (releaseArchitecture && normalizedReleaseArchitecture != context.host.architecture) throw new GradleException("Package verification failed: runtime architecture is ${releaseArchitecture}")
+        File ptyJar = appDir.listFiles().find { it.name.startsWith('pty4j-') && it.name.endsWith('.jar') }
+        File jnaJar = appDir.listFiles().find { it.name.startsWith('jna-') && !it.name.startsWith('jna-platform') && it.name.endsWith('.jar') }
+        if (ptyJar == null || jnaJar == null) throw new GradleException('Package verification failed: pty4j or JNA dependency is missing')
+        [[jar: ptyJar, prefix: context.host.os == 'macos' ? 'resources/com/pty4j/native/darwin/' : 'resources/com/pty4j/native/win/x86-64/'],
+         [jar: jnaJar, prefix: context.host.os == 'macos' ? "com/sun/jna/darwin-${context.host.architecture == 'aarch64' ? 'aarch64' : 'x86-64'}/" : 'com/sun/jna/win32-x86-64/']].each { expected ->
+            File nativeJar = expected.jar
+            ZipFile zip = new ZipFile(nativeJar)
+            try {
+                boolean hasPayload = zip.entries().any { entry -> !entry.directory && entry.name.startsWith(expected.prefix) }
+                if (!hasPayload) throw new GradleException("Package verification failed: ${nativeJar.name} lacks a host native payload")
+            } finally { zip.close() }
+        }
+        if (context.host.os == 'macos') {
+            File plist = new File(image, 'Contents/Info.plist')
+            if (!plist.isFile()) throw new GradleException("Package verification failed: missing ${plist}")
+            def identifier = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist.absolutePath], 'plutil identifier').stdout.trim()
+            def bundleVersion = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleShortVersionString', 'raw', '-o', '-', plist.absolutePath], 'plutil version').stdout.trim()
+            if (identifier != 'dev.moray.app' || bundleVersion != context.version) throw new GradleException("Package verification failed: plist identity/version is ${identifier}/${bundleVersion}")
+            String fileOutput = executeNative(['/usr/bin/file', nativeLauncher.absolutePath, new File(runtimeHome, 'bin/java').absolutePath], 'native architecture inspection').stdout
+            String architectureNeedle = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
+            if (!fileOutput.contains(architectureNeedle)) throw new GradleException("Package verification failed: native binaries are not ${architectureNeedle}\n${fileOutput}")
+            executeNative(['/usr/bin/codesign', '--verify', '--deep', '--strict', image.absolutePath], 'codesign verification')
+        }
+        File bundledJava = new File(runtimeHome, "bin/java${context.host.os == 'windows' ? '.exe' : ''}")
+        def javaVersion = executeNative([bundledJava.absolutePath, '-XshowSettings:properties', '-version'], 'bundled java -version')
+        String versionOutput = javaVersion.stdout + javaVersion.stderr
+        if (!versionOutput.contains('25.') || !versionOutput.toLowerCase(Locale.ROOT).contains('jbr-')) {
+            throw new GradleException("Package verification failed: unexpected bundled java -version output\n${versionOutput}")
+        }
+        def runtimeArchitectureMatcher = versionOutput =~ /(?m)^\s*os\.arch = ([^\s]+)\s*$/
+        String runtimeArchitecture = runtimeArchitectureMatcher.find() ? runtimeArchitectureMatcher.group(1).toLowerCase(Locale.ROOT) : ''
+        runtimeArchitecture = runtimeArchitecture in ['aarch64', 'arm64'] ? 'aarch64' :
+                (runtimeArchitecture in ['amd64', 'x86_64', 'x64'] ? 'x64' : runtimeArchitecture)
+        if (runtimeArchitecture != context.host.architecture) {
+            throw new GradleException("Package verification failed: bundled Java architecture is ${runtimeArchitecture ?: 'unknown'}")
+        }
+        logger.lifecycle("Verified Moray ${context.version} ${context.host.os}-${context.host.architecture} image at ${image}")
+    }
+}
+
+if (normalizedHost().os == 'windows') {
+    tasks.register('packageDist', Zip) {
+        group = 'distribution'
+        description = 'Creates the portable Windows distribution after verifying its image.'
+        dependsOn(verifyPackage)
+        archiveFileName = version.map { "Moray-${it}-windows-x64.zip" }
+        destinationDirectory = distributionDirectory
+        from(imageDirectory)
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+        doFirst { nativeContext() }
+    }
+} else {
+    tasks.register('packageDist') {
+        group = 'distribution'
+        description = 'Creates the macOS distribution after verifying its image.'
+        dependsOn(verifyPackage)
+        inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
+        inputs.property('version', version)
+        outputs.files(version.map { new File(distributionDirectory.get().asFile, "Moray-${it}-macos-${normalizedHost().architecture}.dmg") })
+        doLast {
+        def context = nativeContext()
+        File distDir = distributionDirectory.get().asFile
+        distDir.mkdirs()
+        File artifact = new File(distDir, "Moray-${context.version}-macos-${context.host.architecture}.dmg")
+        delete(artifact)
+        File temporary = new File(packagingRoot.get().asFile, 'dist-dmg-work')
+        delete(temporary)
+        temporary.mkdirs()
+        try {
+            executeNative([context.jpackage.absolutePath, '--type', 'dmg', '--name', 'Moray',
+                '--app-image', new File(imageDirectory.get().asFile, 'Moray.app').absolutePath,
+                '--dest', temporary.absolutePath], 'jpackage dmg')
+            File generated = temporary.listFiles().find { it.name.endsWith('.dmg') }
+            if (generated == null) throw new GradleException('jpackage dmg completed without producing a DMG')
+            Files.move(generated.toPath(), artifact.toPath())
+            executeNative(['/usr/bin/hdiutil', 'verify', artifact.absolutePath], 'hdiutil verify')
+        } catch (Exception failure) {
+            delete(artifact)
+            throw failure
+        } finally {
+            delete(temporary)
+        }
+        logger.lifecycle("Created ${artifact}")
+        }
+    }
+}

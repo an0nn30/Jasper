@@ -48,3 +48,5 @@ tasks.register<JavaExec>("mockUiPreview") {
     jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
     args(rootProject.layout.projectDirectory.dir("docs/design").asFile.absolutePath)
 }
+
+apply(from = rootProject.file("gradle/packaging.gradle"))
