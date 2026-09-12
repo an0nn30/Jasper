@@ -81,22 +81,22 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
 }
 ```
 viewOptions maps FontConfig/TerminalConfig to Task1 constructor; supplied effective size/palette preserve runtime choices. The old constructor delegates to new defaults with FontConfig.withSize, columns150/lines45.
-- [ ] Write RED real TOML tests for every new setting/default/range, inline/nested tables, array element types, env map values, exact source positions, unknown/empty nested tables, quoted dotted keys and NUL input values. Test per-field fallback, type rejection, collection copies, old constructor compatibility, supported template uncommented defaults and existing binding round trips.
+- [x] Write RED real TOML tests for every new setting/default/range, inline/nested tables, array element types, env map values, exact source positions, unknown/empty nested tables, quoted dotted keys and NUL input values. Test per-field fallback, type rejection, collection copies, old constructor compatibility, supported template uncommented defaults and existing binding round trips.
 ```java
 var r = ConfigLoader.parse(Path.of("config.toml"), "[font]\nline_height=1.5\n[terminal]\nscrollback=321\n[terminal.shell]\nprogram='example-shell'\nargs=['--login', 'one argument']", true);
 assertThat(r.rejected()).isFalse();
 assertThat(r.snapshot().font().lineHeight()).isEqualTo(1.5f);
 assertThat(r.snapshot().terminal().shell().args()).containsExactly("--login", "one argument");
 ```
-- [ ] Implement validated records and expand parser traversal for window/font/terminal and nested shell/cursor/env. Retain positions using List<String> paths, never split quoted path components. Known table/value/array-element types reject on mismatch; invalid scalar/list values default that field. An invalid env entry is omitted with ERROR while valid entries survive. Names must match [A-Za-z_][A-Za-z0-9_]*. Reserved TERM/COLORTERM warn and are omitted. Do not echo arguments/env values in diagnostics; unknown env names are data, not unknown config keys.
+- [x] Implement validated records and expand parser traversal for window/font/terminal and nested shell/cursor/env. Retain positions using List<String> paths, never split quoted path components. Known table/value/array-element types reject on mismatch; invalid scalar/list values default that field. An invalid env entry is omitted with ERROR while valid entries survive. Names must match [A-Za-z_][A-Za-z0-9_]*. Reserved TERM/COLORTERM warn and are omitted. Do not echo arguments/env values in diagnostics; unknown env names are data, not unknown config keys.
 ```java
 // Snapshot conversion, with argument order matching Task1 exactly:
 return new TerminalOptions(font.family(), effectiveSize, font.fallback(), font.ligatures(),
  effectivePalette, terminal.cursorShape(), terminal.cursorBlink(), terminal.optionAsMeta(),
  terminal.scrollback(), terminal.copyOnSelect(), font.lineHeight(), terminal.bell());
 ```
-- [ ] Expand the commented Settings template to every new supported setting with exact defaults/ranges and live versus new-pane/new-window behavior. Keep CREATE_NEW-only lifecycle unchanged. Empty program uses default command plus appended args; explicit program gets only configured args. Clarify missing-font fallback, forced TERM/COLORTERM and temporary runtime font/theme overrides. Extend real parse/round-trip tests rather than mirroring prose.
-- [ ] Run focused RED/GREEN and :moray-app:check/hygiene; commit/report. No service or UI integration changes in this task.
+- [x] Expand the commented Settings template to every new supported setting with exact defaults/ranges and live versus new-pane/new-window behavior. Keep CREATE_NEW-only lifecycle unchanged. Empty program uses default command plus appended args; explicit program gets only configured args. Clarify missing-font fallback, forced TERM/COLORTERM and temporary runtime font/theme overrides. Extend real parse/round-trip tests rather than mirroring prose.
+- [x] Run focused RED/GREEN and :moray-app:check/hygiene; commit/report. No service or UI integration changes in this task.
 
 ### Task 3: Captured launch defaults and initial window sizing
 **Files:** Create moray-app/src/main/java/dev/moray/app/{LaunchSettings,InitialWindowSize}.java. Modify ShellLauncher,TerminalPane,MorayApplication,TerminalWindow,ConfigurationController and focused tests. Task4 owns full live view application.
@@ -120,7 +120,7 @@ final class InitialWindowSize {
  static Dimension fit(Dimension packed, Dimension minimum, Rectangle usableBounds);
 }
 ```
-- [ ] Write RED tests that capture a requested launch into a queued executor, change settings, then execute; verify old command/args/env/scrollback/label remain captured, while the next request gets new values. Exercise exact argument boundaries, immutable environment overlay, default login shell append behavior, platform default resolution, forced TERM/COLORTERM, per-window frozen grid and capture/execute errors. Use standard injected BiFunction and controlled sessions, never user/login shells.
+- [x] Write RED tests that capture a requested launch into a queued executor, change settings, then execute; verify old command/args/env/scrollback/label remain captured, while the next request gets new values. Exercise exact argument boundaries, immutable environment overlay, default login shell append behavior, platform default resolution, forced TERM/COLORTERM, per-window frozen grid and capture/execute errors. Use standard injected BiFunction and controlled sessions, never user/login shells.
 ```java
 var settings = LaunchSettings.resolve(snapshot, "Mac OS X", Map.of("SHELL","/bin/zsh", "KEEP","yes"), 150,45);
 assertThat(settings.columns()).isEqualTo(150);
@@ -128,23 +128,23 @@ assertThat(settings.environment()).containsEntry("KEEP","yes");
 // Test actual queued ShellLauncher: callback must reach EDT and use the captured value,
 // not supplier.get() from inside its worker.
 ```
-- [ ] Implement LaunchSettings resolution with defensive copies. Default program uses DefaultShell.command(os,inherited) plus args; explicit program uses one executable plus exact args. Merge env without mutating inherited map, enforce TERM/COLORTERM. Safe label comes from captured executable; invalid path syntax must not throw while formatting an error label.
-- [ ] Implement configured ShellLauncher capture on request thread (production EDT), directory/process work on executor, EDT completion for capture/scheduling/launch failures. Return captured label, and store it in TerminalPane.start; existing constructor/callback call sites remain compatible. Cleanup of close-before-launch-completion remains unchanged.
-- [ ] MorayApplication creates a configured launcher per new window: capture that window's columns/lines once and supply current configuration.snapshot() for each later launch's session defaults. Actual worker calls TerminalSession.start(captured command/env/directory/grid/scrollback). No UI snapshot reads on worker. Legacy configuration-free construction uses defaults.
-- [ ] Add initial geometry RED tests with actual FontSet metrics and root/content sizing; prove lines/columns and typography affect initial area, that1.0 defaults are coherent, clamps respect minimum/screen constraints, and reload/pending completion do not repack windows. Implement terminalArea from fonts and48px padding. Set first pane preferred area before TerminalWindow.frame.pack; use InitialWindowSize.fit with usable monitor bounds afterward. In a too-small screen prefer the usable bounds over an impossible minimum. Preserve unconfigured fixture geometry.
+- [x] Implement LaunchSettings resolution with defensive copies. Default program uses DefaultShell.command(os,inherited) plus args; explicit program uses one executable plus exact args. Merge env without mutating inherited map, enforce TERM/COLORTERM. Safe label comes from captured executable; invalid path syntax must not throw while formatting an error label.
+- [x] Implement configured ShellLauncher capture on request thread (production EDT), directory/process work on executor, EDT completion for capture/scheduling/launch failures. Return captured label, and store it in TerminalPane.start; existing constructor/callback call sites remain compatible. Cleanup of close-before-launch-completion remains unchanged.
+- [x] MorayApplication creates a configured launcher per new window: capture that window's columns/lines once and supply current configuration.snapshot() for each later launch's session defaults. Actual worker calls TerminalSession.start(captured command/env/directory/grid/scrollback). No UI snapshot reads on worker. Legacy configuration-free construction uses defaults.
+- [x] Add initial geometry RED tests with actual FontSet metrics and root/content sizing; prove lines/columns and typography affect initial area, that1.0 defaults are coherent, clamps respect minimum/screen constraints, and reload/pending completion do not repack windows. Implement terminalArea from fonts and48px padding. Set first pane preferred area before TerminalWindow.frame.pack; use InitialWindowSize.fit with usable monitor bounds afterward. In a too-small screen prefer the usable bounds over an impossible minimum. Preserve unconfigured fixture geometry.
 ```java
 FontConfig f = snapshot.font();
 FontSet fonts = new FontSet(f.family(), f.size(), f.fallback(), f.ligatures(), f.lineHeight());
 return new Dimension(snapshot.columns()*fonts.cellWidth()+48,
  snapshot.lines()*fonts.cellHeight()+48);
 ```
-- [ ] Run focused tests and app check/hygiene; commit/report, including helper/API decisions. Root owns documentation status.
+- [x] Run focused tests and app check/hygiene; commit/report, including helper/API decisions. Root owns documentation status.
 
 ### Task 4: Live view application and complete user documentation
 **Files:** Modify WindowContent,TerminalPane,ConfigurationController only as needed; integration tests, README/docs/configuration.md. Root owns STATUS/spec/plan/native checklist.
 **Consumes:** ConfigSnapshot.viewOptions, font/terminal groups, TerminalView.applyOptions/options and configured launch/sizing paths.
 **TerminalPane addition:** void setConfiguredDim(float amount); setActive/applyTheme must use stored value rather than hard-coded .3.
-- [ ] Write RED real ConfigService→WindowContent/JRootPane tests covering live typography/input/cursor/copy/bell/dim updates across windows, hidden/zoomed and pending views; stable session identity; native text editing and existing shortcut behavior. Verify unrelated setting changes preserve manual font size and global theme; changing font.family/line_height also preserves a manual size when font.size is unchanged; changing size/reset/new panes uses saved size. Verify focus/theme changes retain configured dimming.
+- [x] Write RED real ConfigService→WindowContent/JRootPane tests covering live typography/input/cursor/copy/bell/dim updates across windows, hidden/zoomed and pending views; stable session identity; native text editing and existing shortcut behavior. Verify unrelated setting changes preserve manual font size and global theme; changing font.family/line_height also preserves a manual size when font.size is unchanged; changing size/reset/new panes uses saved size. Verify focus/theme changes retain configured dimming.
 ```java
 // For each retained ready pane when relevant saved fields change:
 float size = previous == null || previous.fontSize()!=next.fontSize()
@@ -152,12 +152,12 @@ float size = previous == null || previous.fontSize()!=next.fontSize()
 pane.view().applyOptions(next.viewOptions(size, pane.view().palette()));
 pane.setConfiguredDim(next.terminal().dimInactivePanes());
 ```
-- [ ] Replace size-only application with grouped field comparisons. Do not apply options for unrelated chrome/binding/session-only changes. Save current font default for reset; configurePane uses the latest snapshot's live options with current shared theme when pending views become ready. Apply dimming to all panes, including pending. Keep launch settings untouched for existing sessions. Preserve palette/manual size explicitly when building options.
-- [ ] Complete behavioral coverage through actual view input/selection/BEL paths where the module tests supply safe seams; never add fake UI or inspect source strings. Check no stale callback mutates closed owners, no permanent timers introduced by bell detach, and current sizing/launch snapshots coexist with live changes.
-- [ ] Update README and configuration guide with full supported table/examples, ranges/defaults, live/new-window/new-pane semantics, exact shell arguments/env overlay, reserved variables, missing-font fallback, initial-screen/minimum constraints and remaining Plan4 scope. Preserve native acceptance links; no internal milestone labels in controls.
-- [ ] Run covering RED/GREEN tests, full ./gradlew check and hygiene, self-review and commit/report. Root performs final independent checks/review and handoff.
+- [x] Replace size-only application with grouped field comparisons. Do not apply options for unrelated chrome/binding/session-only changes. Save current font default for reset; configurePane uses the latest snapshot's live options with current shared theme when pending views become ready. Apply dimming to all panes, including pending. Keep launch settings untouched for existing sessions. Preserve palette/manual size explicitly when building options.
+- [x] Complete behavioral coverage through actual view input/selection/BEL paths where the module tests supply safe seams; never add fake UI or inspect source strings. Check no stale callback mutates closed owners, no permanent timers introduced by bell detach, and current sizing/launch snapshots coexist with live changes.
+- [x] Update README and configuration guide with full supported table/examples, ranges/defaults, live/new-window/new-pane semantics, exact shell arguments/env overlay, reserved variables, missing-font fallback, initial-screen/minimum constraints and remaining Plan4 scope. Preserve native acceptance links; no internal milestone labels in controls.
+- [x] Run covering RED/GREEN tests, full ./gradlew check and hygiene, self-review and commit/report. Root performs final independent checks/review and handoff.
 
 ## Root acceptance
 - [ ] Verify per-task reviews and final whole-branch review, resolving findings under the SDD fix rules.
-- [ ] Fresh full check, XML counts and source/diff hygiene; native GUI/audio/platform acceptance stays user-run.
+- [x] Fresh full check, XML counts and source/diff hygiene; native GUI/audio/platform acceptance stays user-run.
 - [ ] Record full Plan4b scope, remaining theme/packaging work, all rulings and actual verification in STATUS. Clean only this plan's scratch workspace after preserving its decisions.

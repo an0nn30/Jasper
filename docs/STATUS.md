@@ -2,7 +2,7 @@
 
 **As of:** 2026-09-12. Plan 4a and all preceding UI work are integrated on `main` at `05a94d4`. Fresh merged verification ran all eight Gradle tasks: 394 tests, 393 passed and one known font skip, with no failures/errors. Continue from `/Users/dustin/projects/moray`. See [config design](superpowers/specs/2026-09-11-moray-plan-4a-config-design.md) and [implementation plan](superpowers/plans/2026-09-11-moray-plan-4a-config.md). Native UI, benchmark and daily-use acceptance remain open.
 
-**Plan 4b work:** The user approved full terminal configuration. Work is isolated on `codex/plan-4b-terminal-config` in `.worktrees/plan-4b`, based on `ab672fa`. Baseline check: 394 tests, 393 passed and one known skip. Task 1 is implemented and independently reviewed at `8fc85a7`: retained-view live options, shared line metrics and attached-view bells. Terminal check: 257 tests, 256 passed and one known font skip. Parsing, launch capture and app wiring are still in progress. See [design](superpowers/specs/2026-09-12-moray-plan-4b-terminal-config-design.md) and [implementation plan](superpowers/plans/2026-09-12-moray-plan-4b-terminal-config.md).
+**Plan 4b work:** Full terminal configuration is implemented on `codex/plan-4b-terminal-config` in `.worktrees/plan-4b`, based on `ab672fa`. All four task reviews approved through `9d8b9b4`; final whole-branch review is pending. Fresh `./gradlew check --rerun-tasks` executed all eight tasks: 442 tests, 441 passed, one known font skip, no failures/errors or test output. Both modules passed source hygiene and the branch passed diff checks. Native acceptance remains user-run. See [design](superpowers/specs/2026-09-12-moray-plan-4b-terminal-config-design.md), [implementation plan](superpowers/plans/2026-09-12-moray-plan-4b-terminal-config.md) and [native checklist](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md).
 
 **Plan 4a progress:** Saved settings and live reload are integrated on `main`, with all task and final reviews complete through `acd5ea3`. Fresh full verification: 394 tests, 393 passed and one known font skip, no failures/errors. Actual status renders passed visual inspection in dark/light at normal/narrow widths. Final whole-branch review approved after correcting Windows-specific test fixtures; no findings remain open. Native and Windows execution remain unverified. See [configuration usage](configuration.md), [status renders](design/config-status-comparison.md) and [native acceptance](superpowers/plans/2026-09-11-moray-plan-4a-manual-check.md).
 
@@ -24,7 +24,7 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 3.5 — macOS chrome, themes and toolbar | Integrated on main and fully reviewed; native acceptance pending |
 | Screenshot UI revision | Implemented and fully reviewed; compact/motion follow-up implemented and fully reviewed; native acceptance pending; integrated on main |
 | 4a — Saved settings and live reload | Integrated on main and fully reviewed; native acceptance pending |
-| 4b — Full terminal configuration | Active: live typography/behavior, captured session defaults and initial window grid |
+| 4b — Full terminal configuration | Implemented; task reviews approved, final review pending; native acceptance pending |
 | Remaining Plan 4 | Custom themes/system appearance, logging/launcher and .app packaging remain |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart completed plans; Plan 4a is integrated and remaining Plan 4 work should begin from main.
@@ -49,6 +49,8 @@ Plan 3 adds:
 - Background shell launch with close-before-completion cleanup; native Quit routes through app cleanup.
 
 Plan 4a now reads saved TOML settings, polls for changes, enables Settings/Reload and exposes positioned diagnostics through status. Configured height, toolbar/status visibility, font size, built-in theme and shortcuts apply live across owners. Unrelated reloads preserve temporary View/font overrides; Settings creates a template only when absent. The integrated UI baseline on main predates this configuration behavior.
+
+Plan 4b adds live font family/fallback/ligatures/line height, Option-as-Meta, cursor defaults, copy-on-select, configurable inactive dimming and visual/sound/none bells. Retained and pending views use current live settings without restarting sessions; per-field manual size/theme overrides survive unrelated edits. Shell executable/arguments/environment and scrollback are captured for each new request. New windows use configured rows/columns and shared font metrics, constrained to the usable display. The expanded TOML template and [configuration guide](configuration.md) document all fields, validation and lifecycle rules.
 
 The earlier Plan 3.5 implementation (visual geometry superseded below) includes:
 
