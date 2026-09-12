@@ -12,10 +12,10 @@ An immutable `ConfigSnapshot` supports:
 
 | Key | Default | Validation / behavior |
 |---|---|---|
-| window.tab_height | 38 | integer28–72; live across open windows |
+| window.tab_height | 38 | integer 28–72; live across open windows |
 | window.toolbar | icons_and_labels | icons_and_labels, icons, hidden; live |
 | window.status_bar | true | boolean; live |
-| font.size | 16.0 | finite number6–72; live configured default/reset |
+| font.size | 16.0 | finite number 6–72; live configured default/reset |
 | colors.theme | moray-dark | moray-dark or moray-light; live existing theme controller |
 | keybindings.<action> | existing platform defaults | existing parser/none/brace aliases and collision validation |
 
@@ -27,13 +27,13 @@ Syntax and known-key type errors reject the snapshot and retain last-good settin
 
 ## Loading and Settings lifecycle
 
-No user config file or directory is created merely by starting Moray. Initial read occurs off EDT before creating windows. Missing file means defaults. One application-owned background scheduled worker polls every second using modification time and size; Reload forces a read even if timestamps match. Cap file reads at1MiB, report unreadable/oversized files without replacing the last-good snapshot. Deleting a file returns the configured snapshot to defaults; temporary overrides for unchanged fields remain governed by the same per-field difference policy. Malformed or unreadable updates retain the previous valid snapshot and publish diagnostics. Equal unchanged polling results avoid redundant UI updates. Worker publication reaches EDT, stale/post-close deliveries are ignored, and shutdown stops polling/queued work. File I/O, parsing and Desktop/editor operations never run on EDT. Use injected standard functional boundaries/executors for tests, no new service interfaces.
+No user config file or directory is created merely by starting Moray. Initial read occurs off EDT before creating windows. Missing file means defaults. One application-owned background scheduled worker polls every second using modification time and size; Reload forces a read even if timestamps match. Cap file reads at 1 MiB, report unreadable/oversized files without replacing the last-good snapshot. Deleting a file returns the configured snapshot to defaults; temporary overrides for unchanged fields remain governed by the same per-field difference policy. Malformed or unreadable updates retain the previous valid snapshot and publish diagnostics. Equal unchanged polling results avoid redundant UI updates. Worker publication reaches EDT, stale/post-close deliveries are ignored, and shutdown stops polling/queued work. File I/O, parsing and Desktop/editor operations never run on EDT. Use injected standard functional boundaries/executors for tests, no new service interfaces.
 
 Settings is an explicit user action: create a commented template with CREATE_NEW only if absent, then open the existing file in the OS editor, falling back to reveal in Finder/Explorer. Existing files are never truncated or rewritten. Only the actual config parent is created. Template includes every supported key/default, all action IDs with commented default bindings, live behavior and temporary View override guidance. It must parse without warnings/errors. Concurrent Settings actions cannot overwrite existing edits. Open/reveal failures are visible and do not roll back config. Tests use temporary directories and injected open/reveal callbacks; never invoke the desktop editor or touch real ~/.config.
 
 ## Application integration
 
-A small application-owned configuration controller joins the service, existing ThemeController and open WindowContents. Apply only changed fields after startup; register new owners with the current snapshot and unregister on close. Keep KeyBindings as the sole shortcut engine. Replacing bindings clears old root input/action entries and accelerators (including none), installs current ones, and retains native text-field copy/paste. Existing terminal handlers consult current bindings; no view recreation. Use configured font reset without changing the terminal library's14px standalone reset contract. No renderer or terminal-module change is needed for this slice.
+A small application-owned configuration controller joins the service, existing ThemeController and open WindowContents. Apply only changed fields after startup; register new owners with the current snapshot and unregister on close. Keep KeyBindings as the sole shortcut engine. Replacing bindings clears old root input/action entries and accelerators (including none), installs current ones, and retains native text-field copy/paste. Existing terminal handlers consult current bindings; no view recreation. Use configured font reset without changing the terminal library's 14px standalone reset contract. No renderer or terminal-module change is needed for this slice.
 
 Settings and Reload become enabled when configuration actions are connected to a real application owner. Standalone headless fixtures may remain unconnected. Status retains live shell/path/grid and its seamless background, adding an accessible clickable config indicator: Built-in defaults, Config loaded, Config warnings, or Config error with the first available line. Separate green/warning/error semantic colors must remain readable in both themes. Clicking opens selectable plain-text diagnostics including path and positions; no HTML from config strings. Right-side clipping/minimum-width contracts remain intact. No internal milestone language in user-facing controls.
 
