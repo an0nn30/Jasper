@@ -60,9 +60,9 @@ final class WindowTabs extends JPanel {
 
     void setActive(boolean active) { this.active = active; refresh(); }
 
-    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(80), UIScale.scale(54)); }
+    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(80), UIScale.scale(owner.tabHeight())); }
     @Override public Dimension getPreferredSize() {
-        return new Dimension(UIScale.scale(Math.min(800, order.size() * 160 + 32)), UIScale.scale(54));
+        return new Dimension(UIScale.scale(Math.min(800, order.size() * 160 + 32)), UIScale.scale(owner.tabHeight()));
     }
 
     @Override public void doLayout() {

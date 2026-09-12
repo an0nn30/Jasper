@@ -19,11 +19,18 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private final JTabbedPane tabs = new TerminalDeck();
     private final WindowTabs windowTabs;
     private final EnumMap<ActionId, Action> actions = new EnumMap<>(ActionId.class);
-    private final KeyBindings bindings = KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac"));
+    private final KeyBindings bindings;
     private final WindowChrome chrome;
     private final ThemeController themes;
     private JRootPane bindingRoot;
     Runnable onMinimumSizeChanged = () -> {};
+    static final int DEFAULT_TAB_HEIGHT = 38;
+    static final int MIN_TAB_HEIGHT = 28;
+    static final int MAX_TAB_HEIGHT = 72;
+    private int tabHeight = DEFAULT_TAB_HEIGHT;
+    Runnable onTabHeightChanged = () -> {};
+    java.util.function.ToIntFunction<JComponent> confirmTabHeight = control -> JOptionPane.showConfirmDialog(
+        this, control, "Tab height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     private boolean closed;
     private boolean rearranging;
     private boolean active = true;
@@ -37,7 +44,14 @@ final class WindowContent extends JPanel implements AutoCloseable {
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes) {
+        this(launcher, directory, newWindow, quit, onEmpty, themes,
+            KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac")));
+    }
+
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+                  ThemeController themes, KeyBindings bindings) {
         super(new BorderLayout());
+        this.bindings = bindings;
         this.themes = themes;
         this.launcher = launcher; this.newWindow = newWindow; this.quit = quit; this.onEmpty = onEmpty;
         for (ActionId id : ActionId.values()) {
@@ -271,6 +285,21 @@ final class WindowContent extends JPanel implements AutoCloseable {
         } finally { retained.forEach(TerminalTab::endThemeUpdate); }
     }
 
+    int tabHeight() { return tabHeight; }
+
+    void setTabHeight(int height) {
+        if (height < MIN_TAB_HEIGHT || height > MAX_TAB_HEIGHT)
+            throw new IllegalArgumentException("Tab height must be between 28 and 72 pixels");
+        if (closed || tabHeight == height) return;
+        tabHeight = height;
+        windowTabs.revalidate(); windowTabs.repaint();
+        onTabHeightChanged.run();
+        revalidate(); repaint();
+        JRootPane root = SwingUtilities.getRootPane(this);
+        if (root != null) { root.revalidate(); root.repaint(); }
+        onMinimumSizeChanged.run();
+    }
+
     void setActive(boolean value) { active = value; windowTabs.setActive(value); update(); }
     void setToolbarMode(ToolbarMode mode) { chrome.setToolbarMode(mode); revalidate(); onMinimumSizeChanged.run(); }
     void setStatusVisible(boolean visible) { chrome.setStatusVisible(visible); revalidate(); onMinimumSizeChanged.run(); }
@@ -284,6 +313,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
         actions.values().forEach(action -> action.setEnabled(false));
         windowTabs.refresh();
         onThemeChanged = theme -> {};
+        onTabHeightChanged = () -> {};
+        confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
     }
 }

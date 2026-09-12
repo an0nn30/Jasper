@@ -58,6 +58,9 @@ final class WindowChrome {
             @Override public void menuCanceled(MenuEvent event) {}
         });
         view.add(appearance);
+        JMenuItem tabHeight = new JMenuItem("Tab height\u2026");
+        tabHeight.addActionListener(event -> editTabHeight());
+        view.add(tabHeight);
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
         toolbar.add(new ToolbarSeparator());
         JButton split = addButton(ActionId.SPLIT_RIGHT, "columns-2");
@@ -76,6 +79,24 @@ final class WindowChrome {
         toolbar.add(new ToolbarSeparator());
         toolbar.add(Box.createHorizontalGlue());
         addButton(ActionId.OPEN_SETTINGS, "settings"); addButton(ActionId.RELOAD_CONFIG, "refresh");
+    }
+
+    private void editTabHeight() {
+        var control = new JPanel(new FlowLayout(FlowLayout.LEADING));
+        var height = new JSpinner(new SpinnerNumberModel(owner.tabHeight(),
+            WindowContent.MIN_TAB_HEIGHT, WindowContent.MAX_TAB_HEIGHT, 1));
+        height.setName("tabHeight");
+        var label = new JLabel("Height (pixels):"); label.setLabelFor(height);
+        var reset = new JButton("Reset to default"); reset.setName("resetTabHeight");
+        reset.addActionListener(event -> height.setValue(WindowContent.DEFAULT_TAB_HEIGHT));
+        control.add(label); control.add(height); control.add(reset);
+        if (owner.confirmTabHeight.applyAsInt(control) != JOptionPane.OK_OPTION) return;
+        try {
+            height.commitEdit();
+            owner.setTabHeight(((Number) height.getValue()).intValue());
+        } catch (java.text.ParseException | IllegalArgumentException failure) {
+            owner.onError.accept("Enter a tab height between 28 and 72 pixels.");
+        }
     }
 
     private JMenu menu(String label, ActionId... ids) {

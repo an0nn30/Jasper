@@ -17,7 +17,7 @@ class WindowTabsTest {
             var owner = content(launcher(new ArrayDeque<>()));
             JComponent strip = named(owner, "windowTabs");
             assertThat(strip).as("integrated tab strip").isNotNull();
-            assertThat(strip.getPreferredSize().height).isEqualTo(54);
+            assertThat(strip.getPreferredSize().height).isEqualTo(38);
             var first = owner.currentTab();
             first.rename("first"); owner.newTab(HOME);
             var second = owner.currentTab(); second.rename("second"); owner.update();
@@ -63,7 +63,7 @@ class WindowTabsTest {
             assertThat(strip).isNotNull();
             var first = owner.currentTab(); first.rename("first"); owner.newTab(HOME);
             var second = owner.currentTab(); second.rename("second"); owner.update();
-            layout(strip, 600, 54);
+            layout(strip, 600, 38);
             JComponent one = named(strip, "select:first"), two = named(strip, "select:second");
             Point target = SwingUtilities.convertPoint(two, 10, 10, one);
             mouse(one, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
@@ -85,18 +85,18 @@ class WindowTabsTest {
             for (int i = 0; i < 12; i++) {
                 owner.currentTab().rename("long name ".repeat(100) + i); owner.newTab(HOME);
             }
-            owner.update(); layout(strip, 330, 54);
+            owner.update(); layout(strip, 330, 38);
             assertThat(strip.getMinimumSize()).isEqualTo(minimum);
             assertThat(strip.getPreferredSize().width).isLessThanOrEqualTo(800);
             assertThat(named(strip, "previousTabs").isVisible()).isTrue();
             assertThat(named(strip, "nextTabs").isVisible()).isTrue();
-            owner.invoke(ActionId.SELECT_TAB_1); layout(strip, 330, 54);
+            owner.invoke(ActionId.SELECT_TAB_1); layout(strip, 330, 38);
             JComponent selected = named(strip, "select:" + owner.currentTab().title());
             assertThat(selected.isShowing()).isFalse(); // no native window in this test
             assertThat(selected.getParent().isVisible()).isTrue();
-            ((AbstractButton) named(strip, "nextTabs")).doClick(); layout(strip, 330, 54);
+            ((AbstractButton) named(strip, "nextTabs")).doClick(); layout(strip, 330, 38);
             assertThat(selected.getParent().isVisible()).isFalse();
-            owner.invoke(ActionId.NEXT_TAB); layout(strip, 330, 54);
+            owner.invoke(ActionId.NEXT_TAB); layout(strip, 330, 38);
             assertThat(named(strip, "select:" + owner.currentTab().title()).getParent().isVisible()).isTrue();
         });
     }
@@ -107,9 +107,9 @@ class WindowTabsTest {
             JComponent strip = named(owner, "windowTabs");
             for (int i = 0; i < 4; i++) owner.newTab(HOME);
             owner.currentTab().rename("selected"); owner.update();
-            layout(strip, 850, 54);
+            layout(strip, 850, 38);
             assertThat(named(strip, "select:selected").getParent().isVisible()).isTrue();
-            layout(strip, 250, 54);
+            layout(strip, 250, 38);
             assertThat(named(strip, "select:selected").getParent().isVisible()).isTrue();
         });
     }

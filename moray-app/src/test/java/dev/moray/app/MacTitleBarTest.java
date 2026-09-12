@@ -59,11 +59,11 @@ class MacTitleBarTest {
             var minimumChanges = new AtomicInteger();
             owner.onMinimumSizeChanged = minimumChanges::incrementAndGet;
             try (var bar = MacTitleBar.install(root, owner, true, title -> {})) {
-                assertThat(bar.getPreferredSize().height).isEqualTo(54);
+                assertThat(bar.getPreferredSize().height).isEqualTo(38);
                 JComponent tabs = WindowTabsTest.named(bar, "windowTabs");
                 assertThat(tabs).as("the real tabs are in the native header").isNotNull();
                 assertThat(WindowTabsTest.named(owner, "windowTabs")).isNull();
-                bar.setSize(959, 54); bar.doLayout();
+                bar.setSize(959, 38); bar.doLayout();
                 assertThat(tabs.getX()).isEqualTo(98);
                 assertThat(label(bar).getHorizontalAlignment()).isEqualTo(SwingConstants.RIGHT);
                 assertThat(label(bar).getX()).isGreaterThanOrEqualTo(tabs.getX() + tabs.getWidth());
@@ -75,11 +75,11 @@ class MacTitleBarTest {
                 owner.currentTab().rename("extremely long shell title ".repeat(100)); owner.update();
                 assertThat(bar.getMinimumSize()).isEqualTo(before);
                 assertThat(bar.getPreferredSize().width).isLessThan(1000);
-                bar.setSize(80, 54); bar.doLayout();
+                bar.setSize(80, 38); bar.doLayout();
                 assertThat(label(bar).getWidth()).isZero();
                 assertThat(tabs.getWidth()).isZero();
                 root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle());
-                bar.setSize(959, 54); bar.doLayout();
+                bar.setSize(959, 38); bar.doLayout();
                 assertThat(tabs.getX()).isEqualTo(98);
             }
         });
@@ -105,7 +105,7 @@ class MacTitleBarTest {
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0x383a42));
                 owner.setToolbarMode(WindowContent.ToolbarMode.HIDDEN);
                 assertThat(bar.isVisible()).isTrue();
-                assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 54);
+                assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 38);
             }
         });
     }

@@ -58,6 +58,24 @@ enum ActionId {
         return label;
     }
 
+    String defaultBinding(boolean macOs) {
+        if (macOs) return defaultBinding;
+        return switch (this) {
+            case NEXT_TAB -> "ctrl+shift+]";
+            case PREVIOUS_TAB -> "ctrl+shift+[";
+            case SELECT_TAB_1 -> "ctrl+1";
+            case SELECT_TAB_2 -> "ctrl+2";
+            case SELECT_TAB_3 -> "ctrl+3";
+            case SELECT_TAB_4 -> "ctrl+4";
+            case SELECT_TAB_5 -> "ctrl+5";
+            case SELECT_TAB_6 -> "ctrl+6";
+            case SELECT_TAB_7 -> "ctrl+7";
+            case SELECT_TAB_8 -> "ctrl+8";
+            case SELECT_TAB_9 -> "ctrl+9";
+            default -> defaultBinding;
+        };
+    }
+
     String defaultBinding() {
         return defaultBinding;
     }

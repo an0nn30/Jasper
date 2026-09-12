@@ -29,7 +29,7 @@ final class KeyBindings {
     static KeyBindings defaults(boolean macOs) {
         EnumMap<ActionId, KeyStroke> strokes = new EnumMap<>(ActionId.class);
         for (ActionId action : ActionId.values()) {
-            String binding = action.defaultBinding();
+            String binding = action.defaultBinding(macOs);
             KeyStroke stroke = parse(binding, macOs).orElseThrow();
             if (!macOs && binding.contains("cmd+shift")) {
                 stroke = KeyStroke.getKeyStroke(
@@ -105,6 +105,10 @@ final class KeyBindings {
                 case "alt" -> modifiers |= InputEvent.ALT_DOWN_MASK;
                 case "shift" -> modifiers |= InputEvent.SHIFT_DOWN_MASK;
                 default -> {
+                    if (token.equals("{") || token.equals("}")) {
+                        modifiers |= InputEvent.SHIFT_DOWN_MASK;
+                        token = token.equals("{") ? "[" : "]";
+                    }
                     int parsedKey = keyCode(token);
                     if (keyCode != null) {
                         throw new IllegalArgumentException("keybinding has more than one key: " + binding);

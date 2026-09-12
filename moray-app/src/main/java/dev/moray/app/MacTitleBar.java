@@ -52,6 +52,7 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
             if (!displayTitle.equals(bar.title.getText())) { bar.title.setText(displayTitle); bar.revalidate(); }
         };
         content.onThemeChanged = bar::applyTheme;
+        content.onTabHeightChanged = bar::refreshHeight;
         bar.applyTheme(content.theme());
         content.update();
         return bar;
@@ -99,7 +100,13 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
         return Math.max(UIScale.scale(98), Math.max(nativeLeft, controlsEnd) + UIScale.scale(8));
     }
 
-    private int titleHeight() { return UIScale.scale(54); }
+    private int titleHeight() { return UIScale.scale(content.tabHeight()); }
+
+    private void refreshHeight() {
+        if (closed) return;
+        refreshNativeGeometry();
+        revalidate(); repaint(); root.revalidate(); root.repaint();
+    }
 
     @Override public Dimension getMinimumSize() {
         return new Dimension(safeInset() + nativeRight + content.windowTabs().getMinimumSize().width, titleHeight());
@@ -152,6 +159,7 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
             frame = null; nativeTitle = null; decorations = null;
         }
         content.onThemeChanged = theme -> {};
+        content.onTabHeightChanged = () -> {};
         content.onTitle = value -> {};
     }
 }

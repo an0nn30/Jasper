@@ -20,11 +20,11 @@ class MockUiTest {
                 root.setSize(958, 958); layoutTree(root);
                 assertThat(owner.toolbar().getHeight()).isEqualTo(53);
                 assertThat(owner.status().getHeight()).isEqualTo(30);
-                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 821));
-                assertThat(root.getContentPane().getPreferredSize()).isEqualTo(new Dimension(958, 958));
+                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 837));
+                assertThat(root.getContentPane().getPreferredSize()).isEqualTo(new Dimension(958, 942));
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
-                assertThat(image.getRGB(650, 53) & 0xffffff).isEqualTo(0x313439);
+                assertThat(image.getRGB(650, 37) & 0xffffff).isEqualTo(0x313439);
                 assertThat(image.getRGB(650, 80) & 0xffffff).isEqualTo(0x292c34);
                 assertThat(image.getRGB(500, 700)).isEqualTo(image.getRGB(500, 940));
             }
@@ -89,9 +89,9 @@ class MockUiTest {
             buttons.getFirst().doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
             owner.setToolbarMode(WindowContent.ToolbarMode.HIDDEN); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(416);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(432);
             owner.setToolbarMode(WindowContent.ToolbarMode.ICONS); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(363);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(379);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
         });
     }
