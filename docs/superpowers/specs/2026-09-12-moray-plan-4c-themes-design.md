@@ -1,6 +1,6 @@
 # Moray Plan 4c — Custom themes and system appearance
 
-**Status:** Implemented and task-reviewed through `fd6811b`, 2026-09-12; whole-branch review pending and native acceptance user-run. Based on main `b92221f`, after Plan 4b, compact padding and shell-exit policy. The user requested preparation of the next plan and selected automatic switching of **both chrome and built-in terminal palette**, with custom palettes fixed.
+**Status:** Implemented and fully reviewed through `3c3af48`, 2026-09-12; native acceptance remains user-run. Based on main `b92221f`, after Plan 4b, compact padding and shell-exit policy. The user requested preparation of the next plan and selected automatic switching of **both chrome and built-in terminal palette**, with custom palettes fixed.
 
 **Parent:** [Phase 1 design](2026-09-10-moray-phase-1-terminal-design.md), especially configuration and themes. This document amends those sections where stated below; completed terminal, window and configuration behavior remains the baseline.
 
@@ -65,7 +65,7 @@ Theme I/O/parsing runs on the configuration worker. Limit theme reads to 256 KiB
 
 Maintain desired saved configuration separately from its resolved palette. A theme error does not discard valid font, terminal, shortcut or window changes. Retain the previous successfully loaded saved palette; if no theme ever loaded, use Moray Dark. A failed transition from a built-in uses that saved built-in's palette as fallback. During a failed custom selection the fallback stays fixed, just like any custom palette. A successful retry replaces it and clears only theme diagnostics. Main-config syntax failure retains the last good selection while that selected theme continues to be watched.
 
-Publish one immutable state containing configuration, loaded palette and combined diagnostics. Compare by value and retain existing revision/close guards so queued stale updates cannot touch disposed owners. Do not perform duplicate per-window reads or introduce another theme polling executor. Application close stops configuration polling and removes the OS listener. Pending launches receive the latest resolved theme at view attachment.
+Publish one immutable state containing configuration, loaded palette and combined diagnostics. Compare by value for polling and Settings; explicit Reload deliberately republishes one accepted state even when unchanged so failed theme installation can retry. Retain existing revision/close guards so queued stale updates cannot touch disposed owners. Do not perform duplicate per-window reads or introduce another theme polling executor. Application close stops configuration polling and removes the OS listener. Pending launches receive the latest resolved theme at view attachment.
 
 ## 5. Appearance detection and UI application
 

@@ -26,7 +26,7 @@
 
 ---
 
-**Execution status:** Authorized by the user on 2026-09-12. All four tasks implemented and independently reviewed through `fd6811b`; whole-branch review pending. One minor test-portability finding is recorded for final review. Planning worktree `.worktrees/plan-4c`, branch `codex/plan-4c-themes`, base `b92221f`. Main's local `config.example.toml` edit is outside this worktree and must not be overwritten during later integration. Baseline `./gradlew check` executed all eight tasks successfully: 463 tests, 462 passed, one known font skip, zero failures/errors. Native detection and visual acceptance were not run.
+**Execution status:** Authorized by the user on 2026-09-12. All four tasks implemented and independently reviewed; whole-branch findings resolved and scoped re-review approved through `3c3af48`. No review findings remain open. Fresh final verification: 506 tests, 505 passed, one known font skip; all eight tasks executed. Planning worktree `.worktrees/plan-4c`, branch `codex/plan-4c-themes`, base `b92221f`. Main's local `config.example.toml` edit is outside this worktree and must not be overwritten during later integration. Baseline `./gradlew check` executed all eight tasks successfully: 463 tests, 462 passed, one known font skip, zero failures/errors. Native detection and visual acceptance were not run.
 
 ## File responsibilities and contracts
 
@@ -638,3 +638,9 @@ Execution uses the established subagent-driven workflow: one task implementer an
 Ruling: Exclude the detector dependency’s transitive net.java.dev.jna group while retaining existing pty4j-provided JNA and JNA-platform 5.14.0 — detector metadata requested an unpublished jpms variant during Gradle test resolution; this avoids replacing the established runtime — costs revisiting the exclusion if native dependency requirements change. Implementer must include runtime dependency evidence.
 
 Ruling: Keep the latest OS appearance reading separately from the committed effective theme and use it when retrying selection/configuration — the plan’s transactional pseudocode otherwise forgets an OS change when LAF installation fails — costs one extra state field, but preserves visual rollback and permits Follow System retry without another OS event. Task 4 implements and tests it.
+
+Ruling: Explicit Reload publishes one accepted state through the existing revision/close guard even when its value is unchanged, while polling and Settings still suppress unchanged values — equal-state suppression prevented the promised failed-theme retry — costs one deliberate UI reapplication per user reload and avoids a second unguarded completion path.
+
+## Final verification and handoff
+
+All task reviews approved. Whole-branch review found an unchanged-file Reload retry gap and two service-test improvements; combined fix `3c3af48` resolves all three, and scoped re-review approved without new findings. Root `./gradlew check --rerun-tasks` passed in 13 seconds with all eight tasks executed: 506 tests, 505 passed, one known `FontSetTest.fallsBackWhenPrimaryCannotDisplay()` skip, zero failures/errors. Both-module source hygiene, documentation links, diff checks and commit trailers passed. Root inspected all three headless renders and verified the main example-config checksum was unchanged. Native checks are deliberately still unchecked in the [manual checklist](2026-09-12-moray-plan-4c-manual-check.md). Feature branch/worktree are retained for integration or user testing.
