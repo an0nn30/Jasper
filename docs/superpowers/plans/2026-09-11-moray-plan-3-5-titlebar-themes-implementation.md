@@ -3,7 +3,7 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A native-behaving custom macOS title surface, coordinated live Atom-inspired dark/light themes, and the user-selected two-tone toolbar.
-**Status:** All four tasks implemented and task-reviewed; full headless check passes (298 tests, one known skip). Final branch review and native acceptance pending.
+**Status:** All four tasks, final whole-branch review and scoped fix review complete; final code/tests f487631. Full headless check passes (299 tests, zero failures/errors, one known skip). Native acceptance and user integration choice pending.
 **Scope update:** The user selected toolbar study B during execution; Task 4 implements that choice in this same runnable deliverable.
 **Architecture:** TerminalView accepts live palettes; app-owned ThemeController updates every owner and its retained panes; MacTitleBar uses the decorated JFrame's macOS full-content area.
 **Tech Stack:** Java/JBR25, Gradle wrapper 9.7, FlatLaf/flatlaf-extras3.7, existing JUnit/AssertJ.
@@ -115,9 +115,9 @@ Keep original foreground geometry after the backdrop. Replace hardcoded legacygr
 
 ## Root acceptance
 
-- [ ] All task reviews and final whole-branch review approved; fix rounds as required.
+- [x] All task reviews and final whole-branch review approved; fix rounds as required.
 - [x] Full final headless check passes; count skips and preserve warnings/limitations.
-- [ ] Update STATUS/README/roadmap for implemented title/themes and selected two-tone toolbar; record native acceptance pending.
+- [x] Update STATUS/README/roadmap for implemented title/themes and selected two-tone toolbar; record native acceptance pending.
 - [ ] User native title-bar/light-dark checks, including fullscreen/scaling/drag and screen menus.
 - [x] Toolbar alternatives shown; user selected B (fuller, two-tone colored icons).
 - [x] Selected toolbar treatment implemented, reviewed and included in final verification.

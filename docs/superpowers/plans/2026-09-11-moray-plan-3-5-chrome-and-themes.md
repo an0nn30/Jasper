@@ -1,6 +1,6 @@
 # Moray Plan 3.5 — macOS Chrome, Themes and Toolbar
 
-**Status:** Roadmap amendment requested by the user on 2026-09-11. Implemented ahead of Plan 4 configuration and packaging; final review, native acceptance and integration are pending. This roadmap is complemented by the concrete design and execution plan linked below.
+**Status:** Roadmap amendment requested by the user on 2026-09-11. Implemented ahead of Plan 4 configuration and packaging; all code reviews and headless checks pass; native acceptance and integration are pending. This roadmap is complemented by the concrete design and execution plan linked below.
 **Authority:** User feedback after trying Plan 3: the app looks good overall; next build a custom macOS title bar, fix theming using FlatLaf, aim for Atom-style dark/light themes, and discuss a toolbar with actual colored icons.
 **Parent:** [Phase 1 design](../specs/2026-09-10-moray-phase-1-terminal-design.md), especially §§5–7. This amendment supersedes the earlier sequencing that deferred all theme work to Plan 4 and the assumption that the current toolbar presentation is final.
 
@@ -60,7 +60,7 @@ The concrete design records the chosen native integration, initial palette and t
 - [x] Live theme changes preserve sessions, content, split ratios, zoom and per-pane fonts, including hidden panes and newly opened windows.
 - [x] The user has reviewed and selected toolbar layout and colored artwork in both themes.
 - [ ] Toolbar actions, shortcuts, accessibility, hover/disabled states and visibility modes still work.
-- [ ] Appropriate headless regression tests, full Gradle checks, task reviews and final review pass.
+- [x] Appropriate headless regression tests, full Gradle checks, task reviews and final review pass.
 - [ ] The user checks native behavior and visual appearance; headless results are not presented as native validation.
 
 Follow AGENTS.md: no unattended GUI or benchmark launches. The existing performance threshold, three-platform CI, terminal-hardening backlog and Phase 1 daily-use gate remain in force.
