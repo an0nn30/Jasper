@@ -36,6 +36,11 @@ dim_inactive_panes = 0.3
 copy_on_select = false
 # Live. Options: "visual", "sound", or "none".
 bell = "visual"
+# Shell process exit: "keep_open" retains the stopped terminal and output (the default).
+# Use "close_on_success" for code 0 only, or "close" for any exit.
+# Only the exited pane closes; its tab/window closes when empty. Live for future exits;
+# reloading never closes previously retained output. A program returning to the shell is not a shell exit.
+on_exit = "keep_open"
 
 [terminal.shell]
 # New panes only. An empty program selects the platform default login shell.

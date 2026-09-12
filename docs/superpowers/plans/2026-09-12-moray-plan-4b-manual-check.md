@@ -16,4 +16,10 @@ Pending user execution after implementation. Agents do not launch native windows
 - [ ] Set window.columns/lines and open a new window. The initial desired grid uses configured fonts, 4px pane padding on every side and existing chrome, and is constrained by the available display. Existing windows keep their size; delayed launches and subsequent reloads do not repack them. Move between displays and check native decorations/minimum dimensions.
 - [ ] Introduce wrong types, invalid values and unknown nested fields. Confirm positioned diagnostics, last-good retention for type errors and per-field fallback for invalid values. Correct the file and confirm recovery. Existing files must never be rewritten by Settings.
 
+## Shell-exit follow-up
+
+- [ ] With `terminal.on_exit="keep_open"` (or no key), exit a shell with code 0 and then with a nonzero code; confirm output and the exit marker remain. Run an ordinary command and confirm returning to the shell keeps the pane open.
+- [ ] Set `terminal.on_exit="close_on_success"`; `exit 0` closes only that pane, while `exit 7` retains output. Set `"close"` and confirm both codes close. In split, zoomed and inactive tabs, surviving shells, focus and existing tab-close animation behave normally. The final pane removes its tab; the final tab closes its window.
+- [ ] Reload the policy while shells are running and while a new pane starts. Future exits follow the new value, existing retained output stays open, and manual font size/theme choices survive.
+
 Custom themes, automatic system appearance, logging/launcher cleanup and packaging remain subsequent Plan4 work. Retain the Phase1 benchmark, platform CI and two-week daily-use acceptance gates.

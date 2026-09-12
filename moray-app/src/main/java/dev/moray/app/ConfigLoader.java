@@ -34,7 +34,7 @@ final class ConfigLoader {
         List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height"),
         List.of("colors"), Set.of("theme"),
         List.of("terminal"), Set.of("shell", "env", "scrollback", "option_as_meta", "cursor",
-            "dim_inactive_panes", "copy_on_select", "bell"),
+            "dim_inactive_panes", "copy_on_select", "bell", "on_exit"),
         List.of("terminal", "shell"), Set.of("program", "args"),
         List.of("terminal", "cursor"), Set.of("shape", "blink"));
 
@@ -63,6 +63,7 @@ final class ConfigLoader {
     private float dimInactivePanes = .3f;
     private boolean copyOnSelect;
     private BellMode bell = BellMode.VISUAL;
+    private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
     private BuiltinTheme theme = BuiltinTheme.DARK;
     private Map<String, String> keybindings = Map.of();
 
@@ -88,7 +89,7 @@ final class ConfigLoader {
         var snapshot = new ConfigSnapshot(tabHeight, toolbar, statusBar,
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), theme, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
-                cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell));
+                cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit));
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -147,6 +148,9 @@ final class ConfigLoader {
             case "terminal.copy_on_select" -> copyOnSelect = bool(path, value, copyOnSelect);
             case "terminal.bell" -> bell = choice(path, value,
                 Map.of("visual", BellMode.VISUAL, "sound", BellMode.SOUND, "none", BellMode.NONE), bell);
+            case "terminal.on_exit" -> onExit = choice(path, value, Map.of(
+                "keep_open", ShellExitBehavior.KEEP_OPEN, "close_on_success", ShellExitBehavior.CLOSE_ON_SUCCESS,
+                "close", ShellExitBehavior.CLOSE), onExit);
             default -> throw new IllegalStateException("Unrecognized validated field.");
         }
     }

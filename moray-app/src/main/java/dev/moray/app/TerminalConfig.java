@@ -11,7 +11,14 @@ import java.util.Objects;
 /** Validated session defaults and terminal behavior saved in the configuration. */
 record TerminalConfig(Shell shell, Map<String, String> env, int scrollback, OptionAsMeta optionAsMeta,
                       CursorStyle cursorShape, boolean cursorBlink, float dimInactivePanes,
-                      boolean copyOnSelect, BellMode bell) {
+                      boolean copyOnSelect, BellMode bell, ShellExitBehavior onExit) {
+    TerminalConfig(Shell shell, Map<String, String> env, int scrollback, OptionAsMeta optionAsMeta,
+                   CursorStyle cursorShape, boolean cursorBlink, float dimInactivePanes,
+                   boolean copyOnSelect, BellMode bell) {
+        this(shell, env, scrollback, optionAsMeta, cursorShape, cursorBlink, dimInactivePanes,
+            copyOnSelect, bell, ShellExitBehavior.KEEP_OPEN);
+    }
+
     record Shell(String program, List<String> args) {
         Shell {
             Objects.requireNonNull(program, "program");
@@ -42,6 +49,7 @@ record TerminalConfig(Shell shell, Map<String, String> env, int scrollback, Opti
             throw new IllegalArgumentException("Inactive pane dimming must be a finite number from 0–1.");
         }
         Objects.requireNonNull(bell, "bell");
+        Objects.requireNonNull(onExit, "onExit");
     }
 
     static boolean validEnvName(String name) {
