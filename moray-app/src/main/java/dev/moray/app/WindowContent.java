@@ -16,7 +16,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private final Consumer<Path> newWindow;
     private final Runnable quit;
     private final Runnable onEmpty;
-    private final JTabbedPane tabs = new JTabbedPane();
+    private final JTabbedPane tabs = new TerminalDeck();
+    private final WindowTabs windowTabs;
     private final EnumMap<ActionId, Action> actions = new EnumMap<>(ActionId.class);
     private final KeyBindings bindings = KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac"));
     private final WindowChrome chrome;
@@ -53,16 +54,12 @@ final class WindowContent extends JPanel implements AutoCloseable {
         action(ActionId.OPEN_SETTINGS).putValue(Action.SHORT_DESCRIPTION, unavailable);
         action(ActionId.RELOAD_CONFIG).putValue(Action.SHORT_DESCRIPTION, unavailable);
         chrome = new WindowChrome(this);
-        add(chrome.toolbar(), BorderLayout.NORTH); add(tabs); add(chrome.status(), BorderLayout.SOUTH);
-        tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+        windowTabs = new WindowTabs(this);
+        var north = new JPanel(new BorderLayout());
+        north.add(windowTabs, BorderLayout.NORTH); north.add(chrome.toolbar(), BorderLayout.CENTER);
+        add(north, BorderLayout.NORTH); add(tabs); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) { update(); if (currentTab() != null) currentTab().focusTerminal(); }
-        });
-        tabs.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent event) {
-                int index = tabs.indexAtLocation(event.getX(), event.getY());
-                if (index >= 0 && SwingUtilities.isMiddleMouseButton(event)) closeTab((TerminalTab) tabs.getComponentAt(index));
-            }
         });
         themes.register(this);
         newTab(directory);
@@ -96,6 +93,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     JLabel status() { return chrome.status(); }
     JMenuBar menuBar() { return chrome.menuBar(); }
     JTabbedPane tabStrip() { return tabs; }
+    WindowTabs windowTabs() { return windowTabs; }
     TerminalTab currentTab() { return (TerminalTab) tabs.getSelectedComponent(); }
     TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
     Path directory() { return currentPane() == null ? Path.of(System.getProperty("user.home")) : currentPane().directory(); }
@@ -108,7 +106,6 @@ final class WindowContent extends JPanel implements AutoCloseable {
         tab.onError = message -> onError.accept(message);
         tab.configure = pane -> configurePane(tab, pane);
         tabs.addTab(tab.title(), tab);
-        tabs.setTabComponentAt(tabs.indexOfComponent(tab), tabHeader(tab));
         tabs.setSelectedComponent(tab); update(); tab.start();
     }
 
@@ -133,44 +130,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
         rearranging = true;
         try {
             tabs.removeTabAt(from); tabs.insertTab(tab.title(), null, tab, null, to);
-            tabs.setTabComponentAt(to, tabHeader(tab)); tabs.setSelectedComponent(selected);
+            tabs.setSelectedComponent(selected);
         } finally { rearranging = false; }
         update();
-    }
-
-    private JPanel tabHeader(TerminalTab tab) {
-        JPanel header = new JPanel(new FlowLayout(FlowLayout.LEADING, 5, 0));
-        header.setOpaque(false);
-        JLabel label = new JLabel(tab.title()) {
-            @Override public Dimension getPreferredSize() {
-                Dimension size = super.getPreferredSize();
-                return new Dimension(Math.min(200, size.width), size.height);
-            }
-        };
-        label.setToolTipText(tab.title());
-        JButton close = new JButton("\u00d7");
-        close.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
-        close.setContentAreaFilled(false); close.setFocusable(false);
-        close.setToolTipText("Close tab"); close.getAccessibleContext().setAccessibleName("Close tab");
-        close.addActionListener(event -> closeTab(tab));
-        header.add(label); header.add(close);
-        MouseAdapter mouse = new MouseAdapter() {
-            private Point origin;
-            @Override public void mousePressed(MouseEvent event) {
-                if (SwingUtilities.isMiddleMouseButton(event)) { closeTab(tab); return; }
-                if (SwingUtilities.isLeftMouseButton(event)) {
-                    selectTab(tab); origin = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), tabs);
-                }
-            }
-            @Override public void mouseReleased(MouseEvent event) {
-                if (origin == null) return;
-                Point point = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), tabs);
-                if (origin.distance(point) > 5) reorderTab(tabs.indexOfComponent(tab), tabs.indexAtLocation(point.x, point.y));
-                origin = null;
-            }
-        };
-        header.addMouseListener(mouse); label.addMouseListener(mouse);
-        return header;
     }
 
     void closeTab(TerminalTab tab) {
@@ -268,10 +230,6 @@ final class WindowContent extends JPanel implements AutoCloseable {
         for (int i = 0; i < tabs.getTabCount(); i++) {
             TerminalTab tab = (TerminalTab) tabs.getComponentAt(i);
             tabs.setTitleAt(i, tab.title());
-            if (tabs.getTabComponentAt(i) instanceof JPanel header) {
-                JLabel label = (JLabel) header.getComponent(0);
-                label.setText(tab.title()); label.setToolTipText(tab.title());
-            }
             tab.setActive(active && tab == currentTab());
         }
         TerminalPane pane = currentPane();
@@ -280,7 +238,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         chrome.status().setText(pane == null ? "Built-in defaults" : pane.shellLabel() + "  |  " + pane.directory()
             + "  |  " + size + "  |  Built-in defaults");
         onTitle.accept(currentTab() == null ? "Moray" : currentTab().title());
-        updateActions(); onMinimumSizeChanged.run();
+        updateActions(); windowTabs.refresh(); onMinimumSizeChanged.run();
     }
 
     BuiltinTheme theme() { return themes.current(); }
@@ -313,7 +271,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         } finally { retained.forEach(TerminalTab::endThemeUpdate); }
     }
 
-    void setActive(boolean value) { active = value; update(); }
+    void setActive(boolean value) { active = value; windowTabs.setActive(value); update(); }
     void setToolbarMode(ToolbarMode mode) { chrome.setToolbarMode(mode); revalidate(); onMinimumSizeChanged.run(); }
     void setStatusVisible(boolean visible) { chrome.setStatusVisible(visible); revalidate(); onMinimumSizeChanged.run(); }
 
@@ -324,6 +282,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         for (int i = 0; i < tabs.getTabCount(); i++) ((TerminalTab) tabs.getComponentAt(i)).close();
         tabs.removeAll(); removeRootBindings();
         actions.values().forEach(action -> action.setEnabled(false));
+        windowTabs.refresh();
         onThemeChanged = theme -> {};
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
     }

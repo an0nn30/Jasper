@@ -29,6 +29,7 @@ final class TerminalWindow implements AutoCloseable {
         frame.setJMenuBar(content.menuBar());
         content.installRootBindings(frame.getRootPane());
         content.onMinimumSizeChanged = this::updateMinimumSize;
+        if (titleBar != null) titleBar.attach(frame);
         frame.addWindowListener(events); frame.pack(); frame.setLocationByPlatform(true);
         content.update();
     }
