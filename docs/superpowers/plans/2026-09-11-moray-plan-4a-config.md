@@ -1,6 +1,6 @@
 # Plan 4a — saved settings and live reload
 
-**Status:** All three implementation tasks and scoped reviews complete through `9c0ae64`. Fresh full check: 394 tests, 393 passed and one known font skip. Actual status renders inspected in both themes at normal/narrow widths. Final whole-branch review remains pending.
+**Status:** All three implementation tasks, scoped reviews and final whole-branch review complete through `acd5ea3`. Fresh full check: 394 tests, 393 passed and one known font skip. Actual status renders inspected in both themes at normal/narrow widths. The final review’s Windows test portability finding is fixed and re-reviewed; no findings remain. Native and Windows execution remain unverified. The implementation remains on the feature branch pending integration.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development task-by-task. Each task owns its implementation, TDD cycle, scoped commit and independent review.
 
@@ -118,6 +118,6 @@ assertThat(owner.action(ActionId.NEW_TAB).getValue(Action.ACCELERATOR_KEY)).isNu
 - [x] Add README/configuration documentation covering supported keys, paths/--config, Settings creation, reload/error semantics, temporary runtime overrides, actual macOS/non-macOS shortcut examples and remaining Plan 4 scope. Preserve the native checklist; root owns STATUS. Run covering tests, full check and source hygiene; commit and report.
 
 ## Root acceptance
-- [ ] Independent task reviews, final whole-branch review and verified fixes.
-- [ ] Fresh full check, source hygiene and diff checks; inspect actual headless status geometry where changed.
-- [ ] STATUS records the merged UI baseline, Plan 4a delivery, remaining Plan 4 scope, all rulings and pending native acceptance.
+- [x] Independent task reviews, final whole-branch review and verified fixes.
+- [x] Fresh full check, source hygiene and diff checks; inspect actual headless status geometry where changed.
+- [x] STATUS records the merged UI baseline, Plan 4a delivery, remaining Plan 4 scope, all rulings and pending native acceptance.
