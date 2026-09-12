@@ -14,6 +14,23 @@ class FontSetTest {
     private static final String MONO = "JetBrains Mono"; // bundled with the JetBrains Runtime
 
     @Test
+    void lineHeightScalesSharedCellsAndCentersTheNaturalBaseline() {
+        var natural = new FontSet(MONO, 16f, List.of(), true);
+        // Preserve the existing JBR-bundled 16-point font's natural grid and baseline.
+        assertThat(natural.cellWidth()).isEqualTo(10);
+        assertThat(natural.cellHeight()).isEqualTo(22);
+        assertThat(natural.ascent()).isEqualTo(17);
+        var identity = new FontSet(MONO, 16f, List.of(), true, 1f);
+        var spaced = new FontSet(MONO, 16f, List.of(), true, 1.5f);
+        assertThat(identity.cellWidth()).isEqualTo(natural.cellWidth());
+        assertThat(identity.cellHeight()).isEqualTo(natural.cellHeight());
+        assertThat(identity.ascent()).isEqualTo(natural.ascent());
+        assertThat(spaced.cellWidth()).isEqualTo(natural.cellWidth());
+        assertThat(spaced.cellHeight()).isEqualTo((int) Math.ceil(natural.cellHeight() * 1.5));
+        assertThat(spaced.ascent()).isEqualTo(natural.ascent() + (spaced.cellHeight() - natural.cellHeight()) / 2);
+    }
+
+    @Test
     void primaryFontResolvesFromTheRuntime() {
         assertThat(new FontSet(MONO, 14f, List.of(), true).primaryFamily()).isEqualTo(MONO);
     }
