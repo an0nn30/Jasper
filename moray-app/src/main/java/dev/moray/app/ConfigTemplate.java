@@ -79,8 +79,9 @@ final class ConfigTemplate {
             [terminal.env]
             # New panes only: add string values to the inherited environment.
             # Names use letters, digits and underscore, starting with a letter or underscore.
-            # Values must not contain NUL. Desktop launches remove inherited terminal identity
-            # variables (TERM_PROGRAM*, TERM_SESSION_ID, TMUX*, and ITERM_*), then apply this overlay.
+            # Values must not contain NUL. Desktop launches remove inherited TERM_PROGRAM,
+            # TERM_PROGRAM_VERSION, TERM_SESSION_ID, TMUX, TMUX_PANE, and ITERM_* variables,
+            # then apply this overlay.
             # Explicit configured values are intentional overrides. On macOS, LANG defaults to
             # en_US.UTF-8 only when absent or blank; LC_* values are preserved. TERM and COLORTERM
             # remain reserved and are always forced to xterm-256color and truecolor.

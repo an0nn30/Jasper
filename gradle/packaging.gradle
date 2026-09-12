@@ -163,8 +163,9 @@ def verifyPackage = tasks.register('verifyPackage') {
         if (!cfg.contains('--enable-native-access=ALL-UNNAMED') || !cfg.contains('-Dapple.awt.application.name=Moray')) {
             throw new GradleException('Package verification failed: required JVM options are missing from Moray.cfg')
         }
+        String normalizedCfg = cfg.replace('\\', '/')
         configurations.runtimeClasspath.files.findAll { it.name.endsWith('.jar') }.each { dependency ->
-            if (!cfg.contains("\$APPDIR/${dependency.name}")) throw new GradleException("Package verification failed: classpath omits ${dependency.name}")
+            if (!normalizedCfg.contains("\$APPDIR/${dependency.name}")) throw new GradleException("Package verification failed: classpath omits ${dependency.name}")
         }
         File release = new File(runtimeHome, 'release')
         String releaseText = release.getText('UTF-8')
