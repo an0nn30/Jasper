@@ -1,5 +1,7 @@
 # Moray — screenshot-matched Swing chrome
 
+> **Geometry superseded (2026-09-12):** The later compact-padding follow-up uses a 4px terminal inset on every side. The 24px inset below remains the historical screenshot measurement; all other mock styling and geometry remain in force.
+
 **Follow-up amendment:** The user subsequently requested a shorter configurable title/tab row and animated tab entry/underline. The [tab motion design](2026-09-11-moray-tab-motion-design.md) supersedes fixed54px geometry and adds platform tab shortcuts; remaining visual styling is retained.
 
 

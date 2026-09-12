@@ -1,0 +1,71 @@
+# Moray example configuration
+# Copy this file to your platform's config.toml, then edit only the values you want to change.
+# All active values below are Moray's built-in defaults.
+
+[window]
+# Live across open windows. Range: 28-72 logical pixels.
+tab_height = 38
+# Live across open windows. Options: "icons_and_labels", "icons", or "hidden".
+toolbar = "icons_and_labels"
+# Live across open windows.
+status_bar = true
+# Initial grid for new windows only. Columns: 5-500; lines: 2-200.
+columns = 150
+lines = 45
+
+[font]
+# Live across existing and new panes. Missing fonts use JBR/system fallback.
+family = "JetBrains Mono"
+# Range: 6-72 points. A saved size change is live; new panes and Font reset use this value.
+size = 16.0
+# Ordered live fallbacks; names must be nonblank. An empty list is allowed.
+fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
+# Live across existing and new panes.
+ligatures = true
+# Live multiplier from 1.0-3.0. It changes cell height without changing cell width.
+line_height = 1.0
+
+[terminal]
+# New panes only. Range: 0-1000000 retained lines; zero disables scrollback history.
+scrollback = 10000
+# Live. Options: "left", "right", "both", or "none".
+option_as_meta = "left"
+# Live. Range: 0.0-1.0; zero disables inactive dimming and one fully dims.
+dim_inactive_panes = 0.3
+# Live. Completed local selections copy when true.
+copy_on_select = false
+# Live. Options: "visual", "sound", or "none".
+bell = "visual"
+
+[terminal.shell]
+# New panes only. An empty program selects the platform default login shell.
+# Configured args append to that default command. An explicit program receives only these args,
+# with no implicit login flag. Each array item is passed as one exact argument: Moray performs
+# no shell parsing, splitting, expansion, or interpolation. Program and args must contain no NUL.
+program = ""
+args = []
+
+[terminal.cursor]
+# Live fallback until a running program sets its own cursor. Shape: "block", "beam", or "underline".
+shape = "block"
+blink = true
+
+[terminal.env]
+# New panes only. Uncomment entries to overlay the inherited environment with exact string values.
+# Names must match [A-Za-z_][A-Za-z0-9_]* and values must contain no NUL. TERM and COLORTERM are
+# reserved: Moray always sets TERM=xterm-256color and COLORTERM=truecolor. This table does not
+# choose the default login shell; setting SHELL here only changes the child's environment.
+# MY_VARIABLE = "a value with spaces"
+
+[colors]
+# Live across all windows. Options: "moray-dark" or "moray-light".
+theme = "moray-dark"
+
+[keybindings]
+# Optional live overrides. Shortcuts must be unique; use "none" to disable an action.
+# On macOS, cmd is Command and alt/option is Option. Example:
+# new_tab = "cmd+t"
+# split_down = "cmd+shift+d"
+# On Linux and Windows, cmd means Ctrl+Shift; literal Ctrl combinations are often clearer. Example:
+# new_tab = "ctrl+shift+t"
+# split_down = "ctrl+alt+shift+d"

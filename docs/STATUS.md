@@ -2,6 +2,8 @@
 
 **As of:** 2026-09-12. Plan 4b and all preceding work are integrated on `main` at `b25ebaf`. Fresh merged verification executed all eight Gradle tasks: 442 tests, 441 passed and one known font skip, with no failures/errors. Continue from `/Users/dustin/projects/moray`. The [configuration guide](configuration.md) and generated Settings template include all new options. Native UI, benchmark and daily-use acceptance remain open.
 
+**Compact padding/config example follow-up:** The terminal pane now uses a 4px inset on every side, superseding the old screenshot-matched 24px inset. Initial window sizing includes the same 8px total per dimension. The root [copyable example](../config.example.toml) contains all supported non-shortcut defaults and optional commented platform-specific shortcut examples. Headless layout and parse coverage are included; native visual sizing remains user-run.
+
 **Plan 4b work:** Full terminal configuration is integrated on `main`. It was developed on `codex/plan-4b-terminal-config`, based on `ab672fa`; the merged worktree and branch are cleaned up after verification. All four task reviews approved through `9d8b9b4`; final whole-branch review approved after the documentation-only correction `7ab277b`, with no open findings. Fresh `./gradlew check --rerun-tasks` executed all eight tasks: 442 tests, 441 passed, one known font skip, no failures/errors or test output. Both modules passed source hygiene and the branch passed diff checks. Native acceptance remains user-run. See [design](superpowers/specs/2026-09-12-moray-plan-4b-terminal-config-design.md), [implementation plan](superpowers/plans/2026-09-12-moray-plan-4b-terminal-config.md) and [native checklist](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md).
 
 **Plan 4a progress:** Saved settings and live reload are integrated on `main`, with all task and final reviews complete through `acd5ea3`. Fresh full verification: 394 tests, 393 passed and one known font skip, no failures/errors. Actual status renders passed visual inspection in dark/light at normal/narrow widths. Final whole-branch review approved after correcting Windows-specific test fixtures; no findings remain open. Native and Windows execution remain unverified. See [configuration usage](configuration.md), [status renders](design/config-status-comparison.md) and [native acceptance](superpowers/plans/2026-09-11-moray-plan-4a-manual-check.md).
@@ -64,7 +66,7 @@ The screenshot revision now supplies:
 
 - A single 54px title/tab row with native traffic-light space, persistent tab controls, overflow navigation and a clipped trailing title. Public JBR title-height integration retains native decoration with a fallback.
 - A 53px horizontal toolbar using 16px neutral Tabler outlines, inline labels, highlighted New tab, separators and right-aligned Settings/Reload. Existing actions, menus and visibility modes remain functional.
-- A 30px status bar that shares the terminal background, live shell/path/grid metadata and running dot; 24px terminal padding and app default/reset font size 16.
+- A 30px status bar that shares the terminal background, live shell/path/grid metadata and running dot; the current 4px terminal padding supersedes the old 24px mock geometry, and the app default/reset font size remains 16.
 - Measured dark surface and visible ANSI accent colors, with equivalent light geometry. Actual headless previews: [dark](design/mock-ui-dark.png), [light](design/mock-ui-light.png). Reproduce with `./gradlew :moray-app:mockUiPreview`.
 
 ## 3. Fixes included during Plan 3

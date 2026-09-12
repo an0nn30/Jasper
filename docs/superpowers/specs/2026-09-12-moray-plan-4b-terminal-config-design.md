@@ -1,5 +1,7 @@
 # Plan 4b — full terminal configuration
 
+> **Geometry clarification (2026-09-12):** The compact-padding follow-up supersedes this plan's 24px-per-side assumption with 4px per side, so initial sizing now adds 8px total to each dimension. Other Plan 4b behavior is unchanged.
+
 The user approved the next scope: typography, terminal input/behavior, session defaults and initial window dimensions. This is an architectural extension of the reviewed Plan 4a snapshot/service/controller, with implementation continuing under the established Superpowers workflow. Base: main `ab672fa`; isolated branch `codex/plan-4b-terminal-config`, `.worktrees/plan-4b`. Baseline: 394 tests, 393 passed and one known font skip.
 
 ## Scope and approach

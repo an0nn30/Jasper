@@ -6,9 +6,11 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.tomlj.Toml;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -18,6 +20,33 @@ class ConfigTemplateTest {
     @Test void commentedTemplatesParseCleanlyWithBuiltInDefaultsOnBothPlatforms() {
         for (boolean macOs : new boolean[]{true, false}) {
             var result = ConfigLoader.parse(directory.resolve("config.toml"), ConfigTemplate.text(macOs), macOs);
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.diagnostics()).isEmpty();
+            assertThat(result.snapshot()).isEqualTo(ConfigSnapshot.defaults());
+        }
+    }
+
+    @Test void repositoryExampleIsCompleteAndParsesAsBuiltInDefaultsOnBothPlatforms() throws Exception {
+        Path example = Path.of(System.getProperty("moray.projectDir")).resolve("config.example.toml");
+        assertThat(example).isRegularFile();
+        String text = Files.readString(example, StandardCharsets.UTF_8);
+        var toml = Toml.parse(text);
+        assertThat(toml.errors()).isEmpty();
+        assertThat(toml.getTable("window").keySet())
+            .containsExactlyInAnyOrder("tab_height", "toolbar", "status_bar", "columns", "lines");
+        assertThat(toml.getTable("font").keySet())
+            .containsExactlyInAnyOrder("family", "size", "fallback", "ligatures", "line_height");
+        assertThat(toml.getTable("terminal").keySet())
+            .containsExactlyInAnyOrder("scrollback", "option_as_meta", "dim_inactive_panes", "copy_on_select",
+                "bell", "shell", "cursor", "env");
+        assertThat(toml.getTable("terminal.shell").keySet()).containsExactlyInAnyOrder("program", "args");
+        assertThat(toml.getTable("terminal.cursor").keySet()).containsExactlyInAnyOrder("shape", "blink");
+        assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
+        assertThat(toml.getTable("colors").keySet()).containsExactly("theme");
+        assertThat(toml.getTable("keybindings").keySet()).isEmpty();
+
+        for (boolean macOs : new boolean[]{true, false}) {
+            var result = ConfigLoader.parse(example, text, macOs);
             assertThat(result.rejected()).isFalse();
             assertThat(result.diagnostics()).isEmpty();
             assertThat(result.snapshot()).isEqualTo(ConfigSnapshot.defaults());

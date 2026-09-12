@@ -19,6 +19,12 @@ application {
     )
 }
 
+tasks.test {
+    val configExample = rootProject.layout.projectDirectory.file("config.example.toml")
+    inputs.file(configExample).withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("moray.projectDir", rootProject.layout.projectDirectory.asFile.absolutePath)
+}
+
 tasks.register<JavaExec>("bench") {
     group = "verification"
     description = "Pipes ~100 MB of ANSI-colored text through a Moray terminal window and prints MB/s."

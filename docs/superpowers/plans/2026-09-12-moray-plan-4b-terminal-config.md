@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development task-by-task, with TDD and separate scoped reviews.
 
+> **Geometry clarification (2026-09-12):** The later compact-padding follow-up supersedes the historical +48px sizing steps below. The current pane inset is 4px per side, and `InitialWindowSize` adds 8px total to each dimension.
+
 **Execution clarification:** Array validation points to the containing key’s exact source position; TomlJ element positions include preceding whitespace/comments.
 
 **Status:** Implemented and fully reviewed through `7ab277b`; no open findings. Fresh full verification: 442 tests, 441 passed, one known font skip, all eight tasks executed. Merged locally into main at `b25ebaf`; fresh merged verification reproduced these results. Native acceptance remains pending. The per-plan scratch workspace is removed after preserving its decisions in STATUS.
