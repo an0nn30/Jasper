@@ -49,7 +49,8 @@ class ConfigTemplateTest {
             var result = ConfigLoader.parse(example, text, macOs);
             assertThat(result.rejected()).isFalse();
             assertThat(result.diagnostics()).isEmpty();
-            assertThat(result.snapshot()).isEqualTo(ConfigSnapshot.defaults());
+            assertThat(result.snapshot()).isEqualTo(new ConfigSnapshot(38,
+                WindowContent.ToolbarMode.ICONS_AND_LABELS, true, 16f, BuiltinTheme.DARK, java.util.Map.of()));
         }
     }
 
@@ -69,7 +70,7 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().lines()).isEqualTo(45);
             assertThat(all.snapshot().font()).isEqualTo(FontConfig.defaults());
             assertThat(all.snapshot().terminal()).isEqualTo(TerminalConfig.defaults());
-            assertThat(all.snapshot().theme()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(all.snapshot().colors()).isEqualTo(new ColorsConfig(Appearance.DARK, "moray-dark"));
             assertThat(all.snapshot().keybindings()).hasSize(ActionId.values().length);
             var defaults = KeyBindings.defaults(macOs);
             for (ActionId action : ActionId.values()) {

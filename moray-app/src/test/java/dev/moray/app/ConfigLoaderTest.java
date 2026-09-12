@@ -14,13 +14,22 @@ class ConfigLoaderTest {
     private static final Path FILE = Path.of("/fixture/config.toml");
     private ConfigLoader.Result parse(String text) { return ConfigLoader.parse(FILE, text, true); }
 
+    @Test void legacyThemeRetainsAppearanceAndExplicitSystemOptsIn() {
+        var path = Path.of("config.toml");
+        var legacy = ConfigLoader.parse(path, "[colors]\ntheme = 'moray-light'\n", true);
+        var automatic = ConfigLoader.parse(path,
+            "[colors]\ntheme = 'moray-light'\nappearance = 'system'\n", true);
+        assertThat(legacy.snapshot().colors().appearance()).isEqualTo(Appearance.LIGHT);
+        assertThat(automatic.snapshot().colors().appearance()).isEqualTo(Appearance.SYSTEM);
+        assertThat(ConfigLoader.parse(path, "", true).snapshot().colors()).isEqualTo(ColorsConfig.defaults());
+    }
+
     @Test void emptyFileSuppliesUsableDefaultsOnBothPlatforms() {
         for (boolean mac : new boolean[]{true, false}) {
             var result = ConfigLoader.parse(FILE, "# empty", mac);
             assertThat(result.rejected()).isFalse();
             assertThat(result.diagnostics()).isEmpty();
-            assertThat(result.snapshot()).isEqualTo(new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS_AND_LABELS,
-                true, 16f, BuiltinTheme.DARK, Map.of()));
+            assertThat(result.snapshot()).isEqualTo(ConfigSnapshot.defaults());
             int modifiers = mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
             assertThat(result.snapshot().bindings(mac).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_C, modifiers)))
                 .contains(ActionId.COPY);
@@ -51,7 +60,7 @@ class ConfigLoaderTest {
         assertThat(state.toolbar()).isEqualTo(WindowContent.ToolbarMode.ICONS);
         assertThat(state.statusBar()).isFalse();
         assertThat(state.fontSize()).isEqualTo(18f);
-        assertThat(state.theme()).isEqualTo(BuiltinTheme.LIGHT);
+        assertThat(state.colors()).isEqualTo(new ColorsConfig(Appearance.LIGHT, "moray-light"));
         assertThat(state.bindings(true).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.META_DOWN_MASK)))
             .contains(ActionId.COPY);
         assertThat(state.bindings(true).strokeFor(ActionId.NEW_TAB)).isEmpty();
@@ -74,7 +83,7 @@ class ConfigLoaderTest {
         assertDiagnostic(result, "font.size", 4, 3, ConfigDiagnostic.Severity.ERROR);
         for (String text : new String[]{"window.tab_height=27", "window.tab_height=73", "font.size=5.9",
                 "font.size=72.1", "font.size=nan", "font.size=inf", "font.size=-inf",
-                "window.toolbar='secret-value'", "colors.theme='secret-value'"}) {
+                "window.toolbar='secret-value'"}) {
             var invalid = parse(text);
             assertThat(invalid.rejected()).as(text).isFalse();
             assertThat(invalid.snapshot()).isEqualTo(ConfigSnapshot.defaults());

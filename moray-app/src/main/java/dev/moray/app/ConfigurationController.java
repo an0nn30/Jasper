@@ -25,7 +25,7 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         this.themes = themes; this.service = service; this.editor = editor;
         state = service.initialState();
-        themes.select(state.snapshot().theme());
+        themes.select(selected(state.snapshot()));
         service.start(this::accept);
     }
 
@@ -59,8 +59,8 @@ final class ConfigurationController implements AutoCloseable {
     void accept(ConfigService.State next) {
         requireEdt();
         if (closed) return;
-        if (state.snapshot().theme() != next.snapshot().theme()) {
-            try { themes.select(next.snapshot().theme()); }
+        if (selected(state.snapshot()) != selected(next.snapshot())) {
+            try { themes.select(selected(next.snapshot())); }
             catch (IllegalStateException failure) {
                 for (WindowContent owner : List.copyOf(owners)) owner.onError.accept(failure.getMessage());
             }
@@ -70,6 +70,10 @@ final class ConfigurationController implements AutoCloseable {
             owner.applyConfiguration(next.snapshot(), service.macOs());
             owner.setConfigurationState(next);
         }
+    }
+
+    private static BuiltinTheme selected(ConfigSnapshot snapshot) {
+        return snapshot.colors().appearance() == Appearance.LIGHT ? BuiltinTheme.LIGHT : BuiltinTheme.DARK;
     }
 
     @Override public void close() {

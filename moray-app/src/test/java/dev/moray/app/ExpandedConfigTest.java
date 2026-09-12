@@ -20,6 +20,44 @@ class ExpandedConfigTest {
 
     private ConfigLoader.Result parse(String text) { return ConfigLoader.parse(FILE, text, true); }
 
+    @Test void acceptsThemeBasenamesAndParsesColorsIndependentlyOfFieldOrder() {
+        for (String selector : List.of("night", "night.toml", "My Theme", "夜空")) {
+            for (String text : List.of(
+                    "[colors]\ntheme='" + selector + "'\nappearance='light'\n",
+                    "[colors]\nappearance='light'\ntheme='" + selector + "'\n")) {
+                var result = parse(text);
+                assertThat(result.rejected()).as(text).isFalse();
+                assertThat(result.diagnostics()).as(text).isEmpty();
+                assertThat(result.snapshot().colors()).isEqualTo(new ColorsConfig(Appearance.LIGHT, selector));
+            }
+        }
+    }
+
+    @Test void rejectsUnsafeOrBlankThemeSelectors() {
+        for (String selector : List.of("../night", "/night", "night\\theme", "night:theme", ".", "..", " ")) {
+            var result = parse("colors.theme='" + selector.replace("'", "''") + "'");
+            assertThat(result.rejected()).as(selector).isFalse();
+            assertThat(result.snapshot().colors()).as(selector).isEqualTo(ColorsConfig.defaults());
+            assertPosition(result, "colors.theme", 1, 1, ConfigDiagnostic.Severity.ERROR);
+        }
+        var control = parse("colors.theme=\"night\\u001f\"");
+        assertThat(control.rejected()).isFalse();
+        assertThat(control.snapshot().colors()).isEqualTo(ColorsConfig.defaults());
+        assertPosition(control, "colors.theme", 1, 1, ConfigDiagnostic.Severity.ERROR);
+    }
+
+    @Test void invalidAppearanceDefaultsWhileWrongTypeRejects() {
+        var invalid = parse("[colors]\ntheme='moray-light'\nappearance='automatic'");
+        assertThat(invalid.rejected()).isFalse();
+        assertThat(invalid.snapshot().colors().appearance()).isEqualTo(Appearance.SYSTEM);
+        assertPosition(invalid, "colors.appearance", 3, 1, ConfigDiagnostic.Severity.ERROR);
+
+        var wrongType = parse("colors.appearance=1");
+        assertThat(wrongType.rejected()).isTrue();
+        assertThat(wrongType.snapshot().colors().appearance()).isEqualTo(Appearance.SYSTEM);
+        assertPosition(wrongType, "colors.appearance", 1, 1, ConfigDiagnostic.Severity.ERROR);
+    }
+
     @Test void expandedSettingsAreRecognizedInNestedAndInlineTables() {
         for (String text : List.of("""
             [window]
@@ -106,8 +144,9 @@ class ExpandedConfigTest {
                 "terminal.bell='secret'", "terminal.on_exit='secret'", "terminal.on_exit='CLOSE'")) {
             var result = parse(assignment + "\nwindow.tab_height=44");
             assertThat(result.rejected()).as(assignment).isFalse();
-            assertThat(result.snapshot()).isEqualTo(new ConfigSnapshot(44, WindowContent.ToolbarMode.ICONS_AND_LABELS,
-                true, 16f, BuiltinTheme.DARK, java.util.Map.of()));
+            var expected = ConfigSnapshot.defaults();
+            assertThat(result.snapshot()).isEqualTo(new ConfigSnapshot(44, expected.toolbar(), expected.statusBar(),
+                expected.font(), expected.colors(), expected.keybindings(), expected.columns(), expected.lines(), expected.terminal()));
             assertThat(result.diagnostics()).singleElement().satisfies(d -> {
                 assertThat(d.severity()).as(assignment).isEqualTo(ConfigDiagnostic.Severity.ERROR);
                 assertThat(d.message()).doesNotContain("secret", "bad");
