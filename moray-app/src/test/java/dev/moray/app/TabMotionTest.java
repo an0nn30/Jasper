@@ -118,7 +118,7 @@ class TabMotionTest {
         });
     }
 
-    @Test void overflowResizeReorderAndRemovalSettleWithoutStaleBounds() throws Exception {
+    @Test void overflowResizeAndReorderSettleWhileCloseAnimatesWithoutStaleBounds() throws Exception {
         edt(() -> {
             try (var fixture = new Fixture()) {
                 var owner = fixture.owner; var strip = owner.windowTabs();
@@ -140,6 +140,9 @@ class TabMotionTest {
                 assertThat(underline(strip)).isEqualTo(new Rectangle(334, 37, 132, 1));
                 assertThat(strip.animationTimer.isRunning()).isFalse();
                 owner.closeTab(first); layout(strip, 700, 38);
+                assertThat(underline(strip)).isEqualTo(new Rectangle(334, 37, 132, 1));
+                assertThat(strip.animationTimer.isRunning()).isTrue();
+                fixture.frame(280);
                 assertThat(underline(strip)).isEqualTo(new Rectangle(174, 37, 132, 1));
                 assertThat(strip.animationTimer.isRunning()).isFalse();
                 layout(strip, 80, 28);
@@ -282,6 +285,116 @@ class TabMotionTest {
                 layout(fixture.host, 400, 958);
                 assertThat(entry(strip, owner.currentTab()).isVisible()).isTrue();
                 assertThat(named(strip, "newTab").getBounds().getMaxX()).isLessThanOrEqualTo(strip.getWidth());
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+            }
+        });
+    }
+
+    @Test void realHeaderActiveCloseContractsAndSlidesToPreviousTabImmediatelySelected() throws Exception {
+        edt(() -> {
+            try (var fixture = new Fixture()) {
+                var owner = fixture.owner; var strip = owner.windowTabs();
+                var first = owner.currentTab(); first.rename("short");
+                owner.newTab(HOME); var second = owner.currentTab(); second.rename("a much longer title"); owner.update();
+                fixture.installHeader();
+                Container departing = entry(strip, second);
+                Rectangle before = underline(strip);
+                owner.closeTab(second); fixture.layoutHeader();
+                assertThat(owner.currentTab()).isSameAs(first);
+                assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+                assertThat(departing.getParent()).isSameAs(strip);
+                assertThat(departing.getWidth()).isEqualTo(160);
+                assertThat(named(departing, "close:a much longer title").isEnabled()).isFalse();
+                assertThat(underline(strip)).isEqualTo(before);
+                fixture.frame(90);
+                assertThat(departing.getWidth()).isBetween(1, 100);
+                assertThat(underline(strip).x).isBetween(15, 173);
+                fixture.frame(180);
+                assertThat(departing.getParent()).isNull();
+                assertThat(underline(strip)).isEqualTo(new Rectangle(14, 37, 132, 1));
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+            }
+        });
+    }
+
+    @Test void inactiveCloseMovesFollowingTabAndUnderlineTogether() throws Exception {
+        edt(() -> {
+            try (var fixture = new Fixture()) {
+                var owner = fixture.owner; var strip = owner.windowTabs();
+                var first = owner.currentTab(); first.rename("first");
+                owner.newTab(HOME); var second = owner.currentTab(); second.rename("second"); owner.update();
+                fixture.installHeader();
+                Container departing = entry(strip, first), remaining = entry(strip, second);
+                owner.closeTab(first); fixture.layoutHeader();
+                assertThat(owner.currentTab()).isSameAs(second);
+                assertThat(remaining.getX()).isEqualTo(160);
+                assertThat(underline(strip).x).isEqualTo(174);
+                fixture.frame(90);
+                assertThat(remaining.getX()).isBetween(1, 100);
+                assertThat(underline(strip).x).isEqualTo(remaining.getX() + 14);
+                fixture.frame(180);
+                assertThat(departing.getParent()).isNull();
+                assertThat(remaining.getX()).isZero();
+                assertThat(underline(strip).x).isEqualTo(14);
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+            }
+        });
+    }
+
+    @Test void closeDuringEntryStartsAtCurrentWidthAndCleanupDropsAllDepartures() throws Exception {
+        edt(() -> {
+            try (var fixture = new Fixture()) {
+                var owner = fixture.owner; var strip = owner.windowTabs();
+                fixture.installHeader();
+                owner.newTab(HOME); var second = owner.currentTab(); second.rename("second"); owner.update();
+                fixture.layoutHeader(); fixture.frame(60);
+                Container departing = entry(strip, second);
+                int before = departing.getWidth();
+                owner.closeTab(second); fixture.layoutHeader();
+                assertThat(departing.getParent()).isSameAs(strip);
+                assertThat(departing.getWidth()).isEqualTo(before);
+                fixture.frame(120);
+                assertThat(departing.getWidth()).isBetween(1, before - 1);
+                owner.newTab(HOME); fixture.layoutHeader();
+                owner.closeTab(owner.currentTab()); fixture.layoutHeader();
+                fixture.host.setVisible(false);
+                assertThat(departing.getParent()).isNull();
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+                fixture.host.setVisible(true); fixture.layoutHeader();
+                assertThat(underline(strip).x).isEqualTo(14);
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+                owner.close(); fixture.frame(400);
+                assertThat(underline(strip)).isEqualTo(new Rectangle());
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+            }
+        });
+    }
+
+    @Test void consecutiveClosesFinishIndependentlyAndEmptyOwnerKeepsNoMotion() throws Exception {
+        edt(() -> {
+            try (var fixture = new Fixture()) {
+                var owner = fixture.owner; var strip = owner.windowTabs();
+                var first = owner.currentTab(); first.rename("first");
+                owner.newTab(HOME); var second = owner.currentTab(); second.rename("second");
+                owner.newTab(HOME); var third = owner.currentTab(); third.rename("third"); owner.update();
+                fixture.installHeader();
+                Container one = entry(strip, first), two = entry(strip, second);
+                owner.closeTab(first); fixture.layoutHeader(); fixture.frame(60);
+                owner.closeTab(second); fixture.layoutHeader();
+                assertThat(owner.currentTab()).isSameAs(third);
+                assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+                fixture.frame(180);
+                assertThat(one.getParent()).isNull();
+                assertThat(two.getParent()).isSameAs(strip);
+                assertThat(two.getWidth()).isPositive();
+                fixture.frame(240);
+                assertThat(two.getParent()).isNull();
+                assertThat(entry(strip, third).getX()).isZero();
+                assertThat(underline(strip)).isEqualTo(new Rectangle(14, 37, 132, 1));
+                assertThat(strip.animationTimer.isRunning()).isFalse();
+                owner.closeTab(third); fixture.layoutHeader();
+                assertThat(owner.tabStrip().getTabCount()).isZero();
+                assertThat(underline(strip)).isEqualTo(new Rectangle());
                 assertThat(strip.animationTimer.isRunning()).isFalse();
             }
         });
