@@ -38,7 +38,7 @@ Run focusedtests RED; change obsolete54 default assertions intentionally.
 **Files:** WindowTabs.java, small package-private TabMotion.java if interpolation state warrants separation; WindowContent close lifecycle if needed; WindowTabsTest.java/new TabMotionTest.java, MockUiPreview.java and comparison docs as needed.
 **Consumes:** owner.tabHeight(), persistent Entry model, real selection and existing overflow layout fromTask1.
 **Produces:** Visible180ms newtab/underline motion with shared easedovershoot, no idle or disposedtimer, reproducible deterministictests.
-- [ ] Write failing behavior/render tests using actual WindowTabs and explicit elapsed-time advancement. Cover entry midway/final bounds, underline old/intermediate/new positions, rapidretarget continuity, metadata refresh not restarting, overflow/removal/resize settling and timercompletion/disposal. Inject monotonic clock via package-private constructor or tick method; normal default uses System.nanoTime. Do not sleep. Existing immediate-selection tests retained.
+- [x] Write failing behavior/render tests using actual WindowTabs and explicit elapsed-time advancement. Cover entry midway/final bounds, underline old/intermediate/new positions, rapidretarget continuity, metadata refresh not restarting, overflow/removal/resize settling and timercompletion/disposal. Inject monotonic clock via package-private constructor or tick method; normal default uses System.nanoTime. Do not sleep. Existing immediate-selection tests retained.
 ```java
 owner.selectTab(first);
 // Advance the real strip's interpolation to a known elapsed instant.
@@ -46,13 +46,13 @@ assertThat(owner.currentTab()).isSameAs(first);
 // Assert rendered intermediate underline differs from both endpoint positions,
 // then exactly reaches the selected tab at duration and timer stops.
 ```
-- [ ] Implement single timer16ms onEDT withduration180ms; track shownentrywidth/targetwidth and underline rectangle. Firstlayout settles; newmembership triggersentrymotion afterinitiallayout. Use shared slow-fast-slow curve withsmallovershoot. A suitable piecewise curve uses smoothstep to1.035 through82% then smoothstep settles to1:
+- [x] Implement single timer16ms onEDT withduration180ms; track shownentrywidth/targetwidth and underline rectangle. Firstlayout settles; newmembership triggersentrymotion afterinitiallayout. Use shared slow-fast-slow curve withsmallovershoot. A suitable piecewise curve uses smoothstep to1.035 through82% then smoothstep settles to1:
 ```java
 double smooth(double t) { return t * t * (3 - 2 * t); }
 double ease(double t) { return t < .82 ? 1.035 * smooth(t / .82) : 1.035 - .035 * smooth((t - .82) / .18); }
 ```
 Clamp elapsed0..1; keep entrywidth nonnegative/withinclip. Capture renderedcurrentstate before retargeting. Draw one shared underline afterchildpaint (remove perEntryunderline) so movementcrossestabs; cliptoavailabletabregion andretainsemanticcolor. Entrybuttons retainrealhitboxes. Layoutretainsplus/navigation andactivevisibility. Resize/reorder/close settleorretarget coherently; terminaloutput refreshdoesnot resetmotion. Stop timeronfinish/removeNotify/close; reattachsettles. No manualnativehit-testing/drag or terminalrendererchanges.
-- [ ] Run focused tests RED/GREEN, fullcheck and sourcehygiene, regenerate actualheadlesspreviews atsettledstate, update comparison toexplain screenshot54px geometry supersededby38px. Add usermanual checks forquickmotion, keyboardselection andheight; commit/report.
+- [x] Run focused tests RED/GREEN, fullcheck and sourcehygiene, regenerate actualheadlesspreviews atsettledstate, update comparison toexplain screenshot54px geometry supersededby38px. Add usermanual checks forquickmotion, keyboardselection andheight; commit/report.
 
 ## Root acceptance
 - [ ] Separate reviews aftereach task; finalwholebranch review overthisfollowup range.

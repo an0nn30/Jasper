@@ -1,6 +1,6 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11. Compact tab follow-up implemented on `codex/mock-ui`, code/tests `e46eaae`; Task 1 reviewed, motion/final review pending. Root fresh `./gradlew check --rerun-tasks`: **325 tests, 324 passed, 1 known font skip**, zero failures/errors, all eight tasks executed. Source hygiene/diff checks pass; regenerated dark/light previews inspected. Main remains Plan 3.5 baseline `182b9fb`; this branch is not merged. No GUI, benchmark or push occurred.
+**As of:** 2026-09-11. Compact tab follow-up implemented on `codex/mock-ui`, code/tests `e46eaae`; both task reviews approved, final review pending. Root fresh `./gradlew check --rerun-tasks`: **325 tests, 324 passed, 1 known font skip**, zero failures/errors, all eight tasks executed. Source hygiene/diff checks pass; regenerated dark/light previews inspected. Main remains Plan 3.5 baseline `182b9fb`; this branch is not merged. No GUI, benchmark or push occurred.
 
 **Current follow-up:** Default title/tab height is now 38px, configurable from 28–72 through View → Tab height… for the current window. Both Swing and native height use the same value; reset restores 38, cancellation preserves the previous value. Height survives theme changes but is session-only. New tabs and the selected underline animate with a shared 180ms eased settle; selection/focus/launch remain immediate and timers stop when idle/hidden/disposed. The existing shortcut engine now provides Cmd/Ctrl+1–9 and Cmd/Ctrl+{ / } (Shift+brackets), with plain Ctrl for tab navigation outside macOS. Unrelated shortcut behavior is retained. [Design](superpowers/specs/2026-09-11-moray-tab-motion-design.md), [plan](superpowers/plans/2026-09-11-moray-tab-motion.md), [native checks](superpowers/plans/2026-09-11-moray-tab-motion-manual-check.md).
 
@@ -18,7 +18,7 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
 | 3.5 — macOS chrome, themes and toolbar | Integrated on main and fully reviewed; native acceptance pending |
-| Screenshot UI revision | Implemented and fully reviewed; compact/motion follow-up implemented, review pending |
+| Screenshot UI revision | Implemented and fully reviewed; compact/motion follow-up implemented and task-reviewed, final review pending |
 | 4 — Config and packaging | Follows screenshot UI acceptance; not written yet |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart Plan 3 or Plan 3.5; the active revision is in `.worktrees/mock-ui`.
