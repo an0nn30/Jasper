@@ -4,17 +4,38 @@ import java.nio.file.Path;
 import javax.swing.SwingUtilities;
 
 public final class Main {
+    private static final System.Logger LOG = System.getLogger(Main.class.getName());
+
     private Main() {}
 
     public static void main(String[] args) {
         int result = start(args, System.out, System.err, service -> {
-            System.setProperty("apple.awt.application.appearance", "system");
-            System.setProperty("apple.laf.useScreenMenuBar", "true");
-            SystemAppearance source = SystemAppearance.production();
-            SwingUtilities.invokeLater(() -> {
-                try { new MorayApplication(service, source).newWindow(Path.of(System.getProperty("user.home"))); }
-                catch (RuntimeException failure) { source.close(); service.close(); throw failure; }
-            });
+            AppDirs dirs = AppDirs.resolve(System.getProperty("os.name"), System.getenv(),
+                Path.of(System.getProperty("user.home")));
+            AppLog log = AppLog.open(dirs.logs());
+            Thread shutdown = Thread.ofPlatform().name("moray-log-shutdown").unstarted(log::close);
+            try {
+                Runtime.getRuntime().addShutdownHook(shutdown);
+                System.setProperty("apple.awt.application.appearance", "system");
+                System.setProperty("apple.laf.useScreenMenuBar", "true");
+                SystemAppearance source = SystemAppearance.production();
+                SwingUtilities.invokeLater(() -> {
+                    try { new MorayApplication(service, source).newWindow(Path.of(System.getProperty("user.home"))); }
+                    catch (RuntimeException failure) {
+                        LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
+                        source.close(); service.close(); log.close();
+                        try { Runtime.getRuntime().removeShutdownHook(shutdown); }
+                        catch (IllegalStateException shutdownInProgress) { /* The hook owns the concurrent close. */ }
+                        throw failure;
+                    }
+                });
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
+                log.close();
+                try { Runtime.getRuntime().removeShutdownHook(shutdown); }
+                catch (IllegalStateException shutdownInProgress) { /* The hook owns the concurrent close. */ }
+                throw failure;
+            }
         });
         if (result != 0) System.exit(result);
     }

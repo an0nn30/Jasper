@@ -49,6 +49,7 @@ import java.util.regex.PatternSyntaxException;
  * and prompt jumps.
  */
 public final class TerminalView extends JComponent {
+    private static final System.Logger LOG = System.getLogger(TerminalView.class.getName());
     private static final int FRAME_MILLIS = 8;
     private static final int BLINK_MILLIS = 530;
     private static final int BELL_MILLIS = 150;
@@ -1004,6 +1005,7 @@ public final class TerminalView extends JComponent {
         try {
             return (String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
         } catch (UnsupportedFlavorException | IOException | IllegalStateException | HeadlessException e) {
+            LOG.log(System.Logger.Level.WARNING, "Clipboard read failed", e);
             return null;
         }
     }
@@ -1012,7 +1014,7 @@ public final class TerminalView extends JComponent {
         try {
             Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
         } catch (IllegalStateException | HeadlessException e) {
-            // The clipboard is busy or unavailable; plan 4 logs this.
+            LOG.log(System.Logger.Level.WARNING, "Clipboard write failed", e);
         }
     }
 
@@ -1023,7 +1025,7 @@ public final class TerminalView extends JComponent {
             }
         } catch (IOException | URISyntaxException | RuntimeException e) {
             // RuntimeException covers UnsupportedOperationException, IllegalArgumentException and SecurityException.
-            // Nothing can open this link; plan 4 logs this.
+            LOG.log(System.Logger.Level.WARNING, "Browser open failed", e);
         }
     }
 }

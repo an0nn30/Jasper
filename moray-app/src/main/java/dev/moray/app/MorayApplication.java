@@ -14,6 +14,7 @@ import javax.swing.SwingUtilities;
 
 /** Application-level window and shell ownership; closing a window never exits sibling windows. */
 final class MorayApplication {
+    private static final System.Logger LOG = System.getLogger(MorayApplication.class.getName());
     private final ThemeController themes = new ThemeController();
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     private final ExecutorService launches = Executors.newThreadPerTaskExecutor(
@@ -53,7 +54,10 @@ final class MorayApplication {
         try {
             return TerminalSession.start(settings.command(), settings.environment(), directory,
                 settings.columns(), settings.lines(), settings.scrollback());
-        } catch (IOException failure) { throw new UncheckedIOException(failure); }
+        } catch (IOException failure) {
+            LOG.log(System.Logger.Level.ERROR, "Shell launch failed", failure);
+            throw new UncheckedIOException(failure);
+        }
     }
 
     void windowClosed(TerminalWindow window) {

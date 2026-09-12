@@ -11,6 +11,7 @@ import javax.swing.*;
 
 /** Exactly one asynchronously launched shell and its retained output. Owned on the EDT. */
 final class TerminalPane extends JPanel implements AutoCloseable {
+    private static final System.Logger LOG = System.getLogger(TerminalPane.class.getName());
     static final float DEFAULT_FONT_SIZE = 16f;
     static final int PADDING = 4;
     private final UUID id = UUID.randomUUID();
@@ -56,6 +57,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         shellLabel = launcher.launch(launchDirectory, (created, failure) -> {
             if (closed) { if (created != null) created.close(); return; }
             if (failure != null) {
+                LOG.log(System.Logger.Level.ERROR, "Terminal pane launch failed", failure);
                 Throwable cause = failure;
                 while (cause.getCause() != null) cause = cause.getCause();
                 removeAll(); add(new JLabel("Could not start terminal: " + cause.getMessage()));

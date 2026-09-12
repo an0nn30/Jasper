@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Connects JediTerm to a pty4j process: UTF-8 output in, bytes out, window size changes. */
 final class PtyConnector implements TtyConnector {
+    private static final System.Logger LOG = System.getLogger(PtyConnector.class.getName());
     private static final long CLOSE_GRACE_MILLIS = 500;
 
     private final PtyProcess process;
@@ -94,6 +95,9 @@ final class PtyConnector implements TtyConnector {
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 process.destroyForcibly();
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "Terminal process cleanup failed", failure);
+                throw failure;
             } finally {
                 closeStreams();
             }
@@ -103,13 +107,13 @@ final class PtyConnector implements TtyConnector {
     private void closeStreams() {
         try {
             input.close();
-        } catch (IOException ignored) {
-            // Already closed with the PTY.
+        } catch (IOException failure) {
+            if (process.isAlive()) LOG.log(System.Logger.Level.WARNING, "Terminal input cleanup failed", failure);
         }
         try {
             reader.close();
-        } catch (IOException ignored) {
-            // Already closed with the PTY.
+        } catch (IOException failure) {
+            if (process.isAlive()) LOG.log(System.Logger.Level.WARNING, "Terminal output cleanup failed", failure);
         }
     }
 }

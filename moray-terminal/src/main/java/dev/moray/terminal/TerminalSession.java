@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 
 /** A program running in a pseudo-terminal, emulated by JediTerm on a dedicated reader thread. */
 public final class TerminalSession implements AutoCloseable {
+    private static final System.Logger LOG = System.getLogger(TerminalSession.class.getName());
     /** Schemes an OSC 8 hyperlink may open; anything else could launch an application or a custom handler. */
     private static final Set<String> OSC8_SCHEMES = Set.of("http", "https", "ftp", "mailto");
 
@@ -160,7 +161,7 @@ public final class TerminalSession implements AutoCloseable {
         } catch (IOException endOfStream) {
             // End of output, or EIO from a macOS PTY whose child has exited.
         } catch (RuntimeException emulatorFailure) {
-            emulatorFailure.printStackTrace(); // replaced by the app log in plan 4
+            LOG.log(System.Logger.Level.ERROR, "Terminal emulation failed", emulatorFailure);
         }
         int code;
         try {
@@ -190,7 +191,8 @@ public final class TerminalSession implements AutoCloseable {
         try {
             connector.write(bytes);
         } catch (IOException closed) {
-            // The program has exited; input is dropped.
+            // A closed program normally rejects late input; a live one indicates an unexpected write failure.
+            if (connector.isConnected()) LOG.log(System.Logger.Level.WARNING, "Terminal write failed", closed);
         }
     }
 
@@ -218,7 +220,12 @@ public final class TerminalSession implements AutoCloseable {
         } finally {
             buffer.unlock();
         }
-        connector.resize(size);
+        try {
+            connector.resize(size);
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Terminal resize failed", failure);
+            throw failure;
+        }
     }
 
     /** Clears saved history while preserving the live screen and notifying listeners that absolute rows were reset. */
