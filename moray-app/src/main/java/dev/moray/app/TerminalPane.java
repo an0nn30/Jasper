@@ -22,6 +22,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     private FindBar findBar;
     private boolean closed;
     private boolean active;
+    private float configuredDim = .3f;
     Runnable onChanged = () -> {};
     Runnable onFocused = () -> {};
     Runnable onClose = () -> {};
@@ -115,7 +116,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     void setActive(boolean selected) {
         active = selected;
         setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
-        if (view != null) view.setInactiveDim(selected ? 0 : 0.3f);
+        if (view != null) view.setInactiveDim(selected ? 0 : configuredDim);
+    }
+
+    void setConfiguredDim(float amount) {
+        configuredDim = amount;
+        setActive(active);
     }
 
     void applyTheme(BuiltinTheme theme) {

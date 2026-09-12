@@ -158,13 +158,32 @@ final class WindowContent extends JPanel implements AutoCloseable {
         if (previous == null || previous.tabHeight() != next.tabHeight()) setTabHeight(next.tabHeight());
         if (previous == null || previous.toolbar() != next.toolbar()) setToolbarMode(next.toolbar());
         if (previous == null || previous.statusBar() != next.statusBar()) setStatusVisible(next.statusBar());
-        if (previous == null || previous.fontSize() != next.fontSize()) {
-            configuredFontSize = next.fontSize();
-            for (int i = 0; i < tabs.getTabCount(); i++)
-                for (TerminalPane pane : ((TerminalTab) tabs.getComponentAt(i)).panes())
-                    if (pane.view() != null) pane.view().setFontSize(configuredFontSize);
+        boolean sizeChanged = previous == null || previous.fontSize() != next.fontSize();
+        boolean optionsChanged = previous == null || !previous.font().equals(next.font())
+            || liveBehaviorChanged(previous.terminal(), next.terminal());
+        boolean dimChanged = previous == null
+            || previous.terminal().dimInactivePanes() != next.terminal().dimInactivePanes();
+        configuredFontSize = next.fontSize();
+        if (optionsChanged || dimChanged) {
+            for (int i = 0; i < tabs.getTabCount(); i++) {
+                for (TerminalPane pane : ((TerminalTab) tabs.getComponentAt(i)).panes()) {
+                    if (optionsChanged && pane.view() != null) {
+                        float size = sizeChanged ? next.fontSize() : pane.view().fontSize();
+                        pane.view().applyOptions(next.viewOptions(size, pane.view().palette()));
+                    }
+                    if (dimChanged) pane.setConfiguredDim(next.terminal().dimInactivePanes());
+                }
+            }
         }
         if (previous == null || !previous.keybindings().equals(next.keybindings())) setBindings(next.bindings(macOs));
+    }
+
+    private static boolean liveBehaviorChanged(TerminalConfig previous, TerminalConfig next) {
+        return previous.optionAsMeta() != next.optionAsMeta()
+            || previous.cursorShape() != next.cursorShape()
+            || previous.cursorBlink() != next.cursorBlink()
+            || previous.copyOnSelect() != next.copyOnSelect()
+            || previous.bell() != next.bell();
     }
 
     Action action(ActionId id) { return actions.get(id); }
@@ -191,7 +210,12 @@ final class WindowContent extends JPanel implements AutoCloseable {
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
         pane.applyTheme(themes.current());
-        pane.view().setFontSize(configuredFontSize);
+        if (configured == null) {
+            pane.view().setFontSize(configuredFontSize);
+        } else {
+            pane.view().applyOptions(configured.viewOptions(configuredFontSize, themes.current().palette()));
+            pane.setConfiguredDim(configured.terminal().dimInactivePanes());
+        }
         pane.view().setShortcutHandler(event -> dispatchShortcut(KeyStroke.getKeyStrokeForEvent(event), pane.view()));
         pane.view().setContextMenuHandler(event -> {
             selectTab(tab); tab.focus(pane); pane.focusTerminal(); update();

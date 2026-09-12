@@ -28,8 +28,9 @@ class ConfigurationControllerTest {
         service = new ConfigService(directory.resolve("config.toml"), false);
         edt(() -> { themes = new ThemeController(); controller = new ConfigurationController(themes, service); });
     }
-    WindowContent owner() {
-        var result = new WindowContent(launcher(pending), HOME, path -> {}, () -> {}, () -> {}, themes);
+    WindowContent owner() { return owner(launcher(pending)); }
+    WindowContent owner(ShellLauncher launcher) {
+        var result = new WindowContent(launcher, HOME, path -> {}, () -> {}, () -> {}, themes);
         owners.add(result); controller.register(result); return result;
     }
     void reload(String text) throws Exception {
@@ -242,6 +243,241 @@ class ConfigurationControllerTest {
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(3);
             assertThat(retained.view().selectedText()).contains("alpha");
         });
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void fullLiveOptionsReachEveryRetainedAndPendingPaneWithStableSessions() throws Exception {
+        start(""); edt(() -> { owner(); owner(); }); launchAll();
+        var first = owners.getFirst(); var retained = first.currentPane(); var tab = first.currentTab();
+        var session = retained.session();
+        edt(() -> first.invoke(ActionId.SPLIT_RIGHT)); launchAll();
+        var sibling = first.currentPane();
+        edt(() -> { tab.toggleZoom(); first.newTab(HOME); });
+        reload(liveSettings(18));
+        launchAll();
+        edt(() -> {
+            assertThat(tab.tree().zoomed()).isTrue();
+            assertThat(retained.session()).isSameAs(session);
+            for (var pane : List.of(retained, sibling, first.currentPane(), owners.get(1).currentPane())) {
+                var options = pane.view().options();
+                assertThat(options.fontFamily()).isEqualTo("Monospaced");
+                assertThat(options.fontSize()).isEqualTo(18);
+                assertThat(options.fallbackFonts()).containsExactly("Dialog");
+                assertThat(options.ligatures()).isFalse();
+                assertThat(options.lineHeight()).isEqualTo(1.5f);
+                assertThat(options.optionAsMeta()).isEqualTo(dev.moray.terminal.OptionAsMeta.NONE);
+                assertThat(options.cursorStyle()).isEqualTo(dev.moray.terminal.CursorStyle.BEAM);
+                assertThat(options.cursorBlink()).isFalse();
+                assertThat(options.copyOnSelect()).isTrue();
+                assertThat(options.bell()).isEqualTo(dev.moray.terminal.BellMode.NONE);
+                var fonts = new dev.moray.terminal.FontSet("Monospaced", 18, List.of("Dialog"), false, 1.5f);
+                assertThat(pane.view().getMinimumSize()).isEqualTo(
+                    new java.awt.Dimension(5 * fonts.cellWidth(), 2 * fonts.cellHeight()));
+            }
+            assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
+            first.setActive(false);
+            assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(.65f);
+            first.selectTheme(BuiltinTheme.LIGHT);
+            assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
+            first.setActive(true);
+            assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(0f);
+            first.selectTab(tab); tab.toggleZoom(); tab.focus(retained);
+            assertThat(field(sibling.view(), "inactiveDim")).isEqualTo(.65f);
+        });
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void typographyAndBehaviorChangesPreserveManualSizeAndThemeUntilSavedSizeChanges() throws Exception {
+        start("[font]\nsize=18\n"); edt(this::owner); launchAll();
+        var owner = owners.getFirst(); var pane = owner.currentPane();
+        edt(() -> { pane.view().setFontSize(27); owner.selectTheme(BuiltinTheme.LIGHT); });
+        reload(liveSettings(18));
+        edt(() -> {
+            assertThat(pane.view().fontSize()).isEqualTo(27);
+            assertThat(pane.view().options().fontFamily()).isEqualTo("Monospaced");
+            assertThat(pane.view().options().lineHeight()).isEqualTo(1.5f);
+            assertThat(pane.view().palette()).isEqualTo(BuiltinTheme.LIGHT.palette());
+            owner.newTab(HOME);
+        }); launchAll();
+        edt(() -> {
+            assertThat(owner.currentPane().view().fontSize()).isEqualTo(18);
+            owner.selectTab((TerminalTab) owner.tabStrip().getComponentAt(0));
+            owner.invoke(ActionId.FONT_RESET);
+            assertThat(pane.view().fontSize()).isEqualTo(18);
+            pane.view().setFontSize(29);
+        });
+        reload(liveSettings(20));
+        edt(() -> {
+            assertThat(pane.view().fontSize()).isEqualTo(20);
+            assertThat(pane.view().palette()).isEqualTo(BuiltinTheme.LIGHT.palette());
+        });
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void chromeBindingsSessionAndDimOnlyReloadsDoNotReapplyViewOptions() throws Exception {
+        start(liveSettings(18)); edt(this::owner); launchAll();
+        var pane = owners.getFirst().currentPane();
+        var retained = pane.view().options();
+        reload(liveSettings(18).replace("dim_inactive_panes=0.65", "dim_inactive_panes=0.8") + """
+            [window]
+            columns=90
+            lines=30
+            tab_height=50
+            toolbar='icons'
+            status_bar=false
+            [terminal.shell]
+            program='unused-executable'
+            args=['literal argument']
+            [terminal.env]
+            MORAY_TEST='temporary'
+            [keybindings]
+            new_tab='Ctrl+F12'
+            """);
+        // Scrollback is also a session default, so changing it alone must leave view options untouched.
+        var text = Files.readString(directory.resolve("config.toml"));
+        reload(text.replace("[terminal]", "[terminal]\nscrollback=200"));
+        edt(() -> assertThat(pane.view().options()).isSameAs(retained));
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void savedCopyOnSelectRunsActualSelectionAndPreservesNativeEditingAndShortcuts() throws Exception {
+        start(""); edt(this::owner); launchAll();
+        var owner = owners.getFirst(); var view = owner.currentPane().view();
+        var copied = new java.util.concurrent.atomic.AtomicReference<String>();
+        edt(() -> call(view, "setClipboard", new Class<?>[] {java.util.function.Supplier.class, java.util.function.Consumer.class},
+            (java.util.function.Supplier<String>) () -> null, (java.util.function.Consumer<String>) copied::set));
+        until(() -> { selectWord(view); return view.selectedText().orElse("").equals("alpha"); });
+        assertThat(copied).hasNullValue();
+        reload("[terminal]\ncopy_on_select=true\noption_as_meta='none'\n[keybindings]\nnew_tab='Ctrl+F12'\n");
+        edt(() -> {
+            selectWord(view); assertThat(copied).hasValue("alpha");
+            var field = owner.currentPane().findBar().queryField();
+            field.setText("native text"); field.selectAll();
+            assertThat(owner.dispatchShortcut(owner.bindings().strokeFor(ActionId.COPY).orElseThrow(), field)).isFalse();
+            assertThat(owner.dispatchShortcut(owner.bindings().strokeFor(ActionId.PASTE).orElseThrow(), field)).isFalse();
+            assertThat(field.getSelectedText()).isEqualTo("native text");
+            var event = new java.awt.event.KeyEvent(view, java.awt.event.KeyEvent.KEY_PRESSED, 0,
+                java.awt.event.InputEvent.CTRL_DOWN_MASK, java.awt.event.KeyEvent.VK_F12, java.awt.event.KeyEvent.CHAR_UNDEFINED);
+            terminalKey(view, event);
+            assertThat(event.isConsumed()).isTrue();
+            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+        });
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void configuredDimmingSurvivesPendingLaunchFocusAndThemeChanges() throws Exception {
+        start("[terminal]\ndim_inactive_panes=0.7\n");
+        edt(() -> { owner().setActive(false); });
+        launchAll();
+        var owner = owners.getFirst(); var pane = owner.currentPane();
+        edt(() -> {
+            assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.7f);
+            owner.setActive(true);
+            assertThat(field(pane.view(), "inactiveDim")).isEqualTo(0f);
+            owner.setActive(false); owner.selectTheme(BuiltinTheme.LIGHT);
+            assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.7f);
+        });
+        reload("[terminal]\ndim_inactive_panes=0.2\n");
+        edt(() -> assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.2f));
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void queuedLaunchKeepsSessionAndGridCaptureWhileReadyViewUsesLatestLiveSettings() throws Exception {
+        start("""
+            [window]
+            columns=80
+            lines=24
+            [terminal]
+            scrollback=111
+            [terminal.shell]
+            program='first-shell'
+            args=['one argument']
+            [terminal.env]
+            MORAY_TEST='first'
+            """);
+        var launches = new ArrayList<LaunchSettings>();
+        edt(() -> owner(MorayApplication.windowLauncher(pending::add, controller::snapshot, (path, settings) -> {
+            assertThat(SwingUtilities.isEventDispatchThread()).isFalse();
+            launches.add(settings); return shell(path);
+        })));
+        var first = owners.getFirst(); var pane = first.currentPane();
+        var initialArea = pane.getPreferredSize();
+        reload(liveSettings(22) + """
+            [window]
+            columns=100
+            lines=32
+            [terminal.shell]
+            program='second-shell'
+            args=['two arguments', '']
+            [terminal.env]
+            MORAY_TEST='second'
+            """);
+        launchAll();
+        edt(() -> {
+            assertThat(pane.shellLabel()).isEqualTo("first-shell");
+            assertThat(pane.view().options().lineHeight()).isEqualTo(1.5f);
+            assertThat(pane.view().fontSize()).isEqualTo(22);
+            assertThat(pane.getPreferredSize()).isEqualTo(initialArea);
+            first.newTab(HOME);
+            owner(MorayApplication.windowLauncher(pending::add, controller::snapshot, (path, settings) -> {
+                launches.add(settings); return shell(path);
+            }));
+        }); launchAll();
+        assertThat(launches).hasSize(3);
+        assertThat(launches.get(0).command()).containsExactly("first-shell", "one argument");
+        assertThat(launches.get(0).environment()).containsEntry("MORAY_TEST", "first");
+        assertThat(launches.get(0).scrollback()).isEqualTo(111);
+        assertThat(launches.get(1).command()).containsExactly("second-shell", "two arguments", "");
+        assertThat(launches.get(1).environment()).containsEntry("MORAY_TEST", "second");
+        assertThat(launches.get(1).scrollback()).isEqualTo(10000);
+        assertThat(launches.get(1).columns()).isEqualTo(80);
+        assertThat(launches.get(1).lines()).isEqualTo(24);
+        assertThat(launches.get(2).columns()).isEqualTo(100);
+        assertThat(launches.get(2).lines()).isEqualTo(32);
+        edt(() -> {
+            assertThat(first.currentPane().shellLabel()).isEqualTo("second-shell");
+            assertThat(first.currentPane().view().fontSize()).isEqualTo(22);
+        });
+    }
+
+    private static String liveSettings(int size) {
+        return """
+            [font]
+            family='Monospaced'
+            size=%d
+            fallback=['Dialog']
+            ligatures=false
+            line_height=1.5
+            [terminal]
+            option_as_meta='none'
+            dim_inactive_panes=0.65
+            copy_on_select=true
+            bell='none'
+            [terminal.cursor]
+            shape='beam'
+            blink=false
+            """.formatted(size);
+    }
+
+    private static void selectWord(dev.moray.terminal.TerminalView view) {
+        for (int id : new int[] {java.awt.event.MouseEvent.MOUSE_PRESSED, java.awt.event.MouseEvent.MOUSE_RELEASED}) {
+            var event = new java.awt.event.MouseEvent(view, id, 0, 0, 1, 1, 1, 1, 2, false, java.awt.event.MouseEvent.BUTTON1);
+            call(view, "handleMouse", new Class<?>[] {java.awt.event.MouseEvent.class}, event);
+        }
+    }
+
+    private static Object field(Object target, String name) {
+        try {
+            var field = target.getClass().getDeclaredField(name);
+            field.setAccessible(true); return field.get(target);
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+
+    private static void call(Object target, String name, Class<?>[] parameters, Object... args) {
+        try {
+            var method = target.getClass().getDeclaredMethod(name, parameters);
+            method.setAccessible(true); method.invoke(target, args);
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
     private static void terminalKey(dev.moray.terminal.TerminalView view, java.awt.event.KeyEvent event) {
