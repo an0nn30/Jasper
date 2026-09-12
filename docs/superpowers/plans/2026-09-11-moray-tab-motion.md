@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement task-by-task.
 
+**Status:** Implemented and reviewed. Final code `20764b3`; one final integration finding fixed and scoped review approved. Root fresh check: 328 total, 327 passed, one known skip. Native acceptance and integration approval remain pending.
+
 **Goal:** Configurable compact title tabs, quick entry/underline animation, and requested platform tab shortcuts.
 **Architecture:** Extend existing WindowContent appearance and KeyBindings action engine; add presentation interpolation inside WindowTabs over unchanged tab/session ownership.
 **Tech Stack:** Java25/JBR, Swing/FlatLaf, JUnit/AssertJ.
@@ -55,6 +57,6 @@ Clamp elapsed0..1; keep entrywidth nonnegative/withinclip. Capture renderedcurre
 - [x] Run focused tests RED/GREEN, fullcheck and sourcehygiene, regenerate actualheadlesspreviews atsettledstate, update comparison toexplain screenshot54px geometry supersededby38px. Add usermanual checks forquickmotion, keyboardselection andheight; commit/report.
 
 ## Root acceptance
-- [ ] Separate reviews aftereach task; finalwholebranch review overthisfollowup range.
+- [x] Separate reviews aftereach task; finalwholebranch review overthisfollowup range.
 - [x] Fresh finalcheck/sourcehygiene; inspect actualpreviews; document nativeanimation acceptancepending.
 - [x] STATUS/README/spec reflect followup and preserveddecisions. No mergerwithoutuserapproval.
