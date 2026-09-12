@@ -37,10 +37,13 @@ record LogicalLine(long firstRow, long lastRow, int columns, boolean truncated) 
             count++;
         }
         TerminalLine current = clicked;
-        while (current.isWrapped() && last != Long.MAX_VALUE) {
+        while (current.isWrapped()) {
+            if (last == Long.MAX_VALUE) {
+                truncated = true;
+                break;
+            }
             TerminalLine below = lineAt.apply(last + 1);
-            if (below == null) break;
-            if (count == limit) {
+            if (below == null || count == limit) {
                 truncated = true;
                 break;
             }

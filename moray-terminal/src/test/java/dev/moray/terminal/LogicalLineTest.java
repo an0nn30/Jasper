@@ -62,6 +62,13 @@ class LogicalLineTest {
             return row == Long.MAX_VALUE ? line(true) : null;
         });
         assertThat(last.rowCount()).isOne();
+        assertThat(last.truncated()).as("the known continuation cannot be traversed").isTrue();
+    }
+
+    @Test
+    void aMissingWrappedContinuationMakesTheAvailableContextIncomplete() {
+        LogicalLine line = LogicalLine.around(0, 20, row -> row == 0 ? line(true) : null);
+        assertThat(line).isEqualTo(new LogicalLine(0, 0, 20, true));
     }
 
     @Test
