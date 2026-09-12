@@ -141,6 +141,63 @@ class BenchmarkTest {
             .isInstanceOf(TimeoutException.class).hasMessageContaining("preparation");
     }
 
+    @Test void runnerFinalizationCleansScratchEvenWhenReportDestinationIsInvalid() throws Exception {
+        Path scratch = Files.createDirectory(temp.resolve("owned-scratch"));
+        Path payload = Files.writeString(scratch.resolve("payload"), "owned benchmark data");
+        Path invalidOutput = Files.createDirectory(temp.resolve("report-is-a-directory"));
+        Files.writeString(invalidOutput.resolve("obstacle"), "keep");
+        Map<String, Object> report = new LinkedHashMap<>(Map.of("status", "complete"));
+        Exception failure = BenchmarkRun.finishReport(invalidOutput, report, null, () -> {
+            Files.delete(payload); Files.delete(scratch);
+        });
+        assertThat(failure).isInstanceOf(java.io.IOException.class);
+        assertThat(scratch).doesNotExist();
+        assertThat(report).containsEntry("status", "failed");
+        assertThat(Files.readString(Path.of(invalidOutput + ".md"))).contains("Status: failed");
+    }
+
+    @Test void runnerFinalizationPersistsCleanupFailureAndKeepsPrimaryFailure() throws Exception {
+        Path output = temp.resolve("cleanup-failure.json");
+        Map<String, Object> report = new LinkedHashMap<>(Map.of("status", "complete"));
+        IllegalStateException primary = new IllegalStateException("measurement failed");
+        java.io.IOException cleanup = new java.io.IOException("owned directory deletion failed");
+        Exception failure = BenchmarkRun.finishReport(output, report, primary, () -> { throw cleanup; });
+        assertThat(failure).isSameAs(primary);
+        assertThat(failure.getSuppressed()).containsExactly(cleanup);
+        assertThat(Files.readString(output)).contains("\"status\":\"failed\"", "owned directory deletion failed", "measurement failed");
+    }
+
+    @Test void runnerFinalizationDoesNotLeaveCompleteJsonWhenCompanionWriteFails() throws Exception {
+        Path output = temp.resolve("companion-failure.json");
+        Files.createDirectory(Path.of(output + ".md"));
+        Map<String, Object> report = new LinkedHashMap<>(Map.of("status", "complete"));
+        AtomicBoolean cleaned = new AtomicBoolean();
+        Exception failure = BenchmarkRun.finishReport(output, report, null, () -> cleaned.set(true));
+        assertThat(failure).isInstanceOf(java.io.IOException.class);
+        assertThat(cleaned).isTrue();
+        assertThat(Files.readString(output)).contains("\"status\":\"failed\"");
+    }
+
+    @Test void runnerRetirementClosesAndWaitsAfterStopFileFailure() throws Exception {
+        Path invalidControl = Files.writeString(temp.resolve("not-a-directory"), "control failure");
+        AtomicBoolean closed = new AtomicBoolean();
+        java.util.concurrent.CompletableFuture<Integer> exit = new java.util.concurrent.CompletableFuture<>();
+        assertThatThrownBy(() -> BenchmarkRun.closeChild(invalidControl, null, () -> {
+            closed.set(true); exit.completeExceptionally(new IllegalStateException("exit verification failure"));
+        }, exit)).isInstanceOf(java.io.IOException.class)
+            .satisfies(failure -> assertThat(failure.getSuppressed()).hasSize(1));
+        assertThat(closed).isTrue();
+    }
+
+    @Test void runnerRetirementStillVerifiesExitWhenSessionCloseThrows() throws Exception {
+        Path control = Files.createDirectory(temp.resolve("close-failure-control"));
+        java.io.IOException closeFailure = new java.io.IOException("session close failed");
+        var exit = java.util.concurrent.CompletableFuture.<Integer>failedFuture(new IllegalStateException("exit failed"));
+        assertThatThrownBy(() -> BenchmarkRun.closeChild(control, null, () -> { throw closeFailure; }, exit))
+            .isSameAs(closeFailure).satisfies(failure -> assertThat(failure.getSuppressed()).hasSize(1));
+        assertThat(control.resolve("stop")).exists();
+    }
+
     private BenchmarkOptions options(String... extra) {
         List<String> args = new ArrayList<>(List.of("--output", temp.resolve("results.json").toString(), "--revision", "test-revision"));
         args.addAll(List.of(extra)); return BenchmarkOptions.parse(true, args.toArray(String[]::new));

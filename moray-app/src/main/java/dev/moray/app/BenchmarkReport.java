@@ -17,6 +17,11 @@ final class BenchmarkReport {
         return result;
     }
     static void write(Path file, Map<String, Object> result) throws IOException {
+        // Publish the JSON checkpoint last; a companion error cannot leave a new successful JSON behind.
+        writeCompanion(file, result);
+        writeJson(file, result);
+    }
+    static void writeJson(Path file, Map<String, Object> result) throws IOException {
         Files.createDirectories(file.toAbsolutePath().getParent());
         Path temporary = Files.createTempFile(file.toAbsolutePath().getParent(), "benchmark-report-", ".tmp");
         try {
@@ -24,6 +29,9 @@ final class BenchmarkReport {
             try { Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
             catch (AtomicMoveNotSupportedException ignored) { Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING); }
         } finally { Files.deleteIfExists(temporary); }
+    }
+    static void writeCompanion(Path file, Map<String, Object> result) throws IOException {
+        Files.createDirectories(file.toAbsolutePath().getParent());
         StringBuilder human = new StringBuilder("# Moray benchmark\n\nStatus: " + result.get("status")
             + "\n\nSizes are bytes, rates use decimal MB/s, timing uses seconds or explicitly named milliseconds. "
             + "Unavailable metrics are null. No forced GC is performed.\n\n");

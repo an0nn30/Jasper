@@ -101,13 +101,65 @@ final class BenchmarkRun implements AutoCloseable {
             report.put("elapsedSeconds", (System.nanoTime() - entireStart) / 1e9);
             report.put("throughputMBpsSummary", BenchmarkReport.summary(runs.stream()
                 .map(r -> (Double) r.get("streamMBps")).toList()));
-            BenchmarkReport.write(options.output(), report);
-            try (var paths = Files.walk(temporary)) {
-                for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
-            }
+            failure = finishReport(options.output(), report, failure, () -> deleteTemporary(temporary));
         }
         System.out.println("Benchmark " + report.get("status") + ": " + options.output());
         if (failure != null) throw failure;
+    }
+
+    /** Actual finalization boundary, with the owned scratch cleanup supplied by the caller. */
+    static Exception finishReport(Path output, Map<String, Object> report, Exception failure, AutoCloseable cleanup) {
+        try { cleanup.close(); } catch (Exception error) { failure = accumulate(failure, error); }
+        finalStatus(report, failure);
+        try { BenchmarkReport.write(output, report); }
+        catch (Exception error) {
+            failure = accumulate(failure, error);
+            finalStatus(report, failure);
+            // Correct each writable artifact independently if publishing its sibling failed.
+            try { BenchmarkReport.writeCompanion(output, report); }
+            catch (Exception companion) { failure = accumulate(failure, companion); finalStatus(report, failure); }
+            try { BenchmarkReport.writeJson(output, report); }
+            catch (Exception persistence) { failure = accumulate(failure, persistence); finalStatus(report, failure); }
+        }
+        return failure;
+    }
+
+    private static void finalStatus(Map<String, Object> report, Exception failure) {
+        report.put("status", failure == null ? "complete" : "failed");
+        if (failure != null) {
+            report.put("failure", failure.toString());
+            List<String> errors = new ArrayList<>(); collectFailures(failure, errors); report.put("failures", errors);
+        }
+    }
+    private static void collectFailures(Throwable failure, List<String> errors) {
+        errors.add(failure.toString());
+        for (Throwable suppressed : failure.getSuppressed()) collectFailures(suppressed, errors);
+    }
+    private static Exception accumulate(Exception previous, Exception next) {
+        if (previous == null) return next;
+        if (previous != next) previous.addSuppressed(next);
+        return previous;
+    }
+    private static void deleteTemporary(Path directory) throws IOException {
+        List<IOException> failures = new ArrayList<>();
+        Files.walkFileTree(directory, new SimpleFileVisitor<>() {
+            private void delete(Path path) { try { Files.deleteIfExists(path); } catch (IOException error) { failures.add(error); } }
+            @Override public FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attributes) {
+                delete(file); return FileVisitResult.CONTINUE;
+            }
+            @Override public FileVisitResult visitFileFailed(Path file, IOException error) {
+                failures.add(error); return FileVisitResult.CONTINUE;
+            }
+            @Override public FileVisitResult postVisitDirectory(Path dir, IOException error) {
+                if (error != null) failures.add(error);
+                delete(dir); return FileVisitResult.CONTINUE;
+            }
+        });
+        if (!failures.isEmpty()) {
+            IOException first = failures.getFirst();
+            for (IOException error : failures.subList(1, failures.size())) first.addSuppressed(error);
+            throw first;
+        }
     }
 
     private static Map<String, Object> environment(BenchmarkOptions options) {
@@ -252,11 +304,14 @@ final class BenchmarkRun implements AutoCloseable {
 
     private void retireChildrenExcept(Set<Child> retained) throws Exception {
         List<Child> retired = children.stream().filter(c -> !retained.contains(c)).toList();
+        Exception failure = null;
         for (Child child : retired) {
             if (child.pid() != null) retiredChildPids.add(child.pid());
-            closeChild(child);
+            try { closeChild(child); children.remove(child); }
+            catch (Exception error) { failure = accumulate(failure, error); }
         }
-        children.removeAll(retired); // Release closed sessions before measuring cycle retention.
+        // Successfully retired sessions are released; failed children remain owned for final cleanup retry.
+        if (failure != null) throw failure;
     }
 
     private List<Long> childPids() {
@@ -321,27 +376,48 @@ final class BenchmarkRun implements AutoCloseable {
         closing.set(true); sampler.shutdownNow(); launches.shutdown();
         Exception failure = null;
         try {
-            edt(() -> { if (application != null) application.quit();
-                if (previousRepaintManager != null) RepaintManager.setCurrentManager(previousRepaintManager); return null; });
+            edt(() -> {
+                try { if (application != null) application.quit(); }
+                finally { if (previousRepaintManager != null) RepaintManager.setCurrentManager(previousRepaintManager); }
+                return null;
+            });
         } catch (Exception error) { failure = error; }
-        if (!launches.awaitTermination(5, TimeUnit.SECONDS)) { launches.shutdownNow(); failure = new TimeoutException("Fixture launch cleanup"); }
-        for (Child child : children) try { closeChild(child); } catch (Exception error) { if (failure == null) failure = error; else failure.addSuppressed(error); }
-        if (!sampler.awaitTermination(3, TimeUnit.SECONDS) && failure == null) failure = new TimeoutException("Metric sampler cleanup");
+        try {
+            if (!launches.awaitTermination(5, TimeUnit.SECONDS)) {
+                launches.shutdownNow(); throw new TimeoutException("Fixture launch cleanup");
+            }
+        } catch (Exception error) { launches.shutdownNow(); failure = accumulate(failure, error); }
+        for (Child child : children) try { closeChild(child); }
+        catch (Exception error) { failure = accumulate(failure, error); }
+        try {
+            if (!sampler.awaitTermination(3, TimeUnit.SECONDS)) throw new TimeoutException("Metric sampler cleanup");
+        } catch (Exception error) { failure = accumulate(failure, error); }
         children.clear(); application = null; window = null;
         if (failure != null) throw failure;
     }
     private static void closeChild(Child child) throws Exception {
-        Files.writeString(child.control.resolve("stop"), "stop");
-        if (child.session != null) child.session.close();
-        Long pid = child.pid();
-        if (pid != null) {
-            Optional<ProcessHandle> process = ProcessHandle.of(pid);
-            if (process.isPresent() && process.get().isAlive()) {
-                try { process.get().onExit().get(3, TimeUnit.SECONDS); }
-                catch (TimeoutException timeout) { process.get().destroyForcibly(); process.get().onExit().get(3, TimeUnit.SECONDS); }
-            }
-        }
-        if (child.session != null) child.session.exitFuture().get(3, TimeUnit.SECONDS);
+        TerminalSession session = child.session;
+        closeChild(child.control, child.pid(), session == null ? () -> {} : session::close,
+            session == null ? CompletableFuture.completedFuture(0) : session.exitFuture());
         child.session = null;
+    }
+
+    /** Actual retirement boundary; tests inject session ownership without starting a PTY or window. */
+    static void closeChild(Path control, Long pid, AutoCloseable closeSession, CompletableFuture<Integer> exit) throws Exception {
+        Exception failure = null;
+        try { Files.writeString(control.resolve("stop"), "stop"); }
+        catch (Exception error) { failure = error; }
+        try { closeSession.close(); } catch (Exception error) { failure = accumulate(failure, error); }
+        try {
+            if (pid != null) {
+                Optional<ProcessHandle> process = ProcessHandle.of(pid);
+                if (process.isPresent() && process.get().isAlive()) {
+                    try { process.get().onExit().get(3, TimeUnit.SECONDS); }
+                    catch (TimeoutException timeout) { process.get().destroyForcibly(); process.get().onExit().get(3, TimeUnit.SECONDS); }
+                }
+            }
+        } catch (Exception error) { failure = accumulate(failure, error); }
+        try { exit.get(3, TimeUnit.SECONDS); } catch (Exception error) { failure = accumulate(failure, error); }
+        if (failure != null) throw failure;
     }
 }
