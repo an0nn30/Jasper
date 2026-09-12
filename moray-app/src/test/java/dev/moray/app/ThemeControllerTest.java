@@ -45,6 +45,9 @@ class ThemeControllerTest {
         edt(() -> {
             retained[0] = owners[0].currentTab(); first[0] = owners[0].currentPane();
             session[0] = first[0].session();
+            first[0].findBar().queryField().removeCaretListener((javax.swing.event.CaretListener)
+                first[0].findBar().queryField().getAccessibleContext());
+            owners[0].addNotify();
             first[0].view().setFontSize(23);
             first[0].findBar().open(); first[0].findBar().queryField().setText("[");
             first[0].findBar().regexButton().doClick();
@@ -96,6 +99,7 @@ class ThemeControllerTest {
             assertThat(first[0].findBar().result().error()).isNotNull();
             assertThat(retained[0].tree().zoomed()).isTrue();
             assertThat(appearance(owners[1]).getItem(2).isSelected()).isTrue();
+            owners[0].removeNotify();
         });
     }
 

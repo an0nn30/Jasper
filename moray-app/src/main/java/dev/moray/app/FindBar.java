@@ -4,6 +4,7 @@ import dev.moray.terminal.FindResult;
 import dev.moray.terminal.TerminalView;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
+import java.awt.event.HierarchyEvent;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -50,6 +51,9 @@ final class FindBar extends JPanel {
             invalidateSearch(); dirty = true;
             if (result.error() == null) showResult(found);
         });
+        addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0) refreshShowing();
+        });
         setVisible(false);
     }
 
@@ -74,7 +78,16 @@ final class FindBar extends JPanel {
 
     @Override public void addNotify() {
         super.addNotify();
-        if (dirty && !disposed && isVisible()) debounce.restart();
+        refreshShowing();
+    }
+
+    private void refreshShowing() {
+        if (!isShowing()) {
+            dirty |= searching;
+            cancelSearch(); // retain the query, completed result and queued navigation across hidden tabs
+        } else if (dirty && !disposed) {
+            debounce.restart();
+        }
     }
 
     void open() {
@@ -86,16 +99,17 @@ final class FindBar extends JPanel {
         if (isVisible() && !disposed) {
             // Cancel old matching immediately, including during the debounce interval.
             invalidateSearch(); dirty = true;
-            view.clearFind(); showResult(new FindResult(0, 0, null)); debounce.restart();
+            view.clearFind(); showResult(new FindResult(0, 0, null));
+            if (isShowing()) debounce.restart();
         }
     }
 
     private void search() {
-        if (disposed || !isVisible()) return;
+        if (disposed || !isShowing()) return;
         searching = true; dirty = false;
         long request = generation;
         view.findAsync(query.getText(), regex.isSelected(), caseSensitive.isSelected(), found -> {
-            if (disposed || !isVisible() || request != generation) return;
+            if (disposed || !isShowing() || request != generation) return;
             searching = false;
             FindResult navigated = found;
             if (found.error() == null && found.count() > 0) {

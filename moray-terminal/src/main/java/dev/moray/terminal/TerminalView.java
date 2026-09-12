@@ -1034,6 +1034,7 @@ public final class TerminalView extends JComponent {
         if (renderingActive) {
             markDirty(attachmentGeneration);
         } else {
+            invalidatePendingSearch();
             pendingFrame = new AtomicBoolean();
             frameTimer.stop();
         }

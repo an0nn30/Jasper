@@ -243,6 +243,37 @@ class TerminalAppIntegrationTest {
     }
 
     @Test
+    void hidingAnAncestorCancelsRunningSearchAndRejectsItsLateCompletion() throws Exception {
+        show("alpha alpha", 0, "alpha alpha");
+        var parent = new javax.swing.JPanel();
+        onEdt(() -> { parent.add(view); parent.addNotify(); });
+        try {
+            AtomicBoolean callbackRan = new AtomicBoolean();
+            TerminalTextBuffer buffer = terminalBuffer();
+            ThreadPoolExecutor executor;
+            buffer.lock();
+            try {
+                onEdt(() -> view.findAsync("alpha", false, false, result -> callbackRan.set(true)));
+                executor = searchExecutor();
+                Await.until(() -> executor.getActiveCount() == 1, "search blocked on buffer");
+                var field = TerminalView.class.getDeclaredField("pendingSearch");
+                field.setAccessible(true);
+                var pending = (java.util.concurrent.Future<?>) field.get(view);
+                onEdt(() -> {
+                    parent.setVisible(false);
+                    assertThat(view.isVisible()).isTrue();
+                    assertThat(view.isShowing()).isFalse();
+                    assertThat(pending.isCancelled()).as("hidden running search cancelled best effort").isTrue();
+                });
+            } finally { buffer.unlock(); }
+            Await.until(() -> executor.getActiveCount() == 0, "hidden search finished");
+            drainEventQueue();
+            assertThat(callbackRan).isFalse();
+            assertThat(view.findNext()).isEqualTo(new FindResult(0, 0, null));
+        } finally { onEdt(parent::removeNotify); }
+    }
+
+    @Test
     void repeatedTemporaryDetachesKeepBlockedSearchWorkerAllocationBounded() throws Exception {
         TerminalTextBuffer buffer = terminalBuffer();
         List<ThreadPoolExecutor> seenExecutors = new ArrayList<>();
