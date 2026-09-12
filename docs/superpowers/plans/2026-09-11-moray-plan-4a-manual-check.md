@@ -1,6 +1,6 @@
 # Plan 4a native acceptance
 
-Pending user execution after implementation. Agents do not launch the GUI or editor. During development, run from `.worktrees/plan-4` with `./gradlew :moray-app:run`; after integration use the main checkout.
+Pending user execution after implementation. Agents do not launch the GUI or editor. Plan 4a is integrated. Run from `/Users/dustin/projects/moray` with `./gradlew :moray-app:run`.
 
 - [ ] Start without a config file: built-in defaults apply and startup does not create directories or a file. Existing terminal/chrome behavior remains intact.
 - [ ] Click Settings: a commented template is created only if absent, then opens in the default editor or is revealed in Finder/Explorer. Clicking again preserves existing content. An editor failure is reported visibly.

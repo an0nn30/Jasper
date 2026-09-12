@@ -1,6 +1,6 @@
 # Plan 4a — saved settings and live reload
 
-The user approved merging the UI branch and starting Plan 4 with saved settings and live reload. The complete UI work is integrated on main at `1bd8b49`; merged and fresh worktree checks pass 332 tests (331 passed, one known font skip). Plan 4a is implemented and reviewed in `.worktrees/plan-4` on `codex/plan-4-config`; final verification passed 394 tests (393 passed, one known font skip). The branch remains available for integration.
+The user approved merging the UI branch and starting Plan 4 with saved settings and live reload. The complete UI work is integrated on main at `1bd8b49`; merged and fresh worktree checks pass 332 tests (331 passed, one known font skip). Plan 4a was developed and reviewed on `codex/plan-4-config`, then integrated on main at `05a94d4` on 2026-09-12. Fresh merged verification passed 394 tests (393 passed, one known font skip). Continue from the main checkout.
 
 Plan 4 is split into runnable deliverables. This first slice delivers file-backed settings for existing live controls, a safe reload lifecycle and working Settings/Reload/status diagnostics. Subsequent slices retain additional terminal options (font family/fallback/ligatures/line height, shell/env/scrollback, cursor/input/bell), custom themes, automatic system appearance, logging/launcher environment and packaging. This explicitly narrows the first generated template to supported settings; unsupported keys produce warnings rather than being silently accepted. It does not claim all of parent §7 is complete.
 

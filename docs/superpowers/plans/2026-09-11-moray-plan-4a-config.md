@@ -1,6 +1,6 @@
 # Plan 4a — saved settings and live reload
 
-**Status:** All three implementation tasks, scoped reviews and final whole-branch review complete through `acd5ea3`. Fresh full check: 394 tests, 393 passed and one known font skip. Actual status renders inspected in both themes at normal/narrow widths. The final review’s Windows test portability finding is fixed and re-reviewed; no findings remain. Native and Windows execution remain unverified. The implementation remains on the feature branch pending integration.
+**Status:** All three implementation tasks, scoped reviews and final whole-branch review complete through `acd5ea3`. Fresh full check: 394 tests, 393 passed and one known font skip. Actual status renders inspected in both themes at normal/narrow widths. The final review’s Windows test portability finding is fixed and re-reviewed; no findings remain. Native and Windows execution remain unverified. Integrated on main at `05a94d4` on 2026-09-12; fresh merged verification confirms the same 394-test result.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development task-by-task. Each task owns its implementation, TDD cycle, scoped commit and independent review.
 
