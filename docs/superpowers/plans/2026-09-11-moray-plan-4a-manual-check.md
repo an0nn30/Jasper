@@ -10,7 +10,7 @@ Pending user execution after implementation. Agents do not launch the GUI or edi
 - [ ] Override a shortcut and set another to none: menus, toolbar hints and actual terminal/root dispatch agree; the old shortcut is removed. Native copy/paste in the find field continues to work.
 - [ ] Introduce a syntax/type error: retain last-good settings and show a red indicator with source line. Unknown keys/actions warn; invalid values use their defaults and report errors. Correct the file and observe recovery. Click diagnostics to view/copy the plain-text details.
 - [ ] Long config paths and error messages do not inflate the window minimum width or obscure live shell/path/grid metadata. Inspect status and config indicator in dark/light.
-- [ ] Delete the file: defaults return. Test `--config` with another file and verify Settings opens that file; other app paths remain unchanged.
+- [ ] Delete the file: saved defaults return, with unrelated temporary overrides retained. Test `--config` with another file and verify Settings opens that file; other app paths remain unchanged.
 - [ ] Close the final window while a reload/editor request is pending: no late UI changes or lingering polling process. Native Quit still closes sessions normally.
 
 This slice intentionally supports existing live controls only. Additional terminal options, custom theme files, automatic appearance, logging/launcher refinements and packaging remain later Plan 4 deliverables. This checklist does not replace the terminal benchmark or daily-use acceptance gate.
