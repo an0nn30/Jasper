@@ -1,6 +1,6 @@
 # Compact tab motion — native acceptance
 
-Pending user execution. Run `./gradlew :moray-app:run` in `.worktrees/mock-ui`. Agents do not launch the app unattended.
+Pending user execution. Run `./gradlew :moray-app:run` from `/Users/dustin/projects/moray`. Agents do not launch the app unattended.
 
 - [ ] Default title/tab row is 38 logical pixels. Native traffic lights, blank-title dragging, double-click and fullscreen remain usable.
 - [ ] View → Tab height… changes the current window to the accepted numeric height; cancel preserves it; reset returns 38. Try 28, 44, 54 and 72. Both native title region and tabs resize together. Theme changes retain the setting. This control is session-only.

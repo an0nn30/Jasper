@@ -1,6 +1,6 @@
 # Moray — Status and Handoff
 
-**As of:** 2026-09-11. Compact tab follow-up implemented on `codex/mock-ui`, code/tests `0f4cd74`; prior motion reviews and reverse-close review approved. Root fresh `./gradlew check --rerun-tasks`: **332 tests, 331 passed, 1 known font skip**, zero failures/errors, all eight tasks executed. Source hygiene/diff checks pass; regenerated dark/light previews inspected. Main remains Plan 3.5 baseline `182b9fb`; this branch is not merged. No GUI, benchmark or push occurred.
+**As of:** 2026-09-11. Compact tab follow-up implemented on `codex/mock-ui`, code/tests `0f4cd74`; prior motion reviews and reverse-close review approved. Root fresh `./gradlew check --rerun-tasks`: **332 tests, 331 passed, 1 known font skip**, zero failures/errors, all eight tasks executed. Source hygiene/diff checks pass; regenerated dark/light previews inspected. The user approved local integration of all UI work and starting Plan 4. This revision is being integrated into main; merged verification follows. No GUI, benchmark or push occurred.
 
 **Current follow-up:** Default title/tab height is now 38px, configurable from 28–72 through View → Tab height… for the current window. Both Swing and native height use the same value; reset restores 38, cancellation preserves the previous value. Height survives theme changes but is session-only. Opening and closing tabs and the selected underline animate with a shared 180ms eased settle; selection/focus/launch remain immediate and timers stop when idle/hidden/disposed. The existing shortcut engine now provides Cmd/Ctrl+1–9 and Cmd/Ctrl+{ / } (Shift+brackets), with plain Ctrl for tab navigation outside macOS. Unrelated shortcut behavior is retained. [Design](superpowers/specs/2026-09-11-moray-tab-motion-design.md), [plan](superpowers/plans/2026-09-11-moray-tab-motion.md), [native checks](superpowers/plans/2026-09-11-moray-tab-motion-manual-check.md).
 
@@ -18,7 +18,7 @@ Moray is a Java Swing terminal workstation with a MobaXterm-style layout, built 
 | 2 — Terminal completeness | Complete on main (`196e24d`..`0ce4add`) |
 | 3 — App chrome | Implemented and reviewed on main; all automated checks passed; native acceptance pending |
 | 3.5 — macOS chrome, themes and toolbar | Integrated on main and fully reviewed; native acceptance pending |
-| Screenshot UI revision | Implemented and fully reviewed; compact/motion follow-up implemented and fully reviewed; native acceptance and integration approval pending |
+| Screenshot UI revision | Implemented and fully reviewed; compact/motion follow-up implemented and fully reviewed; native acceptance pending; local integration approved |
 | 4 — Config and packaging | Follows screenshot UI acceptance; not written yet |
 
 Plan 3 design: [application design](superpowers/specs/2026-09-11-moray-plan-3-app-chrome-design.md). Execution: [implementation plan](superpowers/plans/2026-09-11-moray-plan-3-app-chrome.md). The per-plan scratch workspace was removed after final review; this handoff, completed plan checkboxes and git history preserve the record. Do not restart Plan 3 or Plan 3.5; the active revision is in `.worktrees/mock-ui`.
@@ -100,7 +100,7 @@ Retained coverage opportunities: astral search, edge/overlapping highlights, lar
 
 ## 6. Next: native acceptance, then Plan 4
 
-The screenshot revision supersedes Plan 3.5 geometry and artwork. User visual/native acceptance and approved integration are next. Run from `/Users/dustin/projects/moray/.worktrees/mock-ui` with `./gradlew :moray-app:run`. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
+The screenshot revision supersedes Plan 3.5 geometry and artwork. User visual/native acceptance remains open; the user approved integration and starting Plan 4. Run from `/Users/dustin/projects/moray` with `./gradlew :moray-app:run`. No complete pixel-identity claim: native frame controls/focus/font rasterization are not headless-verifiable, and the existing terminal renderer computes 91 × 35 cells versus the mock's 100 × 40 at the measured content size. See the comparison report for exact prompt ink bounds. Built-in palettes and live theme application have moved forward from Plan 4.
 
 Plan 4: AppDirs/per-OS paths, TOML diagnostics with line numbers and last-good retention, live reload, custom theme loading and persistence, automatic system appearance, settings-file creation, --config, app logging and macOS .app bundling JBR. Carryovers:
 
@@ -185,3 +185,7 @@ Final whole-branch review (`182b9fb..7449ac4`) found one integration issue: the 
 User-requested bounded follow-up `0f4cd74` reverses the existing motion for visible tab closure. The tab and shell leave the live model immediately; a disabled departing entry contracts while following tabs fill its space and the underline targets the new selection. Closing during entry uses its current width; consecutive closes have independent deadlines. Completed, hidden, reordered, cramped/overflow and disposed departing visuals are removed. Final-tab closure is not delayed.
 
 Four new real MacTitleBar/JRootPane regressions cover active/inactive closes, closing during entry, consecutive deadlines and cleanup. Initial three regressions failed against the prior behavior; the empty-owner timer regression also failed before its fix. Final covering tests:27 passed. Fresh full `./gradlew check --rerun-tasks`:332 total,331 passed, one known font skip; all eight tasks executed, no warnings. Source hygiene and diff checks pass. Independent review of `600c378..0f4cd74` approved without actionable findings; native reverse-motion acceptance remains user-run. This bounded extension updates the existing spec without a new subsystem or plan.
+
+## 14. Approved integration and Plan 4 start
+
+The user explicitly approved merging all current UI work into main and beginning Plan 4 with saved settings and live reload. The reviewed code remains `0f4cd74`; only documentation followed. Main receives the complete branch, then a fresh merged check; the completed mock-ui worktree/branch will be removed after it passes. Plan 4 starts in a new isolated worktree. Native UI/benchmark/daily-use acceptance remains open and is not implied by merge approval.

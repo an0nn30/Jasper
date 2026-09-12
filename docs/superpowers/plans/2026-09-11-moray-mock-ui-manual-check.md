@@ -1,6 +1,6 @@
 # Screenshot UI — native acceptance
 
-Pending user execution. Run `./gradlew :moray-app:run` from `.worktrees/mock-ui` while this revision remains isolated. This opens real windows and the user's shell. Agents do not launch it unattended.
+Pending user execution. Run `./gradlew :moray-app:run` from `/Users/dustin/projects/moray`. This opens real windows and the user's shell. Agents do not launch it unattended.
 
 - [ ] At the reference proportions, compare the supplied mock with the actual window: one54px title/tab row,53px horizontal toolbar, matching terminal/status fill, no status separator, and24px terminal inset.
 - [ ] Native traffic lights are centered and usable beside tabs; drag and double-click blank title space, resize and enter/leave fullscreen. Tab controls and plus do not accidentally move the window.
