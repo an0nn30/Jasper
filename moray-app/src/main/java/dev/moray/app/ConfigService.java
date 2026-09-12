@@ -104,19 +104,20 @@ final class ConfigService implements AutoCloseable {
             if (this.listener != null) throw new IllegalStateException("Configuration listener already started.");
             this.listener = listener;
             publish();
-            worker.scheduleWithFixedDelay(() -> refresh(false), 1, 1, TimeUnit.SECONDS);
+            worker.scheduleWithFixedDelay(() -> refresh(false, false), 1, 1, TimeUnit.SECONDS);
         }
     }
 
     CompletableFuture<State> reload() {
-        return submit(() -> refresh(true));
+        // An explicit retry must reach consumers even after I/O accepted an unchanged state.
+        return submit(() -> refresh(true, true));
     }
 
     CompletableFuture<Path> openSettings(Consumer<Path> opener) {
         Objects.requireNonNull(opener, "opener");
         return submit(() -> {
             ConfigTemplate.ensureExists(file, macOs);
-            refresh(true);
+            refresh(true, false);
             synchronized (lifecycle) {
                 if (closed) throw closedException();
             }
@@ -125,14 +126,14 @@ final class ConfigService implements AutoCloseable {
         });
     }
 
-    private State refresh(boolean force) {
+    private State refresh(boolean force, boolean publishUnchanged) {
         synchronized (lifecycle) {
             if (closed) return state;
         }
         lastConfig = readState(lastConfig.snapshot(), force);
         State next = join(lastConfig, force);
         synchronized (lifecycle) {
-            if (!closed && !next.equals(state)) {
+            if (!closed && (publishUnchanged || !next.equals(state))) {
                 state = next;
                 revision++;
                 publish();

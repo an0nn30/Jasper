@@ -522,6 +522,86 @@ class ConfigurationControllerTest {
         });
     }
 
+    @Test void reloadActionRetriesFailedSystemInstallationWithUnchangedFiles() throws Exception {
+        retryFailedInstallationThroughReloadAction(true);
+    }
+
+    @Test void reloadActionRetriesFailedSavedInstallationWithUnchangedFiles() throws Exception {
+        retryFailedInstallationThroughReloadAction(false);
+    }
+
+    private void retryFailedInstallationThroughReloadAction(boolean systemTransition) throws Exception {
+        Path file = directory.resolve("config.toml");
+        Files.writeString(file, "colors.appearance='system'");
+        Path themeDirectory = Files.createDirectory(directory.resolve("themes"));
+        Files.writeString(themeDirectory.resolve("night.toml"), "[colors.primary]\nbackground='#101820'");
+        var configWorker = new java.util.concurrent.ScheduledThreadPoolExecutor(1) {
+            @Override public java.util.concurrent.ScheduledFuture<?> scheduleWithFixedDelay(
+                    Runnable command, long initialDelay, long delay, java.util.concurrent.TimeUnit unit) {
+                return super.scheduleWithFixedDelay(command, 1, 1, java.util.concurrent.TimeUnit.DAYS);
+            }
+        };
+        var appearanceWorker = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var callback = new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<Boolean>>();
+        var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var broken = new java.util.concurrent.atomic.AtomicBoolean(false);
+        var attempts = new ArrayList<BuiltinTheme>();
+        var errors = new ArrayList<String>();
+        var source = new SystemAppearance(() -> new SystemAppearance.Binding(dark::get,
+            callback::set, ignored -> callback.set(null)), appearanceWorker, SwingUtilities::invokeLater);
+        service = new ConfigService(file, themeDirectory, false, configWorker, SwingUtilities::invokeLater);
+        edt(() -> {
+            themes = new ThemeController(theme -> { attempts.add(theme); return !broken.get() && ThemeController.install(theme); });
+            controller = new ConfigurationController(themes, service, source);
+            owner().onError = errors::add;
+        });
+        appearanceWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        edt(() -> {
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(attempts).containsExactly(BuiltinTheme.DARK);
+            broken.set(true);
+        });
+        if (systemTransition) {
+            dark.set(false); callback.get().accept(false);
+            appearanceWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        } else {
+            Files.writeString(file, "colors.appearance='light'\ncolors.theme='night'");
+            edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
+            configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        edt(() -> {
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(themes.choice()).isEqualTo(Appearance.SYSTEM);
+            assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT);
+            assertThat(errors).hasSize(1);
+            broken.set(false);
+        });
+        String acceptedText = Files.readString(file);
+        var acceptedTime = Files.getLastModifiedTime(file);
+        edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
+        configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        edt(() -> {
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(owners.getFirst().theme()).isEqualTo(themes.current());
+            assertThat(themes.choice()).isEqualTo(systemTransition ? Appearance.SYSTEM : Appearance.LIGHT);
+            assertThat(themes.current().palette().background()).isEqualTo(systemTransition
+                ? BuiltinTheme.LIGHT.palette().background() : new java.awt.Color(0x101820));
+            assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT, BuiltinTheme.LIGHT);
+            assertThat(errors).hasSize(1);
+            owners.getFirst().selectAppearance(Appearance.DARK);
+            owners.getFirst().invoke(ActionId.RELOAD_CONFIG);
+        });
+        configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        edt(() -> {
+            assertThat(themes.choice()).isEqualTo(Appearance.DARK);
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT,
+                BuiltinTheme.LIGHT, BuiltinTheme.DARK);
+        });
+        assertThat(Files.readString(file)).isEqualTo(acceptedText);
+        assertThat(Files.getLastModifiedTime(file)).isEqualTo(acceptedTime);
+    }
+
     private static String liveSettings(int size) {
         return """
             [font]
