@@ -230,7 +230,8 @@ class AppLogTest {
             System.setErr(original);
             root.removeHandler(parentRecords);
         }
-        assertThat(captured.toString(StandardCharsets.UTF_8)).isEqualTo("Moray diagnostics are unavailable.\n");
+        assertThat(captured.toString(StandardCharsets.UTF_8))
+            .isEqualTo("Moray diagnostics are unavailable." + System.lineSeparator());
         assertThat(String.join("", parentRecords.records))
             .doesNotContain("SECRET_FAILED_PARAMETER", "SECRET_FAILED_UNCAUGHT", "SECRET_OVERLAP");
         assertThat(namespace.getUseParentHandlers()).isEqualTo(parentBefore);

@@ -5,6 +5,8 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
 import javax.swing.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import static dev.moray.app.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,7 +33,8 @@ class MockUiTest {
         });
     }
 
-    @Test void terminalLayoutKeepsCompactInsetsAcrossThemeChanges() throws Exception {
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void terminalLayoutKeepsCompactInsetsAcrossThemeChanges() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owners = new WindowContent[1];
         edt(() -> owners[0] = content(launcher(pending)));

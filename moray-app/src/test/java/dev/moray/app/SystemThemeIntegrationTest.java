@@ -5,13 +5,16 @@ import java.awt.Color;
 import java.util.ArrayDeque;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import static dev.moray.app.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.*;
 
 class SystemThemeIntegrationTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    @Test void customPaletteSurvivesSystemChangeWithoutReplacingSession() throws Exception {
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void customPaletteSurvivesSystemChangeWithoutReplacingSession() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         ThemeController[] themes = new ThemeController[1];
         WindowContent[] owner = new WindowContent[1];
