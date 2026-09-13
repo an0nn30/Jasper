@@ -4,6 +4,8 @@
 
 **Branch:** `codex/command-palette-design`, from main `1db31b1`.
 
+**Implementation plan:** [Six-task delivery plan](../plans/2026-09-12-moray-command-palette.md).
+
 This user-requested design brings the palette forward from the Phase 1 spec's later list. It preserves the terminal architecture and introduces no plugin framework. It is the scoped amendment for palette behavior and its conflicting default shortcut.
 
 ## Confirmed requirements
