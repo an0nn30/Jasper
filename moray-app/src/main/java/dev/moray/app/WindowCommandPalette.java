@@ -27,6 +27,14 @@ final class WindowCommandPalette implements AutoCloseable {
     WindowCommandPalette(WindowContent owner, CommandRegistry registry, CommandHistory history, boolean macOs) {
         this.owner = owner; this.registry = registry; this.history = history;
         palette = new CommandPalette(macOs, query -> rebuild(false), this::execute, this::dismiss);
+        palette.setFocusCycleRoot(true);
+        palette.setFocusTraversalPolicy(new FocusTraversalPolicy() {
+            @Override public Component getComponentAfter(Container root, Component current) { return palette.queryField(); }
+            @Override public Component getComponentBefore(Container root, Component current) { return palette.queryField(); }
+            @Override public Component getFirstComponent(Container root) { return palette.queryField(); }
+            @Override public Component getLastComponent(Container root) { return palette.queryField(); }
+            @Override public Component getDefaultComponent(Container root) { return palette.queryField(); }
+        });
         overlay.setLayout(null); overlay.setOpaque(false); overlay.add(palette); overlay.setVisible(false);
         registryListener = registry.onChanged(this::changed);
         historyListener = history.onChanged(this::changed);
@@ -54,6 +62,7 @@ final class WindowCommandPalette implements AutoCloseable {
 
     void dismiss() { if (open) restoreAndHide(); }
     boolean isOpen() { return open; }
+    boolean composing() { return palette.composing(); }
     CommandPalette component() { return palette; }
 
     private void changed() {

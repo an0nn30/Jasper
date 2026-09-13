@@ -32,7 +32,8 @@ enum ActionId {
     NEXT_PROMPT("next_prompt", "Next Prompt", "cmd+down"),
     COPY("copy", "Copy", "cmd+c"),
     PASTE("paste", "Paste", "cmd+v"),
-    CLEAR_SCROLLBACK("clear_scrollback", "Clear Scrollback", "cmd+k"),
+    COMMAND_PALETTE("command_palette", "Command Palette", "cmd+k"),
+    CLEAR_SCROLLBACK("clear_scrollback", "Clear Scrollback", "cmd+shift+k"),
     FONT_BIGGER("font_bigger", "Increase Font Size", "cmd+="),
     FONT_SMALLER("font_smaller", "Decrease Font Size", "cmd+-"),
     FONT_RESET("font_reset", "Reset Font Size", "cmd+0"),
@@ -61,6 +62,8 @@ enum ActionId {
     String defaultBinding(boolean macOs) {
         if (macOs) return defaultBinding;
         return switch (this) {
+            case COMMAND_PALETTE -> "ctrl+k";
+            case CLEAR_SCROLLBACK -> "ctrl+shift+k";
             case NEXT_TAB -> "ctrl+shift+]";
             case PREVIOUS_TAB -> "ctrl+shift+[";
             case SELECT_TAB_1 -> "ctrl+1";

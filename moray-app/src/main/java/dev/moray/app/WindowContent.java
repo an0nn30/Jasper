@@ -22,6 +22,13 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private final CommandRegistry commands = new CommandRegistry();
     private final WindowCommands windowCommands;
     private final WindowCommandPalette commandPalette;
+    // EDT-owned roster gives a held sequence priority over every window's new shortcuts,
+    // regardless of the order in which KeyboardFocusManager registered their dispatchers.
+    private static final java.util.List<WindowContent> PALETTE_KEY_OWNERS = new ArrayList<>();
+    private final PaletteKeyRouter paletteKeys;
+    private final KeyEventDispatcher paletteDispatcher = this::paletteKeysDispatch;
+    private KeyboardFocusManager paletteFocusManager;
+    private javax.swing.Timer paletteTailCleanup;
     private boolean updatingActions;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
     private KeyBindings bindings;
@@ -93,6 +100,13 @@ final class WindowContent extends JPanel implements AutoCloseable {
         windowCommands = new WindowCommands(this, commands);
         chrome = new WindowChrome(this);
         commandPalette = new WindowCommandPalette(this, commands, history, macOs);
+        paletteKeys = new PaletteKeyRouter(commandPalette, () -> this.bindings, macOs,
+            source -> !closed && active && bindingRoot != null && source != null
+                && SwingUtilities.isDescendingFrom(this, bindingRoot)
+                && SwingUtilities.isDescendingFrom(source, bindingRoot));
+        addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
+        });
         windowTabs = new WindowTabs(this, animationClock);
         var north = new JPanel(new BorderLayout());
         north.add(windowTabs, BorderLayout.NORTH); north.add(chrome.toolbar(), BorderLayout.CENTER);
@@ -120,6 +134,49 @@ final class WindowContent extends JPanel implements AutoCloseable {
             });
         });
         commandPalette.install(root);
+        syncPaletteDispatcher();
+    }
+
+    private boolean paletteKeysDispatch(KeyEvent event) {
+        boolean tail = false;
+        for (WindowContent owner : java.util.List.copyOf(PALETTE_KEY_OWNERS)) {
+            tail |= owner.paletteKeys.dispatchTail(event);
+            if (owner.paletteKeys.drained() && (owner.closed || !owner.paletteAttached()))
+                owner.removePaletteDispatcher();
+        }
+        return tail || paletteKeys.dispatch(event);
+    }
+
+    private boolean paletteAttached() {
+        return bindingRoot != null && SwingUtilities.isDescendingFrom(this, bindingRoot);
+    }
+
+    private void syncPaletteDispatcher() {
+        if (!closed && paletteAttached()) {
+            if (paletteTailCleanup != null) { paletteTailCleanup.stop(); paletteTailCleanup = null; }
+            if (paletteFocusManager == null) {
+                paletteFocusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+                PALETTE_KEY_OWNERS.add(this);
+                paletteFocusManager.addKeyEventDispatcher(paletteDispatcher);
+            }
+        } else {
+            if (!closed) commandPalette.dismiss();
+            if (paletteKeys.drained()) removePaletteDispatcher();
+            else if (paletteTailCleanup == null) {
+                paletteTailCleanup = new javax.swing.Timer(2000, event -> {
+                    paletteKeys.reset(); removePaletteDispatcher();
+                });
+                paletteTailCleanup.setRepeats(false); paletteTailCleanup.start();
+            }
+        }
+    }
+
+    private void removePaletteDispatcher() {
+        if (paletteTailCleanup != null) { paletteTailCleanup.stop(); paletteTailCleanup = null; }
+        if (paletteFocusManager != null) {
+            paletteFocusManager.removeKeyEventDispatcher(paletteDispatcher); paletteFocusManager = null;
+            PALETTE_KEY_OWNERS.remove(this);
+        }
     }
 
     private void removeRootBindings() {
@@ -283,6 +340,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     boolean dispatchShortcut(KeyStroke stroke, Component source) {
+        if (paletteKeys.dispatchShortcut(stroke, source == null ? this : source)) return true;
         Optional<ActionId> found = bindings.actionFor(stroke);
         if (found.isEmpty()) return false;
         ActionId id = found.get();
@@ -294,12 +352,14 @@ final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     void invoke(ActionId id) {
+        if (commandPalette != null && commandPalette.isOpen() && id != ActionId.COMMAND_PALETTE) return;
         updateActions();
         if (!action(id).isEnabled()) return;
         TerminalTab tab = currentTab();
         TerminalPane pane = currentPane();
         TerminalView view = pane == null ? null : pane.view();
         switch (id) {
+            case COMMAND_PALETTE -> commandPalette.toggle();
             case NEW_TAB -> newTab(directory());
             case NEW_WINDOW -> newWindow.accept(directory());
             case QUIT -> quit.run();
@@ -355,7 +415,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                 boolean enabled = !closed && switch (id) {
                     case OPEN_SETTINGS -> openSettings != null;
                     case RELOAD_CONFIG -> reloadConfiguration != null;
-                    case NEW_TAB, NEW_WINDOW, QUIT -> true;
+                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT -> true;
                     case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
                     case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
@@ -458,8 +518,10 @@ final class WindowContent extends JPanel implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
+        paletteKeys.close();
         commandPalette.close(); windowCommands.close(); commands.close();
         closed = true;
+        syncPaletteDispatcher();
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};
         windowTabs.close();

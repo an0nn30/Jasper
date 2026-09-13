@@ -17,6 +17,12 @@ import static org.assertj.core.api.Assertions.*;
 class ConfigTemplateTest {
     @TempDir Path directory;
 
+    @Test void paletteAndClearCommentsShowTheirLiteralPlatformDefaults() {
+        assertThat(ConfigTemplate.text(true)).contains("# command_palette = \"cmd+k\"", "# clear_scrollback = \"cmd+shift+k\"");
+        assertThat(ConfigTemplate.text(false)).contains("# command_palette = \"ctrl+k\"", "# clear_scrollback = \"ctrl+shift+k\"",
+            "Command Palette uses plain Ctrl+K");
+    }
+
     @Test void commentedTemplatesParseCleanlyWithBuiltInDefaultsOnBothPlatforms() {
         for (boolean macOs : new boolean[]{true, false}) {
             var result = ConfigLoader.parse(directory.resolve("config.toml"), ConfigTemplate.text(macOs), macOs);

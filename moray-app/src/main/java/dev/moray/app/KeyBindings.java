@@ -39,6 +39,7 @@ final class KeyBindings {
     /** Text that round-trips the effective default, including non-macOS compatibility modifiers. */
     static String effectiveDefaultBinding(ActionId action, boolean macOs) {
         String binding = action.defaultBinding(macOs);
+        if (action == ActionId.COMMAND_PALETTE || action == ActionId.CLEAR_SCROLLBACK) return binding;
         return !macOs && binding.contains("cmd+shift") ? "alt+" + binding : binding;
     }
 
