@@ -21,6 +21,9 @@ final class MorayApplication {
         Thread.ofPlatform().name("moray-shell-launch-", 0).factory());
     private final ConfigurationController configuration;
     private boolean quitting;
+    private boolean shutdownQueued;
+    private boolean stopped;
+    private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
 
     MorayApplication() { this(null); }
@@ -31,6 +34,11 @@ final class MorayApplication {
 
     /** Isolated launch ownership for controlled tools; production still resolves captured settings. */
     MorayApplication(ConfigService service, SystemAppearance source, ShellLauncher suppliedLauncher) {
+        this(service, source, suppliedLauncher, new CommandHistory());
+    }
+
+    MorayApplication(ConfigService service, SystemAppearance source, ShellLauncher suppliedLauncher, CommandHistory history) {
+        this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         configuration = service == null ? null : new ConfigurationController(themes, service, source);
         if (service == null) source.close();
@@ -44,7 +52,7 @@ final class MorayApplication {
         if (quitting) return null;
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot, MorayApplication::startSession);
-        TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration);
+        TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history);
         windows.add(window); window.show();
         return window;
     }
@@ -68,18 +76,29 @@ final class MorayApplication {
 
     void windowClosed(TerminalWindow window) {
         windows.remove(window);
-        if (windows.isEmpty()) shutdown();
+        if (windows.isEmpty()) requestShutdown();
     }
 
     void quit() {
         quitting = true;
         for (TerminalWindow window : List.copyOf(windows)) window.close();
-        shutdown();
+        requestShutdown();
+    }
+
+    private void requestShutdown() {
+        quitting = true;
+        if (shutdownQueued || stopped) return;
+        shutdownQueued = true;
+        // Accepted palette actions record only after dispatch, including Quit/last-tab close.
+        SwingUtilities.invokeLater(this::shutdown);
     }
 
     private void shutdown() {
+        if (stopped) return;
+        stopped = true;
         quitting = true;
         launches.shutdown();
+        history.close();
         if (configuration != null) configuration.close();
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler(null);
     }

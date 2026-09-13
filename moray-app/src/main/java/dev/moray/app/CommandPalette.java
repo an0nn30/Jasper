@@ -29,6 +29,7 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.ListCellRenderer;
@@ -125,7 +126,11 @@ final class CommandPalette extends JPanel {
         empty.setOpaque(false);
         empty.putClientProperty("html.disable", Boolean.TRUE);
         empty.setPreferredSize(new Dimension(0, UIScale.scale(ROW_HEIGHT)));
-        cards.add(results, "results");
+        var scrollingResults = new JScrollPane(results, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollingResults.setBorder(BorderFactory.createEmptyBorder());
+        scrollingResults.setOpaque(false); scrollingResults.getViewport().setOpaque(false);
+        cards.add(scrollingResults, "results");
         cards.add(empty, "empty");
         cardLayout.show(cards, "empty");
 

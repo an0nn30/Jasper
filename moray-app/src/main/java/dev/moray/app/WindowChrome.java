@@ -35,21 +35,17 @@ final class WindowChrome {
         menuBar.add(file); menuBar.add(edit); menuBar.add(view); menuBar.add(pane); menuBar.add(tab);
         JMenu modes = new JMenu("Toolbar");
         for (WindowContent.ToolbarMode mode : WindowContent.ToolbarMode.values()) {
-            String label = switch (mode) { case ICONS_AND_LABELS -> "Icons and Labels"; case ICONS -> "Icons Only"; case HIDDEN -> "Hidden"; };
-            JRadioButtonMenuItem item = new JRadioButtonMenuItem(label, mode == WindowContent.ToolbarMode.ICONS_AND_LABELS);
-            item.setActionCommand(mode.name()); item.addActionListener(event -> owner.setToolbarMode(mode));
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));
+            item.setActionCommand(mode.name());
             toolbarModes.add(item); modes.add(item);
         }
         view.addSeparator(); view.add(modes); view.add(statusVisible);
-        statusVisible.addActionListener(event -> owner.setStatusVisible(statusVisible.isSelected()));
+        statusVisible.setAction(owner.windowCommands().view("view.status_bar"));
         JMenu appearance = new JMenu("Appearance");
         ButtonGroup themes = new ButtonGroup();
         for (Appearance theme : new Appearance[]{Appearance.LIGHT, Appearance.DARK, Appearance.SYSTEM}) {
-            String label = theme == Appearance.SYSTEM ? "Follow System" : theme == Appearance.LIGHT ? "Light" : "Dark";
-            JRadioButtonMenuItem item = new JRadioButtonMenuItem(label, owner.appearance() == theme);
-            item.setAction(new AbstractAction(label) {
-                @Override public void actionPerformed(ActionEvent event) { owner.selectAppearance(theme); }
-            });
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(
+                owner.windowCommands().view("view.appearance." + theme.name().toLowerCase(java.util.Locale.ROOT)));
             themeItems.put(theme, item); themes.add(item); appearance.add(item);
         }
         appearance.addMenuListener(new MenuListener() {
@@ -58,8 +54,7 @@ final class WindowChrome {
             @Override public void menuCanceled(MenuEvent event) {}
         });
         view.add(appearance);
-        JMenuItem tabHeight = new JMenuItem("Tab height\u2026");
-        tabHeight.addActionListener(event -> editTabHeight());
+        JMenuItem tabHeight = new JMenuItem(owner.windowCommands().view("view.tab_height"));
         view.add(tabHeight);
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
         toolbar.add(new ToolbarSeparator());
@@ -81,7 +76,7 @@ final class WindowChrome {
         addButton(ActionId.OPEN_SETTINGS, "settings"); addButton(ActionId.RELOAD_CONFIG, "refresh");
     }
 
-    private void editTabHeight() {
+    void editTabHeight() {
         var control = new JPanel(new FlowLayout(FlowLayout.LEADING));
         var height = new JSpinner(new SpinnerNumberModel(owner.tabHeight(),
             WindowContent.MIN_TAB_HEIGHT, WindowContent.MAX_TAB_HEIGHT, 1));

@@ -19,6 +19,11 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private final JTabbedPane tabs = new TerminalDeck();
     private final WindowTabs windowTabs;
     private final EnumMap<ActionId, Action> actions = new EnumMap<>(ActionId.class);
+    private final CommandRegistry commands = new CommandRegistry();
+    private final WindowCommands windowCommands;
+    private final WindowCommandPalette commandPalette;
+    private boolean updatingActions;
+    private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
     private KeyBindings bindings;
     private ConfigSnapshot configured;
     private float configuredFontSize = TerminalPane.DEFAULT_FONT_SIZE;
@@ -61,6 +66,13 @@ final class WindowContent extends JPanel implements AutoCloseable {
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock) {
+        this(launcher, directory, newWindow, quit, onEmpty, themes, bindings, animationClock,
+            new CommandHistory(), System.getProperty("os.name").startsWith("Mac"));
+    }
+
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+                  ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock,
+                  CommandHistory history, boolean macOs) {
         super(new BorderLayout());
         this.bindings = bindings;
         this.themes = themes;
@@ -78,13 +90,19 @@ final class WindowContent extends JPanel implements AutoCloseable {
         String unavailable = "Configuration is not connected";
         action(ActionId.OPEN_SETTINGS).putValue(Action.SHORT_DESCRIPTION, unavailable);
         action(ActionId.RELOAD_CONFIG).putValue(Action.SHORT_DESCRIPTION, unavailable);
+        windowCommands = new WindowCommands(this, commands);
         chrome = new WindowChrome(this);
+        commandPalette = new WindowCommandPalette(this, commands, history, macOs);
         windowTabs = new WindowTabs(this, animationClock);
         var north = new JPanel(new BorderLayout());
         north.add(windowTabs, BorderLayout.NORTH); north.add(chrome.toolbar(), BorderLayout.CENTER);
         add(north, BorderLayout.NORTH); add(tabs); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
-            if (!rearranging) { update(); if (currentTab() != null) currentTab().focusTerminal(); }
+            if (!rearranging) {
+                if (commandPalette != null) commandPalette.dismiss();
+                update();
+                if (currentTab() != null) currentTab().focusTerminal();
+            }
         });
         themes.register(this);
         newTab(directory);
@@ -101,6 +119,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                 }
             });
         });
+        commandPalette.install(root);
     }
 
     private void removeRootBindings() {
@@ -188,6 +207,13 @@ final class WindowContent extends JPanel implements AutoCloseable {
             || previous.bell() != next.bell();
     }
 
+    CommandRegistry commands() { return commands; }
+    WindowCommandPalette commandPalette() { return commandPalette; }
+    WindowChrome chrome() { return chrome; }
+    WindowCommands windowCommands() { return windowCommands; }
+    ToolbarMode toolbarMode() { return toolbarMode; }
+    boolean isActiveAndOpen() { return active && !closed; }
+    boolean updatingActions() { return updatingActions; }
     Action action(ActionId id) { return actions.get(id); }
     KeyBindings bindings() { return bindings; }
     JToolBar toolbar() { return chrome.toolbar(); }
@@ -216,6 +242,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
+        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
         pane.applyTheme(themes.current().palette());
         if (configured == null) {
             pane.view().setFontSize(configuredFontSize);
@@ -318,26 +345,31 @@ final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     void updateActions() {
-        TerminalPane pane = currentPane();
-        boolean present = pane != null;
-        boolean ready = present && pane.view() != null;
-        boolean running = present && pane.running();
-        for (ActionId id : ActionId.values()) {
-            boolean enabled = !closed && switch (id) {
-                case OPEN_SETTINGS -> openSettings != null;
-                case RELOAD_CONFIG -> reloadConfiguration != null;
-                case NEW_TAB, NEW_WINDOW, QUIT -> true;
-                case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
-                case COPY -> ready && pane.view().hasSelection();
-                case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
-                     CLEAR_SCROLLBACK, FONT_BIGGER, FONT_SMALLER, FONT_RESET -> ready;
-                case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
-                     SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
-                    id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < tabs.getTabCount();
-                default -> present;
-            };
-            action(id).setEnabled(enabled);
-        }
+        updatingActions = true;
+        try {
+            TerminalPane pane = currentPane();
+            boolean present = pane != null;
+            boolean ready = present && pane.view() != null;
+            boolean running = present && pane.running();
+            for (ActionId id : ActionId.values()) {
+                boolean enabled = !closed && switch (id) {
+                    case OPEN_SETTINGS -> openSettings != null;
+                    case RELOAD_CONFIG -> reloadConfiguration != null;
+                    case NEW_TAB, NEW_WINDOW, QUIT -> true;
+                    case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
+                    case COPY -> ready && pane.view().hasSelection();
+                    case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
+                         CLEAR_SCROLLBACK, FONT_BIGGER, FONT_SMALLER, FONT_RESET -> ready;
+                    case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
+                         SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
+                        id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < tabs.getTabCount();
+                    default -> present;
+                };
+                action(id).setEnabled(enabled);
+            }
+            if (windowCommands != null && chrome != null) windowCommands.refresh();
+        } finally { updatingActions = false; }
+        if (commandPalette != null) commandPalette.refreshIfChanged();
     }
 
     void update() {
@@ -391,7 +423,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
             setBackground(theme.palette().background());
             tabs.setBackground(theme.palette().background());
             chrome.status().applyPalette(theme.palette());
-            chrome.refreshTheme(); onThemeChanged.accept(theme); update();
+            chrome.refreshTheme();
+            if (commandPalette != null) commandPalette.refreshTheme();
+            onThemeChanged.accept(theme); update();
             revalidate(); repaint();
         } finally { retained.forEach(TerminalTab::endThemeUpdate); }
     }
@@ -411,12 +445,20 @@ final class WindowContent extends JPanel implements AutoCloseable {
         onMinimumSizeChanged.run();
     }
 
-    void setActive(boolean value) { active = value; windowTabs.setActive(value); update(); }
-    void setToolbarMode(ToolbarMode mode) { chrome.setToolbarMode(mode); revalidate(); onMinimumSizeChanged.run(); }
-    void setStatusVisible(boolean visible) { chrome.setStatusVisible(visible); revalidate(); onMinimumSizeChanged.run(); }
+    void setActive(boolean value) {
+        if (!value && commandPalette != null) commandPalette.dismiss();
+        active = value; windowTabs.setActive(value); update();
+    }
+    void setToolbarMode(ToolbarMode mode) {
+        toolbarMode = mode; chrome.setToolbarMode(mode); updateActions(); revalidate(); onMinimumSizeChanged.run();
+    }
+    void setStatusVisible(boolean visible) {
+        chrome.setStatusVisible(visible); updateActions(); revalidate(); onMinimumSizeChanged.run();
+    }
 
     @Override public void close() {
         if (closed) return;
+        commandPalette.close(); windowCommands.close(); commands.close();
         closed = true;
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};

@@ -31,12 +31,18 @@ public final class Main {
                 System.setProperty("apple.laf.useScreenMenuBar", "true");
                 SystemAppearance source = SystemAppearance.production();
                 SwingUtilities.invokeLater(() -> {
+                    CommandHistory history = null;
+                    MorayApplication application = null;
                     try {
+                        history = new CommandHistory(dirs.commandHistory());
                         ApplicationIcon.installTaskbarIcon();
-                        new MorayApplication(service, source).newWindow(Path.of(System.getProperty("user.home")));
+                        application = new MorayApplication(service, source, null, history);
+                        application.newWindow(Path.of(System.getProperty("user.home")));
                     }
                     catch (RuntimeException failure) {
                         LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
+                        if (application != null) application.quit();
+                        else if (history != null) history.close();
                         source.close(); service.close();
                         closeLogAfterStartupFailure(log, () -> {
                             exceptions.close();

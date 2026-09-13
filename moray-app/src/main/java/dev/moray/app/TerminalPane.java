@@ -26,6 +26,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     private boolean active;
     private float configuredDim = .3f;
     private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
+    java.util.function.BooleanSupplier allowLaunchFocus = () -> true;
     Runnable onChanged = () -> {};
     Runnable onFocused = () -> {};
     Runnable onClose = () -> {};
@@ -91,7 +92,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
             onReady.accept(view); setActive(active);
             revalidate(); repaint(); onChanged.run();
             // A shell finishing its launch must not steal focus from a newer pane or a find field.
-            if (active && isShowing()) focusTerminal();
+            if (active && isShowing() && allowLaunchFocus.getAsBoolean()) focusTerminal();
         });
     }
 
@@ -158,6 +159,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         }
         if (session != null) { session.removeListener(listener); session.close(); }
         onChanged = () -> {}; onFocused = () -> {}; onClose = () -> {};
+        allowLaunchFocus = () -> false;
         onReady = terminal -> {}; onFailure = message -> {};
         removeAll();
     }
