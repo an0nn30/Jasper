@@ -1,6 +1,6 @@
 # Moray command palette — approved design
 
-**Status:** Approved by the user on 2026-09-12 following the interactive visual review. Implemented locally on `codex/command-palette-design` through Tasks 1–6; task reviews through Task 5 are approved, Task 6 and the whole branch still await independent review and native acceptance. The selected treatment is the 560px raised card, 12px outer corners and 40px result rows in the app’s purple chrome, with equivalent classic-dark/light treatments.
+**Status:** Approved by the user on 2026-09-12 following the interactive visual review. Implemented locally on `codex/command-palette-design` through Tasks 1–6; all six task reviews and whole-branch/scoped review are complete through `28a7ff0`; native acceptance remains user-run. The selected treatment is the 560px raised card, 12px outer corners and 40px result rows in the app’s purple chrome, with equivalent classic-dark/light treatments.
 
 **Branch:** `codex/command-palette-design`, from main `1db31b1`.
 

@@ -57,6 +57,28 @@ once, 5,000 warmup calls and 10,000 measured calls for exact, prefix, fuzzy and
 zero-match queries. Its workstation numbers describe matching only, not native
 key-to-paint latency, and set no CI threshold.
 
+## Final verification and review
+
+All six task reviews are approved. Whole-branch review of `1db31b1..a12d851`
+found one small-window issue: rebuilding a scrolled list could leave its selected
+command outside the viewport. Fix `28a7ff0` updates bounded viewport geometry and
+reveals the selected row. Query-reset, preserved-ID reorder and result-growth
+regressions passed after reproducing the defect. Scoped review approved the fix
+with no new breakage; no review findings remain open.
+
+Fresh `./gradlew check --rerun-tasks` after the final code change executed all eight
+tasks: app 365 passed; terminal 295 passed plus one existing font skip. Total:
+661 tests, 660 passed, one skipped, zero failures/errors. The controller independently
+read the XML. Existing negative-fixture logs remain documented; no palette output
+or unrelated fixture cleanup was introduced. Source hygiene and final branch-wide
+diff checks passed. The accidentally tracked temporary Task 1 report was removed
+with final bookkeeping; the useful evidence and decisions remain here.
+
+The renders above verify the theme/geometry fixes in `8e7292c`; the final correction
+only changes selected-row scrolling, covered by actual Swing viewport assertions.
+Search code is unchanged from the measured revision. Native acceptance stays
+unchecked in the linked checklist, and the feature worktree remains available.
+
 ## Durable execution record
 
 The feature used the existing project-local ignored worktree and branch so `main`
@@ -78,3 +100,15 @@ gives a held sequence's residual events priority across windows; disposal remove
 the owner. These choices preserve owned-tail containment without creating a public
 input or terminal testing API. Existing unrelated negative-fixture output was not
 expanded into baseline cleanup.
+
+### Execution decisions and tradeoffs
+
+- use the existing branch in a project-local ignored worktree — follows the user's established subagent/worktree workflow while preserving main — no runtime behavior cost.
+- implementation code in the plan is a recipe, not authority above the spec; correct proven source defects with TDD and record changes in the plan status and STATUS — avoids mechanically preserving bugs — may require scoped re-review.
+- Task 4 can expose and test palette through its controller before Task 5 introduces COMMAND_PALETTE; exclude the future ID by string as already specified — preserves sequential compilability — no shipped behavior difference.
+- Task 5 may prove terminal-byte isolation using the existing controlled PTY fixture where FakeConnector is inaccessible across the module boundary — avoid adding a public terminal testing API or a JediTerm dependency to moray-app — synthetic routing remains cross-platform, PTY integration is OS-qualified. Record exact evidence and platform limitation.
+- Task 2 may replace new String UTF-8 decoding with a strict REPORT decoder if malformed bytes otherwise survive in TOML comments — malformed-history policy requires rejection rather than silent replacement — no valid history behavior changes. Sent to implementer for regression-backed confirmation.
+- stage/pump persistence before listener notification in record and loaded, with real reentrant close tests — required to preserve accepted history and close contract — changes callback order internally only.
+- correct blanket typed-event swallowing if an intervening fresh foreign press proves the recipe consumes unrelated input — preserve both owned-tail containment and window-scoped fresh input — requires a small provenance state and regression, with native sequence acceptance still pending.
+- permit an EDT roster of installed window palette dispatch owners to give callback-free owned tails priority over any new owner action — KFM registration order must not let an older destination execute a held key from a newer source — adds bounded shared dispatcher bookkeeping requiring cleanup and multi-window regression coverage.
+- restore selected-row visibility after result rebuild and updated layout, including query reset and availability reorder — approved small-window behavior overrides the recipe omission — adds bounded layout/scroll work on result changes, verified by actual viewport regressions.
