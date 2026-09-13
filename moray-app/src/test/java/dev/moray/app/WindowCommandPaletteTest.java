@@ -282,4 +282,61 @@ class WindowCommandPaletteTest {
         }
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void paneTransitionNeverRestoresTheOldPanesFocus(boolean navigate) throws Exception {
+        var pending = new ArrayDeque<Runnable>(); WindowContent[] owner = new WindowContent[1];
+        var previousManager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+        var oldRequests = new AtomicInteger(); JPanel[] host = new JPanel[1];
+        try {
+            DesktopTestSupport.edt(() -> {
+                owner[0] = DesktopTestSupport.content(DesktopTestSupport.launcher(pending)); install(owner[0]);
+            });
+            pending.remove().run(); DesktopTestSupport.until(() -> owner[0].currentPane().view() != null);
+            DesktopTestSupport.edt(() -> owner[0].currentTab().split(SplitTree.Axis.RIGHT));
+            pending.remove().run(); DesktopTestSupport.until(() -> owner[0].currentPane().view() != null);
+            DesktopTestSupport.edt(() -> {
+                var tab = owner[0].currentTab(); var original = tab.panes().getFirst(); var destination = tab.panes().getLast();
+                // Record requests on a real focusable child of the old pane. Like TerminalPane's
+                // focus listener, accepting a stale request would select that pane again.
+                var prior = new JTextField() {
+                    @Override public boolean requestFocusInWindow() {
+                        oldRequests.incrementAndGet(); tab.focus(original); return true;
+                    }
+                };
+                prior.removeCaretListener((javax.swing.event.CaretListener) prior.getAccessibleContext());
+                // Accessible text location callbacks require a native screen peer, which this
+                // lightweight fixture deliberately does not create.
+                for (var listener : prior.getComponentListeners()) prior.removeComponentListener(listener);
+                original.add(prior, BorderLayout.NORTH);
+                var query = owner[0].commandPalette().component().queryField();
+                query.removeCaretListener((javax.swing.event.CaretListener) query.getAccessibleContext());
+                for (var listener : query.getComponentListeners()) query.removeComponentListener(listener);
+                var root = SwingUtilities.getRootPane(owner[0]);
+                host[0] = new JPanel(); host[0].add(root); host[0].addNotify(); MockUiTest.layoutTree(root);
+                assertThat(original.isShowing()).isTrue(); assertThat(destination.isShowing()).isTrue();
+                assertThat(prior.isShowing()).isTrue(); assertThat(original.view().isShowing()).isTrue();
+                KeyboardFocusManager.setCurrentKeyboardFocusManager(new DefaultKeyboardFocusManager() {
+                    @Override public Component getFocusOwner() { return prior; }
+                });
+                tab.focus(original); owner[0].commandPalette().toggle();
+                if (navigate) tab.navigate(SplitTree.Direction.RIGHT); else tab.focus(destination);
+                assertThat(owner[0].commandPalette().isOpen()).isFalse();
+                assertThat(oldRequests.get()).isZero();
+                assertThat(tab.focusedPane()).isSameAs(destination);
+                // Cancellation with a still-valid origin must retain normal synchronous restoration.
+                tab.focus(original); owner[0].commandPalette().toggle(); owner[0].commandPalette().dismiss();
+                assertThat(oldRequests.get()).isEqualTo(1);
+            });
+            DesktopTestSupport.edt(() -> assertThat(oldRequests.get()).isEqualTo(1));
+        } finally {
+            DesktopTestSupport.edt(() -> {
+                KeyboardFocusManager.setCurrentKeyboardFocusManager(previousManager);
+                if (host[0] != null) host[0].removeNotify();
+                if (owner[0] != null) owner[0].close();
+            });
+        }
+    }
+
 }

@@ -119,8 +119,12 @@ final class WindowCommandPalette implements AutoCloseable {
     }
 
     private void restoreAndHide() {
+        // Pane changes notify us after choosing the new logical target. A captured component
+        // in the old pane may still be showing, but restoring it would undo that transition.
+        boolean restorePriorFocus = validOrigin();
         open = false; palette.setVisible(false); overlay.setVisible(overlay.swallowing);
-        if (priorFocus != null && priorFocus.isShowing() && SwingUtilities.isDescendingFrom(priorFocus, owner))
+        if (restorePriorFocus && priorFocus != null && priorFocus.isShowing()
+            && SwingUtilities.isDescendingFrom(priorFocus, owner))
             priorFocus.requestFocusInWindow();
         else if (owner.currentPane() != null) owner.currentPane().focusTerminal();
         priorFocus = null; originTab = null; originPane = null;
