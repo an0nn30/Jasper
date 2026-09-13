@@ -116,6 +116,38 @@ class CommandPaletteTest {
         });
     }
 
+    @Test void preservedSelectionStaysVisibleAcrossReorderAndResultGrowth() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var first = command("test.first", "First");
+            var second = command("test.second", "Second");
+            var third = command("test.third", "Third");
+            var fourth = command("test.fourth", "Fourth");
+            var selected = command("test.selected", "Selected");
+            var palette = new CommandPalette(false, query -> {}, command -> {}, () -> {});
+            palette.setResults(List.of(first, second, third, fourth, selected), false, null);
+            palette.setSize(UIScale.scale(318), UIScale.scale(140));
+            layoutTree(palette);
+
+            palette.selectRelative(4);
+            assertThat(palette.resultList().getVisibleRect().contains(
+                palette.resultList().getCellBounds(4, 4))).isTrue();
+
+            palette.setResults(List.of(selected, first, second, third, fourth), false, selected.id());
+            layoutTree(palette);
+            assertThat(palette.resultList().getSelectedIndex()).isZero();
+            assertThat(palette.resultList().getVisibleRect().contains(
+                palette.resultList().getCellBounds(0, 0))).isTrue();
+
+            palette.setResults(List.of(first, selected), false, selected.id());
+            layoutTree(palette);
+            palette.setResults(List.of(first, second, third, fourth, selected), false, selected.id());
+            layoutTree(palette);
+            assertThat(palette.resultList().getSelectedIndex()).isEqualTo(4);
+            assertThat(palette.resultList().getVisibleRect().contains(
+                palette.resultList().getCellBounds(4, 4))).isTrue();
+        });
+    }
+
     @Test void realRowBoundsExecuteClicksButBlankListSpaceDoesNothing() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var executed = new ArrayList<String>();

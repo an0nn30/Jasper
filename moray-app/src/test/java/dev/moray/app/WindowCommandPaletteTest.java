@@ -211,6 +211,25 @@ class WindowCommandPaletteTest {
         });
     }
 
+    @Test void queryChangeRevealsResetSelectionInScrolledShortCard() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var root = install(owner);
+                for (int i = 0; i < 5; i++) owner.commands().register(command("custom." + i, () -> {}));
+                owner.commandPalette().toggle(); var palette = owner.commandPalette().component();
+                palette.queryField().setText("custom"); root.setSize(350, 210); MockUiTest.layoutTree(root);
+                root.dispatchEvent(new ComponentEvent(root, ComponentEvent.COMPONENT_RESIZED)); MockUiTest.layoutTree(root);
+                palette.selectRelative(4); MockUiTest.layoutTree(root);
+
+                palette.queryField().setText("custom "); MockUiTest.layoutTree(root);
+
+                assertThat(palette.resultList().getSelectedIndex()).isZero();
+                assertThat(palette.resultList().getVisibleRect().contains(
+                    palette.resultList().getCellBounds(0, 0))).isTrue();
+            }
+        });
+    }
+
     @Test @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
     void delayedReadinessPreservesOriginThenPaneChangeDismissesAndZoomTitleUpdates() throws Exception {
         var pending = new ArrayDeque<Runnable>(); WindowContent[] owner = new WindowContent[1]; JRootPane[] root = new JRootPane[1];

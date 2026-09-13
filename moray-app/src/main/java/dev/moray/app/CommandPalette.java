@@ -58,6 +58,8 @@ final class CommandPalette extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel cards = new JPanel(cardLayout);
     private final JLabel empty = new JLabel("No matching commands", SwingConstants.CENTER);
+    private final JScrollPane scrollingResults = new JScrollPane(results, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+        JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
     private final ResultRenderer renderer;
     private Color surfaceBorder;
     private boolean composing;
@@ -130,8 +132,6 @@ final class CommandPalette extends JPanel {
         empty.setOpaque(false);
         empty.putClientProperty("html.disable", Boolean.TRUE);
         empty.setPreferredSize(new Dimension(0, UIScale.scale(ROW_HEIGHT)));
-        var scrollingResults = new JScrollPane(results, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-            JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollingResults.setBorder(BorderFactory.createEmptyBorder());
         scrollingResults.setOpaque(false); scrollingResults.getViewport().setOpaque(false);
         cards.add(scrollingResults, "results");
@@ -163,7 +163,13 @@ final class CommandPalette extends JPanel {
         cardLayout.show(cards, commands.isEmpty() ? "empty" : "results");
         results.setVisibleRowCount(Math.max(1, commands.size()));
         results.getAccessibleContext().setAccessibleDescription(commands.size() + " commands");
-        revalidate(); repaint();
+        revalidate();
+        if (!commands.isEmpty()) {
+            scrollingResults.doLayout();
+            scrollingResults.getViewport().doLayout();
+            results.ensureIndexIsVisible(selected);
+        }
+        repaint();
     }
 
     void refreshTheme() {
