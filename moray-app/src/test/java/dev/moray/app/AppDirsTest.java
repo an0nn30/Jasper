@@ -15,12 +15,16 @@ class AppDirsTest {
         assertThat(dirs.configFile()).isEqualTo(dirs.root().resolve("config.toml"));
         assertThat(dirs.themes()).isEqualTo(dirs.root().resolve("themes"));
         assertThat(dirs.logs()).isEqualTo(dirs.root().resolve("logs"));
+        assertThat(dirs.commandHistory()).isEqualTo(dirs.root().resolve("command-history.toml"));
         assertThat(dirs.root()).doesNotExist();
     }
 
     @Test void linuxUsesAbsoluteXdgAndIgnoresBlankOrRelativeRoots() {
-        assertThat(AppDirs.resolve("Linux", Map.of("XDG_CONFIG_HOME", home.resolve("xdg/../settings").toString()), home).root())
-            .isEqualTo(home.resolve("settings/moray"));
+        var configured = AppDirs.resolve("Linux",
+            Map.of("XDG_CONFIG_HOME", home.resolve("xdg/../settings").toString()), home);
+        assertThat(configured.root()).isEqualTo(home.resolve("settings/moray"));
+        assertThat(configured.commandHistory())
+            .isEqualTo(home.resolve("settings/moray/command-history.toml"));
         for (var env : java.util.List.of(Map.<String,String>of(), Map.of("XDG_CONFIG_HOME", ""),
                 Map.of("XDG_CONFIG_HOME", "relative"))) {
             assertThat(AppDirs.resolve("Linux", env, home).root()).isEqualTo(home.resolve(".config/moray"));
@@ -29,12 +33,23 @@ class AppDirsTest {
     }
 
     @Test void windowsUsesAppDataWithHomeFallback() {
-        assertThat(AppDirs.resolve("Windows 11", Map.of("APPDATA", home.resolve("roaming").toString()), home).root())
-            .isEqualTo(home.resolve("roaming/moray"));
+        var configured = AppDirs.resolve("Windows 11",
+            Map.of("APPDATA", home.resolve("roaming").toString()), home);
+        assertThat(configured.root()).isEqualTo(home.resolve("roaming/moray"));
+        assertThat(configured.commandHistory())
+            .isEqualTo(home.resolve("roaming/moray/command-history.toml"));
         for (var env : java.util.List.of(Map.<String,String>of(), Map.of("APPDATA", ""))) {
             assertThat(AppDirs.resolve("Windows 11", env, home).root())
                 .isEqualTo(home.resolve("AppData/Roaming/moray"));
         }
         assertThat(home.resolve("AppData")).doesNotExist();
+    }
+
+    @Test void commandHistoryUsesRootWhenConfigFileIsOverridden() {
+        Path root = home.resolve("root");
+        var dirs = new AppDirs(root, home.resolve("elsewhere/custom.toml"),
+            root.resolve("themes"), root.resolve("logs"));
+
+        assertThat(dirs.commandHistory()).isEqualTo(root.resolve("command-history.toml"));
     }
 }

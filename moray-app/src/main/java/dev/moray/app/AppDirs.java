@@ -7,6 +7,10 @@ import java.util.Map;
 
 /** Resolves application locations without touching the filesystem. */
 record AppDirs(Path root, Path configFile, Path themes, Path logs) {
+    Path commandHistory() {
+        return root.resolve("command-history.toml");
+    }
+
     static AppDirs resolve(String osName, Map<String, String> env, Path home) {
         String os = osName.toLowerCase(Locale.ROOT);
         Path base;

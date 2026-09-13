@@ -156,7 +156,7 @@ A window captures its grid defaults once. Later reloads do not resize or repack 
 
 ## Shortcuts
 
-The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `open_settings` and `reload_config`.
+The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `clear_scrollback`, `open_settings` and `reload_config`.
 
 On macOS, `cmd` means Command and `alt`/`option` means Option. For example:
 
@@ -183,6 +183,33 @@ reload_config = "ctrl+F12"
 `{` and `}` are aliases for Shift+[ and Shift+]. Named function keys F1–F24 are accepted. To remove an accelerator while keeping the menu/toolbar action, set it to `"none"`. Reload removes the previous shortcut immediately; terminal views use the new map without being recreated. Copy/paste in find text fields retain native text editing.
 
 Each shortcut must be unique. Invalid or colliding shortcut overrides restore the whole default binding map and produce an error; unknown action names produce warnings and are ignored. For example, outside macOS `split_down = "cmd+shift+d"` collides with split right; use `"alt+cmd+shift+d"` or the literal Ctrl+Alt+Shift+D above.
+
+## Command palette shortcuts
+
+The [command palette](command-palette.md) opens with Cmd+K on macOS and Ctrl+K on
+Windows/Linux. Clear Scrollback uses Cmd+Shift+K on macOS and Ctrl+Shift+K
+elsewhere. While the palette is open, Cmd/Ctrl+1–5 runs the corresponding visible
+result; plain digits continue to edit the search field.
+
+On macOS, keep Cmd+K for Clear Scrollback and move the palette to Cmd+P:
+
+```toml
+[keybindings]
+command_palette = "cmd+p"
+clear_scrollback = "cmd+k"
+```
+
+On Windows/Linux, free Ctrl+K for terminal input and move the palette to Ctrl+P:
+
+```toml
+[keybindings]
+command_palette = "ctrl+p"
+```
+
+Outside macOS, the compatibility token `cmd` still means Ctrl+Shift; it was not
+redefined for the palette. Use literal `ctrl+k` or `ctrl+p` when that is the
+intended combination. Setting `command_palette = "none"` disables its accelerator
+while leaving View → Command Palette available.
 
 ## Reload and diagnostics
 
