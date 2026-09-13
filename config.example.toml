@@ -81,3 +81,8 @@ theme = "moray-dark-purple"
 # On Linux and Windows, cmd means Ctrl+Shift; literal Ctrl combinations are often clearer. Example:
 # new_tab = "ctrl+shift+t"
 # split_down = "ctrl+alt+shift+d"
+# macOS: keep Cmd+K for Clear Scrollback and open the palette with Cmd+P.
+# command_palette = "cmd+p"
+# clear_scrollback = "cmd+k"
+# Windows/Linux: free Ctrl+K for the terminal and open the palette with Ctrl+P.
+# command_palette = "ctrl+p"

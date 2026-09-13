@@ -10,7 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-12-moray-command-palette-design.md` (approved, including visual review).
 
-**Status:** Ready for implementation; all checkboxes intentionally remain open. Design base: `93d2f88`, feature branch `codex/command-palette-design`. No runtime code has changed. This plan produces one runnable deliverable. Implementation uses per-task implementer/reviewer, fix rounds and a final whole-branch review. Record deviations here and in `docs/STATUS.md`.
+**Status:** Execution active in `.worktrees/command-palette` on `codex/command-palette-design`. Baseline `./gradlew check` executed all eight tasks: 585 tests, no failures/errors, one existing font skip. Task 1 is complete in `4217707` with independent spec/quality approval; Task 2 is complete through `0979752` after one reviewed reentrancy fix (18 focused history and 321 app tests passing). Task 3 is complete in `8b74856` with independent approval, 9 focused and 330 app tests passing. Task 4 is complete through `1b9cbe7` after an independently approved stale-focus fix (343 app tests before the fix, 29 covering tests after it). Task 5 is complete in `b2e1384` with independent spec/quality approval: 55 focused tests passed; full check XML reports 657 tests, 656 passed and one existing skip. Task 6 implementation and self-review are complete locally: 24 headless matrix renders plus a fresh-JVM 2× UIScale check were inspected, pure matching was measured on 1,000 pre-indexed commands, and user/developer/native-handoff docs were written. Fresh forced check reports 659 tests, 658 passed and one existing font skip. Task 6 independent review and whole-branch review remain pending. No GUI, merge or push has occurred. Controller integration rulings: Task 4 may touch TerminalPane to prevent delayed-launch focus theft and Main to create production-only persistent history; palette searches must not rerun on unchanged terminal screen updates. Task 5 may use the existing controlled PTY fixture for byte-isolation evidence where FakeConnector is inaccessible across modules, retaining cross-platform synthetic routing tests.
+
+**Task 2 source corrections:** The history reader uses a strict UTF-8 decoder instead of replacement decoding so malformed bytes in otherwise valid TOML comments are rejected. Invalid null write IDs produce the file API's IOException rather than NullPointerException. Both have regression coverage; no valid history behavior changes. Independent review also found listener-before-persistence ordering unsafe under reentrant close; fix round 1 stages persistence before callbacks in both record and initial load, with final-file/closedFuture regressions.
+
+**Task 6 render corrections and evidence:** The initial actual Swing renders exposed two issues that component-layout tests had missed: `CellRendererPane` painted the null-layout result renderer before its labels received final bounds, and the Escape button filled the 56px input row. Focused tests failed on missing painted label/badge bounds and full-height Escape geometry, then passed after laying out renderer children at paint time and centering the button in a transparent wrapper. The headless capture adds an explicit root/layered-pane resize-layout pass before the plan's core paint routine so the first image cannot race deferred component events. The default task produced four states × three themes × two output-pixel scales; a separate JVM with `flatlaf.uiScale=2x` asserted 1120/112/80 card/input/row dimensions. All images were inspected with no remaining clipping, contrast or centering findings, including an independent controller subset. Matching-only medians were 93.875 µs exact, 18.292 µs prefix, 52.791 µs fuzzy and 32.584 µs zero-match on macOS aarch64/JBR 25.0.4.1; there is no timing gate. Native acceptance remains user-run.
 
 ## Global Constraints
 
@@ -48,7 +52,7 @@ All paths above are under `moray-app/src/main/java/dev/moray/app/`. Tests use th
 
 - [ ] Confirm branch/status/worktree, read STATUS, AGENTS and the approved spec. Keep the user's existing design branch. Apply the worktree skill at execution time; use existing repository worktree conventions if isolation is needed.
 - [ ] Run `./gradlew check` as the baseline, recording actual XML counts and any pre-existing skip. Do not call a GUI task.
-- [ ] Initialize the SDD ledger with the skill's `scripts/sdd-workspace` and preflight interface table. The code blocks below are the implementation contract; fix discovered integration defects against the spec and record rulings.
+- [x] Initialize the SDD ledger with the skill's `scripts/sdd-workspace` and preflight interface table. The code blocks below are the implementation contract; fix discovered integration defects against the spec and record rulings.
 
 ### Task 1: Register commands and rank bounded results
 
@@ -56,7 +60,7 @@ All paths above are under `moray-app/src/main/java/dev/moray/app/`. Tests use th
 
 **Interfaces:** Produces `Command(String id, Action action, List<String> keywords)`, `CommandRegistry.register(Command)`, `CommandRegistry.onChanged(Runnable)`, `CommandRegistry.entries()`, `CommandRegistry.contains(Command)`, `CommandRegistry.close()` and `CommandSearch.find(List<Entry>, String, List<String>)`. Registry registration/listener handles are concrete `CommandRegistry.Subscription implements AutoCloseable`. Returned collections are immutable. New feature code uses the same `register` operation as built-ins.
 
-- [ ] **Write these first failing behavior tests.** Both methods belong to a package-private JUnit test; use static AssertJ assertions and JUnit `@Test`, `java.util.*`, `javax.swing.*`. They prove removal cannot leave executable stale results, and relevance wins over recency.
+- [x] **Write these first failing behavior tests.** Both methods belong to a package-private JUnit test; use static AssertJ assertions and JUnit `@Test`, `java.util.*`, `javax.swing.*`. They prove removal cannot leave executable stale results, and relevance wins over recency.
 
 ```java
 @Test void registrationRemovalInvalidatesPreviouslyReturnedCommand() throws Exception {
@@ -92,8 +96,8 @@ All paths above are under `moray-app/src/main/java/dev/moray/app/`. Tests use th
 }
 ```
 
-- [ ] **Run RED:** `./gradlew :moray-app:test --tests '*CommandRegistryTest' --tests '*CommandSearchTest'`. Missing production types are expected initially; after the types exist, new regression tests must fail behaviorally before changes.
-- [ ] **Implement the command definition.** Keep custom palette title/icon properties separate from menu labels. Metadata is indexed when registration or action properties change, not during every query.
+- [x] **Run RED:** `./gradlew :moray-app:test --tests '*CommandRegistryTest' --tests '*CommandSearchTest'`. Missing production types are expected initially; after the types exist, new regression tests must fail behaviorally before changes.
+- [x] **Implement the command definition.** Keep custom palette title/icon properties separate from menu labels. Metadata is indexed when registration or action properties change, not during every query.
 
 ```java
 package dev.moray.app;
@@ -127,7 +131,7 @@ record Command(String id, Action action, List<String> keywords) {
 }
 ```
 
-- [ ] **Implement the registry.** Listener notification iterates a copy so unregistering while handling an update is safe. `contains` deliberately uses object identity, not record equality. A removed registration cannot execute a later replacement with the same ID.
+- [x] **Implement the registry.** Listener notification iterates a copy so unregistering while handling an update is safe. `contains` deliberately uses object identity, not record equality. A removed registration cannot execute a later replacement with the same ID.
 
 ```java
 package dev.moray.app;
@@ -198,7 +202,7 @@ final class CommandRegistry implements AutoCloseable {
 }
 ```
 
-- [ ] **Implement search with these exact tiers.** Multiword queries compare the worst matching tier, then summed fuzzy gaps; an early fuzzy match cannot beat a complete keyword match. Empty search is handled by the controller, not this method. Recent ordering only breaks equal relevance. No regex over terminal content, sorting of unbounded live provider results, filesystem access or async workers.
+- [x] **Implement search with these exact tiers.** Multiword queries compare the worst matching tier, then summed fuzzy gaps; an early fuzzy match cannot beat a complete keyword match. Empty search is handled by the controller, not this method. Recent ordering only breaks equal relevance. No regex over terminal content, sorting of unbounded live provider results, filesystem access or async workers.
 
 ```java
 package dev.moray.app;
@@ -266,8 +270,8 @@ final class CommandSearch {
 }
 ```
 
-- [ ] **Extend tests before changing any discovered defect:** action enabled/name/custom-title changes refresh the index; duplicate IDs reject; subscription close twice is harmless; reusing an ID after removal does not validate the old object; closing registry removes action listeners; all words must match; exact/prefix/word-prefix/substring/keyword/fuzzy precedence; Unicode casing; recency tie; empty and no-match results. Use the first two tests' real-action style, not registry mocks.
-- [ ] **Run GREEN:** the focused command above, then `./gradlew :moray-app:test`. Review and commit `feat: add command registration and ranked search` with the required trailer.
+- [x] **Extend tests before changing any discovered defect:** action enabled/name/custom-title changes refresh the index; duplicate IDs reject; subscription close twice is harmless; reusing an ID after removal does not validate the old object; closing registry removes action listeners; all words must match; exact/prefix/word-prefix/substring/keyword/fuzzy precedence; Unicode casing; recency tie; empty and no-match results. Use the first two tests' real-action style, not registry mocks.
+- [x] **Run GREEN:** the focused command above, then `./gradlew :moray-app:test`. Review and commit `feat: add command registration and ranked search` with the required trailer.
 
 ### Task 2: Persist shared three-command recents
 
@@ -275,7 +279,7 @@ final class CommandSearch {
 
 **Interfaces:** Produces `CommandHistory()` (memory-only), `CommandHistory(Path file)` (production serialized worker), `recent(): List<String>`, `record(String)`, `onChanged(Runnable): CommandRegistry.Subscription`, `close()` (EDT request, nonblocking), and `closedFuture(): CompletableFuture<Void>` (background drain completion). `CommandHistoryFile.read(Path): List<String>` and `write(Path,List<String>): void` throw `IOException`. `AppDirs.commandHistory()` resolves `root.resolve("command-history.toml")`; it is a method, preserving the existing record constructor shape.
 
-- [ ] **Write RED tests using a temporary directory.** Imports: JUnit `@Test`, `@TempDir`, `Path`, `List`, `Files`, AssertJ assertions. The file class has no Swing dependency.
+- [x] **Write RED tests using a temporary directory.** Imports: JUnit `@Test`, `@TempDir`, `Path`, `List`, `Files`, AssertJ assertions. The file class has no Swing dependency.
 
 ```java
 @TempDir Path directory;
@@ -294,8 +298,8 @@ final class CommandSearch {
 }
 ```
 
-- [ ] **Run RED:** `./gradlew :moray-app:test --tests '*CommandHistory*Test'`.
-- [ ] **Implement bounded storage.** Read at most 16 KiB plus one byte rather than `readString` after a racy size check. IDs follow Task 1's grammar; no escaping arbitrary queries is needed. Unknown fields or invalid entries reject the file so the service can report the issue consistently.
+- [x] **Run RED:** `./gradlew :moray-app:test --tests '*CommandHistory*Test'`.
+- [x] **Implement bounded storage.** Read at most 16 KiB plus one byte rather than `readString` after a racy size check. IDs follow Task 1's grammar; no escaping arbitrary queries is needed. Unknown fields or invalid entries reject the file so the service can report the issue consistently.
 
 ```java
 package dev.moray.app;
@@ -347,7 +351,7 @@ final class CommandHistoryFile {
 }
 ```
 
-- [ ] **Implement the service's state reducer and worker contract.** Use the following exact merge routine for initial load and each accepted execution. No `record` call occurs during highlighting or failed dispatch.
+- [x] **Implement the service's state reducer and worker contract.** Use the following exact merge routine for initial load and each accepted execution. No `record` call occurs during highlighting or failed dispatch.
 
 ```java
 static List<String> merge(List<String> newest, List<String> older) {
@@ -467,9 +471,9 @@ final class CommandHistory implements AutoCloseable {
 }
 ```
 
-- [ ] **Write reducer/service tests before implementation changes.** Assert `merge([c,a],[a,b]) == [c,a,b]`, repeated record does not duplicate, a fourth distinct record drops the oldest, two listeners see the same order, closed listeners receive no late load notification, pre-load invocation survives load, final write survives close-before-load, files on two separate service instances reload recents, unknown registered IDs are not purged by storage, and I/O failure does not prevent memory recency. Fake executors explicitly run queued load/write/EDT tasks in the chosen order.
-- [ ] **Add `Path commandHistory() { return root.resolve("command-history.toml"); }` to `AppDirs`.** Extend the existing OS-path tests for the same resolved parent as config/themes/logs, independent of `--config`.
-- [ ] **Run GREEN:** `./gradlew :moray-app:test --tests '*CommandHistory*Test' --tests '*AppDirsTest'`, then app tests. Review and commit `feat: persist shared command palette recents` with trailer.
+- [x] **Write reducer/service tests before implementation changes.** Assert `merge([c,a],[a,b]) == [c,a,b]`, repeated record does not duplicate, a fourth distinct record drops the oldest, two listeners see the same order, closed listeners receive no late load notification, pre-load invocation survives load, final write survives close-before-load, files on two separate service instances reload recents, unknown registered IDs are not purged by storage, and I/O failure does not prevent memory recency. Fake executors explicitly run queued load/write/EDT tasks in the chosen order.
+- [x] **Add `Path commandHistory() { return root.resolve("command-history.toml"); }` to `AppDirs`.** Extend the existing OS-path tests for the same resolved parent as config/themes/logs, independent of `--config`.
+- [x] **Run GREEN:** `./gradlew :moray-app:test --tests '*CommandHistory*Test' --tests '*AppDirsTest'`, then app tests. Review and commit `feat: persist shared command palette recents` with trailer.
 
 ### Task 3: Build the approved headless-testable palette component
 
@@ -477,7 +481,7 @@ final class CommandHistory implements AutoCloseable {
 
 **Interfaces:** `CommandPalette(boolean macOs, Consumer<String> queryChanged, Consumer<Command> execute, Runnable dismiss)`; `queryField(): JTextField`; `resultList(): JList<Command>`; `setResults(List<Command>, boolean recent, String preserveSelectionId)`; `refreshTheme()`; `selectRelative(int)`; `executeNumber(int)` (one-based); `executeSelected()`; `setOpeningLabel(String)` (accepts Recent or Suggested); `composing(): boolean` (tracks noncommitted input-method text). Query edits call `queryChanged`; all execution requests call the supplied callback, never an action directly. The controller owns registration, availability rechecks and persistence.
 
-- [ ] **Write RED component tests on EDT.** The tests below require no native window or shell. Include Task 1's `Command`/Swing action construction and static AssertJ imports.
+- [x] **Write RED component tests on EDT.** The tests below require no native window or shell. Include Task 1's `Command`/Swing action construction and static AssertJ imports.
 
 ```java
 @Test void limitsAreVisibleAndMissingNumbersCannotExecute() throws Exception {
@@ -515,8 +519,8 @@ final class CommandHistory implements AutoCloseable {
 }
 ```
 
-- [ ] **Run RED:** `./gradlew :moray-app:test --tests '*CommandPaletteTest'`.
-- [ ] **Implement the component with these concrete Swing elements:** a transparent `JPanel(BorderLayout)`, a transparent input row with `JTextField` and small Escape button, a Recent label and a `JList<Command>` backed by `DefaultListModel`. A `CardLayout` switches the list and centered “No matching commands” label. Result rows use a reusable renderer with icon, title, secondary current shortcut and numbered badge. Renderers never store listeners, own actions or start timers. `queryField()`/`resultList()` expose real components for integration tests and accessibility.
+- [x] **Run RED:** `./gradlew :moray-app:test --tests '*CommandPaletteTest'`.
+- [x] **Implement the component with these concrete Swing elements:** a transparent `JPanel(BorderLayout)`, a transparent input row with `JTextField` and small Escape button, a Recent label and a `JList<Command>` backed by `DefaultListModel`. A `CardLayout` switches the list and centered “No matching commands” label. Result rows use a reusable renderer with icon, title, secondary current shortcut and numbered badge. Renderers never store listeners, own actions or start timers. `queryField()`/`resultList()` expose real components for integration tests and accessibility.
 
 Use these complete state-update and selection routines; fields are `DefaultListModel<Command> model`, `JList<Command> results`, `JLabel recentLabel`, `JPanel cards` with `CardLayout cardLayout`, and the constructor's `Consumer<Command> execute`.
 
@@ -554,7 +558,7 @@ void executeSelected() {
 
 Register the input document listener for insert/remove/change, calling `queryChanged.accept(query.getText())`. Set input accessible name to “Search commands”, list name to “Commands” and placeholder with `JTextField.placeholderText`. Escape button calls only `dismiss`. A mouse press executes only if `locationToIndex(point)` returns an index whose `getCellBounds(index,index).contains(point)` is true; blank space below the list must do nothing. Arrow/Enter/Escape handling is wired through Task 5's key router; keep native JTextField editing and IME handling intact.
 
-- [ ] **Implement exact palette geometry and theme painting.** Apply `UIScale.scale` to every logical dimension. Preferred width is 560; the input row is 56; each result row is 40. The list and renderer use the app UI font, not the terminal's adjustable font. Add semantic keys with these property bindings:
+- [x] **Implement exact palette geometry and theme painting.** Apply `UIScale.scale` to every logical dimension. Preferred width is 560; the input row is 56; each result row is 40. The list and renderer use the app UI font, not the terminal's adjustable font. Add semantic keys with these property bindings:
 
 ```properties
 Moray.paletteBackground = $Moray.tabSelectedBackground
@@ -588,8 +592,8 @@ static void paintSurface(java.awt.Graphics graphics, int width, int height,
 
 `refreshTheme()` rereads semantic colors, updates all children, and repaints without resetting query or selection. Use the current action `ACCELERATOR_KEY` for secondary shortcut labels; format macOS modifiers as escaped Unicode glyphs, Windows/Linux as literal modifier names. Hide this secondary shortcut when title space is insufficient, preserving the trailing quick-selection badge. Reserve icon width even when a command has no icon. Escape and quick badges are hints, not extra tab stops per renderer row.
 
-- [ ] **Add behavior/geometry tests:** empty input notification, first selection, navigation clamps, selection ID survives reorder, removal chooses first, empty selection cannot execute, bounds contain real rows, click below final row does nothing, initial/changed themes retain query, and long command titles fit at 320px without covering badges. Check native input map Copy/Paste remains installed. Use actual renderer components and layout bounds, not source-string assertions.
-- [ ] **Run GREEN:** focused component tests, app tests. Review and commit `feat: add themed command palette component` with trailer.
+- [x] **Add behavior/geometry tests:** empty input notification, first selection, navigation clamps, selection ID survives reorder, removal chooses first, empty selection cannot execute, bounds contain real rows, click below final row does nothing, initial/changed themes retain query, and long command titles fit at 320px without covering badges. Check native input map Copy/Paste remains installed. Use actual renderer components and layout bounds, not source-string assertions.
+- [x] **Run GREEN:** focused component tests, app tests. Review and commit `feat: add themed command palette component` with trailer.
 
 ### Task 4: Register built-ins and integrate the window-owned overlay
 
@@ -597,7 +601,7 @@ static void paintSurface(java.awt.Graphics graphics, int width, int height,
 
 **Interfaces:** `WindowCommands(WindowContent owner, CommandRegistry registry)`, `refresh()`, `close()`; `WindowCommandPalette(WindowContent owner, CommandRegistry registry, CommandHistory history, boolean macOs)`, `install(JRootPane)`, `toggle()`, `dismiss()`, `refresh()`, `isOpen()`, `component(): CommandPalette`, `close()`. `WindowContent.commands()` returns its registry and `commandPalette()` its controller. Preserve existing WindowContent construction; add history/platform arguments only to a new full constructor and delegate existing overloads.
 
-- [ ] **Write RED integration tests with delayed shell launch.** `DesktopTestSupport.launcher(new ArrayDeque<>())` leaves launch pending and opens no shell; use it to prove global commands work while pane actions are unavailable. Construct `JRootPane`, `setContentPane(owner)`, `owner.installRootBindings(root)`, `root.setSize(900,600)` and use existing `MockUiTest.layoutTree(root)`.
+- [x] **Write RED integration tests with delayed shell launch.** `DesktopTestSupport.launcher(new ArrayDeque<>())` leaves launch pending and opens no shell; use it to prove global commands work while pane actions are unavailable. Construct `JRootPane`, `setContentPane(owner)`, `owner.installRootBindings(root)`, `root.setSize(900,600)` and use existing `MockUiTest.layoutTree(root)`.
 
 ```java
 @Test void overlayDoesNotResizeTerminalAndUsesWholeDeckCenter() throws Exception {
@@ -619,8 +623,8 @@ static void paintSurface(java.awt.Graphics graphics, int width, int height,
 }
 ```
 
-- [ ] **Run RED:** `./gradlew :moray-app:test --tests '*WindowCommand*Test'`.
-- [ ] **Register current actions in `WindowCommands`.** Iterate `ActionId.values()` and skip `id.id().equals("command_palette")`. This string check compiles before Task 5 introduces that enum member. Existing IDs remain unchanged. Store returned registrations and close them on disposal. Use `Action.getValue` properties for title/icon; preserve menu labels. Built-in icon mapping uses only currently bundled names: NEW_TAB→square-plus, NEW_WINDOW→app-window, SPLIT_RIGHT/SPLIT_DOWN→columns-2, ZOOM_PANE→maximize, FIND/FIND_NEXT/FIND_PREVIOUS→search, OPEN_SETTINGS→settings, RELOAD_CONFIG→refresh; other icons may be absent. Do not add missing-network icon dependencies.
+- [x] **Run RED:** `./gradlew :moray-app:test --tests '*WindowCommand*Test'`.
+- [x] **Register current actions in `WindowCommands`.** Iterate `ActionId.values()` and skip `id.id().equals("command_palette")`. This string check compiles before Task 5 introduces that enum member. Existing IDs remain unchanged. Store returned registrations and close them on disposal. Use `Action.getValue` properties for title/icon; preserve menu labels. Built-in icon mapping uses only currently bundled names: NEW_TAB→square-plus, NEW_WINDOW→app-window, SPLIT_RIGHT/SPLIT_DOWN→columns-2, ZOOM_PANE→maximize, FIND/FIND_NEXT/FIND_PREVIOUS→search, OPEN_SETTINGS→settings, RELOAD_CONFIG→refresh; other icons may be absent. Do not add missing-network icon dependencies.
 
 Use the following split metadata exactly:
 
@@ -637,7 +641,7 @@ The generic loop skips those two separately registered IDs. Other keywords are d
 
 View actions use these exact stable IDs: `view.toolbar.icons_and_labels`, `view.toolbar.icons`, `view.toolbar.hidden`, `view.status_bar`, `view.appearance.light`, `view.appearance.dark`, `view.appearance.system`, `view.tab_height`. The toolbar action callbacks call `owner.setToolbarMode(mode)`; status calls `owner.setStatusVisible(!owner.status().isVisible())`; appearance calls `owner.selectAppearance(value)`; tab height calls the existing extracted `WindowChrome.editTabHeight()` (make package-private). Keep existing View-menu behavior but bind those items to the same actions instead of duplicate callbacks. `refresh()` updates selected action state and dynamic palette titles: Zoom/Restore from `owner.currentTab().tree().zoomed()`, Show/Hide Status Bar from its current visibility. Guard currentTab null. Updating properties to equal values must not induce recursive refresh loops.
 
-- [ ] **Install an overlay without changing terminal parent/layout.** Add a transparent overlay `JComponent` to `root.getLayeredPane()` above content, covering the owner content bounds. A root/layered-pane component listener relays resize into overlay bounds/layout. Its only child is the palette. Convert deck bounds to overlay coordinates and use this exact clamped-center function. Palette opening never calls `frame.pack()` or modifies the minimum/preferred size of terminals.
+- [x] **Install an overlay without changing terminal parent/layout.** Add a transparent overlay `JComponent` to `root.getLayeredPane()` above content, covering the owner content bounds. A root/layered-pane component listener relays resize into overlay bounds/layout. Its only child is the palette. Convert deck bounds to overlay coordinates and use this exact clamped-center function. Palette opening never calls `frame.pack()` or modifies the minimum/preferred size of terminals.
 
 ```java
 static java.awt.Rectangle centered(java.awt.Rectangle terminal, java.awt.Dimension preferred,
@@ -656,7 +660,7 @@ static java.awt.Rectangle centered(java.awt.Rectangle terminal, java.awt.Dimensi
 
 Normal available bounds are the terminal rectangle. On very small terminal heights allow the overlay owner rectangle as the clamping area so input and selected row remain usable. Keep an input-fixed, results-scrollable fallback only when the normal five-row card cannot fit. Clicks outside the palette dismiss and consume press/release/click; do not let a release reach the underlying terminal. Render a restrained shadow in overlay `paintComponent`: twelve antialiased round-rect fills from 12px to 1px expansion, black alpha 2 per layer in light themes or alpha 4 in dark themes; card paints afterward. No screenshot/blur buffers or recurring paint timer.
 
-- [ ] **Implement origin validation and guarded execution.** Opening records current tab, pane and `KeyboardFocusManager.getFocusOwner()`. Registry/history listeners refresh only while open. Empty query selects up to three available history IDs; if none are available use New Tab, Split Right, Settings and New Window fallback, stopping at three. Label that no-history state “Suggested” rather than “Recent”. Nonempty queries use Task 1. On query edit reset selection; on availability refresh preserve selected ID.
+- [x] **Implement origin validation and guarded execution.** Opening records current tab, pane and `KeyboardFocusManager.getFocusOwner()`. Registry/history listeners refresh only while open. Empty query selects up to three available history IDs; if none are available use New Tab, Split Right, Settings and New Window fallback, stopping at three. Label that no-history state “Suggested” rather than “Recent”. Nonempty queries use Task 1. On query edit reset selection; on availability refresh preserve selected ID.
 
 `validOrigin()` is true only while owner is active/open, current tab is the captured tab, captured pane is still in that tab and remains its logical focused pane (or both panes are null during a legitimate empty lifecycle). A tab switch, removed pane, changed logical pane, deactivation or owner close dismisses. Handle updates after constructor initialization with null guards to avoid new-tab callbacks using an uninitialized controller.
 
@@ -684,9 +688,9 @@ private void execute(Command command) {
 
 `Quit` can close history before post-dispatch recording. Resolve that lifecycle explicitly: the application requests shutdown on the next EDT event after windows close, letting successful dispatch update history before close. Shutdown remains idempotent and refuses new windows immediately once quitting begins. Closing the final window by ordinary means uses the same deferred service shutdown. Do not record before dispatch just to make Quit appear in history.
 
-- [ ] **Wire owner and application lifecycle:** install overlay after root bindings; refresh after completed `updateActions`, View state changes and theme changes; dismiss before changing active tab/focus; close controller before disposing tabs and root bindings. A single application-level history created at the production startup boundary is passed to every window; normal test/benchmark constructors retain memory-only history. Resolve its file through `AppDirs.commandHistory()`, not `--config`. Close shared history when the last window closes/quit occurs, after accepted palette dispatch as above. Closing a window never closes shared history while sibling windows exist.
-- [ ] **Add integration regressions:** two windows share recents and never target each other's panes; pending panes omit split/paste; registered third-party-style internal action appears and executes without an enum change; removed/replaced command cannot execute from a stale row; disabled command is rechecked; tab/pane changes dismiss; Find gains focus without a later restore; action failure reports and does not record; status/zoom labels refresh; palette stays open through theme changes; disposal removes all registry/history/root listeners; last-window/Quit history reaches the final file. Use injected launchers and callbacks, never OS Settings/Quit side effects in tests.
-- [ ] **Run GREEN:** focused integration and app tests. Review and commit `feat: integrate palette commands and window ownership` with trailer.
+- [x] **Wire owner and application lifecycle:** install overlay after root bindings; refresh after completed `updateActions`, View state changes and theme changes; dismiss before changing active tab/focus; close controller before disposing tabs and root bindings. A single application-level history created at the production startup boundary is passed to every window; normal test/benchmark constructors retain memory-only history. Resolve its file through `AppDirs.commandHistory()`, not `--config`. Close shared history when the last window closes/quit occurs, after accepted palette dispatch as above. Closing a window never closes shared history while sibling windows exist.
+- [x] **Add integration regressions:** two windows share recents and never target each other's panes; pending panes omit split/paste; registered third-party-style internal action appears and executes without an enum change; removed/replaced command cannot execute from a stale row; disabled command is rechecked; tab/pane changes dismiss; Find gains focus without a later restore; action failure reports and does not record; status/zoom labels refresh; palette stays open through theme changes; disposal removes all registry/history/root listeners; last-window/Quit history reaches the final file. Use injected launchers and callbacks, never OS Settings/Quit side effects in tests.
+- [x] **Run GREEN:** focused integration and app tests. Review and commit `feat: integrate palette commands and window ownership` with trailer.
 
 ### Task 5: Own palette shortcuts without leaking input
 
@@ -694,7 +698,7 @@ private void execute(Command command) {
 
 **Interfaces:** `PaletteKeyRouter(WindowCommandPalette palette, Supplier<KeyBindings> bindings, boolean macOs, Predicate<Component> belongsToOwner)`, `dispatch(KeyEvent): boolean`, `reset()`, `close()`, `drained(): boolean` (true when the swallowed-key set is empty). Install the standard JDK `KeyEventDispatcher` only while the root is attached, scope it to its owner and remove it at disposal once swallowed tails drain. Dispatcher registration is a window responsibility; the key router itself is independently testable. The controller supplies `toggle`, `dismiss`, `isOpen`, `component`; the binding supplier always reads current live bindings.
 
-- [ ] **Write RED defaults and override tests first.** Use JUnit/AssertJ and `java.awt.event.*`, `javax.swing.*`, `java.util.Map`.
+- [x] **Write RED defaults and override tests first.** Use JUnit/AssertJ and `java.awt.event.*`, `javax.swing.*`, `java.util.Map`.
 
 ```java
 @Test void paletteUsesLiteralPlatformModifierAndPreservesClearShortcut() {
@@ -713,12 +717,12 @@ private void execute(Command command) {
 }
 ```
 
-- [ ] **Run RED:** `./gradlew :moray-app:test --tests '*CommandPaletteShortcutsTest' --tests '*PaletteKeyRouterTest'`.
-- [ ] **Add the action and explicit defaults.** Add `COMMAND_PALETTE("command_palette", "Command Palette", "cmd+k")` outside the contiguous SELECT_TAB_1–9 enum run. Change CLEAR_SCROLLBACK's macOS default to `cmd+shift+k`. In `ActionId.defaultBinding(boolean)`, add `case COMMAND_PALETTE -> "ctrl+k"; case CLEAR_SCROLLBACK -> "ctrl+shift+k";` to the non-macOS switch. In `KeyBindings.effectiveDefaultBinding`, both cases must bypass the non-macOS Alt compatibility rewrite because their non-macOS values contain no `cmd`. Leave every other default unchanged. ConfigTemplate automatically enumerates the new action; add one explanatory comment about the plain-Ctrl palette exception on non-macOS.
+- [x] **Run RED:** `./gradlew :moray-app:test --tests '*CommandPaletteShortcutsTest' --tests '*PaletteKeyRouterTest'`.
+- [x] **Add the action and explicit defaults.** Add `COMMAND_PALETTE("command_palette", "Command Palette", "cmd+k")` outside the contiguous SELECT_TAB_1–9 enum run. Change CLEAR_SCROLLBACK's macOS default to `cmd+shift+k`. In `ActionId.defaultBinding(boolean)`, add `case COMMAND_PALETTE -> "ctrl+k"; case CLEAR_SCROLLBACK -> "ctrl+shift+k";` to the non-macOS switch. In `KeyBindings.effectiveDefaultBinding`, both cases must bypass the non-macOS Alt compatibility rewrite because their non-macOS values contain no `cmd`. Leave every other default unchanged. ConfigTemplate automatically enumerates the new action; add one explanatory comment about the plain-Ctrl palette exception on non-macOS.
 
 Add `case COMMAND_PALETTE -> commandPalette.toggle();` to `WindowContent.invoke` and include it among globally enabled actions while the window is open. Put the action first in the View menu with a separator before pane/font controls. Keep it out of searchable results to avoid a self-referential entry.
 
-- [ ] **Implement the key-routing state machine.** This concrete event handling routine uses fields `Set<Integer> swallowed = new HashSet<>()`, `boolean closed`, constructor-supplied `palette`, `bindings`, `macOs` and `belongsToOwner`. Explicit reset clears held keys after a cancelled input sequence. Owner deactivation dismisses the palette but does not discard a still-held activation tail. On pressed opening/activation, swallow the matching typed/released sequence even after the card closes; held-key repeat must not reopen the card or execute the next command. Fresh key sequences from unrelated windows are never consumed. The already-swallowed sequence must finish even if its own command moved focus to another Moray window.
+- [x] **Implement the key-routing state machine.** This concrete event handling routine uses fields `Set<Integer> swallowed = new HashSet<>()`, `boolean closed`, constructor-supplied `palette`, `bindings`, `macOs` and `belongsToOwner`. Explicit reset clears held keys after a cancelled input sequence. Owner deactivation dismisses the palette but does not discard a still-held activation tail. On pressed opening/activation, swallow the matching typed/released sequence even after the card closes; held-key repeat must not reopen the card or execute the next command. Fresh key sequences from unrelated windows are never consumed. The already-swallowed sequence must finish even if its own command moved focus to another Moray window.
 
 ```java
 boolean dispatch(java.awt.event.KeyEvent event) {
@@ -777,8 +781,8 @@ On close, mark the router closed to reject new sequences, retain its dispatcher 
 
 The owner predicate verifies a component belongs to this root/window, not just that some palette is open. While open, native input focus is kept within the card, but app action dispatch also checks `isOpen` so menu/root-map activation cannot bypass suppression. COPY/PASTE inside the palette input continue using Swing editor actions; selecting the explicit terminal Copy/Paste command still calls the window's terminal action after dismissal. `dispatchShortcut` tests invoke the same route policy for root input-map paths instead of duplicating a second modifier table.
 
-- [ ] **Add sequence tests:** for Mac and non-Mac, press/typed/release open K; repeat K stays open; release then K closes; numbered command executes once through repeat and release; typed digit remains searchable; missing number is consumed; numbered tabs work again after dismissal; configured remapping/none works live; Copy/Paste native field bindings survive; arrow navigation clamps; stale registry result is rechecked; unrelated window keys and ordinary closed-palette terminal keys pass through; deactivation dismisses while preserving the current consumed tail; timeout cleanup removes a missing-release tail. Add at least one real `JRootPane.processKeyBinding` test, one focused field edit test and one terminal connector assertion to guard zero byte leakage. Use the repository's real headless terminal fixture seam; do not put FakeConnector or test-only behavior into production.
-- [ ] **Run GREEN:** focused tests, existing `TabShortcutsTest` and `ApplicationActionsTest`, then full `./gradlew check`. Review and commit `feat: route command palette shortcuts safely` with trailer.
+- [x] **Add sequence tests:** for Mac and non-Mac, press/typed/release open K; repeat K stays open; release then K closes; numbered command executes once through repeat and release; typed digit remains searchable; missing number is consumed; numbered tabs work again after dismissal; configured remapping/none works live; Copy/Paste native field bindings survive; arrow navigation clamps; stale registry result is rechecked; unrelated window keys and ordinary closed-palette terminal keys pass through; deactivation dismisses while preserving the current consumed tail; timeout cleanup removes a missing-release tail. Add at least one real `JRootPane.processKeyBinding` test, one focused field edit test and one terminal connector assertion to guard zero byte leakage. Use the repository's real headless terminal fixture seam; do not put FakeConnector or test-only behavior into production.
+- [x] **Run GREEN:** focused tests, existing `TabShortcutsTest` and `ApplicationActionsTest`, then full `./gradlew check`. Review and commit `feat: route command palette shortcuts safely` with trailer.
 
 ### Task 6: Render, measure and document the runnable deliverable
 
@@ -786,7 +790,7 @@ The owner predicate verifies a component belongs to this root/window, not just t
 
 **Interfaces:** `:moray-app:commandPalettePreview --args="<output-dir>"` writes actual Swing renders without creating JFrame or login shells. `:moray-app:commandSearchMeasurement --args="<output-dir>"` writes timing/allocation results using a deterministic catalog. Neither runs under `check` or opens a window.
 
-- [ ] **Add opt-in Gradle wiring.** These tasks use test runtime classes because render fixtures/measurements are verification tools, not product classes.
+- [x] **Add opt-in Gradle wiring.** These tasks use test runtime classes because render fixtures/measurements are verification tools, not product classes.
 
 ```kotlin
 for ((taskName, entryPoint) in listOf(
@@ -803,7 +807,7 @@ for ((taskName, entryPoint) in listOf(
 }
 ```
 
-- [ ] **Create the render fixture using real components.** Construct `WindowContent` and `JRootPane` on EDT with an in-memory history and a delayed launcher. Use only harmless synthetic registry actions for preview commands where a pending pane would correctly disable a real command; label that render fixture in the README. For whole-window integration renders, the existing `DesktopTestSupport` controlled `/bin/sh` fixture may be used headlessly on macOS/Linux, with all sessions closed and exit futures awaited. Never use the user's login shell or a JFrame. The core capture routine is:
+- [x] **Create the render fixture using real components.** Construct `WindowContent` and `JRootPane` on EDT with an in-memory history and a delayed launcher. Use only harmless synthetic registry actions for preview commands where a pending pane would correctly disable a real command; label that render fixture in the README. For whole-window integration renders, the existing `DesktopTestSupport` controlled `/bin/sh` fixture may be used headlessly on macOS/Linux, with all sessions closed and exit futures awaited. Never use the user's login shell or a JFrame. The core capture routine is:
 
 ```java
 static void capture(JComponent root, Path file, int width, int height, int scale) throws Exception {
@@ -823,9 +827,9 @@ static void capture(JComponent root, Path file, int width, int height, int scale
 
 Render recents (three), query `pane` (five), query with no match, and long labels/narrow layout. Cover purple/classic/light, 1×/2× pixel output, 900×600 and 360×500 roots. Pixel output scale is not Swing `UIScale`; also test actual UI scaling in a fresh JVM with the relevant FlatLaf scale property so the dimension assertions prove geometry is scaled exactly once. Visually inspect generated PNGs with the image tool and correct clipping, contrast, centering or theme regressions before declaring visual verification. Record native focus/physical-display acceptance as pending, not inferred from PNGs.
 
-- [ ] **Measure pure search on 1,000 indexed commands.** Normalize/index once outside measurement. Use a deterministic set of labels/keywords, include exact, prefix, fuzzy and zero-match queries; warm up 5,000 calls and measure 10,000 calls using `System.nanoTime`. Consume result IDs/counts in a checksum so calls are not optimized away. Record median/p95/max per query and thread-allocated bytes when `com.sun.management.ThreadMXBean` supports them. No CI threshold based on workstation timing. Record OS, CPU architecture, Java vendor/version, commit, catalog count, query set and warmup/sample counts. These numbers measure matching only, not native key-to-paint latency.
+- [x] **Measure pure search on 1,000 indexed commands.** Normalize/index once outside measurement. Use a deterministic set of labels/keywords, include exact, prefix, fuzzy and zero-match queries; warm up 5,000 calls and measure 10,000 calls using `System.nanoTime`. Consume result IDs/counts in a checksum so calls are not optimized away. Record median/p95/max per query and thread-allocated bytes when `com.sun.management.ThreadMXBean` supports them. No CI threshold based on workstation timing. Record OS, CPU architecture, Java vendor/version, commit, catalog count, query set and warmup/sample counts. These numbers measure matching only, not native key-to-paint latency.
 
-- [ ] **Write user/developer documentation with this content.**
+- [x] **Write user/developer documentation with this content.**
 
 ```markdown
 # Command palette
@@ -878,8 +882,8 @@ var registration = owner.commands().register(
 
 Here `openSessionPicker` is the feature's existing `Runnable`; this example neither creates a session feature nor adds a new production API. Document title/icon action properties, identity validation, availability, EDT registration and no I/O in metadata/availability. State the history version/limits, off-EDT writes, failure behavior and last-writer-wins multi-process limitation in developer notes.
 
-- [ ] **Write native acceptance checklist:** macOS Cmd+K and Windows/Linux Ctrl+K; tab shortcuts before/during/after; key hold/release; plain digits and copy/paste; IME composition; two windows; open Find/Settings and focus; move/resize/zoom/split; close target pane during launch/exit; changing themes and shortcuts while open; three recents after normal restart; accessible input/list announcements; no stray shell input. Leave each native item unchecked until user-run.
-- [ ] **Run final verification once after all code changes:** `./gradlew check --rerun-tasks`; read exact XML counts in both modules; run source hygiene from AGENTS against all changed Java files; run `git diff --check`; inspect rendered PNGs and measurement report. Do not run packaging unless separately requested.
+- [x] **Write native acceptance checklist:** macOS Cmd+K and Windows/Linux Ctrl+K; tab shortcuts before/during/after; key hold/release; plain digits and copy/paste; IME composition; two windows; open Find/Settings and focus; move/resize/zoom/split; close target pane during launch/exit; changing themes and shortcuts while open; three recents after normal restart; accessible input/list announcements; no stray shell input. Leave each native item unchecked until user-run.
+- [x] **Run final verification once after all code changes:** `./gradlew check --rerun-tasks`; read exact XML counts in both modules; run source hygiene from AGENTS against all changed Java files; run `git diff --check`; inspect rendered PNGs and measurement report. Do not run packaging unless separately requested.
 - [ ] **Review and commit `docs: verify and document command palette`** with trailer. Then dispatch the whole-branch reviewer against the design and all feature commits, fix actionable findings and run scoped re-review. Update plan/status with exact evidence and any deviations. Preserve branch/worktree for user acceptance; no merge or push is authorized by design approval.
 
 ## Coverage and handoff

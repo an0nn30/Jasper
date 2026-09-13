@@ -9,6 +9,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.event.InputEvent;
@@ -92,10 +93,13 @@ final class CommandPalette extends JPanel {
         escape.setMargin(new Insets(0, UIScale.scale(7), 0, UIScale.scale(7)));
         escape.getAccessibleContext().setAccessibleName("Dismiss command palette");
         escape.addActionListener(event -> dismiss.run());
+        var escapeHolder = new JPanel(new GridBagLayout());
+        escapeHolder.setOpaque(false);
+        escapeHolder.add(escape);
         inputRow.setOpaque(false);
         inputRow.setLayout(new BorderLayout(UIScale.scale(10), 0));
         inputRow.add(query, BorderLayout.CENTER);
-        inputRow.add(escape, BorderLayout.LINE_END);
+        inputRow.add(escapeHolder, BorderLayout.LINE_END);
         add(inputRow, BorderLayout.NORTH);
 
         recentLabel.setOpaque(false);
@@ -356,6 +360,9 @@ final class CommandPalette extends JPanel {
         }
 
         @Override protected void paintComponent(Graphics graphics) {
+            // CellRendererPane assigns this component's bounds immediately before painting;
+            // lay out its null-layout children at that final width.
+            doLayout();
             if (selected) {
                 var g = (Graphics2D) graphics.create();
                 try {

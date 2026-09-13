@@ -258,6 +258,46 @@ class CommandPaletteTest {
         });
     }
 
+    @Test void actualListPaintingLaysOutRendererTextAndBadge() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var command = command("test.rendered", "Rendered command");
+            var palette = new CommandPalette(false, query -> {}, selected -> {}, () -> {});
+            palette.setResults(List.of(command), false, null);
+            palette.setSize(palette.getPreferredSize());
+            layoutTree(palette);
+
+            var image = new BufferedImage(palette.getWidth(), palette.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics();
+            palette.printAll(graphics);
+            graphics.dispose();
+
+            Component rendered = palette.resultList().getCellRenderer().getListCellRendererComponent(
+                palette.resultList(), command, 0, true, false);
+            JLabel title = labels(rendered).stream().filter(label -> label.getText().equals("Rendered command"))
+                .findFirst().orElseThrow();
+            JLabel badge = labels(rendered).stream().filter(label -> label.getText().equals("Ctrl+1"))
+                .findFirst().orElseThrow();
+            assertThat(title.getWidth()).isGreaterThan(0);
+            assertThat(badge.getWidth()).isGreaterThan(0);
+        });
+    }
+
+    @Test void escapeHintRemainsCompactAndVerticallyCentered() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var palette = new CommandPalette(false, query -> {}, selected -> {}, () -> {});
+            palette.setResults(List.of(command("test.first", "First")), false, null);
+            palette.setSize(palette.getPreferredSize());
+            layoutTree(palette);
+
+            JButton escape = buttons(palette).getFirst();
+            Container inputRow = escape.getParent().getParent();
+            assertThat(escape.getHeight()).isLessThan(UIScale.scale(32));
+            int actualTop = escape.getY() + escape.getParent().getY();
+            int centeredTop = (inputRow.getHeight() - escape.getHeight()) / 2;
+            assertThat(Math.abs(actualTop - centeredTop)).isLessThanOrEqualTo(1);
+        });
+    }
+
     private static Command command(String id, String title) {
         return new Command(id, new AbstractAction(title) {
             @Override public void actionPerformed(java.awt.event.ActionEvent event) {}

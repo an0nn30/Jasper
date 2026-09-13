@@ -53,4 +53,22 @@ tasks.register<JavaExec>("mockUiPreview") {
     args(rootProject.layout.projectDirectory.dir("docs/design").asFile.absolutePath)
 }
 
+// Explicit opt-in verification tools. They use real app components from the test
+// runtime, but check never runs them and they never create a native window.
+for ((taskName, entryPoint) in listOf(
+    "commandPalettePreview" to "CommandPalettePreview",
+    "commandSearchMeasurement" to "CommandSearchMeasurement",
+)) {
+    tasks.register<JavaExec>(taskName) {
+        group = "verification"
+        dependsOn(tasks.testClasses)
+        classpath = sourceSets["test"].runtimeClasspath
+        mainClass = "dev.moray.app.$entryPoint"
+        jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
+        providers.gradleProperty("moray.uiScale").orNull?.let {
+            systemProperty("flatlaf.uiScale", it)
+        }
+    }
+}
+
 apply(from = rootProject.file("gradle/packaging.gradle"))

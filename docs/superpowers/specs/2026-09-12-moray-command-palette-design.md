@@ -1,6 +1,6 @@
 # Moray command palette — approved design
 
-**Status:** Approved by the user on 2026-09-12 following the interactive visual review. The selected treatment is the 560px raised card, 12px outer corners and 40px result rows in the app’s purple chrome, with equivalent classic-dark/light treatments. Implementation has not started.
+**Status:** Approved by the user on 2026-09-12 following the interactive visual review. Implemented locally on `codex/command-palette-design` through Tasks 1–6; task reviews through Task 5 are approved, Task 6 and the whole branch still await independent review and native acceptance. The selected treatment is the 560px raised card, 12px outer corners and 40px result rows in the app’s purple chrome, with equivalent classic-dark/light treatments.
 
 **Branch:** `codex/command-palette-design`, from main `1db31b1`.
 
@@ -102,4 +102,4 @@ Create one implementation plan following repository TDD, per-task implementer/re
 
 Measure search on a deterministic synthetic 1,000-command catalog and record latency/allocations without fragile wall-clock unit-test thresholds. Search stays in memory with preprocessed metadata, no debounce, filesystem reads or terminal-buffer locks. Inspect headless renders in purple/classic/light, recents, five results, empty state, narrow sizes and scale factors. Native focus, input methods, accessibility and physical-display placement require user-run acceptance. No GUI or benchmark window is needed to review this design.
 
-The interactive review used illustrative terminal content, sample recents, local simulated execution and a preview-only reopen button. Those preview helpers are not app requirements. Production uses real command availability, native actions and persistent history. Implementation, merge and publication are not claimed by this design.
+The interactive review used illustrative terminal content, sample recents, local simulated execution and a preview-only reopen button. Those preview helpers are not app requirements. Production uses real command availability, native actions and persistent history. Headless implementation and verification are recorded by the linked plan and [render evidence](../../design/command-palette/README.md). Native acceptance, merge and publication are not claimed by this design.

@@ -1,0 +1,29 @@
+# Command palette render manifest
+
+Swing UI scale: 1.0
+Pixel output scales: 1x, 2x
+
+recents-purple-900x600-1x.png
+recents-purple-900x600-2x.png
+recents-classic-900x600-1x.png
+recents-classic-900x600-2x.png
+recents-light-900x600-1x.png
+recents-light-900x600-2x.png
+pane-query-purple-900x600-1x.png
+pane-query-purple-900x600-2x.png
+pane-query-classic-900x600-1x.png
+pane-query-classic-900x600-2x.png
+pane-query-light-900x600-1x.png
+pane-query-light-900x600-2x.png
+no-match-purple-900x600-1x.png
+no-match-purple-900x600-2x.png
+no-match-classic-900x600-1x.png
+no-match-classic-900x600-2x.png
+no-match-light-900x600-1x.png
+no-match-light-900x600-2x.png
+long-labels-narrow-purple-360x500-1x.png
+long-labels-narrow-purple-360x500-2x.png
+long-labels-narrow-classic-360x500-1x.png
+long-labels-narrow-classic-360x500-2x.png
+long-labels-narrow-light-360x500-1x.png
+long-labels-narrow-light-360x500-2x.png
