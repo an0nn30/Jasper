@@ -19,6 +19,7 @@ public final class MockUiPreview {
         Files.createDirectories(output);
         var pending = new ArrayDeque<Runnable>();
         var sessions = new ArrayList<TerminalSession>();
+        ThemeController[] themes = new ThemeController[1];
         WindowContent[] owner = new WindowContent[1];
         JRootPane[] root = new JRootPane[1];
         MacTitleBar[] header = new MacTitleBar[1];
@@ -28,12 +29,36 @@ public final class MockUiPreview {
                     try {
                         // Fixture-only prompt and metadata. The real application never embeds them.
                         String script = "printf '\033[32m\u256d\u2500(\033[34mdustin \033[32m\u2022 \033[34mmbp\033[32m)\u2500[~]\r\n\u2570\u2500\033[34m\u03bb \033[0m\033]7;file://localhost/Users/dustin\007\033]2;dustin\007'; read answer";
+                        if (args.length > 1 && args[1].equals("--palette")) {
+                            StringBuilder sample = new StringBuilder("\\nMoray terminal  /  color palette\\n\\n");
+                            String[] names = {"black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"};
+                            for (int row = 0; row < 2; row++) {
+                                for (int color = 0; color < 8; color++) {
+                                    sample.append("\\033[").append((row == 0 ? 40 : 100) + color).append("m     ");
+                                }
+                                sample.append("\\033[0m\\n");
+                            }
+                            sample.append("\\n");
+                            for (int color = 1; color < 8; color++) {
+                                sample.append("\\033[").append(30 + color).append("m")
+                                    .append(names[color]).append("  ");
+                            }
+                            sample.append("\\033[0m\\n\\n")
+                                .append("\\033[35m~/projects/moray\\033[0m  on  \\033[34mmain\\033[0m\\n")
+                                .append("\\033[32mPASS\\033[0m  Terminal ready\\n")
+                                .append("\\033[33mWARN\\033[0m  Example diagnostic\\n")
+                                .append("\\033[31mFAIL\\033[0m  Example diagnostic\\n\\n")
+                                .append("\\033[1mBright text\\033[0m  Normal text  \\033[90mMuted text\\033[0m\\n\\n")
+                                .append("\\033[35m>\\033[0m ");
+                            script = script.replace("; read answer", "; printf '" + sample + "'; read answer");
+                        }
                         TerminalSession session = TerminalSession.start(List.of("/bin/sh", "-c", script),
                             System.getenv(), HOME, 80, 24, 100);
                         sessions.add(session); return session;
                     } catch (Exception failure) { throw new CompletionException(failure); }
                 }, "bash");
-                owner[0] = content(launcher);
+                themes[0] = new ThemeController();
+                owner[0] = content(launcher, themes[0]);
                 owner[0].newTab(HOME);
                 owner[0].currentTab().rename("moray");
                 owner[0].tabStrip().setSelectedIndex(0);
@@ -47,6 +72,7 @@ public final class MockUiPreview {
                 && sessions.stream().allMatch(session -> session.title().equals("dustin")));
             for (BuiltinTheme theme : BuiltinTheme.values()) {
                 edt(() -> {
+                    themes[0].configure(new ColorsConfig(Appearance.SYSTEM, theme.id()), theme.palette());
                     owner[0].selectTheme(theme);
                     root[0].setSize(958, 958); MockUiTest.layoutTree(root[0]);
                 });

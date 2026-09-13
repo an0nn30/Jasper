@@ -26,8 +26,8 @@ class MockUiTest {
                 assertThat(root.getContentPane().getPreferredSize()).isEqualTo(new Dimension(958, 942));
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
-                assertThat(image.getRGB(650, 37) & 0xffffff).isEqualTo(0x313439);
-                assertThat(image.getRGB(650, 80) & 0xffffff).isEqualTo(0x292c34);
+                assertThat(image.getRGB(650, 37) & 0xffffff).isEqualTo(0x301a42);
+                assertThat(image.getRGB(650, 80) & 0xffffff).isEqualTo(0x120c1c);
                 assertThat(image.getRGB(500, 700)).isEqualTo(image.getRGB(500, 940));
             }
         });
@@ -95,19 +95,19 @@ class MockUiTest {
             var status = owner.status(); status.setSize(600, 30);
             status.setMetadata("bash", "/tmp", "91 \u00d7 35", true); layoutTree(status);
             BufferedImage before = paint(status);
-            assertThat(before.getRGB(32, 30) & 0xffffff).isEqualTo(0xa8c58d);
+            assertThat(before.getRGB(32, 30) & 0xffffff).isEqualTo(0x9ccf9a);
             status.setMetadata("bash", "/very-long-directory".repeat(100), "91 \u00d7 35", false); layoutTree(status);
             BufferedImage after = paint(status);
             assertThat(status.getMinimumSize().width).isZero();
             assertThat(status.getPreferredSize().width).isZero();
             assertThat(status.getText()).contains("/very-long-directory").contains("91 \u00d7 35");
-            assertThat(after.getRGB(32, 30) & 0xffffff).isEqualTo(0x848c9b);
+            assertThat(after.getRGB(32, 30) & 0xffffff).isEqualTo(0x9c91ae);
             for (int y = 0; y < 60; y++) for (int x = 900; x < 1200; x++)
                 assertThat(after.getRGB(x, y)).as("right segment remains visible").isEqualTo(before.getRGB(x, y));
             // The slash remains subdued independently of the metadata text color.
             boolean foundSeparator = false;
             for (int y = 16; y < 44; y++) for (int x = 100; x < 156; x++)
-                foundSeparator |= (after.getRGB(x, y) & 0xffffff) == 0x353940;
+                foundSeparator |= (after.getRGB(x, y) & 0xffffff) == 0x4e2c69;
             assertThat(foundSeparator).isTrue();
         });
     }

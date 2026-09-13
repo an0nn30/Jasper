@@ -85,7 +85,11 @@ final class ThemeController {
 
     static boolean install(BuiltinTheme theme) {
         requireEdt();
-        return theme == BuiltinTheme.LIGHT ? FlatLightLaf.setup() : FlatDarkLaf.setup();
+        return switch (theme) {
+            case LIGHT -> FlatLightLaf.setup();
+            case CLASSIC_DARK -> FlatDarkLaf.setup();
+            case DARK -> FlatLaf.setup(new MorayDarkPurpleLaf());
+        };
     }
 
     private static void requireEdt() {

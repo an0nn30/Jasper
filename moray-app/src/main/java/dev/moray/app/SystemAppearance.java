@@ -52,7 +52,7 @@ final class SystemAppearance implements AutoCloseable {
 
     static SystemAppearance fixed(BuiltinTheme theme) {
         Objects.requireNonNull(theme, "theme");
-        return new SystemAppearance(() -> new Binding(() -> theme == BuiltinTheme.DARK,
+        return new SystemAppearance(() -> new Binding(() -> theme != BuiltinTheme.LIGHT,
             ignored -> {}, ignored -> {}), daemonWorker(), SwingUtilities::invokeLater);
     }
 

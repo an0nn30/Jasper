@@ -19,7 +19,7 @@ class AppIconsTest {
                 assertThat(icon.getIconWidth()).isEqualTo(16);
                 BufferedImage image = paint(icon);
                 assertThat(image.getRGB(2, 30) >>> 24).as(name + " no soft field").isZero();
-                assertThat(hasColor(image, 0xd3d7df)).as(name + " neutral stroke").isTrue();
+                assertThat(hasColor(image, 0xbcc2d2)).as(name + " neutral stroke").isTrue();
             }
         });
     }
@@ -28,10 +28,10 @@ class AppIconsTest {
         edt(() -> {
             var themes = new ThemeController();
             FlatSVGIcon icon = AppIcons.icon("square-plus");
-            assertThat(hasColor(paint(icon), 0xd3d7df)).isTrue();
+            assertThat(hasColor(paint(icon), 0xbcc2d2)).isTrue();
             themes.select(BuiltinTheme.LIGHT);
             assertThat(hasColor(paint(icon), 0x383a42)).isTrue();
-            assertThat(hasColor(paint(icon), 0xd3d7df)).isFalse();
+            assertThat(hasColor(paint(icon), 0xbcc2d2)).isFalse();
         });
     }
 

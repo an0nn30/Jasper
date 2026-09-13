@@ -26,6 +26,8 @@ application {
 tasks.test {
     val configExample = rootProject.layout.projectDirectory.file("config.example.toml")
     inputs.file(configExample).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(rootProject.file("packaging/icons/Moray.icns"), rootProject.file("packaging/icons/Moray.ico"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("moray.projectDir", rootProject.layout.projectDirectory.asFile.absolutePath)
 }
 

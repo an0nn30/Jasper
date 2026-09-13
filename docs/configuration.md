@@ -63,7 +63,7 @@ blink = true
 # System switches both chrome and the built-in palette; custom palettes stay fixed.
 appearance = "system"
 # Either built-in ID follows appearance. A custom basename is loaded from themes/.
-theme = "moray-dark"
+theme = "moray-dark-purple"
 # theme = "my-theme.toml"
 
 [keybindings]
@@ -94,7 +94,7 @@ theme = "moray-dark"
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `colors.appearance` | `"system"` | `"system"`, `"light"`, `"dark"` | Live, shared across windows |
-| `colors.theme` | `"moray-dark"` | Either built-in ID or custom basename | Live, shared across windows |
+| `colors.theme` | `"moray-dark-purple"` | Built-in ID or custom basename | Live, shared across windows |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Live settings and temporary choices
@@ -197,19 +197,30 @@ App logging remains planned; see the [packaging guide](packaging.md) for desktop
 
 ## Appearance and custom themes
 
-View → Appearance offers Light, Dark and Follow System across all windows. Choices are temporary and never rewrite the configuration. OS readings are remembered during a manual choice; Follow System applies the latest reading immediately. System initially uses Dark until the asynchronous reading arrives. Unsupported desktops or detector failures use Dark with a diagnostic; explicit choices remain usable.
+View → Appearance offers Light, Dark and Follow System across all windows. Choices are temporary and never rewrite the configuration. OS readings are remembered during a manual choice; Follow System applies the latest reading immediately. System initially uses Dark (purple by default) until the asynchronous reading arrives. Unsupported desktops or detector failures use Dark with a diagnostic; explicit choices remain usable.
 
 | Saved values | Chrome | Terminal palette |
 |---|---|---|
-| System + either built-in ID | OS appearance | Corresponding built-in palette |
-| Light or Dark + either built-in ID | Saved appearance | Corresponding built-in palette |
+| System + moray-dark-purple (default) | Purple Dark or Light | moray-dark-purple or moray-light |
+| System + moray-dark | Classic Dark or Light | moray-dark or moray-light |
+| System + moray-light | Purple Dark or Light | moray-dark-purple or moray-light |
+| Light + any built-in ID | Light | moray-light |
+| Dark + moray-dark | Classic Dark | moray-dark |
+| Dark + moray-dark-purple or moray-light | Purple Dark | moray-dark-purple |
 | Any appearance + custom file | Saved/system appearance | Fixed custom palette |
 | Appearance omitted + explicit moray-light | Light | Built-in Light (legacy behavior) |
-| Appearance omitted + explicit moray-dark | Dark | Built-in Dark (legacy behavior) |
-| Both omitted | System | Following built-in pair |
+| Appearance omitted + explicit moray-dark | Classic Dark | moray-dark (legacy behavior) |
+| Appearance omitted + explicit moray-dark-purple | Purple Dark | moray-dark-purple |
+| Both omitted | System | moray-dark-purple / moray-light |
 | Appearance omitted + custom file | System | Fixed custom palette |
 
 Explicit appearance takes precedence over a built-in ID's suffix. Changing the parsed saved appearance clears the temporary override; rewriting the same value does not. Custom palettes retain their colors as chrome changes. Terminal padding and status match the palette background; toolbar, menus, find controls and native title follow chrome.
+
+The built-in IDs are `moray-dark-purple`, `moray-dark` (classic) and `moray-light`.
+New/missing configurations use `appearance = "system"` and `theme = "moray-dark-purple"`.
+An existing configuration explicitly selecting `moray-dark` retains the classic palette;
+change its selector to `moray-dark-purple` to adopt the new theme. Explicit custom themes
+also remain selected. See the [palette and actual UI renders](design/moray-dark-purple/README.md).
 
 Theme files live only in Moray's `themes/` directory beside its default configuration directory (macOS: `~/.config/moray/themes/`). `--config` does not relocate themes. Select one basename, with an optional `.toml` extension. Spaces and Unicode are allowed; paths, separators, control characters, Windows-reserved filename characters, `.` and `..` are rejected. The selected file must be a regular file contained within the real theme directory; escaping symlinks are rejected. Loading creates no files or directories.
 
@@ -223,7 +234,7 @@ The [complete twenty-color example](examples/themes/moray-custom.toml) uses this
 | `colors.normal` | `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white` |
 | `colors.bright` | Same eight ANSI names |
 
-Values are quoted `#RRGGBB` or `0xRRGGBB`. Files must be strict UTF-8 and at most 256 KiB. At least one supported color is required; omitted colors inherit fixed Moray Dark, independent of the OS. Unsupported keys warn and are ignored. Invalid supported colors/types, duplicate definitions, syntax errors and symbolic cell references reject the candidate. Selection foreground, cursor text, dim/indexed colors, imports and other Alacritty features are unsupported.
+Values are quoted `#RRGGBB` or `0xRRGGBB`. Files must be strict UTF-8 and at most 256 KiB. At least one supported color is required; omitted colors inherit fixed classic Moray Dark (`moray-dark`), independent of the OS and the new default. This preserves existing custom theme files. Unsupported keys warn and are ignored. Invalid supported colors/types, duplicate definitions, syntax errors and symbolic cell references reject the candidate. Selection foreground, cursor text, dim/indexed colors, imports and other Alacritty features are unsupported.
 
 To try the example on macOS, choose an absent destination (change the name if already used):
 

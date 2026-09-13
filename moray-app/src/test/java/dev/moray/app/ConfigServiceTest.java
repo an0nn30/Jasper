@@ -493,7 +493,7 @@ class ConfigServiceTest {
         diagnostics.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, file, 0, 0, "", "Failure"));
         assertThat(state.diagnostics()).isEmpty();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> state.diagnostics().clear());
-        assertThat(state.palette()).isEqualTo(Palette.morayDark());
+        assertThat(state.palette()).isEqualTo(Palette.morayDarkPurple());
     }
 
     private static void assertError(ConfigService.State state) {

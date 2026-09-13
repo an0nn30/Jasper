@@ -25,8 +25,8 @@ class TerminalPaletteTest {
     private static final int COLUMNS = 20;
     private static final int ROWS = 4;
     private static final int[] DARK_ANSI = {
-        0x282c34, 0xe06c75, 0xa8c58d, 0xe5c07b, 0x80b4df, 0xc678dd, 0x56b6c2, 0xabb2bf,
-        0x5c6370, 0xef7b85, 0xa9d48a, 0xf0cc8c, 0x74bff8, 0xd68bee, 0x67c7d3, 0xe6e9ef
+        0x241532, 0xed7c96, 0x9ccf9a, 0xe6c07a, 0x8eaff0, 0xc089ef, 0x75c6d2, 0xbcc2d2,
+        0x91819d, 0xff97ae, 0xb6e3ae, 0xf4d69b, 0xb2c6ff, 0xd4a6ff, 0x97dce6, 0xffffff
     };
     private static final int[] LIGHT_ANSI = {
         0x383a42, 0xe45649, 0x50a14f, 0xc18401, 0x4078f2, 0xa626a4, 0x0184bc, 0xa0a1a7,
@@ -62,9 +62,9 @@ class TerminalPaletteTest {
         Await.until(() -> session.snapshot().cursorColumn() == 18, "palette blocks on screen");
 
         BufferedImage dark = onEdtResult(this::paint);
-        assertPalettePixels(dark, fontsAt(14f), 0xabb2bf, 0x292c34, DARK_ANSI);
+        assertPalettePixels(dark, fontsAt(14f), 0xbcc2d2, 0x120c1c, DARK_ANSI);
         assertThat(cellCenter(dark, fontsAt(14f), 17)).isEqualTo(0x123456);
-        assertThat(cursorEdge(dark, fontsAt(14f), 18)).isEqualTo(0xb3bbc7);
+        assertThat(cursorEdge(dark, fontsAt(14f), 18)).isEqualTo(0xffffff);
 
         onEdt(() -> view.setPalette(Palette.morayLight()));
 

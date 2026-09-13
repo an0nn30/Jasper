@@ -87,7 +87,7 @@ class ThemeControllerTest {
             owners[0].selectTab(retained[0]);
             assertThat(first[0].view().getBackground()).isEqualTo(new Color(0xfafafa));
             appearance(owners[1]).getItem(1).doClick();
-            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0x292c34));
+            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0x120c1c));
             assertThat(first[0].findBar().result().error()).isNotNull();
             var custom = new dev.moray.terminal.Palette(Color.WHITE, new Color(0x101820), Color.YELLOW,
                 Color.GRAY, BuiltinTheme.DARK.palette().ansi());
@@ -188,7 +188,7 @@ class ThemeControllerTest {
             assertThatThrownBy(() -> themes.select(BuiltinTheme.LIGHT)).isInstanceOf(IllegalStateException.class);
             assertThat(UIManager.getLookAndFeel()).isSameAs(before);
             assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            assertThat(owner.getBackground()).isEqualTo(new Color(0x292c34));
+            assertThat(owner.getBackground()).isEqualTo(new Color(0x120c1c));
             assertThat(changed).isEmpty();
         });
     }
@@ -271,6 +271,7 @@ class ThemeControllerTest {
             var themes = new ThemeController();
             var owner = content(launcher(new ArrayDeque<>()), themes);
             for (BuiltinTheme theme : BuiltinTheme.values()) {
+                themes.configure(new ColorsConfig(Appearance.SYSTEM, theme.id()), theme.palette());
                 themes.select(theme);
                 assertThat(owner.getBackground()).isEqualTo(theme.palette().background());
                 assertThat(owner.toolbar().getBackground()).isEqualTo(theme.palette().background());

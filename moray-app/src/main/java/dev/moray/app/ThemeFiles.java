@@ -27,7 +27,7 @@ final class ThemeFiles {
     private static final int MAX_BYTES = 256 * 1024;
 
     private final Path directory;
-    private Palette lastGood = Palette.morayDark();
+    private Palette lastGood = Palette.morayDarkPurple();
     private Key lastKey;
     private Result cached;
 
@@ -40,7 +40,7 @@ final class ThemeFiles {
         if (!colors.custom()) {
             lastKey = null;
             cached = null;
-            lastGood = colors.theme().equals("moray-light") ? Palette.morayLight() : Palette.morayDark();
+            lastGood = BuiltinTheme.fromId(colors.theme()).palette();
             return new Result(lastGood, List.of());
         }
 

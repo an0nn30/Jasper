@@ -90,8 +90,9 @@ final class ConfigTemplate {
             [colors]
             # System switches both chrome and the built-in palette; custom palettes stay fixed.
             appearance = "system"
-            # Either built-in ID follows appearance. A custom basename is loaded from themes/.
-            theme = "moray-dark"
+            # Built-ins: moray-dark-purple (default), moray-dark (classic), moray-light.
+            # A custom basename is loaded from themes/.
+            theme = "moray-dark-purple"
             # theme = "my-theme.toml"
 
             [keybindings]

@@ -15,7 +15,7 @@ final class WindowStatusBar extends JPanel {
     private String configColor = "Moray.configSuccessForeground";
     private String shell = "", directory = "", dimensions = "";
     private boolean running;
-    private Palette palette = Palette.morayDark();
+    private Palette palette = Palette.morayDarkPurple();
     private String text = "Built-in defaults";
 
     WindowStatusBar() {
@@ -57,7 +57,7 @@ final class WindowStatusBar extends JPanel {
     JButton configButton() { return configButton; }
     String getText() { return text; }
     void applyPalette(Palette next) { palette = java.util.Objects.requireNonNull(next); refreshTheme(); }
-    private boolean custom() { return (!palette.equals(Palette.morayDark()) && !palette.equals(Palette.morayLight()))
+    private boolean custom() { return (!palette.equals(Palette.morayDarkPurple()) && !palette.equals(Palette.morayDark()) && !palette.equals(Palette.morayLight()))
         || !palette.background().equals(UIManager.getColor("Panel.background")); }
     private Color readable(Color color) {
         return custom() && contrast(color, palette.background()) < 3 ? palette.foreground() : color;

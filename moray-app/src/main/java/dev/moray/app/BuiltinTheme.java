@@ -2,9 +2,10 @@ package dev.moray.app;
 
 import dev.moray.terminal.Palette;
 
-/** The session-only built-in choices for both chrome and terminal rendering. */
+/** Built-in palettes and their corresponding chrome variants. */
 enum BuiltinTheme {
-    DARK("moray-dark", "Dark", Palette.morayDark()),
+    DARK("moray-dark-purple", "Dark purple", Palette.morayDarkPurple()),
+    CLASSIC_DARK("moray-dark", "Classic dark", Palette.morayDark()),
     LIGHT("moray-light", "Light", Palette.morayLight());
 
     private final String id;
@@ -13,6 +14,11 @@ enum BuiltinTheme {
 
     BuiltinTheme(String id, String label, Palette palette) {
         this.id = id; this.label = label; this.palette = palette;
+    }
+
+    static BuiltinTheme fromId(String id) {
+        for (BuiltinTheme theme : values()) if (theme.id.equals(id)) return theme;
+        return null;
     }
 
     String id() { return id; }

@@ -64,7 +64,7 @@ final class ConfigLoader {
     private boolean copyOnSelect;
     private BellMode bell = BellMode.VISUAL;
     private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
-    private String theme = "moray-dark";
+    private String theme = ColorsConfig.defaults().theme();
     private Appearance appearance = Appearance.SYSTEM;
     private Map<String, String> keybindings = Map.of();
 
@@ -89,7 +89,7 @@ final class ConfigLoader {
         if (!toml.contains(List.of("colors", "appearance"))) {
             Object legacy = toml.get(List.of("colors", "theme"));
             if ("moray-light".equals(legacy)) appearance = Appearance.LIGHT;
-            else if ("moray-dark".equals(legacy)) appearance = Appearance.DARK;
+            else if ("moray-dark".equals(legacy) || "moray-dark-purple".equals(legacy)) appearance = Appearance.DARK;
         }
         ColorsConfig colors = new ColorsConfig(appearance, theme);
         diagnostics.sort(Comparator.comparingInt(ConfigDiagnostic::line).thenComparingInt(ConfigDiagnostic::column));

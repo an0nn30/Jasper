@@ -1,4 +1,7 @@
 import java.nio.file.Files
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.zip.ZipFile
 import org.gradle.api.plugins.JavaApplication
@@ -28,6 +31,11 @@ def normalizedHost = {
     if (os.startsWith('mac')) return [os: 'macos', architecture: normalizedArchitecture]
     if (os.startsWith('windows')) return [os: 'windows', architecture: normalizedArchitecture]
     return [os: os, architecture: normalizedArchitecture]
+}
+
+// Keep icon inputs lazy so non-native builds remain usable on other hosts.
+def nativeIcon = providers.provider {
+    rootProject.file("packaging/icons/Moray.${normalizedHost().os == 'macos' ? 'icns' : 'ico'}")
 }
 
 def validatedVersion = {
@@ -100,6 +108,7 @@ def packageApp = tasks.register('packageApp') {
     description = 'Builds a native Moray application image for the current host.'
     dependsOn(stage)
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(nativeIcon).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.property('mainClass', app.mainClass)
     inputs.property('jvmArgs', providers.provider { app.applicationDefaultJvmArgs.collect { it.toString() } })
     inputs.property('version', version)
@@ -120,6 +129,7 @@ def packageApp = tasks.register('packageApp') {
             '--input', inputDirectory.get().asFile.absolutePath, '--dest', imageDir.absolutePath,
             '--main-jar', jarTask.get().archiveFile.get().asFile.name,
             '--main-class', app.mainClass.get(),
+            '--icon', nativeIcon.get().absolutePath,
             '--jlink-options', '--strip-debug --no-man-pages --no-header-files --bind-services']
         app.applicationDefaultJvmArgs.each { args.addAll(['--java-options', it.toString()]) }
         if (context.host.os == 'macos') {
@@ -195,10 +205,35 @@ def verifyPackage = tasks.register('verifyPackage') {
             def identifier = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist.absolutePath], 'plutil identifier').stdout.trim()
             def bundleVersion = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleShortVersionString', 'raw', '-o', '-', plist.absolutePath], 'plutil version').stdout.trim()
             if (identifier != 'dev.moray.app' || bundleVersion != context.version) throw new GradleException("Package verification failed: plist identity/version is ${identifier}/${bundleVersion}")
+            String iconName = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIconFile', 'raw', '-o', '-', plist.absolutePath], 'plutil icon').stdout.trim()
+            if (!iconName.endsWith('.icns')) iconName += '.icns'
+            File packagedIcon = new File(image, "Contents/Resources/${iconName}")
+            if (!packagedIcon.isFile() || !Arrays.equals(Files.readAllBytes(nativeIcon.get().toPath()), Files.readAllBytes(packagedIcon.toPath()))) {
+                throw new GradleException('Package verification failed: bundled macOS icon differs from the official icon')
+            }
             String fileOutput = executeNative(['/usr/bin/file', nativeLauncher.absolutePath, new File(runtimeHome, 'bin/java').absolutePath], 'native architecture inspection').stdout
             String architectureNeedle = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
             if (!fileOutput.contains(architectureNeedle)) throw new GradleException("Package verification failed: native binaries are not ${architectureNeedle}\n${fileOutput}")
             executeNative(['/usr/bin/codesign', '--verify', '--deep', '--strict', image.absolutePath], 'codesign verification')
+        }
+        if (context.host.os == 'windows') {
+            // jpackage embeds the ICO's PNG frames in the executable's native resources.
+            // Inspect bytes without running the launcher or depending on image-conversion tools.
+            byte[] ico = Files.readAllBytes(nativeIcon.get().toPath())
+            ByteBuffer directory = ByteBuffer.wrap(ico).order(ByteOrder.LITTLE_ENDIAN)
+            if (directory.getShort() != 0 || directory.getShort() != 1) {
+                throw new GradleException('Package verification failed: invalid Windows ICO header')
+            }
+            int count = Short.toUnsignedInt(directory.getShort())
+            String executableBytes = new String(Files.readAllBytes(nativeLauncher.toPath()), StandardCharsets.ISO_8859_1)
+            for (int i = 0; i < count; i++) {
+                directory.position(6 + i * 16 + 8)
+                int length = directory.getInt(), offset = directory.getInt()
+                String frameBytes = new String(ico, offset, length, StandardCharsets.ISO_8859_1)
+                if (!executableBytes.contains(frameBytes)) {
+                    throw new GradleException("Package verification failed: Windows launcher omits official icon frame ${i}")
+                }
+            }
         }
         File bundledJava = new File(runtimeHome, "bin/java${context.host.os == 'windows' ? '.exe' : ''}")
         def javaVersion = executeNative([bundledJava.absolutePath, '-XshowSettings:properties', '-version'], 'bundled java -version')

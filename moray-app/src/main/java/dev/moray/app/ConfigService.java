@@ -41,8 +41,8 @@ final class ConfigService implements AutoCloseable {
         }
 
         private static Palette seed(ConfigSnapshot snapshot) {
-            return snapshot.colors().theme().equals("moray-light")
-                ? Palette.morayLight() : Palette.morayDark();
+            BuiltinTheme builtin = BuiltinTheme.fromId(snapshot.colors().theme());
+            return builtin == null ? Palette.morayDarkPurple() : builtin.palette();
         }
     }
 

@@ -30,6 +30,7 @@ final class TerminalWindow implements AutoCloseable {
     TerminalWindow(MorayApplication application, ShellLauncher launcher, Path directory, ThemeController themes,
                    ConfigurationController configuration) {
         this.application = application;
+        frame.setIconImages(ApplicationIcon.images(SystemInfo.isMacOS));
         content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes);
         if (configuration != null) {
             content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(configuration.snapshot()));

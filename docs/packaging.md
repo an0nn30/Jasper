@@ -38,8 +38,9 @@ image is `moray-app/build/packaging/image/Moray.app` on macOS and
 
 The package bundles a runtime and needs no external Java. Current development
 packages have only jpackage's local ad-hoc signature, not a Developer ID signature,
-and use the generated default icon. Distribution signing, notarization, and final
-icon work remain outstanding.
+and use the official Eclipse icon. Distribution signing and notarization remain
+outstanding. See [icon sources, platform framing and regeneration](../packaging/icons/README.md)
+for the macOS ICNS, Windows ICO and runtime PNG assets.
 
 ## Native acceptance checklist
 
@@ -50,6 +51,7 @@ acceptance remain unexecuted on macOS.
 ### macOS
 
 - [ ] Open the DMG, drag Moray to Applications, and launch it from Finder and from the Dock.
+- [ ] Confirm the Eclipse icon in Finder, Dock and Cmd+Tab at normal and Retina sizes; compare its apparent size with neighboring app icons.
 - [ ] With a minimal launcher environment, confirm the shell starts and UTF-8 text renders correctly.
 - [ ] Confirm native title controls and system theme changes.
 - [ ] Confirm multiple windows and shell-exit cleanup.
@@ -64,6 +66,7 @@ acceptance remain unexecuted on macOS.
 ### Windows
 
 - [ ] Build on Windows with a JBR 25 x64 SDK, extract the entire ZIP to a path containing spaces, and launch `Moray.exe` from Explorer.
+- [ ] Confirm the Eclipse icon in Explorer, the taskbar, Alt+Tab and titlebar at 100%, 150% and 200% display scale.
 - [ ] Confirm PowerShell/PTY input and resize behavior, including Unicode text.
 - [ ] Confirm clipboard operations and tab shortcuts.
 - [ ] Confirm the Settings location and live reload.
