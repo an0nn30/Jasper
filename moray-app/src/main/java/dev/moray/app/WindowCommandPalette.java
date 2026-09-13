@@ -146,13 +146,14 @@ final class WindowCommandPalette implements AutoCloseable {
         overlay.doLayout(); overlay.repaint();
     }
 
-    static Rectangle centered(Rectangle terminal, Dimension preferred, Rectangle available, int margin) {
+    static Rectangle positioned(Rectangle terminal, Dimension preferred, Rectangle available, int margin) {
         int insetX = Math.min(margin, Math.max(0, available.width / 2));
         int insetY = Math.min(margin, Math.max(0, available.height / 2));
         int width = Math.min(preferred.width, Math.max(0, available.width - 2 * insetX));
         int height = Math.min(preferred.height, Math.max(0, available.height - 2 * insetY));
         int x = terminal.x + (terminal.width - width) / 2;
-        int y = terminal.y + (terminal.height - height) / 2;
+        // Anchor the card in the upper half while keeping clearance in small windows.
+        int y = terminal.y + terminal.height / 3 - height / 2;
         x = Math.max(available.x + insetX, Math.min(x, available.x + available.width - insetX - width));
         y = Math.max(available.y + insetY, Math.min(y, available.y + available.height - insetY - height));
         return new Rectangle(x, y, width, height);
@@ -194,7 +195,7 @@ final class WindowCommandPalette implements AutoCloseable {
             Rectangle available = terminal;
             if (terminal.height < palette.getPreferredSize().height + UIScale.scale(32))
                 available = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this);
-            palette.setBounds(centered(terminal, palette.getPreferredSize(), available, UIScale.scale(16)));
+            palette.setBounds(positioned(terminal, palette.getPreferredSize(), available, UIScale.scale(16)));
         }
         @Override protected void paintComponent(Graphics graphics) {
             if (!open) return;

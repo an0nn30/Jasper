@@ -31,7 +31,7 @@ out its labels at the final paint width, and it showed the Escape hint stretched
 through the full input row. Focused component regressions reproduced both issues.
 The renderer now lays out at paint time and a transparent wrapper centers a compact
 Escape hint. The regenerated matrix has visible titles and badges, preserves badges
-before truncating narrow titles, stays centered, and has readable selection and
+before truncating narrow titles, stays horizontally centered in the upper half, and has readable selection and
 muted text in purple, classic dark and light.
 
 Native focus, IME behavior, accessibility announcements, window deactivation and
@@ -112,3 +112,10 @@ expanded into baseline cleanup.
 - correct blanket typed-event swallowing if an intervening fresh foreign press proves the recipe consumes unrelated input — preserve both owned-tail containment and window-scoped fresh input — requires a small provenance state and regression, with native sequence acceptance still pending.
 - permit an EDT roster of installed window palette dispatch owners to give callback-free owned tails priority over any new owner action — KFM registration order must not let an older destination execute a held key from a newer source — adds bounded shared dispatcher bookkeeping requiring cleanup and multi-window regression coverage.
 - restore selected-row visibility after result rebuild and updated layout, including query reset and availability reorder — approved small-window behavior overrides the recipe omission — adds bounded layout/scroll work on result changes, verified by actual viewport regressions.
+
+## Placement adjustment — 2026-09-13
+
+The user requested a higher position. The card now targets one-third of the way
+down the full terminal area with its vertical center, while retaining horizontal
+centering and the existing small-window clearance clamps. The PNGs and separate
+2× UI-scale artifact were regenerated for this placement.

@@ -26,7 +26,7 @@ class WindowCommandPaletteTest {
             @Override public void actionPerformed(ActionEvent event) { run.run(); }
         }, List.of());
     }
-    @Test void overlayDoesNotResizeTerminalAndUsesWholeDeckCenter() throws Exception {
+    @Test void overlayDoesNotResizeTerminalAndUsesUpperThirdOfWholeDeck() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
                 var root = install(owner); var before = owner.tabStrip().getBounds();
@@ -35,7 +35,7 @@ class WindowCommandPaletteTest {
                 var palette = owner.commandPalette().component();
                 var deck = SwingUtilities.convertRectangle(owner.tabStrip().getParent(), before, palette.getParent());
                 assertThat(Math.abs(palette.getBounds().getCenterX() - deck.getCenterX())).isLessThanOrEqualTo(1);
-                assertThat(Math.abs(palette.getBounds().getCenterY() - deck.getCenterY())).isLessThanOrEqualTo(1);
+                assertThat(Math.abs(palette.getBounds().getCenterY() - (deck.y + deck.height / 3.0))).isLessThanOrEqualTo(1);
                 owner.setActive(false); assertThat(owner.commandPalette().isOpen()).isFalse();
             }
         });

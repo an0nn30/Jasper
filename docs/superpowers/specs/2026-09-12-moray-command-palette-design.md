@@ -10,7 +10,7 @@ This user-requested design brings the palette forward from the Phase 1 spec's la
 
 ## Confirmed requirements
 
-- A floating, Spotlight-like text box matching Moray's aesthetic, centered in the terminal window.
+- A floating, Spotlight-like text box matching Moray's aesthetic, horizontally centered in the upper half of the terminal window (placement updated by the user on 2026-09-13).
 - Default activation with Cmd+K on macOS and Ctrl+K elsewhere.
 - Commands register throughout the app and execute through the palette. Include toolbar capabilities, vertical/horizontal splits, new window and Settings.
 - Search shows at most five results, numbered 1–5.
@@ -40,7 +40,7 @@ This is internal application functionality, without a public binary compatibilit
 
 ## Placement and visual treatment
 
-Placement is the center of the selected tab's whole terminal pane area, across all splits, excluding title/tabs, toolbar and status bar. It does not center on the focused split or physical display. Keep the card centered on resize and as its result count changes.
+Placement is horizontally centered across the selected tab's whole terminal pane area, across all splits, excluding title/tabs, toolbar and status bar. Following the user's 2026-09-13 adjustment, anchor the card's vertical center one-third of the way down that area, subject to the existing small-window clearance clamps. It does not anchor on the focused split or physical display. Recompute placement on resize and as its result count changes.
 
 Use a lightweight Swing overlay owned by `WindowContent`, above existing content, without reparenting terminal views or changing layout/PTY dimensions. Do not create a separate native window. Outside clicks dismiss and are consumed, preventing click-through into terminal applications.
 
