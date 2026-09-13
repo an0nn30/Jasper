@@ -90,22 +90,29 @@ final class CommandHistory implements AutoCloseable {
             throw new IllegalArgumentException("Invalid command ID");
         }
         recent = merge(List.of(id), recent);
-        List.copyOf(listeners).forEach(Runnable::run);
         if (!loaded) {
             dirtyDuringLoad = true;
         } else if (worker != null) {
             pending.set(recent);
-            pump();
         }
+        notifyListeners();
+        pump();
     }
 
     private void loaded(List<String> saved) {
         CommandRegistry.requireEdt();
         recent = merge(recent, saved);
         loaded = true;
-        if (!closed) List.copyOf(listeners).forEach(Runnable::run);
         if (dirtyDuringLoad) pending.set(recent);
+        notifyListeners();
         pump();
+    }
+
+    private void notifyListeners() {
+        for (Runnable listener : List.copyOf(listeners)) {
+            if (closed) return;
+            listener.run();
+        }
     }
 
     private void pump() {

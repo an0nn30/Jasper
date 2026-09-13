@@ -138,6 +138,50 @@ class CommandHistoryTest {
         assertThat(worker.isShutdown()).isTrue();
     }
 
+    @Test void listenerCloseDuringRecordDrainsTheAcceptedSnapshot() throws Exception {
+        Path file = directory.resolve("command-history.toml");
+        ManualExecutor worker = new ManualExecutor();
+        DeliveryQueue deliveries = new DeliveryQueue();
+        CommandHistory history = create(file, worker, deliveries);
+        worker.runNext();
+        deliveries.runNext();
+        edt(() -> history.onChanged(history::close));
+
+        edt(() -> history.record("new_tab"));
+
+        assertThat(history.closedFuture()).isNotDone();
+        assertThat(worker.queued()).isOne();
+        worker.runNext();
+        deliveries.runNext();
+        assertThat(CommandHistoryFile.read(file)).containsExactly("new_tab");
+        assertThat(history.closedFuture()).isCompleted();
+    }
+
+    @Test void listenerCloseDuringInitialLoadDrainsPreloadRecordAndStopsNotification() throws Exception {
+        Path file = directory.resolve("command-history.toml");
+        CommandHistoryFile.write(file, List.of("saved"));
+        ManualExecutor worker = new ManualExecutor();
+        DeliveryQueue deliveries = new DeliveryQueue();
+        CommandHistory history = create(file, worker, deliveries);
+        var laterNotifications = new java.util.concurrent.atomic.AtomicInteger();
+        edt(() -> {
+            history.record("invoked");
+            history.onChanged(history::close);
+            history.onChanged(laterNotifications::incrementAndGet);
+        });
+
+        worker.runNext();
+        deliveries.runNext();
+
+        assertThat(laterNotifications).hasValue(0);
+        assertThat(history.closedFuture()).isNotDone();
+        assertThat(worker.queued()).isOne();
+        worker.runNext();
+        deliveries.runNext();
+        assertThat(CommandHistoryFile.read(file)).containsExactly("invoked", "saved");
+        assertThat(history.closedFuture()).isCompleted();
+    }
+
     @Test void recordsQueuedForWritingCoalesceIntoLatestSnapshot() throws Exception {
         Path file = directory.resolve("command-history.toml");
         ManualExecutor worker = new ManualExecutor();
