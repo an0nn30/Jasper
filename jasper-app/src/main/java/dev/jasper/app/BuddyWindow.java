@@ -20,8 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import javax.swing.JComponent;
-import javax.swing.JMenuItem;
-import javax.swing.JPopupMenu;
 import javax.swing.JWindow;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
@@ -39,6 +37,7 @@ final class BuddyWindow {
     private final Runnable raiseTerminal;
     private final Runnable toggle;
     private final Timer timer = new Timer(1, event -> tick());
+    private BuddyBubble bubble;
     private Point pressScreen;
     private Point pressOrigin;
     private boolean dragged;
@@ -72,7 +71,8 @@ final class BuddyWindow {
         MouseAdapter mouse = new MouseAdapter() {
             @Override public void mouseEntered(MouseEvent event) { animator.hoverEntered(System.nanoTime()); paintAndSchedule(); }
             @Override public void mousePressed(MouseEvent event) {
-                if (event.isPopupTrigger()) { popup(event); return; }
+                if (event.isPopupTrigger()) { popup(); return; }
+                if (bubble != null) bubble.hide();
                 pressScreen = event.getLocationOnScreen(); pressOrigin = window.getLocation(); dragged = false;
             }
             @Override public void mouseDragged(MouseEvent event) {
@@ -84,7 +84,7 @@ final class BuddyWindow {
                 window.setLocation(pressOrigin.x + dx, pressOrigin.y + dy);
             }
             @Override public void mouseReleased(MouseEvent event) {
-                if (event.isPopupTrigger()) { popup(event); pressScreen = null; return; }
+                if (event.isPopupTrigger()) { popup(); pressScreen = null; return; }
                 if (pressScreen == null) return;
                 pressScreen = null;
                 if (dragged) save(window.getLocation());
@@ -127,6 +127,7 @@ final class BuddyWindow {
     void hide() {
         if (disposed) return;
         timer.stop();
+        if (bubble != null) bubble.hide();
         animator.hidden();
         window.setVisible(false);
     }
@@ -135,6 +136,7 @@ final class BuddyWindow {
         if (disposed) return;
         disposed = true;
         timer.stop();
+        if (bubble != null) bubble.dispose();
         window.dispose();
     }
 
@@ -154,12 +156,10 @@ final class BuddyWindow {
         });
     }
 
-    private void popup(MouseEvent event) {
-        JPopupMenu menu = new JPopupMenu();
-        JMenuItem hide = new JMenuItem("Hide Jasper");
-        hide.addActionListener(ignored -> toggle.run());
-        menu.add(hide);
-        menu.show(event.getComponent(), event.getX(), event.getY());
+    /** The right-click menu is one bubble entry beside Jasper, not a platform popup menu. */
+    private void popup() {
+        if (bubble == null) bubble = new BuddyBubble(toggle);
+        bubble.showBeside(window.getBounds(), BuddyBubbleContent.menu("Hide Jasper"));
     }
 
     private Point initialLocation(Dimension size) {
@@ -182,7 +182,7 @@ final class BuddyWindow {
     }
 
     /** Default screen first, each reduced by its Dock/menu/taskbar insets. */
-    private static List<Rectangle> usableScreens() {
+    static List<Rectangle> usableScreens() {
         var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
         var screens = new ArrayList<Rectangle>();
         GraphicsDevice primary = environment.getDefaultScreenDevice();
