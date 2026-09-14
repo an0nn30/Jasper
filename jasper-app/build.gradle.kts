@@ -5,6 +5,10 @@ plugins {
 dependencies {
     implementation(project(":jasper-terminal"))
     implementation("org.tomlj:tomlj:1.1.1")
+    implementation("net.java.dev.jna:jna:5.14.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.85.2")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
+    implementation("org.apache.sshd:sshd-common:2.18.0")
     runtimeOnly("org.slf4j:slf4j-nop:2.0.13")
 }
 
