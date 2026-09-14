@@ -39,14 +39,14 @@ final class TerminalWindow implements AutoCloseable {
         frame.setIconImages(ApplicationIcon.images(System.getProperty("os.name").startsWith("Mac")));
         content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes,
             KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac")), System::nanoTime, history, System.getProperty("os.name").startsWith("Mac"));
+        content.onToggleBuddy = application::toggleBuddy;
+        content.buddyShown = application::buddyEnabled;
         if (configuration != null) {
             content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(configuration.snapshot()));
             configuration.register(content);
         }
         frame.setContentPane(content);
         content.onTitle = title -> frame.setTitle(Main.windowTitle(title));
-        content.onToggleBuddy = application::toggleBuddy;
-        content.buddyShown = application::buddyEnabled;
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.setJMenuBar(content.menuBar());
         content.installRootBindings(frame.getRootPane());

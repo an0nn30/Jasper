@@ -101,7 +101,7 @@ final class JasperApplication {
 
     void windowActivated(TerminalWindow window) { if (windows.contains(window)) lastActive = window; }
 
-    void toggleBuddy() { buddyVisibility.toggle(); syncBuddy(); for (TerminalWindow window : windows) window.content().updateActions(); }
+    void toggleBuddy() { buddyVisibility.toggle(); syncBuddy(); }
 
     boolean buddyEnabled() { return buddyVisibility.enabled(); }
 
@@ -116,10 +116,11 @@ final class JasperApplication {
         if (buddyVisibility.shown()) {
             if (buddy == null) {
                 buddy = BuddyWindow.create(buddyStateFile, this::raiseTerminal, this::toggleBuddy);
-                if (buddy == null) { buddyUnavailable = true; return; }
+                if (buddy == null) buddyUnavailable = true;
             }
-            buddy.show();
+            if (buddy != null) buddy.show();
         } else if (buddy != null) buddy.hide();
+        for (TerminalWindow window : windows) window.content().updateActions();
     }
 
     void quit() {

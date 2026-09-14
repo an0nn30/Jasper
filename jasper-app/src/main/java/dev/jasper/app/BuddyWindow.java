@@ -1,5 +1,6 @@
 package dev.jasper.app;
 
+import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -52,7 +53,13 @@ final class BuddyWindow {
         window.setBackground(new Color(0, 0, 0, 0));
         JComponent canvas = new JComponent() {
             @Override protected void paintComponent(Graphics g) {
-                sprite.paint((Graphics2D) g, animator.frame(), SCALE, 0, 0);
+                Graphics2D g2 = (Graphics2D) g.create();
+                try {
+                    g2.setComposite(AlphaComposite.Clear);
+                    g2.fillRect(0, 0, getWidth(), getHeight());
+                    g2.setComposite(AlphaComposite.SrcOver);
+                    sprite.paint(g2, animator.frame(), SCALE, 0, 0);
+                } finally { g2.dispose(); }
             }
         };
         canvas.setOpaque(false);
