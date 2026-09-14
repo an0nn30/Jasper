@@ -13,12 +13,16 @@ import javax.swing.UIManager;
 
 /** Paints one bubble: a dark translucent rounded rectangle with a title, an optional detail line and a glyph. */
 final class BuddyBubblePanel extends JComponent {
-    static final int PAD_X = 18;
-    static final int PAD_Y = 14;
+    // Message style (status bubbles): roomy, bold title. Menu style: a compact regular-weight pill.
+    static final int MESSAGE_PAD_X = 18;
+    static final int MESSAGE_PAD_Y = 14;
+    static final int MESSAGE_RADIUS = 14;
+    static final int MESSAGE_MIN_WIDTH = 120;
+    static final int MENU_PAD_X = 12;
+    static final int MENU_PAD_Y = 7;
+    static final int MENU_RADIUS = 9;
     static final int LINE_GAP = 4;
     static final int GLYPH_GAP = 16;
-    static final int RADIUS = 14;
-    static final int MIN_WIDTH = 120;
     static final int MAX_WIDTH = 320;
 
     private static final Color FILL = new Color(30, 30, 32, 235);
@@ -35,7 +39,25 @@ final class BuddyBubblePanel extends JComponent {
         setOpaque(false);
     }
 
-    static Font titleFont() { return font(Font.BOLD, 15f); }
+    static Font titleFont(BuddyBubbleContent.Style style) {
+        return style == BuddyBubbleContent.Style.MENU ? font(Font.PLAIN, 13f) : font(Font.BOLD, 15f);
+    }
+
+    private Font titleFont() { return titleFont(style()); }
+
+    private BuddyBubbleContent.Style style() {
+        return content == null ? BuddyBubbleContent.Style.MESSAGE : content.style();
+    }
+
+    private boolean menu() { return style() == BuddyBubbleContent.Style.MENU; }
+
+    private int padX() { return menu() ? MENU_PAD_X : MESSAGE_PAD_X; }
+
+    private int padY() { return menu() ? MENU_PAD_Y : MESSAGE_PAD_Y; }
+
+    private int radius() { return menu() ? MENU_RADIUS : MESSAGE_RADIUS; }
+
+    private int minWidth() { return menu() ? 0 : MESSAGE_MIN_WIDTH; }
 
     static Font detailFont() { return font(Font.PLAIN, 14f); }
 
@@ -61,7 +83,7 @@ final class BuddyBubblePanel extends JComponent {
     boolean isHighlighted() { return highlighted; }
 
     @Override public Dimension getPreferredSize() {
-        if (content == null) return new Dimension(MIN_WIDTH, 2 * PAD_Y);
+        if (content == null) return new Dimension(MESSAGE_MIN_WIDTH, 2 * MESSAGE_PAD_Y);
         FontMetrics title = getFontMetrics(titleFont());
         int textWidth = title.stringWidth(content.title());
         int textHeight = title.getHeight();
@@ -70,9 +92,9 @@ final class BuddyBubblePanel extends JComponent {
             textWidth = Math.max(textWidth, detail.stringWidth(content.detail()));
             textHeight += LINE_GAP + detail.getHeight();
         }
-        int width = textWidth + 2 * PAD_X + glyphSpace();
-        int height = Math.max(textHeight, glyphHeight()) + 2 * PAD_Y;
-        return new Dimension(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width)), height);
+        int width = textWidth + 2 * padX() + glyphSpace();
+        int height = Math.max(textHeight, glyphHeight()) + 2 * padY();
+        return new Dimension(Math.max(minWidth(), Math.min(MAX_WIDTH, width)), height);
     }
 
     private int glyphSpace() {
@@ -94,16 +116,17 @@ final class BuddyBubblePanel extends JComponent {
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             int width = getWidth(), height = getHeight();
             g2.setColor(highlighted ? FILL_HIGHLIGHTED : FILL);
-            g2.fillRoundRect(0, 0, width, height, RADIUS * 2, RADIUS * 2);
+            int arc = radius() * 2;
+            g2.fillRoundRect(0, 0, width, height, arc, arc);
             g2.setColor(BORDER);
-            g2.drawRoundRect(0, 0, width - 1, height - 1, RADIUS * 2, RADIUS * 2);
+            g2.drawRoundRect(0, 0, width - 1, height - 1, arc, arc);
 
             Icon glyph = content.glyph();
             if (glyph != null) {
-                glyph.paintIcon(this, g2, width - PAD_X - glyph.getIconWidth(),
+                glyph.paintIcon(this, g2, width - padX() - glyph.getIconWidth(),
                     (height - glyph.getIconHeight()) / 2);
             }
-            int available = Math.max(0, width - 2 * PAD_X - glyphSpace());
+            int available = Math.max(0, width - 2 * padX() - glyphSpace());
             FontMetrics title = getFontMetrics(titleFont());
             int textHeight = title.getHeight();
             FontMetrics detail = content.detail() == null ? null : getFontMetrics(detailFont());
@@ -111,12 +134,12 @@ final class BuddyBubblePanel extends JComponent {
             int y = (height - textHeight) / 2;
             g2.setFont(titleFont());
             g2.setColor(TITLE_COLOR);
-            g2.drawString(fit(title, content.title(), available), PAD_X, y + title.getAscent());
+            g2.drawString(fit(title, content.title(), available), padX(), y + title.getAscent());
             if (detail != null) {
                 g2.setFont(detailFont());
                 g2.setColor(DETAIL_COLOR);
                 g2.drawString(fit(detail, content.detail(), available),
-                    PAD_X, y + title.getHeight() + LINE_GAP + detail.getAscent());
+                    padX(), y + title.getHeight() + LINE_GAP + detail.getAscent());
             }
         } finally { g2.dispose(); }
     }

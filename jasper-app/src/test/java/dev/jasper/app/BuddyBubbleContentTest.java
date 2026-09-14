@@ -21,6 +21,13 @@ class BuddyBubbleContentTest {
         assertThat(content.title()).isEqualTo("Hide Jasper");
         assertThat(content.detail()).isNull();
         assertThat(content.glyph()).isNull();
+        assertThat(content.style()).isEqualTo(BuddyBubbleContent.Style.MENU);
+    }
+
+    @Test void messagesUseTheBoldMessageStyle() {
+        assertThat(BuddyBubbleContent.message("Blocked", "Waiting", null).style()).isEqualTo(BuddyBubbleContent.Style.MESSAGE);
+        assertThat(new BuddyBubbleContent("Blocked", null, null).style()).isEqualTo(BuddyBubbleContent.Style.MESSAGE);
+        assertThatIllegalArgumentException().isThrownBy(() -> new BuddyBubbleContent("Blocked", null, null, null));
     }
 
     @Test void detailsAndGlyphsAreKept() {

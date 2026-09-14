@@ -27,17 +27,31 @@ class BuddyBubblePanelTest {
         return image;
     }
 
-    @Test void aTitleOnlyBubbleIsTheTextPlusPadding() {
+    @Test void aTitleOnlyMessageIsTheTextPlusPadding() {
         BuddyBubblePanel panel = new BuddyBubblePanel();
-        panel.setContent(BuddyBubbleContent.menu(TITLE));
-        FontMetrics metrics = panel.getFontMetrics(BuddyBubblePanel.titleFont());
+        panel.setContent(BuddyBubbleContent.message(TITLE, null, null));
+        FontMetrics metrics = panel.getFontMetrics(BuddyBubblePanel.titleFont(BuddyBubbleContent.Style.MESSAGE));
         int expected = Math.max(120, Math.min(320, metrics.stringWidth(TITLE) + 36));
         assertThat(panel.getPreferredSize()).isEqualTo(new Dimension(expected, metrics.getHeight() + 28));
     }
 
+    @Test void aMenuBubbleIsACompactRegularWeightPill() {
+        BuddyBubblePanel menu = new BuddyBubblePanel();
+        menu.setContent(BuddyBubbleContent.menu(TITLE));
+        java.awt.Font font = BuddyBubblePanel.titleFont(BuddyBubbleContent.Style.MENU);
+        assertThat(font.isBold()).isFalse();
+        assertThat(font.getSize2D()).isLessThan(BuddyBubblePanel.titleFont(BuddyBubbleContent.Style.MESSAGE).getSize2D());
+        FontMetrics metrics = menu.getFontMetrics(font);
+        assertThat(menu.getPreferredSize()).isEqualTo(new Dimension(metrics.stringWidth(TITLE) + 24, metrics.getHeight() + 14));
+        BuddyBubblePanel message = new BuddyBubblePanel();
+        message.setContent(BuddyBubbleContent.message(TITLE, null, null));
+        assertThat(menu.getPreferredSize().width).isLessThan(message.getPreferredSize().width);
+        assertThat(menu.getPreferredSize().height).isLessThan(message.getPreferredSize().height);
+    }
+
     @Test void aDetailLineAddsItsHeightAndAFourPixelGap() {
         BuddyBubblePanel titleOnly = new BuddyBubblePanel();
-        titleOnly.setContent(BuddyBubbleContent.menu("Blocked"));
+        titleOnly.setContent(BuddyBubbleContent.message("Blocked", null, null));
         BuddyBubblePanel withDetail = new BuddyBubblePanel();
         withDetail.setContent(new BuddyBubbleContent("Blocked", "Waiting", null));
         FontMetrics detail = withDetail.getFontMetrics(BuddyBubblePanel.detailFont());
@@ -48,7 +62,7 @@ class BuddyBubblePanelTest {
     @Test void aGlyphAddsItsWidthAndAGap() {
         String wide = "Hide Jasper for now"; // long enough that neither size hits the min or max clamp
         BuddyBubblePanel plain = new BuddyBubblePanel();
-        plain.setContent(BuddyBubbleContent.menu(wide));
+        plain.setContent(BuddyBubbleContent.message(wide, null, null));
         BuddyBubblePanel decorated = new BuddyBubblePanel();
         decorated.setContent(new BuddyBubbleContent(wide, null, glyph()));
         assertThat(decorated.getPreferredSize().width).isEqualTo(plain.getPreferredSize().width + 18 + 16);
@@ -56,11 +70,17 @@ class BuddyBubblePanelTest {
 
     @Test void theBubbleIsNeverNarrowerThanTheMinimumOrWiderThanTheMaximum() {
         BuddyBubblePanel narrow = new BuddyBubblePanel();
-        narrow.setContent(BuddyBubbleContent.menu("Hi"));
+        narrow.setContent(BuddyBubbleContent.message("Hi", null, null));
         assertThat(narrow.getPreferredSize().width).isEqualTo(120);
         BuddyBubblePanel wide = new BuddyBubblePanel();
-        wide.setContent(BuddyBubbleContent.menu(TITLE.repeat(20)));
+        wide.setContent(BuddyBubbleContent.message(TITLE.repeat(20), null, null));
         assertThat(wide.getPreferredSize().width).isEqualTo(320);
+        BuddyBubblePanel menu = new BuddyBubblePanel();
+        menu.setContent(BuddyBubbleContent.menu("Hi"));
+        assertThat(menu.getPreferredSize().width).isLessThan(120); // menus take their natural width
+        BuddyBubblePanel longMenu = new BuddyBubblePanel();
+        longMenu.setContent(BuddyBubbleContent.menu(TITLE.repeat(20)));
+        assertThat(longMenu.getPreferredSize().width).isEqualTo(320);
     }
 
     @Test void theCornersAreTransparentAndTheFillIsDarkAndTranslucent() {
