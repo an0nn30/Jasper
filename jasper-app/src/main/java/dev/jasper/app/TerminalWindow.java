@@ -17,8 +17,11 @@ final class TerminalWindow implements AutoCloseable {
     private boolean closed;
     private final WindowAdapter events = new WindowAdapter() {
         @Override public void windowClosing(WindowEvent event) { close(); }
-        @Override public void windowActivated(WindowEvent event) { setActive(true); }
+        @Override public void windowActivated(WindowEvent event) { setActive(true); application.windowActivated(TerminalWindow.this); }
         @Override public void windowDeactivated(WindowEvent event) { setActive(false); }
+        @Override public void windowOpened(WindowEvent event) { reportState(); }
+        @Override public void windowIconified(WindowEvent event) { reportState(); }
+        @Override public void windowDeiconified(WindowEvent event) { reportState(); }
     };
 
     TerminalWindow(JasperApplication application, ShellLauncher launcher, Path directory, ThemeController themes) {
@@ -42,6 +45,8 @@ final class TerminalWindow implements AutoCloseable {
         }
         frame.setContentPane(content);
         content.onTitle = title -> frame.setTitle(Main.windowTitle(title));
+        content.onToggleBuddy = application::toggleBuddy;
+        content.buddyShown = application::buddyEnabled;
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.setJMenuBar(content.menuBar());
         content.installRootBindings(frame.getRootPane());
@@ -81,12 +86,23 @@ final class TerminalWindow implements AutoCloseable {
         content.setActive(active);
     }
 
+    private void reportState() {
+        application.windowStateChanged(this, frame.isShowing(),
+            (frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0);
+    }
+
+    void toFront() {
+        if ((frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0) frame.setExtendedState(frame.getExtendedState() & ~java.awt.Frame.ICONIFIED);
+        frame.toFront(); frame.requestFocus();
+        if (content.currentTab() != null) content.currentTab().focusTerminal();
+    }
+
     WindowContent content() { return content; }
     boolean closed() { return closed; }
     Dimension size() { return frame.getSize(); }
     void resize(Dimension size) { frame.setSize(size); }
 
-    void show() { frame.setVisible(true); if (content.currentTab() != null) content.currentTab().focusTerminal(); }
+    void show() { frame.setVisible(true); reportState(); if (content.currentTab() != null) content.currentTab().focusTerminal(); }
 
     @Override public void close() {
         if (closed) return;

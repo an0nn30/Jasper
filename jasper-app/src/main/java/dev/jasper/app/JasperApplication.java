@@ -25,6 +25,11 @@ final class JasperApplication {
     private boolean stopped;
     private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
+    private final BuddyVisibility buddyVisibility = new BuddyVisibility();
+    private final Path buddyStateFile;
+    private BuddyWindow buddy;
+    private boolean buddyUnavailable;
+    private TerminalWindow lastActive;
 
     JasperApplication() { this(null); }
 
@@ -36,9 +41,18 @@ final class JasperApplication {
     }
 
     JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history) {
+        this(service, suppliedLauncher, history, null);
+    }
+
+    /** {@code buddyStateFile} may be null: the buddy then starts in the default corner and forgets drags. */
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile) {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
+        this.buddyStateFile = buddyStateFile;
         configuration = service == null ? null : new ConfigurationController(themes, service);
+        if (configuration != null) configuration.onSnapshot(snapshot -> {
+            buddyVisibility.configure(snapshot.buddyEnabled()); syncBuddy();
+        });
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler((event, response) -> {
             // Cancel the native immediate JVM exit; pane close owns bounded child cleanup.
             response.cancelQuit(); SwingUtilities.invokeLater(this::quit);
@@ -73,7 +87,39 @@ final class JasperApplication {
 
     void windowClosed(TerminalWindow window) {
         windows.remove(window);
+        buddyVisibility.remove(window);
+        if (lastActive == window) lastActive = null;
         if (windows.isEmpty()) requestShutdown();
+        else syncBuddy();
+    }
+
+    void windowStateChanged(TerminalWindow window, boolean showing, boolean iconified) {
+        if (!windows.contains(window)) return;
+        buddyVisibility.window(window, showing, iconified);
+        syncBuddy();
+    }
+
+    void windowActivated(TerminalWindow window) { if (windows.contains(window)) lastActive = window; }
+
+    void toggleBuddy() { buddyVisibility.toggle(); syncBuddy(); for (TerminalWindow window : windows) window.content().updateActions(); }
+
+    boolean buddyEnabled() { return buddyVisibility.enabled(); }
+
+    private void raiseTerminal() {
+        TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive
+            : windows.isEmpty() ? null : windows.iterator().next();
+        if (target != null) target.toFront();
+    }
+
+    private void syncBuddy() {
+        if (quitting || stopped || buddyUnavailable) return;
+        if (buddyVisibility.shown()) {
+            if (buddy == null) {
+                buddy = BuddyWindow.create(buddyStateFile, this::raiseTerminal, this::toggleBuddy);
+                if (buddy == null) { buddyUnavailable = true; return; }
+            }
+            buddy.show();
+        } else if (buddy != null) buddy.hide();
     }
 
     void quit() {
@@ -95,6 +141,7 @@ final class JasperApplication {
         stopped = true;
         quitting = true;
         launches.shutdown();
+        if (buddy != null) buddy.dispose();
         history.close();
         if (configuration != null) configuration.close();
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler(null);
