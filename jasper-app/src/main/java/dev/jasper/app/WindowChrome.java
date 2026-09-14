@@ -30,7 +30,8 @@ final class WindowChrome {
         JMenu tab = menu("Tab", ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.RENAME_TAB,
             ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4,
             ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6, ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9);
-        menuBar.add(file); menuBar.add(edit); menuBar.add(view); menuBar.add(pane); menuBar.add(tab);
+        JMenu tools = menu("Tools", ActionId.VAULT_MANAGER, ActionId.VAULT_LOCK);
+        menuBar.add(file); menuBar.add(edit); menuBar.add(view); menuBar.add(pane); menuBar.add(tab); menuBar.add(tools);
         JMenu modes = new JMenu("Toolbar");
         for (WindowContent.ToolbarMode mode : WindowContent.ToolbarMode.values()) {
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));

@@ -27,6 +27,8 @@ final class WindowCommands implements AutoCloseable {
                 case RELOAD_CONFIG -> "refresh"; default -> null;
             };
             if (icon != null) owner.action(id).putValue(Command.ICON, AppIcons.icon(icon));
+            if (id == ActionId.VAULT_MANAGER || id == ActionId.VAULT_LOCK)
+                owner.action(id).putValue(Command.ICON, VaultIcons.icon("lock"));
             if (id == ActionId.SPLIT_RIGHT || id == ActionId.SPLIT_DOWN) continue;
             var keywords = new ArrayList<String>(); keywords.add(id.id().replace('_', ' '));
             keywords.addAll(switch (id) {
@@ -36,6 +38,8 @@ final class WindowCommands implements AutoCloseable {
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> List.of("search");
                 case CLEAR_SCROLLBACK -> List.of("history", "clear");
                 case FONT_BIGGER, FONT_SMALLER, FONT_RESET -> List.of("text", "size");
+                case VAULT_MANAGER -> List.of("vault", "credential", "credentials", "password", "ssh key", "manager");
+                case VAULT_LOCK -> List.of("vault", "credential", "lock", "unlock", "create");
                 default -> List.of();
             });
             registrations.add(registry.register(new Command(id.id(), owner.action(id), keywords)));

@@ -30,8 +30,7 @@ final class KeyBindings {
         EnumMap<ActionId, KeyStroke> strokes = new EnumMap<>(ActionId.class);
         for (ActionId action : ActionId.values()) {
             String binding = effectiveDefaultBinding(action, macOs);
-            KeyStroke stroke = parse(binding, macOs).orElseThrow();
-            putWithoutCollision(strokes, action, stroke, binding);
+            parse(binding, macOs).ifPresent(stroke -> putWithoutCollision(strokes, action, stroke, binding));
         }
         return new KeyBindings(strokes);
     }

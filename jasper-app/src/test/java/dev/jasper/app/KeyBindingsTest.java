@@ -27,7 +27,8 @@ class KeyBindingsTest {
             ActionId.RENAME_TAB, ActionId.FIND, ActionId.FIND_NEXT, ActionId.FIND_PREVIOUS,
             ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT, ActionId.COPY, ActionId.PASTE,
             ActionId.COMMAND_PALETTE, ActionId.CLEAR_SCROLLBACK, ActionId.FONT_BIGGER, ActionId.FONT_SMALLER,
-            ActionId.FONT_RESET, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
+            ActionId.FONT_RESET, ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG,
+            ActionId.VAULT_MANAGER, ActionId.VAULT_LOCK, ActionId.QUIT);
         assertThat(ActionId.SPLIT_RIGHT.id()).isEqualTo("split_right");
         assertThat(ActionId.SPLIT_RIGHT.label()).isEqualTo("Split Right");
         assertThat(ActionId.SPLIT_RIGHT.defaultBinding()).isEqualTo("cmd+d");
@@ -61,6 +62,10 @@ class KeyBindingsTest {
             KeyBindings bindings = KeyBindings.defaults(macOs);
             HashSet<KeyStroke> strokes = new HashSet<>();
             for (ActionId action : ActionId.values()) {
+                if (action.defaultBinding().equals("none")) {
+                    assertThat(bindings.strokeFor(action)).as("no default for %s", action).isEmpty();
+                    continue;
+                }
                 KeyStroke stroke = bindings.strokeFor(action).orElseThrow();
                 assertThat(strokes.add(stroke)).as("unique %s binding for %s", macOs, action).isTrue();
                 assertThat(bindings.actionFor(stroke)).contains(action);

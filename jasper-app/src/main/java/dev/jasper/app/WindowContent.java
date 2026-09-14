@@ -1,5 +1,6 @@
 package dev.jasper.app;
 
+import dev.jasper.app.vault.VaultSnapshot;
 import dev.jasper.terminal.TerminalView;
 import java.awt.*;
 import java.awt.event.*;
@@ -47,6 +48,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private boolean active = true;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
     private Runnable openSettings, reloadConfiguration;
+    private Runnable openVaultManager, toggleVaultLock;
     private Runnable unregisterConfiguration = () -> {};
     Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
         this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
@@ -208,6 +210,38 @@ final class WindowContent extends JPanel implements AutoCloseable {
         status().onConfigurationDetails = () -> {};
         status().configButton().setEnabled(false);
         updateActions();
+    }
+
+    void connectVault(Runnable openManager, Runnable toggleLock) {
+        if (closed) return;
+        openVaultManager = Objects.requireNonNull(openManager); toggleVaultLock = Objects.requireNonNull(toggleLock);
+        status().onVaultClick = () -> invoke(ActionId.VAULT_LOCK);
+        updateActions();
+    }
+
+    void disconnectVault() {
+        openVaultManager = null; toggleVaultLock = null;
+        status().onVaultClick = () -> {};
+        status().setVault(false, false, "Credential vault is not available");
+        updateActions();
+    }
+
+    /** Metadata-only snapshot; never carries secrets. */
+    void showVaultState(VaultSnapshot snapshot) {
+        if (closed) return;
+        String title = !snapshot.exists() ? "Create Vault…" : snapshot.locked() ? "Unlock Vault…" : "Lock Vault";
+        action(ActionId.VAULT_LOCK).putValue(Action.NAME, title);
+        action(ActionId.VAULT_LOCK).putValue(Command.TITLE, title);
+        status().setVault(openVaultManager != null, snapshot.exists() && !snapshot.locked(), vaultTooltip(snapshot));
+        updateActions();
+    }
+
+    static String vaultTooltip(VaultSnapshot snapshot) {
+        if (!snapshot.exists()) return "No credential vault yet. Click to create one.";
+        if (snapshot.locked()) return "Credential vault locked. Click to unlock.";
+        int minutes = snapshot.settings().autoLockMinutes();
+        return "Credential vault unlocked. Click to lock."
+            + (minutes > 0 ? " Auto-lock after " + minutes + " min of inactivity." : "");
     }
 
     void setConfigurationState(ConfigService.State state) {
@@ -392,6 +426,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
             case FONT_RESET -> view.setFontSize(configuredFontSize);
             case OPEN_SETTINGS -> openSettings.run();
             case RELOAD_CONFIG -> reloadConfiguration.run();
+            case VAULT_MANAGER -> openVaultManager.run();
+            case VAULT_LOCK -> toggleVaultLock.run();
         }
         update();
     }
@@ -411,6 +447,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                 boolean enabled = !closed && switch (id) {
                     case OPEN_SETTINGS -> openSettings != null;
                     case RELOAD_CONFIG -> reloadConfiguration != null;
+                    case VAULT_MANAGER, VAULT_LOCK -> openVaultManager != null;
                     case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT -> true;
                     case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
@@ -508,7 +545,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         commandPalette.close(); windowCommands.close(); commands.close();
         closed = true;
         syncPaletteDispatcher();
-        unregisterConfiguration.run(); disconnectConfiguration();
+        unregisterConfiguration.run(); disconnectConfiguration(); disconnectVault();
         showConfigDiagnostics = control -> {};
         windowTabs.close();
         themes.unregister(this);

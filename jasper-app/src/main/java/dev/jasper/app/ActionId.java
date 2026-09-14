@@ -39,6 +39,8 @@ enum ActionId {
     FONT_RESET("font_reset", "Reset Font Size", "cmd+0"),
     OPEN_SETTINGS("open_settings", "Settings", "cmd+,"),
     RELOAD_CONFIG("reload_config", "Reload Config", "cmd+shift+r"),
+    VAULT_MANAGER("vault_manager", "Credential Vault…", "none"),
+    VAULT_LOCK("vault_lock", "Lock Vault", "none"),
     QUIT("quit", "Quit", "cmd+q");
 
     private final String id;
