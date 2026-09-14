@@ -9,6 +9,9 @@ final class WindowStatusBar extends JPanel {
     private final Segment left = new Segment(new JLabel());
     private final JButton configButton = new JButton("Built-in defaults");
     private final Segment right = new Segment(configButton);
+    private final JButton vaultButton = new JButton(VaultIcons.icon("lock"));
+    Runnable onVaultClick = () -> {};
+    private static final int VAULT_WIDTH = 28;
     Runnable onConfigurationDetails = () -> {};
     private String configText = "Built-in defaults";
     private String shell = "", directory = "", dimensions = "";
@@ -18,6 +21,13 @@ final class WindowStatusBar extends JPanel {
         super(null);
         configButton.setEnabled(false); configButton.putClientProperty("html.disable", true);
         configButton.addActionListener(event -> onConfigurationDetails.run());
+        vaultButton.setEnabled(false); vaultButton.setFocusable(false);
+        vaultButton.setMargin(new Insets(0, 0, 0, 0)); vaultButton.setBorderPainted(false);
+        vaultButton.setContentAreaFilled(false); vaultButton.putClientProperty("html.disable", true);
+        vaultButton.setToolTipText("Credential vault is not available");
+        vaultButton.getAccessibleContext().setAccessibleName("Credential vault is not available");
+        vaultButton.addActionListener(event -> onVaultClick.run());
+        add(vaultButton);
         add(left); add(right); refreshTheme();
         getAccessibleContext().setAccessibleName("Terminal status");
     }
@@ -48,6 +58,15 @@ final class WindowStatusBar extends JPanel {
         revalidate(); repaint();
     }
     JButton configButton() { return configButton; }
+    JButton vaultButton() { return vaultButton; }
+
+    void setVault(boolean connected, boolean unlocked, String tooltip) {
+        vaultButton.setEnabled(connected);
+        vaultButton.setIcon(VaultIcons.icon(unlocked ? "unlock" : "lock"));
+        vaultButton.setToolTipText(tooltip);
+        vaultButton.getAccessibleContext().setAccessibleName(tooltip);
+        revalidate(); repaint();
+    }
     String getText() { return text; }
     void applyPalette(Palette next) { java.util.Objects.requireNonNull(next); refreshTheme(); }
     static double contrast(Color a, Color b) {
@@ -63,6 +82,7 @@ final class WindowStatusBar extends JPanel {
         setBackground(UIManager.getColor("Panel.background"));
         left.refreshTheme(); right.refreshTheme();
         configButton.setForeground(UIManager.getColor("Button.foreground"));
+        vaultButton.setForeground(UIManager.getColor("Label.foreground"));
     }
 
     private final class Segment extends JPanel {
@@ -101,9 +121,11 @@ final class WindowStatusBar extends JPanel {
     @Override public Dimension getPreferredSize() { return new Dimension(0, 30); }
     @Override public void doLayout() {
         int edge = Math.min(6, getWidth() / 2), leftInset = edge;
-        int available = Math.max(0, getWidth() - edge * 2);
+        int vaultWidth = Math.min(VAULT_WIDTH, Math.max(0, getWidth() - edge));
+        vaultButton.setBounds(Math.max(0, getWidth() - edge - vaultWidth), 0, vaultWidth, getHeight());
+        int available = Math.max(0, vaultButton.getX() - edge * 2);
         int rightWidth = Math.min(available, right.getPreferredSize().width);
-        right.setBounds(Math.max(edge, getWidth() - edge - rightWidth), 0, rightWidth, getHeight());
+        right.setBounds(Math.max(edge, vaultButton.getX() - edge - rightWidth), 0, rightWidth, getHeight());
         left.setBounds(leftInset, 0, Math.max(0, right.getX() - leftInset - edge), getHeight());
     }
 }
