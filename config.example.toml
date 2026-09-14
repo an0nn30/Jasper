@@ -70,13 +70,9 @@ blink = true
 # On macOS, LANG defaults to en_US.UTF-8 only when absent or blank; LC_* values are preserved.
 # MY_VARIABLE = "a value with spaces"
 
-[colors]
-# System switches both chrome and the built-in palette; custom palettes stay fixed.
-appearance = "system"
-# Built-ins: jasper-dark-purple (default), jasper-dark (classic), jasper-light.
-# A custom basename is loaded from themes/.
-theme = "jasper-dark-purple"
-# theme = "my-theme.toml"
+[ui.theme]
+# Live across open windows. Options: "dark" or "light"; each pairs FlatLaf chrome with its terminal palette.
+variant = "dark"
 
 [keybindings]
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.

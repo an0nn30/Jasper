@@ -8,10 +8,6 @@ dependencies {
     implementation("com.formdev:flatlaf:3.7")
     implementation("org.jetbrains.runtime:jbr-api:1.9.0")
     implementation("com.formdev:flatlaf-extras:3.7")
-    implementation("com.github.Dansoftowner:jSystemThemeDetector:3.9.1") {
-        // pty4j already supplies newer JNA modules; the detector's old JPMS variant is unpublished.
-        exclude(group = "net.java.dev.jna")
-    }
     runtimeOnly("org.slf4j:slf4j-nop:2.0.13")
 }
 

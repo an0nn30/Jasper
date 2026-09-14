@@ -92,13 +92,9 @@ final class ConfigTemplate {
             # remain reserved and are always forced to xterm-256color and truecolor.
             # This table does not change which default login shell is selected.
 
-            [colors]
-            # System switches both chrome and the built-in palette; custom palettes stay fixed.
-            appearance = "system"
-            # Built-ins: jasper-dark-purple (default), jasper-dark (classic), jasper-light.
-            # A custom basename is loaded from themes/.
-            theme = "jasper-dark-purple"
-            # theme = "my-theme.toml"
+            [ui.theme]
+            # Theme variant: "dark" or "light"; switches chrome and terminal colors live across windows.
+            # variant = "dark"
 
             [keybindings]
             # Shortcuts update live. Use "none" to disable an action; shortcuts must be unique.

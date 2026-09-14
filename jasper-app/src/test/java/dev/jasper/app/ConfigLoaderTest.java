@@ -14,14 +14,13 @@ class ConfigLoaderTest {
     private static final Path FILE = Path.of("/fixture/config.toml");
     private ConfigLoader.Result parse(String text) { return ConfigLoader.parse(FILE, text, true); }
 
-    @Test void legacyThemeRetainsAppearanceAndExplicitSystemOptsIn() {
+    @Test void themeVariantDefaultsToDarkAndAcceptsLight() {
         var path = Path.of("config.toml");
-        var legacy = ConfigLoader.parse(path, "[colors]\ntheme = 'jasper-light'\n", true);
-        var automatic = ConfigLoader.parse(path,
-            "[colors]\ntheme = 'jasper-light'\nappearance = 'system'\n", true);
-        assertThat(legacy.snapshot().colors().appearance()).isEqualTo(Appearance.LIGHT);
-        assertThat(automatic.snapshot().colors().appearance()).isEqualTo(Appearance.SYSTEM);
-        assertThat(ConfigLoader.parse(path, "", true).snapshot().colors()).isEqualTo(ColorsConfig.defaults());
+        assertThat(ConfigLoader.parse(path, "", true).snapshot().variant()).isEqualTo(Appearance.DARK);
+        assertThat(ConfigLoader.parse(path, "[ui.theme]\nvariant = 'light'\n", true).snapshot().variant())
+            .isEqualTo(Appearance.LIGHT);
+        assertThat(ConfigLoader.parse(path, "ui.theme.variant = 'dark'\n", true).snapshot().variant())
+            .isEqualTo(Appearance.DARK);
     }
 
     @Test void emptyFileSuppliesUsableDefaultsOnBothPlatforms() {
@@ -44,8 +43,8 @@ class ConfigLoaderTest {
             status_bar = false
             [font]
             size = 18
-            [colors]
-            theme = "jasper-light"
+            [ui.theme]
+            variant = "light"
             [keybindings]
             "copy" = "cmd+v"
             paste = "cmd+c"
@@ -60,7 +59,7 @@ class ConfigLoaderTest {
         assertThat(state.toolbar()).isEqualTo(WindowContent.ToolbarMode.ICONS);
         assertThat(state.statusBar()).isFalse();
         assertThat(state.fontSize()).isEqualTo(18f);
-        assertThat(state.colors()).isEqualTo(new ColorsConfig(Appearance.LIGHT, "jasper-light"));
+        assertThat(state.variant()).isEqualTo(Appearance.LIGHT);
         assertThat(state.bindings(true).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.META_DOWN_MASK)))
             .contains(ActionId.COPY);
         assertThat(state.bindings(true).strokeFor(ActionId.NEW_TAB)).isEmpty();
@@ -95,7 +94,7 @@ class ConfigLoaderTest {
 
     @Test void wrongScalarTypesRejectWholeCandidate() {
         for (String assignment : new String[]{"window.tab_height=38.0", "window.toolbar=true", "window.status_bar=1",
-                "font.size='secret-value'", "colors.theme=1", "keybindings.copy=7", "font.size=[16]",
+                "font.size='secret-value'", "ui.theme.variant=1", "keybindings.copy=7", "font.size=[16]",
                 "window.tab_height={x=38}"}) {
             var result = parse(assignment);
             assertThat(result.rejected()).as(assignment).isTrue();
@@ -107,7 +106,7 @@ class ConfigLoaderTest {
     }
 
     @Test void wrongKnownTablesRejectAtTheirOwnPosition() {
-        for (String table : new String[]{"window", "font", "colors", "keybindings"}) {
+        for (String table : new String[]{"window", "font", "ui", "keybindings"}) {
             var result = parse("# comment\n  " + table + " = 2");
             assertThat(result.rejected()).isTrue();
             assertDiagnostic(result, table, 2, 3, ConfigDiagnostic.Severity.ERROR);

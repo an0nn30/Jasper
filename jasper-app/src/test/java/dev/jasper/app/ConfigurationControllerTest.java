@@ -41,7 +41,7 @@ class ConfigurationControllerTest {
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void savedFieldsApplyAcrossOwnersAndPendingHiddenViewsWithoutReplacingSessions() throws Exception {
-        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=19\n[colors]\ntheme='jasper-light'\n");
+        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=19\n[ui.theme]\nvariant='light'\n");
         edt(() -> { owner(); owner(); }); launchAll();
         var first = owners.getFirst(); var second = owners.get(1);
         var retained = first.currentPane(); var session = retained.session();
@@ -88,7 +88,7 @@ class ConfigurationControllerTest {
             assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
         }); launchAll();
         edt(() -> assertThat(owners.get(1).currentPane().view().fontSize()).isEqualTo(19));
-        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=20\n[colors]\ntheme='jasper-light'\n");
+        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=20\n[ui.theme]\nvariant='light'\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(45); assertThat(first.toolbar().isVisible()).isTrue();
             assertThat(first.currentPane().view().fontSize()).isEqualTo(20);
@@ -452,126 +452,33 @@ class ConfigurationControllerTest {
         });
     }
 
-    @Test void syntheticAppearanceWarningsJoinAndClearIndependentlyAndCloseDropsQueuedEvents() throws Exception {
-        var callbacks = new java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<Boolean>>();
-        var published = new java.util.concurrent.ConcurrentLinkedQueue<Runnable>();
-        var broken = new java.util.concurrent.atomic.AtomicBoolean(true);
-        var worker = java.util.concurrent.Executors.newSingleThreadExecutor();
-        var source = new SystemAppearance(() -> new SystemAppearance.Binding(() -> {
-            if (broken.get()) throw new IllegalStateException("synthetic unavailable");
-            return false;
-        }, callbacks::add, callbacks::remove), worker, published::add);
-        service = new ConfigService(directory.resolve("config.toml"), false);
-        edt(() -> {
-            themes = new ThemeController(); controller = new ConfigurationController(themes, service, source);
-            owner(); owner();
-        });
-        until(() -> !published.isEmpty()); edt(() -> published.remove().run());
-        edt(() -> {
-            var initial = service.initialState();
-            controller.accept(new ConfigService.State(initial.snapshot(), List.of(new ConfigDiagnostic(
-                ConfigDiagnostic.Severity.WARNING, initial.file(), 1, 1, "test", "config warning")), initial.file(), true, initial.palette()));
-            var shown = new ArrayList<JComponent>(); owners.getFirst().showConfigDiagnostics = shown::add;
-            owners.getFirst().status().configButton().doClick();
-            var text = (JTextArea) ((JScrollPane) shown.getFirst()).getViewport().getView();
-            assertThat(text.getText()).contains("synthetic unavailable", "config warning");
-            controller.accept(initial);
-            assertThat(owners.getFirst().status().getText()).contains("Config warnings");
-        });
-        broken.set(false); callbacks.getFirst().accept(false);
-        until(() -> !published.isEmpty()); edt(() -> published.remove().run());
-        edt(() -> {
-            assertThat(owners.getFirst().status().getText()).contains("Built-in defaults");
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
-            assertThat(ThemeControllerTest.appearance(owners.get(1)).getItem(2).isSelected()).isTrue();
-        });
-        broken.set(true); callbacks.getFirst().accept(true);
-        until(() -> !published.isEmpty());
-        edt(() -> {
-            controller.close();
-            published.remove().run(); controller.accept(service.initialState());
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
-            assertThat(owners.getFirst().status().getText()).contains("Built-in defaults");
-        });
-        until(callbacks::isEmpty);
-    }
-
-    @Test @DisabledOnOs(OS.WINDOWS)
-    void initialCustomConfigurationAndPaletteOnlyChangesReachPendingAndNewOwners() throws Exception {
-        Path themesDirectory = directory.resolve("themes"); Files.createDirectory(themesDirectory);
-        Files.writeString(themesDirectory.resolve("night.toml"), "[colors.primary]\nbackground='#101820'\n");
-        Files.writeString(directory.resolve("config.toml"), "[colors]\nappearance='system'\ntheme='night'\n");
-        service = new ConfigService(directory.resolve("config.toml"), themesDirectory, false);
-        edt(() -> {
-            themes = new ThemeController(); controller = new ConfigurationController(themes, service);
-            owner();
-            assertThat(owners.getFirst().currentPane().getBackground()).isEqualTo(new java.awt.Color(0x101820));
-        });
-        launchAll();
-        var first = owners.getFirst(); var session = first.currentPane().session();
-        edt(() -> { first.selectAppearance(Appearance.LIGHT); first.newTab(HOME); });
-        Files.writeString(themesDirectory.resolve("night.toml"), "[colors.primary]\nbackground='#202830'\n");
-        service.reload().get(); edt(() -> { owner(); assertThat(themes.choice()).isEqualTo(Appearance.LIGHT); });
-        launchAll();
-        edt(() -> {
-            assertThat(((TerminalTab) first.tabStrip().getComponentAt(0)).panes().getFirst().session()).isSameAs(session);
-            for (var owner : owners) {
-                assertThat(owner.currentPane().view().palette().background()).isEqualTo(new java.awt.Color(0x202830));
-                assertThat(owner.status().getBackground()).isEqualTo(new java.awt.Color(0x202830));
-            }
-        });
-    }
-
-    @Test void reloadActionRetriesFailedSystemInstallationWithUnchangedFiles() throws Exception {
-        retryFailedInstallationThroughReloadAction(true);
-    }
-
     @Test void reloadActionRetriesFailedSavedInstallationWithUnchangedFiles() throws Exception {
-        retryFailedInstallationThroughReloadAction(false);
-    }
-
-    private void retryFailedInstallationThroughReloadAction(boolean systemTransition) throws Exception {
         Path file = directory.resolve("config.toml");
-        Files.writeString(file, "colors.appearance='system'");
-        Path themeDirectory = Files.createDirectory(directory.resolve("themes"));
-        Files.writeString(themeDirectory.resolve("night.toml"), "[colors.primary]\nbackground='#101820'");
+        Files.writeString(file, "ui.theme.variant='dark'");
         var configWorker = new java.util.concurrent.ScheduledThreadPoolExecutor(1) {
             @Override public java.util.concurrent.ScheduledFuture<?> scheduleWithFixedDelay(
                     Runnable command, long initialDelay, long delay, java.util.concurrent.TimeUnit unit) {
                 return super.scheduleWithFixedDelay(command, 1, 1, java.util.concurrent.TimeUnit.DAYS);
             }
         };
-        var appearanceWorker = java.util.concurrent.Executors.newSingleThreadExecutor();
-        var callback = new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<Boolean>>();
-        var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
         var broken = new java.util.concurrent.atomic.AtomicBoolean(false);
         var attempts = new ArrayList<BuiltinTheme>();
         var errors = new ArrayList<String>();
-        var source = new SystemAppearance(() -> new SystemAppearance.Binding(dark::get,
-            callback::set, ignored -> callback.set(null)), appearanceWorker, SwingUtilities::invokeLater);
-        service = new ConfigService(file, themeDirectory, false, configWorker, SwingUtilities::invokeLater);
+        service = new ConfigService(file, false, configWorker, SwingUtilities::invokeLater);
         edt(() -> {
             themes = new ThemeController(theme -> { attempts.add(theme); return !broken.get() && ThemeController.install(theme); });
-            controller = new ConfigurationController(themes, service, source);
+            controller = new ConfigurationController(themes, service);
             owner().onError = errors::add;
-        });
-        appearanceWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
-        edt(() -> {
             assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
             assertThat(attempts).containsExactly(BuiltinTheme.DARK);
             broken.set(true);
         });
-        if (systemTransition) {
-            dark.set(false); callback.get().accept(false);
-            appearanceWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
-        } else {
-            Files.writeString(file, "colors.appearance='light'\ncolors.theme='night'");
-            edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
-            configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
-        }
+        Files.writeString(file, "ui.theme.variant='light'");
+        edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
+        configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         edt(() -> {
             assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            assertThat(themes.choice()).isEqualTo(Appearance.SYSTEM);
+            assertThat(themes.choice()).isEqualTo(Appearance.DARK);
             assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT);
             assertThat(errors).hasSize(1);
             broken.set(false);
@@ -583,23 +490,22 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
             assertThat(owners.getFirst().theme()).isEqualTo(themes.current());
-            assertThat(themes.choice()).isEqualTo(systemTransition ? Appearance.SYSTEM : Appearance.LIGHT);
-            assertThat(themes.current().palette().background()).isEqualTo(systemTransition
-                ? BuiltinTheme.LIGHT.palette().background() : new java.awt.Color(0x101820));
+            assertThat(themes.choice()).isEqualTo(Appearance.LIGHT);
+            assertThat(themes.current().palette()).isEqualTo(BuiltinTheme.LIGHT.palette());
             assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT, BuiltinTheme.LIGHT);
             assertThat(errors).hasSize(1);
             owners.getFirst().selectAppearance(Appearance.DARK);
             owners.getFirst().invoke(ActionId.RELOAD_CONFIG);
         });
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertThat(Files.readString(file)).isEqualTo(acceptedText);
+        assertThat(Files.getLastModifiedTime(file)).isEqualTo(acceptedTime);
         edt(() -> {
             assertThat(themes.choice()).isEqualTo(Appearance.DARK);
             assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
             assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT,
                 BuiltinTheme.LIGHT, BuiltinTheme.DARK);
         });
-        assertThat(Files.readString(file)).isEqualTo(acceptedText);
-        assertThat(Files.getLastModifiedTime(file)).isEqualTo(acceptedTime);
     }
 
     private static String liveSettings(int size) {

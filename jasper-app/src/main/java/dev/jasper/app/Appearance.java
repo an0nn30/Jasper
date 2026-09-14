@@ -1,3 +1,4 @@
 package dev.jasper.app;
 
-enum Appearance { SYSTEM, LIGHT, DARK }
+/** The saved {@code ui.theme.variant}, or a temporary View menu override of it. */
+enum Appearance { LIGHT, DARK }

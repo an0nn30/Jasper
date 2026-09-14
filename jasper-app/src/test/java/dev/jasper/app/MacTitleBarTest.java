@@ -93,10 +93,10 @@ class MacTitleBarTest {
                 assertThat(bar).isNotNull();
                 owner.installRootBindings(root);
                 bar.setSize(400, 28);
-                assertThat(pixel(bar)).isEqualTo(new Color(0x07050d));
-                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x9c91ae));
+                assertThat(pixel(bar)).isEqualTo(new Color(0x23262c));
+                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x848c9b));
                 bar.setActive(false);
-                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x9c91ae));
+                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x848c9b));
                 owner.selectTheme(BuiltinTheme.LIGHT);
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
                 assertThat(pixel(bar)).isEqualTo(new Color(0xeaeaeb));

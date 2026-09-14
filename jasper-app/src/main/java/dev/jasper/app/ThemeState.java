@@ -1,31 +1,22 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.Palette;
-
 import java.util.Objects;
 
-record ThemeState(ColorsConfig saved, Palette loaded, Appearance override, BuiltinTheme system) {
-    ThemeState { Objects.requireNonNull(saved); Objects.requireNonNull(loaded); Objects.requireNonNull(system); }
+/** The saved variant plus an optional temporary View choice; both resolve to one built-in theme. */
+record ThemeState(Appearance saved, Appearance override) {
+    ThemeState { Objects.requireNonNull(saved); }
 
-    static ThemeState defaults() {
-        return new ThemeState(ColorsConfig.defaults(), Palette.jasperDarkPurple(), null, BuiltinTheme.DARK);
-    }
+    static ThemeState defaults() { return new ThemeState(Appearance.DARK, null); }
 
-    ThemeState configure(ColorsConfig next, Palette palette) {
-        return new ThemeState(next, palette, saved.appearance() == next.appearance() ? override : null, system);
-    }
+    /** A changed saved variant clears the temporary choice; rewriting the same value keeps it. */
+    ThemeState configure(Appearance next) { return new ThemeState(next, saved == next ? override : null); }
 
-    ThemeState choose(Appearance next) { return new ThemeState(saved, loaded, Objects.requireNonNull(next), system); }
+    ThemeState choose(Appearance next) { return new ThemeState(saved, Objects.requireNonNull(next)); }
 
-    ThemeState systemChanged(BuiltinTheme next) { return new ThemeState(saved, loaded, override, next); }
-
-    Appearance choice() { return override == null ? saved.appearance() : override; }
+    Appearance choice() { return override == null ? saved : override; }
 
     ResolvedTheme resolve() {
-        boolean light = choice() == Appearance.LIGHT
-            || (choice() == Appearance.SYSTEM && system == BuiltinTheme.LIGHT);
-        BuiltinTheme dark = saved.theme().equals("jasper-dark") ? BuiltinTheme.CLASSIC_DARK : BuiltinTheme.DARK;
-        BuiltinTheme chrome = light ? BuiltinTheme.LIGHT : dark;
-        return new ResolvedTheme(chrome, saved.custom() ? loaded : chrome.palette());
+        BuiltinTheme theme = BuiltinTheme.of(choice());
+        return new ResolvedTheme(theme, theme.palette());
     }
 }

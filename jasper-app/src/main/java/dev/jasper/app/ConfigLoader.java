@@ -29,11 +29,12 @@ final class ConfigLoader {
     }
 
     private static final Map<List<String>, Set<String>> FIELDS = Map.of(
-        List.of(), Set.of("window", "font", "colors", "keybindings", "terminal", "buddy"),
+        List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy"),
         List.of("buddy"), Set.of("enabled"),
         List.of("window"), Set.of("tab_height", "toolbar", "status_bar", "columns", "lines"),
         List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height"),
-        List.of("colors"), Set.of("theme", "appearance"),
+        List.of("ui"), Set.of("theme"),
+        List.of("ui", "theme"), Set.of("variant"),
         List.of("terminal"), Set.of("shell", "env", "scrollback", "option_as_meta", "cursor",
             "dim_inactive_panes", "copy_on_select", "bell", "on_exit"),
         List.of("terminal", "shell"), Set.of("program", "args"),
@@ -66,8 +67,7 @@ final class ConfigLoader {
     private boolean copyOnSelect;
     private BellMode bell = BellMode.VISUAL;
     private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
-    private String theme = ColorsConfig.defaults().theme();
-    private Appearance appearance = Appearance.SYSTEM;
+    private Appearance variant = Appearance.DARK;
     private Map<String, String> keybindings = Map.of();
 
     private ConfigLoader(Path file, String text, boolean macOs) {
@@ -88,15 +88,9 @@ final class ConfigLoader {
             return new Result(ConfigSnapshot.defaults(), diagnostics, true);
         }
         readTable(List.of(), toml);
-        if (!toml.contains(List.of("colors", "appearance"))) {
-            Object legacy = toml.get(List.of("colors", "theme"));
-            if ("jasper-light".equals(legacy)) appearance = Appearance.LIGHT;
-            else if ("jasper-dark".equals(legacy) || "jasper-dark-purple".equals(legacy)) appearance = Appearance.DARK;
-        }
-        ColorsConfig colors = new ColorsConfig(appearance, theme);
         diagnostics.sort(Comparator.comparingInt(ConfigDiagnostic::line).thenComparingInt(ConfigDiagnostic::column));
         var snapshot = new ConfigSnapshot(tabHeight, toolbar, statusBar,
-            new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), colors, keybindings, columns, lines,
+            new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit), buddyEnabled);
         return new Result(snapshot, diagnostics, rejected);
@@ -142,10 +136,8 @@ final class ConfigLoader {
             case "font.fallback" -> fallback = strings(path, value, ConfigLoader::fontName, fallback);
             case "font.ligatures" -> ligatures = bool(path, value, ligatures);
             case "font.line_height" -> lineHeight = number(path, value, 1, 3, lineHeight);
-            case "colors.theme" -> theme = string(path, value, ColorsConfig::validSelector,
-                "Use a theme basename in Jasper's themes directory; using the default.", theme);
-            case "colors.appearance" -> appearance = choice(path, value, Map.of(
-                "system", Appearance.SYSTEM, "light", Appearance.LIGHT, "dark", Appearance.DARK), Appearance.SYSTEM);
+            case "ui.theme.variant" -> variant = choice(path, value, Map.of(
+                "light", Appearance.LIGHT, "dark", Appearance.DARK), variant);
             case "terminal.shell.program" -> program = string(path, value,
                 text -> (text.isEmpty() || !text.isBlank()) && noNul(text),
                 "Use an empty or nonblank executable name without NUL; using the default.", program);

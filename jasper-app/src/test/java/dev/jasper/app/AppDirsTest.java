@@ -13,7 +13,6 @@ class AppDirsTest {
         var dirs = AppDirs.resolve("Mac OS X", Map.of("XDG_CONFIG_HOME", "/elsewhere"), home);
         assertThat(dirs.root()).isEqualTo(home.resolve(".config/jasper"));
         assertThat(dirs.configFile()).isEqualTo(dirs.root().resolve("config.toml"));
-        assertThat(dirs.themes()).isEqualTo(dirs.root().resolve("themes"));
         assertThat(dirs.logs()).isEqualTo(dirs.root().resolve("logs"));
         assertThat(dirs.commandHistory()).isEqualTo(dirs.root().resolve("command-history.toml"));
         assertThat(dirs.root()).doesNotExist();
@@ -47,8 +46,7 @@ class AppDirsTest {
 
     @Test void commandHistoryUsesRootWhenConfigFileIsOverridden() {
         Path root = home.resolve("root");
-        var dirs = new AppDirs(root, home.resolve("elsewhere/custom.toml"),
-            root.resolve("themes"), root.resolve("logs"));
+        var dirs = new AppDirs(root, home.resolve("elsewhere/custom.toml"), root.resolve("logs"));
 
         assertThat(dirs.commandHistory()).isEqualTo(root.resolve("command-history.toml"));
     }

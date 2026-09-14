@@ -24,7 +24,6 @@ final class ThemeController {
     private final Set<WindowContent> owners = new LinkedHashSet<>();
     private final Predicate<BuiltinTheme> installer;
     private ThemeState state = ThemeState.defaults();
-    private BuiltinTheme latestSystem = BuiltinTheme.DARK;
 
     ThemeController() { this(ThemeController::install); }
 
@@ -38,20 +37,9 @@ final class ThemeController {
     ResolvedTheme current() { requireEdt(); return state.resolve(); }
     Appearance choice() { requireEdt(); return state.choice(); }
 
-    void configure(ColorsConfig colors, dev.jasper.terminal.Palette loaded) {
-        requireEdt(); apply(state.systemChanged(latestSystem).configure(colors, loaded));
-    }
-    void selectAppearance(Appearance choice) {
-        requireEdt(); apply(state.systemChanged(latestSystem).choose(choice));
-    }
-    void select(BuiltinTheme theme) {
-        Objects.requireNonNull(theme);
-        selectAppearance(theme == BuiltinTheme.LIGHT ? Appearance.LIGHT : Appearance.DARK);
-    }
-    void systemChanged(BuiltinTheme system) {
-        requireEdt(); latestSystem = Objects.requireNonNull(system);
-        apply(state.systemChanged(system));
-    }
+    void configure(Appearance saved) { requireEdt(); apply(state.configure(Objects.requireNonNull(saved))); }
+    void selectAppearance(Appearance choice) { requireEdt(); apply(state.choose(choice)); }
+    void select(BuiltinTheme theme) { selectAppearance(Objects.requireNonNull(theme).appearance()); }
     private void apply(ThemeState candidate) {
         ResolvedTheme previous = state.resolve(), next = candidate.resolve();
         boolean chromeChanged = previous.chrome() != next.chrome();
@@ -87,8 +75,7 @@ final class ThemeController {
         requireEdt();
         return switch (theme) {
             case LIGHT -> FlatLightLaf.setup();
-            case CLASSIC_DARK -> FlatDarkLaf.setup();
-            case DARK -> FlatLaf.setup(new JasperDarkPurpleLaf());
+            case DARK -> FlatDarkLaf.setup();
         };
     }
 

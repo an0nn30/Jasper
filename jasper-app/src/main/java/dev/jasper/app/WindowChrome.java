@@ -46,7 +46,7 @@ final class WindowChrome {
         buddyVisible.setAction(owner.windowCommands().view("view.buddy"));
         JMenu appearance = new JMenu("Appearance");
         ButtonGroup themes = new ButtonGroup();
-        for (Appearance theme : new Appearance[]{Appearance.LIGHT, Appearance.DARK, Appearance.SYSTEM}) {
+        for (Appearance theme : new Appearance[]{Appearance.LIGHT, Appearance.DARK}) {
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(
                 owner.windowCommands().view("view.appearance." + theme.name().toLowerCase(java.util.Locale.ROOT)));
             themeItems.put(theme, item); themes.add(item); appearance.add(item);

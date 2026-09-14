@@ -26,8 +26,8 @@ class MockUiTest {
                 assertThat(root.getContentPane().getPreferredSize()).isEqualTo(new Dimension(958, 942));
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
-                assertThat(image.getRGB(650, 37) & 0xffffff).isEqualTo(0x301a42);
-                assertThat(image.getRGB(650, 80) & 0xffffff).isEqualTo(0x120c1c);
+                assertThat(image.getRGB(650, 37) & 0xffffff).isEqualTo(0x313439);
+                assertThat(image.getRGB(650, 80) & 0xffffff).isEqualTo(0x292c34);
                 assertThat(image.getRGB(500, 700)).isEqualTo(image.getRGB(500, 940));
             }
         });
@@ -63,51 +63,25 @@ class MockUiTest {
         });
     }
 
-    @Test void customSurfacePixelsAndNativeChromePropertyRemainIndependent() throws Exception {
-        edt(() -> {
-            var themes = new ThemeController();
-            var owner = content(launcher(new ArrayDeque<>()), themes);
-            var root = new JRootPane();
-            try (var title = MacTitleBar.install(root, owner, true, value -> {})) {
-                owner.installRootBindings(root);
-                var palette = new dev.jasper.terminal.Palette(Color.WHITE, new Color(0x101820),
-                    Color.YELLOW, Color.GRAY, BuiltinTheme.DARK.palette().ansi());
-                themes.configure(new ColorsConfig(Appearance.SYSTEM, "custom"), palette);
-                themes.systemChanged(BuiltinTheme.LIGHT);
-                owner.setConfigurationState(new ConfigService.State(ConfigSnapshot.defaults(), java.util.List.of(),
-                    java.nio.file.Path.of("config.toml"), true));
-                root.setSize(958, 958); layoutTree(root);
-                var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
-                var g = image.createGraphics(); root.printAll(g); g.dispose();
-                assertThat(image.getRGB(1, 700) & 0xffffff).isEqualTo(0x101820);
-                assertThat(image.getRGB(500, 940) & 0xffffff).isEqualTo(0x101820);
-                assertThat(owner.currentPane().getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
-                assertThat(owner.toolbar().getBackground()).isEqualTo(BuiltinTheme.LIGHT.palette().background());
-                assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
-                assertThat(title.getBackground()).isNotEqualTo(palette.background());
-            }
-        });
-    }
-
     @Test void statusClipsLongMetadataWithoutMovingRightSegmentOrGrowingMinimumWidth() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var status = owner.status(); status.setSize(600, 30);
             status.setMetadata("bash", "/tmp", "91 \u00d7 35", true); layoutTree(status);
             BufferedImage before = paint(status);
-            assertThat(before.getRGB(32, 30) & 0xffffff).isEqualTo(0x9ccf9a);
+            assertThat(before.getRGB(32, 30) & 0xffffff).isEqualTo(0xa8c58d);
             status.setMetadata("bash", "/very-long-directory".repeat(100), "91 \u00d7 35", false); layoutTree(status);
             BufferedImage after = paint(status);
             assertThat(status.getMinimumSize().width).isZero();
             assertThat(status.getPreferredSize().width).isZero();
             assertThat(status.getText()).contains("/very-long-directory").contains("91 \u00d7 35");
-            assertThat(after.getRGB(32, 30) & 0xffffff).isEqualTo(0x9c91ae);
+            assertThat(after.getRGB(32, 30) & 0xffffff).isEqualTo(0x848c9b);
             for (int y = 0; y < 60; y++) for (int x = 900; x < 1200; x++)
                 assertThat(after.getRGB(x, y)).as("right segment remains visible").isEqualTo(before.getRGB(x, y));
             // The slash remains subdued independently of the metadata text color.
             boolean foundSeparator = false;
             for (int y = 16; y < 44; y++) for (int x = 100; x < 156; x++)
-                foundSeparator |= (after.getRGB(x, y) & 0xffffff) == 0x4e2c69;
+                foundSeparator |= (after.getRGB(x, y) & 0xffffff) == 0x353940;
             assertThat(foundSeparator).isTrue();
         });
     }

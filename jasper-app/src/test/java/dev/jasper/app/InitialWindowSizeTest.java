@@ -15,7 +15,7 @@ class InitialWindowSizeTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
     static ConfigSnapshot withGridAndFont(int columns, int lines, FontConfig font) {
         var d = ConfigSnapshot.defaults();
-        return new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), font, d.colors(), d.keybindings(), columns, lines, d.terminal());
+        return new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), font, d.variant(), d.keybindings(), columns, lines, d.terminal());
     }
 
     @Test void initialAreaUsesActualSharedFontMetricsAndRequestedGrid() {

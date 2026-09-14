@@ -20,42 +20,33 @@ class ExpandedConfigTest {
 
     private ConfigLoader.Result parse(String text) { return ConfigLoader.parse(FILE, text, true); }
 
-    @Test void acceptsThemeBasenamesAndParsesColorsIndependentlyOfFieldOrder() {
-        for (String selector : List.of("night", "night.toml", "My Theme", "夜空")) {
-            for (String text : List.of(
-                    "[colors]\ntheme='" + selector + "'\nappearance='light'\n",
-                    "[colors]\nappearance='light'\ntheme='" + selector + "'\n")) {
-                var result = parse(text);
-                assertThat(result.rejected()).as(text).isFalse();
-                assertThat(result.diagnostics()).as(text).isEmpty();
-                assertThat(result.snapshot().colors()).isEqualTo(new ColorsConfig(Appearance.LIGHT, selector));
-            }
+    @Test void readsThemeVariantInEveryKeyForm() {
+        for (String text : List.of("[ui.theme]\nvariant='light'\n", "ui.theme.variant='light'\n", "[ui]\ntheme.variant='light'\n")) {
+            var result = parse(text);
+            assertThat(result.rejected()).as(text).isFalse();
+            assertThat(result.diagnostics()).as(text).isEmpty();
+            assertThat(result.snapshot().variant()).as(text).isEqualTo(Appearance.LIGHT);
         }
     }
 
-    @Test void rejectsUnsafeOrBlankThemeSelectors() {
-        for (String selector : List.of("../night", "/night", "night\\theme", "night:theme", ".", "..", " ")) {
-            var result = parse("colors.theme='" + selector.replace("'", "''") + "'");
-            assertThat(result.rejected()).as(selector).isFalse();
-            assertThat(result.snapshot().colors()).as(selector).isEqualTo(ColorsConfig.defaults());
-            assertPosition(result, "colors.theme", 1, 1, ConfigDiagnostic.Severity.ERROR);
-        }
-        var control = parse("colors.theme=\"night\\u001f\"");
-        assertThat(control.rejected()).isFalse();
-        assertThat(control.snapshot().colors()).isEqualTo(ColorsConfig.defaults());
-        assertPosition(control, "colors.theme", 1, 1, ConfigDiagnostic.Severity.ERROR);
-    }
-
-    @Test void invalidAppearanceDefaultsWhileWrongTypeRejects() {
-        var invalid = parse("[colors]\ntheme='jasper-light'\nappearance='automatic'");
+    @Test void invalidVariantDefaultsWhileWrongTypeRejectsAndLegacyColorsWarn() {
+        var invalid = parse("[ui.theme]\nvariant='system'");
         assertThat(invalid.rejected()).isFalse();
-        assertThat(invalid.snapshot().colors().appearance()).isEqualTo(Appearance.SYSTEM);
-        assertPosition(invalid, "colors.appearance", 3, 1, ConfigDiagnostic.Severity.ERROR);
+        assertThat(invalid.snapshot().variant()).isEqualTo(Appearance.DARK);
+        assertPosition(invalid, "ui.theme.variant", 2, 1, ConfigDiagnostic.Severity.ERROR);
 
-        var wrongType = parse("colors.appearance=1");
+        var wrongType = parse("ui.theme.variant=1");
         assertThat(wrongType.rejected()).isTrue();
-        assertThat(wrongType.snapshot().colors().appearance()).isEqualTo(Appearance.SYSTEM);
-        assertPosition(wrongType, "colors.appearance", 1, 1, ConfigDiagnostic.Severity.ERROR);
+        assertThat(wrongType.snapshot().variant()).isEqualTo(Appearance.DARK);
+        assertPosition(wrongType, "ui.theme.variant", 1, 1, ConfigDiagnostic.Severity.ERROR);
+
+        var legacy = parse("[colors]\ntheme='jasper-light'\nappearance='system'");
+        assertThat(legacy.rejected()).isFalse();
+        assertThat(legacy.snapshot()).isEqualTo(ConfigSnapshot.defaults());
+        assertThat(legacy.diagnostics()).singleElement().satisfies(d -> {
+            assertThat(d.key()).isEqualTo("colors");
+            assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
+        });
     }
 
     @Test void expandedSettingsAreRecognizedInNestedAndInlineTables() {
@@ -146,7 +137,7 @@ class ExpandedConfigTest {
             assertThat(result.rejected()).as(assignment).isFalse();
             var expected = ConfigSnapshot.defaults();
             assertThat(result.snapshot()).isEqualTo(new ConfigSnapshot(44, expected.toolbar(), expected.statusBar(),
-                expected.font(), expected.colors(), expected.keybindings(), expected.columns(), expected.lines(), expected.terminal()));
+                expected.font(), expected.variant(), expected.keybindings(), expected.columns(), expected.lines(), expected.terminal()));
             assertThat(result.diagnostics()).singleElement().satisfies(d -> {
                 assertThat(d.severity()).as(assignment).isEqualTo(ConfigDiagnostic.Severity.ERROR);
                 assertThat(d.message()).doesNotContain("secret", "bad");

@@ -6,7 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /** Resolves application locations without touching the filesystem. */
-record AppDirs(Path root, Path configFile, Path themes, Path logs) {
+record AppDirs(Path root, Path configFile, Path logs) {
     Path commandHistory() {
         return root.resolve("command-history.toml");
     }
@@ -26,7 +26,7 @@ record AppDirs(Path root, Path configFile, Path themes, Path logs) {
             base = absoluteRoot(env.get("XDG_CONFIG_HOME"), home.resolve(".config"));
         }
         Path root = base.resolve("jasper").toAbsolutePath().normalize();
-        return new AppDirs(root, root.resolve("config.toml"), root.resolve("themes"), root.resolve("logs"));
+        return new AppDirs(root, root.resolve("config.toml"), root.resolve("logs"));
     }
 
     private static Path absoluteRoot(String value, Path fallback) {

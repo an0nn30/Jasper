@@ -37,18 +37,18 @@ class ConfigurationStatusTest {
             }
         });
     }
-    @Test void customPalettePersistsAcrossConfigurationRefreshAndOppositeChromeIsReadable() throws Exception {
+    @Test void statusSurfaceFollowsTheAppliedPaletteBackground() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(); themes.select(BuiltinTheme.LIGHT);
+            var themes = new ThemeController();
             var status = new WindowStatusBar();
-            for (var palette : List.of(dev.jasper.terminal.Palette.jasperDark(),
-                    new dev.jasper.terminal.Palette(Color.WHITE, new Color(0x101820), Color.YELLOW,
-                        Color.GRAY, dev.jasper.terminal.Palette.jasperDark().ansi()))) {
-                status.applyPalette(palette);
+            for (var theme : BuiltinTheme.values()) {
+                themes.select(theme);
+                status.applyPalette(theme.palette());
                 status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));
-                assertThat(status.getBackground()).isEqualTo(palette.background());
-                assertThat(contrast(status.configButton().getForeground(), palette.background())).isGreaterThanOrEqualTo(3);
+                assertThat(status.getBackground()).isEqualTo(theme.palette().background());
+                assertThat(contrast(status.configButton().getForeground(), theme.palette().background())).isGreaterThanOrEqualTo(3);
             }
+            themes.select(BuiltinTheme.DARK);
         });
     }
 

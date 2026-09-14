@@ -16,7 +16,6 @@ class SplitDividerTest {
             JSplitPane split = new JSplitPane();
             try {
                 for (BuiltinTheme theme : BuiltinTheme.values()) {
-                    themes.configure(new ColorsConfig(Appearance.SYSTEM, theme.id()), theme.palette());
                     themes.select(theme);
                     SwingUtilities.updateComponentTreeUI(split);
                     split.setBorder(null);
@@ -40,7 +39,7 @@ class SplitDividerTest {
                             if (Math.abs(along - length / 2) < UIScale.scale(16)) continue;
                             Color stroke = new Color(image.getRGB(vertical ? across / 2 : along,
                                 vertical ? along : across / 2));
-                            assertThat(WindowStatusBar.contrast(stroke, theme.palette().background()))
+                            assertThat(contrast(stroke, theme.palette().background()))
                                 .as("%s orientation %s at %s", theme, orientation, along).isGreaterThanOrEqualTo(3);
                         }
                         int painted = 0;
@@ -52,9 +51,18 @@ class SplitDividerTest {
                     }
                 }
             } finally {
-                themes.configure(ColorsConfig.defaults(), BuiltinTheme.DARK.palette());
                 themes.select(BuiltinTheme.DARK);
             }
         });
+    }
+
+    private static double contrast(Color a, Color b) {
+        double first = luminance(a), second = luminance(b);
+        return (Math.max(first, second) + .05) / (Math.min(first, second) + .05);
+    }
+    private static double luminance(Color color) {
+        double[] rgb = {color.getRed() / 255.0, color.getGreen() / 255.0, color.getBlue() / 255.0};
+        for (int i = 0; i < rgb.length; i++) rgb[i] = rgb[i] <= .04045 ? rgb[i] / 12.92 : Math.pow((rgb[i] + .055) / 1.055, 2.4);
+        return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
     }
 }

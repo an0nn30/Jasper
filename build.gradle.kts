@@ -6,10 +6,6 @@ subprojects {
         maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies") {
             content { includeGroup("org.jetbrains.jediterm") }
         }
-        exclusiveContent {
-            forRepository { maven("https://jitpack.io") }
-            filter { includeGroup("com.github.Dansoftowner") }
-        }
     }
 
     extensions.configure<JavaPluginExtension> {

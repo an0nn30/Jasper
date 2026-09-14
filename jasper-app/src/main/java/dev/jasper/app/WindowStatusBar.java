@@ -15,7 +15,7 @@ final class WindowStatusBar extends JPanel {
     private String configColor = "Jasper.configSuccessForeground";
     private String shell = "", directory = "", dimensions = "";
     private boolean running;
-    private Palette palette = Palette.jasperDarkPurple();
+    private Palette palette = Palette.jasperDark();
     private String text = "Built-in defaults";
 
     WindowStatusBar() {
@@ -57,32 +57,11 @@ final class WindowStatusBar extends JPanel {
     JButton configButton() { return configButton; }
     String getText() { return text; }
     void applyPalette(Palette next) { palette = java.util.Objects.requireNonNull(next); refreshTheme(); }
-    private boolean custom() { return (!palette.equals(Palette.jasperDarkPurple()) && !palette.equals(Palette.jasperDark()) && !palette.equals(Palette.jasperLight()))
-        || !palette.background().equals(UIManager.getColor("Panel.background")); }
-    private Color readable(Color color) {
-        return custom() && contrast(color, palette.background()) < 3 ? palette.foreground() : color;
-    }
-    private Color muted() {
-        return custom() ? readable(blend(palette.foreground(), palette.background(), .8)) : UIManager.getColor("Jasper.mutedForeground");
-    }
-    private static Color blend(Color foreground, Color background, double weight) {
-        return new Color((int) Math.round(foreground.getRed() * weight + background.getRed() * (1 - weight)),
-            (int) Math.round(foreground.getGreen() * weight + background.getGreen() * (1 - weight)),
-            (int) Math.round(foreground.getBlue() * weight + background.getBlue() * (1 - weight)));
-    }
-    static double contrast(Color a, Color b) {
-        double first = luminance(a), second = luminance(b);
-        return (Math.max(first, second) + .05) / (Math.min(first, second) + .05);
-    }
-    private static double luminance(Color color) {
-        double[] rgb = {color.getRed() / 255.0, color.getGreen() / 255.0, color.getBlue() / 255.0};
-        for (int i = 0; i < rgb.length; i++) rgb[i] = rgb[i] <= .04045 ? rgb[i] / 12.92 : Math.pow((rgb[i] + .055) / 1.055, 2.4);
-        return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
-    }
+    private Color muted() { return UIManager.getColor("Jasper.mutedForeground"); }
     void refreshTheme() {
         setBackground(palette.background());
         left.refreshTheme(); right.refreshTheme();
-        configButton.setForeground(readable(UIManager.getColor(configColor)));
+        configButton.setForeground(UIManager.getColor(configColor));
     }
 
     private final class Segment extends JPanel {
@@ -101,8 +80,7 @@ final class WindowStatusBar extends JPanel {
         }
         void refreshTheme() {
             for (JComponent label : new JComponent[]{first, slash, last}) {
-                label.setForeground(label == slash ? (custom() ? blend(palette.foreground(), palette.background(), .25)
-                    : UIManager.getColor("Separator.foreground")) : muted());
+                label.setForeground(label == slash ? UIManager.getColor("Separator.foreground") : muted());
                 label.setFont(UIManager.getFont("Label.font").deriveFont(UIScale.scale(10f)));
             }
         }
@@ -129,7 +107,7 @@ final class WindowStatusBar extends JPanel {
     }
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(running ? readable(UIManager.getColor("Jasper.runningForeground")) : muted());
+        g.setColor(running ? UIManager.getColor("Jasper.runningForeground") : muted());
         var copy = (Graphics2D) g.create();
         try {
             copy.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);

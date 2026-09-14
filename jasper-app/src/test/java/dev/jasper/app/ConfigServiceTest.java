@@ -102,74 +102,6 @@ class ConfigServiceTest {
         }
     }
 
-    @Test void pollingReloadsThemeWhileConfigMetadataStaysUntouchedAndRetainsLastGood() throws Exception {
-        Path file = directory.resolve("config.toml");
-        Path themes = Files.createDirectory(directory.resolve("themes"));
-        Path theme = themes.resolve("night.toml");
-        Files.writeString(file, "colors.theme='night'");
-        String configText = Files.readString(file);
-        FileTime configTime = Files.getLastModifiedTime(file);
-        Files.writeString(theme, "[colors.primary]\nbackground='#101820'");
-        Files.setLastModifiedTime(theme, FileTime.fromMillis(1_000_000));
-        var worker = new PollWorker();
-        var delivered = new ArrayList<ConfigService.State>();
-        try (var service = new ConfigService(file, themes, true, worker, Runnable::run)) {
-            service.start(delivered::add);
-            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0x101820));
-            Files.writeString(theme, "[colors.primary]\nbackground='#fafafa'");
-            Files.setLastModifiedTime(theme, FileTime.fromMillis(2_000_000));
-            worker.poll();
-            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0xfafafa));
-            Files.writeString(theme, "[colors.primary]\nbackground='broken'");
-            Files.setLastModifiedTime(theme, FileTime.fromMillis(3_000_000));
-            worker.poll();
-            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0xfafafa));
-            assertThat(delivered.getLast().diagnostics()).isNotEmpty();
-            assertThat(Files.readString(file)).isEqualTo(configText);
-            assertThat(Files.getLastModifiedTime(file)).isEqualTo(configTime);
-            Files.writeString(file, "colors.theme='night'\nwindow.tab_height=45");
-            worker.poll();
-            assertThat(delivered.getLast().snapshot().tabHeight()).isEqualTo(45);
-            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0xfafafa));
-        }
-    }
-
-    @Test void selectedThemeKeepsPollingWhileUnchangedMalformedMainConfigRetainsItsDiagnostics() throws Exception {
-        Path file = directory.resolve("config.toml");
-        Path themes = Files.createDirectory(directory.resolve("themes"));
-        Path theme = themes.resolve("night.toml");
-        Files.writeString(file, "colors.theme='night'\nwindow.tab_height=44");
-        Files.writeString(theme, "[colors.primary]\nbackground='#101820'");
-        Files.setLastModifiedTime(theme, FileTime.fromMillis(1_000_000));
-        var worker = new PollWorker();
-        var delivered = new ArrayList<ConfigService.State>();
-        try (var service = new ConfigService(file, themes, true, worker, Runnable::run)) {
-            service.start(delivered::add);
-            assertThat(delivered.getLast().diagnostics()).isEmpty();
-            Files.writeString(file, "[colors");
-            worker.poll();
-            var rejected = delivered.getLast();
-            assertThat(rejected.snapshot().colors().theme()).isEqualTo("night");
-            assertThat(rejected.snapshot().tabHeight()).isEqualTo(44);
-            assertThat(rejected.palette().background()).isEqualTo(new Color(0x101820));
-            assertError(rejected);
-            assertThat(rejected.diagnostics()).allSatisfy(diagnostic -> assertThat(diagnostic.file()).isEqualTo(file));
-            var configTime = Files.getLastModifiedTime(file);
-            Files.writeString(theme, "[colors.primary]\nbackground='#fafafa'");
-            Files.setLastModifiedTime(theme, FileTime.fromMillis(2_000_000));
-            worker.poll();
-            assertThat(delivered).hasSize(3);
-            var updated = delivered.getLast();
-            assertThat(updated.snapshot()).isEqualTo(rejected.snapshot());
-            assertThat(updated.palette().background()).isEqualTo(new Color(0xfafafa));
-            assertThat(updated.diagnostics()).isEqualTo(rejected.diagnostics());
-            assertThat(Files.readString(file)).isEqualTo("[colors");
-            assertThat(Files.getLastModifiedTime(file)).isEqualTo(configTime);
-            worker.poll();
-            assertThat(delivered).hasSize(3);
-        }
-    }
-
     @Test void unchangedExplicitReloadPublishesOnceAndRetainsStaleAndCloseGuards() throws Exception {
         Path file = directory.resolve("config.toml");
         var queued = new ConcurrentLinkedQueue<Runnable>();
@@ -199,29 +131,6 @@ class ConfigServiceTest {
             assertThat(delivered).hasSize(3);
         } finally {
             service.close();
-        }
-    }
-
-    @Test void forcedReloadPublishesEqualMetadataThemeContentAndDropsStalePublication() throws Exception {
-        Path file = directory.resolve("config.toml");
-        Path themes = Files.createDirectory(directory.resolve("themes"));
-        Path theme = themes.resolve("night.toml");
-        Files.writeString(file, "colors.theme='night'");
-        Files.writeString(theme, "[colors.primary]\nbackground='#101820'");
-        FileTime modified = Files.getLastModifiedTime(theme);
-        var queued = new ConcurrentLinkedQueue<Runnable>();
-        var delivered = new ArrayList<ConfigService.State>();
-        try (var service = new ConfigService(file, themes, true, new PollWorker(), queued::add)) {
-            service.start(delivered::add);
-            Files.writeString(theme, "[colors.primary]\nbackground='#fafafa'");
-            Files.setLastModifiedTime(theme, modified);
-            service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(queued).hasSize(2);
-            queued.remove().run();
-            assertThat(delivered).isEmpty();
-            queued.remove().run();
-            assertThat(delivered).singleElement().satisfies(state ->
-                assertThat(state.palette().background()).isEqualTo(new Color(0xfafafa)));
         }
     }
 
@@ -493,7 +402,6 @@ class ConfigServiceTest {
         diagnostics.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, file, 0, 0, "", "Failure"));
         assertThat(state.diagnostics()).isEmpty();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> state.diagnostics().clear());
-        assertThat(state.palette()).isEqualTo(Palette.jasperDarkPurple());
     }
 
     private static void assertError(ConfigService.State state) {

@@ -195,8 +195,7 @@ public final class CommandPalettePreview {
 
         private void configure(BuiltinTheme theme, String query) throws Exception {
             SwingUtilities.invokeAndWait(() -> {
-                Appearance appearance = theme == BuiltinTheme.LIGHT ? Appearance.LIGHT : Appearance.DARK;
-                themes.configure(new ColorsConfig(appearance, theme.id()), theme.palette());
+                themes.configure(theme.appearance());
                 owner.commandPalette().component().queryField().setText(query);
             });
         }
@@ -271,8 +270,7 @@ public final class CommandPalettePreview {
 
         private static String themeSlug(BuiltinTheme theme) {
             return switch (theme) {
-                case DARK -> "purple";
-                case CLASSIC_DARK -> "classic";
+                case DARK -> "dark";
                 case LIGHT -> "light";
             };
         }

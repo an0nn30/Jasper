@@ -129,7 +129,7 @@ class WindowCommandPaletteTest {
             var file = dir.resolve(quit ? "quit.toml" : "close.toml");
             DesktopTestSupport.edt(() -> {
                 history[0] = new CommandHistory(file);
-                var application = new JasperApplication(null, SystemAppearance.fixed(BuiltinTheme.DARK),
+                var application = new JasperApplication(null,
                     DesktopTestSupport.launcher(new ArrayDeque<>()), history[0]);
                 WindowContent[] content = new WindowContent[1];
                 content[0] = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,

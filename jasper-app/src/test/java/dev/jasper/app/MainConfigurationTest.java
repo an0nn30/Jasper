@@ -34,25 +34,16 @@ class MainConfigurationTest {
         } finally { if (received.get() != null) received.get().close(); }
     }
 
-    @Test void explicitConfigurationStillUsesDefaultAppThemeDirectory() throws Exception {
-        String oldHome = System.getProperty("user.home");
-        String oldOs = System.getProperty("os.name");
-        Path home = Files.createDirectory(directory.resolve("home"));
-        Path themes = Files.createDirectories(home.resolve(".config/jasper/themes"));
-        Files.writeString(themes.resolve("night.toml"), "[colors.primary]\nbackground='#101820'");
+    @Test void explicitConfigurationSuppliesTheSavedThemeVariant() throws Exception {
         Path config = directory.resolve("elsewhere/config.toml");
         Files.createDirectories(config.getParent());
-        Files.writeString(config, "colors.theme='night'");
+        Files.writeString(config, "ui.theme.variant='light'");
         var received = new AtomicReference<ConfigService>();
         try {
-            System.setProperty("user.home", home.toString());
-            System.setProperty("os.name", "Mac OS X");
             assertThat(Main.start(new String[]{"--config", config.toString()}, System.out, System.err, received::set)).isZero();
-            assertThat(received.get().initialState().palette().background().getRGB() & 0xffffff).isEqualTo(0x101820);
+            assertThat(received.get().initialState().snapshot().variant()).isEqualTo(Appearance.LIGHT);
         } finally {
             if (received.get() != null) received.get().close();
-            System.setProperty("user.home", oldHome);
-            System.setProperty("os.name", oldOs);
         }
     }
 }

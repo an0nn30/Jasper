@@ -53,7 +53,7 @@ final class WindowCommands implements AutoCloseable {
         add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
             List.of("jasper", "mascot", "turtle", "desk buddy"));
         for (var appearance : Appearance.values()) {
-            String label = switch (appearance) { case LIGHT -> "Light"; case DARK -> "Dark"; case SYSTEM -> "Follow System"; };
+            String label = switch (appearance) { case LIGHT -> "Light"; case DARK -> "Dark"; };
             add(registry, "view.appearance." + appearance.name().toLowerCase(java.util.Locale.ROOT), label,
                 "Appearance: " + label, () -> owner.selectAppearance(appearance));
         }

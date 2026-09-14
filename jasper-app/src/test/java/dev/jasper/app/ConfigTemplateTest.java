@@ -49,7 +49,7 @@ class ConfigTemplateTest {
         assertThat(toml.getTable("terminal.shell").keySet()).containsExactlyInAnyOrder("program", "args");
         assertThat(toml.getTable("terminal.cursor").keySet()).containsExactlyInAnyOrder("shape", "blink");
         assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
-        assertThat(toml.getTable("colors").keySet()).containsExactlyInAnyOrder("appearance", "theme");
+        assertThat(toml.getTable("ui.theme").keySet()).containsExactly("variant");
         assertThat(toml.getTable("keybindings").keySet()).isEmpty();
 
         for (boolean macOs : new boolean[]{true, false}) {
@@ -63,7 +63,6 @@ class ConfigTemplateTest {
     @Test void uncommentedDefaultsAreValidAndPreserveEveryEffectiveShortcut() {
         for (boolean macOs : new boolean[]{true, false}) {
             String uncommented = ConfigTemplate.text(macOs).lines()
-                .filter(line -> !line.contains("my-theme.toml"))
                 .map(line -> line.matches("# ([a-z_0-9]+ = .*|\\[.*])") ? line.substring(2) : line)
                 .collect(java.util.stream.Collectors.joining("\n"));
             var all = ConfigLoader.parse(directory.resolve("config.toml"), uncommented, macOs);
@@ -78,7 +77,7 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().lines()).isEqualTo(45);
             assertThat(all.snapshot().font()).isEqualTo(FontConfig.defaults());
             assertThat(all.snapshot().terminal()).isEqualTo(TerminalConfig.defaults());
-            assertThat(all.snapshot().colors()).isEqualTo(ColorsConfig.defaults());
+            assertThat(all.snapshot().variant()).isEqualTo(Appearance.DARK);
             assertThat(all.snapshot().keybindings()).hasSize(ActionId.values().length);
             var defaults = KeyBindings.defaults(macOs);
             for (ActionId action : ActionId.values()) {
@@ -90,13 +89,6 @@ class ConfigTemplateTest {
                 assertThat(all.snapshot().bindings(macOs).strokeFor(action)).isEqualTo(defaults.strokeFor(action));
             }
         }
-    }
-
-    @Test void repositoryCustomThemeHasAllTwentySupportedColorsAndNoDiagnostics() throws Exception {
-        Path example = Path.of(System.getProperty("jasper.projectDir")).resolve("docs/examples/themes/jasper-custom.toml");
-        var result = ThemeLoader.parse(example, Files.readString(example, StandardCharsets.UTF_8));
-        assertThat(result.rejected()).isFalse(); assertThat(result.diagnostics()).isEmpty();
-        assertThat(Toml.parse(Files.readString(example)).dottedKeySet()).hasSize(20);
     }
 
     @Test void explicitCreationMakesOnlyConfigParentsAndNeverOverwritesEdits() throws Exception {

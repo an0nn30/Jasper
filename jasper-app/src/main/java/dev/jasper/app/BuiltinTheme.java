@@ -2,11 +2,10 @@ package dev.jasper.app;
 
 import dev.jasper.terminal.Palette;
 
-/** Built-in palettes and their corresponding chrome variants. */
+/** The two modern variants: each pairs a FlatLaf chrome with its terminal palette. */
 enum BuiltinTheme {
-    DARK("jasper-dark-purple", "Dark purple", Palette.jasperDarkPurple()),
-    CLASSIC_DARK("jasper-dark", "Classic dark", Palette.jasperDark()),
-    LIGHT("jasper-light", "Light", Palette.jasperLight());
+    DARK("dark", "Dark", Palette.jasperDark()),
+    LIGHT("light", "Light", Palette.jasperLight());
 
     private final String id;
     private final String label;
@@ -16,12 +15,10 @@ enum BuiltinTheme {
         this.id = id; this.label = label; this.palette = palette;
     }
 
-    static BuiltinTheme fromId(String id) {
-        for (BuiltinTheme theme : values()) if (theme.id.equals(id)) return theme;
-        return null;
-    }
+    static BuiltinTheme of(Appearance appearance) { return appearance == Appearance.LIGHT ? LIGHT : DARK; }
 
     String id() { return id; }
     String label() { return label; }
     Palette palette() { return palette; }
+    Appearance appearance() { return this == LIGHT ? Appearance.LIGHT : Appearance.DARK; }
 }

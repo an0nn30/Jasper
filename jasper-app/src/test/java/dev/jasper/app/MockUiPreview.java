@@ -81,7 +81,6 @@ public final class MockUiPreview {
             }
             for (BuiltinTheme theme : BuiltinTheme.values()) {
                 edt(() -> {
-                    themes[0].configure(new ColorsConfig(Appearance.SYSTEM, theme.id()), theme.palette());
                     owner[0].selectTheme(theme);
                     root[0].setSize(958, 958); MockUiTest.layoutTree(root[0]);
                 });

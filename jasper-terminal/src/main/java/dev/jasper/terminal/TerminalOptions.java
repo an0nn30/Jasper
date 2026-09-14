@@ -44,6 +44,6 @@ public record TerminalOptions(String fontFamily, float fontSize, List<String> fa
     /** Standalone terminal defaults; applications can supply their own saved defaults. */
     public static TerminalOptions defaults() {
         return new TerminalOptions("JetBrains Mono", 14f, List.of("Symbols Nerd Font Mono", "Apple Color Emoji"), true,
-            Palette.jasperDarkPurple(), CursorStyle.BLOCK, true, OptionAsMeta.LEFT, 10_000, false);
+            Palette.jasperDark(), CursorStyle.BLOCK, true, OptionAsMeta.LEFT, 10_000, false);
     }
 }

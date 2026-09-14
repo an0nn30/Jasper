@@ -11,12 +11,12 @@ registers five harmless preview-only Swing actions with deliberately long labels
 they exist only in the test-runtime renderer and do nothing if invoked. The
 synthetic entries make truncation deterministic without adding product commands.
 
-| State | Purple | Classic dark | Light |
-|---|---|---|---|
-| Three recents | [1×](recents-purple-900x600-1x.png) / [2×](recents-purple-900x600-2x.png) | [1×](recents-classic-900x600-1x.png) / [2×](recents-classic-900x600-2x.png) | [1×](recents-light-900x600-1x.png) / [2×](recents-light-900x600-2x.png) |
-| `pane`, five results | [1×](pane-query-purple-900x600-1x.png) / [2×](pane-query-purple-900x600-2x.png) | [1×](pane-query-classic-900x600-1x.png) / [2×](pane-query-classic-900x600-2x.png) | [1×](pane-query-light-900x600-1x.png) / [2×](pane-query-light-900x600-2x.png) |
-| No match | [1×](no-match-purple-900x600-1x.png) / [2×](no-match-purple-900x600-2x.png) | [1×](no-match-classic-900x600-1x.png) / [2×](no-match-classic-900x600-2x.png) | [1×](no-match-light-900x600-1x.png) / [2×](no-match-light-900x600-2x.png) |
-| Long labels, 360×500 | [1×](long-labels-narrow-purple-360x500-1x.png) / [2×](long-labels-narrow-purple-360x500-2x.png) | [1×](long-labels-narrow-classic-360x500-1x.png) / [2×](long-labels-narrow-classic-360x500-2x.png) | [1×](long-labels-narrow-light-360x500-1x.png) / [2×](long-labels-narrow-light-360x500-2x.png) |
+| State | Dark | Light |
+|---|---|---|
+| Three recents | [1×](recents-dark-900x600-1x.png) / [2×](recents-dark-900x600-2x.png) | [1×](recents-light-900x600-1x.png) / [2×](recents-light-900x600-2x.png) |
+| `pane`, five results | [1×](pane-query-dark-900x600-1x.png) / [2×](pane-query-dark-900x600-2x.png) | [1×](pane-query-light-900x600-1x.png) / [2×](pane-query-light-900x600-2x.png) |
+| No match | [1×](no-match-dark-900x600-1x.png) / [2×](no-match-dark-900x600-2x.png) | [1×](no-match-light-900x600-1x.png) / [2×](no-match-light-900x600-2x.png) |
+| Long labels, 360×500 | [1×](long-labels-narrow-dark-360x500-1x.png) / [2×](long-labels-narrow-dark-360x500-2x.png) | [1×](long-labels-narrow-light-360x500-1x.png) / [2×](long-labels-narrow-light-360x500-2x.png) |
 
 The 1×/2× labels above describe output pixels: both paint the same logical Swing
 geometry. A separate fresh JVM with `flatlaf.uiScale=2x` produced the
@@ -24,7 +24,7 @@ geometry. A separate fresh JVM with `flatlaf.uiScale=2x` produced the
 The assertions measured a 1120px preferred card width, 112px input row and 80px
 result row, exactly twice the 560/56/40 logical geometry and therefore scaled once.
 
-All 24 matrix PNGs and the UI-scale image were inspected with the image tool. The
+All 16 matrix PNGs and the UI-scale image were inspected with the image tool. The
 controller independently inspected a cross-theme/state subset. The first render
 pass exposed blank command rows because the null-layout cell renderer had not laid
 out its labels at the final paint width, and it showed the Escape hint stretched
@@ -32,7 +32,7 @@ through the full input row. Focused component regressions reproduced both issues
 The renderer now lays out at paint time and a transparent wrapper centers a compact
 Escape hint. The regenerated matrix has visible titles and badges, preserves badges
 before truncating narrow titles, stays horizontally centered in the upper half, and has readable selection and
-muted text in purple, classic dark and light.
+muted text in dark and light.
 
 Native focus, IME behavior, accessibility announcements, window deactivation and
 physical-display placement cannot be inferred from headless PNGs. They remain

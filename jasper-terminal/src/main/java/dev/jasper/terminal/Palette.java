@@ -34,17 +34,6 @@ public record Palette(Color foreground, Color background, Color cursor, Color se
                 new Color(0x74bff8), new Color(0xd68bee), new Color(0x67c7d3), new Color(0xe6e9ef)));
     }
 
-    /** Eclipse icon colors, with distinct semantic ANSI hues on a near-black purple surface. */
-    public static Palette jasperDarkPurple() {
-        return new Palette(
-            new Color(0xbcc2d2), new Color(0x120c1c), new Color(0xffffff), new Color(0x492b61),
-            List.of(
-                new Color(0x241532), new Color(0xed7c96), new Color(0x9ccf9a), new Color(0xe6c07a),
-                new Color(0x8eaff0), new Color(0xc089ef), new Color(0x75c6d2), new Color(0xbcc2d2),
-                new Color(0x91819d), new Color(0xff97ae), new Color(0xb6e3ae), new Color(0xf4d69b),
-                new Color(0xb2c6ff), new Color(0xd4a6ff), new Color(0x97dce6), new Color(0xffffff)));
-    }
-
     public static Palette jasperLight() {
         return new Palette(
             new Color(0x383a42), new Color(0xfafafa), new Color(0x526fff), new Color(0xd5def5),

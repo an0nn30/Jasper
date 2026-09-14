@@ -87,18 +87,12 @@ class ThemeControllerTest {
             owners[0].selectTab(retained[0]);
             assertThat(first[0].view().getBackground()).isEqualTo(new Color(0xfafafa));
             appearance(owners[1]).getItem(1).doClick();
-            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0x120c1c));
+            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0x292c34));
             assertThat(first[0].findBar().result().error()).isNotNull();
-            var custom = new dev.jasper.terminal.Palette(Color.WHITE, new Color(0x101820), Color.YELLOW,
-                Color.GRAY, BuiltinTheme.DARK.palette().ansi());
-            themes[0].configure(new ColorsConfig(Appearance.SYSTEM, "custom"), custom);
-            themes[0].selectAppearance(Appearance.SYSTEM);
-            themes[0].systemChanged(BuiltinTheme.LIGHT);
-            for (TerminalPane pane : retained[0].panes()) assertThat(pane.view().palette()).isEqualTo(custom);
+            for (TerminalPane pane : retained[0].panes()) assertThat(pane.view().palette()).isEqualTo(BuiltinTheme.DARK.palette());
             assertThat(first[0].session()).isSameAs(session[0]);
-            assertThat(first[0].findBar().result().error()).isNotNull();
             assertThat(retained[0].tree().zoomed()).isTrue();
-            assertThat(appearance(owners[1]).getItem(2).isSelected()).isTrue();
+            assertThat(appearance(owners[1]).getItem(1).isSelected()).isTrue();
             owners[0].removeNotify();
         });
     }
@@ -188,7 +182,7 @@ class ThemeControllerTest {
             assertThatThrownBy(() -> themes.select(BuiltinTheme.LIGHT)).isInstanceOf(IllegalStateException.class);
             assertThat(UIManager.getLookAndFeel()).isSameAs(before);
             assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            assertThat(owner.getBackground()).isEqualTo(new Color(0x120c1c));
+            assertThat(owner.getBackground()).isEqualTo(new Color(0x292c34));
             assertThat(changed).isEmpty();
         });
     }
@@ -228,41 +222,26 @@ class ThemeControllerTest {
             assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
             assertThat(UIManager.getLookAndFeel()).isSameAs(before);
             assertThat(appearance(owner).getItem(0).isSelected()).isFalse();
-            assertThat(appearance(owner).getItem(2).isSelected()).isTrue();
+            assertThat(appearance(owner).getItem(1).isSelected()).isTrue();
             assertThat(errors).singleElement().asString().contains("Could not apply theme");
         });
     }
 
-    @Test void failedSystemInstallationRetriesLatestReadingWithoutAnotherEvent() throws Exception {
+    @Test void temporaryChoiceSurvivesAnUnchangedSavedVariantAndClearsWhenItChanges() throws Exception {
         edt(() -> {
-            var fail = new java.util.concurrent.atomic.AtomicBoolean(true);
-            var calls = new ArrayList<BuiltinTheme>();
-            var themes = new ThemeController(theme -> {
-                calls.add(theme);
-                return (theme != BuiltinTheme.LIGHT || !fail.get()) && ThemeController.install(theme);
-            });
-            var first = content(launcher(new ArrayDeque<>()), themes);
-            var second = content(launcher(new ArrayDeque<>()), themes);
-            assertThatThrownBy(() -> themes.systemChanged(BuiltinTheme.LIGHT)).isInstanceOf(IllegalStateException.class);
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            assertThat(themes.choice()).isEqualTo(Appearance.SYSTEM);
-            assertThat(appearance(first).getItem(2).isSelected()).isTrue();
-            fail.set(false);
-            first.selectAppearance(Appearance.SYSTEM);
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
-            assertThat(appearance(second).getItem(2).isSelected()).isTrue();
-            var palette = new dev.jasper.terminal.Palette(java.awt.Color.WHITE, java.awt.Color.BLACK,
-                java.awt.Color.YELLOW, java.awt.Color.GRAY, BuiltinTheme.DARK.palette().ansi());
-            int installations = calls.size();
-            themes.configure(new ColorsConfig(Appearance.SYSTEM, "custom"), palette);
-            assertThat(calls).hasSize(installations);
-            first.selectAppearance(Appearance.DARK);
-            themes.systemChanged(BuiltinTheme.LIGHT);
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            themes.configure(new ColorsConfig(Appearance.SYSTEM, "another"), palette);
-            assertThat(themes.choice()).isEqualTo(Appearance.DARK);
-            themes.configure(new ColorsConfig(Appearance.LIGHT, "another"), palette);
+            var themes = new ThemeController();
+            var owner = content(launcher(new ArrayDeque<>()), themes);
+            owner.selectAppearance(Appearance.LIGHT);
+            themes.configure(Appearance.DARK);
             assertThat(themes.choice()).isEqualTo(Appearance.LIGHT);
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(appearance(owner).getItem(0).isSelected()).isTrue();
+            themes.configure(Appearance.LIGHT);
+            assertThat(themes.choice()).isEqualTo(Appearance.LIGHT);
+            themes.configure(Appearance.DARK);
+            assertThat(themes.choice()).isEqualTo(Appearance.DARK);
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(appearance(owner).getItem(1).isSelected()).isTrue();
         });
     }
 
@@ -271,7 +250,6 @@ class ThemeControllerTest {
             var themes = new ThemeController();
             var owner = content(launcher(new ArrayDeque<>()), themes);
             for (BuiltinTheme theme : BuiltinTheme.values()) {
-                themes.configure(new ColorsConfig(Appearance.SYSTEM, theme.id()), theme.palette());
                 themes.select(theme);
                 assertThat(owner.getBackground()).isEqualTo(theme.palette().background());
                 assertThat(owner.toolbar().getBackground()).isEqualTo(theme.palette().background());

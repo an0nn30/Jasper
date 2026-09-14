@@ -8,7 +8,7 @@ import java.util.Objects;
 
 /** Validated saved defaults; runtime View choices are kept separately by each owner. */
 record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
-                      FontConfig font, ColorsConfig colors, Map<String, String> keybindings,
+                      FontConfig font, Appearance variant, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled) {
     ConfigSnapshot {
         if (tabHeight < 28 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 28–72.");
@@ -17,7 +17,7 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
         Objects.requireNonNull(font, "font");
         Objects.requireNonNull(terminal, "terminal");
         Objects.requireNonNull(toolbar, "toolbar");
-        Objects.requireNonNull(colors, "colors");
+        Objects.requireNonNull(variant, "variant");
         keybindings = Map.copyOf(keybindings);
         // A snapshot has no platform. At least one platform must accept its complete map;
         // the loader validates against the actual platform before constructing a snapshot.
@@ -33,26 +33,21 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
     }
 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
-                   FontConfig font, ColorsConfig colors, Map<String, String> keybindings,
+                   FontConfig font, Appearance variant, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal) {
-        this(tabHeight, toolbar, statusBar, font, colors, keybindings, columns, lines, terminal, true);
+        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, true);
     }
 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
                    float fontSize, BuiltinTheme theme, Map<String, String> keybindings) {
-        this(tabHeight, toolbar, statusBar, FontConfig.defaults().withSize(fontSize), colors(theme),
+        this(tabHeight, toolbar, statusBar, FontConfig.defaults().withSize(fontSize), theme.appearance(),
             keybindings, 150, 45, TerminalConfig.defaults());
     }
 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, BuiltinTheme theme, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal) {
-        this(tabHeight, toolbar, statusBar, font, colors(theme), keybindings, columns, lines, terminal);
-    }
-
-    private static ColorsConfig colors(BuiltinTheme theme) {
-        Objects.requireNonNull(theme, "theme");
-        return new ColorsConfig(theme == BuiltinTheme.LIGHT ? Appearance.LIGHT : Appearance.DARK, theme.id());
+        this(tabHeight, toolbar, statusBar, font, theme.appearance(), keybindings, columns, lines, terminal);
     }
 
     float fontSize() {
@@ -67,7 +62,7 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
 
     static ConfigSnapshot defaults() {
         return new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS_AND_LABELS, true,
-            FontConfig.defaults(), ColorsConfig.defaults(), Map.of(), 150, 45, TerminalConfig.defaults());
+            FontConfig.defaults(), Appearance.DARK, Map.of(), 150, 45, TerminalConfig.defaults());
     }
 
     KeyBindings bindings(boolean macOs) {
