@@ -47,7 +47,9 @@ final class BuddyWindow {
     private BuddyWindow(BuddySprite sprite, Path stateFile, Runnable raiseTerminal, Runnable toggle) {
         this.sprite = sprite; this.stateFile = stateFile; this.raiseTerminal = raiseTerminal; this.toggle = toggle;
         timer.setRepeats(false);
-        window.setType(Window.Type.UTILITY);
+        // POPUP is the only type Java's macOS port marks non-activating, so a click on Jasper
+        // does not bring the whole app forward; it is still a frameless panel absent from the Dock.
+        window.setType(Window.Type.POPUP);
         window.setAlwaysOnTop(true);
         window.setFocusableWindowState(false);
         window.setBackground(new Color(0, 0, 0, 0));

@@ -1,6 +1,7 @@
 package dev.jasper.app;
 
 import com.formdev.flatlaf.util.SystemInfo;
+import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.Insets;
 import java.awt.Rectangle;
@@ -96,6 +97,10 @@ final class TerminalWindow implements AutoCloseable {
 
     void toFront() {
         if ((frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0) frame.setExtendedState(frame.getExtendedState() & ~java.awt.Frame.ICONIFIED);
+        // The buddy window never activates the app, so the double-click raise does it explicitly.
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_REQUEST_FOREGROUND)) {
+            Desktop.getDesktop().requestForeground(false);
+        }
         frame.toFront(); frame.requestFocus();
         if (content.currentTab() != null) content.currentTab().focusTerminal();
     }
