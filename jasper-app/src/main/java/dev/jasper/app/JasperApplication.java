@@ -112,15 +112,17 @@ final class JasperApplication {
     }
 
     private void syncBuddy() {
-        if (quitting || stopped || buddyUnavailable) return;
-        if (buddyVisibility.shown()) {
-            if (buddy == null) {
-                buddy = BuddyWindow.create(buddyStateFile, this::raiseTerminal, this::toggleBuddy);
-                if (buddy == null) buddyUnavailable = true;
-            }
-            if (buddy != null) buddy.show();
-        } else if (buddy != null) buddy.hide();
-        for (TerminalWindow window : windows) window.content().updateActions();
+        if (quitting || stopped) return;
+        if (!buddyUnavailable) {
+            if (buddyVisibility.shown()) {
+                if (buddy == null) {
+                    buddy = BuddyWindow.create(buddyStateFile, this::raiseTerminal, this::toggleBuddy);
+                    if (buddy == null) buddyUnavailable = true;
+                }
+                if (buddy != null) buddy.show();
+            } else if (buddy != null) buddy.hide();
+        }
+        for (TerminalWindow window : List.copyOf(windows)) window.content().updateActions();
     }
 
     void quit() {
