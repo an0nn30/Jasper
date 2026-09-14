@@ -28,4 +28,31 @@ class WindowCommandsTest {
             }
         });
     }
+
+    @Test void showJasperCommandTogglesThroughTheOwnerHookAndReportsItsState() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()))) {
+                boolean[] shown = {true}; int[] toggles = {0};
+                owner.buddyShown = () -> shown[0];
+                owner.onToggleBuddy = () -> { shown[0] = !shown[0]; toggles[0]++; };
+                owner.updateActions();
+                var command = owner.commands().entries().stream().map(CommandSearch.Entry::command)
+                    .filter(c -> c.id().equals("view.buddy")).findFirst().orElseThrow();
+                assertThat(command.title()).isEqualTo("Hide Jasper");
+                assertThat(command.action().getValue(Action.SELECTED_KEY)).isEqualTo(true);
+                assertThat(CommandSearch.find(owner.commands().entries(), "jasper", java.util.List.of()).stream().map(Command::id))
+                    .contains("view.buddy");
+                var viewMenu = owner.menuBar().getMenu(2);
+                var item = java.util.Arrays.stream(viewMenu.getMenuComponents())
+                    .filter(javax.swing.JCheckBoxMenuItem.class::isInstance).map(javax.swing.JCheckBoxMenuItem.class::cast)
+                    .filter(box -> box.getAction() == command.action()).findFirst().orElseThrow();
+                assertThat(item.isSelected()).isTrue();
+                owner.setActive(true);
+                command.action().actionPerformed(new java.awt.event.ActionEvent(owner, 0, "test"));
+                assertThat(toggles[0]).isEqualTo(1);
+                assertThat(command.title()).isEqualTo("Show Jasper");
+                assertThat(item.isSelected()).isFalse();
+            }
+        });
+    }
 }
