@@ -4,13 +4,14 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BuddySpriteTest {
-    @Test void committedSheetHasFourteenOpaqueFramesInsideATransparentMargin() {
+    @Test void committedSheetHasSeventeenOpaqueFramesInsideATransparentMargin() {
         BuddySprite sprite = BuddySprite.load();
         for (BuddyFrame frame : BuddyFrame.values()) {
             BufferedImage image = sprite.frame(frame);
@@ -27,9 +28,23 @@ class BuddySpriteTest {
             for (int x = 0; x < image.getWidth(); x++)
                 assertThat(image.getRGB(x, image.getHeight() - 1) >>> 24).as("%s bottom margin column %d", frame, x).isZero();
         }
+        assertThat(BuddyFrame.values()).hasSize(17);
         assertThat(BuddyFrame.HOP.column()).isEqualTo(5);
         assertThat(BuddyFrame.SLEEP_C.column()).isEqualTo(13);
+        assertThat(BuddyFrame.SPARKLE_C.column()).isEqualTo(16);
         assertThat(BuddySprite.size(2)).isEqualTo(new Dimension(84, 96));
+    }
+
+    @Test void sparkleFramesAreStarsOnlyAndLeaveTheBodyUncovered() {
+        BuddySprite sprite = BuddySprite.load();
+        int star = new Color(0xff, 0xf3, 0xb0).getRGB();
+        for (BuddyFrame frame : List.of(BuddyFrame.SPARKLE_A, BuddyFrame.SPARKLE_B, BuddyFrame.SPARKLE_C)) {
+            BufferedImage image = sprite.frame(frame);
+            assertThat(image.getRGB(21, 30) >>> 24).as("%s must not cover the body's centre", frame).isZero();
+            assertThat(pixels(image)).as("%s must use the star colour", frame).contains(star);
+        }
+        assertThat(pixels(sprite.frame(BuddyFrame.SPARKLE_A))).isNotEqualTo(pixels(sprite.frame(BuddyFrame.SPARKLE_B)));
+        assertThat(pixels(sprite.frame(BuddyFrame.SPARKLE_B))).isNotEqualTo(pixels(sprite.frame(BuddyFrame.SPARKLE_C)));
     }
 
     @Test void framesAreDistinctAndTheOutlineColorIsPresent() {
@@ -59,7 +74,7 @@ class BuddySpriteTest {
 
     @Test void wrongSheetDimensionsAreRejected() {
         assertThatThrownBy(() -> new BuddySprite(new BufferedImage(42, 48, BufferedImage.TYPE_INT_ARGB)))
-            .isInstanceOf(IllegalStateException.class).hasMessageContaining("588");
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("714");
     }
 
     @Test void sleepFramesDifferFromEachOtherAndFromIdle() {

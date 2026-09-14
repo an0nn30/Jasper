@@ -21,7 +21,8 @@ ASE = HERE / "jasper-buddy.ase"
 
 W, H = 42, 48
 FRAMES = ["idle", "blink", "wink", "wave_a", "wave_b", "hop", "lean_left", "lean_right",
-          "sit", "sit_blink", "tuck", "sleep_a", "sleep_b", "sleep_c"]
+          "sit", "sit_blink", "tuck", "sleep_a", "sleep_b", "sleep_c",
+          "sparkle_a", "sparkle_b", "sparkle_c"]
 
 OUT = (0x33, 0x2F, 0x27, 255)
 SKIN = (0xA7, 0xAE, 0x70, 255)
@@ -32,6 +33,8 @@ BELLY = (0xEE, 0xE0, 0xBD, 255)
 BELLY_LINE = (0xAB, 0x96, 0x70, 255)
 EYE = (0xF7, 0xEF, 0xD7, 255)
 GLINT = (255, 255, 255, 255)
+STAR = (0xFF, 0xF3, 0xB0, 255)
+STAR_HI = (255, 255, 255, 255)
 CLEAR = (0, 0, 0, 0)
 
 
@@ -81,6 +84,16 @@ LEGS = {
 }
 Z_SMALL = ("###", ".#.", "###")
 Z_BIG = ("#####", "...#.", "..#..", ".#...", "#####")
+SMALL_STAR = (".#.", "###", ".#.")
+BIG_STAR = ("..#..", "..#..", "#####", "..#..", "..#..")
+# Spawn overlays: (big?, x, y, colour) per star, drawn on an otherwise empty cell. Every glyph
+# stays inside columns 1-40 and rows 0-46 so the transparent margins survive, and none of them
+# reaches the body, which occupies roughly columns 6-39 and rows 2-46.
+SPARKLES = [
+    [(True, 3, 6, STAR), (False, 33, 4, STAR_HI), (False, 8, 30, STAR), (False, 36, 24, STAR)],
+    [(False, 5, 14, STAR_HI), (True, 34, 10, STAR), (False, 2, 38, STAR), (True, 30, 34, STAR)],
+    [(False, 12, 2, STAR), (False, 37, 16, STAR_HI), (True, 1, 26, STAR), (False, 26, 44, STAR_HI)],
+]
 
 
 def shell(c, dy):
@@ -117,8 +130,19 @@ def head(c, eyes, hx, dy):
             [(15, 20), (16, 21), (17, 22), (18, 22), (19, 22), (20, 22), (21, 22), (22, 22), (23, 22), (24, 22), (25, 21), (26, 20)]], OUT)
 
 
-def glyph(c, rows, x, y):
-    put(c, [(x + gx, y + gy) for gy, row in enumerate(rows) for gx, cell in enumerate(row) if cell == "#"], OUT)
+def glyph(c, rows, x, y, color=OUT):
+    put(c, [(x + gx, y + gy) for gy, row in enumerate(rows) for gx, cell in enumerate(row) if cell == "#"], color)
+
+
+def stars(specs):
+    """One spawn overlay cell: nothing but stars, transparent everywhere else. A big star's
+    centre pixel is always the bright highlight so it reads as a twinkle rather than a plus."""
+    c = Image.new("RGBA", (W, H), CLEAR)
+    for big, x, y, color in specs:
+        glyph(c, BIG_STAR if big else SMALL_STAR, x, y, color)
+        if big:
+            put(c, [(x + 2, y + 2)], STAR_HI)
+    return c
 
 
 def frame(eyes=("open", "open"), right_arm="down", left_arm="down", dy=0, lean=0, legs="stand",
@@ -167,7 +191,7 @@ def frames():
         frame(z_glyphs=[(Z_BIG, 22, 13), (Z_SMALL, 28, 6)], **shell_only),
         frame(z_glyphs=[(Z_BIG, 23, 9), (Z_SMALL, 29, 3)], **shell_only),
         frame(z_glyphs=[(Z_BIG, 24, 5), (Z_SMALL, 28, 15)], **shell_only),
-    ]
+    ] + [stars(specs) for specs in SPARKLES]
 
 
 def write_png(images):

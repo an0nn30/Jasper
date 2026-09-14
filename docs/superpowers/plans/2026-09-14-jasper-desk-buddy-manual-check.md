@@ -3,6 +3,7 @@
 Run the app from the `claude/desk-buddy` branch (`./gradlew :jasper-app:run`). Tick each item.
 
 - [ ] Jasper appears in the bottom-right corner above the Dock when the first window opens, 84 × 96 px, crisp 2-px art pixels, transparent background (no square behind him).
+- [ ] Appearance: he fades in over half a second with yellow and white sparkles around him, sparkles fade out, he waves for a second, then stands. Repeats on restore from minimize and when re-enabled.
 - [ ] He stays above other apps' windows (click into Safari/Finder over him: he remains on top).
 - [ ] He is absent from the Dock and from Cmd-Tab.
 - [ ] Idle: he blinks every few seconds; roughly one blink in four is a wink.
@@ -16,7 +17,7 @@ Run the app from the `claude/desk-buddy` branch (`./gradlew :jasper-app:run`). T
 - [ ] Close the last window: he disappears with the app.
 - [ ] `buddy.enabled = false` in `config.toml` hides him within a second; `true` brings him back and resets any session toggle.
 - [ ] External display: drag him onto it, quit, unplug the display, relaunch — he is pulled back onto the built-in screen.
-- [ ] Open packaging/buddy/jasper-buddy.ase in LibreSprite: all fourteen frames load with the transparent background intact (batch export from the command line hung during development, so this is the only check that LibreSprite reads the master).
+- [ ] Open packaging/buddy/jasper-buddy.ase in LibreSprite: all seventeen frames load with the transparent background intact (batch export from the command line hung during development, so this is the only check that LibreSprite reads the master).
 - [ ] No trails or ghosting while he blinks and dances (each frame fully replaces the previous one).
 - [ ] The bubble goes away without hiding him when you left-press Jasper or move the pointer away from it.
 - [ ] Cmd+H (Hide Jasper app): note whether he stays on screen while the app is hidden; the spec only requires hiding on minimize, so record the observed behaviour for a follow-up decision.

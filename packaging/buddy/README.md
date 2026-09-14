@@ -3,8 +3,8 @@
 Pixel-art Jasper for the floating desk buddy: 42 × 48 art pixels per frame, drawn at
 2 logical px per art pixel by the app (84 × 96 window, 4 device px per art pixel on Retina).
 
-- `jasper-buddy.ase` — editable master for [LibreSprite](https://libresprite.github.io). One RGBA layer, fourteen frames.
-- `../../jasper-app/src/main/resources/dev/jasper/app/buddy/jasper-buddy.png` — runtime strip, 588 × 48, frames left to right.
+- `jasper-buddy.ase` — editable master for [LibreSprite](https://libresprite.github.io). One RGBA layer, seventeen frames.
+- `../../jasper-app/src/main/resources/dev/jasper/app/buddy/jasper-buddy.png` — runtime strip, 714 × 48, frames left to right.
 - `generate.py` — bootstrap that drew the first version of both files (Python 3 + Pillow). Do not rerun it after hand edits.
 
 ## Frames (column order is fixed by `BuddyFrame` in the app)
@@ -25,6 +25,12 @@ Pixel-art Jasper for the floating desk buddy: 42 × 48 art pixels per frame, dra
 | 11 | `SLEEP_A` | Empty shell, two Zs low |
 | 12 | `SLEEP_B` | Empty shell, the Zs risen and drifted right |
 | 13 | `SLEEP_C` | Empty shell, the big Z at the top and a new small Z below |
+| 14 | `SPARKLE_A` | Spawn overlay: stars only, no body (painted on top of another frame) |
+| 15 | `SPARKLE_B` | Spawn overlay, stars in different places |
+| 16 | `SPARKLE_C` | Spawn overlay, stars in different places again |
+
+Frames 0–13 are poses. Frames 14–16 are overlays: transparent except for the stars, cycled on top of
+the body while he fades in at spawn, so they never replace a pose.
 
 ## Palette (from `../icons/jasper.svg`)
 
@@ -39,6 +45,8 @@ Pixel-art Jasper for the floating desk buddy: 42 × 48 art pixels per frame, dra
 | Belly lines | `#ab9670` |
 | Lenses | `#f7efd7` |
 | Eye glint | `#ffffff` |
+| Spawn star | `#fff3b0` |
+| Spawn star highlight | `#ffffff` |
 
 ## Editing and exporting
 
@@ -49,7 +57,7 @@ Open `jasper-buddy.ase` in LibreSprite, edit, save, then export the runtime stri
     --sheet jasper-app/src/main/resources/dev/jasper/app/buddy/jasper-buddy.png
 ```
 
-Keep fourteen frames of 42 × 48 with a transparent left, right and bottom margin;
+Keep seventeen frames of 42 × 48 with a transparent left, right and bottom margin;
 `BuddySpriteTest` fails the build otherwise. Ordinary Gradle builds need neither
 LibreSprite nor Python.
 
@@ -59,6 +67,10 @@ produced no output and no window, and did not exit within 60 seconds; it was kil
 PNG was produced to compare against the committed strip. The `.ase` master round-trips
 correctly through `generate.py`'s own reader/writer (`generate.py`'s `main()` re-reads
 the `.ase` it just wrote and asserts it matches the PNG pixel-for-pixel, which passed).
-The committed `jasper-buddy.png` (588 × 48, no padding, written directly by `generate.py`)
+The committed `jasper-buddy.png` (714 × 48, no padding, written directly by `generate.py`)
 remains authoritative for the runtime resource; a human with a GUI session should
 re-attempt the LibreSprite batch export if the master is hand-edited later.
+
+**Rerun 2026-09-14:** the three spawn sparkle overlays were added by rerunning `generate.py`, which
+was safe because the master had still not been hand-edited in LibreSprite. The first fourteen cells
+of the regenerated PNG are byte-identical to the previous strip.

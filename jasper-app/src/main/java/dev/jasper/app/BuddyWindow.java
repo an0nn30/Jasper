@@ -57,8 +57,19 @@ final class BuddyWindow {
                     g2.setComposite(AlphaComposite.Clear);
                     g2.fillRect(0, 0, getWidth(), getHeight());
                     g2.setComposite(AlphaComposite.SrcOver);
-                    sprite.paint(g2, animator.frame(), SCALE, 0, 0);
+                    paintBody(g2, animator.opacity());
+                    // The spawn sparkles stay solid while the body behind them fades in.
+                    animator.overlay().ifPresent(overlay -> sprite.paint(g2, overlay, SCALE, 0, 0));
                 } finally { g2.dispose(); }
+            }
+
+            private void paintBody(Graphics2D g2, float opacity) {
+                if (opacity >= 1f) { sprite.paint(g2, animator.frame(), SCALE, 0, 0); return; }
+                Graphics2D faded = (Graphics2D) g2.create();
+                try {
+                    faded.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity));
+                    sprite.paint(faded, animator.frame(), SCALE, 0, 0);
+                } finally { faded.dispose(); }
             }
         };
         canvas.setOpaque(false);
