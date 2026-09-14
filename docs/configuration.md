@@ -98,8 +98,9 @@ blink = true
 
 `buddy.enabled` shows the pixel-art Jasper who floats above other windows while at least one
 terminal window is open and not minimized. Hover to make him dance; drag him anywhere (the
-position is saved in `buddy.toml` beside `config.toml`); click him to bring the last active
-terminal window forward. View → Show Jasper, the command palette and right-click → Hide Jasper
+position is saved in `buddy.toml` beside `config.toml`); double-click him to bring the last active
+terminal window forward. Left alone he sits down after 20 seconds and retreats into his shell to
+sleep after a minute; hovering wakes him and earns a one-second wave. View → Show Jasper, the command palette and right-click → Hide Jasper
 toggle him for the current session; a saved change to `buddy.enabled` resets that session choice.
 
 ### Swing look and feel
