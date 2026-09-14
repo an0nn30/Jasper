@@ -11,6 +11,10 @@ record AppDirs(Path root, Path configFile, Path themes, Path logs) {
         return root.resolve("command-history.toml");
     }
 
+    Path buddyState() {
+        return root.resolve("buddy.toml");
+    }
+
     static AppDirs resolve(String osName, Map<String, String> env, Path home) {
         String os = osName.toLowerCase(Locale.ROOT);
         Path base;
