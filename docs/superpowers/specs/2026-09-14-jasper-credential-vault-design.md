@@ -32,7 +32,7 @@ Out of scope: SSH, SFTP, the window rail, host associations, API keys, secure no
 
 Everything lives in `jasper-app`. No new module, no plugin framework, no terminal dependency. The single interface, `DeviceAccessStore`, has four real implementations (macOS Keychain, Windows Credential Manager, libsecret, in-memory test store), satisfying the repository's two-implementation rule.
 
-**Ported core, package `dev.jasper.app.vault`** (17 main files, 10 test files). Copied verbatim except for:
+**Ported core, package `dev.jasper.app.vault`** (15 main files, 7 test files; the branch's SSH-only test helper is not ported). Copied verbatim except for:
 
 - package rename `dev.moray.app.vault` → `dev.jasper.app.vault`;
 - file magic `MORAYVLT` → `JASPRVLT` (8 bytes; the 72-byte header layout is unchanged);
@@ -62,7 +62,7 @@ All UI classes are package-private in `dev.jasper.app`, matching the rest of the
 
 **`VaultActivity`** — ported as is. An `AWTEventListener` counts key presses, mouse presses, moves, drags and wheel events whose source lies inside a registered root (windows, manager, dialogs, popups via their invoker). A 1-second Swing `Timer` calls `checkInactivity()` and reports a lock transition through `onChange`. Repaints, focus changes, terminal output and background work never count.
 
-**`WindowStatusBar`** — gains a padlock `JButton` in the right segment, before the configuration button. The icon is a `PadlockIcon` (Java2D, 12 px, closed or open, painted in `Label.foreground`); the OldGnome2 set has no padlock and carries no license record that would justify adding more artwork from it. Tooltip: "Credential vault locked. Click to unlock." / "Credential vault unlocked. Click to lock." with "Auto-lock in N min" appended when unlocked and auto-lock is enabled. Accessible name mirrors the tooltip. `getText()` (used by tests and accessibility) is unchanged.
+**`WindowStatusBar`** — gains a padlock `JButton` in the right segment, before the configuration button. The icon is a `PadlockIcon` (Java2D, 12 px, closed or open, painted in `Label.foreground`); the OldGnome2 set has no padlock and carries no license record that would justify adding more artwork from it. Tooltip: "Credential vault locked. Click to unlock." / "Credential vault unlocked. Click to lock." with "Auto-lock after N min of inactivity." appended when unlocked and auto-lock is enabled (the snapshot carries the setting, not the remaining time). A vault that does not exist yet reads "No credential vault yet. Click to create one." and the menu item reads "Create Vault…". Accessible name mirrors the tooltip. `getText()` (used by tests and accessibility) is unchanged.
 
 **`WindowChrome`** — adds a Tools menu after Tab with two new `ActionId`s:
 
