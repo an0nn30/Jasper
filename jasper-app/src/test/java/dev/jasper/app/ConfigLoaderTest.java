@@ -1,0 +1,231 @@
+package dev.jasper.app;
+
+import org.junit.jupiter.api.Test;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import javax.swing.KeyStroke;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
+import static org.assertj.core.api.Assertions.*;
+
+class ConfigLoaderTest {
+    private static final Path FILE = Path.of("/fixture/config.toml");
+    private ConfigLoader.Result parse(String text) { return ConfigLoader.parse(FILE, text, true); }
+
+    @Test void legacyThemeRetainsAppearanceAndExplicitSystemOptsIn() {
+        var path = Path.of("config.toml");
+        var legacy = ConfigLoader.parse(path, "[colors]\ntheme = 'jasper-light'\n", true);
+        var automatic = ConfigLoader.parse(path,
+            "[colors]\ntheme = 'jasper-light'\nappearance = 'system'\n", true);
+        assertThat(legacy.snapshot().colors().appearance()).isEqualTo(Appearance.LIGHT);
+        assertThat(automatic.snapshot().colors().appearance()).isEqualTo(Appearance.SYSTEM);
+        assertThat(ConfigLoader.parse(path, "", true).snapshot().colors()).isEqualTo(ColorsConfig.defaults());
+    }
+
+    @Test void emptyFileSuppliesUsableDefaultsOnBothPlatforms() {
+        for (boolean mac : new boolean[]{true, false}) {
+            var result = ConfigLoader.parse(FILE, "# empty", mac);
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.diagnostics()).isEmpty();
+            assertThat(result.snapshot()).isEqualTo(ConfigSnapshot.defaults());
+            int modifiers = mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
+            assertThat(result.snapshot().bindings(mac).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_C, modifiers)))
+                .contains(ActionId.COPY);
+        }
+    }
+
+    @Test void readsEverySupportedFieldIncludingQuotedKeysAndIntegerFontSize() {
+        var result = parse("""
+            [window]
+            "tab_height" = 44
+            toolbar = "icons"
+            status_bar = false
+            [font]
+            size = 18
+            [colors]
+            theme = "jasper-light"
+            [keybindings]
+            "copy" = "cmd+v"
+            paste = "cmd+c"
+            next_tab = "cmd+}"
+            previous_tab = "cmd+{"
+            new_tab = "none"
+            """);
+        assertThat(result.rejected()).isFalse();
+        assertThat(result.diagnostics()).isEmpty();
+        var state = result.snapshot();
+        assertThat(state.tabHeight()).isEqualTo(44);
+        assertThat(state.toolbar()).isEqualTo(WindowContent.ToolbarMode.ICONS);
+        assertThat(state.statusBar()).isFalse();
+        assertThat(state.fontSize()).isEqualTo(18f);
+        assertThat(state.colors()).isEqualTo(new ColorsConfig(Appearance.LIGHT, "jasper-light"));
+        assertThat(state.bindings(true).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.META_DOWN_MASK)))
+            .contains(ActionId.COPY);
+        assertThat(state.bindings(true).strokeFor(ActionId.NEW_TAB)).isEmpty();
+        assertThat(state.bindings(true).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET,
+            InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).contains(ActionId.NEXT_TAB);
+    }
+
+    @Test void acceptsNumericBoundariesAndEveryToolbarChoice() {
+        for (int height : new int[]{28, 72}) assertThat(parse("window.tab_height=" + height).snapshot().tabHeight()).isEqualTo(height);
+        for (float size : new float[]{6f, 72f, 13.5f}) assertThat(parse("font.size=" + size).snapshot().fontSize()).isEqualTo(size);
+        assertThat(parse("window.toolbar='hidden'").snapshot().toolbar()).isEqualTo(WindowContent.ToolbarMode.HIDDEN);
+        assertThat(parse("window.toolbar='icons_and_labels'").diagnostics()).isEmpty();
+    }
+
+    @Test void invalidValuesDefaultOnlyTheirKeyWithExactPosition() {
+        var result = parse("[window]\ntab_height = 44\n[font]\n  size = 900");
+        assertThat(result.rejected()).isFalse();
+        assertThat(result.snapshot().tabHeight()).isEqualTo(44);
+        assertThat(result.snapshot().fontSize()).isEqualTo(16f);
+        assertDiagnostic(result, "font.size", 4, 3, ConfigDiagnostic.Severity.ERROR);
+        for (String text : new String[]{"window.tab_height=27", "window.tab_height=73", "font.size=5.9",
+                "font.size=72.1", "font.size=nan", "font.size=inf", "font.size=-inf",
+                "window.toolbar='secret-value'"}) {
+            var invalid = parse(text);
+            assertThat(invalid.rejected()).as(text).isFalse();
+            assertThat(invalid.snapshot()).isEqualTo(ConfigSnapshot.defaults());
+            assertThat(invalid.diagnostics()).hasSize(1);
+            assertThat(invalid.diagnostics().getFirst().severity()).isEqualTo(ConfigDiagnostic.Severity.ERROR);
+            assertThat(invalid.diagnostics().getFirst().message()).doesNotContain("secret-value");
+        }
+    }
+
+    @Test void wrongScalarTypesRejectWholeCandidate() {
+        for (String assignment : new String[]{"window.tab_height=38.0", "window.toolbar=true", "window.status_bar=1",
+                "font.size='secret-value'", "colors.theme=1", "keybindings.copy=7", "font.size=[16]",
+                "window.tab_height={x=38}"}) {
+            var result = parse(assignment);
+            assertThat(result.rejected()).as(assignment).isTrue();
+            assertThat(result.diagnostics()).hasSize(1);
+            assertThat(result.diagnostics().getFirst().line()).isEqualTo(1);
+            assertThat(result.diagnostics().getFirst().severity()).isEqualTo(ConfigDiagnostic.Severity.ERROR);
+            assertThat(result.diagnostics().getFirst().message()).doesNotContain("secret-value");
+        }
+    }
+
+    @Test void wrongKnownTablesRejectAtTheirOwnPosition() {
+        for (String table : new String[]{"window", "font", "colors", "keybindings"}) {
+            var result = parse("# comment\n  " + table + " = 2");
+            assertThat(result.rejected()).isTrue();
+            assertDiagnostic(result, table, 2, 3, ConfigDiagnostic.Severity.ERROR);
+        }
+        var array = parse("[[window]]\ntab_height=44");
+        assertThat(array.rejected()).isTrue();
+        assertDiagnostic(array, "window", 1, 1, ConfigDiagnostic.Severity.ERROR);
+    }
+
+    @Test void syntaxAndDuplicateKeysRejectWithoutEchoingValues() {
+        var duplicate = parse("[font]\nsize=16\nsize=20");
+        assertThat(duplicate.rejected()).isTrue();
+        assertThat(duplicate.diagnostics().getFirst().line()).isEqualTo(3);
+        var malformed = parse("[font]\nsize = secret-value");
+        assertThat(malformed.rejected()).isTrue();
+        assertThat(malformed.diagnostics().getFirst().line()).isEqualTo(2);
+        assertThat(malformed.diagnostics().getFirst().column()).isPositive();
+        assertThat(malformed.diagnostics().getFirst().message()).doesNotContain("secret-value");
+    }
+
+    @Test void unknownKeysAndEmptyTablesWarnWhileSupportedSettingsApply() {
+        var result = parse("""
+            [window]
+            tab_height=44
+            future=9
+            [font]
+            future_font='secret-value'
+            [unknown]
+            [keybindings]
+            "future.action"='secret-value'
+            """);
+        assertThat(result.rejected()).isFalse();
+        assertThat(result.snapshot().tabHeight()).isEqualTo(44);
+        assertThat(result.snapshot().keybindings()).isEmpty();
+        assertThat(result.diagnostics()).hasSize(4);
+        assertDiagnostic(result, "window.future", 3, 1, ConfigDiagnostic.Severity.WARNING);
+        assertDiagnostic(result, "font.future_font", 5, 1, ConfigDiagnostic.Severity.WARNING);
+        assertDiagnostic(result, "unknown", 6, 1, ConfigDiagnostic.Severity.WARNING);
+        assertDiagnostic(result, "keybindings.\"future.action\"", 8, 1, ConfigDiagnostic.Severity.WARNING);
+        assertThat(result.diagnostics()).allSatisfy(d -> assertThat(d.message()).doesNotContain("secret-value"));
+    }
+
+    @Test void quotedDottedKeysDoNotMasqueradeAsKnownPaths() {
+        var result = parse("\"window.tab_height\"=60\nwindow.\"tab.height\"=61\nwindow.tab_height=44");
+        assertThat(result.rejected()).isFalse();
+        assertThat(result.snapshot().tabHeight()).isEqualTo(44);
+        assertThat(result.diagnostics()).hasSize(2);
+        assertDiagnostic(result, "\"window.tab_height\"", 1, 1, ConfigDiagnostic.Severity.WARNING);
+        assertDiagnostic(result, "window.\"tab.height\"", 2, 1, ConfigDiagnostic.Severity.WARNING);
+    }
+
+    @Test void unknownActionOfAnyTypeWarnsAndDoesNotRejectKnownOverrides() {
+        var result = parse("[keybindings]\nunknown=42\ncopy='none'");
+        assertThat(result.rejected()).isFalse();
+        assertThat(result.snapshot().bindings(true).strokeFor(ActionId.COPY)).isEmpty();
+        assertDiagnostic(result, "keybindings.unknown", 2, 1, ConfigDiagnostic.Severity.WARNING);
+    }
+
+    @Test void invalidOrCollidingBindingsDefaultEntireMapAndPreserveOtherFields() {
+        for (String binding : new String[]{"cmd+v", "cmd+secret-value", "cmd+{"}) {
+            var result = parse("window.tab_height=44\n[keybindings]\nnew_tab='none'\ncopy='" + binding + "'");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().tabHeight()).isEqualTo(44);
+            assertThat(result.snapshot().keybindings()).isEmpty();
+            assertDiagnostic(result, "keybindings.copy", 4, 1, ConfigDiagnostic.Severity.ERROR);
+            assertThat(result.diagnostics().getFirst().message()).doesNotContain("secret-value");
+        }
+    }
+
+    @Test void usesActualNonMacDefaultsAndLiteralOverrideSemantics() {
+        var result = ConfigLoader.parse(FILE, "keybindings.split_down='cmd+shift+d'", false);
+        assertThat(result.rejected()).isFalse();
+        assertThat(result.snapshot().keybindings()).isEmpty();
+        assertThat(result.diagnostics()).hasSize(1);
+        assertThat(result.snapshot().bindings(false).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_D,
+            InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK))).contains(ActionId.SPLIT_DOWN);
+    }
+
+    @Test void snapshotAndResultDefensivelyCopyCollections() {
+        var bindings = new HashMap<String,String>();
+        bindings.put("copy", "none");
+        var snapshot = new ConfigSnapshot(40, WindowContent.ToolbarMode.HIDDEN, false, 20f, BuiltinTheme.LIGHT, bindings);
+        bindings.put("copy", "cmd+c");
+        assertThat(snapshot.bindings(true).strokeFor(ActionId.COPY)).isEmpty();
+        assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> snapshot.keybindings().put("paste", "none"));
+        var diagnostics = new ArrayList<ConfigDiagnostic>();
+        var result = new ConfigLoader.Result(snapshot, diagnostics, false);
+        diagnostics.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, FILE, 2, 3, "x", "Unknown setting."));
+        assertThat(result.diagnostics()).isEmpty();
+        assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> result.diagnostics().clear());
+    }
+
+    @Test void directSnapshotsRejectInvalidScalarFieldsAndBindings() {
+        for (int height : new int[]{0, 27, 73}) assertThatIllegalArgumentException().isThrownBy(() ->
+            new ConfigSnapshot(height, WindowContent.ToolbarMode.ICONS, true, 16f, BuiltinTheme.DARK, Map.of()));
+        for (float size : new float[]{0, 5.9f, 72.1f, Float.NaN, Float.POSITIVE_INFINITY}) assertThatIllegalArgumentException().isThrownBy(() ->
+            new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS, true, size, BuiltinTheme.DARK, Map.of()));
+        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, null, true, 16f, BuiltinTheme.DARK, Map.of()));
+        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS, true, 16f, null, Map.of()));
+        for (Map<String,String> bindings : java.util.List.of(Map.of("unknown", "none"), Map.of("copy", "cmd+secret"))) {
+            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS,
+                true, 16f, BuiltinTheme.DARK, bindings));
+        }
+    }
+
+    @Test void diagnosticsFormatPositionAndHandleUnavailableLocation() {
+        assertThat(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, FILE, 4, 3, "font.size", "Expected a number.").formatted())
+            .contains(FILE.toString() + ":4:3", "font.size", "Expected a number.");
+        assertThat(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, FILE, 0, 0, "", "Cannot read file.").formatted())
+            .contains(FILE.toString(), "Cannot read file.").doesNotContain(":0");
+    }
+
+    private void assertDiagnostic(ConfigLoader.Result result, String key, int line, int column, ConfigDiagnostic.Severity severity) {
+        assertThat(result.diagnostics()).filteredOn(d -> d.key().equals(key)).singleElement().satisfies(d -> {
+            assertThat(d.file()).isEqualTo(FILE);
+            assertThat(d.line()).isEqualTo(line);
+            assertThat(d.column()).isEqualTo(column);
+            assertThat(d.severity()).isEqualTo(severity);
+        });
+    }
+}

@@ -13,5 +13,5 @@ if ($Image -notmatch '^(?:[A-Za-z]:[\\/]|\\\\)' -or $Output -notmatch '^(?:[A-Za
 }
 $entry = if ($Mode -eq 'throughput') { 'Bench' } else { 'MemoryBench' }
 & (Join-Path $Image 'runtime\bin\java.exe') '--enable-native-access=ALL-UNNAMED' '-cp' (Join-Path $Image 'app\*') `
-    "dev.moray.app.$entry" '--revision' $Revision '--output' $Output @BenchmarkArguments
+    "dev.jasper.app.$entry" '--revision' $Revision '--output' $Output @BenchmarkArguments
 exit $LASTEXITCODE

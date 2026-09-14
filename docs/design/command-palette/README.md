@@ -36,7 +36,7 @@ muted text in purple, classic dark and light.
 
 Native focus, IME behavior, accessibility announcements, window deactivation and
 physical-display placement cannot be inferred from headless PNGs. They remain
-unchecked in the [native acceptance checklist](../../superpowers/plans/2026-09-12-moray-command-palette-manual-check.md).
+unchecked in the [native acceptance checklist](../../superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md).
 
 ## Reproduce
 
@@ -44,10 +44,10 @@ From the repository root, choose an absolute output directory:
 
 ```bash
 OUTPUT="$(pwd)/docs/design/command-palette"
-./gradlew :moray-app:commandPalettePreview --args="$OUTPUT"
-./gradlew :moray-app:commandPalettePreview -Pmoray.uiScale=2x \
+./gradlew :jasper-app:commandPalettePreview --args="$OUTPUT"
+./gradlew :jasper-app:commandPalettePreview -Pjasper.uiScale=2x \
   --args="$OUTPUT --expect-ui-scale=2"
-./gradlew :moray-app:commandSearchMeasurement --args="$OUTPUT"
+./gradlew :jasper-app:commandSearchMeasurement --args="$OUTPUT"
 ```
 
 These tasks are opt-in and are not dependencies of `check`. The UI task is
@@ -107,7 +107,7 @@ expanded into baseline cleanup.
 - use the existing branch in a project-local ignored worktree — follows the user's established subagent/worktree workflow while preserving main — no runtime behavior cost.
 - implementation code in the plan is a recipe, not authority above the spec; correct proven source defects with TDD and record changes in the plan status and STATUS — avoids mechanically preserving bugs — may require scoped re-review.
 - Task 4 can expose and test palette through its controller before Task 5 introduces COMMAND_PALETTE; exclude the future ID by string as already specified — preserves sequential compilability — no shipped behavior difference.
-- Task 5 may prove terminal-byte isolation using the existing controlled PTY fixture where FakeConnector is inaccessible across the module boundary — avoid adding a public terminal testing API or a JediTerm dependency to moray-app — synthetic routing remains cross-platform, PTY integration is OS-qualified. Record exact evidence and platform limitation.
+- Task 5 may prove terminal-byte isolation using the existing controlled PTY fixture where FakeConnector is inaccessible across the module boundary — avoid adding a public terminal testing API or a JediTerm dependency to jasper-app — synthetic routing remains cross-platform, PTY integration is OS-qualified. Record exact evidence and platform limitation.
 - Task 2 may replace new String UTF-8 decoding with a strict REPORT decoder if malformed bytes otherwise survive in TOML comments — malformed-history policy requires rejection rather than silent replacement — no valid history behavior changes. Sent to implementer for regression-backed confirmation.
 - stage/pump persistence before listener notification in record and loaded, with real reentrant close tests — required to preserve accepted history and close contract — changes callback order internally only.
 - correct blanket typed-event swallowing if an intervening fresh foreign press proves the recipe consumes unrelated input — preserve both owned-tail containment and window-scoped fresh input — requires a small provenance state and regression, with native sequence acceptance still pending.

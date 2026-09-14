@@ -1,10 +1,14 @@
-# Moray
+# Jasper
 
 A cross-platform terminal workstation written in Java Swing, with macOS as the immediate daily-use target and a MobaXterm-style layout. Phase 1 builds the terminal before SSH sessions, credential vault, SFTP, tunnels and plugins.
 
-Moray has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status. The screenshot UI revision puts tabs beside native macOS window controls, with a horizontal Tabler toolbar below and a status bar that shares the terminal background. Coordinated Atom-inspired dark/light themes update the complete window.
+Formerly Moray. The app and Java packages are now Jasper; the Git repository
+remains [an0nn30/moray](https://github.com/an0nn30/moray). Existing settings can be
+carried over using the [rebrand migration notes](docs/rebranding.md).
 
-Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). Desktop acceptance remains user-run: [Plan 3](docs/superpowers/plans/2026-09-11-moray-plan-3-manual-check.md) and [screenshot UI](docs/superpowers/plans/2026-09-11-moray-mock-ui-manual-check.md). Passing the headless tests is not the Phase 1 daily-use gate.
+Jasper has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status. The screenshot UI revision puts tabs beside native macOS window controls, with a horizontal Tabler toolbar below and a status bar that shares the terminal background. Coordinated Atom-inspired dark/light themes update the complete window.
+
+Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). Desktop acceptance remains user-run: [Plan 3](docs/superpowers/plans/2026-09-11-jasper-plan-3-manual-check.md) and [screenshot UI](docs/superpowers/plans/2026-09-11-jasper-mock-ui-manual-check.md). Passing the headless tests is not the Phase 1 daily-use gate.
 
 ## Requirements
 
@@ -21,14 +25,14 @@ From the repository root, compile and run the headless tests:
 To run from source:
 
 ```bash
-./gradlew :moray-app:run
+./gradlew :jasper-app:run
 ```
 
-On Windows, use `.\gradlew.bat build` and `.\gradlew.bat :moray-app:run` from PowerShell. To run only the headless checks, use `./gradlew check` (Windows: `.\gradlew.bat check`).
+On Windows, use `.\gradlew.bat build` and `.\gradlew.bat :jasper-app:run` from PowerShell. To run only the headless checks, use `./gradlew check` (Windows: `.\gradlew.bat check`).
 
 `check` is headless. `run` opens windows and starts your login shell. Coding agents must follow [AGENTS.md](AGENTS.md) and leave GUI checks to the user.
 
-The opt-in `:moray-app:bench` and `:moray-app:memoryBench` tasks require explicit revision and output arguments. They open temporary windows with controlled fixture children; run them only when no game or VM is active. Use the [benchmark guide](docs/benchmarks.md) for source-tree commands, preserved macOS/Windows package commands, and the repeatable comparison protocol. The full workload targets 100 MiB; streaming acceptance is 35 MB/s, with a 45 MB/s target. Startup-inclusive timing is reported separately.
+The opt-in `:jasper-app:bench` and `:jasper-app:memoryBench` tasks require explicit revision and output arguments. They open temporary windows with controlled fixture children; run them only when no game or VM is active. Use the [benchmark guide](docs/benchmarks.md) for source-tree commands, preserved macOS/Windows package commands, and the repeatable comparison protocol. The full workload targets 100 MiB; streaming acceptance is 35 MB/s, with a 45 MB/s target. Startup-inclusive timing is reported separately.
 
 The [terminal readiness report](docs/terminal-readiness.md) records hardening, final build evidence, memory results and the remaining native/CI gates. The two-week trial has not started.
 
@@ -37,32 +41,32 @@ The [terminal readiness report](docs/terminal-readiness.md) records hardening, f
 Run this **on macOS**, with a JBR SDK matching the build architecture: Apple Silicon (`aarch64`) or Intel (`x64`). From the repository root:
 
 ```bash
-./gradlew check :moray-app:packageDist
+./gradlew check :jasper-app:packageDist
 ```
 
-This compiles Moray, runs the headless tests, creates `Moray.app` with its own JBR runtime, verifies the application image, and builds and verifies the DMG. It does not launch Moray.
+This compiles Jasper, runs the headless tests, creates `Jasper.app` with its own JBR runtime, verifies the application image, and builds and verifies the DMG. It does not launch Jasper.
 
 With the default package version `1.0.0`, the outputs are:
 
 | Output | Path |
 |---|---|
-| Application | `moray-app/build/packaging/image/Moray.app` |
-| Apple Silicon DMG | `moray-app/build/packaging/dist/Moray-1.0.0-macos-aarch64.dmg` |
-| Intel DMG | `moray-app/build/packaging/dist/Moray-1.0.0-macos-x64.dmg` |
+| Application | `jasper-app/build/packaging/image/Jasper.app` |
+| Apple Silicon DMG | `jasper-app/build/packaging/dist/Jasper-1.0.0-macos-aarch64.dmg` |
+| Intel DMG | `jasper-app/build/packaging/dist/Jasper-1.0.0-macos-x64.dmg` |
 
-Each build produces the DMG for its own architecture. Open the DMG and drag `Moray.app` to Applications to install it. The packaged app needs no separately installed Java runtime. Current development builds are ad-hoc signed; Developer ID signing and notarization are not included.
+Each build produces the DMG for its own architecture. Open the DMG and drag `Jasper.app` to Applications to install it. The packaged app needs no separately installed Java runtime. Current development builds are ad-hoc signed; Developer ID signing and notarization are not included.
 
 To build only the `.app`, or verify the image without opening the desktop:
 
 ```bash
-./gradlew :moray-app:packageApp
-./gradlew :moray-app:verifyPackage
+./gradlew :jasper-app:packageApp
+./gradlew :jasper-app:verifyPackage
 ```
 
 To set a package version:
 
 ```bash
-./gradlew check :moray-app:packageDist -PmorayVersion=1.0.1
+./gradlew check :jasper-app:packageDist -PjasperVersion=1.0.1
 ```
 
 Versions use `X.Y.Z`: major 1–255, minor 0–255, patch 0–65535, with no leading zeroes. The native macOS packager requires a positive major version.
@@ -72,10 +76,10 @@ Versions use `X.Y.Z`: major 1–255, minor 0–255, patch 0–65535, with no lea
 Run this **on Windows x64**, with a JBR SDK 25 x64 installation. From the repository root in PowerShell:
 
 ```powershell
-.\gradlew.bat check :moray-app:packageDist
+.\gradlew.bat check :jasper-app:packageDist
 ```
 
-The default output is `moray-app\build\packaging\dist\Moray-1.0.0-windows-x64.zip`. Extract the complete `Moray` folder and run `Moray.exe`; keep the launcher, `app` and `runtime` together. No external Java or WiX installation is needed to use the ZIP; building it requires the JBR SDK. The unpacked build image is at `moray-app\build\packaging\image\Moray`.
+The default output is `jasper-app\build\packaging\dist\Jasper-1.0.0-windows-x64.zip`. Extract the complete `Jasper` folder and run `Jasper.exe`; keep the launcher, `app` and `runtime` together. No external Java or WiX installation is needed to use the ZIP; building it requires the JBR SDK. The unpacked build image is at `jasper-app\build\packaging\image\Jasper`.
 
 `jpackage` builds packages on their target operating system; the Mac build cannot produce the Windows ZIP. Windows packaging and desktop behavior still need manual verification on Windows. See the [packaging guide](docs/packaging.md) for the separate macOS and Windows acceptance checklists.
 
@@ -94,13 +98,13 @@ Settings opens the TOML configuration, creating a commented template only when a
 The root [config.example.toml](config.example.toml) is a copyable file containing every supported non-shortcut setting at its built-in default. From the repository or worktree root on macOS, install it with:
 
 ```bash
-mkdir -p ~/.config/moray
-cp -n config.example.toml ~/.config/moray/config.toml
+mkdir -p ~/.config/jasper
+cp -n config.example.toml ~/.config/jasper/config.toml
 ```
 
 If `config.toml` already exists, `cp -n` leaves it unchanged. Choose another filename to inspect the example separately.
 
-Custom TOML palettes reload live and System appearance follows the OS across windows; custom terminal/status colors stay fixed as chrome changes. See [theme configuration](docs/configuration.md#appearance-and-custom-themes) and the [native theme checklist](docs/superpowers/plans/2026-09-12-moray-plan-4c-manual-check.md). Native macOS and Windows packaging commands and acceptance checks are in the [packaging guide](docs/packaging.md). Bounded application logs and their privacy rules are described in [application diagnostics](docs/diagnostics.md). Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md).
+Custom TOML palettes reload live and System appearance follows the OS across windows; custom terminal/status colors stay fixed as chrome changes. See [theme configuration](docs/configuration.md#appearance-and-custom-themes) and the [native theme checklist](docs/superpowers/plans/2026-09-12-jasper-plan-4c-manual-check.md). Native macOS and Windows packaging commands and acceptance checks are in the [packaging guide](docs/packaging.md). Bounded application logs and their privacy rules are described in [application diagnostics](docs/diagnostics.md). Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md).
 
 On Linux/Windows, Ctrl+1–9 selects an existing tab and Ctrl+Shift+[ / Ctrl+Shift+] selects the previous/next tab. For other actions, `cmd` maps to Ctrl+Shift. Those defaults written with an additional explicit Shift add Alt to remain distinct (for example split down is Ctrl+Alt+Shift+D). Other ordinary Ctrl combinations remain available to terminal programs. Keybinding overrides also accept `{` and `}` as Shift+[ and Shift+].
 
@@ -108,7 +112,7 @@ Working-directory inheritance and prompt navigation use OSC 7 and OSC 133 emitte
 
 ## Layout
 
-- `moray-terminal/`: sessions, emulator integration, terminal rendering/input, selection, search and shell integration.
-- `moray-app/`: window/pane ownership, app models, actions, tabs/splits, find and desktop chrome.
+- `jasper-terminal/`: sessions, emulator integration, terminal rendering/input, selection, search and shell integration.
+- `jasper-app/`: window/pane ownership, app models, actions, tabs/splits, find and desktop chrome.
 - `docs/STATUS.md`: completed work, open items and deferred findings.
 - `docs/superpowers/specs/` and `docs/superpowers/plans/`: specifications and implementation plans.

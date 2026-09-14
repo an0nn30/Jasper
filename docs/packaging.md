@@ -1,6 +1,6 @@
 # Native packaging
 
-Moray packages a native image with the JetBrains Runtime. Packaging must run on
+Jasper packages a native image with the JetBrains Runtime. Packaging must run on
 the target operating system: macOS builds the macOS app and DMG, while Windows
 builds the portable Windows ZIP. Windows packaging has not yet been executed and
 remains a manual acceptance boundary.
@@ -15,26 +15,26 @@ WiX.
 On macOS:
 
 ```bash
-./gradlew check :moray-app:packageDist
-./gradlew :moray-app:verifyPackage
-./gradlew :moray-app:packageDist -PmorayVersion=1.0.1
+./gradlew check :jasper-app:packageDist
+./gradlew :jasper-app:verifyPackage
+./gradlew :jasper-app:packageDist -PjasperVersion=1.0.1
 ```
 
 On Windows:
 
 ```powershell
-.\gradlew.bat check :moray-app:packageDist
-.\gradlew.bat :moray-app:verifyPackage
+.\gradlew.bat check :jasper-app:packageDist
+.\gradlew.bat :jasper-app:verifyPackage
 ```
 
-`morayVersion` defaults to `1.0.0`. It accepts three decimal components without
+`jasperVersion` defaults to `1.0.0`. It accepts three decimal components without
 leading zeroes; major is 1–255, minor is 0–255, and patch is 0–65535. Native
-package versions require a positive major component. Outputs are under `moray-app/build/packaging`: the native application is
+package versions require a positive major component. Outputs are under `jasper-app/build/packaging`: the native application is
 in `image/`, and distributions are
-`moray-app/build/packaging/dist/Moray-<version>-macos-<aarch64|x64>.dmg`
-or `moray-app/build/packaging/dist/Moray-<version>-windows-x64.zip`. The unpacked
-image is `moray-app/build/packaging/image/Moray.app` on macOS and
-`moray-app/build/packaging/image/Moray` on Windows.
+`jasper-app/build/packaging/dist/Jasper-<version>-macos-<aarch64|x64>.dmg`
+or `jasper-app/build/packaging/dist/Jasper-<version>-windows-x64.zip`. The unpacked
+image is `jasper-app/build/packaging/image/Jasper.app` on macOS and
+`jasper-app/build/packaging/image/Jasper` on Windows.
 
 The package bundles a runtime and needs no external Java. Current development
 packages have only jpackage's local ad-hoc signature, not a Developer ID signature,
@@ -50,7 +50,7 @@ acceptance remain unexecuted on macOS.
 
 ### macOS
 
-- [ ] Open the DMG, drag Moray to Applications, and launch it from Finder and from the Dock.
+- [ ] Open the DMG, drag Jasper to Applications, and launch it from Finder and from the Dock.
 - [ ] Confirm the Eclipse icon in Finder, Dock and Cmd+Tab at normal and Retina sizes; compare its apparent size with neighboring app icons.
 - [ ] With a minimal launcher environment, confirm the shell starts and UTF-8 text renders correctly.
 - [ ] Confirm native title controls and system theme changes.
@@ -65,7 +65,7 @@ acceptance remain unexecuted on macOS.
 
 ### Windows
 
-- [ ] Build on Windows with a JBR 25 x64 SDK, extract the entire ZIP to a path containing spaces, and launch `Moray.exe` from Explorer.
+- [ ] Build on Windows with a JBR 25 x64 SDK, extract the entire ZIP to a path containing spaces, and launch `Jasper.exe` from Explorer.
 - [ ] Confirm the Eclipse icon in Explorer, the taskbar, Alt+Tab and titlebar at 100%, 150% and 200% display scale.
 - [ ] Confirm PowerShell/PTY input and resize behavior, including Unicode text.
 - [ ] Confirm clipboard operations and tab shortcuts.
@@ -80,6 +80,6 @@ acceptance remain unexecuted on macOS.
 
 ## Terminal readiness verification
 
-The readiness branch's macOS arm64 package at runtime revision `8d84e7d` passed a fresh `./gradlew build :moray-app:packageDist --rerun-tasks`: 576 tests, 575 passed and one known font skip, zero failures/errors; all 16 tasks executed. Native image/runtime/dependency checks, strict bundle seal and DMG integrity passed. This automated verification and controlled fixture benchmarking do not complete the interactive checklist above.
+The readiness branch's macOS arm64 package at runtime revision `8d84e7d` passed a fresh `./gradlew build :jasper-app:packageDist --rerun-tasks`: 576 tests, 575 passed and one known font skip, zero failures/errors; all 16 tasks executed. Native image/runtime/dependency checks, strict bundle seal and DMG integrity passed. This automated verification and controlled fixture benchmarking do not complete the interactive checklist above.
 
 See the [readiness ledger](terminal-readiness.md) for the exact artifact checksum, measurement report and pending CI/macOS/Windows gates. After installing, also check modifier changes during tmux mouse drags, multiple mouse buttons, multi-notch scrolling, whole-word dragging, CJK/emoji selection edges, browser opening, and blinking after hide/show or pane reparenting. Leave the two-week trial unstarted until the acceptance gates are resolved.

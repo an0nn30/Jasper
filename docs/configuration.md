@@ -1,6 +1,6 @@
 # Configuration
 
-Moray reads UTF-8 TOML at startup and watches it for changes once per second. Starting Moray does not create directories or files. Click **Settings** to create a commented template if the file is absent, then open it in your operating system's editor. Moray tries Edit, then Open, then revealing the file in Finder/Explorer when supported. If all attempts fail, Moray shows the error. Existing files are never overwritten by Settings.
+Jasper reads UTF-8 TOML at startup and watches it for changes once per second. Starting Jasper does not create directories or files. Click **Settings** to create a commented template if the file is absent, then open it in your operating system's editor. Jasper tries Edit, then Open, then revealing the file in Finder/Explorer when supported. If all attempts fail, Jasper shows the error. Existing files are never overwritten by Settings.
 
 For a copyable starting point, use the root [config.example.toml](../config.example.toml). It contains every supported non-shortcut setting as an explicit built-in default, an empty environment table and optional platform-specific shortcut examples.
 
@@ -8,15 +8,15 @@ For a copyable starting point, use the root [config.example.toml](../config.exam
 
 | Platform | Default file |
 |---|---|
-| macOS | `~/.config/moray/config.toml` |
-| Linux | `$XDG_CONFIG_HOME/moray/config.toml`, or `~/.config/moray/config.toml` when unset or relative |
-| Windows | `%APPDATA%/moray/config.toml`, or `~/AppData/Roaming/moray/config.toml` when unavailable |
+| macOS | `~/.config/jasper/config.toml` |
+| Linux | `$XDG_CONFIG_HOME/jasper/config.toml`, or `~/.config/jasper/config.toml` when unset or relative |
+| Windows | `%APPDATA%/jasper/config.toml`, or `~/AppData/Roaming/jasper/config.toml` when unavailable |
 
 Use `--config <path>` to select a different file. Relative paths resolve from the process's working directory. The override changes only the configuration file location. Settings creates only that file's parent directories when needed.
 
 ```bash
-./gradlew :moray-app:run --args='--config /absolute/path/to/config.toml'
-./gradlew :moray-app:run --args='--help'
+./gradlew :jasper-app:run --args='--config /absolute/path/to/config.toml'
+./gradlew :jasper-app:run --args='--help'
 ```
 
 The first command launches the desktop and a shell. `--help` prints usage without opening a window or reading configuration. Missing, duplicate and unknown arguments fail before desktop startup.
@@ -63,7 +63,7 @@ blink = true
 # System switches both chrome and the built-in palette; custom palettes stay fixed.
 appearance = "system"
 # Either built-in ID follows appearance. A custom basename is loaded from themes/.
-theme = "moray-dark-purple"
+theme = "jasper-dark-purple"
 # theme = "my-theme.toml"
 
 [keybindings]
@@ -94,7 +94,7 @@ theme = "moray-dark-purple"
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `colors.appearance` | `"system"` | `"system"`, `"light"`, `"dark"` | Live, shared across windows |
-| `colors.theme` | `"moray-dark-purple"` | Built-in ID or custom basename | Live, shared across windows |
+| `colors.theme` | `"jasper-dark-purple"` | Built-in ID or custom basename | Live, shared across windows |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Live settings and temporary choices
@@ -111,9 +111,9 @@ A visual bell flashes a short foreground overlay for 150ms. Sound uses the syste
 
 ### Shell, environment and history
 
-Each new tab or split requests a new pane. Moray captures its shell command, arguments, environment, scrollback capacity and shell label before dispatching the background launch. A reload cannot change an already queued request. Existing sessions retain those settings. Pending views still receive the latest live font and behavior settings when ready.
+Each new tab or split requests a new pane. Jasper captures its shell command, arguments, environment, scrollback capacity and shell label before dispatching the background launch. A reload cannot change an already queued request. Existing sessions retain those settings. Pending views still receive the latest live font and behavior settings when ready.
 
-With an empty program, macOS/Linux use the inherited `SHELL` followed by `-l`; when `SHELL` is unavailable or blank, the fallback is `/bin/zsh` on macOS and `/bin/bash` on Linux. Windows uses `powershell.exe -NoLogo`. Configured arguments append to that default command. An explicit program gets only the configured arguments, with no implicit login flag. Moray does not split strings, expand shell expressions or parse a shell command line.
+With an empty program, macOS/Linux use the inherited `SHELL` followed by `-l`; when `SHELL` is unavailable or blank, the fallback is `/bin/zsh` on macOS and `/bin/bash` on Linux. Windows uses `powershell.exe -NoLogo`. Configured arguments append to that default command. An explicit program gets only the configured arguments, with no implicit login flag. Jasper does not split strings, expand shell expressions or parse a shell command line.
 
 For example, this starts zsh with exactly the two arguments `-l` and `-i`:
 
@@ -129,7 +129,7 @@ PROJECT_LABEL = "a value with spaces"
 
 Arguments containing spaces stay single arguments, and an empty string remains an empty argument. To ask a shell to interpret a command, explicitly name that shell and pass its command flag and command text as separate arguments. Nested tables above and inline tables such as `shell = { program = "/bin/zsh", args = ["-l"] }` under `[terminal]` are both supported; the same applies to `cursor` and `env`.
 
-Environment entries overlay the inherited child environment. Desktop launches remove the exact inherited terminal identity variables `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, `TERM_SESSION_ID`, `TMUX`, and `TMUX_PANE`, plus variables matching `ITERM_*`, before applying this overlay, so configured values intentionally override them. On macOS, `LANG` defaults to `en_US.UTF-8` only when absent or blank; `LC_*` values are preserved. This table does not change which default login shell is selected: setting `SHELL` here only changes the child's environment. `TERM` and `COLORTERM` are reserved; configured entries warn and are ignored. Moray always passes `TERM=xterm-256color` and `COLORTERM=truecolor`. Invalid environment entries are omitted individually. Diagnostics do not echo environment values or shell arguments. Setting scrollback to zero disables retained history for future sessions.
+Environment entries overlay the inherited child environment. Desktop launches remove the exact inherited terminal identity variables `TERM_PROGRAM`, `TERM_PROGRAM_VERSION`, `TERM_SESSION_ID`, `TMUX`, and `TMUX_PANE`, plus variables matching `ITERM_*`, before applying this overlay, so configured values intentionally override them. On macOS, `LANG` defaults to `en_US.UTF-8` only when absent or blank; `LC_*` values are preserved. This table does not change which default login shell is selected: setting `SHELL` here only changes the child's environment. `TERM` and `COLORTERM` are reserved; configured entries warn and are ignored. Jasper always passes `TERM=xterm-256color` and `COLORTERM=truecolor`. Invalid environment entries are omitted individually. Diagnostics do not echo environment values or shell arguments. Setting scrollback to zero disables retained history for future sessions.
 
 ### Shell exit behavior
 
@@ -150,7 +150,7 @@ on_exit = "close_on_success"
 
 ### Initial window grid
 
-Columns and lines specify the desired first terminal grid of a new window. Moray derives the initial pixel area from the saved font metrics and adds 4px pane padding on each side (8px total per dimension); Swing adds chrome and window decorations. The packed window respects its minimum constraints and is capped to the current display's usable area. If the display is smaller than those constraints, its usable area is the cap. Thus a large requested grid may not fit exactly, and native minimums may enlarge a small request.
+Columns and lines specify the desired first terminal grid of a new window. Jasper derives the initial pixel area from the saved font metrics and adds 4px pane padding on each side (8px total per dimension); Swing adds chrome and window decorations. The packed window respects its minimum constraints and is capped to the current display's usable area. If the display is smaller than those constraints, its usable area is the cap. Thus a large requested grid may not fit exactly, and native minimums may enlarge a small request.
 
 A window captures its grid defaults once. Later reloads do not resize or repack it, and a delayed shell does not repack it when ready. New tabs and splits in that window use its captured launch grid and then resize to the available layout. A newly opened window uses the latest saved grid. Changing live typography can change how many cells fit in the existing window.
 
@@ -219,7 +219,7 @@ Syntax errors, wrong types, unreadable files, invalid UTF-8 and files larger tha
 
 ## Remaining configuration work
 
-App logging remains planned; see the [packaging guide](packaging.md) for desktop launcher details. Unsupported keys warn. Native font rendering, keyboard behavior, audio, screen sizing and editor integration still require the user-run [terminal configuration checklist](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md), alongside the acceptance checks linked from the README.
+App logging remains planned; see the [packaging guide](packaging.md) for desktop launcher details. Unsupported keys warn. Native font rendering, keyboard behavior, audio, screen sizing and editor integration still require the user-run [terminal configuration checklist](superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md), alongside the acceptance checks linked from the README.
 
 
 ## Appearance and custom themes
@@ -228,30 +228,30 @@ View → Appearance offers Light, Dark and Follow System across all windows. Cho
 
 | Saved values | Chrome | Terminal palette |
 |---|---|---|
-| System + moray-dark-purple (default) | Purple Dark or Light | moray-dark-purple or moray-light |
-| System + moray-dark | Classic Dark or Light | moray-dark or moray-light |
-| System + moray-light | Purple Dark or Light | moray-dark-purple or moray-light |
-| Light + any built-in ID | Light | moray-light |
-| Dark + moray-dark | Classic Dark | moray-dark |
-| Dark + moray-dark-purple or moray-light | Purple Dark | moray-dark-purple |
+| System + jasper-dark-purple (default) | Purple Dark or Light | jasper-dark-purple or jasper-light |
+| System + jasper-dark | Classic Dark or Light | jasper-dark or jasper-light |
+| System + jasper-light | Purple Dark or Light | jasper-dark-purple or jasper-light |
+| Light + any built-in ID | Light | jasper-light |
+| Dark + jasper-dark | Classic Dark | jasper-dark |
+| Dark + jasper-dark-purple or jasper-light | Purple Dark | jasper-dark-purple |
 | Any appearance + custom file | Saved/system appearance | Fixed custom palette |
-| Appearance omitted + explicit moray-light | Light | Built-in Light (legacy behavior) |
-| Appearance omitted + explicit moray-dark | Classic Dark | moray-dark (legacy behavior) |
-| Appearance omitted + explicit moray-dark-purple | Purple Dark | moray-dark-purple |
-| Both omitted | System | moray-dark-purple / moray-light |
+| Appearance omitted + explicit jasper-light | Light | Built-in Light (legacy behavior) |
+| Appearance omitted + explicit jasper-dark | Classic Dark | jasper-dark (legacy behavior) |
+| Appearance omitted + explicit jasper-dark-purple | Purple Dark | jasper-dark-purple |
+| Both omitted | System | jasper-dark-purple / jasper-light |
 | Appearance omitted + custom file | System | Fixed custom palette |
 
 Explicit appearance takes precedence over a built-in ID's suffix. Changing the parsed saved appearance clears the temporary override; rewriting the same value does not. Custom palettes retain their colors as chrome changes. Terminal padding and status match the palette background; toolbar, menus, find controls and native title follow chrome.
 
-The built-in IDs are `moray-dark-purple`, `moray-dark` (classic) and `moray-light`.
-New/missing configurations use `appearance = "system"` and `theme = "moray-dark-purple"`.
-An existing configuration explicitly selecting `moray-dark` retains the classic palette;
-change its selector to `moray-dark-purple` to adopt the new theme. Explicit custom themes
-also remain selected. See the [palette and actual UI renders](design/moray-dark-purple/README.md).
+The built-in IDs are `jasper-dark-purple`, `jasper-dark` (classic) and `jasper-light`.
+New/missing configurations use `appearance = "system"` and `theme = "jasper-dark-purple"`.
+An existing configuration explicitly selecting `jasper-dark` retains the classic palette;
+change its selector to `jasper-dark-purple` to adopt the new theme. Explicit custom themes
+also remain selected. See the [palette and actual UI renders](design/jasper-dark-purple/README.md).
 
-Theme files live only in Moray's `themes/` directory beside its default configuration directory (macOS: `~/.config/moray/themes/`). `--config` does not relocate themes. Select one basename, with an optional `.toml` extension. Spaces and Unicode are allowed; paths, separators, control characters, Windows-reserved filename characters, `.` and `..` are rejected. The selected file must be a regular file contained within the real theme directory; escaping symlinks are rejected. Loading creates no files or directories.
+Theme files live only in Jasper's `themes/` directory beside its default configuration directory (macOS: `~/.config/jasper/themes/`). `--config` does not relocate themes. Select one basename, with an optional `.toml` extension. Spaces and Unicode are allowed; paths, separators, control characters, Windows-reserved filename characters, `.` and `..` are rejected. The selected file must be a regular file contained within the real theme directory; escaping symlinks are rejected. Loading creates no files or directories.
 
-The [complete twenty-color example](examples/themes/moray-custom.toml) uses this supported Alacritty TOML subset:
+The [complete twenty-color example](examples/themes/jasper-custom.toml) uses this supported Alacritty TOML subset:
 
 | Table | Supported keys |
 |---|---|
@@ -261,17 +261,17 @@ The [complete twenty-color example](examples/themes/moray-custom.toml) uses this
 | `colors.normal` | `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white` |
 | `colors.bright` | Same eight ANSI names |
 
-Values are quoted `#RRGGBB` or `0xRRGGBB`. Files must be strict UTF-8 and at most 256 KiB. At least one supported color is required; omitted colors inherit fixed classic Moray Dark (`moray-dark`), independent of the OS and the new default. This preserves existing custom theme files. Unsupported keys warn and are ignored. Invalid supported colors/types, duplicate definitions, syntax errors and symbolic cell references reject the candidate. Selection foreground, cursor text, dim/indexed colors, imports and other Alacritty features are unsupported.
+Values are quoted `#RRGGBB` or `0xRRGGBB`. Files must be strict UTF-8 and at most 256 KiB. At least one supported color is required; omitted colors inherit fixed classic Jasper Dark (`jasper-dark`), independent of the OS and the new default. This preserves existing custom theme files. Unsupported keys warn and are ignored. Invalid supported colors/types, duplicate definitions, syntax errors and symbolic cell references reject the candidate. Selection foreground, cursor text, dim/indexed colors, imports and other Alacritty features are unsupported.
 
 To try the example on macOS, choose an absent destination (change the name if already used):
 
 ```sh
-mkdir -p ~/.config/moray/themes
-cp -n docs/examples/themes/moray-custom.toml ~/.config/moray/themes/my-theme.toml
+mkdir -p ~/.config/jasper/themes
+cp -n docs/examples/themes/jasper-custom.toml ~/.config/jasper/themes/my-theme.toml
 ```
 
 Then edit your own config's colors block to set `theme = "my-theme.toml"` and your desired appearance. `cp -n` preserves an existing destination; inspect it or choose another name rather than assuming it was copied. To start a main configuration from the root example, likewise copy only to an absent target or a user-chosen filename; do not replace your live settings inadvertently.
 
 The selected theme is checked on the existing one-second reload cadence even without main-config changes. Reload config forces both reads. Deletion, bad edits or I/O errors retain the last successfully loaded saved palette (Dark if none); repair replaces it and clears theme diagnostics. Valid unrelated settings still apply. A main-config syntax error keeps the last good selection while its theme file continues reloading. The status diagnostic viewer identifies the actual failing file and positions. System-source warnings clear independently of configuration/theme errors. A failed chrome installation keeps the previous effective theme/menu and can be retried with Follow System or Reload config.
 
-See the [system/custom theme native checklist](superpowers/plans/2026-09-12-moray-plan-4c-manual-check.md). Native detection, display scaling and title controls require user-run acceptance.
+See the [system/custom theme native checklist](superpowers/plans/2026-09-12-jasper-plan-4c-manual-check.md). Native detection, display scaling and title controls require user-run acceptance.

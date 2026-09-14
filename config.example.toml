@@ -1,6 +1,6 @@
-# Moray example configuration
+# Jasper example configuration
 # Copy this file to your platform's config.toml, then edit only the values you want to change.
-# All active values below are Moray's built-in defaults.
+# All active values below are Jasper's built-in defaults.
 
 [window]
 # Live across open windows. Range: 28-72 logical pixels.
@@ -45,7 +45,7 @@ on_exit = "keep_open"
 [terminal.shell]
 # New panes only. An empty program selects the platform default login shell.
 # Configured args append to that default command. An explicit program receives only these args,
-# with no implicit login flag. Each array item is passed as one exact argument: Moray performs
+# with no implicit login flag. Each array item is passed as one exact argument: Jasper performs
 # no shell parsing, splitting, expansion, or interpolation. Program and args must contain no NUL.
 program = ""
 args = []
@@ -58,7 +58,7 @@ blink = true
 [terminal.env]
 # New panes only. Uncomment entries to overlay the inherited environment with exact string values.
 # Names must match [A-Za-z_][A-Za-z0-9_]* and values must contain no NUL. TERM and COLORTERM are
-# reserved: Moray always sets TERM=xterm-256color and COLORTERM=truecolor. This table does not
+# reserved: Jasper always sets TERM=xterm-256color and COLORTERM=truecolor. This table does not
 # choose the default login shell; setting SHELL here only changes the child's environment.
 # Desktop launches remove inherited TERM_PROGRAM, TERM_PROGRAM_VERSION, TERM_SESSION_ID, TMUX,
 # TMUX_PANE, and ITERM_* variables before applying this overlay; configured values override them.
@@ -68,9 +68,9 @@ blink = true
 [colors]
 # System switches both chrome and the built-in palette; custom palettes stay fixed.
 appearance = "system"
-# Built-ins: moray-dark-purple (default), moray-dark (classic), moray-light.
+# Built-ins: jasper-dark-purple (default), jasper-dark (classic), jasper-light.
 # A custom basename is loaded from themes/.
-theme = "moray-dark-purple"
+theme = "jasper-dark-purple"
 # theme = "my-theme.toml"
 
 [keybindings]

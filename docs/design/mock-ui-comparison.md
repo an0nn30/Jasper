@@ -1,6 +1,6 @@
 # Mock UI comparison
 
-The actual previews are produced by `./gradlew :moray-app:mockUiPreview` and saved as `mock-ui-dark.png` and `mock-ui-light.png`. This headless task paints the real `MacTitleBar`, `WindowContent`, tab controls, action buttons, terminal view and status components at 958 × 958 logical pixels into 1916 × 1916 PNGs. Its two controlled `/bin/sh` PTYs print fixture-only prompt/OSC metadata and wait for input; cleanup closes both sessions and waits for exit. It never creates a JFrame or starts a login shell.
+The actual previews are produced by `./gradlew :jasper-app:mockUiPreview` and saved as `mock-ui-dark.png` and `mock-ui-light.png`. This headless task paints the real `MacTitleBar`, `WindowContent`, tab controls, action buttons, terminal view and status components at 958 × 958 logical pixels into 1916 × 1916 PNGs. Its two controlled `/bin/sh` PTYs print fixture-only prompt/OSC metadata and wait for input; cleanup closes both sessions and waits for exit. It never creates a JFrame or starts a login shell.
 
 The user's compact-tab follow-up supersedes the reference's fixed 54px title/tab row: the actual default is now 38 logical pixels, configurable per window from 28 to 72 through View → Tab height…. These regenerated previews show the settled 38px default. They deliberately no longer match the reference's vertical geometry.
 

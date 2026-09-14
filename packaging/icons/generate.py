@@ -14,30 +14,29 @@ import xml.etree.ElementTree as ET
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-RESOURCES = ROOT / 'moray-app/src/main/resources/dev/moray/app/icons/app'
+RESOURCES = ROOT / 'jasper-app/src/main/resources/dev/jasper/app/icons/app'
 SVG = 'http://www.w3.org/2000/svg'
 INKSCAPE = 'http://www.inkscape.org/namespaces/inkscape'
 ET.register_namespace('', SVG)
 ET.register_namespace('inkscape', INKSCAPE)
 WINDOWS_SIZES = (16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 128, 256)
 MAC_SIZES = (16, 32, 64, 128, 256, 512, 1024)
-MAC_OUTLINE = ('M288 64H736C893 64 960 131 960 288V736'
-               'C960 893 893 960 736 960H288C131 960 64 893 64 736'
-               'V288C64 131 131 64 288 64Z')
-
-
 def platform_svg(platform):
-    root = ET.parse(HERE / 'moray.svg').getroot()
-    root.find(f'{{{SVG}}}title').text = f'Moray Eclipse / {platform}'
+    root = ET.parse(HERE / 'jasper.svg').getroot()
+    root.find(f'{{{SVG}}}title').text = f'Jasper Silver Desk Buddy / {platform}'
     root.find(f'{{{SVG}}}desc').text = (
-        'Approved brighter Eclipse artwork. Native platform framing; '
-        'eel, prompt, purple palette and rim lighting preserved.')
+        'Approved Jasper turtle mascot with glasses and natural shell. '
+        'Motif silver background #dcdee5. Editable vector shapes.')
     if platform == 'macos':
-        case = next(e for e in root if e.get('id') == '01-case')
-        for path in case:
-            path.set('d', MAC_OUTLINE)
-    # One transform replaces the design canvas margin, rather than adding a second one.
-    scale = (824 if platform == 'macos' else 960) / 896
+        # The approved master already has the Mac tile and transparent margin.
+        return ET.tostring(root, encoding='unicode')
+    background = next(e for e in root if e.get('id') == 'background')
+    for rectangle in background.findall(f'{{{SVG}}}rect'):
+        rectangle.set('rx', '100')
+    # Adapt the tile highlight to the tighter Windows corners.
+    background.find(f'{{{SVG}}}path').set('d', 'M132 213 Q132 124 221 124 H786')
+    # Replace the 104px side margins with 32px; scale the artwork together.
+    scale = 960 / 816
     frame = ET.Element(f'{{{SVG}}}g', {'id': 'platform-frame',
         'transform': f'translate(512 512) scale({scale:.12f}) translate(-512 -512)'})
     for child in list(root):
@@ -76,23 +75,23 @@ def main():
     if not Path(args.inkscape).is_file() or not shutil.which('iconutil'):
         parser.error('Regeneration requires Inkscape and macOS iconutil')
     for platform, sizes in [('macos', MAC_SIZES), ('windows', WINDOWS_SIZES)]:
-        source = HERE / f'moray-{platform}.svg'
+        source = HERE / f'jasper-{platform}.svg'
         source.write_text(platform_svg(platform), encoding='utf-8')
         target = RESOURCES / platform
         target.mkdir(parents=True, exist_ok=True)
         for size in sizes:
             render(args.inkscape, source, target / f'icon-{size}.png', size)
         print(f'Rendered {platform}: {sizes}', flush=True)
-    write_ico(HERE / 'Moray.ico', [(s, RESOURCES / f'windows/icon-{s}.png') for s in WINDOWS_SIZES])
-    with tempfile.TemporaryDirectory(prefix='moray-icon-') as temporary:
-        iconset = Path(temporary) / 'Moray.iconset'
+    write_ico(HERE / 'Jasper.ico', [(s, RESOURCES / f'windows/icon-{s}.png') for s in WINDOWS_SIZES])
+    with tempfile.TemporaryDirectory(prefix='jasper-icon-') as temporary:
+        iconset = Path(temporary) / 'Jasper.iconset'
         iconset.mkdir()
         for points in (16, 32, 128, 256, 512):
             for scale in (1, 2):
                 name = f'icon_{points}x{points}{"@2x" if scale == 2 else ""}.png'
                 shutil.copyfile(RESOURCES / f'macos/icon-{points * scale}.png', iconset / name)
-        subprocess.run(['iconutil', '-c', 'icns', str(iconset), '-o', str(HERE / 'Moray.icns')], check=True)
-    print('Wrote Moray.icns and Moray.ico')
+        subprocess.run(['iconutil', '-c', 'icns', str(iconset), '-o', str(HERE / 'Jasper.icns')], check=True)
+    print('Wrote Jasper.icns and Jasper.ico')
 
 
 if __name__ == '__main__':

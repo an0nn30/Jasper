@@ -1,2 +1,2 @@
-rootProject.name = "moray"
-include("moray-terminal", "moray-app")
+rootProject.name = "jasper"
+include("jasper-terminal", "jasper-app")

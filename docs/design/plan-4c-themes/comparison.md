@@ -11,7 +11,7 @@ All variants retain the 38px title row, 53px toolbar, 30px status and exact 4px 
 Reproduce from the worktree/repository root:
 
 ```sh
-./gradlew :moray-app:mockUiPreview --init-script docs/design/plan-4c-themes/preview.gradle
+./gradlew :jasper-app:mockUiPreview --init-script docs/design/plan-4c-themes/preview.gradle
 ```
 
 This uses the test-only `SystemThemePreview` fixture and writes only this directory. Historical mock screenshots remain unchanged.

@@ -12,7 +12,7 @@ def app = extensions.getByType(JavaApplication)
 def toolchains = extensions.getByType(JavaToolchainService)
 def java = extensions.getByType(JavaPluginExtension)
 def launcher = toolchains.launcherFor(java.toolchain)
-def version = providers.gradleProperty('morayVersion').orElse('1.0.0')
+def version = providers.gradleProperty('jasperVersion').orElse('1.0.0')
 def jarTask = tasks.named('jar')
 def packagingRoot = layout.buildDirectory.dir('packaging')
 def inputDirectory = packagingRoot.map { it.dir('input') }
@@ -35,18 +35,18 @@ def normalizedHost = {
 
 // Keep icon inputs lazy so non-native builds remain usable on other hosts.
 def nativeIcon = providers.provider {
-    rootProject.file("packaging/icons/Moray.${normalizedHost().os == 'macos' ? 'icns' : 'ico'}")
+    rootProject.file("packaging/icons/Jasper.${normalizedHost().os == 'macos' ? 'icns' : 'ico'}")
 }
 
 def validatedVersion = {
     String value = version.get()
     def match = value =~ /^(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,4})$/
     if (!match.matches()) {
-        throw new GradleException("Invalid -PmorayVersion '${value}'; expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
+        throw new GradleException("Invalid -PjasperVersion '${value}'; expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
     }
     List<Integer> components = [match.group(1), match.group(2), match.group(3)].collect { Integer.parseInt(it) }
     if (components[0] < 1 || components[0] > 255 || components[1] > 255 || components[2] > 65535) {
-        throw new GradleException("Invalid -PmorayVersion '${value}'; expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
+        throw new GradleException("Invalid -PjasperVersion '${value}'; expected X.Y.Z with major 1..255, minor 0..255, patch 0..65535, and no leading zeroes")
     }
     value
 }
@@ -105,7 +105,7 @@ def stage = tasks.register('stagePackage', Sync) {
 
 def packageApp = tasks.register('packageApp') {
     group = 'distribution'
-    description = 'Builds a native Moray application image for the current host.'
+    description = 'Builds a native Jasper application image for the current host.'
     dependsOn(stage)
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(nativeIcon).withPathSensitivity(PathSensitivity.RELATIVE)
@@ -124,8 +124,8 @@ def packageApp = tasks.register('packageApp') {
         delete(imageDir, marker)
         imageDir.mkdirs()
         List<String> args = [context.jpackage.absolutePath, '--type', 'app-image',
-            '--name', 'Moray', '--app-version', context.version,
-            '--description', 'Moray terminal', '--vendor', 'Moray',
+            '--name', 'Jasper', '--app-version', context.version,
+            '--description', 'Jasper terminal', '--vendor', 'Jasper',
             '--input', inputDirectory.get().asFile.absolutePath, '--dest', imageDir.absolutePath,
             '--main-jar', jarTask.get().archiveFile.get().asFile.name,
             '--main-class', app.mainClass.get(),
@@ -133,7 +133,7 @@ def packageApp = tasks.register('packageApp') {
             '--jlink-options', '--strip-debug --no-man-pages --no-header-files --bind-services']
         app.applicationDefaultJvmArgs.each { args.addAll(['--java-options', it.toString()]) }
         if (context.host.os == 'macos') {
-            args.addAll(['--mac-package-identifier', 'dev.moray.app', '--mac-package-name', 'Moray'])
+            args.addAll(['--mac-package-identifier', 'dev.jasper.app', '--mac-package-name', 'Jasper'])
         }
         try {
             executeNative(args, 'jpackage app-image')
@@ -147,18 +147,18 @@ def packageApp = tasks.register('packageApp') {
 
 def verifyPackage = tasks.register('verifyPackage') {
     group = 'verification'
-    description = 'Verifies the generated native image and bundled runtime without launching Moray.'
+    description = 'Verifies the generated native image and bundled runtime without launching Jasper.'
     dependsOn(packageApp)
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.upToDateWhen { false }
     doLast {
         def context = nativeContext()
-        File image = new File(imageDirectory.get().asFile, context.host.os == 'macos' ? 'Moray.app' : 'Moray')
+        File image = new File(imageDirectory.get().asFile, context.host.os == 'macos' ? 'Jasper.app' : 'Jasper')
         File appDir = context.host.os == 'macos' ? new File(image, 'Contents/app') : new File(image, 'app')
         File runtimeHome = context.host.os == 'macos' ? new File(image, 'Contents/runtime/Contents/Home') : new File(image, 'runtime')
-        File nativeLauncher = context.host.os == 'macos' ? new File(image, 'Contents/MacOS/Moray') : new File(image, 'Moray.exe')
-        File config = new File(appDir, 'Moray.cfg')
+        File nativeLauncher = context.host.os == 'macos' ? new File(image, 'Contents/MacOS/Jasper') : new File(image, 'Jasper.exe')
+        File config = new File(appDir, 'Jasper.cfg')
         [image, appDir, runtimeHome, nativeLauncher, config].each { candidate ->
             if (!candidate.exists()) throw new GradleException("Package verification failed: missing ${candidate}")
         }
@@ -169,9 +169,9 @@ def verifyPackage = tasks.register('verifyPackage') {
             }
         }
         String cfg = config.getText('UTF-8')
-        if (!cfg.contains("app.mainclass=${app.mainClass.get()}")) throw new GradleException('Package verification failed: wrong main class in Moray.cfg')
-        if (!cfg.contains('--enable-native-access=ALL-UNNAMED') || !cfg.contains('-Dapple.awt.application.name=Moray')) {
-            throw new GradleException('Package verification failed: required JVM options are missing from Moray.cfg')
+        if (!cfg.contains("app.mainclass=${app.mainClass.get()}")) throw new GradleException('Package verification failed: wrong main class in Jasper.cfg')
+        if (!cfg.contains('--enable-native-access=ALL-UNNAMED') || !cfg.contains('-Dapple.awt.application.name=Jasper')) {
+            throw new GradleException('Package verification failed: required JVM options are missing from Jasper.cfg')
         }
         String normalizedCfg = cfg.replace('\\', '/')
         configurations.runtimeClasspath.files.findAll { it.name.endsWith('.jar') }.each { dependency ->
@@ -204,7 +204,7 @@ def verifyPackage = tasks.register('verifyPackage') {
             if (!plist.isFile()) throw new GradleException("Package verification failed: missing ${plist}")
             def identifier = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist.absolutePath], 'plutil identifier').stdout.trim()
             def bundleVersion = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleShortVersionString', 'raw', '-o', '-', plist.absolutePath], 'plutil version').stdout.trim()
-            if (identifier != 'dev.moray.app' || bundleVersion != context.version) throw new GradleException("Package verification failed: plist identity/version is ${identifier}/${bundleVersion}")
+            if (identifier != 'dev.jasper.app' || bundleVersion != context.version) throw new GradleException("Package verification failed: plist identity/version is ${identifier}/${bundleVersion}")
             String iconName = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIconFile', 'raw', '-o', '-', plist.absolutePath], 'plutil icon').stdout.trim()
             if (!iconName.endsWith('.icns')) iconName += '.icns'
             File packagedIcon = new File(image, "Contents/Resources/${iconName}")
@@ -248,7 +248,7 @@ def verifyPackage = tasks.register('verifyPackage') {
         if (runtimeArchitecture != context.host.architecture) {
             throw new GradleException("Package verification failed: bundled Java architecture is ${runtimeArchitecture ?: 'unknown'}")
         }
-        logger.lifecycle("Verified Moray ${context.version} ${context.host.os}-${context.host.architecture} image at ${image}")
+        logger.lifecycle("Verified Jasper ${context.version} ${context.host.os}-${context.host.architecture} image at ${image}")
     }
 }
 
@@ -257,7 +257,7 @@ if (normalizedHost().os == 'windows') {
         group = 'distribution'
         description = 'Creates the portable Windows distribution after verifying its image.'
         dependsOn(verifyPackage)
-        archiveFileName = version.map { "Moray-${it}-windows-x64.zip" }
+        archiveFileName = version.map { "Jasper-${it}-windows-x64.zip" }
         destinationDirectory = distributionDirectory
         from(imageDirectory)
         preserveFileTimestamps = false
@@ -271,19 +271,19 @@ if (normalizedHost().os == 'windows') {
         dependsOn(verifyPackage)
         inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.property('version', version)
-        outputs.files(version.map { new File(distributionDirectory.get().asFile, "Moray-${it}-macos-${normalizedHost().architecture}.dmg") })
+        outputs.files(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-macos-${normalizedHost().architecture}.dmg") })
         doLast {
         def context = nativeContext()
         File distDir = distributionDirectory.get().asFile
         distDir.mkdirs()
-        File artifact = new File(distDir, "Moray-${context.version}-macos-${context.host.architecture}.dmg")
+        File artifact = new File(distDir, "Jasper-${context.version}-macos-${context.host.architecture}.dmg")
         delete(artifact)
         File temporary = new File(packagingRoot.get().asFile, 'dist-dmg-work')
         delete(temporary)
         temporary.mkdirs()
         try {
-            executeNative([context.jpackage.absolutePath, '--type', 'dmg', '--name', 'Moray',
-                '--app-image', new File(imageDirectory.get().asFile, 'Moray.app').absolutePath,
+            executeNative([context.jpackage.absolutePath, '--type', 'dmg', '--name', 'Jasper',
+                '--app-image', new File(imageDirectory.get().asFile, 'Jasper.app').absolutePath,
                 '--dest', temporary.absolutePath], 'jpackage dmg')
             File generated = temporary.listFiles().find { it.name.endsWith('.dmg') }
             if (generated == null) throw new GradleException('jpackage dmg completed without producing a DMG')

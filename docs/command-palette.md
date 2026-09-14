@@ -8,7 +8,7 @@ outside click closes the palette.
 
 An empty search shows your last three distinct palette commands, newest first.
 Recents are shared across windows and saved in `command-history.toml` under
-Moray's application directory. Running Settings from the palette counts as a
+Jasper's application directory. Running Settings from the palette counts as a
 recent command like any other accepted palette command. Invoking an action from
 the toolbar, menu, or an ordinary shortcut does not change palette recency, and
 the main configuration file is never used to store recents. Before any history
@@ -83,9 +83,9 @@ snapshots through one worker. Writes happen off EDT, use a sibling temporary fil
 and atomically replace the target where the filesystem supports it. A write
 failure is logged and does not roll back memory. Normal shutdown drains the latest
 snapshot with a bounded wait; abrupt process termination cannot promise the final
-write. Separate Moray processes use last-writer-wins history without cross-process
+write. Separate Jasper processes use last-writer-wins history without cross-process
 locking.
 
 The [actual Swing renders, pure-search measurements, and reproduction commands](design/command-palette/README.md)
 cover the headless verification. Native focus, input methods, accessibility, and
-physical-display placement remain in the [manual acceptance checklist](superpowers/plans/2026-09-12-moray-command-palette-manual-check.md).
+physical-display placement remain in the [manual acceptance checklist](superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md).

@@ -1,84 +1,63 @@
-# Moray app icon
+# Jasper app icon
 
-The official icon is **Eclipse**, with the user-approved brighter purple eel,
-directional violet rim/glow, and white two-tone terminal prompt.
+The official icon is **Silver Desk Buddy Jasper**: a friendly turtle with round
+glasses, a natural shell, and a silver background taken from JBR 25's Motif
+`controlHighlight` color (`#dcdee5`). There is no terminal imagery on Jasper.
+The user selected this artwork on 2026-09-14.
 
-![Platform previews](../../docs/design/app-icon.png)
+![macOS icon](../../jasper-app/src/main/resources/dev/jasper/app/icons/app/macos/icon-256.png)
+![Windows icon](../../jasper-app/src/main/resources/dev/jasper/app/icons/app/windows/icon-256.png)
 
 ## Source and outputs
 
-- `moray.svg` is the editable, approved master. Edit its named SVG layers in Inkscape.
-- `moray-macos.svg` and `moray-windows.svg` are generated platform layouts.
-- `Moray.icns` and `Moray.ico` are committed native package inputs.
-- `moray-app/src/main/resources/dev/moray/app/icons/app/` contains the corresponding
-  PNG representations loaded by Swing and the development-launch Dock icon.
+- `jasper.svg` is the approved editable SVG master, copied from the silver study.
+  Open it directly in Illustrator or Inkscape. All artwork is vector shapes;
+  there are no embedded bitmaps, fonts, filters, or external dependencies.
+- `jasper-macos.svg` and `jasper-windows.svg` are generated platform layouts.
+- `Jasper.icns` and `Jasper.ico` are the native package inputs.
+- `jasper-app/src/main/resources/dev/jasper/app/icons/app/` contains PNG sizes
+  loaded by Swing and the development-launch Dock icon.
 
-The platform transformation changes only framing. Eel geometry, body colors
-(`#5C347C`, `#492B61`, `#371F4B`), outline gradient, glow, eye, and prompt are preserved.
+The application, asset filenames, Java packages, and packaging configuration
+now use Jasper. The Git repository remains `an0nn30/moray`.
 
 ## Platform framing
 
-**macOS:** A rounded squircle occupies an 824×824 area centered in the 1024×1024
-canvas, giving a single 100px transparent margin on each side. This is the legacy
-ICNS pipeline used by jpackage, not an Icon Composer asset: the shape and margin
-are already baked into every representation. Do not add another margin in the
-runtime image or resize it again when packaging. A local reference measurement
-of Apple's Terminal ICNS showed an opaque 204px footprint on a 256px canvas;
-Moray measures 206px. This checks optical scale without claiming live Dock or
-Cmd+Tab acceptance. The native image and runtime PNG use the same artwork.
+**macOS:** The approved artwork is preserved exactly, including its silver
+816px-wide rounded tile and 104px transparent side margins on the 1024px canvas.
+The subtle bottom shadow is part of the SVG. No extra padding is added during
+rendering or packaging. ICNS includes the ten standard 1x/2x representations
+for 16, 32, 128, 256, and 512 point sizes, up to 1024px.
 
-The ICNS contains 16, 32, 128, 256 and 512 point representations at 1× and 2×,
-including the 1024px representation. These use Apple's documented
-[ICNS/iconset convention](https://developer.apple.com/library/archive/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Optimizing/Optimizing.html).
+**Windows:** The same turtle and silver palette use tighter tile corners. The
+artwork scales together to a 960px-wide footprint and 32px side margins.
+The 32-bit-alpha ICO contains PNG frames at 16, 20, 24, 30, 32, 36, 40, 48,
+60, 64, 72, 80, 96, 128, and 256px. Runtime window images use these same frames.
 
-**Windows:** The tighter corner shape occupies 960×960 of the 1024px canvas,
-leaving a 32px margin. Its multi-image, 32-bit-alpha ICO includes 16, 20, 24, 30,
-32, 36, 40, 48, 60, 64, 72, 80, 96, 128 and 256px PNG frames. This covers the
-common desktop/DPI sizes in Microsoft's
-[Windows icon construction guidance](https://learn.microsoft.com/en-us/windows/apps/design/iconography/app-icon-construction).
-Moray is a jpackage desktop application, not an MSIX/UWP app; tile manifests and
-UWP padding variants do not apply. Windows native builds embed the ICO in
-`Moray.exe`; each JFrame also supplies the corresponding images for its titlebar,
-taskbar and app switcher.
+## Regeneration and checks
 
-## Regeneration
-
-On macOS with Python 3 and Inkscape installed:
+On macOS with Python 3, Inkscape, and Apple's `iconutil`:
 
 ```bash
 python3 packaging/icons/generate.py
-# Or specify an alternate Inkscape executable:
-python3 packaging/icons/generate.py --inkscape /path/to/inkscape
+./gradlew check :jasper-app:packageDist
 ```
 
-The generator uses only Python's standard library, Inkscape and Apple's
-`iconutil`. It renders each size directly from SVG. Ordinary builds consume the
-committed assets and require none of these authoring tools on either platform.
+An alternate Inkscape path can be passed with `--inkscape /path/to/inkscape`.
+The generator renders every size directly from SVG. Ordinary builds consume
+the committed assets and require none of the icon authoring tools.
 
-```bash
-./gradlew :moray-app:test --tests dev.moray.app.ApplicationIconTest
-./gradlew check :moray-app:packageDist
-```
+Asset tests check container representations, alpha, platform padding and runtime
+loading. Package verification checks the macOS bundle's `CFBundleIconFile` and
+exact ICNS bytes, or ICO payloads embedded in the Windows executable. None of
+these checks launches the app. Native Windows packaging and live desktop icon
+appearance still require platform acceptance checks.
 
-Packaging tracks the native icon as an input. Verification checks the macOS
-bundle's `CFBundleIconFile` and exact ICNS bytes, or that every ICO frame is
-embedded in the Windows executable, without launching Moray.
+## Verified 2026-09-14
 
-## Verification — 2026-09-12
-
-- Asset tests first failed on missing production files, then passed with the assets.
-- `./gradlew check :moray-app:packageDist` passed: 580 tests represented in the
-  result XML, 579 passed and one existing terminal font skip. Unchanged terminal
-  checks were up to date; app tests executed with the four new icon tests.
-- All 15 ICO payloads decode with alpha and match runtime PNGs; ICNS round-trips
-  through iconutil into all 10 standard/Retina representations.
-- Exact eel, prompt and lighting SVG layers match the approved master.
-- The macOS app/DMG built; bundle icon identity, bytes, native architecture,
-  runtime, strict ad-hoc signature and DMG integrity verification passed.
-- Independent code review found no issues.
-- Rendered platform layouts were inspected at large and small sizes on light and
-  dark backgrounds. Live Dock/Cmd+Tab and Windows desktop/packaging acceptance
-  remain unrun on this macOS host. No GUI or login shell was launched.
-
-The 444 exploratory design files were removed from the project and moved to the
-user's Trash with hashes verified. The official master is preserved here.
+- `./gradlew check :jasper-app:packageDist` passed. XML totals: 662 tests,
+  661 passed and one existing terminal font skip; terminal checks were up to date.
+- The master matches the selected silver study byte-for-byte.
+- All 15 ICO frames match runtime PNG payloads byte-for-byte.
+- macOS and Windows rendered artwork was visually inspected.
+- macOS package verification passed and the DMG was rebuilt. No app was launched.

@@ -1,6 +1,6 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Moray toolbar design study</title><style>
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jasper toolbar design study</title><style>
 *{box-sizing:border-box}body{margin:0;background:#f4f3f0;color:#282c34;font:14px system-ui;padding:32px;max-width:1080px;margin:auto}h1{font-size:24px;margin:0}header{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:14px}p{color:#646872;margin:8px 0 26px}h2{font-size:15px;font-weight:600;margin:24px 0 10px}button{font:inherit;cursor:pointer}#theme{padding:9px 14px;border:1px solid #ccd0d6;border-radius:7px;background:white;color:#383a42}.window{--bg:#282c34;--surface:#21252b;--fg:#abb2bf;--muted:#8b929f;--line:#353b45;--icon:var(--dark-icon);background:var(--bg);color:var(--fg);border:1px solid #383f4a;border-radius:9px;overflow:hidden;box-shadow:0 6px 20px #00000015}.title{height:32px;background:var(--surface);position:relative;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}.lights{display:flex;gap:8px;position:absolute;left:14px}.lights i{width:11px;height:11px;border-radius:50%;background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}.toolbar{display:flex;gap:5px;padding:9px 12px;background:var(--surface);border-bottom:1px solid var(--line);overflow:auto}.tool{border:0;border-radius:5px;background:transparent;min-width:77px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:5px 9px;color:var(--fg);font-size:11px}.tool svg{color:var(--dark-icon)}.tool:hover:enabled{background:#ffffff10}.tool:disabled{cursor:default;opacity:.5}.tabs{background:var(--surface);display:flex;font-size:12px}.tabs span{padding:9px 15px;color:var(--muted)}.tabs .active{background:var(--bg);color:var(--fg);border-top:2px solid #61afef}.tabs b{font-weight:400;margin-left:20px}pre{margin:0;padding:19px 20px 24px;font:13px/1.65 ui-monospace,monospace;overflow:auto}.prompt,.success{color:#98c379}.path{color:#61afef}.branch{color:#c678dd}.cursor{background:#abb2bf}.status{display:flex;justify-content:space-between;background:var(--surface);padding:5px 12px;font-size:11px;color:var(--muted)}body.light .window{--bg:#fafafa;--surface:#eaeaeb;--fg:#383a42;--muted:#696c77;--line:#d3d5da;border-color:#c2c6ce}body.light .tool svg{color:var(--light-icon)}body.light .tool:hover:enabled{background:#00000009}body.light .prompt,body.light .success{color:#3d7d3b}body.light .path{color:#315fc4}body.light .branch{color:#87218b}body.light .cursor{background:#526fff}footer{font-size:12px;color:#696c77;margin:26px 0}@media(max-width:620px){body{padding:16px}.tool{min-width:66px}.toolbar{gap:0;padding:8px}.title{height:32px}header{align-items:flex-start}h1{font-size:20px}}
-</style><header><h1>Moray toolbar study</h1><button id="theme" type="button">Show light theme</button></header><p>Illustrative design alternatives · Native title-bar behavior is not represented here.</p><section><h2>A · Colored outlines</h2><div class="window"><div class="title"><div class="lights"><i></i><i></i><i></i></div><span>moray — zsh</span></div><div class="toolbar"><button class="tool" style="--dark-icon:#61afef;--light-icon:#315fc4" aria-label="New tab"><svg aria-hidden="true"
+</style><header><h1>Jasper toolbar study</h1><button id="theme" type="button">Show light theme</button></header><p>Illustrative design alternatives · Native title-bar behavior is not represented here.</p><section><h2>A · Colored outlines</h2><div class="window"><div class="title"><div class="lights"><i></i><i></i><i></i></div><span>jasper — zsh</span></div><div class="toolbar"><button class="tool" style="--dark-icon:#61afef;--light-icon:#315fc4" aria-label="New tab"><svg aria-hidden="true"
   xmlns="http://www.w3.org/2000/svg"
   width="28"
   height="28"
@@ -102,12 +102,12 @@
   <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
   <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
 </svg>
-<span>Reload</span></button></div><div class="tabs"><span class="active">~ / projects / moray <b>×</b></span><span>local shell <b>×</b></span></div><pre><span class="prompt">dustin</span> <span class="path">~/projects/moray</span> <span class="branch">main</span>
+<span>Reload</span></button></div><div class="tabs"><span class="active">~ / projects / jasper <b>×</b></span><span>local shell <b>×</b></span></div><pre><span class="prompt">dustin</span> <span class="path">~/projects/jasper</span> <span class="branch">main</span>
 <span class="prompt">❯</span> git status
 On branch main
 <span class="success">nothing to commit, working tree clean</span>
 
-<span class="prompt">❯</span> <span class="cursor"> </span></pre><div class="status">zsh · ~/projects/moray<span>120 × 36</span></div></div></section><section><h2>B · Two-tone color</h2><div class="window"><div class="title"><div class="lights"><i></i><i></i><i></i></div><span>moray — zsh</span></div><div class="toolbar"><button class="tool" style="--dark-icon:#61afef;--light-icon:#315fc4" aria-label="New tab"><svg aria-hidden="true"
+<span class="prompt">❯</span> <span class="cursor"> </span></pre><div class="status">zsh · ~/projects/jasper<span>120 × 36</span></div></div></section><section><h2>B · Two-tone color</h2><div class="window"><div class="title"><div class="lights"><i></i><i></i><i></i></div><span>jasper — zsh</span></div><div class="toolbar"><button class="tool" style="--dark-icon:#61afef;--light-icon:#315fc4" aria-label="New tab"><svg aria-hidden="true"
   xmlns="http://www.w3.org/2000/svg"
   width="28"
   height="28"
@@ -209,12 +209,12 @@ On branch main
   <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
   <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
 </svg>
-<span>Reload</span></button></div><div class="tabs"><span class="active">~ / projects / moray <b>×</b></span><span>local shell <b>×</b></span></div><pre><span class="prompt">dustin</span> <span class="path">~/projects/moray</span> <span class="branch">main</span>
+<span>Reload</span></button></div><div class="tabs"><span class="active">~ / projects / jasper <b>×</b></span><span>local shell <b>×</b></span></div><pre><span class="prompt">dustin</span> <span class="path">~/projects/jasper</span> <span class="branch">main</span>
 <span class="prompt">❯</span> git status
 On branch main
 <span class="success">nothing to commit, working tree clean</span>
 
-<span class="prompt">❯</span> <span class="cursor"> </span></pre><div class="status">zsh · ~/projects/moray<span>120 × 36</span></div></div></section><footer>Tabler icon shapes · MIT license · Color and two-tone treatments are proposed adaptations. Settings and Reload remain disabled.</footer><script>document.getElementById('theme').addEventListener('click',function(){const light=document.body.classList.toggle('light');this.textContent=light?'Show dark theme':'Show light theme';});</script><!--
+<span class="prompt">❯</span> <span class="cursor"> </span></pre><div class="status">zsh · ~/projects/jasper<span>120 × 36</span></div></div></section><footer>Tabler icon shapes · MIT license · Color and two-tone treatments are proposed adaptations. Settings and Reload remain disabled.</footer><script>document.getElementById('theme').addEventListener('click',function(){const light=document.body.classList.toggle('light');this.textContent=light?'Show dark theme':'Show light theme';});</script><!--
 MIT License
 
 Copyright (c) 2020-2026 Paweł Kuna

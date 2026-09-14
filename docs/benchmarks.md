@@ -1,6 +1,6 @@
 # Reproducible terminal benchmarks
 
-These opt-in tools open native Moray windows and controlled Java fixture children. They never call production `Main`, load user configuration, or start a login shell. Normal startup and `./gradlew check` do not run them. **Before every native run, the controller must confirm the user has permitted benchmarking and no game or VM is active.** Stop interacting with the benchmark windows while collecting samples. Closing a benchmark window aborts its run and reports failure. Unrelated Moray processes are not closed.
+These opt-in tools open native Jasper windows and controlled Java fixture children. They never call production `Main`, load user configuration, or start a login shell. Normal startup and `./gradlew check` do not run them. **Before every native run, the controller must confirm the user has permitted benchmarking and no game or VM is active.** Stop interacting with the benchmark windows while collecting samples. Closing a benchmark window aborts its run and reports failure. Unrelated Jasper processes are not closed.
 
 The implementation is headlessly tested. [Recorded macOS baseline/final measurements](benchmarks/2026-09-12-terminal-readiness.md) include mixed memory/performance outcomes and explicit limits. Windows execution remains pending. The throughput acceptance floor remains **35 MB/s**, with a **45 MB/s** target, using the streaming metric below. Small smoke workloads cannot establish acceptance.
 
@@ -9,37 +9,37 @@ The implementation is headlessly tested. [Recorded macOS baseline/final measurem
 Build with JBR SDK 25 and the wrapper; these commands do not launch the GUI:
 
 ```sh
-./gradlew check :moray-app:packageApp :moray-app:verifyPackage
+./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage
 ```
 
-Copy the entire verified image outside `moray-app/build/packaging` before changing terminal source. Keep a revision label, command arguments and SHA-256 of the application/terminal JARs alongside the results. Never label a dirty working tree as an exact commit. A later package build replaces its build outputs.
+Copy the entire verified image outside `jasper-app/build/packaging` before changing terminal source. Keep a revision label, command arguments and SHA-256 of the application/terminal JARs alongside the results. Never label a dirty working tree as an exact commit. A later package build replaces its build outputs.
 
 macOS example (replace paths and revision with the actual preserved baseline):
 
 ```sh
 mkdir -p /absolute/benchmark-baselines/pre-hardening
-ditto moray-app/build/packaging/image/Moray.app /absolute/benchmark-baselines/pre-hardening/Moray.app
-./tools/benchmarks/run-macos.sh /absolute/benchmark-baselines/pre-hardening/Moray.app throughput REVISION /absolute/results/throughput-1.json
-./tools/benchmarks/run-macos.sh /absolute/benchmark-baselines/pre-hardening/Moray.app memory REVISION /absolute/results/memory-1.json
+ditto jasper-app/build/packaging/image/Jasper.app /absolute/benchmark-baselines/pre-hardening/Jasper.app
+./tools/benchmarks/run-macos.sh /absolute/benchmark-baselines/pre-hardening/Jasper.app throughput REVISION /absolute/results/throughput-1.json
+./tools/benchmarks/run-macos.sh /absolute/benchmark-baselines/pre-hardening/Jasper.app memory REVISION /absolute/results/memory-1.json
 ```
 
 Equivalent direct invocation, using only the preserved runtime and JARs:
 
 ```sh
-/absolute/benchmark-baselines/pre-hardening/Moray.app/Contents/runtime/Contents/Home/bin/java \
-  --enable-native-access=ALL-UNNAMED -Dapple.awt.application.name='Moray benchmark' \
-  -cp '/absolute/benchmark-baselines/pre-hardening/Moray.app/Contents/app/*' \
-  dev.moray.app.MemoryBench --revision REVISION --output /absolute/results/memory-1.json
+/absolute/benchmark-baselines/pre-hardening/Jasper.app/Contents/runtime/Contents/Home/bin/java \
+  --enable-native-access=ALL-UNNAMED -Dapple.awt.application.name='Jasper benchmark' \
+  -cp '/absolute/benchmark-baselines/pre-hardening/Jasper.app/Contents/app/*' \
+  dev.jasper.app.MemoryBench --revision REVISION --output /absolute/results/memory-1.json
 ```
 
-Windows PowerShell (build natively on Windows first, then copy the entire `Moray` image):
+Windows PowerShell (build natively on Windows first, then copy the entire `Jasper` image):
 
 ```powershell
-.\gradlew.bat :moray-app:packageApp :moray-app:verifyPackage
-Copy-Item -Recurse 'moray-app\build\packaging\image\Moray' 'C:\benchmark-baselines\pre-hardening\Moray'
-.\tools\benchmarks\run-windows.ps1 -Image 'C:\benchmark-baselines\pre-hardening\Moray' -Mode memory -Revision REVISION -Output 'C:\results\memory-1.json'
-& 'C:\benchmark-baselines\pre-hardening\Moray\runtime\bin\java.exe' '--enable-native-access=ALL-UNNAMED' `
-  '-cp' 'C:\benchmark-baselines\pre-hardening\Moray\app\*' 'dev.moray.app.Bench' `
+.\gradlew.bat :jasper-app:packageApp :jasper-app:verifyPackage
+Copy-Item -Recurse 'jasper-app\build\packaging\image\Jasper' 'C:\benchmark-baselines\pre-hardening\Jasper'
+.\tools\benchmarks\run-windows.ps1 -Image 'C:\benchmark-baselines\pre-hardening\Jasper' -Mode memory -Revision REVISION -Output 'C:\results\memory-1.json'
+& 'C:\benchmark-baselines\pre-hardening\Jasper\runtime\bin\java.exe' '--enable-native-access=ALL-UNNAMED' `
+  '-cp' 'C:\benchmark-baselines\pre-hardening\Jasper\app\*' 'dev.jasper.app.Bench' `
   '--revision' 'REVISION' '--output' 'C:\results\throughput-1.json'
 ```
 
@@ -48,14 +48,14 @@ Arguments are separate strings throughout the parent and Java child launches; pa
 For source-tree development only, the equivalent opt-in tasks accept arguments:
 
 ```sh
-./gradlew :moray-app:bench --args='--revision REVISION --output /absolute/results/dev-throughput.json'
-./gradlew :moray-app:memoryBench --args='--revision REVISION --output /absolute/results/dev-memory.json'
+./gradlew :jasper-app:bench --args='--revision REVISION --output /absolute/results/dev-throughput.json'
+./gradlew :jasper-app:memoryBench --args='--revision REVISION --output /absolute/results/dev-memory.json'
 ```
 
 For an independent cold idle measurement, launch a fresh process for each pane count (1, 4, 8) and repeat each three times. The small payload is staged but not emitted in the idle-only scenario:
 
 ```sh
-./tools/benchmarks/run-macos.sh /absolute/benchmark-baselines/pre-hardening/Moray.app memory REVISION /absolute/results/idle-1p-1.json \
+./tools/benchmarks/run-macos.sh /absolute/benchmark-baselines/pre-hardening/Jasper.app memory REVISION /absolute/results/idle-1p-1.json \
   --panes 1 --scrollback 10000 --scenario idle --bytes 65536
 ```
 
@@ -64,7 +64,7 @@ For an independent cold idle measurement, launch a fresh process for each pane c
 After native permission/prerequisite checks, first validate instrumentation and cleanup with this short smoke. It is not a performance baseline:
 
 ```sh
-./tools/benchmarks/run-macos.sh /absolute/benchmark-baselines/pre-hardening/Moray.app memory REVISION /absolute/results/smoke.json \
+./tools/benchmarks/run-macos.sh /absolute/benchmark-baselines/pre-hardening/Jasper.app memory REVISION /absolute/results/smoke.json \
   --panes 1 --scrollback 0 --bytes 65536 --scenario idle,output,interactive,cycles \
   --cycles 1 --warmup-ms 100 --settle-ms 100 --timeout-seconds 30 --max-seconds 60
 ```
@@ -86,7 +86,7 @@ The smoke normally takes a few seconds; its configuration deadline is 30 seconds
 | `--timeout-seconds` | 120 | 1..600 per configuration; children have the same lifetime limit |
 | `--max-seconds` | 900 | 1..3600 total run deadline, including staging; bounded cleanup follows |
 
-Default memory runs cover all nine pane/scrollback configurations. Each uses real application/window/tab/pane ownership and a controlled fixture per pane. Cold-ready and warm-idle snapshots precede workload. Output emits one staged payload per pane concurrently and remains idle afterward; output-settle stays distinct. Interactive selection also populates output, then performs asynchronous literal searches for `moray`, alternating 16/17pt fonts and 1100/1050px window widths, returning to 16pt/1100px. Cycles create a tab, split it, close it, create a sibling window, then close it; the baseline window stays alive. Closed sessions are released before retention samples. Final settle and a post-cleanup sample are separate.
+Default memory runs cover all nine pane/scrollback configurations. Each uses real application/window/tab/pane ownership and a controlled fixture per pane. Cold-ready and warm-idle snapshots precede workload. Output emits one staged payload per pane concurrently and remains idle afterward; output-settle stays distinct. Interactive selection also populates output, then performs asynchronous literal searches for `jasper`, alternating 16/17pt fonts and 1100/1050px window widths, returning to 16pt/1100px. Cycles create a tab, split it, close it, create a sibling window, then close it; the baseline window stays alive. Closed sessions are released before retention samples. Final settle and a post-cleanup sample are separate.
 
 The target initial window is 1100×850 logical pixels; native minimum sizes can alter it. Splits alternate right/down on the focused pane. Each run records the actual window dimensions and actual per-pane rows, columns, view pixels, font size and visibility. Do not compare layouts from different monitor scaling, window managers, fonts or display sizes without reviewing this metadata. The child initially requests 120×36, which is not claimed as its measured grid.
 

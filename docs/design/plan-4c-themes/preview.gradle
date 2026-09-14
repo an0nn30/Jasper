@@ -1,9 +1,9 @@
-// Run from the repository root: ./gradlew :moray-app:mockUiPreview --init-script docs/design/plan-4c-themes/preview.gradle
+// Run from the repository root: ./gradlew :jasper-app:mockUiPreview --init-script docs/design/plan-4c-themes/preview.gradle
 allprojects {
     afterEvaluate {
-        if (name == 'moray-app') {
+        if (name == 'jasper-app') {
             tasks.named('mockUiPreview') {
-                mainClass = 'dev.moray.app.SystemThemePreview'
+                mainClass = 'dev.jasper.app.SystemThemePreview'
                 setArgs([rootProject.file('docs/design/plan-4c-themes').absolutePath])
             }
         }

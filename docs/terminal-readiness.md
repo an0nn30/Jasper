@@ -12,9 +12,9 @@ Local implementation and measurements are complete and integrated into `main` af
 
 ## Verification and measured limits
 
-Fresh `./gradlew build :moray-app:packageDist --rerun-tasks` on runtime commit `8d84e7d5ed8d679000992f8b96d9a97e99bef5e2` executed all 16 tasks successfully in 38 seconds. XML records **576 tests: 575 passed, one known font fallback skip, zero failures/errors**. Source hygiene passed for 172 Java files. Native image metadata, bundled runtime/dependencies, strict bundle seal and DMG integrity passed.
+Fresh `./gradlew build :jasper-app:packageDist --rerun-tasks` on runtime commit `8d84e7d5ed8d679000992f8b96d9a97e99bef5e2` executed all 16 tasks successfully in 38 seconds. XML records **576 tests: 575 passed, one known font fallback skip, zero failures/errors**. Source hygiene passed for 172 Java files. Native image metadata, bundled runtime/dependencies, strict bundle seal and DMG integrity passed.
 
-The preserved packaged DMG is `build/readiness-2026-09-12/Moray-1.0.0-macos-aarch64.dmg` in the main checkout (82,157,741 bytes). SHA-256:
+The preserved packaged DMG is `build/readiness-2026-09-12/Jasper-1.0.0-macos-aarch64.dmg` in the main checkout (82,157,741 bytes). SHA-256:
 
 ```text
 456da609ffb397f3bcfde56ec99893965a3f4844d4d6c86b765d03c3ef9949f2
@@ -36,9 +36,9 @@ The final hidden-search fix (`8d84e7d`) received three fresh full throughput run
 
 ## Native handoff
 
-Use the main checkout for the integrated code. [Build/package commands and native checklist](packaging.md) cover DMG and Windows ZIP creation. On Windows use JBR SDK 25, run `gradlew.bat build :moray-app:packageDist`, then test the extracted native image. Three-platform headless CI is now verified; it does not build or exercise native Windows packaging. The user still owns Windows package and interactive acceptance.
+Use the main checkout for the integrated code. [Build/package commands and native checklist](packaging.md) cover DMG and Windows ZIP creation. On Windows use JBR SDK 25, run `gradlew.bat build :jasper-app:packageDist`, then test the extracted native image. Three-platform headless CI is now verified; it does not build or exercise native Windows packaging. The user still owns Windows package and interactive acceptance.
 
-Before starting the trial, record normal macOS Finder/Dock launch, title controls/tab animation, clipboard and shortcuts, font/IME behavior, theme/config reload, shell exits and tmux/vim/htop interaction. Exercise Shift-changing mouse gestures, multi-notch wheel reports, overwritten/word/wide-character selection, links, hidden tabs, split zoom/reparenting and closed-window cleanup. Existing [terminal configuration checks](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md), [theme checks](superpowers/plans/2026-09-12-moray-plan-4c-manual-check.md) and packaging checklist remain the detailed acceptance record. Record Windows equivalents on the user's Windows machine. Never mark an unexecuted check passed.
+Before starting the trial, record normal macOS Finder/Dock launch, title controls/tab animation, clipboard and shortcuts, font/IME behavior, theme/config reload, shell exits and tmux/vim/htop interaction. Exercise Shift-changing mouse gestures, multi-notch wheel reports, overwritten/word/wide-character selection, links, hidden tabs, split zoom/reparenting and closed-window cleanup. Existing [terminal configuration checks](superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md), [theme checks](superpowers/plans/2026-09-12-jasper-plan-4c-manual-check.md) and packaging checklist remain the detailed acceptance record. Record Windows equivalents on the user's Windows machine. Never mark an unexecuted check passed.
 
 Raw reports, exit records, JFR/NMT/footprint diagnostics, protocol scripts and preserved baseline/final images were copied and checksum-verified under `build/readiness-2026-09-12/benchmarks/` in the main checkout before feature-worktree cleanup. Preserve that archive and the adjacent DMG before `clean`; raw metadata retains original collection paths. Committed aggregate JSON and this report preserve conclusions, not every raw sample.
 
