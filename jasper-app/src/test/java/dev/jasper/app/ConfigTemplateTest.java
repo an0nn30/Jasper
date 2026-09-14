@@ -39,6 +39,7 @@ class ConfigTemplateTest {
         var toml = Toml.parse(text);
         assertThat(toml.errors()).isEmpty();
         assertThat(toml.getTable("ui").keySet()).containsExactly("laf");
+        assertThat(toml.getTable("buddy").keySet()).containsExactly("enabled");
         assertThat(toml.getTable("window").keySet())
             .containsExactlyInAnyOrder("toolbar", "status_bar", "columns", "lines");
         assertThat(toml.getTable("font").keySet())
@@ -72,6 +73,7 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().tabHeight()).isEqualTo(38);
             assertThat(all.snapshot().toolbar()).isEqualTo(WindowContent.ToolbarMode.ICONS_AND_LABELS);
             assertThat(all.snapshot().statusBar()).isTrue();
+            assertThat(all.snapshot().buddyEnabled()).isTrue();
             assertThat(all.snapshot().fontSize()).isEqualTo(16f);
             assertThat(all.snapshot().columns()).isEqualTo(150);
             assertThat(all.snapshot().lines()).isEqualTo(45);

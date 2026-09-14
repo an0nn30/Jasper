@@ -17,6 +17,7 @@ final class ConfigurationController implements AutoCloseable {
     private final Consumer<Path> editor;
     private ConfigService.State state;
     private boolean closed;
+    private Consumer<ConfigSnapshot> applicationListener = snapshot -> {};
 
     ConfigurationController(ThemeController themes, ConfigService service) {
         this(themes, service, new ConfigEditor()::open);
@@ -34,6 +35,13 @@ final class ConfigurationController implements AutoCloseable {
     ConfigSnapshot snapshot() {
         requireEdt();
         return state.snapshot();
+    }
+
+    /** One application-level observer for settings no window owns; receives the current snapshot at once. */
+    void onSnapshot(Consumer<ConfigSnapshot> listener) {
+        requireEdt();
+        applicationListener = java.util.Objects.requireNonNull(listener, "listener");
+        if (!closed) listener.accept(state.snapshot());
     }
 
     void register(WindowContent owner) {
@@ -63,6 +71,7 @@ final class ConfigurationController implements AutoCloseable {
         if (closed) return;
         lafWarning = themes.selectLaf(next.snapshot().laf());
         state = next;
+        applicationListener.accept(next.snapshot());
         for (WindowContent owner : List.copyOf(owners)) {
             owner.applyConfiguration(next.snapshot(), service.macOs());
             owner.setConfigurationState(displayed());
@@ -80,6 +89,7 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         if (closed) return;
         closed = true;
+        applicationListener = snapshot -> {};
         for (WindowContent owner : List.copyOf(owners)) unregister(owner);
         service.close();
     }

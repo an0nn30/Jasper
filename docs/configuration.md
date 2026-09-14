@@ -35,6 +35,9 @@ status_bar = true
 columns = 150
 lines = 45
 
+[buddy]
+enabled = true
+
 [font]
 family = "JetBrains Mono"
 size = 16.0
@@ -72,6 +75,7 @@ blink = true
 | `window.status_bar` | `true` | Boolean | Live |
 | `window.columns` | `150` | Integer 5–500 | New windows |
 | `window.lines` | `45` | Integer 2–200 | New windows |
+| `buddy.enabled` | `true` | Boolean | Live |
 | `font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
 | `font.size` | `16.0` | Finite number 6–72 points | Live |
 | `font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
@@ -89,6 +93,14 @@ blink = true
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
+
+### Desk buddy
+
+`buddy.enabled` shows the pixel-art Jasper who floats above other windows while at least one
+terminal window is open and not minimized. Hover to make him dance; drag him anywhere (the
+position is saved in `buddy.toml` beside `config.toml`); click him to bring the last active
+terminal window forward. View → Show Jasper, the command palette and right-click → Hide Jasper
+toggle him for the current session; a saved change to `buddy.enabled` resets that session choice.
 
 ### Swing look and feel
 

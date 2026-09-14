@@ -9,7 +9,7 @@ import java.util.Objects;
 /** Validated saved defaults; runtime View choices are kept separately by each owner. */
 record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
                       FontConfig font, ColorsConfig colors, Map<String, String> keybindings,
-                      int columns, int lines, TerminalConfig terminal, UiLookAndFeel laf) {
+                      int columns, int lines, TerminalConfig terminal, UiLookAndFeel laf, boolean buddyEnabled) {
     ConfigSnapshot {
         if (tabHeight < 28 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 28–72.");
         if (columns < 5 || columns > 500) throw new IllegalArgumentException("Columns must be 5–500.");
@@ -31,6 +31,12 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
                 throw new IllegalArgumentException("Keybindings must name known actions and valid, noncolliding shortcuts.");
             }
         }
+    }
+
+    ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
+                   FontConfig font, ColorsConfig colors, Map<String, String> keybindings,
+                   int columns, int lines, TerminalConfig terminal, UiLookAndFeel laf) {
+        this(tabHeight, toolbar, statusBar, font, colors, keybindings, columns, lines, terminal, laf, true);
     }
 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
