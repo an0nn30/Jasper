@@ -1,0 +1,5 @@
+Tabler Icons, MIT license; see ../LICENSE.txt.
+Source: https://github.com/tabler/tabler-icons
+Commit: 6d128ed935d4546607b1e4d5d08c8b27bdbe7758
+Copied from /Users/dustin/projects/tabler-icons/icons/outline on 2026-09-11.
+Plain terminal-2, x and plus icons; currentColor replaced with #6e6e6e for neutral runtime theme recoloring.

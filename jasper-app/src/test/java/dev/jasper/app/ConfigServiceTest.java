@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.swing.SwingUtilities;
+import java.awt.Color;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -38,27 +39,27 @@ class ConfigServiceTest {
 
     @Test void invalidReloadRetainsLastGoodThenRecoversAndDeletionRestoresDefaults() throws Exception {
         Path file = directory.resolve("config.toml");
-        Files.writeString(file, "[window]\ncolumns=44");
+        Files.writeString(file, "[window]\ntab_height=44");
         try (var service = new ConfigService(file, true)) {
-            assertThat(service.initialState().snapshot().columns()).isEqualTo(44);
+            assertThat(service.initialState().snapshot().tabHeight()).isEqualTo(44);
             assertThat(service.initialState().present()).isTrue();
             Files.writeString(file, "[window");
             var invalid = service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(invalid.snapshot().columns()).isEqualTo(44);
+            assertThat(invalid.snapshot().tabHeight()).isEqualTo(44);
             assertThat(invalid.present()).isTrue();
             assertThat(invalid.diagnostics()).isNotEmpty();
-            Files.writeString(file, "window.columns='wrong type'");
-            assertThat(service.reload().get(5, TimeUnit.SECONDS).snapshot().columns()).isEqualTo(44);
-            Files.writeString(file, "window.columns=50");
+            Files.writeString(file, "window.tab_height='wrong type'");
+            assertThat(service.reload().get(5, TimeUnit.SECONDS).snapshot().tabHeight()).isEqualTo(44);
+            Files.writeString(file, "window.tab_height=50");
             var recovered = service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(recovered.snapshot().columns()).isEqualTo(50);
+            assertThat(recovered.snapshot().tabHeight()).isEqualTo(50);
             assertThat(recovered.diagnostics()).isEmpty();
             Files.delete(file);
             var missing = service.reload().get(5, TimeUnit.SECONDS);
             assertThat(missing.snapshot()).isEqualTo(ConfigSnapshot.defaults());
             assertThat(missing.present()).isFalse();
             assertThat(missing.diagnostics()).isEmpty();
-            assertThat(service.initialState().snapshot().columns()).isEqualTo(44);
+            assertThat(service.initialState().snapshot().tabHeight()).isEqualTo(44);
         }
     }
 
@@ -74,9 +75,9 @@ class ConfigServiceTest {
     @Test void invalidValuesApplyOtherValidFieldsAndRetainDiagnostics() throws Exception {
         Path file = directory.resolve("config.toml");
         try (var service = new ConfigService(file, false)) {
-            Files.writeString(file, "window.columns=44\nfont.size=100\nfont.future=1");
+            Files.writeString(file, "window.tab_height=44\nfont.size=100\nfont.future=1");
             var state = service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(state.snapshot().columns()).isEqualTo(44);
+            assertThat(state.snapshot().tabHeight()).isEqualTo(44);
             assertThat(state.snapshot().fontSize()).isEqualTo(16f);
             assertThat(state.diagnostics()).extracting(ConfigDiagnostic::severity)
                 .containsExactly(ConfigDiagnostic.Severity.ERROR, ConfigDiagnostic.Severity.WARNING);
@@ -85,42 +86,87 @@ class ConfigServiceTest {
 
     @Test void forcedReloadReadsSameTimestampAndSizeThatPollingSkips() throws Exception {
         Path file = directory.resolve("config.toml");
-        Files.writeString(file, "window.columns=44");
+        Files.writeString(file, "window.tab_height=44");
         FileTime modified = Files.getLastModifiedTime(file);
         var worker = new PollWorker();
         var delivered = new ArrayList<ConfigService.State>();
         try (var service = new ConfigService(file, true, worker, Runnable::run)) {
             service.start(delivered::add);
-            Files.writeString(file, "window.columns=45");
+            Files.writeString(file, "window.tab_height=45");
             Files.setLastModifiedTime(file, modified);
             worker.poll();
             assertThat(delivered).hasSize(1);
             var state = service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(state.snapshot().columns()).isEqualTo(45);
+            assertThat(state.snapshot().tabHeight()).isEqualTo(45);
             assertThat(delivered).hasSize(2);
         }
     }
 
-    @Test void legacyThemeFilesAreNeverLoadedOrPolled() throws Exception {
+    @Test void pollingReloadsThemeWhileConfigMetadataStaysUntouchedAndRetainsLastGood() throws Exception {
         Path file = directory.resolve("config.toml");
         Path themes = Files.createDirectory(directory.resolve("themes"));
         Path theme = themes.resolve("night.toml");
         Files.writeString(file, "colors.theme='night'");
-        Files.writeString(theme, "invalid theme syntax");
+        String configText = Files.readString(file);
+        FileTime configTime = Files.getLastModifiedTime(file);
+        Files.writeString(theme, "[colors.primary]\nbackground='#101820'");
+        Files.setLastModifiedTime(theme, FileTime.fromMillis(1_000_000));
         var worker = new PollWorker();
         var delivered = new ArrayList<ConfigService.State>();
         try (var service = new ConfigService(file, themes, true, worker, Runnable::run)) {
             service.start(delivered::add);
-            var initial = delivered.getLast();
-            assertThat(initial.palette()).isEqualTo(dev.jasper.terminal.Palette.jasperDark());
-            assertThat(initial.diagnostics()).singleElement().satisfies(d -> {
-                assertThat(d.file()).isEqualTo(file);
-                assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
-            });
-            Files.delete(theme);
+            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0x101820));
+            Files.writeString(theme, "[colors.primary]\nbackground='#fafafa'");
+            Files.setLastModifiedTime(theme, FileTime.fromMillis(2_000_000));
             worker.poll();
-            assertThat(delivered).containsExactly(initial);
-            assertThat(service.reload().get(5, TimeUnit.SECONDS)).isEqualTo(initial);
+            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0xfafafa));
+            Files.writeString(theme, "[colors.primary]\nbackground='broken'");
+            Files.setLastModifiedTime(theme, FileTime.fromMillis(3_000_000));
+            worker.poll();
+            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0xfafafa));
+            assertThat(delivered.getLast().diagnostics()).isNotEmpty();
+            assertThat(Files.readString(file)).isEqualTo(configText);
+            assertThat(Files.getLastModifiedTime(file)).isEqualTo(configTime);
+            Files.writeString(file, "colors.theme='night'\nwindow.tab_height=45");
+            worker.poll();
+            assertThat(delivered.getLast().snapshot().tabHeight()).isEqualTo(45);
+            assertThat(delivered.getLast().palette().background()).isEqualTo(new Color(0xfafafa));
+        }
+    }
+
+    @Test void selectedThemeKeepsPollingWhileUnchangedMalformedMainConfigRetainsItsDiagnostics() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Path themes = Files.createDirectory(directory.resolve("themes"));
+        Path theme = themes.resolve("night.toml");
+        Files.writeString(file, "colors.theme='night'\nwindow.tab_height=44");
+        Files.writeString(theme, "[colors.primary]\nbackground='#101820'");
+        Files.setLastModifiedTime(theme, FileTime.fromMillis(1_000_000));
+        var worker = new PollWorker();
+        var delivered = new ArrayList<ConfigService.State>();
+        try (var service = new ConfigService(file, themes, true, worker, Runnable::run)) {
+            service.start(delivered::add);
+            assertThat(delivered.getLast().diagnostics()).isEmpty();
+            Files.writeString(file, "[colors");
+            worker.poll();
+            var rejected = delivered.getLast();
+            assertThat(rejected.snapshot().colors().theme()).isEqualTo("night");
+            assertThat(rejected.snapshot().tabHeight()).isEqualTo(44);
+            assertThat(rejected.palette().background()).isEqualTo(new Color(0x101820));
+            assertError(rejected);
+            assertThat(rejected.diagnostics()).allSatisfy(diagnostic -> assertThat(diagnostic.file()).isEqualTo(file));
+            var configTime = Files.getLastModifiedTime(file);
+            Files.writeString(theme, "[colors.primary]\nbackground='#fafafa'");
+            Files.setLastModifiedTime(theme, FileTime.fromMillis(2_000_000));
+            worker.poll();
+            assertThat(delivered).hasSize(3);
+            var updated = delivered.getLast();
+            assertThat(updated.snapshot()).isEqualTo(rejected.snapshot());
+            assertThat(updated.palette().background()).isEqualTo(new Color(0xfafafa));
+            assertThat(updated.diagnostics()).isEqualTo(rejected.diagnostics());
+            assertThat(Files.readString(file)).isEqualTo("[colors");
+            assertThat(Files.getLastModifiedTime(file)).isEqualTo(configTime);
+            worker.poll();
+            assertThat(delivered).hasSize(3);
         }
     }
 
@@ -138,14 +184,14 @@ class ConfigServiceTest {
             queued.remove().run();
             assertThat(delivered).containsExactly(initial, initial);
             service.reload().get(5, TimeUnit.SECONDS);
-            Files.writeString(file, "window.columns=44");
+            Files.writeString(file, "window.tab_height=44");
             service.reload().get(5, TimeUnit.SECONDS);
             assertThat(queued).hasSize(2);
             queued.remove().run();
             assertThat(delivered).hasSize(2);
             queued.remove().run();
             assertThat(delivered).hasSize(3);
-            assertThat(delivered.getLast().snapshot().columns()).isEqualTo(44);
+            assertThat(delivered.getLast().snapshot().tabHeight()).isEqualTo(44);
             service.reload().get(5, TimeUnit.SECONDS);
             assertThat(queued).hasSize(1);
             service.close();
@@ -153,6 +199,29 @@ class ConfigServiceTest {
             assertThat(delivered).hasSize(3);
         } finally {
             service.close();
+        }
+    }
+
+    @Test void forcedReloadPublishesEqualMetadataThemeContentAndDropsStalePublication() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Path themes = Files.createDirectory(directory.resolve("themes"));
+        Path theme = themes.resolve("night.toml");
+        Files.writeString(file, "colors.theme='night'");
+        Files.writeString(theme, "[colors.primary]\nbackground='#101820'");
+        FileTime modified = Files.getLastModifiedTime(theme);
+        var queued = new ConcurrentLinkedQueue<Runnable>();
+        var delivered = new ArrayList<ConfigService.State>();
+        try (var service = new ConfigService(file, themes, true, new PollWorker(), queued::add)) {
+            service.start(delivered::add);
+            Files.writeString(theme, "[colors.primary]\nbackground='#fafafa'");
+            Files.setLastModifiedTime(theme, modified);
+            service.reload().get(5, TimeUnit.SECONDS);
+            assertThat(queued).hasSize(2);
+            queued.remove().run();
+            assertThat(delivered).isEmpty();
+            queued.remove().run();
+            assertThat(delivered).singleElement().satisfies(state ->
+                assertThat(state.palette().background()).isEqualTo(new Color(0xfafafa)));
         }
     }
 
@@ -189,35 +258,35 @@ class ConfigServiceTest {
 
     @Test void unreadableNonRegularFileRetainsLastGoodAndRecovers() throws Exception {
         Path file = directory.resolve("config.toml");
-        Files.writeString(file, "window.columns=44");
+        Files.writeString(file, "window.tab_height=44");
         try (var service = new ConfigService(file, true)) {
             Files.delete(file);
             Files.createDirectory(file);
             var unreadable = service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(unreadable.snapshot().columns()).isEqualTo(44);
+            assertThat(unreadable.snapshot().tabHeight()).isEqualTo(44);
             assertError(unreadable);
             Files.delete(file);
-            Files.writeString(file, "window.columns=46");
-            assertThat(service.reload().get(5, TimeUnit.SECONDS).snapshot().columns()).isEqualTo(46);
+            Files.writeString(file, "window.tab_height=46");
+            assertThat(service.reload().get(5, TimeUnit.SECONDS).snapshot().tabHeight()).isEqualTo(46);
         }
     }
 
     @Test void ioAccessFailureRetainsLastGoodEvenWhenConfigParentBecomesAFile() throws Exception {
         Path parent = Files.createDirectory(directory.resolve("parent"));
         Path file = parent.resolve("config.toml");
-        Files.writeString(file, "window.columns=44");
+        Files.writeString(file, "window.tab_height=44");
         try (var service = new ConfigService(file, true)) {
             Path moved = directory.resolve("moved");
             Files.move(parent, moved);
             Files.writeString(parent, "user bytes");
             var failed = service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(failed.snapshot().columns()).isEqualTo(44);
+            assertThat(failed.snapshot().tabHeight()).isEqualTo(44);
             assertError(failed);
             assertThat(Files.readString(parent)).isEqualTo("user bytes");
             Files.delete(parent);
             Files.move(moved, parent);
             var recovered = service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(recovered.snapshot().columns()).isEqualTo(44);
+            assertThat(recovered.snapshot().tabHeight()).isEqualTo(44);
             assertThat(recovered.diagnostics()).isEmpty();
         }
     }
@@ -242,15 +311,15 @@ class ConfigServiceTest {
 
     @Test void oneMiBIsAcceptedButExtraByteIsRejectedWithoutDiscardingLastGood() throws Exception {
         Path file = directory.resolve("config.toml");
-        String prefix = "window.columns=44\n#";
+        String prefix = "window.tab_height=44\n#";
         String bounded = prefix + "x".repeat(1024 * 1024 - prefix.length());
         Files.writeString(file, bounded);
         try (var service = new ConfigService(file, true)) {
-            assertThat(service.initialState().snapshot().columns()).isEqualTo(44);
+            assertThat(service.initialState().snapshot().tabHeight()).isEqualTo(44);
             assertThat(service.initialState().diagnostics()).isEmpty();
             Files.writeString(file, bounded + "x");
             var oversized = service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(oversized.snapshot().columns()).isEqualTo(44);
+            assertThat(oversized.snapshot().tabHeight()).isEqualTo(44);
             assertError(oversized);
             assertThat(oversized.diagnostics().getFirst().message()).contains("1 MiB");
         }
@@ -258,11 +327,11 @@ class ConfigServiceTest {
 
     @Test void malformedUtf8IsReportedWithoutAcceptingReplacementCharacters() throws Exception {
         Path file = directory.resolve("config.toml");
-        Files.writeString(file, "window.columns=44");
+        Files.writeString(file, "window.tab_height=44");
         try (var service = new ConfigService(file, true)) {
             Files.write(file, new byte[]{'#', (byte) 0xC3, (byte) 0x28});
             var invalid = service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(invalid.snapshot().columns()).isEqualTo(44);
+            assertThat(invalid.snapshot().tabHeight()).isEqualTo(44);
             assertError(invalid);
         }
     }
@@ -273,14 +342,14 @@ class ConfigServiceTest {
         Path file = directory.resolve("config.toml");
         try (var service = new ConfigService(file, true)) {
             service.start(state -> {
-                if (state.snapshot().columns() == 44) {
+                if (state.snapshot().tabHeight() == 44) {
                     onEdt.set(SwingUtilities.isEventDispatchThread());
                     delivered.complete(state);
                 }
             });
-            Files.writeString(file, "window.columns=44");
+            Files.writeString(file, "window.tab_height=44");
             service.reload().get(5, TimeUnit.SECONDS);
-            assertThat(delivered.get(5, TimeUnit.SECONDS).snapshot().columns()).isEqualTo(44);
+            assertThat(delivered.get(5, TimeUnit.SECONDS).snapshot().tabHeight()).isEqualTo(44);
             assertThat(onEdt).isTrue();
         }
     }
@@ -293,14 +362,14 @@ class ConfigServiceTest {
         var service = new ConfigService(file, true, worker, queued::add);
         try {
             service.start(delivered::add);
-            Files.writeString(file, "window.columns=44");
+            Files.writeString(file, "window.tab_height=44");
             service.reload().get(5, TimeUnit.SECONDS);
             assertThat(queued).hasSize(2);
             queued.remove().run();
             assertThat(delivered).isEmpty();
             queued.remove().run();
-            assertThat(delivered).singleElement().satisfies(state -> assertThat(state.snapshot().columns()).isEqualTo(44));
-            Files.writeString(file, "window.columns=46");
+            assertThat(delivered).singleElement().satisfies(state -> assertThat(state.snapshot().tabHeight()).isEqualTo(44));
+            Files.writeString(file, "window.tab_height=46");
             service.reload().get(5, TimeUnit.SECONDS);
             service.close();
             queued.remove().run();
@@ -329,13 +398,13 @@ class ConfigServiceTest {
         try (var service = new ConfigService(file, true, worker, Runnable::run)) {
             var release = block(worker);
             try {
-                Files.writeString(file, "window.columns=44");
+                Files.writeString(file, "window.tab_height=44");
                 var request = new AtomicReference<CompletableFuture<ConfigService.State>>();
                 SwingUtilities.invokeAndWait(() -> request.set(service.reload()));
                 assertThat(request.get()).isNotDone();
-                Files.writeString(file, "window.columns=46");
+                Files.writeString(file, "window.tab_height=46");
                 release.countDown();
-                assertThat(request.get().get(5, TimeUnit.SECONDS).snapshot().columns()).isEqualTo(46);
+                assertThat(request.get().get(5, TimeUnit.SECONDS).snapshot().tabHeight()).isEqualTo(46);
             } finally {
                 release.countDown();
             }
@@ -357,10 +426,10 @@ class ConfigServiceTest {
             assertThat(onEdt).isFalse();
             assertThat(Files.readString(file)).isEqualTo(ConfigTemplate.text(false));
             assertThat(service.reload().get(5, TimeUnit.SECONDS).present()).isTrue();
-            Files.writeString(file, "window.columns=48");
+            Files.writeString(file, "window.tab_height=48");
             service.openSettings(opened::set).get(5, TimeUnit.SECONDS);
-            assertThat(Files.readString(file)).isEqualTo("window.columns=48");
-            assertThat(service.reload().get(5, TimeUnit.SECONDS).snapshot().columns()).isEqualTo(48);
+            assertThat(Files.readString(file)).isEqualTo("window.tab_height=48");
+            assertThat(service.reload().get(5, TimeUnit.SECONDS).snapshot().tabHeight()).isEqualTo(48);
         }
     }
 
@@ -424,7 +493,7 @@ class ConfigServiceTest {
         diagnostics.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, file, 0, 0, "", "Failure"));
         assertThat(state.diagnostics()).isEmpty();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> state.diagnostics().clear());
-        assertThat(state.palette()).isEqualTo(Palette.jasperDark());
+        assertThat(state.palette()).isEqualTo(Palette.jasperDarkPurple());
     }
 
     private static void assertError(ConfigService.State state) {

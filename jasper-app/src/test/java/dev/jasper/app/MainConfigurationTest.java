@@ -22,7 +22,7 @@ class MainConfigurationTest {
     }
     @Test void explicitConfigurationIsReadBeforeDispatchToSwing() throws Exception {
         Path config = directory.resolve("config.toml");
-        Files.writeString(config, "[window]\ncolumns=47\n");
+        Files.writeString(config, "[window]\ntab_height=47\n");
         var received = new AtomicReference<ConfigService>();
         try {
             int result = Main.start(new String[]{"--config", config.toString()}, System.out, System.err, service -> {
@@ -30,11 +30,11 @@ class MainConfigurationTest {
             });
             assertThat(result).isZero();
             assertThat(received.get()).isNotNull();
-            assertThat(received.get().initialState().snapshot().columns()).isEqualTo(47);
+            assertThat(received.get().initialState().snapshot().tabHeight()).isEqualTo(47);
         } finally { if (received.get() != null) received.get().close(); }
     }
 
-    @Test void explicitConfigurationIgnoresLegacyAppThemeDirectory() throws Exception {
+    @Test void explicitConfigurationStillUsesDefaultAppThemeDirectory() throws Exception {
         String oldHome = System.getProperty("user.home");
         String oldOs = System.getProperty("os.name");
         Path home = Files.createDirectory(directory.resolve("home"));
@@ -48,9 +48,7 @@ class MainConfigurationTest {
             System.setProperty("user.home", home.toString());
             System.setProperty("os.name", "Mac OS X");
             assertThat(Main.start(new String[]{"--config", config.toString()}, System.out, System.err, received::set)).isZero();
-            assertThat(received.get().initialState().palette()).isEqualTo(dev.jasper.terminal.Palette.jasperDark());
-            assertThat(received.get().initialState().diagnostics()).singleElement().satisfies(d ->
-                assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING));
+            assertThat(received.get().initialState().palette().background().getRGB() & 0xffffff).isEqualTo(0x101820);
         } finally {
             if (received.get() != null) received.get().close();
             System.setProperty("user.home", oldHome);

@@ -1,26 +1,22 @@
 package dev.jasper.app;
 
-import java.util.Map;
-import javax.swing.ImageIcon;
+import com.formdev.flatlaf.extras.FlatSVGIcon;
+import java.awt.Color;
+import javax.swing.UIManager;
 
-/** Bundled OldGNOME2 PNG artwork; no network access or recoloring. */
+/** Bundled Tabler icons; no network access is needed to render chrome. */
 final class AppIcons {
-    private static final Map<String, ImageIcon> ICONS = load();
     private AppIcons() {}
-
-    static ImageIcon icon(String name) {
-        ImageIcon icon = ICONS.get(name.equals("plus") ? "square-plus" : name);
-        if (icon == null) throw new IllegalArgumentException("Unknown application icon: " + name);
-        return icon;
+    static FlatSVGIcon icon(String name) {
+        if (!java.util.Set.of("square-plus", "app-window", "columns-2", "maximize", "search", "settings", "refresh").contains(name))
+            throw new IllegalArgumentException("Unknown application icon: " + name);
+        FlatSVGIcon icon = new FlatSVGIcon("dev/jasper/app/icons/" + name + ".svg", 16, 16);
+        return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Jasper.chromeForeground", source)));
     }
 
-    private static Map<String, ImageIcon> load() {
-        var icons = new java.util.HashMap<String, ImageIcon>();
-        for (String name : java.util.List.of("square-plus", "app-window", "columns-2", "maximize",
-                "search", "settings", "refresh", "close")) {
-            var resource = java.util.Objects.requireNonNull(AppIcons.class.getResource("icons/oldgnome2/" + name + ".png"), name);
-            icons.put(name, new ImageIcon(resource));
-        }
-        return Map.copyOf(icons);
+    private static Color themed(String key, Color source) {
+        Color target = UIManager.getColor(key);
+        if (target == null) return source;
+        return new Color(target.getRed(), target.getGreen(), target.getBlue(), source.getAlpha());
     }
 }

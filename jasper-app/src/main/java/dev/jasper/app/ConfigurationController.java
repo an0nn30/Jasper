@@ -11,7 +11,8 @@ import javax.swing.SwingUtilities;
 /** EDT-owned join between saved configuration and retained window contents. */
 final class ConfigurationController implements AutoCloseable {
     private final ThemeController themes;
-    private String lafWarning = "";
+    private final SystemAppearance source;
+    private String appearanceWarning = "";
     private final ConfigService service;
     private final Set<WindowContent> owners = new LinkedHashSet<>();
     private final Consumer<Path> editor;
@@ -24,12 +25,20 @@ final class ConfigurationController implements AutoCloseable {
     }
 
     ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor) {
-        requireEdt();
-        this.themes = themes; this.service = service; this.editor = editor;
-        state = service.initialState();
-        lafWarning = themes.selectLaf(state.snapshot().laf());
-        service.start(this::accept);
+        this(themes, service, SystemAppearance.fixed(BuiltinTheme.DARK), editor);
+    }
 
+    ConfigurationController(ThemeController themes, ConfigService service, SystemAppearance source) {
+        this(themes, service, source, new ConfigEditor()::open);
+    }
+
+    ConfigurationController(ThemeController themes, ConfigService service, SystemAppearance source, Consumer<Path> editor) {
+        requireEdt();
+        this.themes = themes; this.service = service; this.editor = editor; this.source = source;
+        state = service.initialState();
+        themes.configure(state.snapshot().colors(), state.palette());
+        service.start(this::accept);
+        source.start(this::appearanceChanged);
     }
 
     ConfigSnapshot snapshot() {
@@ -69,7 +78,8 @@ final class ConfigurationController implements AutoCloseable {
     void accept(ConfigService.State next) {
         requireEdt();
         if (closed) return;
-        lafWarning = themes.selectLaf(next.snapshot().laf());
+        try { themes.configure(next.snapshot().colors(), next.palette()); }
+        catch (ThemeController.InstallationFailure failure) { reportThemeFailure(failure); }
         state = next;
         applicationListener.accept(next.snapshot());
         for (WindowContent owner : List.copyOf(owners)) {
@@ -78,10 +88,23 @@ final class ConfigurationController implements AutoCloseable {
         }
     }
 
+    private void appearanceChanged(SystemAppearance.Reading reading) {
+        requireEdt();
+        if (closed) return;
+        appearanceWarning = reading.warning();
+        try { themes.systemChanged(reading.theme()); }
+        catch (ThemeController.InstallationFailure failure) { reportThemeFailure(failure); }
+        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(displayed());
+    }
+
+    private void reportThemeFailure(ThemeController.InstallationFailure failure) {
+        for (WindowContent owner : List.copyOf(owners)) owner.onError.accept(failure.getMessage());
+    }
+
     private ConfigService.State displayed() {
         var diagnostics = new java.util.ArrayList<>(state.diagnostics());
-        if (!lafWarning.isEmpty()) diagnostics.add(new ConfigDiagnostic(
-            ConfigDiagnostic.Severity.WARNING, state.file(), 0, 0, "ui.laf", lafWarning));
+        if (!appearanceWarning.isEmpty()) diagnostics.add(new ConfigDiagnostic(
+            ConfigDiagnostic.Severity.WARNING, state.file(), 0, 0, "colors.appearance", appearanceWarning));
         return new ConfigService.State(state.snapshot(), diagnostics, state.file(), state.present(), state.palette());
     }
 
@@ -90,6 +113,7 @@ final class ConfigurationController implements AutoCloseable {
         if (closed) return;
         closed = true;
         applicationListener = snapshot -> {};
+        source.close();
         for (WindowContent owner : List.copyOf(owners)) unregister(owner);
         service.close();
     }

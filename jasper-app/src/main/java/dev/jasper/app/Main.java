@@ -29,20 +29,21 @@ public final class Main {
                 Runtime.getRuntime().addShutdownHook(shutdown);
                 System.setProperty("apple.awt.application.appearance", "system");
                 System.setProperty("apple.laf.useScreenMenuBar", "true");
+                SystemAppearance source = SystemAppearance.production();
                 SwingUtilities.invokeLater(() -> {
                     CommandHistory history = null;
                     JasperApplication application = null;
                     try {
                         history = new CommandHistory(dirs.commandHistory());
                         ApplicationIcon.installTaskbarIcon();
-                        application = new JasperApplication(service, null, history, dirs.buddyState());
+                        application = new JasperApplication(service, source, null, history, dirs.buddyState());
                         application.newWindow(Path.of(System.getProperty("user.home")));
                     }
                     catch (RuntimeException failure) {
                         LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
                         if (application != null) application.quit();
                         else if (history != null) history.close();
-                        service.close();
+                        source.close(); service.close();
                         closeLogAfterStartupFailure(log, () -> {
                             exceptions.close();
                             removeShutdownHook(shutdown);

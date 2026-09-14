@@ -1,5 +1,6 @@
 package dev.jasper.app;
 
+import com.formdev.flatlaf.util.UIScale;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -7,8 +8,10 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.RenderingHints;
 import java.awt.event.InputEvent;
 import java.awt.event.InputMethodEvent;
 import java.awt.event.InputMethodListener;
@@ -38,7 +41,7 @@ import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-/** Standard Swing command search panel. Its host owns placement, focus and key routing. */
+/** The themed command search card. Its host owns placement, focus and key routing. */
 final class CommandPalette extends JPanel {
     private static final int WIDTH = 560;
     private static final int INPUT_HEIGHT = 56;
@@ -58,6 +61,7 @@ final class CommandPalette extends JPanel {
     private final JScrollPane scrollingResults = new JScrollPane(results, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
         JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
     private final ResultRenderer renderer;
+    private Color surfaceBorder;
     private boolean composing;
 
     CommandPalette(boolean macOs, Consumer<String> queryChanged, Consumer<Command> execute, Runnable dismiss) {
@@ -67,8 +71,10 @@ final class CommandPalette extends JPanel {
         Objects.requireNonNull(dismiss);
         renderer = new ResultRenderer(macOs);
 
-        setOpaque(true);
-        query.setToolTipText("Type a command");
+        setOpaque(false);
+        query.setOpaque(false);
+        query.setBorder(BorderFactory.createEmptyBorder());
+        query.putClientProperty("JTextField.placeholderText", "Type a command\u2026");
         query.getAccessibleContext().setAccessibleName("Search commands");
         query.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent event) { changed(); }
@@ -84,28 +90,30 @@ final class CommandPalette extends JPanel {
         });
 
         escape.setFocusable(false);
-        escape.setMargin(new Insets(0, 7, 0, 7));
+        escape.setOpaque(false);
+        escape.setContentAreaFilled(false);
+        escape.setMargin(new Insets(0, UIScale.scale(7), 0, UIScale.scale(7)));
         escape.getAccessibleContext().setAccessibleName("Dismiss command palette");
         escape.addActionListener(event -> dismiss.run());
         var escapeHolder = new JPanel(new GridBagLayout());
         escapeHolder.setOpaque(false);
         escapeHolder.add(escape);
         inputRow.setOpaque(false);
-        inputRow.setLayout(new BorderLayout(10, 0));
+        inputRow.setLayout(new BorderLayout(UIScale.scale(10), 0));
         inputRow.add(query, BorderLayout.CENTER);
         inputRow.add(escapeHolder, BorderLayout.LINE_END);
         add(inputRow, BorderLayout.NORTH);
 
         recentLabel.setOpaque(false);
         recentLabel.putClientProperty("html.disable", Boolean.TRUE);
-        recentLabel.setBorder(BorderFactory.createEmptyBorder(0, 16, 0, 16));
-        recentLabel.setPreferredSize(new Dimension(0, LABEL_HEIGHT));
+        recentLabel.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(16), 0, UIScale.scale(16)));
+        recentLabel.setPreferredSize(new Dimension(0, UIScale.scale(LABEL_HEIGHT)));
         recentLabel.setVisible(false);
 
-        results.setOpaque(true);
+        results.setOpaque(false);
         results.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         results.setFocusable(false);
-        results.setFixedCellHeight(ROW_HEIGHT);
+        results.setFixedCellHeight(UIScale.scale(ROW_HEIGHT));
         results.setVisibleRowCount(1);
         results.setCellRenderer(renderer);
         results.getAccessibleContext().setAccessibleName("Commands");
@@ -123,7 +131,7 @@ final class CommandPalette extends JPanel {
         cards.setOpaque(false);
         empty.setOpaque(false);
         empty.putClientProperty("html.disable", Boolean.TRUE);
-        empty.setPreferredSize(new Dimension(0, ROW_HEIGHT));
+        empty.setPreferredSize(new Dimension(0, UIScale.scale(ROW_HEIGHT)));
         scrollingResults.setBorder(BorderFactory.createEmptyBorder());
         scrollingResults.setOpaque(false); scrollingResults.getViewport().setOpaque(false);
         cards.add(scrollingResults, "results");
@@ -165,22 +173,31 @@ final class CommandPalette extends JPanel {
     }
 
     void refreshTheme() {
-        Color background = UIManager.getColor("Panel.background");
-        var listDefaults = new JList<>();
-        Color foreground = listDefaults.getForeground();
-        Color muted = UIManager.getColor("Label.foreground");
-        Color border = UIManager.getColor("Separator.foreground");
-        Color selection = listDefaults.getSelectionBackground();
-        Color selectionForeground = listDefaults.getSelectionForeground();
+        Color background = color("Jasper.paletteBackground", "Panel.background", Color.DARK_GRAY);
+        Color foreground = color("Jasper.paletteForeground", "Label.foreground", Color.WHITE);
+        Color muted = color("Jasper.paletteMutedForeground", "Label.disabledForeground", Color.GRAY);
+        Color border = color("Jasper.paletteBorder", "Component.borderColor", muted);
+        Color accent = color("Jasper.paletteAccent", "Component.focusedBorderColor", foreground);
+        Color selection = color("Jasper.paletteSelectionBackground", "List.selectionBackground", background);
+        Color selectionForeground = color("Jasper.paletteSelectionForeground", "List.selectionForeground", foreground);
+
         setBackground(background);
         setForeground(foreground);
-        setBorder(BorderFactory.createEtchedBorder());
-        inputRow.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+        surfaceBorder = border;
+        inputRow.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, UIScale.scale(1), 0, border),
+            BorderFactory.createEmptyBorder(0, UIScale.scale(16), 0, UIScale.scale(10))));
+        query.setForeground(foreground);
+        query.setCaretColor(accent);
+        query.setSelectionColor(selection);
+        query.setSelectedTextColor(selectionForeground);
+        escape.setForeground(muted);
+        escape.setBorder(BorderFactory.createLineBorder(border, UIScale.scale(1), true));
         recentLabel.setForeground(muted);
         empty.setForeground(muted);
-        results.setBackground(listDefaults.getBackground());
+        results.setBackground(background);
         results.setForeground(foreground);
-        Font uiFont = UIManager.getFont("List.font");
+        Font uiFont = UIManager.getFont("Label.font");
         if (uiFont != null) results.setFont(uiFont);
         results.setSelectionBackground(selection);
         results.setSelectionForeground(selectionForeground);
@@ -214,9 +231,26 @@ final class CommandPalette extends JPanel {
 
     @Override public Dimension getPreferredSize() {
         int rows = Math.max(1, model.size());
-        int label = recentLabel.isVisible() ? LABEL_HEIGHT : 0;
-        return new Dimension(WIDTH, INPUT_HEIGHT + rows * ROW_HEIGHT + label
-            + getInsets().top + getInsets().bottom);
+        int label = recentLabel.isVisible() ? UIScale.scale(LABEL_HEIGHT) : 0;
+        return new Dimension(UIScale.scale(WIDTH), UIScale.scale(INPUT_HEIGHT + rows * ROW_HEIGHT) + label);
+    }
+
+    @Override protected void paintComponent(Graphics graphics) {
+        paintSurface(graphics, getWidth(), getHeight(), getBackground(), surfaceBorder, 12);
+    }
+
+    static void paintSurface(Graphics graphics, int width, int height, Color background, Color border, int radius) {
+        var g = (Graphics2D) graphics.create();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            int diameter = UIScale.scale(radius * 2);
+            g.setColor(background);
+            g.fillRoundRect(0, 0, width, height, diameter, diameter);
+            if (border != null) {
+                g.setColor(border);
+                g.drawRoundRect(0, 0, width - 1, height - 1, diameter, diameter);
+            }
+        } finally { g.dispose(); }
     }
 
     private static int uncommittedCharacters(InputMethodEvent event) {
@@ -226,6 +260,12 @@ final class CommandPalette extends JPanel {
         return Math.max(0, length - event.getCommittedCharacterCount());
     }
 
+    private static Color color(String key, String fallbackKey, Color fallback) {
+        Color value = UIManager.getColor(key);
+        if (value == null) value = UIManager.getColor(fallbackKey);
+        return value == null ? fallback : value;
+    }
+
     private static final class FixedHeightPanel extends JPanel {
         private final int logicalHeight;
 
@@ -233,9 +273,9 @@ final class CommandPalette extends JPanel {
             this.logicalHeight = logicalHeight;
         }
 
-        @Override public Dimension getMinimumSize() { return new Dimension(0, logicalHeight); }
-        @Override public Dimension getPreferredSize() { return new Dimension(0, logicalHeight); }
-        @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, logicalHeight); }
+        @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(logicalHeight)); }
+        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(logicalHeight)); }
+        @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, UIScale.scale(logicalHeight)); }
     }
 
     private static final class ResultRenderer extends JPanel implements ListCellRenderer<Command> {
@@ -248,10 +288,11 @@ final class CommandPalette extends JPanel {
         private Color muted;
         private Color selectionForeground;
         private Color selection;
+        private boolean selected;
 
         ResultRenderer(boolean macOs) {
             this.macOs = macOs;
-            setOpaque(true);
+            setOpaque(false);
             setLayout(null);
             for (JLabel label : List.of(icon, title, shortcut, badge)) {
                 label.setOpaque(false);
@@ -273,52 +314,51 @@ final class CommandPalette extends JPanel {
             badge.colors(muted, border, selectionForeground);
             Font uiFont = UIManager.getFont("Label.font");
             if (uiFont == null) uiFont = getFont();
-            title.setFont(uiFont);
+            title.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(13f)));
             icon.setFont(title.getFont());
-            shortcut.setFont(uiFont);
-            badge.setFont(uiFont);
+            shortcut.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(11f)));
+            badge.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(10f)));
         }
 
         @Override public Component getListCellRendererComponent(JList<? extends Command> list, Command command,
                                                                  int index, boolean selected,
                                                                  boolean cellHasFocus) {
-            // Synth delegates may replace UIResource colors when a renderer first paints.
-            setBackground(new Color((selected ? selection : list.getBackground()).getRGB(), true));
+            this.selected = selected;
             icon.setIcon(command.icon());
             title.setText(command.title());
             shortcut.setText(formatShortcut(command.action().getValue(Action.ACCELERATOR_KEY), macOs));
             badge.setText((macOs ? "\u2318" : "Ctrl+") + (index + 1));
-            title.setForeground(new Color((selected ? selectionForeground : foreground).getRGB(), true));
-            shortcut.setForeground(new Color((selected ? selectionForeground : muted).getRGB(), true));
+            title.setForeground(selected ? selectionForeground : foreground);
+            shortcut.setForeground(selected ? selectionForeground : muted);
             badge.selected(selected);
             return this;
         }
 
         @Override public void doLayout() {
-            int side = 12;
-            int iconWidth = 20;
-            int gap = 10;
-            int badgeGap = 10;
+            int side = UIScale.scale(12);
+            int iconWidth = UIScale.scale(20);
+            int gap = UIScale.scale(10);
+            int badgeGap = UIScale.scale(10);
             int titleStart = side + iconWidth + gap;
             int badgeWidth = Math.min(Math.max(0, getWidth() - titleStart),
-                badge.getPreferredSize().width + 12);
+                badge.getPreferredSize().width + UIScale.scale(12));
             int badgeX = Math.max(titleStart, getWidth() - side - badgeWidth);
             int titleEnd = Math.max(titleStart, badgeX - badgeGap);
             int rowHeight = getHeight();
 
             icon.setBounds(side, 0, iconWidth, rowHeight);
-            badge.setBounds(badgeX, (rowHeight - 22) / 2, badgeWidth, 22);
+            badge.setBounds(badgeX, (rowHeight - UIScale.scale(22)) / 2, badgeWidth, UIScale.scale(22));
 
             int shortcutWidth = shortcut.getText().isEmpty() ? 0 : shortcut.getPreferredSize().width;
             int titlePreferred = title.getPreferredSize().width;
             int available = titleEnd - titleStart;
             boolean showShortcut = shortcutWidth > 0
-                && titlePreferred + 12 + shortcutWidth <= available;
+                && titlePreferred + UIScale.scale(12) + shortcutWidth <= available;
             shortcut.setVisible(showShortcut);
             if (showShortcut) {
                 int shortcutX = titleEnd - shortcutWidth;
                 shortcut.setBounds(shortcutX, 0, shortcutWidth, rowHeight);
-                title.setBounds(titleStart, 0, Math.max(0, shortcutX - 12 - titleStart), rowHeight);
+                title.setBounds(titleStart, 0, Math.max(0, shortcutX - UIScale.scale(12) - titleStart), rowHeight);
             } else {
                 shortcut.setBounds(0, 0, 0, 0);
                 title.setBounds(titleStart, 0, Math.max(0, available), rowHeight);
@@ -329,26 +369,51 @@ final class CommandPalette extends JPanel {
             // CellRendererPane assigns this component's bounds immediately before painting;
             // lay out its null-layout children at that final width.
             doLayout();
+            if (selected) {
+                var g = (Graphics2D) graphics.create();
+                try {
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g.setColor(selection);
+                    int insetX = UIScale.scale(4);
+                    int insetY = UIScale.scale(2);
+                    int arc = UIScale.scale(12);
+                    g.fillRoundRect(insetX, insetY, Math.max(0, getWidth() - insetX * 2),
+                        Math.max(0, getHeight() - insetY * 2), arc, arc);
+                } finally { g.dispose(); }
+            }
             super.paintComponent(graphics);
         }
     }
 
     private static final class BadgeLabel extends JLabel {
+        private Color border;
         private Color selectedForeground;
         private Color normalForeground;
+        private boolean selected;
 
         void colors(Color foreground, Color border, Color selectedForeground) {
             normalForeground = foreground;
-            setBorder(BorderFactory.createLineBorder(border));
+            this.border = border;
             this.selectedForeground = selectedForeground;
             setForeground(foreground);
         }
 
         void selected(boolean selected) {
-            setForeground(new Color((selected ? selectedForeground : normalForeground).getRGB(), true));
+            this.selected = selected;
+            setForeground(selected ? selectedForeground : normalForeground);
             repaint();
         }
 
+        @Override protected void paintComponent(Graphics graphics) {
+            var g = (Graphics2D) graphics.create();
+            try {
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(border);
+                int arc = UIScale.scale(8);
+                g.drawRoundRect(0, 0, Math.max(0, getWidth() - 1), Math.max(0, getHeight() - 1), arc, arc);
+            } finally { g.dispose(); }
+            super.paintComponent(graphics);
+        }
     }
 
     private static String formatShortcut(Object value, boolean macOs) {

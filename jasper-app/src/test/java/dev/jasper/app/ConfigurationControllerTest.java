@@ -41,7 +41,7 @@ class ConfigurationControllerTest {
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void savedFieldsApplyAcrossOwnersAndPendingHiddenViewsWithoutReplacingSessions() throws Exception {
-        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=19\n[ui]\nlaf='nimbus'\n");
+        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=19\n[colors]\ntheme='jasper-light'\n");
         edt(() -> { owner(); owner(); }); launchAll();
         var first = owners.getFirst(); var second = owners.get(1);
         var retained = first.currentPane(); var session = retained.session();
@@ -49,9 +49,8 @@ class ConfigurationControllerTest {
             assertThat(first.tabHeight()).isEqualTo(44);
             assertThat(((JButton) first.toolbar().getComponent(0)).getText()).isNull();
             assertThat(first.status().isVisible()).isFalse();
-            assertThat(UIManager.getLookAndFeel().getID()).isEqualTo("Nimbus");
+            assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
             assertThat(retained.view().fontSize()).isEqualTo(19);
-            assertThat(retained.findBar().queryField().getUI().getClass().getName()).contains("Synth");
             retained.findBar().open(); retained.findBar().queryField().setText("alpha");
             first.newTab(HOME); // pending and hides the retained terminal
         });
@@ -66,12 +65,6 @@ class ConfigurationControllerTest {
             assertThat(retained.view().fontSize()).isEqualTo(21);
             assertThat(first.currentPane().view().fontSize()).isEqualTo(21);
             assertThat(second.currentPane().view().fontSize()).isEqualTo(21);
-            assertThat(UIManager.getLookAndFeel().getID()).isEqualTo("Motif");
-            for (var pane : List.of(retained, first.currentPane(), second.currentPane())) {
-                assertThat(pane.findBar().queryField().getUI().getClass().getName()).contains("Motif");
-                assertThat(pane.view().palette().background()).isEqualTo(java.awt.Color.BLACK);
-                assertThat(pane.view().palette().foreground()).isEqualTo(java.awt.Color.WHITE);
-            }
             first.currentPane().view().setFontSize(30); first.invoke(ActionId.FONT_RESET);
             assertThat(first.currentPane().view().fontSize()).isEqualTo(21);
         });
@@ -83,19 +76,19 @@ class ConfigurationControllerTest {
         var first = owners.getFirst();
         edt(() -> {
             first.setTabHeight(60); first.setToolbarMode(WindowContent.ToolbarMode.HIDDEN);
-            first.setStatusVisible(false); first.currentPane().view().setFontSize(28);
+            first.setStatusVisible(false); first.selectTheme(BuiltinTheme.LIGHT); first.currentPane().view().setFontSize(28);
         });
         reload("# comment\n[font]\nsize=19\nunknown=1\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(60); assertThat(first.toolbar().isVisible()).isFalse();
-            assertThat(first.status().isVisible()).isFalse(); assertThat(UIManager.getLookAndFeel().getID()).isEqualTo("Motif");
+            assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
             assertThat(first.currentPane().view().fontSize()).isEqualTo(28);
             var next = owner(); assertThat(next.tabHeight()).isEqualTo(38);
             assertThat(next.toolbar().isVisible()).isTrue(); assertThat(next.status().isVisible()).isTrue();
-            assertThat(UIManager.getLookAndFeel().getID()).isEqualTo("Motif");
+            assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
         }); launchAll();
         edt(() -> assertThat(owners.get(1).currentPane().view().fontSize()).isEqualTo(19));
-        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=20\n[ui]\nlaf='nimbus'\n");
+        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=20\n[colors]\ntheme='jasper-light'\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(45); assertThat(first.toolbar().isVisible()).isTrue();
             assertThat(first.currentPane().view().fontSize()).isEqualTo(20);
@@ -205,14 +198,30 @@ class ConfigurationControllerTest {
         until(() -> owners.getFirst().status().getText().contains("Config loaded"));
     }
 
+    @Test void themeInstallFailureReportsToOwnersWhileOtherSettingsAndDiagnosticsStillApply() throws Exception {
+        service = new ConfigService(directory.resolve("config.toml"), false);
+        var errors = new ArrayList<String>();
+        edt(() -> {
+            themes = new ThemeController(theme -> theme != BuiltinTheme.LIGHT && ThemeController.install(theme));
+            controller = new ConfigurationController(themes, service);
+            owner().onError = errors::add;
+            var state = new ConfigService.State(new ConfigSnapshot(53, WindowContent.ToolbarMode.ICONS, true,
+                18, BuiltinTheme.LIGHT, Map.of()), List.of(), directory.resolve("config.toml"), true);
+            controller.accept(state);
+            assertThat(owners.getFirst().tabHeight()).isEqualTo(53);
+            assertThat(owners.getFirst().theme().chrome()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(owners.getFirst().status().getText()).contains("Config loaded");
+            assertThat(errors).singleElement().asString().contains("Could not apply theme");
+        });
+    }
+
     @Test void applicationCallbackFailuresAreNotReportedAsInstallationFailures() throws Exception {
         start("");
         edt(() -> {
             var owner = owner();
             owner.onThemeChanged = ignored -> { throw new IllegalStateException("application callback"); };
-            var file = directory.resolve("config.toml");
-            var next = new ConfigService.State(ConfigLoader.parse(file, "[ui]\nlaf='nimbus'\n", false).snapshot(),
-                List.of(), file, true);
+            var next = new ConfigService.State(new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS_AND_LABELS,
+                true, 16, BuiltinTheme.LIGHT, Map.of()), List.of(), directory.resolve("config.toml"), true);
             assertThatThrownBy(() -> controller.accept(next)).isInstanceOf(IllegalStateException.class)
                 .hasMessage("application callback");
         });
@@ -280,7 +289,7 @@ class ConfigurationControllerTest {
             assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
             first.setActive(false);
             assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(.65f);
-            first.selectLaf(UiLookAndFeel.NIMBUS);
+            first.selectTheme(BuiltinTheme.LIGHT);
             assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
             first.setActive(true);
             assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(0f);
@@ -290,17 +299,16 @@ class ConfigurationControllerTest {
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
-    void typographyAndBehaviorChangesPreserveManualSizeAndLafUntilSavedSizeChanges() throws Exception {
+    void typographyAndBehaviorChangesPreserveManualSizeAndThemeUntilSavedSizeChanges() throws Exception {
         start("[font]\nsize=18\n"); edt(this::owner); launchAll();
         var owner = owners.getFirst(); var pane = owner.currentPane();
-        edt(() -> { pane.view().setFontSize(27); owner.selectLaf(UiLookAndFeel.NIMBUS); });
+        edt(() -> { pane.view().setFontSize(27); owner.selectTheme(BuiltinTheme.LIGHT); });
         reload(liveSettings(18));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(27);
             assertThat(pane.view().options().fontFamily()).isEqualTo("Monospaced");
             assertThat(pane.view().options().lineHeight()).isEqualTo(1.5f);
-            assertThat(pane.view().palette().background()).isEqualTo(java.awt.Color.BLACK);
-            assertThat(pane.view().palette().foreground()).isEqualTo(java.awt.Color.WHITE);
+            assertThat(pane.view().palette()).isEqualTo(BuiltinTheme.LIGHT.palette());
             owner.newTab(HOME);
         }); launchAll();
         edt(() -> {
@@ -313,8 +321,7 @@ class ConfigurationControllerTest {
         reload(liveSettings(20));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(20);
-            assertThat(pane.view().palette().background()).isEqualTo(java.awt.Color.BLACK);
-            assertThat(pane.view().palette().foreground()).isEqualTo(java.awt.Color.WHITE);
+            assertThat(pane.view().palette()).isEqualTo(BuiltinTheme.LIGHT.palette());
         });
     }
 
@@ -370,7 +377,7 @@ class ConfigurationControllerTest {
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
-    void configuredDimmingSurvivesPendingLaunchFocusAndLafChanges() throws Exception {
+    void configuredDimmingSurvivesPendingLaunchFocusAndThemeChanges() throws Exception {
         start("[terminal]\ndim_inactive_panes=0.7\n");
         edt(() -> { owner().setActive(false); });
         launchAll();
@@ -379,7 +386,7 @@ class ConfigurationControllerTest {
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.7f);
             owner.setActive(true);
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(0f);
-            owner.setActive(false); owner.selectLaf(UiLookAndFeel.NIMBUS);
+            owner.setActive(false); owner.selectTheme(BuiltinTheme.LIGHT);
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.7f);
         });
         reload("[terminal]\ndim_inactive_panes=0.2\n");
@@ -445,40 +452,154 @@ class ConfigurationControllerTest {
         });
     }
 
-    @Test @DisabledOnOs(OS.WINDOWS)
-    void unavailableLafFallsBackToMetalAndReportsWarningsAcrossOwners() throws Exception {
-        start("[ui]\nlaf='nimbus'\n"); edt(() -> { owner(); owner(); }); launchAll();
-        var session = owners.getFirst().currentPane().session();
-        // Windows LAF is unavailable on the Unix hosts where this test runs.
-        reload("[ui]\nlaf='windows'\n[font]\nsize=22\n");
+    @Test void syntheticAppearanceWarningsJoinAndClearIndependentlyAndCloseDropsQueuedEvents() throws Exception {
+        var callbacks = new java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<Boolean>>();
+        var published = new java.util.concurrent.ConcurrentLinkedQueue<Runnable>();
+        var broken = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var worker = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var source = new SystemAppearance(() -> new SystemAppearance.Binding(() -> {
+            if (broken.get()) throw new IllegalStateException("synthetic unavailable");
+            return false;
+        }, callbacks::add, callbacks::remove), worker, published::add);
+        service = new ConfigService(directory.resolve("config.toml"), false);
         edt(() -> {
-            assertThat(UIManager.getLookAndFeel().getID()).isEqualTo("Metal");
-            assertThat(owners.getFirst().currentPane().session()).isSameAs(session);
-            for (var owner : owners) {
-                assertThat(owner.currentPane().view().fontSize()).isEqualTo(22);
-                assertThat(owner.currentPane().view().palette().background()).isEqualTo(java.awt.Color.BLACK);
-                assertThat(owner.currentPane().view().palette().foreground()).isEqualTo(java.awt.Color.WHITE);
-                assertThat(owner.status().getText()).contains("Config warnings");
-                var shown = new ArrayList<JComponent>(); owner.showConfigDiagnostics = shown::add;
-                owner.status().configButton().doClick();
-                var text = (JTextArea) ((JScrollPane) shown.getFirst()).getViewport().getView();
-                assertThat(text.getText()).contains("ui.laf");
-            }
+            themes = new ThemeController(); controller = new ConfigurationController(themes, service, source);
+            owner(); owner();
         });
-        reload("[ui]\nlaf='nimbus'\n");
+        until(() -> !published.isEmpty()); edt(() -> published.remove().run());
         edt(() -> {
-            assertThat(UIManager.getLookAndFeel().getID()).isEqualTo("Nimbus");
-            assertThat(owners.getFirst().status().getText()).contains("Config loaded");
+            var initial = service.initialState();
+            controller.accept(new ConfigService.State(initial.snapshot(), List.of(new ConfigDiagnostic(
+                ConfigDiagnostic.Severity.WARNING, initial.file(), 1, 1, "test", "config warning")), initial.file(), true, initial.palette()));
+            var shown = new ArrayList<JComponent>(); owners.getFirst().showConfigDiagnostics = shown::add;
+            owners.getFirst().status().configButton().doClick();
+            var text = (JTextArea) ((JScrollPane) shown.getFirst()).getViewport().getView();
+            assertThat(text.getText()).contains("synthetic unavailable", "config warning");
+            controller.accept(initial);
+            assertThat(owners.getFirst().status().getText()).contains("Config warnings");
+        });
+        broken.set(false); callbacks.getFirst().accept(false);
+        until(() -> !published.isEmpty()); edt(() -> published.remove().run());
+        edt(() -> {
+            assertThat(owners.getFirst().status().getText()).contains("Built-in defaults");
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(ThemeControllerTest.appearance(owners.get(1)).getItem(2).isSelected()).isTrue();
+        });
+        broken.set(true); callbacks.getFirst().accept(true);
+        until(() -> !published.isEmpty());
+        edt(() -> {
+            controller.close();
+            published.remove().run(); controller.accept(service.initialState());
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(owners.getFirst().status().getText()).contains("Built-in defaults");
+        });
+        until(callbacks::isEmpty);
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void initialCustomConfigurationAndPaletteOnlyChangesReachPendingAndNewOwners() throws Exception {
+        Path themesDirectory = directory.resolve("themes"); Files.createDirectory(themesDirectory);
+        Files.writeString(themesDirectory.resolve("night.toml"), "[colors.primary]\nbackground='#101820'\n");
+        Files.writeString(directory.resolve("config.toml"), "[colors]\nappearance='system'\ntheme='night'\n");
+        service = new ConfigService(directory.resolve("config.toml"), themesDirectory, false);
+        edt(() -> {
+            themes = new ThemeController(); controller = new ConfigurationController(themes, service);
+            owner();
+            assertThat(owners.getFirst().currentPane().getBackground()).isEqualTo(new java.awt.Color(0x101820));
+        });
+        launchAll();
+        var first = owners.getFirst(); var session = first.currentPane().session();
+        edt(() -> { first.selectAppearance(Appearance.LIGHT); first.newTab(HOME); });
+        Files.writeString(themesDirectory.resolve("night.toml"), "[colors.primary]\nbackground='#202830'\n");
+        service.reload().get(); edt(() -> { owner(); assertThat(themes.choice()).isEqualTo(Appearance.LIGHT); });
+        launchAll();
+        edt(() -> {
+            assertThat(((TerminalTab) first.tabStrip().getComponentAt(0)).panes().getFirst().session()).isSameAs(session);
+            for (var owner : owners) {
+                assertThat(owner.currentPane().view().palette().background()).isEqualTo(new java.awt.Color(0x202830));
+                assertThat(owner.status().getBackground()).isEqualTo(new java.awt.Color(0x202830));
+            }
         });
     }
 
-    @Test void rejectedConfigurationKeepsPreviouslyInstalledLaf() throws Exception {
-        start("[ui]\nlaf='nimbus'\n"); edt(this::owner);
-        reload("[ui]\nlaf='metal'\n[font]\nsize=[\n");
+    @Test void reloadActionRetriesFailedSystemInstallationWithUnchangedFiles() throws Exception {
+        retryFailedInstallationThroughReloadAction(true);
+    }
+
+    @Test void reloadActionRetriesFailedSavedInstallationWithUnchangedFiles() throws Exception {
+        retryFailedInstallationThroughReloadAction(false);
+    }
+
+    private void retryFailedInstallationThroughReloadAction(boolean systemTransition) throws Exception {
+        Path file = directory.resolve("config.toml");
+        Files.writeString(file, "colors.appearance='system'");
+        Path themeDirectory = Files.createDirectory(directory.resolve("themes"));
+        Files.writeString(themeDirectory.resolve("night.toml"), "[colors.primary]\nbackground='#101820'");
+        var configWorker = new java.util.concurrent.ScheduledThreadPoolExecutor(1) {
+            @Override public java.util.concurrent.ScheduledFuture<?> scheduleWithFixedDelay(
+                    Runnable command, long initialDelay, long delay, java.util.concurrent.TimeUnit unit) {
+                return super.scheduleWithFixedDelay(command, 1, 1, java.util.concurrent.TimeUnit.DAYS);
+            }
+        };
+        var appearanceWorker = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var callback = new java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<Boolean>>();
+        var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var broken = new java.util.concurrent.atomic.AtomicBoolean(false);
+        var attempts = new ArrayList<BuiltinTheme>();
+        var errors = new ArrayList<String>();
+        var source = new SystemAppearance(() -> new SystemAppearance.Binding(dark::get,
+            callback::set, ignored -> callback.set(null)), appearanceWorker, SwingUtilities::invokeLater);
+        service = new ConfigService(file, themeDirectory, false, configWorker, SwingUtilities::invokeLater);
         edt(() -> {
-            assertThat(UIManager.getLookAndFeel().getID()).isEqualTo("Nimbus");
-            assertThat(owners.getFirst().status().getText()).contains("Config error");
+            themes = new ThemeController(theme -> { attempts.add(theme); return !broken.get() && ThemeController.install(theme); });
+            controller = new ConfigurationController(themes, service, source);
+            owner().onError = errors::add;
         });
+        appearanceWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        edt(() -> {
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(attempts).containsExactly(BuiltinTheme.DARK);
+            broken.set(true);
+        });
+        if (systemTransition) {
+            dark.set(false); callback.get().accept(false);
+            appearanceWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        } else {
+            Files.writeString(file, "colors.appearance='light'\ncolors.theme='night'");
+            edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
+            configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        edt(() -> {
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(themes.choice()).isEqualTo(Appearance.SYSTEM);
+            assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT);
+            assertThat(errors).hasSize(1);
+            broken.set(false);
+        });
+        String acceptedText = Files.readString(file);
+        var acceptedTime = Files.getLastModifiedTime(file);
+        edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
+        configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        edt(() -> {
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(owners.getFirst().theme()).isEqualTo(themes.current());
+            assertThat(themes.choice()).isEqualTo(systemTransition ? Appearance.SYSTEM : Appearance.LIGHT);
+            assertThat(themes.current().palette().background()).isEqualTo(systemTransition
+                ? BuiltinTheme.LIGHT.palette().background() : new java.awt.Color(0x101820));
+            assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT, BuiltinTheme.LIGHT);
+            assertThat(errors).hasSize(1);
+            owners.getFirst().selectAppearance(Appearance.DARK);
+            owners.getFirst().invoke(ActionId.RELOAD_CONFIG);
+        });
+        configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        edt(() -> {
+            assertThat(themes.choice()).isEqualTo(Appearance.DARK);
+            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT,
+                BuiltinTheme.LIGHT, BuiltinTheme.DARK);
+        });
+        assertThat(Files.readString(file)).isEqualTo(acceptedText);
+        assertThat(Files.getLastModifiedTime(file)).isEqualTo(acceptedTime);
     }
 
     private static String liveSettings(int size) {

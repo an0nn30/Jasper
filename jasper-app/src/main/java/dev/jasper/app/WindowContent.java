@@ -42,6 +42,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
     static final int MIN_TAB_HEIGHT = 28;
     static final int MAX_TAB_HEIGHT = 72;
     private int tabHeight = DEFAULT_TAB_HEIGHT;
+    Runnable onTabHeightChanged = () -> {};
+    java.util.function.ToIntFunction<JComponent> confirmTabHeight = control -> JOptionPane.showConfirmDialog(
+        this, control, "Tab height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     private boolean closed;
     private boolean rearranging;
     private boolean active = true;
@@ -107,9 +110,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
-        windowTabs = new WindowTabs(this);
+        windowTabs = new WindowTabs(this, animationClock);
         var north = new JPanel(new BorderLayout());
-        north.add(chrome.toolbar(), BorderLayout.CENTER);
+        north.add(windowTabs, BorderLayout.NORTH); north.add(chrome.toolbar(), BorderLayout.CENTER);
         add(north, BorderLayout.NORTH); add(tabs); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {
@@ -277,6 +280,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     WindowStatusBar status() { return chrome.status(); }
     JMenuBar menuBar() { return chrome.menuBar(); }
     JTabbedPane tabStrip() { return tabs; }
+    WindowTabs windowTabs() { return windowTabs; }
     TerminalTab currentTab() { return (TerminalTab) tabs.getSelectedComponent(); }
     TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
     Path directory() { return currentPane() == null ? Path.of(System.getProperty("user.home")) : currentPane().directory(); }
@@ -449,10 +453,17 @@ final class WindowContent extends JPanel implements AutoCloseable {
 
     ResolvedTheme theme() { return themes.current(); }
 
-    void selectLaf(UiLookAndFeel laf) {
+    Appearance appearance() { return themes.choice(); }
+
+    void selectTheme(BuiltinTheme theme) {
+        selectAppearance(theme == BuiltinTheme.LIGHT ? Appearance.LIGHT : Appearance.DARK);
+    }
+
+    void selectAppearance(Appearance appearance) {
         if (closed) return;
-        String warning = themes.selectLaf(laf);
-        if (!warning.isEmpty()) onError.accept(warning);
+        try { themes.selectAppearance(appearance); }
+        catch (ThemeController.InstallationFailure failure) { onError.accept(failure.getMessage()); }
+        finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
 
     /** Updates all retained panes without reparenting them; the native boundary hooks in last. */
@@ -472,7 +483,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
                     pane.applyTheme(theme.palette());
                 }
             }
-            setBackground(UIManager.getColor("Panel.background"));
+            setBackground(theme.palette().background());
+            tabs.setBackground(theme.palette().background());
             chrome.status().applyPalette(theme.palette());
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
@@ -488,6 +500,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
             throw new IllegalArgumentException("Tab height must be between 28 and 72 pixels");
         if (closed || tabHeight == height) return;
         tabHeight = height;
+        windowTabs.revalidate(); windowTabs.repaint();
+        onTabHeightChanged.run();
         revalidate(); repaint();
         JRootPane root = SwingUtilities.getRootPane(this);
         if (root != null) { root.revalidate(); root.repaint(); }
@@ -496,7 +510,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
 
     void setActive(boolean value) {
         if (!value && commandPalette != null) commandPalette.dismiss();
-        active = value; update();
+        active = value; windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {
         toolbarMode = mode; chrome.setToolbarMode(mode); updateActions(); revalidate(); onMinimumSizeChanged.run();
@@ -520,6 +534,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
         actions.values().forEach(action -> action.setEnabled(false));
         windowTabs.refresh();
         onThemeChanged = theme -> {};
+        onTabHeightChanged = () -> {};
+        confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
     }

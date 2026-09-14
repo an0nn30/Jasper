@@ -1,5 +1,6 @@
 package dev.jasper.app;
 
+import com.formdev.flatlaf.util.SystemInfo;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.Taskbar;
@@ -25,7 +26,7 @@ final class ApplicationIcon {
         try {
             Taskbar taskbar = Taskbar.getTaskbar();
             if (taskbar.isSupported(Taskbar.Feature.ICON_IMAGE)) {
-                taskbar.setIconImage(images(System.getProperty("os.name").startsWith("Mac")).getLast());
+                taskbar.setIconImage(images(SystemInfo.isMacOS).getLast());
             }
         } catch (UnsupportedOperationException | SecurityException failure) {
             LOG.log(System.Logger.Level.WARNING, "Desktop does not allow setting the application icon", failure);

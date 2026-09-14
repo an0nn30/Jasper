@@ -33,23 +33,27 @@ final class JasperApplication {
 
     JasperApplication() { this(null); }
 
-    JasperApplication(ConfigService service) { this(service, null); }
+    JasperApplication(ConfigService service) { this(service, SystemAppearance.fixed(BuiltinTheme.DARK)); }
+
+    JasperApplication(ConfigService service, SystemAppearance source) { this(service, source, null); }
 
     /** Isolated launch ownership for controlled tools; production still resolves captured settings. */
-    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher) {
-        this(service, suppliedLauncher, new CommandHistory());
+    JasperApplication(ConfigService service, SystemAppearance source, ShellLauncher suppliedLauncher) {
+        this(service, source, suppliedLauncher, new CommandHistory());
     }
 
-    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history) {
-        this(service, suppliedLauncher, history, null);
+    JasperApplication(ConfigService service, SystemAppearance source, ShellLauncher suppliedLauncher, CommandHistory history) {
+        this(service, source, suppliedLauncher, history, null);
     }
 
     /** {@code buddyStateFile} may be null: the buddy then starts in the default corner and forgets drags. */
-    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile) {
+    JasperApplication(ConfigService service, SystemAppearance source, ShellLauncher suppliedLauncher,
+                      CommandHistory history, Path buddyStateFile) {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         this.buddyStateFile = buddyStateFile;
-        configuration = service == null ? null : new ConfigurationController(themes, service);
+        configuration = service == null ? null : new ConfigurationController(themes, service, source);
+        if (service == null) source.close();
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddyVisibility.configure(snapshot.buddyEnabled()); syncBuddy();
         });

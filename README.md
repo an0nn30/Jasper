@@ -1,12 +1,12 @@
 # Jasper
 
-Formerly Moray. The app and Java packages are now Jasper; the Git repository
-remains [an0nn30/moray](https://github.com/an0nn30/moray). See the
-[migration notes](docs/rebranding.md) for existing settings.
-
 A cross-platform terminal workstation written in Java Swing, with macOS as the immediate daily-use target and a MobaXterm-style layout. Phase 1 builds the terminal before SSH sessions, credential vault, SFTP, tunnels and plugins.
 
-Jasper has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status. The desktop uses standard Swing controls, a normal OS title bar, tabs below the toolbar, and classic GNOME 2 toolbar icons. The terminal is white on black. Set `ui.laf` to choose a built-in Java look and feel.
+Formerly Moray. The app and Java packages are now Jasper; the Git repository
+remains [an0nn30/moray](https://github.com/an0nn30/moray). Existing settings can be
+carried over using the [rebrand migration notes](docs/rebranding.md).
+
+Jasper has its own terminal renderer over JediTerm and pty4j, with ligatures, fallback fonts, truecolor, mouse reporting, scrollback, selection, clipboard, shell integration and links. The Plan 3 application adds multiple windows, tabs, splits, pane zoom/navigation, find controls, menus, toolbar and status. The screenshot UI revision puts tabs beside native macOS window controls, with a horizontal Tabler toolbar below and a status bar that shares the terminal background. Coordinated Atom-inspired dark/light themes update the complete window.
 
 Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). Desktop acceptance remains user-run: [Plan 3](docs/superpowers/plans/2026-09-11-jasper-plan-3-manual-check.md) and [screenshot UI](docs/superpowers/plans/2026-09-11-jasper-mock-ui-manual-check.md). Passing the headless tests is not the Phase 1 daily-use gate.
 
@@ -89,7 +89,7 @@ On macOS: Cmd+T new tab, Cmd+N new window, Cmd+D split right, Cmd+Shift+D split 
 
 Cmd+= / Cmd+- / Cmd+0 changes or resets the focused pane's font. Cmd+K clears history while retaining the live screen. Menus expose the full action list. View controls toolbar labels/visibility, status visibility and light/dark appearance across all windows and terminals, including hidden panes. Theme changes retain shells, scrollback, split ratios and font choices. On macOS the tabs share the title surface, with the toolbar immediately below. The title/tab row defaults to 38 logical pixels. View → Tab height… adjusts it from 28–72 pixels for the current window, with a reset to 38; Cancel preserves the previous height. View choices are temporary overrides and survive unrelated configuration reloads. The default app font is 16 points; Cmd+0 restores the configured size.
 
-Settings opens the TOML configuration, creating a commented template only when absent. Saved Swing look and feel, toolbar/status visibility, font family/fallback/size/ligatures/line height, cursor/input/copy/bell options, shell-exit behavior, inactive-pane dimming and shortcuts reload live across windows. Shell command, exact arguments, environment and scrollback defaults apply to new pane requests; columns/lines supply the initial grid for new windows. Existing sessions continue running. Reload config forces a read; the status indicator opens file diagnostics. See [configuration](docs/configuration.md) for the complete settings table, defaults/ranges, paths, `--config`, shell/shortcut examples and error behavior.
+Settings opens the TOML configuration, creating a commented template only when absent. Saved tab height, toolbar/status visibility, font family/fallback/size/ligatures/line height, cursor/input/copy/bell options, shell-exit behavior, inactive-pane dimming, theme and shortcuts reload live across windows. Shell command, exact arguments, environment and scrollback defaults apply to new pane requests; columns/lines supply the initial grid for new windows. Existing sessions continue running. Reload config forces a read; the status indicator opens file diagnostics. See [configuration](docs/configuration.md) for the complete settings table, defaults/ranges, paths, `--config`, shell/shortcut examples and error behavior.
 
 ### Configuration example
 
@@ -104,7 +104,7 @@ cp -n config.example.toml ~/.config/jasper/config.toml
 
 If `config.toml` already exists, `cp -n` leaves it unchanged. Choose another filename to inspect the example separately.
 
-Look and feel changes reload across windows while terminal colors stay white on black. See [look and feel configuration](docs/configuration.md#swing-look-and-feel). Native macOS and Windows packaging commands and acceptance checks are in the [packaging guide](docs/packaging.md). Bounded application logs and their privacy rules are described in [application diagnostics](docs/diagnostics.md). Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md).
+Custom TOML palettes reload live and System appearance follows the OS across windows; custom terminal/status colors stay fixed as chrome changes. See [theme configuration](docs/configuration.md#appearance-and-custom-themes) and the [native theme checklist](docs/superpowers/plans/2026-09-12-jasper-plan-4c-manual-check.md). Native macOS and Windows packaging commands and acceptance checks are in the [packaging guide](docs/packaging.md). Bounded application logs and their privacy rules are described in [application diagnostics](docs/diagnostics.md). Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md).
 
 On Linux/Windows, Ctrl+1–9 selects an existing tab and Ctrl+Shift+[ / Ctrl+Shift+] selects the previous/next tab. For other actions, `cmd` maps to Ctrl+Shift. Those defaults written with an additional explicit Shift add Alt to remain distinct (for example split down is Ctrl+Alt+Shift+D). Other ordinary Ctrl combinations remain available to terminal programs. Keybinding overrides also accept `{` and `}` as Shift+[ and Shift+].
 

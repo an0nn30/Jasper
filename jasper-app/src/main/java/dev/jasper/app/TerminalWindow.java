@@ -1,5 +1,6 @@
 package dev.jasper.app;
 
+import com.formdev.flatlaf.util.SystemInfo;
 import java.awt.Dimension;
 import java.awt.Insets;
 import java.awt.Rectangle;
@@ -14,6 +15,7 @@ final class TerminalWindow implements AutoCloseable {
     private final JasperApplication application;
     private final JFrame frame = new JFrame("Jasper");
     private final WindowContent content;
+    private final MacTitleBar titleBar;
     private boolean closed;
     private final WindowAdapter events = new WindowAdapter() {
         @Override public void windowClosing(WindowEvent event) { close(); }
@@ -36,21 +38,21 @@ final class TerminalWindow implements AutoCloseable {
     TerminalWindow(JasperApplication application, ShellLauncher launcher, Path directory, ThemeController themes,
                    ConfigurationController configuration, CommandHistory history) {
         this.application = application;
-        frame.setIconImages(ApplicationIcon.images(System.getProperty("os.name").startsWith("Mac")));
+        frame.setIconImages(ApplicationIcon.images(SystemInfo.isMacOS));
         content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes,
-            KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac")), System::nanoTime, history, System.getProperty("os.name").startsWith("Mac"));
+            KeyBindings.defaults(SystemInfo.isMacOS), System::nanoTime, history, SystemInfo.isMacOS);
         content.onToggleBuddy = application::toggleBuddy;
         content.buddyEnabled = application::buddyEnabled;
         if (configuration != null) {
             content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(configuration.snapshot()));
             configuration.register(content);
         }
-        frame.setContentPane(content);
-        content.onTitle = title -> frame.setTitle(Main.windowTitle(title));
+        titleBar = MacTitleBar.install(frame.getRootPane(), content, SystemInfo.isMacFullWindowContentSupported, frame::setTitle);
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.setJMenuBar(content.menuBar());
         content.installRootBindings(frame.getRootPane());
         content.onMinimumSizeChanged = this::updateMinimumSize;
+        if (titleBar != null) titleBar.attach(frame);
         frame.addWindowListener(events); frame.pack();
         if (configuration != null) {
             updateMinimumSize();
@@ -84,6 +86,7 @@ final class TerminalWindow implements AutoCloseable {
 
     private void setActive(boolean active) {
         content.setActive(active);
+        if (titleBar != null) titleBar.setActive(active);
     }
 
     private void reportState() {
@@ -107,6 +110,7 @@ final class TerminalWindow implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true; content.close();
+        if (titleBar != null) titleBar.close();
         frame.removeWindowListener(events); frame.dispose();
         application.windowClosed(this);
     }

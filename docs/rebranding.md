@@ -23,15 +23,17 @@ Jasper uses a new settings directory:
 
 On Linux, an unset or relative `XDG_CONFIG_HOME` falls back to `~/.config`.
 
-To carry settings over, close the app and copy `config.toml` and
-`command-history.toml` from the old directory into the new one.
+To carry settings over, close the app and copy `config.toml`, the `themes`
+directory, and `command-history.toml` from the old directory into the new one.
 If Jasper already has settings, merge them instead of overwriting them. Logs do
-not need to be copied. The combined vanilla Swing UI uses `[ui] laf` instead of
-the old theme system. Remove legacy `[colors]` appearance/theme selections and
-`window.tab_height` from copied settings; they now produce configuration warnings.
-Custom theme files are no longer loaded. See [configuration](configuration.md#swing-look-and-feel)
-for supported look and feels, including `motif`, `metal`, and `nimbus`.
+not need to be copied. Update any built-in theme selector in the copied config:
 
-Update any custom shortcuts, scripts,
+| Previous selector | Jasper selector |
+| --- | --- |
+| `moray-dark-purple` | `jasper-dark-purple` |
+| `moray-dark` | `jasper-dark` |
+| `moray-light` | `jasper-light` |
+
+Custom palette filenames may stay the same. Update any custom shortcuts, scripts,
 or integrations referencing the old executable, package, property, or module name.
 Historical benchmark manifests preserve the original artifact names and hashes.

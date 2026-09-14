@@ -13,6 +13,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MockUiTest {
     @org.junit.jupiter.api.AfterEach void cleanup() throws Exception { closeOwners(); }
 
+    @Test void referenceRowsAndSurfaceRemainContinuousAtActualWindowSize() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var root = new JRootPane();
+            try (var title = MacTitleBar.install(root, owner, true, value -> {})) {
+                assertThat(title).isNotNull();
+                root.setSize(958, 958); layoutTree(root);
+                assertThat(owner.toolbar().getHeight()).isEqualTo(53);
+                assertThat(owner.status().getHeight()).isEqualTo(30);
+                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 837));
+                assertThat(root.getContentPane().getPreferredSize()).isEqualTo(new Dimension(958, 942));
+                var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
+                var g = image.createGraphics(); root.printAll(g); g.dispose();
+                assertThat(image.getRGB(650, 37) & 0xffffff).isEqualTo(0x301a42);
+                assertThat(image.getRGB(650, 80) & 0xffffff).isEqualTo(0x120c1c);
+                assertThat(image.getRGB(500, 700)).isEqualTo(image.getRGB(500, 940));
+            }
+        });
+    }
+
     @Test @DisabledOnOs(OS.WINDOWS)
     void terminalLayoutKeepsCompactInsetsAcrossThemeChanges() throws Exception {
         var pending = new ArrayDeque<Runnable>();
@@ -29,18 +49,96 @@ class MockUiTest {
             owner.action(ActionId.FONT_BIGGER).actionPerformed(null);
             owner.action(ActionId.FONT_RESET).actionPerformed(null);
             assertThat(pane.view().fontSize()).isEqualTo(16);
-            owner.selectLaf(UiLookAndFeel.NIMBUS);
+            owner.selectTheme(BuiltinTheme.LIGHT);
             layoutTree(owner);
             assertThat(pane.getBackground()).isEqualTo(pane.view().palette().background());
             assertThat(pane.getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
             assertThat(pane.view().getBounds()).isEqualTo(new Rectangle(4, 4,
                 pane.getWidth() - 8, pane.getHeight() - 8));
-            owner.selectLaf(UiLookAndFeel.METAL);
+            owner.selectTheme(BuiltinTheme.DARK);
             layoutTree(owner);
             assertThat(pane.getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
             assertThat(pane.view().getBounds()).isEqualTo(new Rectangle(4, 4,
                 pane.getWidth() - 8, pane.getHeight() - 8));
         });
+    }
+
+    @Test void customSurfacePixelsAndNativeChromePropertyRemainIndependent() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController();
+            var owner = content(launcher(new ArrayDeque<>()), themes);
+            var root = new JRootPane();
+            try (var title = MacTitleBar.install(root, owner, true, value -> {})) {
+                owner.installRootBindings(root);
+                var palette = new dev.jasper.terminal.Palette(Color.WHITE, new Color(0x101820),
+                    Color.YELLOW, Color.GRAY, BuiltinTheme.DARK.palette().ansi());
+                themes.configure(new ColorsConfig(Appearance.SYSTEM, "custom"), palette);
+                themes.systemChanged(BuiltinTheme.LIGHT);
+                owner.setConfigurationState(new ConfigService.State(ConfigSnapshot.defaults(), java.util.List.of(),
+                    java.nio.file.Path.of("config.toml"), true));
+                root.setSize(958, 958); layoutTree(root);
+                var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
+                var g = image.createGraphics(); root.printAll(g); g.dispose();
+                assertThat(image.getRGB(1, 700) & 0xffffff).isEqualTo(0x101820);
+                assertThat(image.getRGB(500, 940) & 0xffffff).isEqualTo(0x101820);
+                assertThat(owner.currentPane().getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
+                assertThat(owner.toolbar().getBackground()).isEqualTo(BuiltinTheme.LIGHT.palette().background());
+                assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
+                assertThat(title.getBackground()).isNotEqualTo(palette.background());
+            }
+        });
+    }
+
+    @Test void statusClipsLongMetadataWithoutMovingRightSegmentOrGrowingMinimumWidth() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var status = owner.status(); status.setSize(600, 30);
+            status.setMetadata("bash", "/tmp", "91 \u00d7 35", true); layoutTree(status);
+            BufferedImage before = paint(status);
+            assertThat(before.getRGB(32, 30) & 0xffffff).isEqualTo(0x9ccf9a);
+            status.setMetadata("bash", "/very-long-directory".repeat(100), "91 \u00d7 35", false); layoutTree(status);
+            BufferedImage after = paint(status);
+            assertThat(status.getMinimumSize().width).isZero();
+            assertThat(status.getPreferredSize().width).isZero();
+            assertThat(status.getText()).contains("/very-long-directory").contains("91 \u00d7 35");
+            assertThat(after.getRGB(32, 30) & 0xffffff).isEqualTo(0x9c91ae);
+            for (int y = 0; y < 60; y++) for (int x = 900; x < 1200; x++)
+                assertThat(after.getRGB(x, y)).as("right segment remains visible").isEqualTo(before.getRGB(x, y));
+            // The slash remains subdued independently of the metadata text color.
+            boolean foundSeparator = false;
+            for (int y = 16; y < 44; y++) for (int x = 100; x < 156; x++)
+                foundSeparator |= (after.getRGB(x, y) & 0xffffff) == 0x4e2c69;
+            assertThat(foundSeparator).isTrue();
+        });
+    }
+
+    @Test void toolbarCompactsWithoutLosingActionsAndModeChangesKeepTheContentHeight() throws Exception {
+        edt(() -> {
+            var pending = new ArrayDeque<Runnable>();
+            var owner = content(launcher(pending)); owner.setSize(400, 500); layoutTree(owner);
+            var buttons = java.util.Arrays.stream(owner.toolbar().getComponents()).filter(JButton.class::isInstance)
+                .map(JButton.class::cast).toList();
+            assertThat(buttons).hasSize(7);
+            assertThat(buttons).allSatisfy(button -> {
+                assertThat(button.getWidth()).isGreaterThanOrEqualTo(16);
+                assertThat(button.getX() + button.getWidth()).isLessThanOrEqualTo(400);
+                assertThat(button.getHeight()).isEqualTo(30);
+            });
+            buttons.getFirst().doClick();
+            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            owner.setToolbarMode(WindowContent.ToolbarMode.HIDDEN); layoutTree(owner);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(432);
+            owner.setToolbarMode(WindowContent.ToolbarMode.ICONS); layoutTree(owner);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(379);
+            assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
+        });
+    }
+
+    private static BufferedImage paint(JComponent component) {
+        var image = new BufferedImage(component.getWidth() * 2, component.getHeight() * 2, BufferedImage.TYPE_INT_RGB);
+        var g = image.createGraphics();
+        try { g.scale(2, 2); component.printAll(g); } finally { g.dispose(); }
+        return image;
     }
 
     static void layoutTree(Container container) {

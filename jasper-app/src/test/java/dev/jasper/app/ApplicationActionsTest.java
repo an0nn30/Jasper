@@ -59,7 +59,7 @@ class ApplicationActionsTest {
         Queue<Runnable> pending = new ArrayDeque<>();
         edt(() -> {
             var original = UIManager.getLookAndFeel();
-            UiLookAndFeel.METAL.install();
+            com.formdev.flatlaf.FlatDarkLaf.setup();
             try {
                 WindowContent owner = content(launcher(pending));
                 BindingRoot root = new BindingRoot(); root.setContentPane(owner);

@@ -27,8 +27,7 @@ class ExpandedConfigTest {
                     "[colors]\nappearance='light'\ntheme='" + selector + "'\n")) {
                 var result = parse(text);
                 assertThat(result.rejected()).as(text).isFalse();
-                assertThat(result.diagnostics()).as(text).hasSize(2).allSatisfy(d ->
-                    assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING));
+                assertThat(result.diagnostics()).as(text).isEmpty();
                 assertThat(result.snapshot().colors()).isEqualTo(new ColorsConfig(Appearance.LIGHT, selector));
             }
         }
@@ -143,10 +142,10 @@ class ExpandedConfigTest {
                 "terminal.option_as_meta='secret'", "terminal.cursor.shape='secret'", "terminal.dim_inactive_panes=-0.1",
                 "terminal.dim_inactive_panes=1.1", "terminal.dim_inactive_panes=nan", "terminal.dim_inactive_panes=inf",
                 "terminal.bell='secret'", "terminal.on_exit='secret'", "terminal.on_exit='CLOSE'")) {
-            var result = parse(assignment + "\nwindow.status_bar=false");
+            var result = parse(assignment + "\nwindow.tab_height=44");
             assertThat(result.rejected()).as(assignment).isFalse();
             var expected = ConfigSnapshot.defaults();
-            assertThat(result.snapshot()).isEqualTo(new ConfigSnapshot(expected.tabHeight(), expected.toolbar(), false,
+            assertThat(result.snapshot()).isEqualTo(new ConfigSnapshot(44, expected.toolbar(), expected.statusBar(),
                 expected.font(), expected.colors(), expected.keybindings(), expected.columns(), expected.lines(), expected.terminal()));
             assertThat(result.diagnostics()).singleElement().satisfies(d -> {
                 assertThat(d.severity()).as(assignment).isEqualTo(ConfigDiagnostic.Severity.ERROR);

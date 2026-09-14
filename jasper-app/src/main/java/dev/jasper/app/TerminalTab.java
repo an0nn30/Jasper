@@ -141,7 +141,7 @@ final class TerminalTab extends JPanel implements AutoCloseable {
     void endThemeUpdate() {
         long generation = themeGeneration;
         restoreThemeDividers();
-        // Look and feel replacement and validation can queue another layout on the EDT.
+        // FlatLaf replacement and validation can queue another layout on the EDT.
         SwingUtilities.invokeLater(() -> {
             if (closed || generation != themeGeneration) return;
             restoreThemeDividers(); updatingTheme = false;
