@@ -12,10 +12,9 @@ class ConfigurationStatusTest {
     @Test void statusKeepsConfigAndMetadataBoundedAndReadableInBothThemes() throws Exception {
         edt(() -> {
             var themes = new ThemeController();
-            for (BuiltinTheme theme : BuiltinTheme.values()) {
-                themes.select(theme);
+            for (UiLookAndFeel theme : List.of(UiLookAndFeel.METAL, UiLookAndFeel.NIMBUS)) {
+                themes.selectLaf(theme);
                 var status = new WindowStatusBar();
-                status.applyPalette(theme.palette());
                 for (var severity : ConfigDiagnostic.Severity.values()) {
                     Path file = Path.of("fixture", "settings.toml");
                     status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(
@@ -23,7 +22,7 @@ class ConfigurationStatusTest {
                     status.setMetadata("<html>very long shell".repeat(80), "/a/long/directory/".repeat(80), "120 × 36", true);
                     assertThat(status.getMinimumSize().width).isZero();
                     assertThat(status.getPreferredSize().width).isZero();
-                    assertThat(status.getBackground()).isEqualTo(theme.palette().background());
+                    assertThat(status.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
                     assertThat(contrast(status.configButton().getForeground(), status.getBackground())).isGreaterThanOrEqualTo(4.5);
                     for (int width : new int[]{958, 320, 100, 20, 0}) {
                         status.setSize(width, 30); layout(status);
@@ -37,17 +36,17 @@ class ConfigurationStatusTest {
             }
         });
     }
-    @Test void customPalettePersistsAcrossConfigurationRefreshAndOppositeChromeIsReadable() throws Exception {
+    @Test void terminalPaletteDoesNotChangeStandardSwingStatusColors() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(); themes.select(BuiltinTheme.LIGHT);
+            var themes = new ThemeController(); themes.selectLaf(UiLookAndFeel.METAL);
             var status = new WindowStatusBar();
             for (var palette : List.of(dev.moray.terminal.Palette.morayDark(),
                     new dev.moray.terminal.Palette(Color.WHITE, new Color(0x101820), Color.YELLOW,
                         Color.GRAY, dev.moray.terminal.Palette.morayDark().ansi()))) {
                 status.applyPalette(palette);
                 status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));
-                assertThat(status.getBackground()).isEqualTo(palette.background());
-                assertThat(contrast(status.configButton().getForeground(), palette.background())).isGreaterThanOrEqualTo(3);
+                assertThat(status.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
+                assertThat(contrast(status.configButton().getForeground(), status.getBackground())).isGreaterThanOrEqualTo(3);
             }
         });
     }

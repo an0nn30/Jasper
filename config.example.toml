@@ -2,9 +2,14 @@
 # Copy this file to your platform's config.toml, then edit only the values you want to change.
 # All active values below are Moray's built-in defaults.
 
+[ui]
+# Live Java built-in look and feel. Choices: metal, nimbus, motif, system,
+# aqua (macOS), windows/windows-classic (Windows), gtk (Linux with GTK).
+# Unavailable choices show a warning and fall back to Metal.
+# System uses the Java runtime's platform default.
+laf = "metal"
+
 [window]
-# Live across open windows. Range: 28-72 logical pixels.
-tab_height = 38
 # Live across open windows. Options: "icons_and_labels", "icons", or "hidden".
 toolbar = "icons_and_labels"
 # Live across open windows.
@@ -64,14 +69,6 @@ blink = true
 # TMUX_PANE, and ITERM_* variables before applying this overlay; configured values override them.
 # On macOS, LANG defaults to en_US.UTF-8 only when absent or blank; LC_* values are preserved.
 # MY_VARIABLE = "a value with spaces"
-
-[colors]
-# System switches both chrome and the built-in palette; custom palettes stay fixed.
-appearance = "system"
-# Built-ins: moray-dark-purple (default), moray-dark (classic), moray-light.
-# A custom basename is loaded from themes/.
-theme = "moray-dark-purple"
-# theme = "my-theme.toml"
 
 [keybindings]
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.

@@ -26,8 +26,10 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 These are the supported keys and defaults. Font and terminal behavior settings apply live; session and grid defaults take effect as described below.
 
 ```toml
+[ui]
+laf = "metal"
+
 [window]
-tab_height = 38
 toolbar = "icons_and_labels"
 status_bar = true
 columns = 150
@@ -59,20 +61,13 @@ blink = true
 [terminal.env]
 # MY_VARIABLE = "value"
 
-[colors]
-# System switches both chrome and the built-in palette; custom palettes stay fixed.
-appearance = "system"
-# Either built-in ID follows appearance. A custom basename is loaded from themes/.
-theme = "moray-dark-purple"
-# theme = "my-theme.toml"
-
 [keybindings]
 # Optional action overrides; see examples below.
 ```
 
 | Key | Default | Accepted values | When applied |
 |---|---|---|---|
-| `window.tab_height` | `38` | Integer 28–72 logical pixels | Live |
+| `ui.laf` | `"metal"` | `"metal"`, `"nimbus"`, `"motif"`, `"system"`, `"aqua"`, `"windows"`, `"windows-classic"`, `"gtk"` | Live, shared across windows |
 | `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
 | `window.status_bar` | `true` | Boolean | Live |
 | `window.columns` | `150` | Integer 5–500 | New windows |
@@ -93,19 +88,39 @@ theme = "moray-dark-purple"
 | `terminal.copy_on_select` | `false` | Boolean | Live |
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
-| `colors.appearance` | `"system"` | `"system"`, `"light"`, `"dark"` | Live, shared across windows |
-| `colors.theme` | `"moray-dark-purple"` | Built-in ID or custom basename | Live, shared across windows |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
+
+### Swing look and feel
+
+`ui.laf` selects Java's built-in Swing look and feel. The default is `"metal"`.
+Changes apply live to all open windows without restarting shells. This setting controls
+Swing widgets; terminal text retains its terminal palette.
+
+| Value | Availability |
+|---|---|
+| `metal` | Standard cross-platform Java look and feel |
+| `nimbus` | Normally available across platforms |
+| `motif` | Normally available across platforms |
+| `system` | Java runtime's platform default |
+| `aqua` | macOS |
+| `windows` | Windows |
+| `windows-classic` | Windows |
+| `gtk` | Linux with GTK support |
+
+Platform-specific implementations depend on the installed Java runtime and desktop.
+If a selected implementation is missing or unsupported, Moray shows a warning and
+uses Metal. The saved choice stays selected, and Reload Config retries it.
+Only these named built-ins are accepted; arbitrary Java class names are not supported.
 
 ### Live settings and temporary choices
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary global appearance remains shared until the parsed saved appearance changes. Theme-file edits and unrelated reloads preserve it. The Tab height dialog's reset button restores the built-in 38px value.
+View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
-On macOS, `option_as_meta` controls which Option key sends Meta input; `"none"` leaves Option character entry available. Application shortcuts retain priority over terminal encoding. Cursor settings supply the fallback: a program's cursor shape/blink escape sequence takes precedence until the program resets that choice. Configured pane dimming persists through focus and theme changes. Copy-on-select copies a completed local selection to the clipboard.
+On macOS, `option_as_meta` controls which Option key sends Meta input; `"none"` leaves Option character entry available. Application shortcuts retain priority over terminal encoding. Cursor settings supply the fallback: a program's cursor shape/blink escape sequence takes precedence until the program resets that choice. Configured pane dimming persists through focus and look-and-feel changes. Copy-on-select copies a completed local selection to the clipboard.
 
 A visual bell flashes a short foreground overlay for 150ms. Sound uses the system beep; none disables both. Only attached views handle bells. Detaching a view clears its visual bell and discards queued bell delivery.
 
@@ -213,7 +228,7 @@ while leaving View → Command Palette available.
 
 ## Reload and diagnostics
 
-**Reload config** forces a file read even if its timestamp and size did not change. The status indicator shows **Built-in defaults**, **Config loaded**, **Config warnings**, or **Config error**, with the first available diagnostic line. Green, amber and red distinguish successful, warning and error states. Its tooltip shows the path; click it for selectable plain-text diagnostics including file, line, column and key.
+**Reload config** forces a file read even if its timestamp and size did not change. The status indicator shows **Built-in defaults**, **Config loaded**, **Config warnings**, or **Config error**, with the first available diagnostic line. Its tooltip shows the path; click it for selectable plain-text diagnostics including file, line, column and key.
 
 Syntax errors, wrong types, unreadable files, invalid UTF-8 and files larger than 1 MiB retain the last working settings (built-in defaults before any valid load). An invalid value of the correct type falls back to that key's default while other valid values apply. Invalid font fallback or shell argument lists default as a whole; a wrong element type rejects the candidate. Invalid environment entries are omitted individually while valid entries apply. Unknown keys, including nested keys and empty unknown tables, warn without blocking valid settings. Fixing the file recovers automatically. Deleting the file restores saved defaults to built-in values; unchanged fields still preserve temporary runtime overrides. Settings/editor failures do not roll back a successfully loaded file.
 
@@ -222,56 +237,10 @@ Syntax errors, wrong types, unreadable files, invalid UTF-8 and files larger tha
 App logging remains planned; see the [packaging guide](packaging.md) for desktop launcher details. Unsupported keys warn. Native font rendering, keyboard behavior, audio, screen sizing and editor integration still require the user-run [terminal configuration checklist](superpowers/plans/2026-09-12-moray-plan-4b-manual-check.md), alongside the acceptance checks linked from the README.
 
 
-## Appearance and custom themes
+## Deprecated appearance settings
 
-View → Appearance offers Light, Dark and Follow System across all windows. Choices are temporary and never rewrite the configuration. OS readings are remembered during a manual choice; Follow System applies the latest reading immediately. System initially uses Dark (purple by default) until the asynchronous reading arrives. Unsupported desktops or detector failures use Dark with a diagnostic; explicit choices remain usable.
-
-| Saved values | Chrome | Terminal palette |
-|---|---|---|
-| System + moray-dark-purple (default) | Purple Dark or Light | moray-dark-purple or moray-light |
-| System + moray-dark | Classic Dark or Light | moray-dark or moray-light |
-| System + moray-light | Purple Dark or Light | moray-dark-purple or moray-light |
-| Light + any built-in ID | Light | moray-light |
-| Dark + moray-dark | Classic Dark | moray-dark |
-| Dark + moray-dark-purple or moray-light | Purple Dark | moray-dark-purple |
-| Any appearance + custom file | Saved/system appearance | Fixed custom palette |
-| Appearance omitted + explicit moray-light | Light | Built-in Light (legacy behavior) |
-| Appearance omitted + explicit moray-dark | Classic Dark | moray-dark (legacy behavior) |
-| Appearance omitted + explicit moray-dark-purple | Purple Dark | moray-dark-purple |
-| Both omitted | System | moray-dark-purple / moray-light |
-| Appearance omitted + custom file | System | Fixed custom palette |
-
-Explicit appearance takes precedence over a built-in ID's suffix. Changing the parsed saved appearance clears the temporary override; rewriting the same value does not. Custom palettes retain their colors as chrome changes. Terminal padding and status match the palette background; toolbar, menus, find controls and native title follow chrome.
-
-The built-in IDs are `moray-dark-purple`, `moray-dark` (classic) and `moray-light`.
-New/missing configurations use `appearance = "system"` and `theme = "moray-dark-purple"`.
-An existing configuration explicitly selecting `moray-dark` retains the classic palette;
-change its selector to `moray-dark-purple` to adopt the new theme. Explicit custom themes
-also remain selected. See the [palette and actual UI renders](design/moray-dark-purple/README.md).
-
-Theme files live only in Moray's `themes/` directory beside its default configuration directory (macOS: `~/.config/moray/themes/`). `--config` does not relocate themes. Select one basename, with an optional `.toml` extension. Spaces and Unicode are allowed; paths, separators, control characters, Windows-reserved filename characters, `.` and `..` are rejected. The selected file must be a regular file contained within the real theme directory; escaping symlinks are rejected. Loading creates no files or directories.
-
-The [complete twenty-color example](examples/themes/moray-custom.toml) uses this supported Alacritty TOML subset:
-
-| Table | Supported keys |
-|---|---|
-| `colors.primary` | `foreground`, `background` |
-| `colors.cursor` | `cursor` |
-| `colors.selection` | `background` |
-| `colors.normal` | `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white` |
-| `colors.bright` | Same eight ANSI names |
-
-Values are quoted `#RRGGBB` or `0xRRGGBB`. Files must be strict UTF-8 and at most 256 KiB. At least one supported color is required; omitted colors inherit fixed classic Moray Dark (`moray-dark`), independent of the OS and the new default. This preserves existing custom theme files. Unsupported keys warn and are ignored. Invalid supported colors/types, duplicate definitions, syntax errors and symbolic cell references reject the candidate. Selection foreground, cursor text, dim/indexed colors, imports and other Alacritty features are unsupported.
-
-To try the example on macOS, choose an absent destination (change the name if already used):
-
-```sh
-mkdir -p ~/.config/moray/themes
-cp -n docs/examples/themes/moray-custom.toml ~/.config/moray/themes/my-theme.toml
-```
-
-Then edit your own config's colors block to set `theme = "my-theme.toml"` and your desired appearance. `cp -n` preserves an existing destination; inspect it or choose another name rather than assuming it was copied. To start a main configuration from the root example, likewise copy only to an absent target or a user-chosen filename; do not replace your live settings inadvertently.
-
-The selected theme is checked on the existing one-second reload cadence even without main-config changes. Reload config forces both reads. Deletion, bad edits or I/O errors retain the last successfully loaded saved palette (Dark if none); repair replaces it and clears theme diagnostics. Valid unrelated settings still apply. A main-config syntax error keeps the last good selection while its theme file continues reloading. The status diagnostic viewer identifies the actual failing file and positions. System-source warnings clear independently of configuration/theme errors. A failed chrome installation keeps the previous effective theme/menu and can be retried with Follow System or Reload config.
-
-See the [system/custom theme native checklist](superpowers/plans/2026-09-12-moray-plan-4c-manual-check.md). Native detection, display scaling and title controls require user-run acceptance.
+`colors.theme`, `colors.appearance` and `window.tab_height` are accepted for compatibility
+and produce a warning, but no longer affect appearance. Remove them from existing
+configuration files. Theme files are no longer read or polled. The app uses a fixed
+terminal palette; `ui.laf` controls Swing widgets only. Tab dimensions follow the
+selected Swing look and feel.

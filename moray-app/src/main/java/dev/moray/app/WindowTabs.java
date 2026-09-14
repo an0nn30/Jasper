@@ -1,319 +1,114 @@
 package dev.moray.app;
 
-import com.formdev.flatlaf.extras.FlatSVGIcon;
-import com.formdev.flatlaf.util.UIScale;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.ArrayList;
 import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.function.LongSupplier;
 import javax.swing.*;
 
-/** A single visible tab row over WindowContent's retained Swing selection model. */
-final class WindowTabs extends JPanel implements AutoCloseable {
+/** Adds tab closing and drag reordering to Swing's standard tab pane. */
+final class WindowTabs implements AutoCloseable {
     private final WindowContent owner;
-    private final IdentityHashMap<TerminalTab, Entry> entries = new IdentityHashMap<>();
-    private final List<TerminalTab> order = new ArrayList<>();
-    private final List<Entry> visualOrder = new ArrayList<>();
-    private final JButton plus, previous, next;
-    private TerminalTab selected;
-    private int firstVisible;
-    private int layoutWidth = -1;
-    private boolean revealSelection = true;
-    private boolean active = true;
-    private final LongSupplier clock;
-    final Timer animationTimer;
-    private final TabMotion underlineX = new TabMotion(0);
-    private final TabMotion underlineWidth = new TabMotion(0);
-    private boolean laidOut, settleOnLayout, disposed;
-    private int layoutHeight = -1, layoutTabWidth = -1, tabRegionLeft, tabRegionRight;
+    private final IdentityHashMap<TerminalTab, JPanel> headers = new IdentityHashMap<>();
+    private boolean closed;
 
-    WindowTabs(WindowContent owner, LongSupplier clock) {
-        super(null);
+    private final MouseAdapter nativeGestures = new MouseAdapter() {
+        private MouseAdapter active;
+        @Override public void mousePressed(MouseEvent event) {
+            int index = owner.tabStrip().indexAtLocation(event.getX(), event.getY());
+            active = index < 0 ? null : gestures((TerminalTab) owner.tabStrip().getComponentAt(index));
+            if (active != null) active.mousePressed(event);
+        }
+        @Override public void mouseReleased(MouseEvent event) {
+            if (active != null) active.mouseReleased(event);
+            active = null;
+        }
+    };
+
+    WindowTabs(WindowContent owner) {
         this.owner = owner;
-        this.clock = clock;
-        animationTimer = new Timer(16, event -> animateFrame());
-        animationTimer.setCoalesce(true);
-        addHierarchyListener(event -> {
-            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && !isShowing()) settleMotion();
-        });
-        setName("windowTabs");
-        plus = button("newTab", "New tab", "plus");
-        plus.addActionListener(event -> owner.action(ActionId.NEW_TAB).actionPerformed(event));
-        previous = button("previousTabs", "Previous tabs", null);
-        previous.setText("\u2039");
-        previous.addActionListener(event -> { firstVisible = Math.max(0, firstVisible - 1); settleOnLayout = true; revalidate(); repaint(); });
-        next = button("nextTabs", "Next tabs", null);
-        next.setText("\u203a");
-        next.addActionListener(event -> { firstVisible = Math.min(order.size() - 1, firstVisible + 1); settleOnLayout = true; revalidate(); repaint(); });
-        add(plus); add(previous); add(next);
+        owner.tabStrip().addMouseListener(nativeGestures);
+        ((TerminalDeck) owner.tabStrip()).onMiddleClick = point -> {
+            int index = owner.tabStrip().indexAtLocation(point.x, point.y);
+            if (!closed && index >= 0) owner.closeTab((TerminalTab) owner.tabStrip().getComponentAt(index));
+        };
     }
 
     void refresh() {
-        var updated = new ArrayList<TerminalTab>();
-        for (int i = 0; i < owner.tabStrip().getTabCount(); i++) updated.add((TerminalTab) owner.tabStrip().getComponentAt(i));
-        if (!updated.equals(order)) {
-            boolean reordered = !updated.stream().filter(order::contains).toList()
-                .equals(order.stream().filter(updated::contains).toList());
-            if (reordered) { settleOnLayout = true; discardDepartures(); }
-            for (TerminalTab tab : List.copyOf(order)) if (!updated.contains(tab)) {
-                Entry entry = entries.get(tab);
-                if (!reordered && !updated.isEmpty() && laidOut && isShowing() && !disposed
-                    && entry.isVisible() && !previous.isVisible()) {
-                    entry.depart();
-                } else removeEntry(entry);
-            }
-            order.clear(); order.addAll(updated);
-            for (TerminalTab tab : order) if (!entries.containsKey(tab)) {
-                Entry entry = new Entry(tab); entries.put(tab, entry); visualOrder.add(entry); add(entry);
-            }
-            if (reordered) {
-                visualOrder.clear();
-                for (TerminalTab tab : order) visualOrder.add(entries.get(tab));
-            }
-            if (order.isEmpty()) discardDepartures();
-            revealSelection = true;
+        JTabbedPane tabs = owner.tabStrip();
+        headers.keySet().removeIf(tab -> tabs.indexOfComponent(tab) < 0);
+        for (int i = 0; i < tabs.getTabCount(); i++) {
+            TerminalTab tab = (TerminalTab) tabs.getComponentAt(i);
+            JPanel header = headers.computeIfAbsent(tab, this::header);
+            JLabel label = (JLabel) header.getComponent(0);
+            label.setText(tab.title()); label.setName("select:" + tab.title());
+            label.setToolTipText(tab.title());
+            // Limit shell-supplied titles without altering their text/accessibility value.
+            label.setPreferredSize(null);
+            Dimension preferred = label.getPreferredSize();
+            label.setPreferredSize(new Dimension(Math.min(180, preferred.width), preferred.height));
+            JButton close = (JButton) header.getComponent(1);
+            close.setName("close:" + tab.title()); close.setEnabled(!closed);
+            close.getAccessibleContext().setAccessibleName("Close tab " + tab.title());
+            if (tabs.getTabComponentAt(i) != header) tabs.setTabComponentAt(i, header);
         }
-        if (selected != owner.currentTab()) { selected = owner.currentTab(); revealSelection = true; }
-        setBackground(UIManager.getColor("Moray.titleBackground"));
-        for (TerminalTab tab : order) entries.get(tab).refresh();
-        plus.setEnabled(owner.action(ActionId.NEW_TAB).isEnabled());
-        for (JButton button : new JButton[]{plus, previous, next}) style(button);
-        revalidate(); repaint();
     }
 
-    void setActive(boolean active) { this.active = active; refresh(); }
-
-    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(80), UIScale.scale(owner.tabHeight())); }
-    @Override public Dimension getPreferredSize() {
-        return new Dimension(UIScale.scale(Math.min(800, order.size() * 160 + 32)), UIScale.scale(owner.tabHeight()));
+    private JPanel header(TerminalTab tab) {
+        JPanel header = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
+        header.setOpaque(false);
+        JLabel label = new JLabel(); label.putClientProperty("html.disable", true);
+        JButton close = new JButton(AppIcons.icon("close"));
+        close.setFocusable(false); close.setMargin(new Insets(0, 0, 0, 0));
+        close.setToolTipText("Close tab"); close.addActionListener(event -> owner.closeTab(tab));
+        header.add(label); header.add(close);
+        MouseAdapter gestures = gestures(tab);
+        header.addMouseListener(gestures); label.addMouseListener(gestures);
+        close.addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent event) {
+                if (!closed && SwingUtilities.isMiddleMouseButton(event)) owner.closeTab(tab);
+            }
+        });
+        return header;
     }
 
-    @Override public void doLayout() {
-        long now = clock.getAsLong();
-        for (Entry entry : List.copyOf(visualOrder))
-            if (entry.departing && !entry.width.moving(now)) removeEntry(entry);
-        boolean settle = !laidOut || settleOnLayout || disposed || order.isEmpty();
-        boolean widthChanged = layoutWidth != getWidth();
-        if (widthChanged) { layoutWidth = getWidth(); revealSelection = true; }
-        if (layoutHeight != getHeight()) { layoutHeight = getHeight(); settle = true; }
-        int oldFirstVisible = firstVisible;
-        int width = getWidth(), tabWidth = UIScale.scale(160), plusWidth = Math.min(width, UIScale.scale(32));
-        boolean overflow = order.size() * tabWidth + plusWidth > width;
-        int navigation = overflow ? Math.min(UIScale.scale(24), Math.max(0, (width - plusWidth) / 3)) : 0;
-        int space = Math.max(0, width - plusWidth - 2 * navigation);
-        int slotWidth = Math.min(tabWidth, space);
-        // The active window title can change this allocation without moving any tab.
-        // Preserve motion until the navigation inset, tab slot or visible origin changes.
-        if (navigation != tabRegionLeft || (widthChanged && slotWidth != layoutTabWidth)) settle = true;
-        layoutTabWidth = slotWidth;
-        int count = Math.min(order.size(), Math.max(1, space / tabWidth));
-        firstVisible = Math.max(0, Math.min(firstVisible, order.size() - count));
-        int selectedIndex = order.indexOf(selected);
-        if (revealSelection && selectedIndex >= 0) {
-            if (selectedIndex < firstVisible) firstVisible = selectedIndex;
-            if (selectedIndex >= firstVisible + count) firstVisible = selectedIndex - count + 1;
-            revealSelection = false;
-        }
-        if (firstVisible != oldFirstVisible) settle = true;
-        if (overflow && entries.values().stream().anyMatch(entry -> entry.entering)) settle = true;
-        if (visualOrder.stream().anyMatch(entry -> entry.departing)
-            && visualOrder.size() * tabWidth + plusWidth > width) settle = true;
-        if (settle) discardDepartures();
-        int x = navigation, targetX = navigation, targetSpace = space;
-        int selectedX = 0, selectedWidth = 0;
-        tabRegionLeft = navigation;
-        for (Entry entry : visualOrder) {
-            if (entry.departing) {
-                int shownWidth = Math.min(space, Math.max(0, (int) Math.round(entry.width.value(now))));
-                entry.setBounds(x, 0, shownWidth, getHeight()); entry.doLayout();
-                x += shownWidth; space -= shownWidth;
-                continue;
-            }
-            int i = order.indexOf(entry.tab);
-            boolean visible = i >= firstVisible && i < firstVisible + count;
-            entry.setVisible(visible);
-            if (visible) {
-                int actualWidth = Math.min(tabWidth, targetSpace);
-                if (entry.entering) {
-                    entry.width = new TabMotion(Math.min(UIScale.scale(64), actualWidth));
-                    entry.entering = false;
+    private MouseAdapter gestures(TerminalTab tab) {
+        return new MouseAdapter() {
+            private Point pressed;
+            @Override public void mousePressed(MouseEvent event) {
+                if (closed) return;
+                if (SwingUtilities.isMiddleMouseButton(event)) { owner.closeTab(tab); return; }
+                if (SwingUtilities.isLeftMouseButton(event)) {
+                    owner.selectTab(tab);
+                    pressed = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), owner.tabStrip());
                 }
-                entry.width.target(actualWidth, now, settle);
-                int shownWidth = Math.min(space, Math.max(0, (int) Math.round(entry.width.value(now))));
-                entry.setBounds(x, 0, shownWidth, getHeight());
-                entry.doLayout();
-                if (order.get(i) == selected) { selectedX = targetX; selectedWidth = actualWidth; }
-                x += shownWidth; targetX += actualWidth; space -= shownWidth; targetSpace -= actualWidth;
-            } else {
-                // Offscreen arrivals need no reveal; retaining one would suppress later visible motion.
-                entry.entering = false;
-                entry.width.target(tabWidth, now, true);
+                popup(event);
             }
-        }
-        tabRegionRight = x;
-        int inset = UIScale.scale(14);
-        underlineX.target(selectedX + inset, now, settle);
-        underlineWidth.target(Math.max(0, selectedWidth - 2 * inset), now, settle);
-        laidOut = true; settleOnLayout = false;
-        plus.setBounds(x, 0, plusWidth, getHeight());
-        previous.setVisible(overflow); next.setVisible(overflow);
-        previous.setBounds(0, 0, navigation, getHeight());
-        next.setBounds(x + plusWidth, 0, navigation, getHeight());
-        previous.setEnabled(firstVisible > 0);
-        next.setEnabled(firstVisible + count < order.size());
-        boolean moving = underlineX.moving(now) || underlineWidth.moving(now)
-            || entries.values().stream().anyMatch(entry -> entry.width.moving(now));
-        if (moving && isShowing() && !disposed) animationTimer.start();
-        else animationTimer.stop();
-    }
-
-    /** A frame changes only title-strip bounds; it never revalidates the terminal deck. */
-    private void animateFrame() { doLayout(); repaint(); }
-
-    private void removeEntry(Entry entry) {
-        entries.remove(entry.tab); visualOrder.remove(entry); remove(entry);
-    }
-
-    private void discardDepartures() {
-        for (Entry entry : List.copyOf(visualOrder)) if (entry.departing) removeEntry(entry);
-    }
-
-    private void settleMotion() {
-        animationTimer.stop();
-        discardDepartures();
-        underlineX.settle(); underlineWidth.settle();
-        entries.values().forEach(entry -> { entry.entering = false; entry.width.settle(); });
-        settleOnLayout = true;
-    }
-
-    @Override public void addNotify() { super.addNotify(); settleMotion(); }
-    @Override public void removeNotify() { settleMotion(); super.removeNotify(); }
-    @Override public void close() { disposed = true; settleMotion(); }
-
-    @Override protected void paintChildren(Graphics graphics) {
-        super.paintChildren(graphics);
-        Graphics g = graphics.create();
-        try {
-            g.clipRect(tabRegionLeft, 0, Math.max(0, tabRegionRight - tabRegionLeft), getHeight());
-            g.setColor(UIManager.getColor("Moray.tabUnderline"));
-            long now = clock.getAsLong();
-            g.fillRect((int) Math.round(underlineX.value(now)), getHeight() - UIScale.scale(1),
-                (int) Math.round(underlineWidth.value(now)), UIScale.scale(1));
-        } finally { g.dispose(); }
-    }
-
-    @Override protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        g.setColor(UIManager.getColor("Moray.titleSeparator"));
-        g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
-    }
-
-    private JButton button(String name, String accessible, String icon) {
-        JButton button = new JButton();
-        button.setName(name);
-        button.putClientProperty("html.disable", true);
-        button.setBorder(BorderFactory.createEmptyBorder());
-        button.setContentAreaFilled(false); button.setFocusable(false);
-        button.setToolTipText(accessible); button.getAccessibleContext().setAccessibleName(accessible);
-        if (icon != null) button.setIcon(new FlatSVGIcon("dev/moray/app/icons/title/" + icon + ".svg", icon.equals("x") ? 12 : 16, icon.equals("x") ? 12 : 16)
-            .setColorFilter(new FlatSVGIcon.ColorFilter(source -> button.getForeground())));
-        style(button);
-        return button;
-    }
-
-    private Color foreground() {
-        return UIManager.getColor(active ? "Moray.titleForeground" : "Moray.titleInactiveForeground");
-    }
-
-    private void style(JButton button) {
-        button.setFont(UIManager.getFont("Label.font").deriveFont(UIScale.scale(12f)));
-        button.setForeground(foreground());
-    }
-
-    private final class Entry extends JPanel {
-        private final TerminalTab tab;
-        private final JButton select, close;
-        private Point origin;
-        private boolean entering = laidOut && !disposed;
-        private boolean departing, wasSelected;
-        private TabMotion width = new TabMotion(UIScale.scale(160));
-
-        Entry(TerminalTab tab) {
-            super(null);
-            this.tab = tab;
-            setOpaque(false);
-            select = button("select:" + tab.title(), tab.title(), "terminal-2");
-            select.setHorizontalAlignment(SwingConstants.LEFT);
-            select.setIconTextGap(UIScale.scale(8));
-            select.addActionListener(event -> { if (!departing) owner.selectTab(tab); });
-            close = button("close:" + tab.title(), "Close tab", "x");
-            close.addActionListener(event -> { if (!departing) owner.closeTab(tab); });
-            MouseAdapter gestures = new MouseAdapter() {
-                @Override public void mousePressed(MouseEvent event) {
-                    origin = null;
-                    if (departing) return;
-                    if (SwingUtilities.isMiddleMouseButton(event)) { owner.closeTab(tab); return; }
-                    if (SwingUtilities.isLeftMouseButton(event)) {
-                        owner.selectTab(tab);
-                        origin = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), WindowTabs.this);
-                    }
+            @Override public void mouseReleased(MouseEvent event) {
+                if (closed) return;
+                popup(event);
+                if (pressed == null || !SwingUtilities.isLeftMouseButton(event)) return;
+                Point released = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), owner.tabStrip());
+                if (pressed.distance(released) >= 5) {
+                    int from = owner.tabStrip().indexOfComponent(tab);
+                    int to = owner.tabStrip().indexAtLocation(released.x, released.y);
+                    owner.reorderTab(from, to);
                 }
-                @Override public void mouseReleased(MouseEvent event) {
-                    Point start = origin; origin = null;
-                    if (departing) return;
-                    if (start == null || !SwingUtilities.isLeftMouseButton(event)) return;
-                    Point end = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), WindowTabs.this);
-                    if (start.distance(end) <= UIScale.scale(5)) return;
-                    for (int i = 0; i < order.size(); i++) {
-                        Entry target = entries.get(order.get(i));
-                        if (target.isVisible() && target.getBounds().contains(end)) {
-                            owner.reorderTab(owner.tabStrip().indexOfComponent(tab), i); break;
-                        }
-                    }
-                }
-            };
-            addMouseListener(gestures); select.addMouseListener(gestures);
-            close.addMouseListener(new MouseAdapter() {
-                @Override public void mousePressed(MouseEvent event) {
-                    if (!departing && SwingUtilities.isMiddleMouseButton(event)) owner.closeTab(tab);
-                }
-            });
-            add(select); add(close);
-        }
-
-        void depart() {
-            departing = true; entering = false; wasSelected = tab == selected; origin = null;
-            width.target(0, clock.getAsLong(), false);
-            select.setEnabled(false); close.setEnabled(false);
-        }
-
-        void refresh() {
-            String text = tab.title();
-            if (!text.equals(select.getText())) {
-                select.setText(text); select.setToolTipText(text); select.getAccessibleContext().setAccessibleName(text);
-                select.setName("select:" + text); close.setName("close:" + text);
+                pressed = null;
             }
-            select.setSelected(tab == selected);
-            style(select); style(close);
-            select.setFont(select.getFont().deriveFont(java.util.Map.of(java.awt.font.TextAttribute.WEIGHT,
-                java.awt.font.TextAttribute.WEIGHT_SEMIBOLD)));
-            if (tab == selected && active) select.setForeground(UIManager.getColor("Moray.tabSelectedForeground"));
-        }
-
-        @Override public void doLayout() {
-            int inset = UIScale.scale(14), closeWidth = Math.min(UIScale.scale(16), getWidth());
-            close.setBounds(Math.max(0, getWidth() - UIScale.scale(10) - closeWidth), 0, closeWidth, getHeight());
-            select.setBounds(Math.min(inset, getWidth()), 0, Math.max(0, getWidth() - inset * 2 - closeWidth), getHeight());
-        }
-
-        @Override protected void paintComponent(Graphics graphics) {
-            if (tab == selected || (departing && wasSelected)) {
-                graphics.setColor(UIManager.getColor("Moray.tabSelectedBackground"));
-                graphics.fillRect(0, 0, getWidth(), getHeight());
+            private void popup(MouseEvent event) {
+                if (!event.isPopupTrigger()) return;
+                owner.selectTab(tab); owner.updateActions();
+                JPopupMenu menu = new JPopupMenu();
+                menu.add(owner.action(ActionId.RENAME_TAB)); menu.add(owner.action(ActionId.CLOSE_TAB));
+                menu.show(event.getComponent(), event.getX(), event.getY());
             }
-            super.paintComponent(graphics);
-        }
+        };
+    }
+    @Override public void close() {
+        closed = true;
+        owner.tabStrip().removeMouseListener(nativeGestures);
+        ((TerminalDeck) owner.tabStrip()).onMiddleClick = point -> {};
+        headers.values().forEach(header -> ((JButton) header.getComponent(1)).setEnabled(false));
+        headers.clear();
     }
 }

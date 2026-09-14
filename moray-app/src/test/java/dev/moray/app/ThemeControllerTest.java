@@ -16,20 +16,7 @@ class ThemeControllerTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
     @Test @DisabledOnOs(OS.WINDOWS)
-    void selectingLightRecolorsTheActualTerminalAndFindField() throws Exception {
-        var pending = new ArrayDeque<Runnable>();
-        WindowContent[] owners = new WindowContent[1];
-        edt(() -> owners[0] = content(launcher(pending)));
-        pending.remove().run();
-        edt(() -> {
-            appearance(owners[0]).getItem(0).doClick();
-            assertThat(owners[0].currentPane().view().getBackground()).isEqualTo(new Color(0xfafafa));
-            assertThat(owners[0].currentPane().findBar().queryField().getForeground()).isEqualTo(new Color(0x383a42));
-        });
-    }
-
-    @Test @DisabledOnOs(OS.WINDOWS)
-    void sharedOwnersUpdateHiddenZoomedAndLatePanesWithoutChangingTheirState() throws Exception {
+    void lafChangesRefreshSharedHiddenZoomedAndLatePanesWithoutChangingTheirState() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owners = new WindowContent[3];
         ThemeController[] themes = new ThemeController[1];
@@ -58,11 +45,13 @@ class ThemeControllerTest {
         edt(() -> {
             retained[0].toggleZoom();
             owners[0].newTab(HOME); // completion deliberately waits across theme selection
-            appearance(owners[1]).getItem(0).doClick();
-            assertThat(themes[0].current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            owners[1].selectLaf(UiLookAndFeel.NIMBUS);
+            assertThat(UIManager.getLookAndFeel().getID()).isEqualTo("Nimbus");
+            assertThat(owners[1].currentPane().findBar().queryField().getUI().getClass().getName()).contains("Synth");
             for (TerminalPane pane : retained[0].panes()) {
-                assertThat(pane.view().palette().background()).isEqualTo(new Color(0xfafafa));
-                assertThat(pane.findBar().queryField().getBackground()).isEqualTo(new Color(0xfafafa));
+                assertThat(pane.view().palette().background()).isEqualTo(Color.BLACK);
+                assertThat(pane.view().palette().foreground()).isEqualTo(Color.WHITE);
+                assertThat(pane.findBar().queryField().getUI().getClass().getName()).contains("Synth");
             }
             assertThat(first[0].session()).isSameAs(session[0]);
             assertThat(first[0].view().fontSize()).isEqualTo(23);
@@ -73,32 +62,30 @@ class ThemeControllerTest {
             assertThat(retained[0].focusedPane()).isSameAs(retained[0].panes().get(1));
             assertThat(retained[0].title()).isEqualTo("retained");
             assertThat(owners[0].currentTab()).isNotSameAs(retained[0]);
-            assertThat(appearance(owners[0]).getItem(0).isSelected()).isTrue();
-            assertThat(owners[1].currentPane().view().getBackground()).isEqualTo(new Color(0xfafafa));
+            assertThat(owners[1].currentPane().view().getBackground()).isEqualTo(Color.BLACK);
             owners[2] = content(launcher(pending), themes[0]);
         });
         while (!pending.isEmpty()) pending.remove().run();
         edt(() -> {
-            assertThat(owners[0].currentPane().view().getBackground()).isEqualTo(new Color(0xfafafa));
-            assertThat(owners[2].currentPane().view().getBackground()).isEqualTo(new Color(0xfafafa));
+            assertThat(owners[0].currentPane().view().getBackground()).isEqualTo(Color.BLACK);
+            assertThat(owners[2].currentPane().view().getBackground()).isEqualTo(Color.BLACK);
             var query = first[0].findBar().queryField();
             assertThat(owners[0].dispatchShortcut(owners[0].bindings().strokeFor(ActionId.COPY).orElseThrow(), query)).isFalse();
             assertThat(owners[0].dispatchShortcut(owners[0].bindings().strokeFor(ActionId.PASTE).orElseThrow(), query)).isFalse();
             owners[0].selectTab(retained[0]);
-            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0xfafafa));
-            appearance(owners[1]).getItem(1).doClick();
-            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0x120c1c));
+            assertThat(first[0].view().getBackground()).isEqualTo(Color.BLACK);
+            owners[1].selectLaf(UiLookAndFeel.METAL);
+            assertThat(first[0].view().getBackground()).isEqualTo(Color.BLACK);
             assertThat(first[0].findBar().result().error()).isNotNull();
-            var custom = new dev.moray.terminal.Palette(Color.WHITE, new Color(0x101820), Color.YELLOW,
-                Color.GRAY, BuiltinTheme.DARK.palette().ansi());
-            themes[0].configure(new ColorsConfig(Appearance.SYSTEM, "custom"), custom);
-            themes[0].selectAppearance(Appearance.SYSTEM);
-            themes[0].systemChanged(BuiltinTheme.LIGHT);
-            for (TerminalPane pane : retained[0].panes()) assertThat(pane.view().palette()).isEqualTo(custom);
+            owners[1].selectLaf(UiLookAndFeel.NIMBUS);
+            for (TerminalPane pane : retained[0].panes()) {
+                assertThat(pane.view().palette().background()).isEqualTo(Color.BLACK);
+                assertThat(pane.view().palette().foreground()).isEqualTo(Color.WHITE);
+                assertThat(pane.findBar().queryField().getUI().getClass().getName()).contains("Synth");
+            }
             assertThat(first[0].session()).isSameAs(session[0]);
             assertThat(first[0].findBar().result().error()).isNotNull();
             assertThat(retained[0].tree().zoomed()).isTrue();
-            assertThat(appearance(owners[1]).getItem(2).isSelected()).isTrue();
             owners[0].removeNotify();
         });
     }
@@ -126,7 +113,7 @@ class ThemeControllerTest {
             split[0].addPropertyChangeListener("UI", event -> split[0].setDividerLocation(.2));
             oldUi[0] = split[0].getUI();
             before[0] = owner[0].currentTab().tree().root().orElseThrow();
-            appearance(owner[0]).getItem(0).doClick();
+            owner[0].selectLaf(UiLookAndFeel.NIMBUS);
             split[0].doLayout();
         });
         edt(() -> {
@@ -161,8 +148,8 @@ class ThemeControllerTest {
             split[0].setDividerLocation(.63); split[0].doLayout();
             split[1].setDividerLocation(.31); split[1].doLayout();
             before[0] = owner[0].currentTab().tree().root().orElseThrow();
-            owner[0].selectTheme(BuiltinTheme.LIGHT);
-            owner[0].selectTheme(BuiltinTheme.DARK);
+            owner[0].selectLaf(UiLookAndFeel.NIMBUS);
+            owner[0].selectLaf(UiLookAndFeel.METAL);
         });
         edt(() -> {
             split[0].doLayout(); split[1].doLayout();
@@ -176,131 +163,25 @@ class ThemeControllerTest {
         });
     }
 
-    @Test void failedPartialInstallationRestoresPreviousLafAndDoesNotNotifyOwners() throws Exception {
-        edt(() -> {
-            var themes = new ThemeController(theme -> {
-                ThemeController.install(theme);
-                return theme != BuiltinTheme.LIGHT;
-            });
-            var owner = content(launcher(new ArrayDeque<>()), themes);
-            var changed = new ArrayList<ResolvedTheme>(); owner.onThemeChanged = changed::add;
-            var before = UIManager.getLookAndFeel();
-            assertThatThrownBy(() -> themes.select(BuiltinTheme.LIGHT)).isInstanceOf(IllegalStateException.class);
-            assertThat(UIManager.getLookAndFeel()).isSameAs(before);
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            assertThat(owner.getBackground()).isEqualTo(new Color(0x120c1c));
-            assertThat(changed).isEmpty();
-        });
-    }
-
-    @Test void rejectsOffEdtThemeChangesBeforeMutatingSwing() throws Exception {
+    @Test void rejectsOffEdtLafChangesBeforeMutatingSwing() throws Exception {
         ThemeController[] themes = new ThemeController[1];
         edt(() -> themes[0] = new ThemeController());
-        assertThatThrownBy(() -> themes[0].select(BuiltinTheme.LIGHT)).isInstanceOf(IllegalStateException.class);
-        edt(() -> assertThat(themes[0].current().chrome()).isEqualTo(BuiltinTheme.DARK));
+        assertThatThrownBy(() -> themes[0].selectLaf(UiLookAndFeel.NIMBUS)).isInstanceOf(IllegalStateException.class);
+        edt(() -> assertThat(themes[0].current().palette().background()).isEqualTo(Color.BLACK));
     }
 
-    @Test void closeUnregistersOwnerAndClearsItsThemeCallback() throws Exception {
+    @Test void closeUnregistersOwnerBeforeLaterDelegateChanges() throws Exception {
         edt(() -> {
             var themes = new ThemeController();
+            themes.selectLaf(UiLookAndFeel.METAL);
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var received = new ArrayList<ResolvedTheme>();
             owner.onThemeChanged = received::add;
-            themes.select(BuiltinTheme.LIGHT);
-            assertThat(received).containsExactly(new ResolvedTheme(BuiltinTheme.LIGHT, BuiltinTheme.LIGHT.palette()));
             owner.close();
-            // A closed owner must not even receive UI-delegate changes.
             var closedUi = owner.getUI();
-            owner.onThemeChanged.accept(new ResolvedTheme(BuiltinTheme.DARK, BuiltinTheme.DARK.palette()));
-            themes.select(BuiltinTheme.DARK);
+            themes.selectLaf(UiLookAndFeel.NIMBUS);
             assertThat(owner.getUI()).isSameAs(closedUi);
-            assertThat(received).containsExactly(new ResolvedTheme(BuiltinTheme.LIGHT, BuiltinTheme.LIGHT.palette()));
+            assertThat(received).isEmpty();
         });
-    }
-
-    @Test void failedInstallationKeepsPreviousThemeAndResetsMenuSelection() throws Exception {
-        edt(() -> {
-            var themes = new ThemeController(theme -> theme != BuiltinTheme.LIGHT && ThemeController.install(theme));
-            var owner = content(launcher(new ArrayDeque<>()), themes);
-            var errors = new ArrayList<String>(); owner.onError = errors::add;
-            var before = UIManager.getLookAndFeel();
-            appearance(owner).getItem(0).doClick();
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            assertThat(UIManager.getLookAndFeel()).isSameAs(before);
-            assertThat(appearance(owner).getItem(0).isSelected()).isFalse();
-            assertThat(appearance(owner).getItem(2).isSelected()).isTrue();
-            assertThat(errors).singleElement().asString().contains("Could not apply theme");
-        });
-    }
-
-    @Test void failedSystemInstallationRetriesLatestReadingWithoutAnotherEvent() throws Exception {
-        edt(() -> {
-            var fail = new java.util.concurrent.atomic.AtomicBoolean(true);
-            var calls = new ArrayList<BuiltinTheme>();
-            var themes = new ThemeController(theme -> {
-                calls.add(theme);
-                return (theme != BuiltinTheme.LIGHT || !fail.get()) && ThemeController.install(theme);
-            });
-            var first = content(launcher(new ArrayDeque<>()), themes);
-            var second = content(launcher(new ArrayDeque<>()), themes);
-            assertThatThrownBy(() -> themes.systemChanged(BuiltinTheme.LIGHT)).isInstanceOf(IllegalStateException.class);
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            assertThat(themes.choice()).isEqualTo(Appearance.SYSTEM);
-            assertThat(appearance(first).getItem(2).isSelected()).isTrue();
-            fail.set(false);
-            first.selectAppearance(Appearance.SYSTEM);
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
-            assertThat(appearance(second).getItem(2).isSelected()).isTrue();
-            var palette = new dev.moray.terminal.Palette(java.awt.Color.WHITE, java.awt.Color.BLACK,
-                java.awt.Color.YELLOW, java.awt.Color.GRAY, BuiltinTheme.DARK.palette().ansi());
-            int installations = calls.size();
-            themes.configure(new ColorsConfig(Appearance.SYSTEM, "custom"), palette);
-            assertThat(calls).hasSize(installations);
-            first.selectAppearance(Appearance.DARK);
-            themes.systemChanged(BuiltinTheme.LIGHT);
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            themes.configure(new ColorsConfig(Appearance.SYSTEM, "another"), palette);
-            assertThat(themes.choice()).isEqualTo(Appearance.DARK);
-            themes.configure(new ColorsConfig(Appearance.LIGHT, "another"), palette);
-            assertThat(themes.choice()).isEqualTo(Appearance.LIGHT);
-        });
-    }
-
-    @Test void resourcesCoordinateChromeAndKeepTextReadableAcrossStates() throws Exception {
-        edt(() -> {
-            var themes = new ThemeController();
-            var owner = content(launcher(new ArrayDeque<>()), themes);
-            for (BuiltinTheme theme : BuiltinTheme.values()) {
-                themes.configure(new ColorsConfig(Appearance.SYSTEM, theme.id()), theme.palette());
-                themes.select(theme);
-                assertThat(owner.getBackground()).isEqualTo(theme.palette().background());
-                assertThat(owner.toolbar().getBackground()).isEqualTo(theme.palette().background());
-                assertThat(UIManager.getColor("TabbedPane.selectedBackground")).isEqualTo(theme.palette().background());
-                for (String prefix : new String[]{"Panel", "TextField", "MenuItem", "PopupMenu", "Button"}) {
-                    assertThat(contrast(UIManager.getColor(prefix + ".foreground"), UIManager.getColor(prefix + ".background")))
-                        .as(prefix + " normal text in " + theme).isGreaterThanOrEqualTo(4.5);
-                }
-                assertThat(contrast(UIManager.getColor("Moray.titleInactiveForeground"), owner.toolbar().getBackground())).isGreaterThanOrEqualTo(3);
-                assertThat(contrast(UIManager.getColor("Button.disabledText"), owner.toolbar().getBackground())).isGreaterThanOrEqualTo(3);
-                assertThat(contrast(UIManager.getColor("MenuItem.selectionForeground"), UIManager.getColor("MenuItem.selectionBackground"))).isGreaterThanOrEqualTo(4.5);
-            }
-        });
-    }
-
-    private static double contrast(Color a, Color b) {
-        double first = luminance(a), second = luminance(b);
-        return (Math.max(first, second) + .05) / (Math.min(first, second) + .05);
-    }
-    private static double luminance(Color color) {
-        double[] rgb = {color.getRed() / 255.0, color.getGreen() / 255.0, color.getBlue() / 255.0};
-        for (int i = 0; i < rgb.length; i++) rgb[i] = rgb[i] <= .04045 ? rgb[i] / 12.92 : Math.pow((rgb[i] + .055) / 1.055, 2.4);
-        return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
-    }
-
-    static JMenu appearance(WindowContent owner) {
-        for (var component : owner.menuBar().getMenu(2).getMenuComponents()) {
-            if (component instanceof JMenu menu && menu.getText().equals("Appearance")) return menu;
-        }
-        throw new AssertionError("Appearance menu is absent");
     }
 }

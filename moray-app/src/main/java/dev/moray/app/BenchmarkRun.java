@@ -185,7 +185,7 @@ final class BenchmarkRun implements AutoCloseable {
         launchStart = System.nanoTime();
         edt(() -> {
             previousRepaintManager = RepaintManager.currentManager(null); RepaintManager.setCurrentManager(rendering);
-            application = new MorayApplication(null, SystemAppearance.fixed(BuiltinTheme.DARK), launcher);
+            application = new MorayApplication(null, launcher);
             window = application.newWindow(directory);
             window.content().onError = message -> samplingFailure = new IllegalStateException(message);
             window.resize(new Dimension(1100, 850));
