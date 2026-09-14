@@ -33,7 +33,7 @@ class WindowCommandsTest {
         DesktopTestSupport.edt(() -> {
             try (var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()))) {
                 boolean[] shown = {true}; int[] toggles = {0};
-                owner.buddyShown = () -> shown[0];
+                owner.buddyEnabled = () -> shown[0];
                 owner.onToggleBuddy = () -> { shown[0] = !shown[0]; toggles[0]++; };
                 owner.updateActions();
                 var command = owner.commands().entries().stream().map(CommandSearch.Entry::command)

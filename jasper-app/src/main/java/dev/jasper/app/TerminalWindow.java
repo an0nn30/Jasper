@@ -40,7 +40,7 @@ final class TerminalWindow implements AutoCloseable {
         content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes,
             KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac")), System::nanoTime, history, System.getProperty("os.name").startsWith("Mac"));
         content.onToggleBuddy = application::toggleBuddy;
-        content.buddyShown = application::buddyEnabled;
+        content.buddyEnabled = application::buddyEnabled;
         if (configuration != null) {
             content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(configuration.snapshot()));
             configuration.register(content);

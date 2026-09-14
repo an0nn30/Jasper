@@ -50,11 +50,17 @@ final class WindowCommands implements AutoCloseable {
                 "Toolbar: " + label, () -> owner.setToolbarMode(mode));
         }
         add(registry, "view.status_bar", "Status Bar", "Hide Status Bar", () -> owner.setStatusVisible(!owner.status().isVisible()));
-        add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); });
+        add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
+            List.of("jasper", "mascot", "turtle", "desk buddy"));
 
     }
 
     private void add(CommandRegistry registry, String id, String label, String title, Runnable callback) {
+        add(registry, id, label, title, callback, List.of());
+    }
+
+    private void add(CommandRegistry registry, String id, String label, String title, Runnable callback,
+                      List<String> extraKeywords) {
         Action action = new AbstractAction(label) {
             @Override public void actionPerformed(ActionEvent event) {
                 if (owner.isActiveAndOpen() && !owner.commandPalette().isOpen()) callback.run();
@@ -63,7 +69,7 @@ final class WindowCommands implements AutoCloseable {
         action.putValue(Command.TITLE, title);
         views.put(id, action);
         var keywords = new java.util.ArrayList<>(List.of(id.replace('.', ' ').replace('_', ' ')));
-        if (id.equals("view.buddy")) keywords.addAll(List.of("jasper", "mascot", "turtle", "desk buddy"));
+        keywords.addAll(extraKeywords);
         registrations.add(registry.register(new Command(id, action, keywords)));
     }
 
@@ -74,7 +80,7 @@ final class WindowCommands implements AutoCloseable {
             owner.currentTab() != null && owner.currentTab().tree().zoomed() ? "Restore Pane" : "Zoom Pane");
         view("view.status_bar").putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
         view("view.status_bar").putValue(Action.SELECTED_KEY, owner.status().isVisible());
-        boolean buddy = owner.buddyShown.getAsBoolean();
+        boolean buddy = owner.buddyEnabled.getAsBoolean();
         view("view.buddy").putValue(Command.TITLE, buddy ? "Hide Jasper" : "Show Jasper");
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);
         for (var mode : WindowContent.ToolbarMode.values())

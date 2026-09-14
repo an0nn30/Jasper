@@ -54,7 +54,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     Consumer<String> onError = message -> JOptionPane.showMessageDialog(this, message, "Jasper", JOptionPane.ERROR_MESSAGE);
     /** Application-owned buddy toggle; the window only forwards and displays state. */
     Runnable onToggleBuddy = () -> {};
-    java.util.function.BooleanSupplier buddyShown = () -> false;
+    java.util.function.BooleanSupplier buddyEnabled = () -> false;
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty) {
         this(launcher, directory, newWindow, quit, onEmpty, new ThemeController());
@@ -521,6 +521,6 @@ final class WindowContent extends JPanel implements AutoCloseable {
         windowTabs.refresh();
         onThemeChanged = theme -> {};
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
-        onToggleBuddy = () -> {}; buddyShown = () -> false;
+        onToggleBuddy = () -> {}; buddyEnabled = () -> false;
     }
 }

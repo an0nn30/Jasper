@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Plan written 2026-09-14 on branch `claude/desk-buddy` (from `main` `5bc288f`). Not started.
+**Status:** Plan written 2026-09-14 on branch `claude/desk-buddy` (from `main` `5bc288f`). Implemented on `claude/desk-buddy` in `.worktrees/desk-buddy`; all eight tasks complete and reviewed through the final whole-branch review (see the Deviations log). Desktop acceptance is user-run.
 
 **Goal:** A pixel-art Jasper floats above every desktop window while a terminal window is open, blinks while idle, dances on hover, can be dragged, remembers his spot, and can be hidden from the View menu, the palette, a right-click, or `buddy.enabled`.
 
@@ -1853,3 +1853,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 Record here any departure from the task text (and mirror it in `docs/STATUS.md`):
 
 - Task 6: `BuddyVisibility` is a small state holder (saved default, session choice, window map) rather than a static function, so `JasperApplication` stays thin and the rule is testable. Approved by this plan.
+- Task 4: `CommandHistoryFile` and `BuddyStateFile` share a new package-private `TomlStateFile` helper (bounded strict UTF-8 read, atomic temp-then-move write) instead of duplicating that logic; behaviour and existing tests unchanged. Controller ruling after the task review.
+- Task 8: `TerminalWindow` assigns `content.onToggleBuddy`/`content.buddyEnabled` immediately after constructing `WindowContent`, before `configuration.register(content)`, because `register` refreshes actions and would otherwise read the stub. Supersedes the plan's "after `content.onTitle`" placement.
+- Task 8: `syncBuddy()` refreshes every window's actions on each non-quitting call (config path and toggle path alike), and only quitting/stopped short-circuit it; a buddy failure latches `buddyUnavailable` and never blocks configuration delivery. `paintComponent` clears the translucent canvas with `AlphaComposite.Clear` before painting.
+- Task 8: the headless branch of `BuddyWindow.create` returns null without logging (the spec asks for one warning); headless is the test path and a warning there would be noise.

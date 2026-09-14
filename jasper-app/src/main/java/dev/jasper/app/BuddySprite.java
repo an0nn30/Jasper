@@ -53,9 +53,10 @@ final class BuddySprite {
 
     /** Draws one frame at an integer scale; every art pixel becomes a solid scale-by-scale block. */
     void paint(Graphics2D g, BuddyFrame frame, int scale, int x, int y) {
-        Object previous = g.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-        g.drawImage(frames.get(frame), x, y, FRAME_WIDTH * scale, FRAME_HEIGHT * scale, null);
-        if (previous != null) g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, previous);
+        Graphics2D copy = (Graphics2D) g.create();
+        try {
+            copy.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            copy.drawImage(frames.get(frame), x, y, FRAME_WIDTH * scale, FRAME_HEIGHT * scale, null);
+        } finally { copy.dispose(); }
     }
 }

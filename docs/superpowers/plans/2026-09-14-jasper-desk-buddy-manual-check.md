@@ -17,5 +17,6 @@ Run the app from the `claude/desk-buddy` branch (`./gradlew :jasper-app:run`). T
 - [ ] Open packaging/buddy/jasper-buddy.ase in LibreSprite: all eight frames load with the transparent background intact (batch export from the command line hung during development, so this is the only check that LibreSprite reads the master).
 - [ ] No trails or ghosting while he blinks and dances (each frame fully replaces the previous one).
 - [ ] Right-click menu closes when you click elsewhere without choosing anything.
+- [ ] Cmd+H (Hide Jasper app): note whether he stays on screen while the app is hidden; the spec only requires hiding on minimize, so record the observed behaviour for a follow-up decision.
 
 Record findings and the date below.

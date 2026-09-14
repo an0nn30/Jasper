@@ -114,13 +114,22 @@ final class JasperApplication {
     private void syncBuddy() {
         if (quitting || stopped) return;
         if (!buddyUnavailable) {
-            if (buddyVisibility.shown()) {
-                if (buddy == null) {
-                    buddy = BuddyWindow.create(buddyStateFile, this::raiseTerminal, this::toggleBuddy);
-                    if (buddy == null) buddyUnavailable = true;
+            try {
+                if (buddyVisibility.shown()) {
+                    if (buddy == null) {
+                        buddy = BuddyWindow.create(buddyStateFile, this::raiseTerminal, this::toggleBuddy);
+                        if (buddy == null) buddyUnavailable = true;
+                    }
+                    if (buddy != null) buddy.show();
+                } else if (buddy != null) buddy.hide();
+            } catch (RuntimeException failure) {
+                buddyUnavailable = true;
+                if (buddy != null) {
+                    try { buddy.dispose(); } catch (RuntimeException ignored) { }
                 }
-                if (buddy != null) buddy.show();
-            } else if (buddy != null) buddy.hide();
+                buddy = null;
+                LOG.log(System.Logger.Level.WARNING, "Desk buddy disabled for this session", failure);
+            }
         }
         for (TerminalWindow window : List.copyOf(windows)) window.content().updateActions();
     }
