@@ -1,0 +1,199 @@
+package dev.jasper.app;
+
+import java.awt.AlphaComposite;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import java.awt.Insets;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.Window;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import javax.swing.JComponent;
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
+import javax.swing.JWindow;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
+
+/** The floating translucent utility window; every rule lives in the Buddy* helpers it drives. */
+final class BuddyWindow {
+    private static final System.Logger LOG = System.getLogger(BuddyWindow.class.getName());
+    private static final int SCALE = 2;
+    private static final int DRAG_THRESHOLD = 3;
+
+    private final JWindow window = new JWindow();
+    private final BuddySprite sprite;
+    private final BuddyAnimator animator = new BuddyAnimator(new Random());
+    private final Path stateFile;
+    private final Runnable raiseTerminal;
+    private final Runnable toggle;
+    private final Timer timer = new Timer(1, event -> tick());
+    private Point pressScreen;
+    private Point pressOrigin;
+    private boolean dragged;
+    private boolean disposed;
+
+    private BuddyWindow(BuddySprite sprite, Path stateFile, Runnable raiseTerminal, Runnable toggle) {
+        this.sprite = sprite; this.stateFile = stateFile; this.raiseTerminal = raiseTerminal; this.toggle = toggle;
+        timer.setRepeats(false);
+        window.setType(Window.Type.UTILITY);
+        window.setAlwaysOnTop(true);
+        window.setFocusableWindowState(false);
+        window.setBackground(new Color(0, 0, 0, 0));
+        JComponent canvas = new JComponent() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                try {
+                    g2.setComposite(AlphaComposite.Clear);
+                    g2.fillRect(0, 0, getWidth(), getHeight());
+                    g2.setComposite(AlphaComposite.SrcOver);
+                    sprite.paint(g2, animator.frame(), SCALE, 0, 0);
+                } finally { g2.dispose(); }
+            }
+        };
+        canvas.setOpaque(false);
+        Dimension size = BuddySprite.size(SCALE);
+        canvas.setPreferredSize(size);
+        window.setContentPane(canvas);
+        window.pack();
+        window.setSize(size);
+        window.setLocation(initialLocation(size));
+        MouseAdapter mouse = new MouseAdapter() {
+            @Override public void mouseEntered(MouseEvent event) { animator.hoverEntered(System.nanoTime()); paintAndSchedule(); }
+            @Override public void mousePressed(MouseEvent event) {
+                if (event.isPopupTrigger()) { popup(event); return; }
+                pressScreen = event.getLocationOnScreen(); pressOrigin = window.getLocation(); dragged = false;
+            }
+            @Override public void mouseDragged(MouseEvent event) {
+                if (pressScreen == null) return;
+                Point now = event.getLocationOnScreen();
+                int dx = now.x - pressScreen.x, dy = now.y - pressScreen.y;
+                if (!dragged && Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+                dragged = true;
+                window.setLocation(pressOrigin.x + dx, pressOrigin.y + dy);
+            }
+            @Override public void mouseReleased(MouseEvent event) {
+                if (event.isPopupTrigger()) { popup(event); pressScreen = null; return; }
+                if (pressScreen == null) return;
+                pressScreen = null;
+                if (dragged) save(window.getLocation());
+            }
+            @Override public void mouseClicked(MouseEvent event) {
+                // A macOS control-click is the popup trigger yet reports the left button; it must not raise.
+                if (SwingUtilities.isLeftMouseButton(event) && !event.isControlDown()
+                        && event.getClickCount() == 2 && !dragged) raiseTerminal.run();
+            }
+        };
+        canvas.addMouseListener(mouse);
+        canvas.addMouseMotionListener(mouse);
+    }
+
+    /** Null when headless or the toolkit lacks always-on-top or per-pixel translucency; logs once. */
+    static BuddyWindow create(Path stateFile, Runnable raiseTerminal, Runnable toggle) {
+        if (GraphicsEnvironment.isHeadless()) return null;
+        GraphicsDevice device = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        if (!Toolkit.getDefaultToolkit().isAlwaysOnTopSupported()
+                || !device.isWindowTranslucencySupported(GraphicsDevice.WindowTranslucency.PERPIXEL_TRANSLUCENT)) {
+            LOG.log(System.Logger.Level.WARNING, "Desk buddy disabled: the toolkit lacks always-on-top or per-pixel translucency");
+            return null;
+        }
+        BuddySprite sprite;
+        try { sprite = BuddySprite.load(); }
+        catch (IllegalStateException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Desk buddy disabled: sprite unavailable", failure);
+            return null;
+        }
+        return new BuddyWindow(sprite, stateFile, raiseTerminal, toggle);
+    }
+
+    void show() {
+        if (disposed || window.isVisible()) return;
+        animator.shown(System.nanoTime());
+        window.setVisible(true);
+        paintAndSchedule();
+    }
+
+    void hide() {
+        if (disposed) return;
+        timer.stop();
+        animator.hidden();
+        window.setVisible(false);
+    }
+
+    void dispose() {
+        if (disposed) return;
+        disposed = true;
+        timer.stop();
+        window.dispose();
+    }
+
+    private void tick() {
+        if (disposed || !window.isVisible()) return;
+        animator.tick(System.nanoTime());
+        paintAndSchedule();
+    }
+
+    private void paintAndSchedule() {
+        window.getContentPane().repaint();
+        timer.stop();
+        animator.nextDueNanos().ifPresent(due -> {
+            long millis = Math.max(1, (due - System.nanoTime()) / 1_000_000);
+            timer.setInitialDelay((int) Math.min(Integer.MAX_VALUE, millis));
+            timer.start();
+        });
+    }
+
+    private void popup(MouseEvent event) {
+        JPopupMenu menu = new JPopupMenu();
+        JMenuItem hide = new JMenuItem("Hide Jasper");
+        hide.addActionListener(ignored -> toggle.run());
+        menu.add(hide);
+        menu.show(event.getComponent(), event.getX(), event.getY());
+    }
+
+    private Point initialLocation(Dimension size) {
+        List<Rectangle> screens = usableScreens();
+        Rectangle primary = screens.isEmpty() ? new Rectangle(0, 0, 1280, 800) : screens.getFirst();
+        Point fallback = BuddyPlacement.defaultLocation(primary, size);
+        if (stateFile == null) return fallback;
+        try {
+            return BuddyStateFile.read(stateFile).map(saved -> BuddyPlacement.clamp(saved, screens, size)).orElse(fallback);
+        } catch (IOException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Ignoring unreadable buddy state " + stateFile, failure);
+            return fallback;
+        }
+    }
+
+    private void save(Point location) {
+        if (stateFile == null) return;
+        try { BuddyStateFile.write(stateFile, location); }
+        catch (IOException failure) { LOG.log(System.Logger.Level.WARNING, "Could not save buddy position to " + stateFile, failure); }
+    }
+
+    /** Default screen first, each reduced by its Dock/menu/taskbar insets. */
+    private static List<Rectangle> usableScreens() {
+        var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        var screens = new ArrayList<Rectangle>();
+        GraphicsDevice primary = environment.getDefaultScreenDevice();
+        for (GraphicsDevice device : environment.getScreenDevices()) {
+            var configuration = device.getDefaultConfiguration();
+            Rectangle bounds = new Rectangle(configuration.getBounds());
+            Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(configuration);
+            bounds.x += insets.left; bounds.y += insets.top;
+            bounds.width -= insets.left + insets.right; bounds.height -= insets.top + insets.bottom;
+            if (device == primary) screens.addFirst(bounds); else screens.add(bounds);
+        }
+        return screens;
+    }
+}

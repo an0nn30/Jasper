@@ -528,6 +528,20 @@ class ConfigurationControllerTest {
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
+    @Test void applicationSnapshotListenerReceivesTheCurrentAndEveryLaterSnapshot() throws Exception {
+        start("[buddy]\nenabled=false\n");
+        List<Boolean> seen = new ArrayList<>();
+        edt(() -> controller.onSnapshot(snapshot -> seen.add(snapshot.buddyEnabled())));
+        assertThat(seen).containsExactly(false);
+        reload("[buddy]\nenabled=true\n");
+        assertThat(seen).containsExactly(false, true);
+        reload("[buddy]\nenabled='no'\n"); // rejected: the last good snapshot is redelivered
+        assertThat(seen).containsExactly(false, true, true);
+        edt(() -> controller.onSnapshot(snapshot -> {})); // a later registration replaces the earlier listener
+        reload("[buddy]\nenabled=false\n");
+        assertThat(seen).containsExactly(false, true, true);
+    }
+
     @Test void applicationUsesTheServicesParsePlatformForSavedBindings() throws Exception {
         start("[keybindings]\nsplit_down='alt+cmd+shift+d'\n");
         edt(() -> {

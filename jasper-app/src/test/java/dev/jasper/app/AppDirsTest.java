@@ -52,4 +52,10 @@ class AppDirsTest {
 
         assertThat(dirs.commandHistory()).isEqualTo(root.resolve("command-history.toml"));
     }
+
+    @Test void buddyStateLivesBesideCommandHistory() {
+        AppDirs dirs = AppDirs.resolve("Mac OS X", Map.of(), Path.of("/Users/example"));
+        assertThat(dirs.buddyState())
+            .isEqualTo(Path.of("/Users/example/.config/jasper/buddy.toml"));
+    }
 }

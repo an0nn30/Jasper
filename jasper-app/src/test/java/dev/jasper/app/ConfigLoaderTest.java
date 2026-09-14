@@ -221,6 +221,20 @@ class ConfigLoaderTest {
             .contains(FILE.toString(), "Cannot read file.").doesNotContain(":0");
     }
 
+    @Test void buddyEnabledParsesAndRejectsNonBooleans() {
+        var off = parse("[buddy]\nenabled = false\n");
+        assertThat(off.rejected()).isFalse();
+        assertThat(off.diagnostics()).isEmpty();
+        assertThat(off.snapshot().buddyEnabled()).isFalse();
+        assertThat(ConfigSnapshot.defaults().buddyEnabled()).isTrue();
+        var bad = parse("[buddy]\nenabled = 1\n");
+        assertThat(bad.rejected()).isTrue();
+        assertThat(bad.snapshot().buddyEnabled()).isTrue();
+        assertDiagnostic(bad, "buddy.enabled", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        var unknown = parse("[buddy]\nvisible = true\n");
+        assertDiagnostic(unknown, "buddy.visible", 2, 1, ConfigDiagnostic.Severity.WARNING);
+    }
+
     private void assertDiagnostic(ConfigLoader.Result result, String key, int line, int column, ConfigDiagnostic.Severity severity) {
         assertThat(result.diagnostics()).filteredOn(d -> d.key().equals(key)).singleElement().satisfies(d -> {
             assertThat(d.file()).isEqualTo(FILE);

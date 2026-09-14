@@ -14,6 +14,7 @@ final class WindowChrome {
     private final JMenuBar menuBar = new JMenuBar();
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
+    private final JCheckBoxMenuItem buddyVisible = new JCheckBoxMenuItem("Show Jasper", false);
 
     WindowChrome(WindowContent owner) {
         this.owner = owner;
@@ -37,8 +38,9 @@ final class WindowChrome {
             item.setActionCommand(mode.name());
             toolbarModes.add(item); modes.add(item);
         }
-        view.addSeparator(); view.add(modes); view.add(statusVisible);
+        view.addSeparator(); view.add(modes); view.add(statusVisible); view.add(buddyVisible);
         statusVisible.setAction(owner.windowCommands().view("view.status_bar"));
+        buddyVisible.setAction(owner.windowCommands().view("view.buddy"));
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
         toolbar.add(new JToolBar.Separator());
         JButton split = addButton(ActionId.SPLIT_RIGHT, "columns-2");

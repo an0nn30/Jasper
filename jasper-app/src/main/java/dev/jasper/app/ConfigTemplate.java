@@ -38,6 +38,11 @@ final class ConfigTemplate {
             # lines = 45
             # Columns: 5-500; lines: 2-200. The window is clamped to the usable screen.
 
+            [buddy]
+            # Show the pixel-art Jasper floating above your windows while a terminal is open; updates live.
+            # View > Show Jasper and a right-click on Jasper toggle him for this session only.
+            # enabled = true
+
             [font]
             # Font family and ordered fallbacks update live. Missing fonts use JBR/system fallback.
             # family = "JetBrains Mono"
