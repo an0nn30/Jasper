@@ -8,7 +8,7 @@ Run the app from the `claude/desk-buddy` branch (`./gradlew :jasper-app:run`). T
 - [ ] Idle: he blinks every few seconds; roughly one blink in four is a wink.
 - [ ] Hover: he waves, hops and leans for about one second, then stands still; hovering again during the wave does nothing; hovering after it finished waves again.
 - [ ] Drag: he follows the pointer; after release, quit and relaunch — he reappears where you left him (`~/.config/jasper/buddy.toml` holds `x`/`y`).
-- [ ] Single click does nothing (beyond the wave) and does not bring Jasper's windows forward while another app is active. Double-click brings the most recently active Jasper window to the front with focus; the terminal keeps keyboard focus at all times.
+- [ ] Single click does nothing (beyond the wave). Double-click brings the most recently active Jasper window to the front with focus; the terminal keeps keyboard focus at all times.
 - [ ] Leave him alone: he sits after 20 s, tucks into his shell at 60 s and sleeps with Zs rising every 0.6 s; hovering pops him out, he stands, then waves.
 - [ ] Close the lid or sleep the Mac for a few minutes with him asleep: on wake he is still asleep and animating (no burst of catch-up frames).
 - [ ] Right-click → Hide Jasper hides him; View → Show Jasper shows him again and the checkbox reflects the state; Cmd+K "Show Jasper" also toggles.
