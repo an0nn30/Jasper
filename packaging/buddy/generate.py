@@ -20,7 +20,8 @@ PNG = ROOT / "jasper-app/src/main/resources/dev/jasper/app/buddy/jasper-buddy.pn
 ASE = HERE / "jasper-buddy.ase"
 
 W, H = 42, 48
-FRAMES = ["idle", "blink", "wink", "wave_a", "wave_b", "hop", "lean_left", "lean_right"]
+FRAMES = ["idle", "blink", "wink", "wave_a", "wave_b", "hop", "lean_left", "lean_right",
+          "sit", "sit_blink", "tuck", "sleep_a", "sleep_b", "sleep_c"]
 
 OUT = (0x33, 0x2F, 0x27, 255)
 SKIN = (0xA7, 0xAE, 0x70, 255)
@@ -73,16 +74,17 @@ LEGS = {
     "stand": [(12, 38, 18, 45), (23, 38, 29, 45)],
     "tuck": [(12, 38, 18, 43), (23, 38, 29, 43)],
     "kick": [(12, 38, 18, 45), (27, 36, 34, 42)],
+    # Sitting feet stick out sideways at the shell's foot; they keep their own place while the
+    # rest of the body drops by dy, so their outline stays off the bottom margin row.
+    "sit": [(5, 40, 13, 45), (28, 40, 36, 45)],
+    "none": [],
 }
+Z_SMALL = ("###", ".#.", "###")
+Z_BIG = ("#####", "...#.", "..#..", ".#...", "#####")
 
 
-def frame(eyes=("open", "open"), right_arm="down", left_arm="down", dy=0, lean=0, legs="stand"):
-    c = Image.new("RGBA", (W, H), CLEAR)
-    hx = lean
-    for box in LEGS[legs]:
-        part(c, ellipse(shift(box, 0, dy)), SKIN)
-    part(c, ellipse(shift(LEFT_ARM[left_arm], 0, dy)), SKIN)
-    part(c, ellipse(shift(RIGHT_ARM[right_arm], 0, dy)), SKIN)
+def shell(c, dy):
+    """Rim, belly, belly lines and the shaded rim row, lowered by dy."""
     part(c, ellipse(shift((8, 22, 33, 43), 0, dy)), RIM)
     part(c, ellipse(shift((12, 26, 29, 42), 0, dy)), BELLY)
     d = ImageDraw.Draw(c)
@@ -92,6 +94,11 @@ def frame(eyes=("open", "open"), right_arm="down", left_arm="down", dy=0, lean=0
     for x in range(11, 31):
         if c.getpixel((x, 42 + dy)) == RIM:
             c.putpixel((x, 42 + dy), RIM_LO)
+
+
+def head(c, eyes, hx, dy):
+    """Neck, skull, highlight, glasses, eyes and mouth, moved by hx/dy."""
+    d = ImageDraw.Draw(c)
     part(c, rect(shift((17, 20, 24, 25), hx, dy)), SKIN)
     part(c, ellipse(shift((6, 2, 35, 23), hx, dy)), SKIN)
     put(c, [(x + hx, y + dy) for x, y in [(12, 3), (13, 3), (14, 2), (15, 2), (16, 2), (17, 2), (11, 4), (10, 5)]], SKIN_HI)
@@ -108,10 +115,38 @@ def frame(eyes=("open", "open"), right_arm="down", left_arm="down", dy=0, lean=0
     put(c, [(17 + hx, 20 + dy), (24 + hx, 20 + dy)], OUT)
     put(c, [(x + hx, y + dy) for x, y in
             [(15, 20), (16, 21), (17, 22), (18, 22), (19, 22), (20, 22), (21, 22), (22, 22), (23, 22), (24, 22), (25, 21), (26, 20)]], OUT)
+
+
+def glyph(c, rows, x, y):
+    put(c, [(x + gx, y + gy) for gy, row in enumerate(rows) for gx, cell in enumerate(row) if cell == "#"], OUT)
+
+
+def frame(eyes=("open", "open"), right_arm="down", left_arm="down", dy=0, lean=0, legs="stand",
+          arms=True, head_at="after", head_dy=None, shell_dy=None, z_glyphs=()):
+    """One 42x48 cell. head_at picks "before"/"after" the shell or "none"; head_dy and
+    shell_dy override the body offset dy for the tucked poses; z_glyphs adds sleep Zs."""
+    c = Image.new("RGBA", (W, H), CLEAR)
+    hx = lean
+    hdy = dy if head_dy is None else head_dy
+    sdy = dy if shell_dy is None else shell_dy
+    leg_dy = 0 if legs == "sit" else dy
+    for box in LEGS[legs]:
+        part(c, ellipse(shift(box, 0, leg_dy)), SKIN)
+    if arms:
+        part(c, ellipse(shift(LEFT_ARM[left_arm], 0, dy)), SKIN)
+        part(c, ellipse(shift(RIGHT_ARM[right_arm], 0, dy)), SKIN)
+    if head_at == "before":
+        head(c, eyes, hx, hdy)
+    shell(c, sdy)
+    if head_at == "after":
+        head(c, eyes, hx, hdy)
+    for rows, x, y in z_glyphs:
+        glyph(c, rows, x, y)
     return c
 
 
 def frames():
+    shell_only = dict(legs="none", arms=False, head_at="none", shell_dy=2)
     return [
         frame(),
         frame(eyes=("shut", "shut")),
@@ -121,6 +156,12 @@ def frames():
         frame(dy=-1, legs="tuck", left_arm="out", right_arm="out"),
         frame(lean=-1, legs="kick", right_arm="up"),
         frame(lean=1, left_arm="up"),
+        frame(dy=1, legs="sit"),
+        frame(dy=1, legs="sit", eyes=("shut", "shut")),
+        frame(legs="none", arms=False, head_at="before", head_dy=5, shell_dy=2),
+        frame(z_glyphs=[(Z_BIG, 22, 13), (Z_SMALL, 28, 6)], **shell_only),
+        frame(z_glyphs=[(Z_BIG, 23, 9), (Z_SMALL, 29, 3)], **shell_only),
+        frame(z_glyphs=[(Z_BIG, 24, 5), (Z_SMALL, 28, 15)], **shell_only),
     ]
 
 

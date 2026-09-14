@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BuddySpriteTest {
-    @Test void committedSheetHasEightOpaqueFramesInsideATransparentMargin() {
+    @Test void committedSheetHasFourteenOpaqueFramesInsideATransparentMargin() {
         BuddySprite sprite = BuddySprite.load();
         for (BuddyFrame frame : BuddyFrame.values()) {
             BufferedImage image = sprite.frame(frame);
@@ -28,6 +28,7 @@ class BuddySpriteTest {
                 assertThat(image.getRGB(x, image.getHeight() - 1) >>> 24).as("%s bottom margin column %d", frame, x).isZero();
         }
         assertThat(BuddyFrame.HOP.column()).isEqualTo(5);
+        assertThat(BuddyFrame.SLEEP_C.column()).isEqualTo(13);
         assertThat(BuddySprite.size(2)).isEqualTo(new Dimension(84, 96));
     }
 
@@ -58,7 +59,27 @@ class BuddySpriteTest {
 
     @Test void wrongSheetDimensionsAreRejected() {
         assertThatThrownBy(() -> new BuddySprite(new BufferedImage(42, 48, BufferedImage.TYPE_INT_ARGB)))
-            .isInstanceOf(IllegalStateException.class).hasMessageContaining("336");
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("588");
+    }
+
+    @Test void sleepFramesDifferFromEachOtherAndFromIdle() {
+        BuddySprite sprite = BuddySprite.load();
+        int[] a = pixels(sprite.frame(BuddyFrame.SLEEP_A));
+        int[] b = pixels(sprite.frame(BuddyFrame.SLEEP_B));
+        int[] c = pixels(sprite.frame(BuddyFrame.SLEEP_C));
+        assertThat(a).isNotEqualTo(b);
+        assertThat(b).isNotEqualTo(c);
+        assertThat(a).isNotEqualTo(c);
+        assertThat(a).isNotEqualTo(pixels(sprite.frame(BuddyFrame.IDLE)));
+        assertThat(pixels(sprite.frame(BuddyFrame.TUCK))).isNotEqualTo(a);
+    }
+
+    @Test void sitFramesDifferFromStanding() {
+        BuddySprite sprite = BuddySprite.load();
+        int[] sit = pixels(sprite.frame(BuddyFrame.SIT));
+        assertThat(sit).isNotEqualTo(pixels(sprite.frame(BuddyFrame.IDLE)));
+        assertThat(sit).isNotEqualTo(pixels(sprite.frame(BuddyFrame.SIT_BLINK)));
+        assertThat(pixels(sprite.frame(BuddyFrame.SIT_BLINK))).isNotEqualTo(pixels(sprite.frame(BuddyFrame.BLINK)));
     }
 
     private static int[] pixels(BufferedImage image) {

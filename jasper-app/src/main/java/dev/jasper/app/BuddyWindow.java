@@ -71,7 +71,6 @@ final class BuddyWindow {
         window.setLocation(initialLocation(size));
         MouseAdapter mouse = new MouseAdapter() {
             @Override public void mouseEntered(MouseEvent event) { animator.hoverEntered(System.nanoTime()); paintAndSchedule(); }
-            @Override public void mouseExited(MouseEvent event) { animator.hoverExited(System.nanoTime()); }
             @Override public void mousePressed(MouseEvent event) {
                 if (event.isPopupTrigger()) { popup(event); return; }
                 pressScreen = event.getLocationOnScreen(); pressOrigin = window.getLocation(); dragged = false;
@@ -89,7 +88,9 @@ final class BuddyWindow {
                 if (pressScreen == null) return;
                 pressScreen = null;
                 if (dragged) save(window.getLocation());
-                else if (SwingUtilities.isLeftMouseButton(event)) raiseTerminal.run();
+            }
+            @Override public void mouseClicked(MouseEvent event) {
+                if (SwingUtilities.isLeftMouseButton(event) && event.getClickCount() == 2 && !dragged) raiseTerminal.run();
             }
         };
         canvas.addMouseListener(mouse);
