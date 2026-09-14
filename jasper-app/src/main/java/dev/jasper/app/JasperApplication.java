@@ -15,6 +15,8 @@ import javax.swing.SwingUtilities;
 /** Application-level window and shell ownership; closing a window never exits sibling windows. */
 final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
+    /** Upper bound on waiting for closed shells and the history file before the JVM is terminated. */
+    private static final long EXIT_GRACE_MILLIS = 2_000;
     private final ThemeController themes = new ThemeController();
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     private final ExecutorService launches = Executors.newThreadPerTaskExecutor(
@@ -25,6 +27,8 @@ final class JasperApplication {
     private boolean stopped;
     private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
+    private final Runnable terminate;
+    private final Set<TerminalSession> sessions = ConcurrentHashMap.newKeySet();
     private final BuddyVisibility buddyVisibility = new BuddyVisibility();
     private final Path buddyStateFile;
     private BuddyWindow buddy;
@@ -44,11 +48,20 @@ final class JasperApplication {
         this(service, suppliedLauncher, history, null);
     }
 
-    /** {@code buddyStateFile} may be null: the buddy then starts in the default corner and forgets drags. */
     JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile) {
+        this(service, suppliedLauncher, history, buddyStateFile, () -> {});
+    }
+
+    /**
+     * {@code buddyStateFile} may be null: the buddy then starts in the default corner and forgets drags.
+     * {@code terminate} runs once, off the EDT, after shutdown's bounded cleanup; production passes the JVM exit.
+     */
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate) {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         this.buddyStateFile = buddyStateFile;
+        this.terminate = terminate;
         configuration = service == null ? null : new ConfigurationController(themes, service);
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddyVisibility.configure(snapshot.buddyEnabled()); syncBuddy();
@@ -62,7 +75,8 @@ final class JasperApplication {
     TerminalWindow newWindow(Path directory) {
         if (quitting) return null;
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
-            configuration == null ? ConfigSnapshot::defaults : configuration::snapshot, JasperApplication::startSession);
+            configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
+            (path, settings) -> track(startSession(path, settings)));
         TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history);
         windows.add(window); window.show();
         return window;
@@ -83,6 +97,13 @@ final class JasperApplication {
             LOG.log(System.Logger.Level.ERROR, "Shell launch failed", failure);
             throw new UncheckedIOException(failure);
         }
+    }
+
+    /** Remembers a shell so shutdown can wait for it to leave before terminating the JVM. */
+    TerminalSession track(TerminalSession session) {
+        sessions.add(session);
+        session.exitFuture().whenComplete((code, error) -> sessions.remove(session));
+        return session;
     }
 
     void windowClosed(TerminalWindow window) {
@@ -157,6 +178,18 @@ final class JasperApplication {
         history.close();
         if (configuration != null) configuration.close();
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler(null);
+        // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
+        long started = System.nanoTime();
+        List<CompletableFuture<?>> pending = new ArrayList<>();
+        pending.add(history.closedFuture());
+        for (TerminalSession session : List.copyOf(sessions)) pending.add(session.exitFuture());
+        CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new))
+            .orTimeout(EXIT_GRACE_MILLIS, TimeUnit.MILLISECONDS)
+            .whenComplete((ignored, failure) -> Thread.ofPlatform().name("jasper-exit").start(() -> {
+                LOG.log(System.Logger.Level.INFO, "Shutdown finished in " + (System.nanoTime() - started) / 1_000_000
+                    + " ms" + (failure == null ? "" : " (cleanup timed out)"));
+                terminate.run();
+            }));
     }
 
     private static boolean supportsNativeQuit() {
