@@ -1,5 +1,7 @@
 # Jasper — Phase 1: The Terminal — Design Spec
 
+> Visual amendment, 2026-09-14: the user requested standard Java Swing controls and default colors, a normal OS title bar, ordinary tabs below the toolbar, classic GNOME 2 icons, and a white-on-black terminal. This supersedes previous FlatLaf, coordinated theme, custom title-bar, tab-motion and custom tab-height requirements. `ui.laf` selects a Java built-in look and feel independently of terminal colors; see [configuration](../../configuration.md). App/session behavior remains unchanged.
+
 > Visual amendment, 2026-09-11: the user's supplied screenshot and [mock UI design](2026-09-11-jasper-mock-ui-design.md) supersede earlier title/tab/toolbar geometry and app font defaults. Terminal-library defaults and behavior remain unchanged except the coordinated dark background specified there.
 
 > Tab follow-up amendment, 2026-09-11: the user requested a shorter configurable title/tab row, quick entry/underline motion, and Cmd/Ctrl tab navigation. The [tab motion design](2026-09-11-jasper-tab-motion-design.md) supersedes the fixed mock height and tab-specific defaults below: numbered tabs use Cmd on Mac / plain Ctrl elsewhere; previous/next use that modifier plus Shift+[ / ]. Unrelated `cmd` shortcut semantics remain unchanged.

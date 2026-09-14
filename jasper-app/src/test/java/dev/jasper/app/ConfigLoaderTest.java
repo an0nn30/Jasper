@@ -54,7 +54,8 @@ class ConfigLoaderTest {
             new_tab = "none"
             """);
         assertThat(result.rejected()).isFalse();
-        assertThat(result.diagnostics()).isEmpty();
+        assertThat(result.diagnostics()).hasSize(2).allSatisfy(d ->
+            assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING));
         var state = result.snapshot();
         assertThat(state.tabHeight()).isEqualTo(44);
         assertThat(state.toolbar()).isEqualTo(WindowContent.ToolbarMode.ICONS);
@@ -142,7 +143,7 @@ class ConfigLoaderTest {
         assertThat(result.rejected()).isFalse();
         assertThat(result.snapshot().tabHeight()).isEqualTo(44);
         assertThat(result.snapshot().keybindings()).isEmpty();
-        assertThat(result.diagnostics()).hasSize(4);
+        assertThat(result.diagnostics()).hasSize(5);
         assertDiagnostic(result, "window.future", 3, 1, ConfigDiagnostic.Severity.WARNING);
         assertDiagnostic(result, "font.future_font", 5, 1, ConfigDiagnostic.Severity.WARNING);
         assertDiagnostic(result, "unknown", 6, 1, ConfigDiagnostic.Severity.WARNING);
@@ -154,7 +155,7 @@ class ConfigLoaderTest {
         var result = parse("\"window.tab_height\"=60\nwindow.\"tab.height\"=61\nwindow.tab_height=44");
         assertThat(result.rejected()).isFalse();
         assertThat(result.snapshot().tabHeight()).isEqualTo(44);
-        assertThat(result.diagnostics()).hasSize(2);
+        assertThat(result.diagnostics()).hasSize(3);
         assertDiagnostic(result, "\"window.tab_height\"", 1, 1, ConfigDiagnostic.Severity.WARNING);
         assertDiagnostic(result, "window.\"tab.height\"", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }

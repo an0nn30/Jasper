@@ -1,6 +1,5 @@
 package dev.jasper.app;
 
-import com.formdev.flatlaf.util.UIScale;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.List;
@@ -193,23 +192,10 @@ final class WindowCommandPalette implements AutoCloseable {
             if (root == null || !SwingUtilities.isDescendingFrom(owner, root.getLayeredPane())) return;
             Rectangle terminal = SwingUtilities.convertRectangle(owner.tabStrip().getParent(), owner.tabStrip().getBounds(), this);
             Rectangle available = terminal;
-            if (terminal.height < palette.getPreferredSize().height + UIScale.scale(32))
+            if (terminal.height < palette.getPreferredSize().height + 32)
                 available = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this);
-            palette.setBounds(positioned(terminal, palette.getPreferredSize(), available, UIScale.scale(16)));
+            palette.setBounds(positioned(terminal, palette.getPreferredSize(), available, 16));
         }
-        @Override protected void paintComponent(Graphics graphics) {
-            if (!open) return;
-            var g = (Graphics2D) graphics.create();
-            try {
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                Rectangle card = palette.getBounds();
-                g.setColor(new Color(0, 0, 0, owner.theme().chrome() == BuiltinTheme.LIGHT ? 2 : 4));
-                for (int i = 12; i >= 1; i--) {
-                    int expansion = UIScale.scale(i), arc = UIScale.scale(24) + expansion * 2;
-                    g.fillRoundRect(card.x - expansion, card.y - expansion, card.width + expansion * 2,
-                        card.height + expansion * 2, arc, arc);
-                }
-            } finally { g.dispose(); }
-        }
+
     }
 }

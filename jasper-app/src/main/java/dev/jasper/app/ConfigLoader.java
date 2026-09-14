@@ -29,7 +29,8 @@ final class ConfigLoader {
     }
 
     private static final Map<List<String>, Set<String>> FIELDS = Map.of(
-        List.of(), Set.of("window", "font", "colors", "keybindings", "terminal"),
+        List.of(), Set.of("window", "font", "colors", "keybindings", "terminal", "ui"),
+        List.of("ui"), Set.of("laf"),
         List.of("window"), Set.of("tab_height", "toolbar", "status_bar", "columns", "lines"),
         List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height"),
         List.of("colors"), Set.of("theme", "appearance"),
@@ -46,6 +47,7 @@ final class ConfigLoader {
     private int tabHeight = 38;
     private WindowContent.ToolbarMode toolbar = WindowContent.ToolbarMode.ICONS_AND_LABELS;
     private boolean statusBar = true;
+    private UiLookAndFeel laf = UiLookAndFeel.MOTIF;
     private int columns = 150;
     private int lines = 45;
     private String fontFamily = FontConfig.defaults().family();
@@ -96,7 +98,7 @@ final class ConfigLoader {
         var snapshot = new ConfigSnapshot(tabHeight, toolbar, statusBar,
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), colors, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
-                cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit));
+                cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit), laf);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -125,7 +127,12 @@ final class ConfigLoader {
     }
 
     private void readField(String name, List<String> path, Object value) {
+        int diagnosticCount = diagnostics.size();
         switch (name) {
+            case "ui.laf" -> laf = choice(path, value, Map.of(
+                "metal", UiLookAndFeel.METAL, "nimbus", UiLookAndFeel.NIMBUS, "motif", UiLookAndFeel.MOTIF,
+                "system", UiLookAndFeel.SYSTEM, "aqua", UiLookAndFeel.AQUA, "windows", UiLookAndFeel.WINDOWS,
+                "windows-classic", UiLookAndFeel.WINDOWS_CLASSIC, "gtk", UiLookAndFeel.GTK), laf);
             case "window.tab_height" -> tabHeight = integer(path, value, 28, 72, tabHeight);
             case "window.columns" -> columns = integer(path, value, 5, 500, columns);
             case "window.lines" -> lines = integer(path, value, 2, 200, lines);
@@ -161,6 +168,10 @@ final class ConfigLoader {
                 "keep_open", ShellExitBehavior.KEEP_OPEN, "close_on_success", ShellExitBehavior.CLOSE_ON_SUCCESS,
                 "close", ShellExitBehavior.CLOSE), onExit);
             default -> throw new IllegalStateException("Unrecognized validated field.");
+        }
+        if (diagnostics.size() == diagnosticCount &&
+            (name.equals("window.tab_height") || name.startsWith("colors."))) {
+            warning(path, "Deprecated setting; no longer affects appearance. Use ui.laf for Swing controls.");
         }
     }
 

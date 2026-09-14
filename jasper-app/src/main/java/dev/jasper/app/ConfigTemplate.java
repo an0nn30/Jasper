@@ -20,9 +20,14 @@ final class ConfigTemplate {
             # Reload Config forces a fresh read.
             # Invalid syntax or types keep the last valid settings; diagnostics explain errors.
 
+            [ui]
+            # Java built-in look and feel; updates all open windows live.
+            # Choices: metal, nimbus, motif, system, aqua, windows, windows-classic, gtk.
+            # Aqua requires macOS; Windows variants require Windows; GTK requires Linux with GTK.
+            # Unavailable choices show a warning and use Metal. System uses the runtime platform default.
+            # laf = "motif"
+
             [window]
-            # Tab height in logical pixels, 28-72; updates all open windows live.
-            # tab_height = 38
             # Toolbar: "icons_and_labels", "icons", or "hidden"; updates live.
             # toolbar = "icons_and_labels"
             # Show the status bar; updates live.
@@ -43,7 +48,7 @@ final class ConfigTemplate {
             # line_height = 1.0
             # Font size in points, 6-72; changes update all panes live.
             # Reset Font Size restores this saved default.
-            # Temporary size/appearance choices survive reloads until their respective saved value changes.
+            # Temporary size choices survive reloads until their saved value changes.
             # size = 16.0
 
             [terminal]
@@ -86,14 +91,6 @@ final class ConfigTemplate {
             # en_US.UTF-8 only when absent or blank; LC_* values are preserved. TERM and COLORTERM
             # remain reserved and are always forced to xterm-256color and truecolor.
             # This table does not change which default login shell is selected.
-
-            [colors]
-            # System switches both chrome and the built-in palette; custom palettes stay fixed.
-            appearance = "system"
-            # Built-ins: jasper-dark-purple (default), jasper-dark (classic), jasper-light.
-            # A custom basename is loaded from themes/.
-            theme = "jasper-dark-purple"
-            # theme = "my-theme.toml"
 
             [keybindings]
             # Shortcuts update live. Use "none" to disable an action; shortcuts must be unique.

@@ -28,20 +28,17 @@ final class JasperApplication {
 
     JasperApplication() { this(null); }
 
-    JasperApplication(ConfigService service) { this(service, SystemAppearance.fixed(BuiltinTheme.DARK)); }
-
-    JasperApplication(ConfigService service, SystemAppearance source) { this(service, source, null); }
+    JasperApplication(ConfigService service) { this(service, null); }
 
     /** Isolated launch ownership for controlled tools; production still resolves captured settings. */
-    JasperApplication(ConfigService service, SystemAppearance source, ShellLauncher suppliedLauncher) {
-        this(service, source, suppliedLauncher, new CommandHistory());
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher) {
+        this(service, suppliedLauncher, new CommandHistory());
     }
 
-    JasperApplication(ConfigService service, SystemAppearance source, ShellLauncher suppliedLauncher, CommandHistory history) {
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history) {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
-        configuration = service == null ? null : new ConfigurationController(themes, service, source);
-        if (service == null) source.close();
+        configuration = service == null ? null : new ConfigurationController(themes, service);
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler((event, response) -> {
             // Cancel the native immediate JVM exit; pane close owns bounded child cleanup.
             response.cancelQuit(); SwingUtilities.invokeLater(this::quit);

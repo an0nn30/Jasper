@@ -12,7 +12,6 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -37,13 +36,10 @@ final class ConfigService implements AutoCloseable {
         }
 
         State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present) {
-            this(snapshot, diagnostics, file, present, seed(snapshot));
+            this(snapshot, diagnostics, file, present, Palette.jasperDark());
         }
 
-        private static Palette seed(ConfigSnapshot snapshot) {
-            BuiltinTheme builtin = BuiltinTheme.fromId(snapshot.colors().theme());
-            return builtin == null ? Palette.jasperDarkPurple() : builtin.palette();
-        }
+
     }
 
     private record Fingerprint(boolean present, FileTime modified, long size) { }
@@ -51,7 +47,6 @@ final class ConfigService implements AutoCloseable {
     private static final Fingerprint MISSING = new Fingerprint(false, null, 0);
 
     private final Path file;
-    private final ThemeFiles themeFiles;
     private final boolean macOs;
     private final ScheduledExecutorService worker;
     private final Consumer<Runnable> publisher;
@@ -84,12 +79,12 @@ final class ConfigService implements AutoCloseable {
                   Consumer<Runnable> publisher) {
         requireOffEdt();
         this.file = Objects.requireNonNull(file, "file");
-        this.themeFiles = new ThemeFiles(Objects.requireNonNull(themes, "themes"));
+        Objects.requireNonNull(themes, "themes"); // Retained constructor compatibility; theme files are unused.
         this.macOs = macOs;
         this.worker = Objects.requireNonNull(worker, "worker");
         this.publisher = Objects.requireNonNull(publisher, "publisher");
         lastConfig = readState(ConfigSnapshot.defaults(), true);
-        initialState = join(lastConfig, true);
+        initialState = lastConfig;
         state = initialState;
     }
 
@@ -131,7 +126,7 @@ final class ConfigService implements AutoCloseable {
             if (closed) return state;
         }
         lastConfig = readState(lastConfig.snapshot(), force);
-        State next = join(lastConfig, force);
+        State next = lastConfig;
         synchronized (lifecycle) {
             if (!closed && (publishUnchanged || !next.equals(state))) {
                 state = next;
@@ -191,13 +186,6 @@ final class ConfigService implements AutoCloseable {
         }
         fingerprint = MISSING;
         return new State(ConfigSnapshot.defaults(), List.of(), file, false);
-    }
-
-    private State join(State config, boolean force) {
-        ThemeFiles.Result selected = themeFiles.refresh(config.snapshot().colors(), force);
-        var diagnostics = new ArrayList<>(config.diagnostics());
-        diagnostics.addAll(selected.diagnostics());
-        return new State(config.snapshot(), diagnostics, config.file(), config.present(), selected.palette());
     }
 
     private State readError(ConfigSnapshot lastGood, String message) {

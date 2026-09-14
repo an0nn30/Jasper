@@ -1,19 +1,26 @@
 package dev.jasper.app;
 
-import com.formdev.flatlaf.ui.FlatTabbedPaneUI;
-import java.awt.Insets;
+import java.awt.Point;
+import java.awt.event.MouseEvent;
+import java.util.function.Consumer;
 import javax.swing.JTabbedPane;
+import javax.swing.SwingUtilities;
 
-/** Retains Swing's selection/content model; WindowTabs owns the only visible tab row. */
+/** Standard Swing tabs, with the active look and feel's own layout and painting. */
 final class TerminalDeck extends JTabbedPane {
-    TerminalDeck() { super(TOP, WRAP_TAB_LAYOUT); }
+    Consumer<Point> onMiddleClick = point -> {};
 
-    @Override public void updateUI() {
-        setUI(new FlatTabbedPaneUI() {
-            @Override protected boolean hideTabArea() { return true; }
-            @Override protected Insets getTabAreaInsets(int placement) { return new Insets(0, 0, 0, 0); }
-        });
-        putClientProperty("JTabbedPane.hasFullBorder", false);
-        putClientProperty("JTabbedPane.tabAreaInsets", new Insets(0, 0, 0, 0));
+    TerminalDeck() {
+        super(TOP, SCROLL_TAB_LAYOUT); setName("windowTabs");
+        setRequestFocusEnabled(false); setFocusable(false);
+    }
+
+    @Override protected void processMouseEvent(MouseEvent event) {
+        // BasicTabbedPaneUI also selects on middle press. Close without changing selection first.
+        if (SwingUtilities.isMiddleMouseButton(event)) {
+            if (event.getID() == MouseEvent.MOUSE_PRESSED) onMiddleClick.accept(event.getPoint());
+            return;
+        }
+        super.processMouseEvent(event);
     }
 }

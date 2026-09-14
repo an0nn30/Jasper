@@ -5,13 +5,6 @@ plugins {
 dependencies {
     implementation(project(":jasper-terminal"))
     implementation("org.tomlj:tomlj:1.1.1")
-    implementation("com.formdev:flatlaf:3.7")
-    implementation("org.jetbrains.runtime:jbr-api:1.9.0")
-    implementation("com.formdev:flatlaf-extras:3.7")
-    implementation("com.github.Dansoftowner:jSystemThemeDetector:3.9.1") {
-        // pty4j already supplies newer JNA modules; the detector's old JPMS variant is unpublished.
-        exclude(group = "net.java.dev.jna")
-    }
     runtimeOnly("org.slf4j:slf4j-nop:2.0.13")
 }
 
@@ -65,9 +58,6 @@ for ((taskName, entryPoint) in listOf(
         classpath = sourceSets["test"].runtimeClasspath
         mainClass = "dev.jasper.app.$entryPoint"
         jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
-        providers.gradleProperty("jasper.uiScale").orNull?.let {
-            systemProperty("flatlaf.uiScale", it)
-        }
     }
 }
 

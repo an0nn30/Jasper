@@ -1,6 +1,5 @@
 package dev.jasper.app;
 
-import com.formdev.flatlaf.util.UIScale;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
@@ -49,8 +48,7 @@ class CommandPaletteTest {
             assertThat(hasInputBinding(palette.queryField(), DefaultEditorKit.pasteAction)).isTrue();
             assertThat(palette.queryField().getAccessibleContext().getAccessibleName()).isEqualTo("Search commands");
             assertThat(palette.resultList().getAccessibleContext().getAccessibleName()).isEqualTo("Commands");
-            assertThat(palette.queryField().getClientProperty("JTextField.placeholderText"))
-                .isEqualTo("Type a command\u2026");
+            assertThat(palette.queryField().getToolTipText()).isEqualTo("Type a command");
         });
     }
 
@@ -125,7 +123,7 @@ class CommandPaletteTest {
             var selected = command("test.selected", "Selected");
             var palette = new CommandPalette(false, query -> {}, command -> {}, () -> {});
             palette.setResults(List.of(first, second, third, fourth, selected), false, null);
-            palette.setSize(UIScale.scale(318), UIScale.scale(140));
+            palette.setSize(318, 140);
             layoutTree(palette);
 
             palette.selectRelative(4);
@@ -160,9 +158,9 @@ class CommandPaletteTest {
 
             Rectangle firstBounds = palette.resultList().getCellBounds(0, 0);
             Rectangle secondBounds = palette.resultList().getCellBounds(1, 1);
-            assertThat(firstBounds.height).isEqualTo(UIScale.scale(40));
-            assertThat(secondBounds).isEqualTo(new Rectangle(0, UIScale.scale(40),
-                palette.resultList().getWidth(), UIScale.scale(40)));
+            assertThat(firstBounds.height).isEqualTo(40);
+            assertThat(secondBounds).isEqualTo(new Rectangle(0, 40,
+                palette.resultList().getWidth(), 40));
 
             // BasicListUI asks the native toolkit for the platform menu mask on mouse press.
             // Remove only that delegate listener so this component-level hit test stays headless.
@@ -170,8 +168,8 @@ class CommandPaletteTest {
                 .filter(listener -> listener.getClass().getName().startsWith("javax.swing.plaf."))
                 .forEach(palette.resultList()::removeMouseListener);
             palette.resultList().dispatchEvent(mousePress(palette.resultList(), secondBounds.x + 4, secondBounds.y + 4));
-            palette.resultList().setSize(palette.resultList().getWidth(), UIScale.scale(120));
-            palette.resultList().dispatchEvent(mousePress(palette.resultList(), 4, UIScale.scale(100)));
+            palette.resultList().setSize(palette.resultList().getWidth(), 120);
+            palette.resultList().dispatchEvent(mousePress(palette.resultList(), 4, 100));
             assertThat(executed).containsExactly("test.second");
         });
     }
@@ -193,7 +191,7 @@ class CommandPaletteTest {
 
     @Test void geometryPaintingAndThemeRefreshKeepInputAndSelection() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            ThemeController.install(BuiltinTheme.DARK);
+            new ThemeController().selectLaf(UiLookAndFeel.METAL);
             var first = command("test.first", "First");
             var second = command("test.second", "Second");
             var palette = new CommandPalette(true, query -> {}, command -> {}, () -> {});
@@ -202,34 +200,53 @@ class CommandPaletteTest {
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
 
-            assertThat(palette.getPreferredSize().width).isEqualTo(UIScale.scale(560));
-            assertThat(palette.queryField().getParent().getHeight()).isEqualTo(UIScale.scale(56));
-            assertThat(palette.resultList().getFixedCellHeight()).isEqualTo(UIScale.scale(40));
+            assertThat(palette.getPreferredSize().width).isEqualTo(560);
+            assertThat(palette.queryField().getParent().getHeight()).isEqualTo(56);
+            assertThat(palette.resultList().getFixedCellHeight()).isEqualTo(40);
             assertThat(palette.resultList().getFont().getFamily())
                 .isEqualTo(UIManager.getFont("Label.font").getFamily());
-            assertThat(palette.isOpaque()).isFalse();
+            assertThat(palette.isOpaque()).isTrue();
 
             var image = new BufferedImage(palette.getWidth(), palette.getHeight(), BufferedImage.TYPE_INT_ARGB);
             var graphics = image.createGraphics();
             palette.paint(graphics);
             graphics.dispose();
-            assertThat(new Color(image.getRGB(0, 0), true).getAlpha()).isZero();
-            assertThat(new Color(image.getRGB(palette.getWidth() / 2, UIScale.scale(10)), true))
-                .isEqualTo(UIManager.getColor("Jasper.paletteBackground"));
+            assertThat(new Color(image.getRGB(0, 0), true).getAlpha()).isEqualTo(255);
+            assertThat(new Color(image.getRGB(palette.getWidth() / 2, 3), true))
+                .isEqualTo(UIManager.getColor("Panel.background"));
 
-            for (BuiltinTheme theme : BuiltinTheme.values()) {
-                ThemeController.install(theme);
-                for (String key : List.of("Jasper.paletteBackground", "Jasper.paletteForeground",
-                    "Jasper.paletteMutedForeground", "Jasper.paletteBorder", "Jasper.paletteAccent",
-                    "Jasper.paletteSelectionBackground", "Jasper.paletteSelectionForeground")) {
-                    assertThat(UIManager.getColor(key)).as(theme + " " + key).isNotNull();
-                }
+            for (UiLookAndFeel theme : List.of(UiLookAndFeel.METAL, UiLookAndFeel.NIMBUS)) {
+                new ThemeController().selectLaf(theme);
+                SwingUtilities.updateComponentTreeUI(palette);
                 palette.refreshTheme();
-                assertThat(palette.getBackground()).isEqualTo(UIManager.getColor("Jasper.paletteBackground"));
+                assertThat(palette.getBackground()).isEqualTo(UIManager.getColor("Panel.background"));
+                assertThat(palette.resultList().getSelectionBackground()).isNotNull()
+                    .isNotEqualTo(palette.resultList().getBackground());
+                assertThat(palette.resultList().getSelectionForeground()).isNotNull();
                 assertThat(palette.queryField().getText()).isEqualTo("fir");
                 assertThat(palette.resultList().getSelectedValue()).isSameAs(second);
             }
-            ThemeController.install(BuiltinTheme.DARK);
+            new ThemeController().selectLaf(UiLookAndFeel.METAL);
+        });
+    }
+
+    @Test void standardLookAndFeelSelectionIsVisibleOnFirstRendererPaint() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            for (UiLookAndFeel theme : List.of(UiLookAndFeel.METAL, UiLookAndFeel.NIMBUS)) {
+                new ThemeController().selectLaf(theme);
+                var palette = new CommandPalette(false, query -> {}, selected -> {}, () -> {});
+                var command = command("test.selection", "Selected command");
+                Component rendered = palette.resultList().getCellRenderer().getListCellRendererComponent(
+                    palette.resultList(), command, 0, true, false);
+                rendered.setSize(320, 40);
+                var image = new BufferedImage(320, 40, BufferedImage.TYPE_INT_ARGB);
+                var graphics = image.createGraphics();
+                rendered.paint(graphics);
+                graphics.dispose();
+                assertThat(new Color(image.getRGB(2, 2))).as(theme + " selected row")
+                    .isEqualTo(new Color(palette.resultList().getSelectionBackground().getRGB()));
+            }
+            new ThemeController().selectLaf(UiLookAndFeel.METAL);
         });
     }
 
@@ -257,11 +274,11 @@ class CommandPaletteTest {
             var command = new Command("test.long", action, List.of());
             var palette = new CommandPalette(false, query -> {}, selected -> {}, () -> {});
             palette.setResults(List.of(command), false, null);
-            palette.resultList().setSize(UIScale.scale(320), UIScale.scale(40));
+            palette.resultList().setSize(320, 40);
 
             Component rendered = palette.resultList().getCellRenderer().getListCellRendererComponent(
                 palette.resultList(), command, 0, true, false);
-            rendered.setSize(UIScale.scale(320), UIScale.scale(40));
+            rendered.setSize(320, 40);
             layoutTree(rendered);
             var rowLabels = labels(rendered);
             JLabel title = rowLabels.stream().filter(label -> label.getText().startsWith("<html>"))
@@ -284,7 +301,7 @@ class CommandPaletteTest {
             var macPalette = new CommandPalette(true, query -> {}, selected -> {}, () -> {});
             Component macRendered = macPalette.resultList().getCellRenderer().getListCellRendererComponent(
                 macPalette.resultList(), command, 0, false, false);
-            macRendered.setSize(UIScale.scale(560), UIScale.scale(40));
+            macRendered.setSize(560, 40);
             layoutTree(macRendered);
             assertThat(labels(macRendered)).anyMatch(label -> label.getText().equals("\u21e7\u2318K"));
         });
@@ -323,7 +340,7 @@ class CommandPaletteTest {
 
             JButton escape = buttons(palette).getFirst();
             Container inputRow = escape.getParent().getParent();
-            assertThat(escape.getHeight()).isLessThan(UIScale.scale(32));
+            assertThat(escape.getHeight()).isLessThan(32);
             int actualTop = escape.getY() + escape.getParent().getY();
             int centeredTop = (inputRow.getHeight() - escape.getHeight()) / 2;
             assertThat(Math.abs(actualTop - centeredTop)).isLessThanOrEqualTo(1);

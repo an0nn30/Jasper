@@ -98,7 +98,7 @@ class WindowCommandPaletteTest {
             assertThat(owner.commandPalette().component().resultList().getSelectedValue().title()).isEqualTo("Hide Status Bar");
             owner.setStatusVisible(false);
             assertThat(owner.commandPalette().component().resultList().getSelectedValue().title()).isEqualTo("Show Status Bar");
-            owner.selectAppearance(Appearance.LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
+            owner.selectLaf(UiLookAndFeel.NIMBUS); assertThat(owner.commandPalette().isOpen()).isTrue();
             var overlay = owner.commandPalette().component().getParent(); owner.close();
             assertThat(overlay.getParent()).isNull(); assertThat(root.getComponentListeners().length).isLessThan(listeners);
             assertThat(owner.commands().entries()).isEmpty();
@@ -129,7 +129,7 @@ class WindowCommandPaletteTest {
             var file = dir.resolve(quit ? "quit.toml" : "close.toml");
             DesktopTestSupport.edt(() -> {
                 history[0] = new CommandHistory(file);
-                var application = new JasperApplication(null, SystemAppearance.fixed(BuiltinTheme.DARK),
+                var application = new JasperApplication(null,
                     DesktopTestSupport.launcher(new ArrayDeque<>()), history[0]);
                 WindowContent[] content = new WindowContent[1];
                 content[0] = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
@@ -203,7 +203,7 @@ class WindowCommandPaletteTest {
                 palette.queryField().setText("custom"); root.setSize(350, 210); MockUiTest.layoutTree(root);
                 root.dispatchEvent(new ComponentEvent(root, ComponentEvent.COMPONENT_RESIZED)); MockUiTest.layoutTree(root);
                 assertThat(palette.getWidth()).isLessThanOrEqualTo(318);
-                assertThat(palette.queryField().getParent().getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(56));
+                assertThat(palette.queryField().getParent().getHeight()).isEqualTo(56);
                 palette.selectRelative(4); MockUiTest.layoutTree(root);
                 assertThat(palette.resultList().getVisibleRect().intersects(palette.resultList().getCellBounds(4,4))).isTrue();
                 assertThat(palette.getHeight()).isLessThan(palette.getPreferredSize().height);

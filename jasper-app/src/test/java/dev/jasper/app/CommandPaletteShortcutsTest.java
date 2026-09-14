@@ -146,7 +146,7 @@ class CommandPaletteShortcutsTest {
         edt(() -> {
             var previous = KeyboardFocusManager.getCurrentKeyboardFocusManager();
             var laf = UIManager.getLookAndFeel();
-            com.formdev.flatlaf.FlatDarkLaf.setup();
+            UiLookAndFeel.METAL.install();
             try (var owner = owner(System.getProperty("os.name").startsWith("Mac"))) {
                 var root = install(owner); owner.commandPalette().toggle();
                 var field = owner.commandPalette().component().queryField();

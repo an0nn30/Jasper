@@ -1,6 +1,5 @@
 package dev.jasper.app;
 
-import com.formdev.flatlaf.util.SystemInfo;
 import java.awt.Dimension;
 import java.awt.Insets;
 import java.awt.Rectangle;
@@ -15,7 +14,6 @@ final class TerminalWindow implements AutoCloseable {
     private final JasperApplication application;
     private final JFrame frame = new JFrame("Jasper");
     private final WindowContent content;
-    private final MacTitleBar titleBar;
     private boolean closed;
     private final WindowAdapter events = new WindowAdapter() {
         @Override public void windowClosing(WindowEvent event) { close(); }
@@ -35,19 +33,19 @@ final class TerminalWindow implements AutoCloseable {
     TerminalWindow(JasperApplication application, ShellLauncher launcher, Path directory, ThemeController themes,
                    ConfigurationController configuration, CommandHistory history) {
         this.application = application;
-        frame.setIconImages(ApplicationIcon.images(SystemInfo.isMacOS));
+        frame.setIconImages(ApplicationIcon.images(System.getProperty("os.name").startsWith("Mac")));
         content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes,
-            KeyBindings.defaults(SystemInfo.isMacOS), System::nanoTime, history, SystemInfo.isMacOS);
+            KeyBindings.defaults(System.getProperty("os.name").startsWith("Mac")), System::nanoTime, history, System.getProperty("os.name").startsWith("Mac"));
         if (configuration != null) {
             content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(configuration.snapshot()));
             configuration.register(content);
         }
-        titleBar = MacTitleBar.install(frame.getRootPane(), content, SystemInfo.isMacFullWindowContentSupported, frame::setTitle);
+        frame.setContentPane(content);
+        content.onTitle = title -> frame.setTitle(Main.windowTitle(title));
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.setJMenuBar(content.menuBar());
         content.installRootBindings(frame.getRootPane());
         content.onMinimumSizeChanged = this::updateMinimumSize;
-        if (titleBar != null) titleBar.attach(frame);
         frame.addWindowListener(events); frame.pack();
         if (configuration != null) {
             updateMinimumSize();
@@ -81,7 +79,6 @@ final class TerminalWindow implements AutoCloseable {
 
     private void setActive(boolean active) {
         content.setActive(active);
-        if (titleBar != null) titleBar.setActive(active);
     }
 
     WindowContent content() { return content; }
@@ -94,7 +91,6 @@ final class TerminalWindow implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true; content.close();
-        if (titleBar != null) titleBar.close();
         frame.removeWindowListener(events); frame.dispose();
         application.windowClosed(this);
     }

@@ -50,7 +50,7 @@ class InitialWindowSizeTest {
             owner[0].currentPane().setPreferredSize(area);
             root[0] = new JRootPane(); root[0].setContentPane(owner[0]); root[0].setJMenuBar(owner[0].menuBar());
             packed[0] = root[0].getPreferredSize();
-            assertThat(packed[0].width).isEqualTo(area.width);
+            assertThat(packed[0].width).isGreaterThanOrEqualTo(area.width);
             assertThat(packed[0].height).isGreaterThan(area.height);
             root[0].setSize(packed[0]); root[0].doLayout(); owner[0].doLayout();
             owner[0].applyConfiguration(withGridAndFont(200, 100, FontConfig.defaults().withSize(30)), false);
