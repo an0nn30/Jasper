@@ -90,7 +90,9 @@ final class BuddyWindow {
                 if (dragged) save(window.getLocation());
             }
             @Override public void mouseClicked(MouseEvent event) {
-                if (SwingUtilities.isLeftMouseButton(event) && event.getClickCount() == 2 && !dragged) raiseTerminal.run();
+                // A macOS control-click is the popup trigger yet reports the left button; it must not raise.
+                if (SwingUtilities.isLeftMouseButton(event) && !event.isControlDown()
+                        && event.getClickCount() == 2 && !dragged) raiseTerminal.run();
             }
         };
         canvas.addMouseListener(mouse);

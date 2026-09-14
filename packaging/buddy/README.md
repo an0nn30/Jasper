@@ -19,7 +19,7 @@ Pixel-art Jasper for the floating desk buddy: 42 × 48 art pixels per frame, dra
 | 5 | `HOP` | Lifted one pixel, legs tucked, both arms out |
 | 6 | `LEAN_LEFT` | Head leans left, right leg kicks, right arm up |
 | 7 | `LEAN_RIGHT` | Head leans right, left arm up |
-| 8 | `SIT` | Sitting: body a pixel lower, no standing legs, feet out sideways |
+| 8 | `SIT` | Sitting: body a pixel lower, head slumped, feet out in front of the shell |
 | 9 | `SIT_BLINK` | Sitting with both eyes shut |
 | 10 | `TUCK` | Retracted: no limbs, only the top of the head above the shell |
 | 11 | `SLEEP_A` | Empty shell, two Zs low |

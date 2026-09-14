@@ -54,7 +54,7 @@ All classes live in `dev.jasper.app` with a `Buddy` prefix, flat like the rest o
 
 ## Out of scope
 
-Speech bubbles and status messages (SFTP progress, long-command completion), sound, click opening the command palette, reacting to terminal activity (typing, running commands); the idle timeline is driven by pointer interaction only, following the terminal window, following full-screen Spaces, and Windows native acceptance. The window is sized to the sprite alone; a later plan can grow it upward and add a `say` API once a message producer exists.
+Speech bubbles and status messages (SFTP progress, long-command completion), sound, click opening the command palette, reacting to terminal activity (typing, running commands: the idle timeline is driven by pointer interaction only), following the terminal window, following full-screen Spaces, and Windows native acceptance. The window is sized to the sprite alone; a later plan can grow it upward and add a `say` API once a message producer exists.
 
 ## Testing
 

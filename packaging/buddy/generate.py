@@ -74,9 +74,9 @@ LEGS = {
     "stand": [(12, 38, 18, 45), (23, 38, 29, 45)],
     "tuck": [(12, 38, 18, 43), (23, 38, 29, 43)],
     "kick": [(12, 38, 18, 45), (27, 36, 34, 42)],
-    # Sitting feet stick out sideways at the shell's foot; they keep their own place while the
-    # rest of the body drops by dy, so their outline stays off the bottom margin row.
-    "sit": [(5, 40, 13, 45), (28, 40, 36, 45)],
+    # Sitting feet are drawn in front of the shell's bottom rim; they keep their own place while
+    # the rest of the body drops by dy, so their outline stops on row 46, off the bottom margin.
+    "sit": [(6, 40, 16, 45), (25, 40, 35, 45)],
     "none": [],
 }
 Z_SMALL = ("###", ".#.", "###")
@@ -124,20 +124,25 @@ def glyph(c, rows, x, y):
 def frame(eyes=("open", "open"), right_arm="down", left_arm="down", dy=0, lean=0, legs="stand",
           arms=True, head_at="after", head_dy=None, shell_dy=None, z_glyphs=()):
     """One 42x48 cell. head_at picks "before"/"after" the shell or "none"; head_dy and
-    shell_dy override the body offset dy for the tucked poses; z_glyphs adds sleep Zs."""
+    shell_dy override the body offset dy for the tucked poses; z_glyphs adds sleep Zs.
+    The sitting feet keep their own place and are drawn in front of the shell."""
     c = Image.new("RGBA", (W, H), CLEAR)
     hx = lean
     hdy = dy if head_dy is None else head_dy
     sdy = dy if shell_dy is None else shell_dy
-    leg_dy = 0 if legs == "sit" else dy
-    for box in LEGS[legs]:
-        part(c, ellipse(shift(box, 0, leg_dy)), SKIN)
+    sitting = legs == "sit"
+    if not sitting:
+        for box in LEGS[legs]:
+            part(c, ellipse(shift(box, 0, dy)), SKIN)
     if arms:
         part(c, ellipse(shift(LEFT_ARM[left_arm], 0, dy)), SKIN)
         part(c, ellipse(shift(RIGHT_ARM[right_arm], 0, dy)), SKIN)
     if head_at == "before":
         head(c, eyes, hx, hdy)
     shell(c, sdy)
+    if sitting:
+        for box in LEGS[legs]:
+            part(c, ellipse(box), SKIN)
     if head_at == "after":
         head(c, eyes, hx, hdy)
     for rows, x, y in z_glyphs:
@@ -156,8 +161,8 @@ def frames():
         frame(dy=-1, legs="tuck", left_arm="out", right_arm="out"),
         frame(lean=-1, legs="kick", right_arm="up"),
         frame(lean=1, left_arm="up"),
-        frame(dy=1, legs="sit"),
-        frame(dy=1, legs="sit", eyes=("shut", "shut")),
+        frame(dy=1, legs="sit", head_dy=2),
+        frame(dy=1, legs="sit", head_dy=2, eyes=("shut", "shut")),
         frame(legs="none", arms=False, head_at="before", head_dy=5, shell_dy=2),
         frame(z_glyphs=[(Z_BIG, 22, 13), (Z_SMALL, 28, 6)], **shell_only),
         frame(z_glyphs=[(Z_BIG, 23, 9), (Z_SMALL, 29, 3)], **shell_only),
