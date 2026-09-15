@@ -1,5 +1,44 @@
 # Jasper — Status and Handoff
 
+**Palette scopes and shell history (2026-09-15):** On `claude/palette-scopes` in
+`.worktrees/palette-scopes` (from main `86352b9`), the command palette is now
+scope-based: one `PaletteScope` contract with two implementations, `CommandsScope`
+(wraps the existing registry/search/three-recents behaviour unchanged) and
+`ShellHistoryScope` (substring search over an application-wide `ShellHistoryIndex`
+fed by zsh/bash/fish/nushell/PowerShell history files and OSC 133 B/C live
+capture). Cmd+K/Ctrl+K always opens Commands, Cmd+R/Ctrl+Shift+R always opens
+History; a scope's own shortcut dismisses it while already active, even from the
+picker. Typing `>` at the start of an empty query opens an in-card scope picker
+(Tab/Enter commits, Escape or deleting the `>` reverts); a visible chip shows the
+active scope and doubles as a picker button. History rows show a shell tag,
+optional working-directory detail line and, on Enter, paste the command into the
+focused pane; Cmd+Enter pastes and runs. `history.enabled` (live) registers or
+removes the scope entirely. Deviations from the plan text: the picker state is
+derived statelessly from the query text (`query.startsWith(">")`) rather than
+tracked as a transition, since `JTextField.setText` fires remove+insert and a
+transition-based check cannot see a `>`-prefixed value the whole way through;
+`PaletteKeyRouter` claims a key only when its target scope is registered, so a
+disabled History shortcut is consumed but not held; `ShellHistoryParser.consumed`
+tracks raw byte offsets so a dangling zsh/PowerShell continuation is re-read
+later and a trailing fish block is re-parsed on the next tail read; clipped
+16 MiB tail reads trim forward to the next newline; history rows use the logical
+`Font.MONOSPACED` face rather than the pane's own terminal font, so the palette
+needs no font plumbing from the terminal view; `CommandCapture` and its test
+fixture use JediTerm's `CharUtils.DWC`/`CharBuffer` directly, confined to
+`jasper-terminal`. Task 11 extended the [headless render matrix](design/command-palette/README.md)
+with three new states (History recent/query, scope picker) and added
+`ShellHistorySearchMeasurement`, a substring-ranking benchmark over a synthetic
+50,000-entry snapshot (medians only, no CI threshold; [report](design/command-palette/history-search-measurement.md)).
+[Guide](command-palette.md), [design spec](superpowers/specs/2026-09-15-jasper-palette-scopes-design.md),
+[plan](superpowers/plans/2026-09-15-jasper-palette-scopes.md). Fresh
+`./gradlew check --rerun-tasks` executed all eight tasks: jasper-app 437 tests
+passed; jasper-terminal 302 tests, 301 passed and one existing font skip. Total
+739 tests, 738 passed, one skipped, zero failures/errors — unchanged from before
+this task, since it adds no new `@Test` methods. Still user-run: Cmd+R on a real
+macOS desktop, input-method composition with the chip present, chip rendering on
+the native title-bar theme, and paste/paste-and-run into a real zsh with
+bracketed paste enabled. No GUI, merge or push.
+
 **Fast quit (2026-09-14):** On `claude/fast-quit` in `.worktrees/fast-quit` (from main `0c6463a`), the JVM no longer lingers after the last window closes. Nothing called `System.exit`, so exit relied on AWT's auto-shutdown, which waits a full quiet second after the last peer is disposed (JBR 25 `AWTAutoShutdown.SAFETY_TIMEOUT`; measured 1.0 s headlessly) before the JVM tears down. `JasperApplication.shutdown()` now waits, bounded at two seconds, for the command-history file and the exit of every shell it started (`track`), then runs an injected terminator off the EDT; `Main` passes `System.exit(0)`, tests pass a no-op. The bounded pty force-kill fallback is preserved because closed shells' `exitFuture`s are awaited. One INFO line, `Shutdown finished in N ms`, records the timeline in the app log. New headless `JasperApplicationShutdownTest`; `./gradlew check` passed. Desktop check is user-run: type `exit` (with `on_exit = "close_on_success"`) or close the last window and the Dock icon should vanish at once.
 
 **Two modern theme variants (2026-09-14):** On `claude/modern-restore`, the purple theme, the OS-following appearance mode (and its jSystemThemeDetector dependency), custom Alacritty-style palette files and the `[colors]` table are removed. `ui.theme.variant` (`"dark"` default, or `"light"`) selects the bundled FlatLaf Dark + Jasper Dark or FlatLaf Light + Jasper Light pairing; View → Appearance keeps Light/Dark as a temporary override that clears when the saved variant changes; Reload config retries a failed chrome installation. No Java built-in look and feel is used or selectable. `ThemeState` is now `(saved, override)`, `ConfigService.State` carries no palette, `ConfigurationController` has no appearance source, and `AppDirs` has no themes directory. Legacy `[colors]` settings warn as unknown and are ignored ([migration](rebranding.md), [configuration](configuration.md#theme-variant)). `./gradlew check` after the rebase onto `b779c08` with the desk buddy carried across: 656 tests, 655 passed, one known font skip. Headless previews regenerated: `design/mock-ui-dark.png`, `design/mock-ui-light.png`, and the 16-image [command palette matrix](design/command-palette/README.md). Not done: GUI check (user-run), merge, push. The classic vanilla Swing look (`d09b82e`/`5bc288f`) is still to be added back later as a selectable option.

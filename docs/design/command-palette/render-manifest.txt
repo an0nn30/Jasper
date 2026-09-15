@@ -19,3 +19,15 @@ long-labels-narrow-dark-360x500-1x.png
 long-labels-narrow-dark-360x500-2x.png
 long-labels-narrow-light-360x500-1x.png
 long-labels-narrow-light-360x500-2x.png
+history-recent-dark-900x600-1x.png
+history-recent-dark-900x600-2x.png
+history-recent-light-900x600-1x.png
+history-recent-light-900x600-2x.png
+history-query-dark-900x600-1x.png
+history-query-dark-900x600-2x.png
+history-query-light-900x600-1x.png
+history-query-light-900x600-2x.png
+scope-picker-dark-900x600-1x.png
+scope-picker-dark-900x600-2x.png
+scope-picker-light-900x600-1x.png
+scope-picker-light-900x600-2x.png

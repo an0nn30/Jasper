@@ -54,6 +54,7 @@ tasks.register<JavaExec>("mockUiPreview") {
 for ((taskName, entryPoint) in listOf(
     "commandPalettePreview" to "CommandPalettePreview",
     "commandSearchMeasurement" to "CommandSearchMeasurement",
+    "shellHistorySearchMeasurement" to "ShellHistorySearchMeasurement",
 )) {
     tasks.register<JavaExec>(taskName) {
         group = "verification"

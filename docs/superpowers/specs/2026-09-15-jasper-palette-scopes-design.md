@@ -1,6 +1,6 @@
 # Jasper palette scopes and shell history — design
 
-**Status:** Approved in discussion by the user on 2026-09-15; awaiting the user's review of this written spec before an implementation plan is written.
+**Status:** Implemented on `claude/palette-scopes` in `.worktrees/palette-scopes`, commits `bd76fe4..67743ba` plus the Task 11 documentation commit that records this status. Fresh `./gradlew check --rerun-tasks`: 739 tests, 738 passed, one existing font skip, zero failures/errors. No GUI, merge or push.
 
 **Development branch:** `claude/palette-scopes` in `.worktrees/palette-scopes`, from main `86352b9`.
 

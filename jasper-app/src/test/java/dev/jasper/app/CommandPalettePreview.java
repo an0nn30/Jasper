@@ -81,21 +81,26 @@ public final class CommandPalettePreview {
     }
 
     private enum Scenario {
-        RECENTS("recents", "", LARGE_WIDTH, LARGE_HEIGHT),
-        PANE_QUERY("pane-query", "pane", LARGE_WIDTH, LARGE_HEIGHT),
-        NO_MATCH("no-match", "quasar never", LARGE_WIDTH, LARGE_HEIGHT),
-        LONG_LABELS("long-labels-narrow", "preview fixture", NARROW_WIDTH, NARROW_HEIGHT);
+        RECENTS("recents", "", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID),
+        PANE_QUERY("pane-query", "pane", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID),
+        NO_MATCH("no-match", "quasar never", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID),
+        LONG_LABELS("long-labels-narrow", "preview fixture", NARROW_WIDTH, NARROW_HEIGHT, PaletteScope.COMMANDS_ID),
+        HISTORY_RECENT("history-recent", "", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.HISTORY_ID),
+        HISTORY_QUERY("history-query", "git", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.HISTORY_ID),
+        SCOPE_PICKER("scope-picker", ">", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID);
 
         final String slug;
         final String query;
         final int width;
         final int height;
+        final String scope;
 
-        Scenario(String slug, String query, int width, int height) {
+        Scenario(String slug, String query, int width, int height, String scope) {
             this.slug = slug;
             this.query = query;
             this.width = width;
             this.height = height;
+            this.scope = scope;
         }
     }
 
@@ -104,20 +109,34 @@ public final class CommandPalettePreview {
         private final List<TerminalSession> sessions;
         private final ThemeController themes;
         private final CommandHistory history;
+        private final ShellHistoryIndex shellHistory;
         private final WindowContent owner;
         private final JRootPane root;
         private final MacTitleBar titleBar;
 
         private Fixture(Queue<Runnable> pending, List<TerminalSession> sessions,
-                        ThemeController themes, CommandHistory history, WindowContent owner,
-                        JRootPane root, MacTitleBar titleBar) {
+                        ThemeController themes, CommandHistory history, ShellHistoryIndex shellHistory,
+                        WindowContent owner, JRootPane root, MacTitleBar titleBar) {
             this.pending = pending;
             this.sessions = sessions;
             this.themes = themes;
             this.history = history;
+            this.shellHistory = shellHistory;
             this.owner = owner;
             this.root = root;
             this.titleBar = titleBar;
+        }
+
+        /** Worker and delivery run inline so the fixture's synthetic entries are recorded before the palette opens. */
+        private static java.util.concurrent.ExecutorService inlineWorker() {
+            return new java.util.concurrent.AbstractExecutorService() {
+                @Override public void execute(Runnable task) { task.run(); }
+                @Override public void shutdown() {}
+                @Override public List<Runnable> shutdownNow() { return List.of(); }
+                @Override public boolean isShutdown() { return false; }
+                @Override public boolean isTerminated() { return false; }
+                @Override public boolean awaitTermination(long t, TimeUnit u) { return true; }
+            };
         }
 
         static Fixture create() throws Exception {
@@ -132,12 +151,20 @@ public final class CommandPalettePreview {
                 }, "sh");
                 var themes = new ThemeController();
                 var history = new CommandHistory();
+                var index = new ShellHistoryIndex(List.of(), inlineWorker(), Runnable::run);
+                String[] commands = {"git status", "git commit -m \"Tidy palette scopes\"", "./gradlew check",
+                    "ls -la", "cd ~/projects/moray", "rg TODO jasper-app/src", "cargo build --release",
+                    "docker compose up -d", "kubectl get pods -n jasper", "make test", "python3 -m http.server 8000",
+                    "tail -f /var/log/system.log", "brew upgrade", "ssh build@ci.example.com", "npm run dev"};
+                for (int i = 0; i < commands.length; i++)
+                    index.record(new ShellHistoryEntry(commands[i], 1_700_000_000L + i, java.util.Set.of(i % 3 == 0 ? "bash" : "zsh"),
+                        i == 5 ? java.nio.file.Path.of("/Users/preview/projects/moray") : null, null));
                 var owner = new WindowContent(launcher, DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
-                    themes, KeyBindings.defaults(true), System::nanoTime, history, true);
+                    themes, KeyBindings.defaults(true), System::nanoTime, history, true, index);
                 var root = new JRootPane();
                 var titleBar = MacTitleBar.install(root, owner, true, title -> {});
                 owner.installRootBindings(root);
-                var fixture = new Fixture(pending, sessions, themes, history, owner, root, titleBar);
+                var fixture = new Fixture(pending, sessions, themes, history, index, owner, root, titleBar);
                 fixture.addLongLabelCommands();
                 history.record("find");
                 history.record("split_right");
@@ -178,7 +205,7 @@ public final class CommandPalettePreview {
                 .append("Pixel output scales: 1x, 2x\n\n");
             for (Scenario scenario : Scenario.values()) {
                 for (BuiltinTheme theme : BuiltinTheme.values()) {
-                    configure(theme, scenario.query);
+                    configure(scenario, theme);
                     assertScenario(scenario);
                     for (int pixelScale : List.of(1, 2)) {
                         String name = scenario.slug + "-" + themeSlug(theme) + "-"
@@ -193,36 +220,52 @@ public final class CommandPalettePreview {
             Files.writeString(output.resolve("render-manifest.txt"), manifest.toString());
         }
 
-        private void configure(BuiltinTheme theme, String query) throws Exception {
+        private void configure(Scenario scenario, BuiltinTheme theme) throws Exception {
             SwingUtilities.invokeAndWait(() -> {
                 themes.configure(theme.appearance());
-                owner.commandPalette().component().queryField().setText(query);
+                if (!scenario.scope.equals(owner.commandPalette().activeScopeId())) owner.commandPalette().open(scenario.scope);
+                owner.commandPalette().component().queryField().setText(scenario.query);
             });
         }
 
         private void assertScenario(Scenario scenario) throws Exception {
             SwingUtilities.invokeAndWait(() -> {
                 var palette = owner.commandPalette().component();
-                int count = palette.resultList().getModel().getSize();
+                int modelSize = palette.resultList().getModel().getSize();
+                // History's recent list holds every entry (15); the card only shows preferredRows (12) at once.
+                int count = scenario == Scenario.HISTORY_RECENT ? palette.resultList().getVisibleRowCount() : modelSize;
                 int expected = switch (scenario) {
                     case RECENTS -> 3;
                     case PANE_QUERY, LONG_LABELS -> 5;
                     case NO_MATCH -> 0;
+                    case HISTORY_RECENT -> 12;
+                    case HISTORY_QUERY, SCOPE_PICKER -> 2;
                 };
                 if (count != expected) {
                     throw new AssertionError(scenario.slug + " expected " + expected + " rows, got " + count);
                 }
                 if (scenario == Scenario.PANE_QUERY) {
-                    for (int i = 0; i < count; i++) {
+                    for (int i = 0; i < modelSize; i++) {
                         String id = palette.resultList().getModel().getElementAt(i).id();
                         if (id.startsWith("preview.")) throw new AssertionError("Pane query used synthetic command " + id);
                     }
+                }
+                if (scenario == Scenario.HISTORY_RECENT) {
+                    if (modelSize != 15) throw new AssertionError("history-recent expected 15 model rows, got " + modelSize);
+                    for (int i = 0; i < modelSize; i++) {
+                        PaletteRow row = palette.resultList().getModel().getElementAt(i);
+                        if (row.tag() == null) throw new AssertionError("history-recent row missing tag: " + row.id());
+                    }
+                }
+                if (scenario == Scenario.HISTORY_QUERY) {
+                    String title = palette.resultList().getModel().getElementAt(0).title();
+                    if (!title.startsWith("git")) throw new AssertionError("history-query first title does not start with git: " + title);
                 }
             });
         }
 
         void verifyUiScale(Path output, int expectedScale) throws Exception {
-            configure(BuiltinTheme.DARK, Scenario.LONG_LABELS.query);
+            configure(Scenario.LONG_LABELS, BuiltinTheme.DARK);
             SwingUtilities.invokeAndWait(() -> {
                 int actualUnit = UIScale.scale(1);
                 var palette = owner.commandPalette().component();
@@ -281,6 +324,7 @@ public final class CommandPalettePreview {
                     if (titleBar != null) titleBar.close();
                     owner.close();
                     history.close();
+                    shellHistory.close();
                 });
                 for (TerminalSession session : sessions) session.exitFuture().get(5, TimeUnit.SECONDS);
             } catch (InterruptedException interrupted) {

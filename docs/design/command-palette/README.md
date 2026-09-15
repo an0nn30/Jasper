@@ -11,12 +11,23 @@ registers five harmless preview-only Swing actions with deliberately long labels
 they exist only in the test-runtime renderer and do nothing if invoked. The
 synthetic entries make truncation deterministic without adding product commands.
 
+The History states use a real `ShellHistoryIndex` with no file sources, driven
+entirely by fifteen synthetic entries recorded through `index.record(...)` on an
+inline executor (worker and delivery both run on the calling thread, so every
+entry is indexed before the palette opens) — the same pattern as
+`ShellHistoryIndexTest.inline`. Two of the fifteen commands start with `git`;
+the sixth carries a synthetic working directory to exercise the detail line;
+the rest carry no directory. Shells alternate bash/zsh so every row is tagged.
+
 | State | Dark | Light |
 |---|---|---|
 | Three recents | [1×](recents-dark-900x600-1x.png) / [2×](recents-dark-900x600-2x.png) | [1×](recents-light-900x600-1x.png) / [2×](recents-light-900x600-2x.png) |
 | `pane`, five results | [1×](pane-query-dark-900x600-1x.png) / [2×](pane-query-dark-900x600-2x.png) | [1×](pane-query-light-900x600-1x.png) / [2×](pane-query-light-900x600-2x.png) |
 | No match | [1×](no-match-dark-900x600-1x.png) / [2×](no-match-dark-900x600-2x.png) | [1×](no-match-light-900x600-1x.png) / [2×](no-match-light-900x600-2x.png) |
 | Long labels, 360×500 | [1×](long-labels-narrow-dark-360x500-1x.png) / [2×](long-labels-narrow-dark-360x500-2x.png) | [1×](long-labels-narrow-light-360x500-1x.png) / [2×](long-labels-narrow-light-360x500-2x.png) |
+| History, most recent (15 entries, 12 visible) | [1×](history-recent-dark-900x600-1x.png) / [2×](history-recent-dark-900x600-2x.png) | [1×](history-recent-light-900x600-1x.png) / [2×](history-recent-light-900x600-2x.png) |
+| History, `git` query, two results | [1×](history-query-dark-900x600-1x.png) / [2×](history-query-dark-900x600-2x.png) | [1×](history-query-light-900x600-1x.png) / [2×](history-query-light-900x600-2x.png) |
+| Scope picker (`>`) | [1×](scope-picker-dark-900x600-1x.png) / [2×](scope-picker-dark-900x600-2x.png) | [1×](scope-picker-light-900x600-1x.png) / [2×](scope-picker-light-900x600-2x.png) |
 
 The 1×/2× labels above describe output pixels: both paint the same logical Swing
 geometry. A separate fresh JVM with `flatlaf.uiScale=2x` produced the
@@ -24,7 +35,7 @@ geometry. A separate fresh JVM with `flatlaf.uiScale=2x` produced the
 The assertions measured a 1120px preferred card width, 112px input row and 80px
 result row, exactly twice the 560/56/40 logical geometry and therefore scaled once.
 
-All 16 matrix PNGs and the UI-scale image were inspected with the image tool. The
+All 28 matrix PNGs and the UI-scale image were inspected with the image tool. The
 controller independently inspected a cross-theme/state subset. The first render
 pass exposed blank command rows because the null-layout cell renderer had not laid
 out its labels at the final paint width, and it showed the Escape hint stretched
@@ -33,6 +44,20 @@ The renderer now lays out at paint time and a transparent wrapper centers a comp
 Escape hint. The regenerated matrix has visible titles and badges, preserves badges
 before truncating narrow titles, stays horizontally centered in the upper half, and has readable selection and
 muted text in dark and light.
+
+The three new History/picker states were inspected the same way. In both History
+states the chip reads "History" with its clock icon, the footer shows "⏎ Paste
+⌘⏎ Paste and run", and every row's shell tag sits right-aligned at the row's far
+edge. `history-recent` shows all fifteen entries scrolled to the top, tags
+alternating `bash`/`zsh`, and a muted detail line under the `rg TODO
+jasper-app/src` row reading `/Users/preview/projects/moray` — the only row with
+one; numbered badges (⌘1–⌘5) appear on the first five rows only, and the rest
+show no badge. `history-query` filters to the two `git` commands with the same
+chip, footer and tags. `scope-picker` shows the "Commands" chip (unchanged,
+since typing `>` opens the picker without switching the active scope), a
+"Scopes" section label, and two rows — Commands and History — each with its icon,
+description and application shortcut as its tag. No footer shows in the picker,
+since the underlying active scope (Commands) has one verb.
 
 Native focus, IME behavior, accessibility announcements, window deactivation and
 physical-display placement cannot be inferred from headless PNGs. They remain
@@ -48,6 +73,7 @@ OUTPUT="$(pwd)/docs/design/command-palette"
 ./gradlew :jasper-app:commandPalettePreview -Pjasper.uiScale=2x \
   --args="$OUTPUT --expect-ui-scale=2"
 ./gradlew :jasper-app:commandSearchMeasurement --args="$OUTPUT"
+./gradlew :jasper-app:shellHistorySearchMeasurement --args="$OUTPUT"
 ```
 
 These tasks are opt-in and are not dependencies of `check`. The UI task is
@@ -56,6 +82,13 @@ property. The [search report](search-measurement.md) uses 1,000 entries indexed
 once, 5,000 warmup calls and 10,000 measured calls for exact, prefix, fuzzy and
 zero-match queries. Its workstation numbers describe matching only, not native
 key-to-paint latency, and set no CI threshold.
+
+The [shell-history search report](history-search-measurement.md) covers
+`ShellHistoryScope.search` alone over a synthetic 50,000-entry snapshot (200
+warmup calls, 1,000 measured calls per query), for an empty query, a two-word
+query, a query that matches by directory-adjacent module number, an exact
+trailing command and a query with no match. It records medians only and sets no
+CI threshold, matching the command-search report's descriptive intent.
 
 ## Final verification and review
 
@@ -128,3 +161,22 @@ in `c4f3335`. The conflict-free merged result passed `./gradlew check --rerun-ta
 all eight tasks executed in 18 seconds, 365 app tests passed, and 295 terminal tests
 passed with one existing font skip (661 total; no failures/errors). Native acceptance
 remains user-run.
+
+## Palette scopes and shell history — 2026-09-15
+
+Task 11 of the [palette scopes plan](../../superpowers/plans/2026-09-15-jasper-palette-scopes.md)
+extended this matrix with the three History/picker states above and added
+`ShellHistorySearchMeasurement`. The preview fixture switches the already-open
+palette between scopes with `owner.commandPalette().open(scenario.scope)` before
+setting each scenario's query text, reusing the one `WindowContent`/`JRootPane`
+instance across all seven scenarios. Both `commandPalettePreview` runs (default
+and `-Pjasper.uiScale=2x --expect-ui-scale=2`) passed their in-process assertions,
+including the 15-entry/12-visible split for `history-recent`, the two-row `git`
+filter for `history-query`, and the two-scope picker listing for `scope-picker`.
+
+Fresh `./gradlew check --rerun-tasks` executed all eight tasks in 18 seconds:
+jasper-app 437 tests passed; jasper-terminal 302 tests, 301 passed and one
+existing font skip. Total 739 tests, 738 passed, one skipped, zero
+failures/errors — the same total as before this task, since it adds no new
+`@Test` methods. Source hygiene over both modules and `git diff --check` passed.
+No GUI, merge or push was performed.
