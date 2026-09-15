@@ -104,13 +104,13 @@ final class ShellHistoryIndex implements AutoCloseable {
         }
     }
 
-    /** Worker-only test seam. */
     /** Worker-only test seam: how many bytes the rewrite fingerprint currently covers. */
     int fingerprintLength(ShellHistorySource source) {
         FileState state = states.get(source);
         return state == null ? 0 : state.fingerprint.length;
     }
 
+    /** Worker-only test seam. */
     SourceStats stats(ShellHistorySource source) {
         FileState state = states.get(source);
         return state == null ? new SourceStats(0, 0, 0) : new SourceStats(state.offset, state.fullReads, state.tailReads);
