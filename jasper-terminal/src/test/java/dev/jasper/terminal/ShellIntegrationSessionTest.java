@@ -8,6 +8,9 @@ import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
 import java.nio.file.Path;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -16,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ShellIntegrationSessionTest {
     private FakeConnector connector;
     private TerminalSession session;
+    private CopyOnWriteArrayList<String> captured;
+    private CopyOnWriteArrayList<OptionalInt> statuses;
 
     @BeforeEach
     void start() throws Exception {
@@ -27,6 +32,51 @@ class ShellIntegrationSessionTest {
     @AfterEach
     void stop() {
         session.close();
+    }
+
+    private void listenForCommands() {
+        captured = new CopyOnWriteArrayList<>();
+        statuses = new CopyOnWriteArrayList<>();
+        session.addListener(new TerminalSession.Listener() {
+            @Override public void commandExecuted(String command, OptionalInt exitStatus, Optional<Path> workingDirectory) {
+                captured.add(command);
+                statuses.add(exitStatus);
+            }
+        });
+    }
+
+    @Test void commandsAreCapturedBetweenTheirMarksWithTheirExitStatus() throws Exception {
+        listenForCommands();
+        connector.feed("\033]133;A\007$ \033]133;B\007ls -la\r\n\033]133;C\007out\r\n\033]133;D;2\007\033]133;A\007$ ");
+        Await.until(() -> captured.size() == 1, "one captured command");
+        assertThat(captured).containsExactly("ls -la");
+        assertThat(statuses.getFirst()).hasValue(2);
+    }
+
+    @Test void aPromptWithoutACommandStartMarkCapturesNothing() throws Exception {
+        listenForCommands();
+        connector.feed("\033]133;A\007$ ls\r\n\033]133;C\007out\r\n\033]133;D;0\007\033]133;A\007$ ");
+        Await.until(() -> session.promptRows().size() == 2, "two prompts");
+        assertThat(captured).isEmpty();
+    }
+
+    @Test void aMissingExitMarkStillDeliversTheCommandAtTheNextPrompt() throws Exception {
+        listenForCommands();
+        connector.feed("\033]133;A\007$ \033]133;B\007pwd\r\n\033]133;C\007/tmp\r\n\033]133;A\007$ ");
+        Await.until(() -> captured.size() == 1, "captured at the next prompt");
+        assertThat(captured).containsExactly("pwd");
+        assertThat(statuses.getFirst()).isEmpty();
+    }
+
+    @Test void wrappedRowsJoinWithoutNewlinesAndContinuationRowsKeepThem() throws Exception {
+        listenForCommands();
+        // Width is 20: "$ " plus 25 characters wraps once.
+        connector.feed("\033]133;A\007$ \033]133;B\007echo aaaaaaaaaaaaaaaaaaaa\r\n\033]133;C\007\033]133;D;0\007");
+        Await.until(() -> captured.size() == 1, "wrapped command");
+        assertThat(captured.getFirst()).isEqualTo("echo aaaaaaaaaaaaaaaaaaaa");
+        connector.feed("\033]133;A\007$ \033]133;B\007echo 'a\r\n> b'\r\n\033]133;C\007\033]133;D;0\007");
+        Await.until(() -> captured.size() == 2, "continuation command");
+        assertThat(captured.get(1)).isEqualTo("echo 'a\n> b'");
     }
 
     @Test

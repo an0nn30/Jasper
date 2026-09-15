@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -65,6 +66,10 @@ public final class TerminalSession implements AutoCloseable {
         /** The active terminal buffer changed, so absolute rows from the previous buffer are no longer meaningful. */
         default void alternateBufferChanged(boolean alternate) {
         }
+
+        /** The shell ran a command it marked with OSC 133 B/C (and D when it sends one). Reader thread. */
+        default void commandExecuted(String command, OptionalInt exitStatus, Optional<Path> workingDirectory) {
+        }
     }
 
     private final TtyConnector connector;
@@ -81,6 +86,10 @@ public final class TerminalSession implements AutoCloseable {
     private volatile Path workingDirectory;
     private volatile int columns;
     private volatile int rows;
+    // Reader thread only: tracks the command typed between OSC 133 B and C.
+    private long commandStartRow = -1;
+    private int commandStartColumn;
+    private String pendingCommand;
 
     /** Starts {@code command} in a new pseudo-terminal and begins emulating its output. */
     public static TerminalSession start(List<String> command, Map<String, String> environment, Path workingDirectory,
@@ -610,8 +619,15 @@ public final class TerminalSession implements AutoCloseable {
                 listeners.forEach(l -> l.workingDirectoryChanged(directory));
             });
             case "mark" -> {
-                if (args.size() > 2 && "A".equals(args.get(2))) {
-                    recordPrompt();
+                String mark = args.size() > 2 ? args.get(2) : "";
+                switch (mark) {
+                    case "A" -> { flushPendingCommand(OptionalInt.empty()); recordPrompt(); }
+                    case "B" -> markCommandStart();
+                    case "C" -> captureCommand();
+                    case "D" -> flushPendingCommand(exitStatus(args));
+                    default -> {
+                        // Other FinalTerm marks carry nothing Jasper tracks.
+                    }
                 }
             }
             case "cursor-reset" -> display.resetCursorShape();
@@ -630,6 +646,48 @@ public final class TerminalSession implements AutoCloseable {
             }
         } finally {
             buffer.unlock();
+        }
+    }
+
+    private void markCommandStart() {
+        buffer.lock();
+        try {
+            commandStartRow = absoluteRow(terminal.getCursorY() - 1);
+            commandStartColumn = terminal.getCursorX() - 1;
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    /** At C the shell has echoed the command and moved on; the rows from B to the cursor are what was typed. */
+    private void captureCommand() {
+        buffer.lock();
+        try {
+            if (commandStartRow < 0) return;
+            long endRow = absoluteRow(terminal.getCursorY() - 1);
+            if (terminal.getCursorX() - 1 == 0) endRow--; // Enter moved the cursor to a fresh line
+            String text = CommandCapture.text(commandStartRow, commandStartColumn, endRow, buffer.getWidth(), this::lineAtLocked);
+            commandStartRow = -1;
+            pendingCommand = text.isEmpty() ? null : text;
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    private void flushPendingCommand(OptionalInt exitStatus) {
+        String command = pendingCommand;
+        pendingCommand = null;
+        if (command == null) return;
+        Optional<Path> directory = workingDirectory();
+        listeners.forEach(l -> l.commandExecuted(command, exitStatus, directory));
+    }
+
+    private static OptionalInt exitStatus(List<String> args) {
+        if (args.size() < 4) return OptionalInt.empty();
+        try {
+            return OptionalInt.of(Integer.parseInt(args.get(3).trim()));
+        } catch (NumberFormatException malformed) {
+            return OptionalInt.empty();
         }
     }
 

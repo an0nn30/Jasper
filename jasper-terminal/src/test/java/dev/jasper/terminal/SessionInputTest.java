@@ -70,6 +70,14 @@ class SessionInputTest {
         assertThat(connector.written()).isEqualTo("\033[200~xy\033[201~");
     }
 
+    @Test void aPasteFollowedByARawReturnKeepsTheReturnOutsideTheBracket() throws Exception {
+        connector.feed("\033[?2004h");
+        Await.until(() -> session.display().bracketedPaste(), "bracketed paste on");
+        session.paste("ls -la\n");
+        session.write("\r");
+        assertThat(connector.written()).isEqualTo("\033[200~ls -la\r\033[201~\r");
+    }
+
     @Test
     void osc8LinksAreFoundUnderTheirText() throws Exception {
         connector.feed("\033]8;;https://example.com\007link\033]8;;\007 plain");

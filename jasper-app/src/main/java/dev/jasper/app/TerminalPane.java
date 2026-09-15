@@ -18,7 +18,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     private final Path launchDirectory;
     private final ShellLauncher launcher;
     private final AtomicBoolean updateQueued = new AtomicBoolean();
-    private String shellLabel;
+    private volatile String shellLabel;
     private TerminalSession session;
     private TerminalView view;
     private FindBar findBar;
@@ -32,10 +32,17 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     Runnable onClose = () -> {};
     Consumer<String> onFailure = message -> {};
     Consumer<TerminalView> onReady = terminal -> {};
+    Consumer<ShellHistoryEntry> onCommandExecuted = entry -> {};
     private final TerminalSession.Listener listener = new TerminalSession.Listener() {
         @Override public void screenChanged() { queueUpdate(); }
         @Override public void titleChanged(String title) { queueUpdate(); }
         @Override public void workingDirectoryChanged(Path directory) { queueUpdate(); }
+
+        @Override public void commandExecuted(String command, java.util.OptionalInt exitStatus, java.util.Optional<Path> workingDirectory) {
+            onCommandExecuted.accept(new ShellHistoryEntry(command, java.time.Instant.now().getEpochSecond(),
+                java.util.Set.of(shellLabel), workingDirectory.orElse(null),
+                exitStatus.isPresent() ? exitStatus.getAsInt() : null));
+        }
     };
 
     TerminalPane(Path directory, ShellLauncher launcher) {
@@ -161,6 +168,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         onChanged = () -> {}; onFocused = () -> {}; onClose = () -> {};
         allowLaunchFocus = () -> false;
         onReady = terminal -> {}; onFailure = message -> {};
+        onCommandExecuted = entry -> {};
         removeAll();
     }
 }
