@@ -173,10 +173,10 @@ final class CommandPalette extends JPanel {
     JLabel footer() { return footer; }
     JLabel sectionLabel() { return sectionLabel; }
 
-    void setScope(String label, Icon icon, String placeholder, List<PaletteVerb> verbs, int preferredRows, boolean monospace) {
+    void setScope(String label, Icon icon, String placeholder, List<PaletteVerb> verbs, int maxRows, boolean monospace) {
         scopeLabel = Objects.requireNonNull(label);
         this.verbs = List.copyOf(verbs);
-        this.preferredRows = Math.max(1, preferredRows);
+        this.preferredRows = Math.max(1, maxRows);
         chip.set(label, icon);
         chip.getAccessibleContext().setAccessibleName("Scope: " + label);
         query.putClientProperty("JTextField.placeholderText", placeholder);

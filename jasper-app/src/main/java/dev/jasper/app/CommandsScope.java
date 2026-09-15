@@ -43,12 +43,14 @@ final class CommandsScope implements PaletteScope {
 
     @Override public PaletteResults search(String query, PaletteContext context) {
         if (CommandSearch.normalize(query).isEmpty()) {
-            List<Command> recent = available(history.recent());
+            int limit = Math.min(3, context.maxResults());
+            List<Command> recent = available(history.recent(), limit);
             boolean suggested = recent.isEmpty();
-            if (suggested) recent = available(STARTERS);
+            if (suggested) recent = available(STARTERS, limit);
             return new PaletteResults(rows(recent), suggested ? "Suggested" : "Recent", null);
         }
-        return new PaletteResults(rows(CommandSearch.find(registry.entries(), query, history.recent())), null, null);
+        return new PaletteResults(
+            rows(CommandSearch.find(registry.entries(), query, history.recent(), context.maxResults())), null, null);
     }
 
     @Override public boolean available(PaletteRow row, PaletteContext context) {
@@ -68,9 +70,9 @@ final class CommandsScope implements PaletteScope {
         return new CommandRegistry.Subscription(() -> { registryListener.close(); historyListener.close(); });
     }
 
-    private List<Command> available(List<String> ids) {
+    private List<Command> available(List<String> ids, int limit) {
         return ids.stream().flatMap(id -> registry.find(id).stream())
-            .filter(command -> command.action().isEnabled()).limit(3).toList();
+            .filter(command -> command.action().isEnabled()).limit(limit).toList();
     }
 
     List<PaletteRow> rows(List<Command> commands) {

@@ -25,6 +25,19 @@ class CommandSearchTest {
         assertThat(matches.get(1).id()).isEqualTo("test.0");
     }
 
+    @Test void theResultLimitIsConfigurableAndDefaultsToFive() {
+        var entries = new ArrayList<CommandSearch.Entry>();
+        for (int i = 0; i < 8; i++) {
+            var action = new AbstractAction("Other " + i) {
+                @Override public void actionPerformed(java.awt.event.ActionEvent e) {}
+            };
+            entries.add(CommandSearch.entry(new Command("test." + i, action, List.of())));
+        }
+        assertThat(CommandSearch.find(entries, "other", List.of())).hasSize(5);
+        assertThat(CommandSearch.find(entries, "other", List.of(), 2)).hasSize(2);
+        assertThat(CommandSearch.find(entries, "other", List.of(), 20)).hasSize(8);
+    }
+
     @Test void exactPrefixWordPrefixSubstringKeywordAndFuzzyTiersAreOrdered() {
         var entries = List.of(
             entry("test.fuzzy", "SxPliT", List.of()),

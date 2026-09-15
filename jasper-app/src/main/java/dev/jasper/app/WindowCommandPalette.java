@@ -30,6 +30,7 @@ final class WindowCommandPalette implements AutoCloseable {
     private TerminalPane originPane;
     private Component priorFocus;
     private boolean open, closed, dirty = true;
+    private int maxResults = PaletteContext.DEFAULT_MAX_RESULTS;
 
     WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, String defaultScopeId, boolean macOs) {
         this.owner = owner; this.scopes = scopes; this.defaultScopeId = defaultScopeId; this.macOs = macOs;
@@ -79,7 +80,7 @@ final class WindowCommandPalette implements AutoCloseable {
         owner.updateActions();
         originTab = owner.currentTab(); originPane = owner.currentPane();
         priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
-        context = new PaletteContext(macOs, originPane == null ? PaletteTarget.none() : PaletteTarget.of(originPane));
+        context = new PaletteContext(macOs, originPane == null ? PaletteTarget.none() : PaletteTarget.of(originPane), maxResults);
         open = true; overlay.swallowing = false; palette.setVisible(true); overlay.setVisible(true);
         activate(scope, false);
         palette.queryField().requestFocusInWindow();
@@ -89,12 +90,24 @@ final class WindowCommandPalette implements AutoCloseable {
         if (scopeListener != null) scopeListener.close();
         active = scope; picker = false;
         scopeListener = scope.onChanged(this::changed);
-        palette.setScope(scope.label(), scope.icon(), scope.placeholder(), scope.verbs(), scope.preferredRows(),
-            scope.monospaceRows());
+        palette.setScope(scope.label(), scope.icon(), scope.placeholder(), scope.verbs(), maxResults, scope.monospaceRows());
         if (!keepQuery) palette.queryField().setText("");
         scope.activated(context);
         rebuild(false);
     }
+
+    /** The hard cap every scope returns; a live change re-runs the open query under the new cap. */
+    void setMaxResults(int value) {
+        if (value == maxResults) return;
+        maxResults = value;
+        context = new PaletteContext(macOs, context.target(), maxResults);
+        if (open && active != null) {
+            palette.setScope(active.label(), active.icon(), active.placeholder(), active.verbs(), maxResults, active.monospaceRows());
+            rebuild(true);
+        }
+    }
+
+    int maxResults() { return maxResults; }
 
     void dismiss() { if (open) restoreAndHide(); }
     /** Escape leaves the picker with the previous scope; outside the picker it dismisses. */

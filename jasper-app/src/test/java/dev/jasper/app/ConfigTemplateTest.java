@@ -42,6 +42,7 @@ class ConfigTemplateTest {
         assertThat(toml.errors()).isEmpty();
         assertThat(toml.getTable("buddy").keySet()).containsExactly("enabled");
         assertThat(toml.getTable("history").keySet()).containsExactly("enabled");
+        assertThat(toml.getTable("palette").keySet()).containsExactly("max_results");
         assertThat(toml.getTable("window").keySet())
             .containsExactlyInAnyOrder("tab_height", "toolbar", "status_bar", "columns", "lines");
         assertThat(toml.getTable("font").keySet())
@@ -76,6 +77,7 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().statusBar()).isTrue();
             assertThat(all.snapshot().buddyEnabled()).isTrue();
             assertThat(all.snapshot().historyEnabled()).isTrue();
+            assertThat(all.snapshot().maxResults()).isEqualTo(5);
             assertThat(all.snapshot().fontSize()).isEqualTo(16f);
             assertThat(all.snapshot().columns()).isEqualTo(150);
             assertThat(all.snapshot().lines()).isEqualTo(45);

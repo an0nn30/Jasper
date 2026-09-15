@@ -23,6 +23,11 @@ enabled = true
 # Jasper only reads zsh, bash, fish, nushell and PowerShell history files; it writes no history of its own.
 enabled = true
 
+[palette]
+# Live. Rows the command palette shows in every scope (Commands and History). Range: 1-20.
+# Cmd/Ctrl+1-5 still act on the first five rows.
+max_results = 5
+
 [font]
 # Live across existing and new panes. Missing fonts use JBR/system fallback.
 family = "JetBrains Mono"

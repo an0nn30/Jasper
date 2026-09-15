@@ -16,7 +16,8 @@ entirely by fifteen synthetic entries recorded through `index.record(...)` on an
 inline executor (worker and delivery both run on the calling thread, so every
 entry is indexed before the palette opens) — the same pattern as
 `ShellHistoryIndexTest.inline`. Two of the fifteen commands start with `git`;
-the sixth carries a synthetic working directory to exercise the detail line;
+the thirteenth (`brew upgrade`, inside the five-row cap) carries a synthetic working
+directory to exercise the detail line;
 the rest carry no directory. Every third synthetic entry is bash and the rest are zsh, so every row is tagged.
 
 | State | Dark | Light |
@@ -25,7 +26,7 @@ the rest carry no directory. Every third synthetic entry is bash and the rest ar
 | `pane`, five results | [1×](pane-query-dark-900x600-1x.png) / [2×](pane-query-dark-900x600-2x.png) | [1×](pane-query-light-900x600-1x.png) / [2×](pane-query-light-900x600-2x.png) |
 | No match | [1×](no-match-dark-900x600-1x.png) / [2×](no-match-dark-900x600-2x.png) | [1×](no-match-light-900x600-1x.png) / [2×](no-match-light-900x600-2x.png) |
 | Long labels, 360×500 | [1×](long-labels-narrow-dark-360x500-1x.png) / [2×](long-labels-narrow-dark-360x500-2x.png) | [1×](long-labels-narrow-light-360x500-1x.png) / [2×](long-labels-narrow-light-360x500-2x.png) |
-| History, most recent (15 entries, 12 visible) | [1×](history-recent-dark-900x600-1x.png) / [2×](history-recent-dark-900x600-2x.png) | [1×](history-recent-light-900x600-1x.png) / [2×](history-recent-light-900x600-2x.png) |
+| History, most recent (15 entries, the newest 5 shown) | [1×](history-recent-dark-900x600-1x.png) / [2×](history-recent-dark-900x600-2x.png) | [1×](history-recent-light-900x600-1x.png) / [2×](history-recent-light-900x600-2x.png) |
 | History, `git` query, two results | [1×](history-query-dark-900x600-1x.png) / [2×](history-query-dark-900x600-2x.png) | [1×](history-query-light-900x600-1x.png) / [2×](history-query-light-900x600-2x.png) |
 | Scope picker (`>`) | [1×](scope-picker-dark-900x600-1x.png) / [2×](scope-picker-dark-900x600-2x.png) | [1×](scope-picker-light-900x600-1x.png) / [2×](scope-picker-light-900x600-2x.png) |
 
@@ -48,9 +49,10 @@ muted text in dark and light.
 The three new History/picker states were inspected the same way. In both History
 states the chip reads "History" with its clock icon, the footer shows "⏎ Paste
 ⌘⏎ Paste and run", and every row's shell tag sits right-aligned at the row's far
-edge. `history-recent` shows all fifteen entries scrolled to the top, tags
-alternating `bash`/`zsh`, and a muted detail line under the `rg TODO
-jasper-app/src` row reading `/Users/preview/projects/moray` — the only row with
+edge. `history-recent` shows only the newest five of the fifteen entries (the
+`palette.max_results` hard cap, no scrolling), tags mixing `bash`/`zsh`, and a
+muted detail line under the `brew upgrade` row reading
+`/Users/preview/projects/moray` — the only row with
 one; numbered badges (⌘1–⌘5) appear on the first five rows only, and the rest
 show no badge. `history-query` filters to the two `git` commands with the same
 chip, footer and tags. `scope-picker` shows the "Commands" chip (unchanged,

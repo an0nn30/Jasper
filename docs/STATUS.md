@@ -1,5 +1,12 @@
 # Jasper — Status and Handoff
 
+**Palette result cap (2026-09-15):** `palette.max_results` (1–20, default 5, live) is now the
+hard cap every scope returns: `PaletteContext` carries it to `CommandsScope` (through a
+`CommandSearch.find` limit) and `ShellHistoryScope` (which no longer holds fifty rows and
+scrolls twelve), the card sizes to exactly that many rows, and `PaletteScope.preferredRows()`
+is gone. Cmd/Ctrl+1–5 still number the first five. Tests cover parsing, the range, both
+scopes and the live change on an open palette. History renders regenerated.
+
 **Palette scopes and shell history (2026-09-15):** On `claude/palette-scopes` in
 `.worktrees/palette-scopes` (from main `86352b9`), the command palette is now
 scope-based: one `PaletteScope` contract with two implementations, `CommandsScope`

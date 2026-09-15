@@ -12,7 +12,6 @@ import javax.swing.Icon;
 final class ShellHistoryScope implements PaletteScope {
     static final PaletteVerb PASTE = new PaletteVerb("paste", "Paste");
     static final PaletteVerb PASTE_RUN = new PaletteVerb("paste_run", "Paste and run");
-    static final int MAX_RESULTS = 50;
 
     private final ShellHistoryIndex index;
     private final Icon icon;
@@ -31,7 +30,6 @@ final class ShellHistoryScope implements PaletteScope {
     @Override public String placeholder() { return "Search shell history, or > to switch scope"; }
     @Override public List<String> aliases() { return List.of("hist", "shell"); }
     @Override public List<PaletteVerb> verbs() { return List.of(PASTE, PASTE_RUN); }
-    @Override public int preferredRows() { return 12; }
     @Override public boolean monospaceRows() { return true; }
     @Override public void activated(PaletteContext context) { index.refresh(); }
 
@@ -44,7 +42,7 @@ final class ShellHistoryScope implements PaletteScope {
         if (q.isEmpty()) {
             var rows = new ArrayList<PaletteRow>();
             for (ShellHistoryEntry entry : snapshot.entries()) {
-                if (rows.size() == MAX_RESULTS) break;
+                if (rows.size() == context.maxResults()) break;
                 rows.add(row(entry, tagged));
             }
             return new PaletteResults(rows, "Most recent", null);
@@ -63,7 +61,7 @@ final class ShellHistoryScope implements PaletteScope {
         ranked.sort(Comparator.comparingInt(Ranked::tier).thenComparingInt(Ranked::directory).thenComparingInt(Ranked::position));
         var rows = new ArrayList<PaletteRow>();
         for (Ranked item : ranked) {
-            if (rows.size() == MAX_RESULTS) break;
+            if (rows.size() == context.maxResults()) break;
             rows.add(row(item.entry(), tagged));
         }
         return new PaletteResults(rows, null, null);

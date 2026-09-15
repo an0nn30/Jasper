@@ -40,7 +40,6 @@ class ShellHistoryScopeTest {
                 var context = new PaletteContext(true, target(new ArrayList<>(), new AtomicInteger(), Path.of("/work"), true));
                 assertThat(scope.id()).isEqualTo(PaletteScope.HISTORY_ID);
                 assertThat(scope.verbs()).containsExactly(ShellHistoryScope.PASTE, ShellHistoryScope.PASTE_RUN);
-                assertThat(scope.preferredRows()).isEqualTo(12);
                 assertThat(scope.monospaceRows()).isTrue();
                 var recent = scope.search("  ", context);
                 assertThat(recent.sectionLabel()).isEqualTo("Most recent");
@@ -54,6 +53,22 @@ class ShellHistoryScopeTest {
                     "test-runner --fast", "testing 1 2", "git commit -m test", "make test", "attest now");
                 assertThat(scope.search("commit test", context).rows()).extracting(PaletteRow::title).containsExactly("git commit -m test");
                 assertThat(scope.search("nothing here", context).rows()).isEmpty();
+            }
+        });
+    }
+
+    @Test void theContextCapsBothTheRecentListAndSearchResults() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var index = indexOf(
+                    ShellHistoryEntry.of("test one", 1, "zsh"), ShellHistoryEntry.of("test two", 2, "zsh"),
+                    ShellHistoryEntry.of("test three", 3, "zsh"), ShellHistoryEntry.of("test four", 4, "zsh"),
+                    ShellHistoryEntry.of("test five", 5, "zsh"), ShellHistoryEntry.of("test six", 6, "zsh"))) {
+                var scope = new ShellHistoryScope(index, null);
+                var three = new PaletteContext(true, target(new ArrayList<>(), new AtomicInteger(), null, true), 3);
+                assertThat(scope.search("", three).rows()).extracting(PaletteRow::title).containsExactly("test six", "test five", "test four");
+                assertThat(scope.search("test", three).rows()).hasSize(3);
+                var five = new PaletteContext(true, target(new ArrayList<>(), new AtomicInteger(), null, true));
+                assertThat(scope.search("", five).rows()).hasSize(5);
             }
         });
     }

@@ -43,6 +43,10 @@ final class ConfigTemplate {
             # Reads zsh, bash, fish, nushell and PowerShell history files; Jasper writes no history of its own.
             # enabled = true
 
+            [palette]
+            # Rows the command palette shows in every scope, 1-20; updates live. Cmd/Ctrl+1-5 still number the first five.
+            # max_results = 5
+
             [font]
             # Font family and ordered fallbacks update live. Missing fonts use JBR/system fallback.
             # family = "JetBrains Mono"

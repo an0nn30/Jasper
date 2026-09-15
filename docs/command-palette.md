@@ -20,7 +20,8 @@ text.
 
 ## Commands
 
-Type to search available commands. At most five results appear. An empty search
+Type to search available commands. At most `palette.max_results` results appear
+(five by default; see [configuration](configuration.md#palette)). An empty search
 shows your last three distinct palette commands, newest first.
 Recents are shared across windows and saved in `command-history.toml` under
 Jasper's application directory. Running Settings from the palette counts as a

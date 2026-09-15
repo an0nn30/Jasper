@@ -26,6 +26,10 @@ final class CommandSearch {
     }
 
     static List<Command> find(List<Entry> entries, String query, List<String> recent) {
+        return find(entries, query, recent, PaletteContext.DEFAULT_MAX_RESULTS);
+    }
+
+    static List<Command> find(List<Entry> entries, String query, List<String> recent, int limit) {
         String q = normalize(query);
         if (q.isEmpty()) return List.of();
         List<Match> matches = new ArrayList<>();
@@ -64,7 +68,7 @@ final class CommandSearch {
         matches.sort(Comparator.comparingInt(Match::tier).thenComparingInt(Match::gaps)
             .thenComparingInt(Match::recent).thenComparing(Match::title)
             .thenComparing(m -> m.command().id()));
-        return matches.stream().limit(5).map(Match::command).toList();
+        return matches.stream().limit(limit).map(Match::command).toList();
     }
 
     private static int fuzzyGaps(String title, String token) {

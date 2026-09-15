@@ -66,6 +66,33 @@ class ShellHistoryIntegrationTest {
         });
     }
 
+    @Test void maxResultsCapsEveryScopeLiveAndTheCardShowsExactlyThatMany() throws Exception {
+        edt(() -> {
+            try (var index = inlineIndex(); var owner = owner(true, index)) {
+                for (int i = 0; i < 8; i++) index.record(ShellHistoryEntry.of("cmd " + i, 10 + i, "zsh"));
+                CommandPaletteShortcutsTest.install(owner);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.open(PaletteScope.HISTORY_ID);
+                assertThat(card.resultList().getModel().getSize()).isEqualTo(5);
+                assertThat(card.resultList().getVisibleRowCount()).isEqualTo(5);
+                var defaults = ConfigSnapshot.defaults();
+                var three = new ConfigSnapshot(defaults.tabHeight(), defaults.toolbar(), defaults.statusBar(), defaults.font(),
+                    defaults.variant(), Map.of(), defaults.columns(), defaults.lines(), defaults.terminal(),
+                    defaults.buddyEnabled(), defaults.historyEnabled(), 3);
+                owner.applyConfiguration(three, true);
+                assertThat(palette.isOpen()).isTrue();
+                assertThat(card.resultList().getModel().getSize()).isEqualTo(3);
+                assertThat(card.resultList().getVisibleRowCount()).isEqualTo(3);
+                assertThat(card.resultList().getModel().getElementAt(0).title()).isEqualTo("cmd 7");
+                palette.open(PaletteScope.COMMANDS_ID);
+                card.queryField().setText("tab");
+                assertThat(card.resultList().getModel().getSize()).isEqualTo(3);
+                owner.applyConfiguration(defaults, true);
+                assertThat(card.resultList().getModel().getSize()).isEqualTo(5);
+            }
+        });
+    }
+
     @Test @DisabledOnOs(OS.WINDOWS)
     void commandsRunInARealShellReachTheIndexWithTheirShellTag(@org.junit.jupiter.api.io.TempDir Path directory) throws Exception {
         var pending = new ArrayDeque<Runnable>();

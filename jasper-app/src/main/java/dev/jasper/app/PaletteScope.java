@@ -18,10 +18,10 @@ interface PaletteScope {
     String placeholder();
     default List<String> aliases() { return List.of(); }
     List<PaletteVerb> verbs();
-    default int preferredRows() { return 5; }
     default boolean monospaceRows() { return false; }
     /** The scope became active in an open palette; a scope may ask its index for a background refresh here. */
     default void activated(PaletteContext context) {}
+    /** At most {@code context.maxResults()} rows; the palette is a hard-capped list, never a scrolling one. */
     PaletteResults search(String query, PaletteContext context);
     /** Rechecked immediately before execution; a false answer refreshes the list instead of executing. */
     default boolean available(PaletteRow row, PaletteContext context) { return row.enabled(); }

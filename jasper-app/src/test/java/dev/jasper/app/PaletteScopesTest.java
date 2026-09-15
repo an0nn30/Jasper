@@ -22,7 +22,6 @@ class PaletteScopesTest {
         @Override public String placeholder() { return "Search fake"; }
         @Override public List<String> aliases() { return List.of("fx"); }
         @Override public List<PaletteVerb> verbs() { return List.of(new PaletteVerb("one", "One"), new PaletteVerb("two", "Two")); }
-        @Override public int preferredRows() { return 12; }
         @Override public void activated(PaletteContext context) { activations++; }
         @Override public PaletteResults search(String query, PaletteContext context) {
             String q = CommandSearch.normalize(query);

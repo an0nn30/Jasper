@@ -79,6 +79,7 @@ variant = "dark"
 | `window.lines` | `45` | Integer 2–200 | New windows |
 | `buddy.enabled` | `true` | Boolean | Live |
 | `history.enabled` | `true` | Boolean | Live |
+| `palette.max_results` | `5` | Integer 1–20 | Live |
 | `font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
 | `font.size` | `16.0` | Finite number 6–72 points | Live |
 | `font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
@@ -107,6 +108,13 @@ active terminal window forward. Left alone he sits down after 20 seconds and ret
 shell to sleep after a minute; hovering wakes him and earns a one-second wave. View → Show
 Jasper, the command palette and right-click → Hide Jasper toggle him for the current session; a
 saved change to `buddy.enabled` resets that session choice.
+
+### Palette
+
+`palette.max_results` is the hard cap on rows the command palette lists, in every scope: Commands shows the
+best `max_results` matches and History the most recent or best-matching `max_results` commands, with no
+scrolling. Cmd/Ctrl+1–5 always act on the first five rows, so a larger cap only adds rows you reach with the
+arrow keys. Changes apply live, including to an open palette.
 
 ### Shell history
 

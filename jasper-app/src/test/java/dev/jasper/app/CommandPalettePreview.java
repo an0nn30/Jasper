@@ -158,7 +158,7 @@ public final class CommandPalettePreview {
                     "tail -f /var/log/system.log", "brew upgrade", "ssh build@ci.example.com", "npm run dev"};
                 for (int i = 0; i < commands.length; i++)
                     index.record(new ShellHistoryEntry(commands[i], 1_700_000_000L + i, java.util.Set.of(i % 3 == 0 ? "bash" : "zsh"),
-                        i == 5 ? java.nio.file.Path.of("/Users/preview/projects/moray") : null, null));
+                        i == 12 ? java.nio.file.Path.of("/Users/preview/projects/moray") : null, null));
                 var owner = new WindowContent(launcher, DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
                     themes, KeyBindings.defaults(true), System::nanoTime, history, true, index);
                 var root = new JRootPane();
@@ -231,28 +231,26 @@ public final class CommandPalettePreview {
         private void assertScenario(Scenario scenario) throws Exception {
             SwingUtilities.invokeAndWait(() -> {
                 var palette = owner.commandPalette().component();
-                int modelSize = palette.resultList().getModel().getSize();
-                // History's recent list holds every entry (15); the card only shows preferredRows (12) at once.
-                int count = scenario == Scenario.HISTORY_RECENT ? palette.resultList().getVisibleRowCount() : modelSize;
+                int count = palette.resultList().getModel().getSize();
                 int expected = switch (scenario) {
                     case RECENTS -> 3;
                     case PANE_QUERY, LONG_LABELS -> 5;
                     case NO_MATCH -> 0;
-                    case HISTORY_RECENT -> 12;
+                    case HISTORY_RECENT -> 5;
                     case HISTORY_QUERY, SCOPE_PICKER -> 2;
                 };
                 if (count != expected) {
                     throw new AssertionError(scenario.slug + " expected " + expected + " rows, got " + count);
                 }
                 if (scenario == Scenario.PANE_QUERY) {
-                    for (int i = 0; i < modelSize; i++) {
+                    for (int i = 0; i < count; i++) {
                         String id = palette.resultList().getModel().getElementAt(i).id();
                         if (id.startsWith("preview.")) throw new AssertionError("Pane query used synthetic command " + id);
                     }
                 }
                 if (scenario == Scenario.HISTORY_RECENT) {
-                    if (modelSize != 15) throw new AssertionError("history-recent expected 15 model rows, got " + modelSize);
-                    for (int i = 0; i < modelSize; i++) {
+                    // Fifteen entries are recorded; the hard cap keeps only the newest five.
+                    for (int i = 0; i < count; i++) {
                         PaletteRow row = palette.resultList().getModel().getElementAt(i);
                         if (row.tag() == null) throw new AssertionError("history-recent row missing tag: " + row.id());
                     }
