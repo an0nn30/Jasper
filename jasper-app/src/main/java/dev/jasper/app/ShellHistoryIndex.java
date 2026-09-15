@@ -119,9 +119,10 @@ final class ShellHistoryIndex implements AutoCloseable {
         if (size == state.size && modified.equals(state.modified) && state.offset > 0) return;
         boolean tail = state.offset > 0 && size >= state.size;
         long from = tail ? state.offset : 0;
-        if (size - from > MAX_READ) from = size - MAX_READ;
+        boolean clipped = size - from > MAX_READ;
+        if (clipped) from = size - MAX_READ;
         byte[] bytes = read(file, from, size);
-        if (from > 0 && !tail) {
+        if (from > 0 && (!tail || clipped)) {
             int newline = 0;
             while (newline < bytes.length && bytes[newline] != '\n') newline++;
             int skip = Math.min(bytes.length, newline + 1);

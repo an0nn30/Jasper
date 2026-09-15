@@ -12,12 +12,16 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 class ShellHistoryIndexTest {
+    /** Each generated line is exactly this many characters (excluding the trailing '\n'). */
+    private static final int LINE_WIDTH = 1999;
+
     @TempDir Path home;
 
     /** Worker and delivery run inline on the EDT so each refresh is complete when the call returns. */
@@ -97,6 +101,57 @@ class ShellHistoryIndexTest {
                 assertThat(index.snapshot().entries()).extracting(ShellHistoryEntry::command).containsExactly("ls -la");
                 assertThat(index.snapshot().entries().getFirst().directory()).isEqualTo(Path.of("/tmp"));
                 assertThat(index.snapshot().shells()).containsExactly("sh");
+            }
+        });
+    }
+
+    private static String historyLine(String prefix, int index) {
+        StringBuilder line = new StringBuilder(prefix).append(String.format("%06d", index));
+        while (line.length() < LINE_WIDTH) line.append('.');
+        return line.toString();
+    }
+
+    private static String block(String prefix, int count) {
+        var block = new StringBuilder(count * (LINE_WIDTH + 1));
+        for (int i = 0; i < count; i++) block.append(historyLine(prefix, i)).append('\n');
+        return block.toString();
+    }
+
+    /**
+     * A clipped read window (the 16 MiB {@code MAX_READ} cap) must be trimmed forward to the next
+     * newline whether it comes from a full read or a tail read, or the read starts mid-line and the
+     * first fragment parses as a garbled, truncated entry. 2000-byte lines are used deliberately: the
+     * 16 MiB window is not a multiple of 2000, so the clip point never happens to land on a line
+     * boundary by coincidence, and the test would pass vacuously with 64-byte (or any power-of-two)
+     * lines because 16 MiB is itself a power of two.
+     */
+    @Test void aClippedTailReadIsTrimmedToTheNextLineSoNoPartialEntrySurvives() throws Exception {
+        Path bash = home.resolve(".bash_history");
+        int initCount = 8_450;   // 16,900,000 bytes: just over the 16,777,216-byte MAX_READ window.
+        int appendCount = 8_500; // 17,000,000 bytes: also over MAX_READ, so the tail read is clipped too.
+        Files.writeString(bash, block("init", initCount));
+        long initSize = Files.size(bash);
+        assertThat(initSize).isGreaterThan(16L * 1024 * 1024);
+        var sources = List.of(new ShellHistorySource(HistoryShell.BASH, bash));
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                try (var index = inline(sources)) {
+                    index.refresh(); // Full read, itself clipped; the pre-fix code already trimmed full reads.
+                    Files.writeString(bash, block("appd", appendCount), StandardOpenOption.APPEND);
+                    assertThat(Files.size(bash) - initSize).isGreaterThan(16L * 1024 * 1024);
+                    Files.setLastModifiedTime(bash, FileTime.fromMillis(System.currentTimeMillis() + 5_000));
+                    index.refresh(); // Tail read, clipped: this is the path the fix corrects.
+                    assertThat(index.stats(sources.get(0)).tailReads()).isEqualTo(1);
+
+                    Pattern fullLine = Pattern.compile("^(init|appd)\\d{6}\\.{" + (LINE_WIDTH - 10) + "}$");
+                    var entries = index.snapshot().entries();
+                    assertThat(entries).isNotEmpty();
+                    assertThat(entries).extracting(ShellHistoryEntry::command).allMatch(fullLine.asMatchPredicate(),
+                        "is a complete, unclipped history line");
+                    assertThat(entries.getFirst().command()).isEqualTo(historyLine("appd", appendCount - 1));
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
             }
         });
     }
