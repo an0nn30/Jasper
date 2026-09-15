@@ -26,8 +26,8 @@ final class WindowChrome {
             ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
             ActionId.FIND_PREVIOUS, ActionId.CLEAR_SCROLLBACK);
-        JMenu view = menu("View", ActionId.COMMAND_PALETTE, ActionId.ZOOM_PANE, ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET);
-        view.insertSeparator(1);
+        JMenu view = menu("View", ActionId.COMMAND_PALETTE, ActionId.HISTORY_PALETTE, ActionId.ZOOM_PANE, ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET);
+        view.insertSeparator(2);
         JMenu pane = menu("Pane", ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_PANE_LEFT,
             ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
             ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT);

@@ -47,7 +47,29 @@ class CommandPaletteShortcutsTest {
                 assertThat(owner.commands().entries()).noneMatch(e -> e.command().id().equals("command_palette"));
                 var view = owner.chrome().menuBar().getMenu(2);
                 assertThat(view.getItem(0).getAction()).isSameAs(owner.action(ActionId.COMMAND_PALETTE));
-                assertThat(view.getMenuComponent(1)).isInstanceOf(JSeparator.class);
+                assertThat(view.getItem(1).getAction()).isSameAs(owner.action(ActionId.HISTORY_PALETTE));
+                assertThat(view.getMenuComponent(2)).isInstanceOf(JSeparator.class);
+            }
+        });
+    }
+
+    @Test void historyShortcutIsCmdROnMacAndCtrlShiftRElsewhereAndIsInertWithoutTheScope() throws Exception {
+        assertThat(KeyBindings.defaults(true).strokeFor(ActionId.HISTORY_PALETTE))
+            .contains(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_DOWN_MASK));
+        assertThat(KeyBindings.defaults(false).strokeFor(ActionId.HISTORY_PALETTE))
+            .contains(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        assertThat(KeyBindings.defaults(false).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK))).isEmpty();
+        assertThat(KeyBindings.effectiveDefaultBinding(ActionId.HISTORY_PALETTE, false)).isEqualTo("ctrl+shift+r");
+        assertThat(PaletteKeyRouter.scopeFor(ActionId.HISTORY_PALETTE)).isEqualTo(PaletteScope.HISTORY_ID);
+        edt(() -> {
+            try (var owner = owner(false)) {
+                var root = install(owner); var router = PaletteKeyRouterTest.router(owner, false, root);
+                assertThat(owner.action(ActionId.HISTORY_PALETTE).isEnabled()).isFalse();
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_R,
+                    InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                assertThat(owner.commandPalette().isOpen()).isFalse();
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK))).isFalse();
+                assertThat(owner.commands().entries()).noneMatch(e -> e.command().id().equals("history_palette"));
             }
         });
     }

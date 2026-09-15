@@ -58,6 +58,9 @@ final class WindowCommandPalette implements AutoCloseable {
 
     void toggle() { open(defaultScopeId); }
 
+    /** Whether a scope ID is currently registered; a shortcut targeting an unregistered scope is inert. */
+    boolean hasScope(String scopeId) { return scopes.find(scopeId).isPresent(); }
+
     /**
      * Opens in a scope, or dismisses when its shortcut is pressed while it is already active
      * (regardless of the picker). Switching to a different scope keeps the query, except from

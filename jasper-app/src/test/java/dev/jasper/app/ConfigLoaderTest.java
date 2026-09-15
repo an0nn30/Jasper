@@ -233,6 +233,20 @@ class ConfigLoaderTest {
         assertDiagnostic(unknown, "buddy.visible", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
 
+    @Test void historyEnabledParsesAndRejectsNonBooleans() {
+        var off = parse("[history]\nenabled = false\n");
+        assertThat(off.rejected()).isFalse();
+        assertThat(off.diagnostics()).isEmpty();
+        assertThat(off.snapshot().historyEnabled()).isFalse();
+        assertThat(ConfigSnapshot.defaults().historyEnabled()).isTrue();
+        var bad = parse("[history]\nenabled = \"yes\"\n");
+        assertThat(bad.rejected()).isTrue();
+        assertThat(bad.snapshot().historyEnabled()).isTrue();
+        assertDiagnostic(bad, "history.enabled", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        var unknown = parse("[history]\nshells = [\"zsh\"]\n");
+        assertDiagnostic(unknown, "history.shells", 2, 1, ConfigDiagnostic.Severity.WARNING);
+    }
+
     private void assertDiagnostic(ConfigLoader.Result result, String key, int line, int column, ConfigDiagnostic.Severity severity) {
         assertThat(result.diagnostics()).filteredOn(d -> d.key().equals(key)).singleElement().satisfies(d -> {
             assertThat(d.file()).isEqualTo(FILE);

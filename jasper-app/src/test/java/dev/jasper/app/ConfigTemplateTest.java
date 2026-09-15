@@ -19,8 +19,10 @@ class ConfigTemplateTest {
 
     @Test void paletteAndClearCommentsShowTheirLiteralPlatformDefaults() {
         assertThat(ConfigTemplate.text(true)).contains("# command_palette = \"cmd+k\"", "# clear_scrollback = \"cmd+shift+k\"");
+        assertThat(ConfigTemplate.text(true)).contains("# history_palette = \"cmd+r\"");
         assertThat(ConfigTemplate.text(false)).contains("# command_palette = \"ctrl+k\"", "# clear_scrollback = \"ctrl+shift+k\"",
             "Command Palette uses plain Ctrl+K");
+        assertThat(ConfigTemplate.text(false)).contains("# history_palette = \"ctrl+shift+r\"", "Search Shell History uses Ctrl+Shift+R");
     }
 
     @Test void commentedTemplatesParseCleanlyWithBuiltInDefaultsOnBothPlatforms() {
@@ -39,6 +41,7 @@ class ConfigTemplateTest {
         var toml = Toml.parse(text);
         assertThat(toml.errors()).isEmpty();
         assertThat(toml.getTable("buddy").keySet()).containsExactly("enabled");
+        assertThat(toml.getTable("history").keySet()).containsExactly("enabled");
         assertThat(toml.getTable("window").keySet())
             .containsExactlyInAnyOrder("tab_height", "toolbar", "status_bar", "columns", "lines");
         assertThat(toml.getTable("font").keySet())
@@ -72,6 +75,7 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().toolbar()).isEqualTo(WindowContent.ToolbarMode.ICONS_AND_LABELS);
             assertThat(all.snapshot().statusBar()).isTrue();
             assertThat(all.snapshot().buddyEnabled()).isTrue();
+            assertThat(all.snapshot().historyEnabled()).isTrue();
             assertThat(all.snapshot().fontSize()).isEqualTo(16f);
             assertThat(all.snapshot().columns()).isEqualTo(150);
             assertThat(all.snapshot().lines()).isEqualTo(45);

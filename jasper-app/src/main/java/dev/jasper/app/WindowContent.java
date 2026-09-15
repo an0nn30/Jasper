@@ -61,6 +61,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     /** Application-owned buddy toggle; the window only forwards and displays state. */
     Runnable onToggleBuddy = () -> {};
     java.util.function.BooleanSupplier buddyEnabled = () -> false;
+    private boolean historyEnabled = true;
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty) {
         this(launcher, directory, newWindow, quit, onEmpty, new ThemeController());
@@ -263,6 +264,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
             }
         }
         if (previous == null || !previous.keybindings().equals(next.keybindings())) setBindings(next.bindings(macOs));
+        if (previous == null || previous.historyEnabled() != next.historyEnabled()) setHistoryEnabled(next.historyEnabled());
     }
 
     private static boolean liveBehaviorChanged(TerminalConfig previous, TerminalConfig next) {
@@ -283,6 +285,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     String scopeShortcut(String scopeId) {
         ActionId id = switch (scopeId) {
             case PaletteScope.COMMANDS_ID -> ActionId.COMMAND_PALETTE;
+            case PaletteScope.HISTORY_ID -> ActionId.HISTORY_PALETTE;
             default -> null;
         };
         return id == null ? null : CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
@@ -374,7 +377,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     void invoke(ActionId id) {
-        if (commandPalette != null && commandPalette.isOpen() && id != ActionId.COMMAND_PALETTE) return;
+        if (commandPalette != null && commandPalette.isOpen() && id != ActionId.COMMAND_PALETTE && id != ActionId.HISTORY_PALETTE) return;
         updateActions();
         if (!action(id).isEnabled()) return;
         TerminalTab tab = currentTab();
@@ -382,6 +385,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         TerminalView view = pane == null ? null : pane.view();
         switch (id) {
             case COMMAND_PALETTE -> commandPalette.open(PaletteScope.COMMANDS_ID);
+            case HISTORY_PALETTE -> commandPalette.open(PaletteScope.HISTORY_ID);
             case NEW_TAB -> newTab(directory());
             case NEW_WINDOW -> newWindow.accept(directory());
             case QUIT -> quit.run();
@@ -438,6 +442,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                     case OPEN_SETTINGS -> openSettings != null;
                     case RELOAD_CONFIG -> reloadConfiguration != null;
                     case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT -> true;
+                    case HISTORY_PALETTE -> scopes.find(PaletteScope.HISTORY_ID).isPresent();
                     case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
                     case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
@@ -537,6 +542,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
     void setStatusVisible(boolean visible) {
         chrome.setStatusVisible(visible); updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
+    void setHistoryEnabled(boolean value) { historyEnabled = value; updateActions(); }
+    boolean historyEnabled() { return historyEnabled; }
 
     @Override public void close() {
         if (closed) return;

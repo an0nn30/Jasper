@@ -38,6 +38,11 @@ final class ConfigTemplate {
             # View > Show Jasper and a right-click on Jasper toggle him for this session only.
             # enabled = true
 
+            [history]
+            # Search shell history from the palette (Cmd+R on macOS, Ctrl+Shift+R elsewhere); updates live.
+            # Reads zsh, bash, fish, nushell and PowerShell history files; Jasper writes no history of its own.
+            # enabled = true
+
             [font]
             # Font family and ordered fallbacks update live. Missing fonts use JBR/system fallback.
             # family = "JetBrains Mono"
@@ -102,7 +107,7 @@ final class ConfigTemplate {
             """);
         text.append(macOs
             ? "# cmd is the Command key on macOS.\n"
-            : "# cmd means Ctrl+Shift; some defaults add Alt to keep actions distinct.\n# Command Palette uses plain Ctrl+K; Clear Scrollback uses Ctrl+Shift+K.\n");
+            : "# cmd means Ctrl+Shift; some defaults add Alt to keep actions distinct.\n# Command Palette uses plain Ctrl+K; Clear Scrollback uses Ctrl+Shift+K; Search Shell History uses Ctrl+Shift+R.\n");
         for (ActionId action : ActionId.values()) {
             text.append("# ").append(action.label()).append('\n');
             text.append("# ").append(action.id()).append(" = \"")

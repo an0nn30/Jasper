@@ -9,7 +9,8 @@ import java.util.Objects;
 /** Validated saved defaults; runtime View choices are kept separately by each owner. */
 record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
                       FontConfig font, Appearance variant, Map<String, String> keybindings,
-                      int columns, int lines, TerminalConfig terminal, boolean buddyEnabled) {
+                      int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
+                      boolean historyEnabled) {
     ConfigSnapshot {
         if (tabHeight < 28 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 28–72.");
         if (columns < 5 || columns > 500) throw new IllegalArgumentException("Columns must be 5–500.");
@@ -35,7 +36,13 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, Appearance variant, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal) {
-        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, true);
+        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, true, true);
+    }
+
+    ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
+                   FontConfig font, Appearance variant, Map<String, String> keybindings,
+                   int columns, int lines, TerminalConfig terminal, boolean buddyEnabled) {
+        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, true);
     }
 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,

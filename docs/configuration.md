@@ -78,6 +78,7 @@ variant = "dark"
 | `window.columns` | `150` | Integer 5–500 | New windows |
 | `window.lines` | `45` | Integer 2–200 | New windows |
 | `buddy.enabled` | `true` | Boolean | Live |
+| `history.enabled` | `true` | Boolean | Live |
 | `font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
 | `font.size` | `16.0` | Finite number 6–72 points | Live |
 | `font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
@@ -106,6 +107,13 @@ active terminal window forward. Left alone he sits down after 20 seconds and ret
 shell to sleep after a minute; hovering wakes him and earns a one-second wave. View → Show
 Jasper, the command palette and right-click → Hide Jasper toggle him for the current session; a
 saved change to `buddy.enabled` resets that session choice.
+
+### Shell history
+
+`history.enabled` adds the History scope to the [command palette](command-palette.md): Cmd+R on
+macOS or Ctrl+Shift+R elsewhere searches every shell history file Jasper can find plus commands
+it saw run through shell integration. Disabling it removes the scope and its shortcut does
+nothing.
 
 ### Live settings and temporary choices
 
@@ -166,7 +174,7 @@ A window captures its grid defaults once. Later reloads do not resize or repack 
 
 ## Shortcuts
 
-The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `clear_scrollback`, `open_settings` and `reload_config`.
+The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `clear_scrollback`, `open_settings` and `reload_config`.
 
 On macOS, `cmd` means Command and `alt`/`option` means Option. For example:
 
@@ -198,8 +206,9 @@ Each shortcut must be unique. Invalid or colliding shortcut overrides restore th
 
 The [command palette](command-palette.md) opens with Cmd+K on macOS and Ctrl+K on
 Windows/Linux. Clear Scrollback uses Cmd+Shift+K on macOS and Ctrl+Shift+K
-elsewhere. While the palette is open, Cmd/Ctrl+1–5 runs the corresponding visible
-result; plain digits continue to edit the search field.
+elsewhere. Search Shell History uses Cmd+R on macOS and Ctrl+Shift+R elsewhere. While
+the palette is open, Cmd/Ctrl+1–5 runs the corresponding visible result; plain digits
+continue to edit the search field.
 
 On macOS, keep Cmd+K for Clear Scrollback and move the palette to Cmd+P:
 

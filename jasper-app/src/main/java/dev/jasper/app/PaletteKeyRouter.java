@@ -60,7 +60,11 @@ final class PaletteKeyRouter implements AutoCloseable {
         var action = bindings.get().actionFor(stroke);
         String scope = scopeFor(action.orElse(null));
         if (scope != null) {
-            claim.accept(code); palette.open(scope); return true;
+            // An unregistered scope's shortcut is inert: it does not hold the physical key,
+            // so it cannot swallow a later, differently-modified press of the same key.
+            if (palette.hasScope(scope)) claim.accept(code);
+            palette.open(scope);
+            return true;
         }
         if (!palette.isOpen()) return false;
         // KeyStroke carries legacy bits as well as extended modifiers.
@@ -96,6 +100,7 @@ final class PaletteKeyRouter implements AutoCloseable {
         if (id == null) return null;
         return switch (id) {
             case COMMAND_PALETTE -> PaletteScope.COMMANDS_ID;
+            case HISTORY_PALETTE -> PaletteScope.HISTORY_ID;
             default -> null;
         };
     }

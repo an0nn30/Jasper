@@ -29,8 +29,9 @@ final class ConfigLoader {
     }
 
     private static final Map<List<String>, Set<String>> FIELDS = Map.of(
-        List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy"),
+        List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy", "history"),
         List.of("buddy"), Set.of("enabled"),
+        List.of("history"), Set.of("enabled"),
         List.of("window"), Set.of("tab_height", "toolbar", "status_bar", "columns", "lines"),
         List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height"),
         List.of("ui"), Set.of("theme"),
@@ -49,6 +50,7 @@ final class ConfigLoader {
     private WindowContent.ToolbarMode toolbar = WindowContent.ToolbarMode.ICONS_AND_LABELS;
     private boolean statusBar = true;
     private boolean buddyEnabled = true;
+    private boolean historyEnabled = true;
     private int columns = 150;
     private int lines = 45;
     private String fontFamily = FontConfig.defaults().family();
@@ -92,7 +94,7 @@ final class ConfigLoader {
         var snapshot = new ConfigSnapshot(tabHeight, toolbar, statusBar,
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
-                cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit), buddyEnabled);
+                cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit), buddyEnabled, historyEnabled);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -130,6 +132,7 @@ final class ConfigLoader {
                 "icons", WindowContent.ToolbarMode.ICONS, "hidden", WindowContent.ToolbarMode.HIDDEN), toolbar);
             case "window.status_bar" -> statusBar = bool(path, value, statusBar);
             case "buddy.enabled" -> buddyEnabled = bool(path, value, buddyEnabled);
+            case "history.enabled" -> historyEnabled = bool(path, value, historyEnabled);
             case "font.family" -> fontFamily = string(path, value, ConfigLoader::fontName,
                 "Use a nonblank font name without NUL; using the default.", fontFamily);
             case "font.size" -> fontSize = number(path, value, 6, 72, fontSize);

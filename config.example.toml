@@ -18,6 +18,11 @@ lines = 45
 # View > Show Jasper (also in the command palette) and right-click > Hide Jasper toggle him for the session.
 enabled = true
 
+[history]
+# Live. Search shell history from the palette with Cmd+R (macOS) or Ctrl+Shift+R.
+# Jasper only reads zsh, bash, fish, nushell and PowerShell history files; it writes no history of its own.
+enabled = true
+
 [font]
 # Live across existing and new panes. Missing fonts use JBR/system fallback.
 family = "JetBrains Mono"
