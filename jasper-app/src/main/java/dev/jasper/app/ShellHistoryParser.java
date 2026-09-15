@@ -17,8 +17,8 @@ final class ShellHistoryParser {
     /** Entries in file order and the byte count consumed: only complete lines are parsed. */
     record Parsed(List<ShellHistoryEntry> entries, int consumed) {}
 
-    /** Line text with its byte offset in the raw input. */
-    private record LineWithOffset(String text, int byteOffset) {}
+    /** Line text with byte offsets: byteOffset is the start, endOffset is just past the terminating \n in raw bytes. */
+    private record LineWithOffset(String text, int byteOffset, int endOffset) {}
 
     private ShellHistoryParser() {}
 
@@ -55,14 +55,15 @@ final class ShellHistoryParser {
             while (lineEnd < end && bytes[lineEnd] != '\n') lineEnd++;
             // lineEnd now points to '\n' or end of bytes
             int lineLength = lineEnd - i;
+            int endOffset = lineLength + 1; // +1 for the \n; relative to byteOffset
             // For zsh, unmetafy only this line's bytes to get the text
             byte[] lineBytes = shell == HistoryShell.ZSH ? unmetafy(bytes, i, lineEnd) : Arrays.copyOfRange(bytes, i, lineEnd);
             String text = new String(lineBytes, StandardCharsets.UTF_8); // malformed bytes become U+FFFD
             // Strip trailing \r if present
             int stop = text.length() > 0 && text.charAt(text.length() - 1) == '\r' ? text.length() - 1 : text.length();
             String trimmed = text.substring(0, stop);
-            lines.add(new LineWithOffset(trimmed, byteOffset));
-            byteOffset += lineLength + 1; // +1 for the \n
+            lines.add(new LineWithOffset(trimmed, byteOffset, byteOffset + endOffset));
+            byteOffset += endOffset;
             i = lineEnd + 1; // Move past the \n
         }
         return lines;
@@ -89,7 +90,7 @@ final class ShellHistoryParser {
             }
             // Line is complete (no trailing backslash)
             add(entries, pending.toString(), time, HistoryShell.ZSH);
-            consumed = lineWithOffset.byteOffset + line.length() + 1; // +1 for the \n
+            consumed = lineWithOffset.endOffset;
             pending = null;
         }
         // If pending is not null at end, there's an incomplete continuation: don't emit it
@@ -106,7 +107,7 @@ final class ShellHistoryParser {
         int consumed = 0;
         for (LineWithOffset lineWithOffset : lines) {
             String line = lineWithOffset.text;
-            consumed = lineWithOffset.byteOffset + line.length() + 1; // +1 for the \n
+            consumed = lineWithOffset.endOffset;
             Matcher stamp = BASH_TIMESTAMP.matcher(line);
             if (stamp.matches()) { time = parseTime(stamp.group(1)); continue; }
             boolean added = add(entries, line, time, HistoryShell.BASH);
@@ -121,12 +122,10 @@ final class ShellHistoryParser {
         long time = 0;
         int commandStartOffset = 0;
         int consumed = 0;
-        boolean hasFollowingCmd = false;
         for (int i = 0; i < lines.size(); i++) {
             LineWithOffset lineWithOffset = lines.get(i);
             String line = lineWithOffset.text;
             if (line.startsWith("- cmd: ")) {
-                hasFollowingCmd = (command != null); // True if we're replacing a pending command
                 if (command != null) add(entries, command, time, HistoryShell.FISH);
                 command = unescapeFish(line.substring(7));
                 commandStartOffset = lineWithOffset.byteOffset;
@@ -145,7 +144,7 @@ final class ShellHistoryParser {
             // No trailing command; consumed is set normally
             if (!lines.isEmpty()) {
                 LineWithOffset last = lines.get(lines.size() - 1);
-                consumed = last.byteOffset + last.text.length() + 1;
+                consumed = last.endOffset;
             }
         }
         return new Parsed(entries, consumed);
@@ -180,7 +179,7 @@ final class ShellHistoryParser {
             }
             // Line is complete (no trailing backtick)
             add(entries, pending.toString(), 0, HistoryShell.POWERSHELL);
-            consumed = lineWithOffset.byteOffset + line.length() + 1; // +1 for the \n
+            consumed = lineWithOffset.endOffset;
             pending = null;
         }
         // If pending is not null at end, there's an incomplete continuation: don't emit it
@@ -196,7 +195,7 @@ final class ShellHistoryParser {
         int consumed = 0;
         for (LineWithOffset lineWithOffset : lines) {
             add(entries, lineWithOffset.text, 0, shell);
-            consumed = lineWithOffset.byteOffset + lineWithOffset.text.length() + 1; // +1 for the \n
+            consumed = lineWithOffset.endOffset;
         }
         return new Parsed(entries, consumed);
     }

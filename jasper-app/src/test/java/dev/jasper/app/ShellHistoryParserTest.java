@@ -16,7 +16,9 @@ class ShellHistoryParserTest {
         assertThat(parsed.entries().get(2).timestamp()).isZero();
         assertThat(parsed.entries().get(0).shells()).containsExactly("zsh");
         byte[] meta = {':', ' ', '1', ':', '0', ';', 'c', 'a', 'f', (byte) 0xC3, (byte) 0x83, (byte) 0x89, '\n'};
-        assertThat(ShellHistoryParser.parse(HistoryShell.ZSH, meta).entries().getFirst().command()).isEqualTo("café");
+        var metaParsed = ShellHistoryParser.parse(HistoryShell.ZSH, meta);
+        assertThat(metaParsed.entries().getFirst().command()).isEqualTo("café");
+        assertThat(metaParsed.consumed()).isEqualTo(meta.length);
     }
 
     @Test void bashTimestampsApplyToTheFollowingCommandOnly() {
@@ -99,5 +101,30 @@ class ShellHistoryParserTest {
         var parsed = ShellHistoryParser.parse(HistoryShell.BASH, bytes);
         assertThat(parsed.entries()).extracting(ShellHistoryEntry::command).containsExactly("ls");
         assertThat(parsed.entries().get(0).timestamp()).isEqualTo(1700000111L);
+    }
+
+    @Test void powershellCRLFIsCountedInConsumed() {
+        String text = "ls\r\ncd\r\n";
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        var parsed = ShellHistoryParser.parse(HistoryShell.POWERSHELL, bytes);
+        assertThat(parsed.entries()).extracting(ShellHistoryEntry::command).containsExactly("ls", "cd");
+        assertThat(parsed.consumed()).isEqualTo(8);
+    }
+
+    @Test void bashUTF8MultiByteIsCountedInConsumed() {
+        String text = "café\nls\n";
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        var parsed = ShellHistoryParser.parse(HistoryShell.BASH, bytes);
+        assertThat(parsed.entries()).extracting(ShellHistoryEntry::command).containsExactly("café", "ls");
+        assertThat(parsed.consumed()).isEqualTo(bytes.length);
+    }
+
+    @Test void zshMultiByteCompletedLineFollowedByDanglingContinuation() {
+        String firstLine = ": 1:0;café\n";
+        String text = firstLine + ": 2:0;echo b \\\n";
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        var parsed = ShellHistoryParser.parse(HistoryShell.ZSH, bytes);
+        assertThat(parsed.entries()).extracting(ShellHistoryEntry::command).containsExactly("café");
+        assertThat(parsed.consumed()).isEqualTo(firstLine.getBytes(StandardCharsets.UTF_8).length);
     }
 }
