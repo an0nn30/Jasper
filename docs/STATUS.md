@@ -6,9 +6,8 @@ scope-based: one `PaletteScope` contract with two implementations, `CommandsScop
 (wraps the existing registry/search/three-recents behaviour unchanged) and
 `ShellHistoryScope` (substring search over an application-wide `ShellHistoryIndex`
 fed by zsh/bash/fish/nushell/PowerShell history files and OSC 133 B/C live
-capture; known limitation: on macOS, nushell's history file is only found at
-`~/.config/nushell/history.txt` when `XDG_CONFIG_HOME` is set, since nushell's actual
-default config directory there is `~/Library/Application Support/nushell`). Cmd+K/Ctrl+K
+capture; nushell is looked up under `$XDG_CONFIG_HOME` or `~/.config` and, on macOS,
+also under `~/Library/Application Support/nushell`). Cmd+K/Ctrl+K
 always opens Commands, Cmd+R/Ctrl+Shift+R always opens History (a prior user override
 already bound to that shortcut now collides with the `history_palette` default and reverts
 all keybinding overrides to defaults until the user sets `history_palette = "none"` or
@@ -38,10 +37,12 @@ with three new states (History recent/query, scope picker) and added
 50,000-entry snapshot (medians only, no CI threshold; [report](design/command-palette/history-search-measurement.md)).
 [Guide](command-palette.md), [design spec](superpowers/specs/2026-09-15-jasper-palette-scopes-design.md),
 [plan](superpowers/plans/2026-09-15-jasper-palette-scopes.md). Fresh
-`./gradlew check --rerun-tasks` executed all eight tasks: jasper-app 437 tests
-passed; jasper-terminal 302 tests, 301 passed and one existing font skip. Total
-739 tests, 738 passed, one skipped, zero failures/errors — unchanged from before
-this task, since it adds no new `@Test` methods. Still user-run: Cmd+R on a real
+`./gradlew check --rerun-tasks` after the final-review fix wave executed all eight
+tasks: jasper-app 438 tests passed; jasper-terminal 303 tests, 302 passed and one
+existing font skip. Total 741 tests, 740 passed, one skipped, zero failures/errors.
+A 2026-09-15 follow-up (`claude/history-hardening`) then made the rewrite
+fingerprint always cover the last 64 file bytes before the offset (kept across a
+zero-progress read) and added the nushell candidates above. Still user-run: Cmd+R on a real
 macOS desktop, input-method composition with the chip present, chip rendering on
 the native title-bar theme, and paste/paste-and-run into a real zsh with
 bracketed paste enabled. No GUI, merge or push.

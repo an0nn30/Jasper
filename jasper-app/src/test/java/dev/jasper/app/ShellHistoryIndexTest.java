@@ -189,6 +189,66 @@ class ShellHistoryIndexTest {
         });
     }
 
+    @Test void theFingerprintKeepsSixtyFourBytesAcrossSmallTailReads() throws Exception {
+        Path zsh = home.resolve(".zsh_history");
+        String original = ": 100:0;ls -la --color=always\n: 200:0;git status --short\n: 300:0;cargo build --release\n";
+        Files.writeString(zsh, original);
+        var sources = List.of(new ShellHistorySource(HistoryShell.ZSH, zsh));
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                try (var index = inline(sources)) {
+                    index.refresh();
+                    Files.writeString(zsh, ": 400:0;cd /tmp\n", StandardOpenOption.APPEND);
+                    Files.setLastModifiedTime(zsh, FileTime.fromMillis(System.currentTimeMillis() + 5_000));
+                    index.refresh();
+                    assertThat(index.stats(sources.get(0)).tailReads()).isEqualTo(1);
+                    assertThat(index.fingerprintLength(sources.get(0))).isEqualTo(64);
+
+                    // A rewrite that keeps the last appended line in place but changes everything before it.
+                    long offset = index.stats(sources.get(0)).offset();
+                    String tail = ": 400:0;cd /tmp\n";
+                    String prefix = "x".repeat((int) offset - tail.length() - 1) + "\n";
+                    Files.writeString(zsh, prefix + tail + ": 500:0;docker ps\n");
+                    Files.setLastModifiedTime(zsh, FileTime.fromMillis(System.currentTimeMillis() + 10_000));
+                    index.refresh();
+                    assertThat(index.stats(sources.get(0)).fullReads()).isEqualTo(2);
+                    assertThat(index.snapshot().entries()).extracting(ShellHistoryEntry::command)
+                        .containsExactly("docker ps", "cd /tmp", "x".repeat((int) offset - tail.length() - 1));
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
+    @Test void aZeroProgressReadKeepsTheFingerprintSoALaterRewriteIsStillDetected() throws Exception {
+        Path zsh = home.resolve(".zsh_history");
+        Files.writeString(zsh, ": 100:0;ls -la --color=always\n: 200:0;git status --short\n: 300:0;cargo build --release\n");
+        var sources = List.of(new ShellHistorySource(HistoryShell.ZSH, zsh));
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                try (var index = inline(sources)) {
+                    index.refresh();
+                    long offset = index.stats(sources.get(0)).offset();
+                    Files.writeString(zsh, ": 400:0;partial", StandardOpenOption.APPEND);
+                    Files.setLastModifiedTime(zsh, FileTime.fromMillis(System.currentTimeMillis() + 5_000));
+                    index.refresh();
+                    assertThat(index.stats(sources.get(0))).isEqualTo(new ShellHistoryIndex.SourceStats(offset, 1, 1));
+                    assertThat(index.fingerprintLength(sources.get(0))).isEqualTo(64);
+
+                    Files.writeString(zsh, ": 500:0;" + "y".repeat(80) + "\n: 600:0;docker ps\n");
+                    Files.setLastModifiedTime(zsh, FileTime.fromMillis(System.currentTimeMillis() + 10_000));
+                    index.refresh();
+                    assertThat(index.stats(sources.get(0)).fullReads()).isEqualTo(2);
+                    assertThat(index.snapshot().entries()).extracting(ShellHistoryEntry::command)
+                        .containsExactly("docker ps", "y".repeat(80));
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
     @Test void unreadableSourcesContributeNothingAndDoNotStopOthers() throws Exception {
         Path directoryNotFile = Files.createDirectory(home.resolve(".zsh_history"));
         Path bash = home.resolve(".bash_history");

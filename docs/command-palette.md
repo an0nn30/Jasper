@@ -62,13 +62,8 @@ The History scope searches every command Jasper can find, from two places:
 | zsh | `$HISTFILE` from the app's environment, else `~/.zsh_history` | Extended `: <ts>:<dur>;<cmd>` or plain lines; backslash-newline continuation; zsh metafied bytes (0x83 marker) unescaped before UTF-8 decoding |
 | bash | `~/.bash_history` | Plain lines; `#<ts>` lines from `HISTTIMEFORMAT` supply timestamps |
 | fish | `~/.local/share/fish/fish_history` | `- cmd:` / `when:` / `paths:` blocks, hand-parsed; escapes in `cmd` decoded |
-| nushell | `~/.config/nushell/history.txt` | Plain lines. The SQLite backend is not read |
+| nushell | `$XDG_CONFIG_HOME/nushell/history.txt` (default `~/.config/nushell/history.txt`), plus `~/Library/Application Support/nushell/history.txt` on macOS | Plain lines. The SQLite backend is not read |
 | PowerShell | PSReadLine `ConsoleHost_history.txt` in its platform location | Plain lines; trailing backtick continuation |
-
-Known limitation: on macOS, nushell's default config directory is `~/Library/Application
-Support/nushell` unless `XDG_CONFIG_HOME` is set, so the `~/.config/nushell/history.txt` path
-above is only found when you use XDG on that platform; a follow-up should read nushell's actual
-config directory instead of assuming XDG everywhere.
 
 and **live capture**: while a shell session is running, Jasper watches for the
 OSC 133 B (command start) and C (output start) marks its shell integration

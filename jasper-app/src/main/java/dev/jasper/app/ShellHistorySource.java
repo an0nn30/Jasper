@@ -1,6 +1,7 @@
 package dev.jasper.app;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -15,11 +16,18 @@ record ShellHistorySource(HistoryShell shell, Path file) {
             ? Path.of(env.getOrDefault("APPDATA", home.resolve("AppData/Roaming").toString()))
                 .resolve("Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt")
             : home.resolve(".local/share/powershell/PSReadLine/ConsoleHost_history.txt");
-        return List.of(
-            new ShellHistorySource(HistoryShell.ZSH, zsh),
-            new ShellHistorySource(HistoryShell.BASH, home.resolve(".bash_history")),
-            new ShellHistorySource(HistoryShell.FISH, home.resolve(".local/share/fish/fish_history")),
-            new ShellHistorySource(HistoryShell.NUSHELL, home.resolve(".config/nushell/history.txt")),
-            new ShellHistorySource(HistoryShell.POWERSHELL, powershell));
+        String xdg = env.get("XDG_CONFIG_HOME");
+        Path configHome = xdg == null || xdg.isBlank() ? home.resolve(".config") : Path.of(xdg);
+        boolean macOs = osName != null && osName.toLowerCase(Locale.ROOT).startsWith("mac");
+        var sources = new ArrayList<ShellHistorySource>();
+        sources.add(new ShellHistorySource(HistoryShell.ZSH, zsh));
+        sources.add(new ShellHistorySource(HistoryShell.BASH, home.resolve(".bash_history")));
+        sources.add(new ShellHistorySource(HistoryShell.FISH, home.resolve(".local/share/fish/fish_history")));
+        sources.add(new ShellHistorySource(HistoryShell.NUSHELL, configHome.resolve("nushell/history.txt")));
+        // nushell's default config directory on macOS is Application Support unless XDG_CONFIG_HOME is set.
+        if (macOs) sources.add(new ShellHistorySource(HistoryShell.NUSHELL,
+            home.resolve("Library/Application Support/nushell/history.txt")));
+        sources.add(new ShellHistorySource(HistoryShell.POWERSHELL, powershell));
+        return List.copyOf(sources);
     }
 }

@@ -29,6 +29,7 @@ import javax.swing.SwingUtilities;
 final class ShellHistoryIndex implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(ShellHistoryIndex.class.getName());
     private static final int MAX_READ = 16 * 1024 * 1024;
+    private static final int FINGERPRINT_BYTES = 64;
 
     record SourceStats(long offset, int fullReads, int tailReads) {}
 
@@ -37,7 +38,7 @@ final class ShellHistoryIndex implements AutoCloseable {
         FileTime modified;
         int fullReads, tailReads;
         List<ShellHistoryEntry> entries = List.of();
-        /** The last (up to) 64 bytes read that immediately precede {@code offset}; see {@link #fingerprintMatches}. */
+        /** The last (up to) 64 bytes of the file before {@code offset}, read back after each read; see {@link #fingerprintMatches}. */
         byte[] fingerprint = new byte[0];
     }
 
@@ -104,6 +105,12 @@ final class ShellHistoryIndex implements AutoCloseable {
     }
 
     /** Worker-only test seam. */
+    /** Worker-only test seam: how many bytes the rewrite fingerprint currently covers. */
+    int fingerprintLength(ShellHistorySource source) {
+        FileState state = states.get(source);
+        return state == null ? 0 : state.fingerprint.length;
+    }
+
     SourceStats stats(ShellHistorySource source) {
         FileState state = states.get(source);
         return state == null ? new SourceStats(0, 0, 0) : new SourceStats(state.offset, state.fullReads, state.tailReads);
@@ -170,13 +177,13 @@ final class ShellHistoryIndex implements AutoCloseable {
             state.entries = entries.size() > ShellHistorySnapshot.MAX_ENTRIES
                 ? List.copyOf(entries.subList(entries.size() - ShellHistorySnapshot.MAX_ENTRIES, entries.size())) : entries;
         }
+        boolean progressed = parsed.consumed() > 0 || !tail;
         state.offset = from + parsed.consumed();
         state.size = size;
         state.modified = modified;
-        int consumedInBuffer = (int) (state.offset - from);
-        int fingerprintLength = Math.min(64, consumedInBuffer);
-        state.fingerprint = fingerprintLength > 0
-            ? Arrays.copyOfRange(bytes, consumedInBuffer - fingerprintLength, consumedInBuffer) : new byte[0];
+        // Always the last 64 bytes of the file before the offset, not just of this read: a small tail
+        // read must not narrow the window, and a read that consumed nothing keeps the last good one.
+        if (progressed) state.fingerprint = read(file, Math.max(0, state.offset - FINGERPRINT_BYTES), state.offset);
         perSource.put(source, state.entries);
     }
 
