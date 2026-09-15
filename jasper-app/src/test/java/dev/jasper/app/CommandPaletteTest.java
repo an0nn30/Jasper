@@ -6,8 +6,6 @@ import java.awt.Component;
 import java.awt.Container;
 import java.awt.Rectangle;
 import java.awt.event.InputMethodEvent;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.text.AttributedString;
@@ -15,8 +13,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.swing.AbstractAction;
-import javax.swing.Action;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.KeyStroke;
@@ -33,8 +29,9 @@ class CommandPaletteTest {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new ArrayList<String>();
             var dismissed = new AtomicInteger();
-            var executed = new ArrayList<Command>();
-            var palette = new CommandPalette(false, changes::add, executed::add, dismissed::incrementAndGet);
+            var executed = new ArrayList<PaletteRow>();
+            var palette = new CommandPalette(false, changes::add, (row, verb) -> executed.add(row),
+                dismissed::incrementAndGet, () -> {});
 
             palette.queryField().setText("split 2");
             palette.queryField().setText("");
@@ -50,30 +47,28 @@ class CommandPaletteTest {
             assertThat(palette.queryField().getAccessibleContext().getAccessibleName()).isEqualTo("Search commands");
             assertThat(palette.resultList().getAccessibleContext().getAccessibleName()).isEqualTo("Commands");
             assertThat(palette.queryField().getClientProperty("JTextField.placeholderText"))
-                .isEqualTo("Type a command\u2026");
+                .isEqualTo("Type a command…");
         });
     }
 
     @Test void limitsAreVisibleAndMissingNumbersCannotExecute() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var executed = new ArrayList<String>();
-            var palette = new CommandPalette(true, query -> {}, command -> executed.add(command.id()), () -> {});
-            var commands = new ArrayList<Command>();
+            var palette = new CommandPalette(true, query -> {}, (row, verb) -> executed.add(row.id()), () -> {}, () -> {});
+            var commands = new ArrayList<PaletteRow>();
             for (int i = 0; i < 5; i++) {
-                var action = new AbstractAction("Command " + i) {
-                    @Override public void actionPerformed(java.awt.event.ActionEvent event) {}
-                };
-                commands.add(new Command("test." + i, action, List.of()));
+                commands.add(PaletteRow.of("test." + i, "Command " + i));
             }
-            palette.setResults(commands, false, null);
+            palette.setResults(commands, null, null);
             palette.executeNumber(5);
             palette.executeNumber(6);
             assertThat(executed).containsExactly("test.4");
             assertThat(palette.resultList().getModel().getSize()).isEqualTo(5);
-            assertThat(palette.resultList().getAccessibleContext().getAccessibleDescription()).isEqualTo("5 commands");
-            assertThatIllegalArgumentException().isThrownBy(() -> palette.setResults(
-                List.of(commands.get(0), commands.get(1), commands.get(2), commands.get(3)), true, null));
-            palette.setResults(List.of(), false, null);
+            assertThat(palette.resultList().getAccessibleContext().getAccessibleDescription()).isEqualTo("5 results");
+            var tooMany = new ArrayList<PaletteRow>();
+            for (int i = 0; i < PaletteResults.MAX_ROWS + 1; i++) tooMany.add(PaletteRow.of("many." + i, "Many " + i));
+            assertThatIllegalArgumentException().isThrownBy(() -> palette.setResults(tooMany, null, null));
+            palette.setResults(List.of(), null, null);
             palette.executeSelected();
             assertThat(executed).containsExactly("test.4");
         });
@@ -81,36 +76,33 @@ class CommandPaletteTest {
 
     @Test void selectionSurvivesRefreshByIdentityAndQueryAcceptsDigits() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var palette = new CommandPalette(false, query -> {}, command -> {}, () -> {});
-            var action = new AbstractAction("Select Tab 2") {
-                @Override public void actionPerformed(java.awt.event.ActionEvent event) {}
-            };
-            var command = new Command("select_tab_2", action, List.of("tab"));
-            palette.setResults(List.of(command), false, command.id());
+            var palette = new CommandPalette(false, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
+            var row = PaletteRow.of("select_tab_2", "Select Tab 2");
+            palette.setResults(List.of(row), null, row.id());
             palette.queryField().setText("tab 2");
             assertThat(palette.queryField().getText()).isEqualTo("tab 2");
-            assertThat(palette.resultList().getSelectedValue()).isSameAs(command);
+            assertThat(palette.resultList().getSelectedValue()).isSameAs(row);
         });
     }
 
     @Test void navigationClampsAndRefreshFallsBackWhenIdentityDisappears() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var first = command("test.first", "First");
-            var second = command("test.second", "Second");
-            var third = command("test.third", "Third");
-            var palette = new CommandPalette(false, query -> {}, command -> {}, () -> {});
+            var first = PaletteRow.of("test.first", "First");
+            var second = PaletteRow.of("test.second", "Second");
+            var third = PaletteRow.of("test.third", "Third");
+            var palette = new CommandPalette(false, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
 
-            palette.setResults(List.of(first, second, third), false, null);
+            palette.setResults(List.of(first, second, third), null, null);
             assertThat(palette.resultList().getSelectedValue()).isSameAs(first);
             palette.selectRelative(50);
             assertThat(palette.resultList().getSelectedValue()).isSameAs(third);
             palette.selectRelative(-50);
             assertThat(palette.resultList().getSelectedValue()).isSameAs(first);
-            palette.setResults(List.of(third, second, first), false, second.id());
+            palette.setResults(List.of(third, second, first), null, second.id());
             assertThat(palette.resultList().getSelectedValue()).isSameAs(second);
-            palette.setResults(List.of(third, first), false, second.id());
+            palette.setResults(List.of(third, first), null, second.id());
             assertThat(palette.resultList().getSelectedValue()).isSameAs(third);
-            palette.setResults(List.of(), false, null);
+            palette.setResults(List.of(), null, null);
             palette.selectRelative(1);
             assertThat(palette.resultList().isSelectionEmpty()).isTrue();
         });
@@ -118,13 +110,13 @@ class CommandPaletteTest {
 
     @Test void preservedSelectionStaysVisibleAcrossReorderAndResultGrowth() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var first = command("test.first", "First");
-            var second = command("test.second", "Second");
-            var third = command("test.third", "Third");
-            var fourth = command("test.fourth", "Fourth");
-            var selected = command("test.selected", "Selected");
-            var palette = new CommandPalette(false, query -> {}, command -> {}, () -> {});
-            palette.setResults(List.of(first, second, third, fourth, selected), false, null);
+            var first = PaletteRow.of("test.first", "First");
+            var second = PaletteRow.of("test.second", "Second");
+            var third = PaletteRow.of("test.third", "Third");
+            var fourth = PaletteRow.of("test.fourth", "Fourth");
+            var selected = PaletteRow.of("test.selected", "Selected");
+            var palette = new CommandPalette(false, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
+            palette.setResults(List.of(first, second, third, fourth, selected), null, null);
             palette.setSize(UIScale.scale(318), UIScale.scale(140));
             layoutTree(palette);
 
@@ -132,15 +124,15 @@ class CommandPaletteTest {
             assertThat(palette.resultList().getVisibleRect().contains(
                 palette.resultList().getCellBounds(4, 4))).isTrue();
 
-            palette.setResults(List.of(selected, first, second, third, fourth), false, selected.id());
+            palette.setResults(List.of(selected, first, second, third, fourth), null, selected.id());
             layoutTree(palette);
             assertThat(palette.resultList().getSelectedIndex()).isZero();
             assertThat(palette.resultList().getVisibleRect().contains(
                 palette.resultList().getCellBounds(0, 0))).isTrue();
 
-            palette.setResults(List.of(first, selected), false, selected.id());
+            palette.setResults(List.of(first, selected), null, selected.id());
             layoutTree(palette);
-            palette.setResults(List.of(first, second, third, fourth, selected), false, selected.id());
+            palette.setResults(List.of(first, second, third, fourth, selected), null, selected.id());
             layoutTree(palette);
             assertThat(palette.resultList().getSelectedIndex()).isEqualTo(4);
             assertThat(palette.resultList().getVisibleRect().contains(
@@ -151,10 +143,10 @@ class CommandPaletteTest {
     @Test void realRowBoundsExecuteClicksButBlankListSpaceDoesNothing() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var executed = new ArrayList<String>();
-            var first = command("test.first", "First");
-            var second = command("test.second", "Second");
-            var palette = new CommandPalette(false, query -> {}, command -> executed.add(command.id()), () -> {});
-            palette.setResults(List.of(first, second), false, null);
+            var first = PaletteRow.of("test.first", "First");
+            var second = PaletteRow.of("test.second", "Second");
+            var palette = new CommandPalette(false, query -> {}, (row, verb) -> executed.add(row.id()), () -> {}, () -> {});
+            palette.setResults(List.of(first, second), null, null);
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
 
@@ -178,7 +170,7 @@ class CommandPaletteTest {
 
     @Test void inputMethodEventsExposeOnlyActiveComposition() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var palette = new CommandPalette(false, query -> {}, command -> {}, () -> {});
+            var palette = new CommandPalette(false, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
             var composing = new AttributedString("ab").getIterator();
             palette.queryField().dispatchEvent(new InputMethodEvent(palette.queryField(),
                 InputMethodEvent.INPUT_METHOD_TEXT_CHANGED, composing, 1, null, null));
@@ -194,11 +186,11 @@ class CommandPaletteTest {
     @Test void geometryPaintingAndThemeRefreshKeepInputAndSelection() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             ThemeController.install(BuiltinTheme.DARK);
-            var first = command("test.first", "First");
-            var second = command("test.second", "Second");
-            var palette = new CommandPalette(true, query -> {}, command -> {}, () -> {});
+            var first = PaletteRow.of("test.first", "First");
+            var second = PaletteRow.of("test.second", "Second");
+            var palette = new CommandPalette(true, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
             palette.queryField().setText("fir");
-            palette.setResults(List.of(first, second), false, second.id());
+            palette.setResults(List.of(first, second), null, second.id());
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
 
@@ -233,68 +225,11 @@ class CommandPaletteTest {
         });
     }
 
-    @Test void openingLabelCanShowRecentOrSuggestedResults() throws Exception {
-        SwingUtilities.invokeAndWait(() -> {
-            var palette = new CommandPalette(false, query -> {}, command -> {}, () -> {});
-            palette.setOpeningLabel("Suggested");
-            palette.setResults(List.of(command("test.first", "First")), true, null);
-            assertThat(labels(palette)).anySatisfy(label -> {
-                assertThat(label.getText()).isEqualTo("Suggested");
-                assertThat(label.isVisible()).isTrue();
-            });
-            palette.setOpeningLabel("Recent");
-            assertThat(labels(palette)).anyMatch(label -> label.getText().equals("Recent"));
-        });
-    }
-
-    @Test void rendererKeepsLiteralLongTitlesBehindTheQuickBadge() throws Exception {
-        SwingUtilities.invokeAndWait(() -> {
-            var action = new AbstractAction("<html>Extremely long command title that cannot share a narrow row with its shortcut") {
-                @Override public void actionPerformed(java.awt.event.ActionEvent event) {}
-            };
-            action.putValue(Action.ACCELERATOR_KEY,
-                KeyStroke.getKeyStroke(KeyEvent.VK_K, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
-            var command = new Command("test.long", action, List.of());
-            var palette = new CommandPalette(false, query -> {}, selected -> {}, () -> {});
-            palette.setResults(List.of(command), false, null);
-            palette.resultList().setSize(UIScale.scale(320), UIScale.scale(40));
-
-            Component rendered = palette.resultList().getCellRenderer().getListCellRendererComponent(
-                palette.resultList(), command, 0, true, false);
-            rendered.setSize(UIScale.scale(320), UIScale.scale(40));
-            layoutTree(rendered);
-            var rowLabels = labels(rendered);
-            JLabel title = rowLabels.stream().filter(label -> label.getText().startsWith("<html>"))
-                .findFirst().orElseThrow();
-            JLabel shortcut = rowLabels.stream().filter(label -> label.getText().equals("Ctrl+Shift+K"))
-                .findFirst().orElseThrow();
-            JLabel badge = rowLabels.stream().filter(label -> label.getText().equals("Ctrl+1"))
-                .findFirst().orElseThrow();
-
-            assertThat(title.getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
-            assertThat(shortcut.getClientProperty("html.disable")).isEqualTo(Boolean.TRUE);
-            assertThat(shortcut.isVisible()).isFalse();
-            assertThat(badge.isVisible()).isTrue();
-            assertThat(title.getX() + title.getWidth()).isLessThanOrEqualTo(badge.getX());
-            assertThat(badge.getX() + badge.getWidth()).isLessThanOrEqualTo(rendered.getWidth());
-
-            action.putValue(Action.NAME, "Open");
-            action.putValue(Action.ACCELERATOR_KEY,
-                KeyStroke.getKeyStroke(KeyEvent.VK_K, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
-            var macPalette = new CommandPalette(true, query -> {}, selected -> {}, () -> {});
-            Component macRendered = macPalette.resultList().getCellRenderer().getListCellRendererComponent(
-                macPalette.resultList(), command, 0, false, false);
-            macRendered.setSize(UIScale.scale(560), UIScale.scale(40));
-            layoutTree(macRendered);
-            assertThat(labels(macRendered)).anyMatch(label -> label.getText().equals("\u21e7\u2318K"));
-        });
-    }
-
     @Test void actualListPaintingLaysOutRendererTextAndBadge() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var command = command("test.rendered", "Rendered command");
-            var palette = new CommandPalette(false, query -> {}, selected -> {}, () -> {});
-            palette.setResults(List.of(command), false, null);
+            var row = PaletteRow.of("test.rendered", "Rendered command");
+            var palette = new CommandPalette(false, query -> {}, (r, verb) -> {}, () -> {}, () -> {});
+            palette.setResults(List.of(row), null, null);
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
 
@@ -304,7 +239,7 @@ class CommandPaletteTest {
             graphics.dispose();
 
             Component rendered = palette.resultList().getCellRenderer().getListCellRendererComponent(
-                palette.resultList(), command, 0, true, false);
+                palette.resultList(), row, 0, true, false);
             JLabel title = labels(rendered).stream().filter(label -> label.getText().equals("Rendered command"))
                 .findFirst().orElseThrow();
             JLabel badge = labels(rendered).stream().filter(label -> label.getText().equals("Ctrl+1"))
@@ -316,8 +251,8 @@ class CommandPaletteTest {
 
     @Test void escapeHintRemainsCompactAndVerticallyCentered() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            var palette = new CommandPalette(false, query -> {}, selected -> {}, () -> {});
-            palette.setResults(List.of(command("test.first", "First")), false, null);
+            var palette = new CommandPalette(false, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
+            palette.setResults(List.of(PaletteRow.of("test.first", "First")), null, null);
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
 
@@ -330,10 +265,90 @@ class CommandPaletteTest {
         });
     }
 
-    private static Command command(String id, String title) {
-        return new Command(id, new AbstractAction(title) {
-            @Override public void actionPerformed(java.awt.event.ActionEvent event) {}
-        }, List.of());
+    @Test void scopeChipPlaceholderFooterAndSectionLabelFollowSetScope() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var palette = new CommandPalette(true, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
+            assertThat(palette.chip().getText()).isEqualTo("Commands");
+            assertThat(palette.footer().isVisible()).isFalse();
+            var verbs = List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run"));
+            palette.setScope("History", null, "Search shell history", verbs, 12, true);
+            assertThat(palette.chip().getText()).isEqualTo("History");
+            assertThat(palette.chip().getAccessibleContext().getAccessibleName()).isEqualTo("Scope: History");
+            assertThat(palette.queryField().getClientProperty("JTextField.placeholderText")).isEqualTo("Search shell history");
+            assertThat(palette.queryField().getAccessibleContext().getAccessibleName()).isEqualTo("Search history");
+            assertThat(palette.resultList().getAccessibleContext().getAccessibleName()).isEqualTo("History");
+            assertThat(palette.footer().isVisible()).isTrue();
+            assertThat(palette.footer().getText()).isEqualTo("⏎ Paste  ⌘⏎ Paste and run");
+            assertThat(CommandPalette.footerText(verbs, false)).isEqualTo("Enter Paste  Ctrl+Enter Paste and run");
+            palette.setResults(List.of(PaletteRow.of("a", "ls")), "Most recent", null);
+            assertThat(palette.sectionLabel().isVisible()).isTrue();
+            assertThat(palette.sectionLabel().getText()).isEqualTo("Most recent");
+            assertThat(palette.resultList().getAccessibleContext().getAccessibleDescription())
+                .isEqualTo("1 results; ⏎ Paste  ⌘⏎ Paste and run");
+            palette.setResults(List.of(), null, null);
+            assertThat(palette.sectionLabel().isVisible()).isFalse();
+            int expected = UIScale.scale(56 + 40 + 24);
+            assertThat(palette.getPreferredSize().height).isEqualTo(expected);
+        });
+    }
+
+    @Test void preferredRowsBoundTheCardHeightAndTheListScrollsBeyondThem() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var palette = new CommandPalette(false, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
+            palette.setScope("History", null, "x", List.of(new PaletteVerb("paste", "Paste")), 12, true);
+            var rows = new ArrayList<PaletteRow>();
+            for (int i = 0; i < 30; i++) rows.add(PaletteRow.of("r" + i, "row " + i));
+            palette.setResults(rows, null, null);
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(56 + 12 * 40));
+            assertThat(palette.resultList().getVisibleRowCount()).isEqualTo(12);
+            palette.setSize(palette.getPreferredSize());
+            layoutTree(palette);
+            palette.selectRelative(29);
+            assertThat(palette.resultList().getSelectedIndex()).isEqualTo(29);
+            assertThat(palette.resultList().getVisibleRect().intersects(palette.resultList().getCellBounds(29, 29))).isTrue();
+            palette.setScope("Commands", null, "x", List.of(new PaletteVerb("run", "Run")), 5, false);
+            palette.setResults(rows.subList(0, 5), null, null);
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(56 + 5 * 40));
+        });
+    }
+
+    @Test void verbsRouteThroughExecuteWithTheirIndexAndBadgesStopAtFive() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var executed = new ArrayList<String>();
+            var palette = new CommandPalette(true, query -> {}, (row, verb) -> executed.add(row.id() + ":" + verb), () -> {}, () -> {});
+            var rows = new ArrayList<PaletteRow>();
+            for (int i = 0; i < 7; i++) rows.add(new PaletteRow("r" + i, "row " + i, "detail " + i, "zsh", null, true, null));
+            palette.setResults(rows, null, null);
+            palette.executeSelected();
+            palette.executeSelected(1);
+            palette.selectRelative(6);
+            palette.executeNumber(2);
+            palette.executeNumber(7);
+            assertThat(executed).containsExactly("r0:0", "r0:1", "r1:0");
+            palette.setSize(palette.getPreferredSize());
+            palette.doLayout();
+            // The renderer is a single shared component reused for every cell (the usual Swing
+            // ListCellRenderer pattern), so its labels must be captured immediately after each
+            // getListCellRendererComponent call, before the next call reconfigures it.
+            var renderer = palette.resultList().getCellRenderer();
+            var sixth = (java.awt.Container) renderer.getListCellRendererComponent(palette.resultList(), rows.get(5), 5, false, false);
+            sixth.setSize(UIScale.scale(560), UIScale.scale(40));
+            sixth.doLayout();
+            var sixthLabels = visibleLabels(sixth);
+            var first = (java.awt.Container) renderer.getListCellRendererComponent(palette.resultList(), rows.get(0), 0, true, false);
+            first.setSize(UIScale.scale(560), UIScale.scale(40));
+            first.doLayout();
+            assertThat(visibleLabels(first)).contains("row 0", "detail 0", "zsh", "⌘1");
+            assertThat(sixthLabels).contains("row 5", "detail 5", "zsh").doesNotContain("⌘6");
+        });
+    }
+
+    private static List<String> visibleLabels(java.awt.Container container) {
+        var texts = new ArrayList<String>();
+        for (Component child : container.getComponents())
+            if (child instanceof JLabel label && label.isVisible() && label.getWidth() > 0 && !label.getText().isEmpty())
+                texts.add(label.getText());
+        return texts;
     }
 
     private static MouseEvent mousePress(Component source, int x, int y) {
