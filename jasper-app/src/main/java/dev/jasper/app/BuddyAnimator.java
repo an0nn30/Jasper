@@ -15,8 +15,9 @@ import java.util.concurrent.TimeUnit;
  * stands, sits down after {@link #SIT_AFTER_NANOS}, tucks into his shell after
  * {@link #SLEEP_AFTER_NANOS} and then sleeps. Those postures are absolute deadlines measured from
  * the boredom origin, so a tick that arrives hours late (a closed lid) resolves in constant time
- * instead of replaying every step. The pointer entering plays a one-second greeting and restarts
- * the boredom clock; entering while he is tucked or asleep wakes him first.
+ * instead of replaying every step. {@link #greet} — the pointer entering, or the user coming back to
+ * a Jasper window — plays a one-second greeting and restarts the boredom clock, waking him first if
+ * he is tucked or asleep. {@link #poke} — the user typing — restarts the same clock without a wave.
  */
 final class BuddyAnimator {
     static final long BLINK_MIN_NANOS = TimeUnit.SECONDS.toNanos(3);
@@ -51,6 +52,8 @@ final class BuddyAnimator {
     private long blinkDue;
     private boolean blinking;
     private boolean sitting;
+    /** Whether the wake in progress ends in a greeting ({@link #greet}) or straight in standing ({@link #poke}). */
+    private boolean wakeGreets;
     private BuddyFrame blinkFrame = BuddyFrame.BLINK;
     private long stepDue;
     private int step;
@@ -91,13 +94,31 @@ final class BuddyAnimator {
         blinking = false; sitting = false; step = 0;
     }
 
-    /** The pointer entered: greet, or wake first if he had gone to sleep. Ignored mid-spawn and mid-greeting. */
-    void hoverEntered(long now) {
+    /** The pointer entered; the same attention as the user coming back to a window. */
+    void hoverEntered(long now) { greet(now); }
+
+    /** The user came back: greet, or wake first if he had gone to sleep. Ignored mid-spawn, -greeting and -wake. */
+    void greet(long now) {
         if (mode == Mode.HIDDEN) return;
         tick(now);
         switch (mode) {
             case RESTING -> startGreeting(now);
-            case TUCKING, SLEEPING -> { mode = Mode.WAKING; step = 0; frame = BuddyFrame.TUCK; stepDue = now + WAKE_STEP_NANOS; }
+            case TUCKING, SLEEPING -> startWaking(now, true);
+            default -> { }
+        }
+    }
+
+    /**
+     * The user is working: restart the boredom clock without a wave. Standing he only keeps standing,
+     * keeping his pending blink; sitting he stands up; tucked or asleep he wakes and then stands.
+     * Ignored mid-spawn, mid-greeting and mid-wake.
+     */
+    void poke(long now) {
+        if (mode == Mode.HIDDEN) return;
+        tick(now);
+        switch (mode) {
+            case RESTING -> { if (sitting) standUp(now); else boredomOrigin = now; }
+            case TUCKING, SLEEPING -> startWaking(now, false);
             default -> { }
         }
     }
@@ -139,7 +160,10 @@ final class BuddyAnimator {
     private void advanceWaking(long now) {
         while (now >= stepDue) {
             step++;
-            if (step > 1) { startGreeting(stepDue); return; }
+            if (step > 1) {
+                if (wakeGreets) startGreeting(stepDue); else standUp(stepDue);
+                return;
+            }
             frame = BuddyFrame.IDLE;
             stepDue += WAKE_STEP_NANOS;
         }
@@ -184,6 +208,12 @@ final class BuddyAnimator {
         mode = Mode.RESTING; frame = BuddyFrame.IDLE;
         boredomOrigin = now; sitting = false; blinking = false; step = 0;
         scheduleBlink(now);
+    }
+
+    /** Pops him out of his shell over two {@link #WAKE_STEP_NANOS} steps, greeting afterwards only if asked. */
+    private void startWaking(long now, boolean greets) {
+        mode = Mode.WAKING; step = 0; wakeGreets = greets;
+        frame = BuddyFrame.TUCK; stepDue = now + WAKE_STEP_NANOS;
     }
 
     private void startGreeting(long now) {

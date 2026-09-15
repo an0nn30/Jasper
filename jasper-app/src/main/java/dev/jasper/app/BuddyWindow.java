@@ -135,6 +135,20 @@ final class BuddyWindow {
         paintAndSchedule();
     }
 
+    /** The user came back to a Jasper window: wave, waking him out of his shell first if need be. */
+    void greet() {
+        if (disposed || !window.isVisible()) return;
+        animator.greet(System.nanoTime());
+        paintAndSchedule();
+    }
+
+    /** The user is typing in a Jasper window: keep him awake, without a wave for every keystroke. */
+    void poke() {
+        if (disposed || !window.isVisible()) return;
+        animator.poke(System.nanoTime());
+        paintAndSchedule();
+    }
+
     void hide() {
         if (disposed) return;
         timer.stop();

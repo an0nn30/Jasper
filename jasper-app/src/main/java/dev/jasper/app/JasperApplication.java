@@ -1,8 +1,13 @@
 package dev.jasper.app;
 
 import dev.jasper.terminal.TerminalSession;
+import java.awt.AWTEvent;
+import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.GraphicsEnvironment;
+import java.awt.Toolkit;
+import java.awt.event.AWTEventListener;
+import java.awt.event.KeyEvent;
 import java.io.UncheckedIOException;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -17,6 +22,8 @@ final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
     /** Upper bound on waiting for closed shells and the history file before the JVM is terminated. */
     private static final long EXIT_GRACE_MILLIS = 2_000;
+    /** At most one buddy poke per second, however fast the user types. */
+    private static final long POKE_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(1);
     private final ThemeController themes = new ThemeController();
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     private final ExecutorService launches = Executors.newThreadPerTaskExecutor(
@@ -33,6 +40,8 @@ final class JasperApplication {
     private final Path buddyStateFile;
     private BuddyWindow buddy;
     private boolean buddyUnavailable;
+    private AWTEventListener keyWatch;
+    private long lastPokeNanos;
     private TerminalWindow lastActive;
 
     JasperApplication() { this(null); }
@@ -120,7 +129,41 @@ final class JasperApplication {
         syncBuddy();
     }
 
-    void windowActivated(TerminalWindow window) { if (windows.contains(window)) lastActive = window; }
+    /** Coming back to a Jasper window is attention: the buddy wakes and waves. */
+    void windowActivated(TerminalWindow window) {
+        if (!windows.contains(window)) return;
+        lastActive = window;
+        if (buddy != null && !quitting && !stopped) buddy.greet();
+    }
+
+    /**
+     * One toolkit listener for the whole app, installed with the buddy: typing in a Jasper window keeps
+     * him awake without a wave. Key events from the buddy's own bubble or any other window are ignored.
+     */
+    private void installKeyWatch() {
+        if (keyWatch != null) return;
+        lastPokeNanos = System.nanoTime() - POKE_INTERVAL_NANOS;
+        keyWatch = event -> {
+            if (event.getID() != KeyEvent.KEY_PRESSED || quitting || stopped || buddy == null) return;
+            if (!(event.getSource() instanceof Component source) || !owns(source)) return;
+            long now = System.nanoTime();
+            if (now - lastPokeNanos < POKE_INTERVAL_NANOS) return;
+            lastPokeNanos = now;
+            buddy.poke();
+        };
+        Toolkit.getDefaultToolkit().addAWTEventListener(keyWatch, AWTEvent.KEY_EVENT_MASK);
+    }
+
+    private void removeKeyWatch() {
+        if (keyWatch == null) return;
+        Toolkit.getDefaultToolkit().removeAWTEventListener(keyWatch);
+        keyWatch = null;
+    }
+
+    private boolean owns(Component component) {
+        for (TerminalWindow window : windows) if (window.owns(component)) return true;
+        return false;
+    }
 
     void toggleBuddy() { buddyVisibility.toggle(); syncBuddy(); }
 
@@ -139,7 +182,7 @@ final class JasperApplication {
                 if (buddyVisibility.shown()) {
                     if (buddy == null) {
                         buddy = BuddyWindow.create(buddyStateFile, this::raiseTerminal, this::toggleBuddy);
-                        if (buddy == null) buddyUnavailable = true;
+                        if (buddy == null) buddyUnavailable = true; else installKeyWatch();
                     }
                     if (buddy != null) buddy.show();
                 } else if (buddy != null) buddy.hide();
@@ -149,6 +192,7 @@ final class JasperApplication {
                     try { buddy.dispose(); } catch (RuntimeException ignored) { }
                 }
                 buddy = null;
+                removeKeyWatch();
                 LOG.log(System.Logger.Level.WARNING, "Desk buddy disabled for this session", failure);
             }
         }
@@ -174,6 +218,7 @@ final class JasperApplication {
         stopped = true;
         quitting = true;
         launches.shutdown();
+        removeKeyWatch();
         if (buddy != null) buddy.dispose();
         history.close();
         if (configuration != null) configuration.close();

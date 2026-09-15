@@ -1,6 +1,7 @@
 package dev.jasper.app;
 
 import com.formdev.flatlaf.util.SystemInfo;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Insets;
 import java.awt.Rectangle;
@@ -98,6 +99,11 @@ final class TerminalWindow implements AutoCloseable {
         if ((frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0) frame.setExtendedState(frame.getExtendedState() & ~java.awt.Frame.ICONIFIED);
         frame.toFront(); frame.requestFocus();
         if (content.currentTab() != null) content.currentTab().focusTerminal();
+    }
+
+    /** Whether {@code component} is this window's frame or sits inside it; used to filter toolkit key events. */
+    boolean owns(Component component) {
+        return component == frame || SwingUtilities.getWindowAncestor(component) == frame;
     }
 
     WindowContent content() { return content; }

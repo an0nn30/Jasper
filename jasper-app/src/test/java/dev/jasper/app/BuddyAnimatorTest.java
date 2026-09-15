@@ -60,6 +60,21 @@ class BuddyAnimatorTest {
         return events.stream().filter(event -> List.of(shut).contains(event.frame())).count();
     }
 
+    /** Every frame the greeting can show; a quiet wake must produce none of them. */
+    private static final List<BuddyFrame> WAVES = List.of(BuddyFrame.WAVE_A, BuddyFrame.WAVE_B, BuddyFrame.HOP,
+        BuddyFrame.LEAN_LEFT, BuddyFrame.LEAN_RIGHT);
+
+    private static void assertNoWave(List<Event> events) {
+        assertThat(events).as("a poke never waves")
+            .noneSatisfy(event -> assertThat(WAVES).contains(event.frame()));
+    }
+
+    /** The first moment he is down, whether or not that frame happens to be a blink. */
+    private static Event firstSit(List<Event> events) {
+        return events.stream().filter(event -> event.frame() == BuddyFrame.SIT || event.frame() == BuddyFrame.SIT_BLINK)
+            .findFirst().orElseThrow();
+    }
+
     @Test void hiddenAnimatorIsIdleWithNothingScheduled() {
         var animator = new BuddyAnimator(new Random(1));
         assertThat(animator.frame()).isEqualTo(BuddyFrame.IDLE);
@@ -332,6 +347,155 @@ class BuddyAnimatorTest {
         assertThat(sitting.frame()).isIn(BuddyFrame.SIT, BuddyFrame.SIT_BLINK);
         assertThat(sitting.nextDueNanos().orElseThrow() - 30 * SECOND)
             .isPositive().isLessThanOrEqualTo(BuddyAnimator.BLINK_MAX_NANOS);
+    }
+
+    @Test void greetMatchesHoverFromEveryPosture() {
+        var animator = new BuddyAnimator(new Random(59));
+        animator.shown(0);
+        spawned(animator, 0);
+
+        animator.greet(3 * SECOND);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.WAVE_A);
+        assertThat(runUntil(animator, 4 * SECOND)).containsExactly(
+            new Event(3_125 * MILLIS, BuddyFrame.WAVE_B),
+            new Event(3_250 * MILLIS, BuddyFrame.HOP),
+            new Event(3_375 * MILLIS, BuddyFrame.LEAN_LEFT),
+            new Event(3_500 * MILLIS, BuddyFrame.LEAN_RIGHT),
+            new Event(3_625 * MILLIS, BuddyFrame.WAVE_A),
+            new Event(3_750 * MILLIS, BuddyFrame.WAVE_B),
+            new Event(3_875 * MILLIS, BuddyFrame.HOP),
+            new Event(4 * SECOND, BuddyFrame.IDLE));
+
+        animator.tick(25 * SECOND);                       // he sat down 20 s after the greeting ended
+        assertThat(animator.frame()).isIn(BuddyFrame.SIT, BuddyFrame.SIT_BLINK);
+        animator.greet(25 * SECOND);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.WAVE_A);
+        assertThat(animator.nextDueNanos()).hasValue(25 * SECOND + BuddyAnimator.STEP_NANOS);
+
+        runUntil(animator, 26 * SECOND);                  // the greeting ends and he stands at 26 s
+        animator.tick(90 * SECOND);
+        assertThat(animator.frame()).isIn(BuddyFrame.SLEEP_A, BuddyFrame.SLEEP_B, BuddyFrame.SLEEP_C);
+        animator.greet(90_100 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.TUCK);
+        assertThat(runUntil(animator, 90_600 * MILLIS)).containsExactly(
+            new Event(90_350 * MILLIS, BuddyFrame.IDLE),
+            new Event(90_600 * MILLIS, BuddyFrame.WAVE_A));
+    }
+
+    @Test void pokeWhileStandingOnlyRestartsTheBoredomClock() {
+        var animator = new BuddyAnimator(new Random(61));
+        animator.shown(0);
+        spawned(animator, 0);
+        animator.tick(10 * SECOND);
+        BuddyFrame frame = animator.frame();
+        long due = animator.nextDueNanos().orElseThrow();
+
+        animator.poke(10 * SECOND);
+        assertThat(animator.frame()).as("a poke while standing never changes the frame").isEqualTo(frame);
+        assertThat(animator.nextDueNanos()).as("the pending blink is untouched").hasValue(due);
+
+        List<Event> onwards = runUntil(animator, 35 * SECOND);
+        assertNoWave(onwards);
+        assertThat(firstSit(onwards).at()).as("the boredom clock restarted at the poke").isEqualTo(30 * SECOND);
+    }
+
+    @Test void pokeWhileSittingStandsWithoutAWave() {
+        var animator = new BuddyAnimator(new Random(67));
+        animator.shown(0);
+        spawned(animator, 0);
+        animator.tick(25 * SECOND);
+        assertThat(animator.frame()).isIn(BuddyFrame.SIT, BuddyFrame.SIT_BLINK);
+
+        animator.poke(25_500 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.IDLE);
+        assertThat(animator.nextDueNanos().orElseThrow() - 25_500 * MILLIS).as("a blink, not a wave")
+            .isBetween(BuddyAnimator.BLINK_MIN_NANOS, BuddyAnimator.BLINK_MAX_NANOS);
+
+        List<Event> onwards = runUntil(animator, 46 * SECOND);
+        assertNoWave(onwards);
+        assertThat(firstSit(onwards).at()).isEqualTo(45_500 * MILLIS);
+    }
+
+    @Test void pokeWhileSleepingWakesWithoutAWave() {
+        var animator = new BuddyAnimator(new Random(71));
+        animator.shown(0);
+        animator.tick(65 * SECOND);
+        assertThat(animator.frame()).isIn(BuddyFrame.SLEEP_A, BuddyFrame.SLEEP_B, BuddyFrame.SLEEP_C);
+
+        animator.poke(65_100 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.TUCK);
+        assertThat(animator.nextDueNanos()).hasValue(65_350 * MILLIS);
+        animator.tick(65_350 * MILLIS);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.IDLE);
+        assertThat(animator.nextDueNanos()).hasValue(65_600 * MILLIS);
+        animator.tick(65_600 * MILLIS);
+        assertThat(animator.frame()).as("he stands up where a greet would have waved").isEqualTo(BuddyFrame.IDLE);
+        assertThat(animator.nextDueNanos().orElseThrow() - 65_600 * MILLIS)
+            .isBetween(BuddyAnimator.BLINK_MIN_NANOS, BuddyAnimator.BLINK_MAX_NANOS);
+
+        List<Event> onwards = runUntil(animator, 86 * SECOND);
+        assertNoWave(onwards);
+        assertThat(firstSit(onwards).at()).isEqualTo(85_600 * MILLIS);
+    }
+
+    @Test void pokeAndGreetAreIgnoredDuringSpawnGreetingAndWaking() {
+        var spawning = new BuddyAnimator(new Random(73));
+        spawning.shown(0);
+        spawning.poke(500 * MILLIS);
+        spawning.greet(500 * MILLIS);
+        assertThat(paintState(spawning, 500 * MILLIS))
+            .isEqualTo(new Step(500 * MILLIS, BuddyFrame.IDLE, 1f, BuddyFrame.SPARKLE_B));
+        assertThat(spawning.nextDueNanos()).hasValue(625 * MILLIS);
+        spawned(spawning, 0);
+
+        var greeting = new BuddyAnimator(new Random(79));
+        greeting.shown(0);
+        spawned(greeting, 0);
+        greeting.greet(3 * SECOND);
+        greeting.tick(3_250 * MILLIS);
+        assertThat(greeting.frame()).isEqualTo(BuddyFrame.HOP);
+        greeting.poke(3_300 * MILLIS);
+        greeting.greet(3_300 * MILLIS);
+        assertThat(greeting.frame()).isEqualTo(BuddyFrame.HOP);
+        assertThat(greeting.nextDueNanos()).hasValue(3_375 * MILLIS);
+        assertThat(runUntil(greeting, 4 * SECOND)).containsExactly(
+            new Event(3_375 * MILLIS, BuddyFrame.LEAN_LEFT),
+            new Event(3_500 * MILLIS, BuddyFrame.LEAN_RIGHT),
+            new Event(3_625 * MILLIS, BuddyFrame.WAVE_A),
+            new Event(3_750 * MILLIS, BuddyFrame.WAVE_B),
+            new Event(3_875 * MILLIS, BuddyFrame.HOP),
+            new Event(4 * SECOND, BuddyFrame.IDLE));
+
+        var waking = new BuddyAnimator(new Random(83));
+        waking.shown(0);
+        waking.tick(63 * SECOND);
+        waking.greet(63_100 * MILLIS);
+        assertThat(waking.frame()).isEqualTo(BuddyFrame.TUCK);
+        waking.poke(63_200 * MILLIS);                     // a poke must not turn a greeting wake quiet
+        waking.greet(63_200 * MILLIS);
+        assertThat(waking.frame()).isEqualTo(BuddyFrame.TUCK);
+        assertThat(waking.nextDueNanos()).hasValue(63_350 * MILLIS);
+        assertThat(runUntil(waking, 63_600 * MILLIS)).containsExactly(
+            new Event(63_350 * MILLIS, BuddyFrame.IDLE),
+            new Event(63_600 * MILLIS, BuddyFrame.WAVE_A));
+    }
+
+    @Test void pokeAndGreetAreIgnoredWhileHidden() {
+        var animator = new BuddyAnimator(new Random(89));
+        animator.poke(SECOND);
+        animator.greet(SECOND);
+        animator.tick(2 * SECOND);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.IDLE);
+        assertThat(animator.nextDueNanos()).isEmpty();
+
+        animator.shown(0);
+        spawned(animator, 0);
+        animator.tick(30 * SECOND);
+        animator.hidden();
+        animator.poke(31 * SECOND);
+        animator.greet(31 * SECOND);
+        assertThat(animator.frame()).isEqualTo(BuddyFrame.IDLE);
+        assertThat(animator.nextDueNanos()).isEmpty();
     }
 
     @Test void hiddenClearsEverything() {
