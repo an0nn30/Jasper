@@ -62,6 +62,12 @@ final class ShellHistoryIndex implements AutoCloseable {
         this.deliver = Objects.requireNonNull(deliver);
     }
 
+    /** Every shell history file this machine may have, discovered from the home directory and environment. */
+    static ShellHistoryIndex discovered() {
+        return new ShellHistoryIndex(ShellHistorySource.discover(Path.of(System.getProperty("user.home")),
+            System.getenv(), System.getProperty("os.name")));
+    }
+
     ShellHistorySnapshot snapshot() { CommandRegistry.requireEdt(); return snapshot; }
 
     CommandRegistry.Subscription onChanged(Runnable listener) {

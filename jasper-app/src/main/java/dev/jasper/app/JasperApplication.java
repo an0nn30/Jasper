@@ -35,6 +35,7 @@ final class JasperApplication {
     private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
     private final Runnable terminate;
+    private final ShellHistoryIndex shellHistory;
     private final Set<TerminalSession> sessions = ConcurrentHashMap.newKeySet();
     private final BuddyVisibility buddyVisibility = new BuddyVisibility();
     private final Path buddyStateFile;
@@ -61,16 +62,22 @@ final class JasperApplication {
         this(service, suppliedLauncher, history, buddyStateFile, () -> {});
     }
 
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, new ShellHistoryIndex(List.of()));
+    }
+
     /**
      * {@code buddyStateFile} may be null: the buddy then starts in the default corner and forgets drags.
      * {@code terminate} runs once, off the EDT, after shutdown's bounded cleanup; production passes the JVM exit.
      */
     JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
-                      Runnable terminate) {
+                      Runnable terminate, ShellHistoryIndex shellHistory) {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         this.buddyStateFile = buddyStateFile;
         this.terminate = terminate;
+        this.shellHistory = shellHistory;
         configuration = service == null ? null : new ConfigurationController(themes, service);
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddyVisibility.configure(snapshot.buddyEnabled()); syncBuddy();
@@ -83,11 +90,13 @@ final class JasperApplication {
 
     TerminalWindow newWindow(Path directory) {
         if (quitting) return null;
+        boolean first = windows.isEmpty();
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(startSession(path, settings)));
-        TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history);
+        TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history, shellHistory);
         windows.add(window); window.show();
+        if (first) shellHistory.refresh();
         return window;
     }
 
@@ -221,6 +230,7 @@ final class JasperApplication {
         removeKeyWatch();
         if (buddy != null) buddy.dispose();
         history.close();
+        shellHistory.close();
         if (configuration != null) configuration.close();
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler(null);
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
