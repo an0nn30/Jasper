@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-15-jasper-palette-scopes-design.md` (approved 2026-09-15).
 
-**Status:** Complete through Task 11. Development branch `claude/palette-scopes` in `.worktrees/palette-scopes` from main `86352b9`, commits `bd76fe4..67743ba` plus the Task 11 documentation commit. Fresh `./gradlew check --rerun-tasks`: 739 tests, 738 passed, one existing font skip, zero failures/errors. No GUI, merge or push.
+**Status:** Complete through Task 11. Development branch `claude/palette-scopes` in `.worktrees/palette-scopes` from main `86352b9`, commits `bd76fe4..67743ba` plus the Task 11 documentation commit. Fresh `./gradlew check --rerun-tasks`: 739 tests, 738 passed, one existing font skip, zero failures/errors. No GUI, merge or push. Deviation found in final review: `ShellHistoryScope` hides the shell tag on a row when only one shell contributed to the snapshot, rather than always showing the shell name as the tag as the spec described.
 
 **Deliberate simplification recorded here:** history rows use the logical `Font.MONOSPACED` face rather than the pane's configured terminal font, so the palette needs no font plumbing from the terminal view. Record any further deviation in this banner and in `docs/STATUS.md`.
 

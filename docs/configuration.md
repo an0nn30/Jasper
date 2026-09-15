@@ -113,7 +113,10 @@ saved change to `buddy.enabled` resets that session choice.
 `history.enabled` adds the History scope to the [command palette](command-palette.md): Cmd+R on
 macOS or Ctrl+Shift+R elsewhere searches every shell history file Jasper can find plus commands
 it saw run through shell integration. Disabling it removes the scope and its shortcut does
-nothing.
+nothing. If you already bound Cmd+R (macOS) or Ctrl+Shift+R (elsewhere) to something else, that
+override now collides with the new `history_palette` default and is rejected, reverting all of
+your keybinding overrides to their defaults until you either set `history_palette = "none"` or
+rebind the colliding action.
 
 ### Live settings and temporary choices
 
@@ -224,6 +227,11 @@ On Windows/Linux, free Ctrl+K for terminal input and move the palette to Ctrl+P:
 [keybindings]
 command_palette = "ctrl+p"
 ```
+
+A prior override that already used Cmd+R (macOS) or Ctrl+Shift+R (elsewhere) for another
+action now collides with the `history_palette` default; a colliding override is rejected and
+all of your keybinding overrides revert to their defaults until you set
+`history_palette = "none"` or rebind the colliding action.
 
 Outside macOS, the compatibility token `cmd` still means Ctrl+Shift; it was not
 redefined for the palette. Use literal `ctrl+k` or `ctrl+p` when that is the

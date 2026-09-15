@@ -6,8 +6,13 @@ scope-based: one `PaletteScope` contract with two implementations, `CommandsScop
 (wraps the existing registry/search/three-recents behaviour unchanged) and
 `ShellHistoryScope` (substring search over an application-wide `ShellHistoryIndex`
 fed by zsh/bash/fish/nushell/PowerShell history files and OSC 133 B/C live
-capture). Cmd+K/Ctrl+K always opens Commands, Cmd+R/Ctrl+Shift+R always opens
-History; a scope's own shortcut dismisses it while already active, even from the
+capture; known limitation: on macOS, nushell's history file is only found at
+`~/.config/nushell/history.txt` when `XDG_CONFIG_HOME` is set, since nushell's actual
+default config directory there is `~/Library/Application Support/nushell`). Cmd+K/Ctrl+K
+always opens Commands, Cmd+R/Ctrl+Shift+R always opens History (a prior user override
+already bound to that shortcut now collides with the `history_palette` default and reverts
+all keybinding overrides to defaults until the user sets `history_palette = "none"` or
+rebinds it); a scope's own shortcut dismisses it while already active, even from the
 picker. Typing `>` at the start of an empty query opens an in-card scope picker
 (Tab/Enter commits, Escape or deleting the `>` reverts); a visible chip shows the
 active scope and doubles as a picker button. History rows show a shell tag,
@@ -25,7 +30,9 @@ later and a trailing fish block is re-parsed on the next tail read; clipped
 `Font.MONOSPACED` face rather than the pane's own terminal font, so the palette
 needs no font plumbing from the terminal view; `CommandCapture` and its test
 fixture use JediTerm's `CharUtils.DWC`/`CharBuffer` directly, confined to
-`jasper-terminal`. Task 11 extended the [headless render matrix](design/command-palette/README.md)
+`jasper-terminal`; `ShellHistoryScope` hides the shell tag on a row when only one
+shell contributed to the snapshot, rather than always showing the shell name as
+the tag as the spec described. Task 11 extended the [headless render matrix](design/command-palette/README.md)
 with three new states (History recent/query, scope picker) and added
 `ShellHistorySearchMeasurement`, a substring-ranking benchmark over a synthetic
 50,000-entry snapshot (medians only, no CI threshold; [report](design/command-palette/history-search-measurement.md)).

@@ -17,7 +17,7 @@ inline executor (worker and delivery both run on the calling thread, so every
 entry is indexed before the palette opens) — the same pattern as
 `ShellHistoryIndexTest.inline`. Two of the fifteen commands start with `git`;
 the sixth carries a synthetic working directory to exercise the detail line;
-the rest carry no directory. Shells alternate bash/zsh so every row is tagged.
+the rest carry no directory. Every third synthetic entry is bash and the rest are zsh, so every row is tagged.
 
 | State | Dark | Light |
 |---|---|---|

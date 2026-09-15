@@ -39,9 +39,13 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         @Override public void workingDirectoryChanged(Path directory) { queueUpdate(); }
 
         @Override public void commandExecuted(String command, java.util.OptionalInt exitStatus, java.util.Optional<Path> workingDirectory) {
-            onCommandExecuted.accept(new ShellHistoryEntry(command, java.time.Instant.now().getEpochSecond(),
-                java.util.Set.of(shellLabel), workingDirectory.orElse(null),
-                exitStatus.isPresent() ? exitStatus.getAsInt() : null));
+            try {
+                onCommandExecuted.accept(new ShellHistoryEntry(command, java.time.Instant.now().getEpochSecond(),
+                    java.util.Set.of(shellLabel), workingDirectory.orElse(null),
+                    exitStatus.isPresent() ? exitStatus.getAsInt() : null));
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "History listener failed for a captured command", failure);
+            }
         }
     };
 

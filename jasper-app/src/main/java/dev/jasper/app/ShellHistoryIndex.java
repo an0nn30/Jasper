@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -18,6 +19,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import javax.swing.SwingUtilities;
 
 /**
@@ -35,6 +37,8 @@ final class ShellHistoryIndex implements AutoCloseable {
         FileTime modified;
         int fullReads, tailReads;
         List<ShellHistoryEntry> entries = List.of();
+        /** The last (up to) 64 bytes read that immediately precede {@code offset}; see {@link #fingerprintMatches}. */
+        byte[] fingerprint = new byte[0];
     }
 
     private final List<ShellHistorySource> sources;
@@ -88,11 +92,15 @@ final class ShellHistoryIndex implements AutoCloseable {
     /** A command the terminal saw run; safe from any thread. */
     void record(ShellHistoryEntry entry) {
         if (closed) return;
-        worker.execute(() -> {
-            live.add(entry);
-            if (live.size() > ShellHistorySnapshot.MAX_ENTRIES) live.removeFirst();
-            publish(false);
-        });
+        try {
+            worker.execute(() -> {
+                live.add(entry);
+                if (live.size() > ShellHistorySnapshot.MAX_ENTRIES) live.removeFirst();
+                publish(false);
+            });
+        } catch (RejectedExecutionException ignored) {
+            // close() raced with this call between the closed check above and worker.execute: nothing to record.
+        }
     }
 
     /** Worker-only test seam. */
@@ -110,7 +118,20 @@ final class ShellHistoryIndex implements AutoCloseable {
                     LOG.log(System.Logger.Level.WARNING, "Could not read " + source.shell().label() + " history at " + source.file(), failure);
             }
         }
-        publish(true);
+        try {
+            publish(true);
+        } catch (RuntimeException failure) {
+            // ShellHistorySnapshot.build ran (and threw) before publish reached deliver.execute, so the
+            // usual "refreshing = false" delivery never happens. Without this, refreshing stays true
+            // forever and every later refresh() is queued and never runs. Catch (not just try/finally)
+            // so the normal success path is not double-delivered here as well as inside publish().
+            LOG.log(System.Logger.Level.WARNING, "Shell history snapshot build failed", failure);
+            deliver.execute(() -> {
+                refreshing = false;
+                if (closed) return;
+                if (refreshQueued) { refreshQueued = false; refresh(); }
+            });
+        }
     }
 
     private void readSource(ShellHistorySource source) throws IOException {
@@ -123,7 +144,7 @@ final class ShellHistoryIndex implements AutoCloseable {
         long size = Files.size(file);
         FileTime modified = Files.getLastModifiedTime(file);
         if (size == state.size && modified.equals(state.modified) && state.offset > 0) return;
-        boolean tail = state.offset > 0 && size >= state.size;
+        boolean tail = state.offset > 0 && size >= state.size && fingerprintMatches(file, state);
         long from = tail ? state.offset : 0;
         boolean clipped = size - from > MAX_READ;
         if (clipped) from = size - MAX_READ;
@@ -152,7 +173,27 @@ final class ShellHistoryIndex implements AutoCloseable {
         state.offset = from + parsed.consumed();
         state.size = size;
         state.modified = modified;
+        int consumedInBuffer = (int) (state.offset - from);
+        int fingerprintLength = Math.min(64, consumedInBuffer);
+        state.fingerprint = fingerprintLength > 0
+            ? Arrays.copyOfRange(bytes, consumedInBuffer - fingerprintLength, consumedInBuffer) : new byte[0];
         perSource.put(source, state.entries);
+    }
+
+    /**
+     * bash without {@code histappend} overwrites its history file on shell exit, and zsh rewrites
+     * {@code $HISTFILE} when trimming to {@code SAVEHIST}; either can leave the file the same size or
+     * larger, so size/mtime alone cannot tell a rewrite from a genuine append. This re-reads the bytes
+     * that immediately preceded the last consumed offset and compares them against what was read back
+     * then: a mismatch means the file was rewritten underneath us, so the caller must do a full read
+     * instead of a tail read starting mid-line in unrelated content.
+     */
+    private static boolean fingerprintMatches(Path file, FileState state) throws IOException {
+        if (state.fingerprint.length == 0) return true;
+        long start = state.offset - state.fingerprint.length;
+        if (start < 0) return false;
+        byte[] actual = read(file, start, start + state.fingerprint.length);
+        return Arrays.equals(actual, state.fingerprint);
     }
 
     private static byte[] read(Path file, long from, long size) throws IOException {

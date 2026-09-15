@@ -60,6 +60,20 @@ class ShellIntegrationSessionTest {
         assertThat(captured).isEmpty();
     }
 
+    /**
+     * A prompt (mark A) must reset the pending command-start row, or a stray B without a matching C
+     * leaves {@code commandStartRow} pointing at stale content; a later C with no B of its own would
+     * then wrongly capture text between that stale row and wherever the cursor now is.
+     */
+    @Test void aPromptResetsTheCommandStartSoALeftoverMarkCapturesNothing() throws Exception {
+        listenForCommands();
+        connector.feed("\033]133;A\007$ \033]133;B\007partial text\r\n"
+            + "\033]133;A\007$ \033]133;C\007\033]133;D;0\007\r\n"
+            + "\033]133;A\007$ ");
+        Await.until(() -> session.promptRows().size() == 3, "three prompt marks");
+        assertThat(captured).isEmpty();
+    }
+
     @Test void aMissingExitMarkStillDeliversTheCommandAtTheNextPrompt() throws Exception {
         listenForCommands();
         connector.feed("\033]133;A\007$ \033]133;B\007pwd\r\n\033]133;C\007/tmp\r\n\033]133;A\007$ ");

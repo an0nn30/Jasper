@@ -156,6 +156,39 @@ class ShellHistoryIndexTest {
         });
     }
 
+    /**
+     * bash without {@code histappend} overwrites {@code ~/.bash_history} on exit, and zsh rewrites
+     * {@code $HISTFILE} when trimming to {@code SAVEHIST}; either can leave the file the same size or
+     * larger than before, so a tail read starting from the old offset would land mid-line in unrelated
+     * content. The rewrite here is deliberately larger than the original so the old
+     * {@code size >= state.size} check alone would (wrongly) choose a tail read.
+     */
+    @Test void aRewrittenFileThatGrewIsReReadInFullAndYieldsNoFragment() throws Exception {
+        Path zsh = home.resolve(".zsh_history");
+        Files.writeString(zsh, ": 100:0;ls\n: 200:0;git status\n");
+        var sources = List.of(new ShellHistorySource(HistoryShell.ZSH, zsh));
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                try (var index = inline(sources)) {
+                    index.refresh();
+                    assertThat(index.stats(sources.get(0))).isEqualTo(new ShellHistoryIndex.SourceStats(Files.size(zsh), 1, 0));
+
+                    Files.writeString(zsh, ": 300:0;cargo build\n: 400:0;cargo test\n: 500:0;docker ps\n");
+                    assertThat(Files.size(zsh)).isGreaterThan(30L);
+                    Files.setLastModifiedTime(zsh, FileTime.fromMillis(System.currentTimeMillis() + 5_000));
+                    index.refresh();
+
+                    assertThat(index.stats(sources.get(0)).fullReads()).isEqualTo(2);
+                    assertThat(index.stats(sources.get(0)).tailReads()).isZero();
+                    assertThat(index.snapshot().entries()).extracting(ShellHistoryEntry::command)
+                        .containsExactly("docker ps", "cargo test", "cargo build");
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
     @Test void unreadableSourcesContributeNothingAndDoNotStopOthers() throws Exception {
         Path directoryNotFile = Files.createDirectory(home.resolve(".zsh_history"));
         Path bash = home.resolve(".bash_history");

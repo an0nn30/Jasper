@@ -621,7 +621,7 @@ public final class TerminalSession implements AutoCloseable {
             case "mark" -> {
                 String mark = args.size() > 2 ? args.get(2) : "";
                 switch (mark) {
-                    case "A" -> { flushPendingCommand(OptionalInt.empty()); recordPrompt(); }
+                    case "A" -> { flushPendingCommand(OptionalInt.empty()); recordPrompt(); commandStartRow = -1; }
                     case "B" -> markCommandStart();
                     case "C" -> captureCommand();
                     case "D" -> flushPendingCommand(exitStatus(args));
