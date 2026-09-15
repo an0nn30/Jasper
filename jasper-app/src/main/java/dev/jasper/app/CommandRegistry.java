@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.swing.SwingUtilities;
 
 final class CommandRegistry implements AutoCloseable {
@@ -68,6 +69,12 @@ final class CommandRegistry implements AutoCloseable {
         requireEdt();
         Registered current = commands.get(command.id());
         return current != null && current.command() == command;
+    }
+
+    Optional<Command> find(String id) {
+        requireEdt();
+        Registered current = commands.get(id);
+        return current == null ? Optional.empty() : Optional.of(current.command());
     }
 
     private void rebuild() {
