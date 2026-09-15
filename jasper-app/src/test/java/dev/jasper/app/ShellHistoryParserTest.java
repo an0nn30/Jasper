@@ -55,4 +55,49 @@ class ShellHistoryParserTest {
         assertThat(ShellHistoryParser.parse(HistoryShell.ZSH, new byte[0]).entries()).isEmpty();
         assertThatIllegalArgumentException().isThrownBy(() -> ShellHistoryEntry.of(" ", 0, "zsh"));
     }
+
+    @Test void zshTrailingContinuationIsNotEmitted() {
+        String text = ": 1:0;echo a\n: 2:0;echo b \\\n";
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        var parsed = ShellHistoryParser.parse(HistoryShell.ZSH, bytes);
+        assertThat(parsed.entries()).extracting(ShellHistoryEntry::command).containsExactly("echo a");
+        assertThat(parsed.consumed()).isEqualTo(text.indexOf(": 2"));
+    }
+
+    @Test void powershellTrailingBacktickIsNotEmitted() {
+        String text = "cmd one\nGet-ChildItem `\n";
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        var parsed = ShellHistoryParser.parse(HistoryShell.POWERSHELL, bytes);
+        assertThat(parsed.entries()).extracting(ShellHistoryEntry::command).containsExactly("cmd one");
+        assertThat(parsed.consumed()).isEqualTo(text.indexOf("Get-ChildItem"));
+    }
+
+    @Test void fishTrailingBlockWithoutWhenIsReturned() {
+        String text = "- cmd: one\n  when: 5\n- cmd: two\n";
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        var parsed = ShellHistoryParser.parse(HistoryShell.FISH, bytes);
+        assertThat(parsed.entries()).extracting(ShellHistoryEntry::command).containsExactly("one", "two");
+        assertThat(parsed.entries().get(0).timestamp()).isEqualTo(5L);
+        assertThat(parsed.entries().get(1).timestamp()).isZero();
+        assertThat(parsed.consumed()).isEqualTo(text.indexOf("- cmd: two"));
+    }
+
+    @Test void fishTrailingBlockWithWhenDoesNotReparse() {
+        String text = "- cmd: one\n  when: 5\n- cmd: two\n  when: 6\n- cmd: three\n";
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        var parsed = ShellHistoryParser.parse(HistoryShell.FISH, bytes);
+        assertThat(parsed.entries()).extracting(ShellHistoryEntry::command).containsExactly("one", "two", "three");
+        assertThat(parsed.entries().get(0).timestamp()).isEqualTo(5L);
+        assertThat(parsed.entries().get(1).timestamp()).isEqualTo(6L);
+        assertThat(parsed.entries().get(2).timestamp()).isZero();
+        assertThat(parsed.consumed()).isEqualTo(text.indexOf("- cmd: three"));
+    }
+
+    @Test void bashEmptyLinesDoNotResetTimestamp() {
+        String text = "#1700000111\n\nls\n";
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        var parsed = ShellHistoryParser.parse(HistoryShell.BASH, bytes);
+        assertThat(parsed.entries()).extracting(ShellHistoryEntry::command).containsExactly("ls");
+        assertThat(parsed.entries().get(0).timestamp()).isEqualTo(1700000111L);
+    }
 }

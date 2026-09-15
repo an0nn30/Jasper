@@ -17,54 +17,68 @@ final class ShellHistoryParser {
     /** Entries in file order and the byte count consumed: only complete lines are parsed. */
     record Parsed(List<ShellHistoryEntry> entries, int consumed) {}
 
+    /** Line text with its byte offset in the raw input. */
+    private record LineWithOffset(String text, int byteOffset) {}
+
     private ShellHistoryParser() {}
 
     static Parsed parse(HistoryShell shell, byte[] bytes) {
-        int consumed = 0;
-        for (int i = bytes.length - 1; i >= 0; i--) if (bytes[i] == '\n') { consumed = i + 1; break; }
-        List<String> lines = lines(shell, bytes, consumed);
-        List<ShellHistoryEntry> entries = switch (shell) {
+        int lineEndOffset = 0;
+        for (int i = bytes.length - 1; i >= 0; i--) if (bytes[i] == '\n') { lineEndOffset = i + 1; break; }
+        List<LineWithOffset> lines = lines(shell, bytes, lineEndOffset);
+        return switch (shell) {
             case ZSH -> zsh(lines);
             case BASH -> bash(lines);
             case FISH -> fish(lines);
             case NUSHELL -> plain(lines, HistoryShell.NUSHELL);
             case POWERSHELL -> powershell(lines);
         };
-        return new Parsed(entries, consumed);
     }
 
     /** zsh stores a byte {@code b} that collides with its markers as 0x83 followed by {@code b ^ 0x20}. */
-    static byte[] unmetafy(byte[] bytes, int length) {
-        var out = new ByteArrayOutputStream(length);
-        for (int i = 0; i < length; i++) {
+    static byte[] unmetafy(byte[] bytes, int start, int end) {
+        var out = new ByteArrayOutputStream(end - start);
+        for (int i = start; i < end; i++) {
             int b = bytes[i] & 0xff;
-            if (b == 0x83 && i + 1 < length) out.write((bytes[++i] & 0xff) ^ 0x20);
+            if (b == 0x83 && i + 1 < end) out.write((bytes[++i] & 0xff) ^ 0x20);
             else out.write(b);
         }
         return out.toByteArray();
     }
 
-    private static List<String> lines(HistoryShell shell, byte[] bytes, int end) {
-        byte[] data = shell == HistoryShell.ZSH ? unmetafy(bytes, end) : Arrays.copyOf(bytes, end);
-        String text = new String(data, StandardCharsets.UTF_8); // malformed bytes become U+FFFD
-        var lines = new ArrayList<String>();
-        int start = 0;
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) != '\n') continue;
-            int stop = i > start && text.charAt(i - 1) == '\r' ? i - 1 : i;
-            lines.add(text.substring(start, stop));
-            start = i + 1;
+    private static List<LineWithOffset> lines(HistoryShell shell, byte[] bytes, int end) {
+        // For zsh, compute offsets before unmetafying (newlines are never metafied)
+        var lines = new ArrayList<LineWithOffset>();
+        int byteOffset = 0;
+        for (int i = 0; i < end; ) {
+            int lineEnd = i;
+            while (lineEnd < end && bytes[lineEnd] != '\n') lineEnd++;
+            // lineEnd now points to '\n' or end of bytes
+            int lineLength = lineEnd - i;
+            // For zsh, unmetafy only this line's bytes to get the text
+            byte[] lineBytes = shell == HistoryShell.ZSH ? unmetafy(bytes, i, lineEnd) : Arrays.copyOfRange(bytes, i, lineEnd);
+            String text = new String(lineBytes, StandardCharsets.UTF_8); // malformed bytes become U+FFFD
+            // Strip trailing \r if present
+            int stop = text.length() > 0 && text.charAt(text.length() - 1) == '\r' ? text.length() - 1 : text.length();
+            String trimmed = text.substring(0, stop);
+            lines.add(new LineWithOffset(trimmed, byteOffset));
+            byteOffset += lineLength + 1; // +1 for the \n
+            i = lineEnd + 1; // Move past the \n
         }
         return lines;
     }
 
-    private static List<ShellHistoryEntry> zsh(List<String> lines) {
+    private static Parsed zsh(List<LineWithOffset> lines) {
         var entries = new ArrayList<ShellHistoryEntry>();
         StringBuilder pending = null;
         long time = 0;
-        for (String line : lines) {
+        int pendingStartOffset = 0;
+        int consumed = 0;
+        for (LineWithOffset lineWithOffset : lines) {
+            String line = lineWithOffset.text;
             if (line.length() > MAX_LINE) { pending = null; continue; }
             if (pending == null) {
+                pendingStartOffset = lineWithOffset.byteOffset;
                 Matcher extended = ZSH_EXTENDED.matcher(line);
                 if (extended.matches()) { time = parseTime(extended.group(1)); pending = new StringBuilder(extended.group(3)); }
                 else { time = 0; pending = new StringBuilder(line); }
@@ -73,39 +87,68 @@ final class ShellHistoryParser {
                 pending.setLength(pending.length() - 1);
                 continue;
             }
+            // Line is complete (no trailing backslash)
             add(entries, pending.toString(), time, HistoryShell.ZSH);
+            consumed = lineWithOffset.byteOffset + line.length() + 1; // +1 for the \n
             pending = null;
         }
-        return entries;
+        // If pending is not null at end, there's an incomplete continuation: don't emit it
+        // and set consumed to the start of that pending entry
+        if (pending != null) {
+            consumed = pendingStartOffset;
+        }
+        return new Parsed(entries, consumed);
     }
 
-    private static List<ShellHistoryEntry> bash(List<String> lines) {
+    private static Parsed bash(List<LineWithOffset> lines) {
         var entries = new ArrayList<ShellHistoryEntry>();
         long time = 0;
-        for (String line : lines) {
+        int consumed = 0;
+        for (LineWithOffset lineWithOffset : lines) {
+            String line = lineWithOffset.text;
+            consumed = lineWithOffset.byteOffset + line.length() + 1; // +1 for the \n
             Matcher stamp = BASH_TIMESTAMP.matcher(line);
             if (stamp.matches()) { time = parseTime(stamp.group(1)); continue; }
-            add(entries, line, time, HistoryShell.BASH);
-            time = 0;
+            boolean added = add(entries, line, time, HistoryShell.BASH);
+            if (added) time = 0; // Only reset time when entry is actually added
         }
-        return entries;
+        return new Parsed(entries, consumed);
     }
 
-    private static List<ShellHistoryEntry> fish(List<String> lines) {
+    private static Parsed fish(List<LineWithOffset> lines) {
         var entries = new ArrayList<ShellHistoryEntry>();
         String command = null;
         long time = 0;
-        for (String line : lines) {
+        int commandStartOffset = 0;
+        int consumed = 0;
+        boolean hasFollowingCmd = false;
+        for (int i = 0; i < lines.size(); i++) {
+            LineWithOffset lineWithOffset = lines.get(i);
+            String line = lineWithOffset.text;
             if (line.startsWith("- cmd: ")) {
+                hasFollowingCmd = (command != null); // True if we're replacing a pending command
                 if (command != null) add(entries, command, time, HistoryShell.FISH);
                 command = unescapeFish(line.substring(7));
+                commandStartOffset = lineWithOffset.byteOffset;
                 time = 0;
             } else if (command != null && line.startsWith("  when: ")) {
                 time = parseTime(line.substring(8).trim());
             }
         }
-        if (command != null) add(entries, command, time, HistoryShell.FISH);
-        return entries;
+        // Emit the trailing command if any
+        if (command != null) {
+            add(entries, command, time, HistoryShell.FISH);
+            // If this is the last block and no following "- cmd:" exists, set consumed to its start
+            // so a tail read re-parses it once "when:" is added
+            consumed = commandStartOffset;
+        } else {
+            // No trailing command; consumed is set normally
+            if (!lines.isEmpty()) {
+                LineWithOffset last = lines.get(lines.size() - 1);
+                consumed = last.byteOffset + last.text.length() + 1;
+            }
+        }
+        return new Parsed(entries, consumed);
     }
 
     private static String unescapeFish(String text) {
@@ -120,31 +163,49 @@ final class ShellHistoryParser {
         return out.toString();
     }
 
-    private static List<ShellHistoryEntry> powershell(List<String> lines) {
+    private static Parsed powershell(List<LineWithOffset> lines) {
         var entries = new ArrayList<ShellHistoryEntry>();
         StringBuilder pending = null;
-        for (String line : lines) {
-            if (pending == null) pending = new StringBuilder(line); else pending.append('\n').append(line);
+        int pendingStartOffset = 0;
+        int consumed = 0;
+        for (LineWithOffset lineWithOffset : lines) {
+            String line = lineWithOffset.text;
+            if (pending == null) {
+                pendingStartOffset = lineWithOffset.byteOffset;
+                pending = new StringBuilder(line);
+            } else pending.append('\n').append(line);
             if (!pending.isEmpty() && pending.charAt(pending.length() - 1) == '`') {
                 pending.setLength(pending.length() - 1);
                 continue;
             }
+            // Line is complete (no trailing backtick)
             add(entries, pending.toString(), 0, HistoryShell.POWERSHELL);
+            consumed = lineWithOffset.byteOffset + line.length() + 1; // +1 for the \n
             pending = null;
         }
-        return entries;
+        // If pending is not null at end, there's an incomplete continuation: don't emit it
+        // and set consumed to the start of that pending entry
+        if (pending != null) {
+            consumed = pendingStartOffset;
+        }
+        return new Parsed(entries, consumed);
     }
 
-    private static List<ShellHistoryEntry> plain(List<String> lines, HistoryShell shell) {
+    private static Parsed plain(List<LineWithOffset> lines, HistoryShell shell) {
         var entries = new ArrayList<ShellHistoryEntry>();
-        for (String line : lines) add(entries, line, 0, shell);
-        return entries;
+        int consumed = 0;
+        for (LineWithOffset lineWithOffset : lines) {
+            add(entries, lineWithOffset.text, 0, shell);
+            consumed = lineWithOffset.byteOffset + lineWithOffset.text.length() + 1; // +1 for the \n
+        }
+        return new Parsed(entries, consumed);
     }
 
-    private static void add(List<ShellHistoryEntry> entries, String command, long time, HistoryShell shell) {
+    private static boolean add(List<ShellHistoryEntry> entries, String command, long time, HistoryShell shell) {
         String trimmed = command.stripTrailing();
-        if (trimmed.isBlank() || trimmed.length() > MAX_LINE) return;
+        if (trimmed.isBlank() || trimmed.length() > MAX_LINE) return false;
         entries.add(ShellHistoryEntry.of(trimmed, time, shell.label()));
+        return true;
     }
 
     private static long parseTime(String digits) {
