@@ -3,30 +3,38 @@ package dev.jasper.app;
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
 
-/** Window-local palette ownership and synchronous, validated command dispatch. */
+/** Window-local palette ownership: one active scope, the scope picker, validated dispatch and focus restore. */
 final class WindowCommandPalette implements AutoCloseable {
+    private static final System.Logger LOG = System.getLogger(WindowCommandPalette.class.getName());
     private final WindowContent owner;
-    private final CommandRegistry registry;
-    private final CommandHistory history;
+    private final ScopeRegistry scopes;
+    private final String defaultScopeId;
+    private final boolean macOs;
     private final CommandPalette palette;
     private final Overlay overlay = new Overlay();
-    private final CommandRegistry.Subscription registryListener, historyListener;
+    private final CommandRegistry.Subscription scopesListener;
     private final ComponentAdapter resize = new ComponentAdapter() {
         @Override public void componentResized(ComponentEvent event) { layoutOverlay(); }
         @Override public void componentMoved(ComponentEvent event) { layoutOverlay(); }
     };
+    private CommandRegistry.Subscription scopeListener;
+    private PaletteScope active;
+    private PaletteContext context;
+    private boolean picker;
     private JRootPane root;
     private TerminalTab originTab;
     private TerminalPane originPane;
     private Component priorFocus;
     private boolean open, closed, dirty = true;
 
-    WindowCommandPalette(WindowContent owner, CommandRegistry registry, CommandHistory history, boolean macOs) {
-        this.owner = owner; this.registry = registry; this.history = history;
-        palette = new CommandPalette(macOs, query -> rebuild(false), this::execute, this::dismiss);
+    WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, String defaultScopeId, boolean macOs) {
+        this.owner = owner; this.scopes = scopes; this.defaultScopeId = defaultScopeId; this.macOs = macOs;
+        context = new PaletteContext(macOs, PaletteTarget.none());
+        palette = new CommandPalette(macOs, this::queryChanged, this::execute, this::escape, this::openPicker);
         palette.setFocusCycleRoot(true);
         palette.setFocusTraversalPolicy(new FocusTraversalPolicy() {
             @Override public Component getComponentAfter(Container root, Component current) { return palette.queryField(); }
@@ -36,8 +44,7 @@ final class WindowCommandPalette implements AutoCloseable {
             @Override public Component getDefaultComponent(Container root) { return palette.queryField(); }
         });
         overlay.setLayout(null); overlay.setOpaque(false); overlay.add(palette); overlay.setVisible(false);
-        registryListener = registry.onChanged(this::changed);
-        historyListener = history.onChanged(this::changed);
+        scopesListener = scopes.onChanged(this::changed);
     }
 
     void install(JRootPane replacement) {
@@ -49,21 +56,66 @@ final class WindowCommandPalette implements AutoCloseable {
         layoutOverlay();
     }
 
-    void toggle() {
-        if (open) { dismiss(); return; }
+    void toggle() { open(defaultScopeId); }
+
+    /** Opens in a scope, switches an open palette to it keeping the query, or dismisses when it is already active. */
+    void open(String scopeId) {
+        PaletteScope scope = scopes.find(scopeId).orElse(null);
+        if (scope == null) return;
+        if (open) {
+            if (scope == active && !picker) { dismiss(); return; }
+            activate(scope, true);
+            return;
+        }
         if (closed || root == null || !owner.isActiveAndOpen()
             || !SwingUtilities.isDescendingFrom(owner, root.getLayeredPane())) return;
         owner.updateActions();
         originTab = owner.currentTab(); originPane = owner.currentPane();
         priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+        context = new PaletteContext(macOs, originPane == null ? PaletteTarget.none() : PaletteTarget.of(originPane));
         open = true; overlay.swallowing = false; palette.setVisible(true); overlay.setVisible(true);
-        palette.queryField().setText(""); rebuild(false); layoutOverlay(); palette.queryField().requestFocusInWindow();
+        activate(scope, false);
+        palette.queryField().requestFocusInWindow();
+    }
+
+    private void activate(PaletteScope scope, boolean keepQuery) {
+        if (scopeListener != null) scopeListener.close();
+        active = scope; picker = false;
+        scopeListener = scope.onChanged(this::changed);
+        palette.setScope(scope.label(), scope.icon(), scope.placeholder(), scope.verbs(), scope.preferredRows(),
+            scope.monospaceRows());
+        if (!keepQuery) palette.queryField().setText("");
+        scope.activated(context);
+        rebuild(false);
     }
 
     void dismiss() { if (open) restoreAndHide(); }
+    /** Escape leaves the picker with the previous scope; outside the picker it dismisses. */
+    void escape() { if (pickerOpen()) palette.queryField().setText(""); else dismiss(); }
+    void openPicker() { if (open && !picker) palette.queryField().setText(">"); }
     boolean isOpen() { return open; }
+    boolean pickerOpen() { return open && picker; }
+    String activeScopeId() { return active == null ? null : active.id(); }
     boolean composing() { return palette.composing(); }
     CommandPalette component() { return palette; }
+
+    /** Tab commits the picker's highlighted scope; elsewhere Tab has no palette meaning. */
+    boolean tabPressed() {
+        if (!pickerOpen()) return false;
+        PaletteRow row = palette.resultList().getSelectedValue();
+        if (row != null) scopes.find(row.id()).ifPresent(scope -> activate(scope, false));
+        return true;
+    }
+
+    private void queryChanged(String query) {
+        if (!open) return;
+        // Stateless by design: JTextField.setText replaces its whole value as a remove
+        // followed by an insert, so a transition-based (was picker, is query now ">")
+        // check sees a transient empty string in between and can never recover. Deriving
+        // picker fresh from the current text each call is immune to that split.
+        picker = query.startsWith(">");
+        rebuild(false);
+    }
 
     private void changed() {
         dirty = true;
@@ -72,38 +124,45 @@ final class WindowCommandPalette implements AutoCloseable {
 
     void refreshIfChanged() {
         if (!open) return;
-        if (!validOrigin()) { dismiss(); return; }
+        if (!validOrigin() || !scopes.contains(active)) { dismiss(); return; }
         if (dirty) refresh();
     }
 
     void refresh() {
         if (!open) return;
-        if (!validOrigin()) { dismiss(); return; }
+        if (!validOrigin() || !scopes.contains(active)) { dismiss(); return; }
         rebuild(true);
     }
 
     void refreshTheme() { palette.refreshTheme(); if (open) { layoutOverlay(); overlay.repaint(); } }
 
     private void rebuild(boolean preserve) {
-        if (!open) return;
+        if (!open || active == null) return;
         dirty = false;
-        Command selected = palette.resultList().getSelectedValue();
+        PaletteRow selected = palette.resultList().getSelectedValue();
         String query = palette.queryField().getText();
-        boolean empty = CommandSearch.normalize(query).isEmpty();
-        List<Command> matches;
-        if (empty) {
-            matches = available(history.recent());
-            boolean suggested = matches.isEmpty();
-            if (suggested) matches = available(List.of("new_tab", "split_right", "open_settings", "new_window"));
-            palette.setOpeningLabel(suggested ? "Suggested" : "Recent");
-        } else matches = CommandSearch.find(registry.entries(), query, history.recent());
-        palette.setResults(matches, empty, preserve && selected != null ? selected.id() : null);
+        PaletteResults results = picker ? pickerResults(query.substring(1)) : active.search(query, context);
+        String keep = preserve && selected != null ? selected.id() : results.initialSelectionId();
+        palette.setResults(results.rows(), picker ? "Scopes" : results.sectionLabel(), keep);
         layoutOverlay();
     }
 
-    private List<Command> available(List<String> ids) {
-        return ids.stream().flatMap(id -> registry.entries().stream().map(CommandSearch.Entry::command)
-            .filter(command -> command.id().equals(id) && command.action().isEnabled())).limit(3).toList();
+    private PaletteResults pickerResults(String filter) {
+        String q = CommandSearch.normalize(filter);
+        var rows = new ArrayList<PaletteRow>();
+        for (PaletteScope scope : scopes.scopes()) {
+            if (!q.isEmpty() && !matchesScope(scope, q)) continue;
+            rows.add(new PaletteRow(scope.id(), scope.label(), scope.description(), owner.scopeShortcut(scope.id()),
+                scope.icon(), true, scope));
+        }
+        return new PaletteResults(rows, "Scopes", null);
+    }
+
+    static boolean matchesScope(PaletteScope scope, String q) {
+        String label = CommandSearch.normalize(scope.label());
+        if (label.contains(q)) return true;
+        for (String alias : scope.aliases()) if (CommandSearch.normalize(alias).startsWith(q)) return true;
+        return false;
     }
 
     private boolean validOrigin() {
@@ -112,18 +171,22 @@ final class WindowCommandPalette implements AutoCloseable {
             && (originPane == null || originTab != null && originTab.panes().contains(originPane));
     }
 
-    private void execute(Command command) {
-        if (!isOpen() || !validOrigin() || !registry.contains(command)) { dismiss(); return; }
+    private void execute(PaletteRow row, int verbIndex) {
+        if (!open) return;
+        if (picker) { scopes.find(row.id()).ifPresent(scope -> activate(scope, false)); return; }
+        PaletteScope scope = active;
+        if (!validOrigin() || !scopes.contains(scope)) { dismiss(); return; }
+        if (verbIndex < 0 || verbIndex >= scope.verbs().size()) return;
         owner.updateActions();
-        if (!validOrigin() || !registry.contains(command) || !command.action().isEnabled()) { refresh(); return; }
+        if (!validOrigin() || !scopes.contains(scope) || !scope.available(row, context)) { refresh(); return; }
+        PaletteVerb verb = scope.verbs().get(verbIndex);
+        PaletteContext target = context;
         restoreAndHide();
         try {
-            command.action().actionPerformed(new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, command.id()));
-            history.record(command.id());
+            scope.execute(row, verb, target);
         } catch (RuntimeException failure) {
-            System.getLogger(WindowCommandPalette.class.getName()).log(System.Logger.Level.ERROR,
-                "Command failed: " + command.id(), failure);
-            owner.onError.accept("Could not run " + command.title() + ". See the application log for details.");
+            LOG.log(System.Logger.Level.ERROR, "Palette action failed: " + scope.id() + " " + row.id(), failure);
+            owner.onError.accept("Could not run " + row.title() + ". See the application log for details.");
         }
     }
 
@@ -131,7 +194,9 @@ final class WindowCommandPalette implements AutoCloseable {
         // Pane changes notify us after choosing the new logical target. A captured component
         // in the old pane may still be showing, but restoring it would undo that transition.
         boolean restorePriorFocus = validOrigin();
-        open = false; palette.setVisible(false); overlay.setVisible(overlay.swallowing);
+        open = false; picker = false; palette.setVisible(false); overlay.setVisible(overlay.swallowing);
+        if (scopeListener != null) { scopeListener.close(); scopeListener = null; }
+        active = null;
         if (restorePriorFocus && priorFocus != null && priorFocus.isShowing()
             && SwingUtilities.isDescendingFrom(priorFocus, owner))
             priorFocus.requestFocusInWindow();
@@ -168,7 +233,7 @@ final class WindowCommandPalette implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
-        dismiss(); closed = true; registryListener.close(); historyListener.close(); uninstall();
+        dismiss(); closed = true; scopesListener.close(); uninstall();
     }
 
     private final class Overlay extends JComponent {

@@ -58,8 +58,9 @@ final class PaletteKeyRouter implements AutoCloseable {
         if (closed) return false;
         int code = stroke.getKeyCode();
         var action = bindings.get().actionFor(stroke);
-        if (action.orElse(null) == ActionId.COMMAND_PALETTE) {
-            claim.accept(code); palette.toggle(); return true;
+        String scope = scopeFor(action.orElse(null));
+        if (scope != null) {
+            claim.accept(code); palette.open(scope); return true;
         }
         if (!palette.isOpen()) return false;
         // KeyStroke carries legacy bits as well as extended modifiers.
@@ -68,11 +69,14 @@ final class PaletteKeyRouter implements AutoCloseable {
         int primary = macOs ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
         if (palette.composing() && modifiers == 0 && code != KeyEvent.VK_ESCAPE) return false;
         boolean numbered = modifiers == primary && code >= KeyEvent.VK_1 && code <= KeyEvent.VK_5;
+        boolean secondVerb = modifiers == primary && code == KeyEvent.VK_ENTER;
         Runnable operation = null;
         if (numbered) operation = () -> palette.component().executeNumber(code - KeyEvent.VK_1 + 1);
+        else if (secondVerb) operation = () -> palette.component().executeSelected(1);
         else if (modifiers == 0) operation = switch (code) {
-            case KeyEvent.VK_ESCAPE -> palette::dismiss;
+            case KeyEvent.VK_ESCAPE -> palette::escape;
             case KeyEvent.VK_ENTER -> palette.component()::executeSelected;
+            case KeyEvent.VK_TAB -> palette::tabPressed;
             case KeyEvent.VK_UP -> () -> palette.component().selectRelative(-1);
             case KeyEvent.VK_DOWN -> () -> palette.component().selectRelative(1);
             default -> null;
@@ -85,6 +89,15 @@ final class PaletteKeyRouter implements AutoCloseable {
             && (action.orElse(null) == ActionId.COPY || action.orElse(null) == ActionId.PASTE);
         if (action.isPresent() && !nativeClipboard) { claim.accept(code); return true; }
         return false;
+    }
+
+    /** Which scope an opening action targets; null for every other action. */
+    static String scopeFor(ActionId id) {
+        if (id == null) return null;
+        return switch (id) {
+            case COMMAND_PALETTE -> PaletteScope.COMMANDS_ID;
+            default -> null;
+        };
     }
 
     void reset() { swallowed.clear(); swallowTyped = false; }

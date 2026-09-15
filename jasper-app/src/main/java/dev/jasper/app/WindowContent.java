@@ -21,6 +21,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private final EnumMap<ActionId, Action> actions = new EnumMap<>(ActionId.class);
     private final CommandRegistry commands = new CommandRegistry();
     private final WindowCommands windowCommands;
+    private final ScopeRegistry scopes = new ScopeRegistry();
+    private final CommandsScope commandsScope;
+    private final boolean macOs;
     private final WindowCommandPalette commandPalette;
     // EDT-owned roster gives a held sequence priority over every window's new shortcuts,
     // regardless of the order in which KeyboardFocusManager registered their dispatchers.
@@ -85,6 +88,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                   CommandHistory history, boolean macOs) {
         super(new BorderLayout());
         this.bindings = bindings;
+        this.macOs = macOs;
         this.themes = themes;
         this.launcher = launcher; this.newWindow = newWindow; this.quit = quit; this.onEmpty = onEmpty;
         for (ActionId id : ActionId.values()) {
@@ -102,7 +106,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
         action(ActionId.RELOAD_CONFIG).putValue(Action.SHORT_DESCRIPTION, unavailable);
         windowCommands = new WindowCommands(this, commands);
         chrome = new WindowChrome(this);
-        commandPalette = new WindowCommandPalette(this, commands, history, macOs);
+        commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
+        scopes.register(commandsScope);
+        commandPalette = new WindowCommandPalette(this, scopes, PaletteScope.COMMANDS_ID, macOs);
         paletteKeys = new PaletteKeyRouter(commandPalette, () -> this.bindings, macOs,
             source -> !closed && active && bindingRoot != null && source != null
                 && SwingUtilities.isDescendingFrom(this, bindingRoot)
@@ -268,6 +274,19 @@ final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     CommandRegistry commands() { return commands; }
+    ScopeRegistry scopes() { return scopes; }
+    CommandsScope commandsScope() { return commandsScope; }
+    void dispatchCommand(Command command) {
+        command.action().actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, command.id()));
+    }
+    /** The application shortcut that opens a scope directly, for the picker's trailing tag; null when none. */
+    String scopeShortcut(String scopeId) {
+        ActionId id = switch (scopeId) {
+            case PaletteScope.COMMANDS_ID -> ActionId.COMMAND_PALETTE;
+            default -> null;
+        };
+        return id == null ? null : CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
+    }
     WindowCommandPalette commandPalette() { return commandPalette; }
     WindowChrome chrome() { return chrome; }
     WindowCommands windowCommands() { return windowCommands; }
@@ -362,7 +381,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         TerminalPane pane = currentPane();
         TerminalView view = pane == null ? null : pane.view();
         switch (id) {
-            case COMMAND_PALETTE -> commandPalette.toggle();
+            case COMMAND_PALETTE -> commandPalette.open(PaletteScope.COMMANDS_ID);
             case NEW_TAB -> newTab(directory());
             case NEW_WINDOW -> newWindow.accept(directory());
             case QUIT -> quit.run();
@@ -522,7 +541,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         paletteKeys.close();
-        commandPalette.close(); windowCommands.close(); commands.close();
+        commandPalette.close(); windowCommands.close(); commands.close(); scopes.close();
         closed = true;
         syncPaletteDispatcher();
         unregisterConfiguration.run(); disconnectConfiguration();

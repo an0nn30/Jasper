@@ -66,11 +66,11 @@ class WindowCommandPaletteTest {
                 owner.commandPalette().toggle(); owner.commandPalette().component().queryField().setText("custom");
                 registration.close(); owner.commands().register(command("custom", count::incrementAndGet));
                 // Simulate a row already selected by a queued mouse/key event.
-                owner.commandPalette().component().setResults(List.of(stale), false, null);
+                owner.commandPalette().component().setResults(owner.commandsScope().rows(List.of(stale)), null, null);
                 owner.commandPalette().component().executeSelected(); assertThat(count.get()).isZero();
                 owner.commandPalette().toggle(); stale = command("disabled", count::incrementAndGet);
                 owner.commands().register(stale); stale.action().setEnabled(false);
-                owner.commandPalette().component().setResults(List.of(stale), false, null);
+                owner.commandPalette().component().setResults(owner.commandsScope().rows(List.of(stale)), null, null);
                 owner.commandPalette().component().executeSelected(); assertThat(count.get()).isZero();
             }
         });
@@ -180,7 +180,9 @@ class WindowCommandPaletteTest {
                 owner.commandPalette().toggle(); var palette = owner.commandPalette().component();
                 palette.queryField().setText("custom"); palette.selectRelative(1);
                 var selected = palette.resultList().getSelectedValue(); first.action().putValue(Command.TITLE, "custom one");
-                assertThat(palette.resultList().getSelectedValue()).isSameAs(selected);
+                // Rows are rebuilt as fresh PaletteRow records on every refresh; only their
+                // content (matched by row ID) is stable across an edit to an unrelated command.
+                assertThat(palette.resultList().getSelectedValue()).isEqualTo(selected);
                 palette.queryField().setText("custom "); assertThat(palette.resultList().getSelectedIndex()).isZero();
                 var changes = new AtomicInteger(); palette.resultList().getModel().addListDataListener(new ListDataListener() {
                     public void intervalAdded(ListDataEvent e) { changes.incrementAndGet(); }

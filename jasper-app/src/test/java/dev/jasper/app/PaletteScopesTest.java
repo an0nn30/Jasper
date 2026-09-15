@@ -1,0 +1,179 @@
+package dev.jasper.app;
+
+import java.awt.event.KeyEvent;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+import static dev.jasper.app.DesktopTestSupport.edt;
+import static dev.jasper.app.CommandPaletteShortcutsTest.*;
+
+class PaletteScopesTest {
+    /** A scope with no Swing in it: rows and verbs are data; execution records what it was asked to do. */
+    static final class FakeScope implements PaletteScope {
+        final List<String> executed = new ArrayList<>();
+        final List<Runnable> listeners = new ArrayList<>();
+        int activations;
+        List<PaletteRow> rows = List.of(PaletteRow.of("alpha", "Alpha"), PaletteRow.of("beta", "Beta"));
+        @Override public String id() { return "test.fake"; }
+        @Override public String label() { return "Fake"; }
+        @Override public String description() { return "Fixture scope"; }
+        @Override public String placeholder() { return "Search fake"; }
+        @Override public List<String> aliases() { return List.of("fx"); }
+        @Override public List<PaletteVerb> verbs() { return List.of(new PaletteVerb("one", "One"), new PaletteVerb("two", "Two")); }
+        @Override public int preferredRows() { return 12; }
+        @Override public void activated(PaletteContext context) { activations++; }
+        @Override public PaletteResults search(String query, PaletteContext context) {
+            String q = CommandSearch.normalize(query);
+            return new PaletteResults(rows.stream()
+                .filter(row -> q.isEmpty() || row.title().toLowerCase(Locale.ROOT).contains(q)).toList(),
+                q.isEmpty() ? "Most recent" : null, null);
+        }
+        @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {
+            executed.add(row.id() + ":" + verb.id() + ":" + context.target().shellName().get());
+        }
+        @Override public CommandRegistry.Subscription onChanged(Runnable listener) {
+            listeners.add(listener);
+            return new CommandRegistry.Subscription(() -> listeners.remove(listener));
+        }
+    }
+
+    @Test void pickerFiltersByAliasTabCommitsAndShortcutSwitchKeepsTheQuery() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner);
+                var fake = new FakeScope();
+                owner.scopes().register(fake);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.toggle();
+                assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
+                assertThat(card.chip().getText()).isEqualTo("Commands");
+                assertThat(card.queryField().getClientProperty("JTextField.placeholderText")).isEqualTo("Type a command, or > to switch scope");
+                card.queryField().setText(">");
+                assertThat(palette.pickerOpen()).isTrue();
+                assertThat(card.sectionLabel().getText()).isEqualTo("Scopes");
+                assertThat(card.resultList().getModel().getSize()).isEqualTo(2);
+                assertThat(card.resultList().getModel().getElementAt(0).tag()).isEqualTo("⌘K");
+                card.queryField().setText(">fx");
+                assertThat(card.resultList().getModel().getSize()).isEqualTo(1);
+                assertThat(card.resultList().getSelectedValue().id()).isEqualTo("test.fake");
+                assertThat(card.resultList().getSelectedValue().detail()).isEqualTo("Fixture scope");
+                assertThat(palette.tabPressed()).isTrue();
+                assertThat(palette.pickerOpen()).isFalse();
+                assertThat(palette.activeScopeId()).isEqualTo("test.fake");
+                assertThat(card.queryField().getText()).isEmpty();
+                assertThat(card.chip().getText()).isEqualTo("Fake");
+                assertThat(card.footer().isVisible()).isTrue();
+                assertThat(card.sectionLabel().getText()).isEqualTo("Most recent");
+                assertThat(fake.activations).isEqualTo(1);
+                card.queryField().setText("bet");
+                assertThat(card.resultList().getModel().getSize()).isEqualTo(1);
+                palette.open(PaletteScope.COMMANDS_ID);
+                assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
+                assertThat(card.queryField().getText()).isEqualTo("bet");
+                assertThat(card.footer().isVisible()).isFalse();
+                palette.open(PaletteScope.COMMANDS_ID);
+                assertThat(palette.isOpen()).isFalse();
+                palette.open("test.missing");
+                assertThat(palette.isOpen()).isFalse();
+                assertThat(palette.tabPressed()).isFalse();
+            }
+        });
+    }
+
+    @Test void greaterThanOnlyOpensThePickerAtTheStartOfAnEmptyQueryAndEscapeLeavesIt() throws Exception {
+        edt(() -> {
+            try (var owner = owner(false)) {
+                install(owner);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.toggle();
+                card.queryField().setText("a");
+                card.queryField().setText("a>");
+                assertThat(palette.pickerOpen()).isFalse();
+                card.queryField().setText("");
+                card.queryField().setText(">");
+                assertThat(palette.pickerOpen()).isTrue();
+                card.queryField().setText("");
+                assertThat(palette.pickerOpen()).isFalse();
+                assertThat(palette.isOpen()).isTrue();
+                palette.openPicker();
+                assertThat(palette.pickerOpen()).isTrue();
+                palette.escape();
+                assertThat(palette.pickerOpen()).isFalse();
+                assertThat(palette.isOpen()).isTrue();
+                assertThat(card.queryField().getText()).isEmpty();
+                palette.escape();
+                assertThat(palette.isOpen()).isFalse();
+            }
+        });
+    }
+
+    @Test void verbsRouteEnterCmdEnterAndNumbersThroughTheOriginTarget() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner);
+                var fake = new FakeScope();
+                owner.scopes().register(fake);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.open("test.fake");
+                card.executeSelected();
+                assertThat(palette.isOpen()).isFalse();
+                palette.open("test.fake");
+                card.executeSelected(1);
+                palette.open("test.fake");
+                card.executeNumber(2);
+                assertThat(fake.executed).containsExactly("alpha:one:sh", "alpha:two:sh", "beta:one:sh");
+                palette.toggle();
+                card.queryField().setText("new tab");
+                card.executeSelected(1);
+                assertThat(palette.isOpen()).isTrue();
+                assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+                card.queryField().setText(">");
+                card.executeSelected();
+                assertThat(palette.isOpen()).isTrue();
+                assertThat(palette.pickerOpen()).isFalse();
+                assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
+            }
+        });
+    }
+
+    @Test void scopeChangesRefreshTheOpenListAndRemovingTheActiveScopeDismisses() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner);
+                var fake = new FakeScope();
+                var registration = owner.scopes().register(fake);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.open("test.fake");
+                card.selectRelative(1);
+                fake.rows = List.of(PaletteRow.of("alpha", "Alpha"), PaletteRow.of("beta", "Beta"), PaletteRow.of("gamma", "Gamma"));
+                List.copyOf(fake.listeners).forEach(Runnable::run);
+                assertThat(card.resultList().getModel().getSize()).isEqualTo(3);
+                assertThat(card.resultList().getSelectedValue().id()).isEqualTo("beta");
+                registration.close();
+                assertThat(palette.isOpen()).isFalse();
+                assertThat(fake.listeners).isEmpty();
+            }
+        });
+    }
+
+    @Test void routerOpensSwitchesAndCommitsWithTabAndCmdEnter() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                var root = install(owner);
+                var fake = new FakeScope();
+                owner.scopes().register(fake);
+                var router = PaletteKeyRouterTest.router(owner, true, root);
+                int mod = primary(true);
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, mod))).isTrue();
+                owner.commandPalette().component().queryField().setText(">fa");
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_TAB, 0))).isTrue();
+                assertThat(owner.commandPalette().activeScopeId()).isEqualTo("test.fake");
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_ENTER, mod))).isTrue();
+                assertThat(fake.executed).containsExactly("alpha:two:sh");
+                assertThat(owner.commandPalette().isOpen()).isFalse();
+            }
+        });
+    }
+}

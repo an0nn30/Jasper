@@ -125,13 +125,13 @@ class PaletteKeyRouterTest {
                     null, 0, null, null);
                 for (var listener : card.queryField().getInputMethodListeners()) listener.inputMethodTextChanged(committed);
                 owner.commandPalette().toggle(); registration.close();
-                card.setResults(List.of(first), false, null);
+                card.setResults(owner.commandsScope().rows(List.of(first)), null, null);
                 assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(count.get()).isZero();
                 router.dispatch(release(card.queryField(), KeyEvent.VK_ENTER));
                 owner.commandPalette().toggle(); second.action().setEnabled(false);
-                card.setResults(List.of(second), false, null);
+                card.setResults(owner.commandsScope().rows(List.of(second)), null, null);
                 router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0));
                 assertThat(count.get()).isZero();
             }
