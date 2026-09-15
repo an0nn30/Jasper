@@ -58,13 +58,17 @@ final class WindowCommandPalette implements AutoCloseable {
 
     void toggle() { open(defaultScopeId); }
 
-    /** Opens in a scope, switches an open palette to it keeping the query, or dismisses when it is already active. */
+    /**
+     * Opens in a scope, or dismisses when its shortcut is pressed while it is already active
+     * (regardless of the picker). Switching to a different scope keeps the query, except from
+     * the picker, where the raw {@code >…} filter text is dropped.
+     */
     void open(String scopeId) {
         PaletteScope scope = scopes.find(scopeId).orElse(null);
         if (scope == null) return;
         if (open) {
-            if (scope == active && !picker) { dismiss(); return; }
-            activate(scope, true);
+            if (scope == active) { dismiss(); return; }
+            activate(scope, !picker);
             return;
         }
         if (closed || root == null || !owner.isActiveAndOpen()

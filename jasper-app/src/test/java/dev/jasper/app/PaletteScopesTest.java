@@ -158,6 +158,58 @@ class PaletteScopesTest {
         });
     }
 
+    @Test void theActiveScopesShortcutDismissesEvenWhileThePickerIsOpen() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.toggle();
+                card.queryField().setText(">");
+                assertThat(palette.pickerOpen()).isTrue();
+                palette.open(PaletteScope.COMMANDS_ID);
+                assertThat(palette.isOpen()).isFalse();
+            }
+        });
+    }
+
+    @Test void switchingScopesFromThePickerDropsTheRawFilterText() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner);
+                var fake = new FakeScope();
+                owner.scopes().register(fake);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.toggle();
+                card.queryField().setText(">fa");
+                assertThat(palette.pickerOpen()).isTrue();
+                palette.open("test.fake");
+                assertThat(palette.activeScopeId()).isEqualTo("test.fake");
+                assertThat(palette.pickerOpen()).isFalse();
+                assertThat(card.queryField().getText()).isEmpty();
+            }
+        });
+    }
+
+    @Test void routerRepeatingTheOpenShortcutDismissesEvenWithThePickerFilteredMidway() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                var root = install(owner);
+                var router = PaletteKeyRouterTest.router(owner, true, root);
+                int mod = primary(true);
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, mod))).isTrue();
+                assertThat(router.dispatch(PaletteKeyRouterTest.typed(owner, 'k'))).isTrue();
+                assertThat(router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_K))).isTrue();
+                assertThat(owner.commandPalette().isOpen()).isTrue();
+                owner.commandPalette().component().queryField().setText(">");
+                assertThat(owner.commandPalette().pickerOpen()).isTrue();
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_K, mod))).isTrue();
+                assertThat(router.dispatch(PaletteKeyRouterTest.typed(owner, 'k'))).isTrue();
+                assertThat(router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_K))).isTrue();
+                assertThat(owner.commandPalette().isOpen()).isFalse();
+            }
+        });
+    }
+
     @Test void routerOpensSwitchesAndCommitsWithTabAndCmdEnter() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
