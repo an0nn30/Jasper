@@ -68,12 +68,17 @@ The command line is never rewritten for tmux; only environment variables are set
 
 ```toml
 [history]
-deprioritize_trivial = true   # live; new setting
+# live; new setting. Replaces the default list; an empty list turns de-ranking off.
+trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
 ```
 
 When true, an entry whose command is one of a built-in set — `exit`, `clear`, `ll`, `ls`, `cd`, `pwd`, plus `cd` with a single argument — sorts after every non-trivial entry, keeping its relative order within the trivial group. It is a partition, not a score adjustment, so the rule is predictable: trivial commands are still present, still searchable, just never above real work.
 
-The set is deliberately built in and short. A user-supplied list is a larger surface (validation, matching semantics) than the problem warrants; if it is wanted later, the setting can grow from a boolean to a list without changing the ranking code.
+**Revised on request.** The setting shipped as a boolean over a built-in set; the user then asked for
+the set itself to be configurable, with those entries as the defaults. It is now a list, which the
+ranking code did not have to change to accommodate — only what it is handed. Each entry is a single
+word compared against a command's first word, so an entry containing whitespace could never match and
+is rejected with a diagnostic; entries are normalized to lower case and de-duplicated.
 
 **Correction after implementation.** `ShellHistoryScope` receives no config snapshot. The flag rides
 on `PaletteContext` beside `maxResults`, which is how `palette.max_results` already reaches a scope,

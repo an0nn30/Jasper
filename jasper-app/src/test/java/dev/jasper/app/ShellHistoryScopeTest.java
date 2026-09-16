@@ -161,9 +161,13 @@ class ShellHistoryScopeTest {
     }
 
     private static PaletteContext context(boolean deprioritizeTrivial) {
+        return context(deprioritizeTrivial ? ShellHistoryScope.DEFAULT_TRIVIAL : List.of());
+    }
+
+    private static PaletteContext context(List<String> trivial) {
         return new PaletteContext(true,
             new PaletteTarget(s -> {}, () -> {}, Optional::empty, () -> "zsh", () -> true),
-            PaletteContext.DEFAULT_MAX_RESULTS, deprioritizeTrivial);
+            PaletteContext.DEFAULT_MAX_RESULTS, trivial);
     }
 
     /** exit and clear are genuinely the most recent commands; they are still not what you are looking for. */
@@ -208,13 +212,32 @@ class ShellHistoryScopeTest {
     }
 
     @Test void onlyAShortCommandWhoseFirstWordIsTrivialCounts() {
-        assertThat(ShellHistoryScope.trivial("clear")).isTrue();
-        assertThat(ShellHistoryScope.trivial("cd ..")).isTrue();
-        assertThat(ShellHistoryScope.trivial("ls -la")).isTrue();
-        assertThat(ShellHistoryScope.trivial("exit")).isTrue();
+        var set = ShellHistoryScope.DEFAULT_TRIVIAL;
+        assertThat(ShellHistoryScope.trivial("clear", set)).isTrue();
+        assertThat(ShellHistoryScope.trivial("cd ..", set)).isTrue();
+        assertThat(ShellHistoryScope.trivial("ls -la", set)).isTrue();
+        assertThat(ShellHistoryScope.trivial("EXIT", set)).as("matching ignores case").isTrue();
         // A real command that merely starts with a trivial word is not trivial.
-        assertThat(ShellHistoryScope.trivial("cd /very/deep/path && ./gradlew build")).isFalse();
-        assertThat(ShellHistoryScope.trivial("clearcache --all")).isFalse();
-        assertThat(ShellHistoryScope.trivial("./gradlew build")).isFalse();
+        assertThat(ShellHistoryScope.trivial("cd /very/deep/path && ./gradlew build", set)).isFalse();
+        assertThat(ShellHistoryScope.trivial("clearcache --all", set)).isFalse();
+        assertThat(ShellHistoryScope.trivial("./gradlew build", set)).isFalse();
+        assertThat(ShellHistoryScope.trivial("clear", List.of())).as("an empty list means nothing is trivial").isFalse();
+    }
+
+    /** The list is the user's: a command they name is de-ranked, one they drop is not. */
+    @Test void aConfiguredListReplacesTheBuiltInOne() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var index = indexOf(
+                    ShellHistoryEntry.of("./gradlew build", 100, "zsh"),
+                    ShellHistoryEntry.of("clear", 200, "zsh"))) {
+                var scope = new ShellHistoryScope(index, null);
+                // "clear" is no longer trivial, so strict recency applies to it.
+                assertThat(scope.search("", context(List.of("exit"))).rows()).extracting(PaletteRow::title)
+                    .containsExactly("clear", "./gradlew build");
+                // ...and a command the user names is de-ranked even though nothing built in matches it.
+                assertThat(scope.search("", context(List.of("./gradlew"))).rows()).extracting(PaletteRow::title)
+                    .containsExactly("clear", "./gradlew build");
+            }
+        });
     }
 }

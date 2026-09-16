@@ -287,8 +287,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
         if (previous == null || !previous.keybindings().equals(next.keybindings())) setBindings(next.bindings(macOs));
         if (previous == null || previous.historyEnabled() != next.historyEnabled()) setHistoryEnabled(next.historyEnabled());
         if (previous == null || previous.maxResults() != next.maxResults()) commandPalette.setMaxResults(next.maxResults());
-        if (previous == null || previous.deprioritizeTrivial() != next.deprioritizeTrivial())
-            commandPalette.setDeprioritizeTrivial(next.deprioritizeTrivial());
+        if (previous == null || !previous.trivialCommands().equals(next.trivialCommands()))
+            commandPalette.setTrivialCommands(next.trivialCommands());
     }
 
     private static boolean liveBehaviorChanged(TerminalConfig previous, TerminalConfig next) {

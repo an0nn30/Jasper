@@ -80,7 +80,7 @@ variant = "dark"
 | `window.lines` | `45` | Integer 2–200 | New windows |
 | `buddy.enabled` | `true` | Boolean | Live |
 | `history.enabled` | `true` | Boolean | Live |
-| `history.deprioritize_trivial` | `true` | Boolean | Live |
+| `history.trivial_commands` | see below | Array of single words | Live |
 | `palette.max_results` | `5` | Integer 1–20 | Live |
 | `font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
 | `font.size` | `16.0` | Finite number 6–72 points | Live |
@@ -121,12 +121,20 @@ arrow keys. Changes apply live, including to an open palette.
 
 ### Shell history
 
-`history.deprioritize_trivial` ranks a handful of commands below more substantial ones in the
-History palette: `exit`, `clear`, `ls`, `ll`, `la`, `cd`, `pwd`, `c`, `q` and `logout`. Those are
+`history.trivial_commands` lists the commands ranked below more substantial ones in the History
+palette. It defaults to `["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]` —
 often the most recent thing you typed, so strict recency pushed the work you came back for off the
-first page. Only a short command whose first word is one of them counts, so `cd ..` is trivial while
-`cd deep/path && ./gradlew build` is not. They are still listed and still searchable — searching for
-`clear` finds it — they just never sort above real work. Set it to `false` for strict recency.
+first page.
+
+Each entry is a **single word**, compared against a command's first word and ignoring case, and only
+a command of at most two words counts. So `cd ..` is trivial while `cd deep/path && ./gradlew build`
+is real work, and `clearcache --all` is not caught by `clear`. An entry containing whitespace could
+never match and is rejected with a diagnostic.
+
+Setting the key **replaces** the default list rather than adding to it, so include any defaults you
+want to keep. An empty list (`trivial_commands = []`) turns de-ranking off entirely and restores
+strict recency. De-ranked commands are still listed and still searchable — searching for `clear`
+finds it — they just never sort above real work.
 
 `history.enabled` adds the History scope to the [command palette](command-palette.md): Cmd+R on
 macOS or Ctrl+Shift+R elsewhere searches every shell history file Jasper can find plus commands

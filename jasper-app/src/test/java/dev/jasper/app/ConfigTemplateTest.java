@@ -42,7 +42,7 @@ class ConfigTemplateTest {
         var toml = Toml.parse(text);
         assertThat(toml.errors()).isEmpty();
         assertThat(toml.getTable("buddy").keySet()).containsExactly("enabled");
-        assertThat(toml.getTable("history").keySet()).containsExactlyInAnyOrder("enabled", "deprioritize_trivial");
+        assertThat(toml.getTable("history").keySet()).containsExactlyInAnyOrder("enabled", "trivial_commands");
         assertThat(toml.getTable("palette").keySet()).containsExactly("max_results");
         assertThat(toml.getTable("window").keySet())
             .containsExactlyInAnyOrder("tab_height", "toolbar", "status_bar", "columns", "lines");

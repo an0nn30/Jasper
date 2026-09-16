@@ -37,7 +37,7 @@ final class WindowCommandPalette implements AutoCloseable {
     // would call complete() twice before the first result arrives.
     private boolean completing;
     private int maxResults = PaletteContext.DEFAULT_MAX_RESULTS;
-    private boolean deprioritizeTrivial = true;
+    private java.util.List<String> trivialCommands = ShellHistoryScope.DEFAULT_TRIVIAL;
 
     WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, String defaultScopeId, boolean macOs) {
         this.owner = owner; this.scopes = scopes; this.defaultScopeId = defaultScopeId; this.macOs = macOs;
@@ -88,7 +88,7 @@ final class WindowCommandPalette implements AutoCloseable {
         originTab = owner.currentTab(); originPane = owner.currentPane();
         priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
         context = new PaletteContext(macOs, originPane == null ? PaletteTarget.none() : PaletteTarget.of(originPane),
-            maxResults, deprioritizeTrivial);
+            maxResults, trivialCommands);
         open = true; overlay.swallowing = false; palette.setVisible(true); overlay.setVisible(true);
         activate(scope, false);
         palette.queryField().requestFocusInWindow();
@@ -110,7 +110,7 @@ final class WindowCommandPalette implements AutoCloseable {
     void setMaxResults(int value) {
         if (value == maxResults) return;
         maxResults = value;
-        context = new PaletteContext(macOs, context.target(), maxResults, deprioritizeTrivial);
+        context = new PaletteContext(macOs, context.target(), maxResults, trivialCommands);
         if (open && active != null) {
             palette.setScope(active.label(), active.icon(), active.placeholder(), active.verbs(), maxResults, active.monospaceRows());
             rebuild(true);
@@ -119,15 +119,15 @@ final class WindowCommandPalette implements AutoCloseable {
 
     int maxResults() { return maxResults; }
 
-    /** Live: the next query uses the new value, and an open palette re-runs its search. */
-    void setDeprioritizeTrivial(boolean value) {
-        if (value == deprioritizeTrivial) return;
-        deprioritizeTrivial = value;
-        context = new PaletteContext(macOs, context.target(), maxResults, deprioritizeTrivial);
+    /** Live: the next query uses the new list, and an open palette re-runs its search. */
+    void setTrivialCommands(java.util.List<String> value) {
+        if (value.equals(trivialCommands)) return;
+        trivialCommands = java.util.List.copyOf(value);
+        context = new PaletteContext(macOs, context.target(), maxResults, trivialCommands);
         changed();
     }
 
-    boolean deprioritizeTrivial() { return deprioritizeTrivial; }
+    java.util.List<String> trivialCommands() { return trivialCommands; }
 
     void dismiss() { if (open) restoreAndHide(); }
     void openPicker() { if (open && step == null && !picker) palette.queryField().setText(">"); }

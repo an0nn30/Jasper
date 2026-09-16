@@ -35,11 +35,16 @@ sets — the interactive shell is the child of a non-interactive one, and the
 `JASPER_INTEGRATION_LOADED` separates the two cases. Verified against real tmux
 with that configuration: the integration loads and `__jasper_precmd` is defined.
 
-*Trivial de-ranking.* `history.deprioritize_trivial` (default `true`, live)
-partitions rather than scores: `exit`, `clear`, `ls`, `ll`, `la`, `cd`, `pwd`,
-`c`, `q` and `logout` keep their order among themselves and follow everything
-else, and are still listed and searchable. Only a short command whose first word
-is trivial counts, so `cd deep/path && ./gradlew build` is real work.
+*Trivial de-ranking.* `history.trivial_commands` (live) partitions rather than
+scores: the listed commands keep their order among themselves and follow
+everything else, and are still listed and searchable. It defaults to `exit`,
+`clear`, `ls`, `ll`, `la`, `cd`, `pwd`, `c`, `q` and `logout`. Only a short
+command whose first word is listed counts, so `cd deep/path && ./gradlew build`
+is real work and `clearcache` is not `clear`. Setting the key replaces the
+default list; an empty list turns de-ranking off. It shipped first as a boolean
+over a built-in set and became a list on request — the ranking code did not
+change, only what it is handed. Entries are single words (one containing
+whitespace could never match and is rejected), lower-cased and de-duplicated.
 
 Deviations from the plan: the flag rides on `PaletteContext` beside
 `maxResults`, not on a config snapshot the scope never receives, so the

@@ -42,9 +42,11 @@ final class ConfigTemplate {
             # Search shell history from the palette (Cmd+R on macOS, Ctrl+Shift+R elsewhere); updates live.
             # Reads zsh, bash, fish, nushell and PowerShell history files; Jasper writes no history of its own.
             # enabled = true
-            # Rank exit, clear, ls, ll, la, cd, pwd, c, q and logout below more substantial commands.
-            # They are still listed and still searchable, just never above real work.
-            # deprioritize_trivial = true
+            # Commands ranked below more substantial ones in the History palette. Each entry is a
+            # single word matched against a command's first word, so "cd .." is trivial but
+            # "cd path && build" is not. Still listed and searchable, just never above real work.
+            # An empty list turns this off; setting the key replaces the default list entirely.
+            # trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
 
             [palette]
             # Rows the command palette shows in every scope, 1-20; updates live. Cmd/Ctrl+1-5 still number the first five.

@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,7 +32,7 @@ final class ConfigLoader {
     private static final Map<List<String>, Set<String>> FIELDS = Map.ofEntries(
         Map.entry(List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy", "history", "palette")),
         Map.entry(List.of("buddy"), Set.of("enabled")),
-        Map.entry(List.of("history"), Set.of("enabled", "deprioritize_trivial")),
+        Map.entry(List.of("history"), Set.of("enabled", "trivial_commands")),
         Map.entry(List.of("palette"), Set.of("max_results")),
         Map.entry(List.of("window"), Set.of("tab_height", "toolbar", "status_bar", "columns", "lines")),
         Map.entry(List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height")),
@@ -52,7 +53,7 @@ final class ConfigLoader {
     private boolean statusBar = true;
     private boolean buddyEnabled = true;
     private boolean historyEnabled = true;
-    private boolean deprioritizeTrivial = true;
+    private List<String> trivialCommands = ShellHistoryScope.DEFAULT_TRIVIAL;
     private int maxResults = PaletteContext.DEFAULT_MAX_RESULTS;
     private int columns = 150;
     private int lines = 45;
@@ -99,7 +100,7 @@ final class ConfigLoader {
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, historyEnabled, maxResults, deprioritizeTrivial);
+                buddyEnabled, historyEnabled, maxResults, trivialCommands);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -138,7 +139,8 @@ final class ConfigLoader {
             case "window.status_bar" -> statusBar = bool(path, value, statusBar);
             case "buddy.enabled" -> buddyEnabled = bool(path, value, buddyEnabled);
             case "history.enabled" -> historyEnabled = bool(path, value, historyEnabled);
-            case "history.deprioritize_trivial" -> deprioritizeTrivial = bool(path, value, deprioritizeTrivial);
+            case "history.trivial_commands" -> trivialCommands = lowercased(strings(path, value,
+                ConfigLoader::trivialName, trivialCommands));
             case "palette.max_results" -> maxResults = integer(path, value, PaletteContext.MIN_MAX_RESULTS, PaletteContext.MAX_MAX_RESULTS, maxResults);
             case "font.family" -> fontFamily = string(path, value, ConfigLoader::fontName,
                 "Use a nonblank font name without NUL; using the default.", fontFamily);
@@ -243,6 +245,15 @@ final class ConfigLoader {
             else values.put(name, text);
         }
         env = Map.copyOf(values);
+    }
+
+    /** Only a command's first word is ever compared, so an entry with whitespace could never match. */
+    private static boolean trivialName(String text) {
+        return !text.isBlank() && noNul(text) && text.strip().split("\\s+").length == 1;
+    }
+
+    private static List<String> lowercased(List<String> values) {
+        return values.stream().map(value -> value.strip().toLowerCase(Locale.ROOT)).distinct().toList();
     }
 
     private static boolean noNul(String text) {

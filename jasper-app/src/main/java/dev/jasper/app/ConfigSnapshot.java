@@ -3,6 +3,7 @@ package dev.jasper.app;
 import dev.jasper.terminal.Palette;
 import dev.jasper.terminal.TerminalOptions;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -10,7 +11,7 @@ import java.util.Objects;
 record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
                       FontConfig font, Appearance variant, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                      boolean historyEnabled, int maxResults, boolean deprioritizeTrivial) {
+                      boolean historyEnabled, int maxResults, List<String> trivialCommands) {
     ConfigSnapshot {
         if (maxResults < PaletteContext.MIN_MAX_RESULTS || maxResults > PaletteContext.MAX_MAX_RESULTS)
             throw new IllegalArgumentException("Max results must be 1\u201320.");
@@ -22,6 +23,7 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
         Objects.requireNonNull(toolbar, "toolbar");
         Objects.requireNonNull(variant, "variant");
         keybindings = Map.copyOf(keybindings);
+        trivialCommands = List.copyOf(trivialCommands);
         // A snapshot has no platform. At least one platform must accept its complete map;
         // the loader validates against the actual platform before constructing a snapshot.
         try {
@@ -59,7 +61,7 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
                    int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, boolean historyEnabled,
                    int maxResults) {
         this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled,
-            historyEnabled, maxResults, true);
+            historyEnabled, maxResults, ShellHistoryScope.DEFAULT_TRIVIAL);
     }
 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,

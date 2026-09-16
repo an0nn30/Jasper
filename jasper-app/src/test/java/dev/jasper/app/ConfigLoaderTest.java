@@ -289,11 +289,25 @@ class ConfigLoaderTest {
         });
     }
 
-    @Test void deprioritizeTrivialParsesValidatesAndDefaultsToOn() {
-        assertThat(parse("").snapshot().deprioritizeTrivial()).isTrue();
-        assertThat(parse("[history]\ndeprioritize_trivial=false\n").snapshot().deprioritizeTrivial()).isFalse();
-        var bad = parse("[history]\ndeprioritize_trivial='yes'\n");
-        assertThat(bad.snapshot().deprioritizeTrivial()).as("an invalid value keeps the default").isTrue();
-        assertThat(bad.diagnostics()).isNotEmpty();
+    @Test void trivialCommandsParsesValidatesAndDefaultsToTheBuiltInList() {
+        assertThat(parse("").snapshot().trivialCommands())
+            .isEqualTo(ShellHistoryScope.DEFAULT_TRIVIAL)
+            .contains("exit", "clear", "cd");
+
+        assertThat(parse("[history]\ntrivial_commands=['foo','BAR']\n").snapshot().trivialCommands())
+            .as("the user's list replaces the default, normalized to lower case")
+            .containsExactly("foo", "bar");
+
+        assertThat(parse("[history]\ntrivial_commands=[]\n").snapshot().trivialCommands())
+            .as("an empty list turns de-ranking off").isEmpty();
+
+        // An entry with whitespace could never match: only a command's first word is compared.
+        var spaced = parse("[history]\ntrivial_commands=['git status']\n");
+        assertThat(spaced.snapshot().trivialCommands()).isEqualTo(ShellHistoryScope.DEFAULT_TRIVIAL);
+        assertThat(spaced.diagnostics()).isNotEmpty();
+
+        var wrongType = parse("[history]\ntrivial_commands='exit'\n");
+        assertThat(wrongType.snapshot().trivialCommands()).isEqualTo(ShellHistoryScope.DEFAULT_TRIVIAL);
+        assertThat(wrongType.diagnostics()).isNotEmpty();
     }
 }
