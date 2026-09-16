@@ -26,6 +26,10 @@ class SnippetsScopeTest {
         return new PaletteTarget(pasted::add, returns::incrementAndGet, Optional::empty, () -> "zsh", () -> true);
     }
 
+    private static PaletteTarget deadTarget(List<String> pasted, AtomicInteger returns) {
+        return new PaletteTarget(pasted::add, returns::incrementAndGet, Optional::empty, () -> "zsh", () -> false);
+    }
+
     private static final String FILE = """
         [[snippet]]
         name = "Rebase onto main"
@@ -114,8 +118,42 @@ class SnippetsScopeTest {
                 assertThat(rows.getFirst().title()).isEqualTo("Snippets file has errors");
                 assertThat(rows.getFirst().enabled()).isFalse();
                 assertThat(scope.available(rows.getFirst(), SnippetsScope.EDIT, context)).isTrue();
+                assertThat(scope.available(rows.getFirst(), SnippetsScope.PASTE, context)).isFalse();
                 scope.execute(rows.getFirst(), SnippetsScope.EDIT, context);
                 assertThat(opened).containsExactly(store.file());
+            } catch (Exception e) { throw new RuntimeException(e); }
+        });
+    }
+
+    @Test void pasteVerbsRequireALiveTargetButEditFileDoesNot() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var store = storeWith(FILE, new ArrayList<>())) {
+                store.reload();
+                var scope = new SnippetsScope(store, message -> {}, null);
+                var dead = new PaletteContext(true, deadTarget(new ArrayList<>(), new AtomicInteger()));
+                var row = scope.search("", dead).rows().getFirst();
+                assertThat(scope.available(row, SnippetsScope.PASTE, dead)).isFalse();
+                assertThat(scope.available(row, SnippetsScope.PASTE_RUN, dead)).isFalse();
+                assertThat(scope.available(row, SnippetsScope.EDIT, dead)).isTrue();
+            } catch (Exception e) { throw new RuntimeException(e); }
+        });
+    }
+
+    @Test void pasteUnescapesLiteralBracesEvenWithoutPlaceholders() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var store = storeWith("""
+                [[snippet]]
+                name = "Echo brace"
+                command = 'echo \\{{x}}'
+                """, new ArrayList<>())) {
+                store.reload();
+                var scope = new SnippetsScope(store, message -> {}, null);
+                var pasted = new ArrayList<String>(); var returns = new AtomicInteger();
+                var context = new PaletteContext(true, target(pasted, returns));
+                var row = scope.search("", context).rows().getFirst();
+                assertThat(scope.step(row, SnippetsScope.PASTE, context)).isNull();
+                scope.execute(row, SnippetsScope.PASTE, context);
+                assertThat(pasted).containsExactly("echo {{x}}");
             } catch (Exception e) { throw new RuntimeException(e); }
         });
     }

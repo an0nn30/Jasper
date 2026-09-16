@@ -21,10 +21,13 @@ record PaletteStep(String title, List<Field> fields, BiConsumer<Map<String, Stri
         }
     }
 
-    record Result(String error, String reopenScopeId, String reopenRowId) {
-        static Result done() { return new Result(null, null, null); }
-        static Result error(String message) { return new Result(Objects.requireNonNull(message), null, null); }
-        static Result reopen(String scopeId, String rowId) { return new Result(null, Objects.requireNonNull(scopeId), rowId); }
+    record Result(String error, String reopenScopeId, String reopenRowId, String reopenQuery) {
+        static Result done() { return new Result(null, null, null, null); }
+        static Result error(String message) { return new Result(Objects.requireNonNull(message), null, null, null); }
+        static Result reopen(String scopeId, String rowId) { return new Result(null, Objects.requireNonNull(scopeId), rowId, null); }
+        static Result reopen(String scopeId, String rowId, String query) {
+            return new Result(null, Objects.requireNonNull(scopeId), rowId, query);
+        }
     }
 
     PaletteStep {

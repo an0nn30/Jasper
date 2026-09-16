@@ -257,6 +257,9 @@ class PaletteScopesTest {
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK))).isTrue();
                 router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_ENTER));
                 assertThat(palette.stepOpen()).isTrue();
+                palette.openPicker();
+                assertThat(palette.pickerOpen()).isFalse();
+                assertThat(card.queryField().getText()).isEqualTo("al");
                 assertThat(card.stepFields()).hasSize(2);
                 assertThat(card.stepFields().getFirst().getText()).isEqualTo("pre");
                 assertThat(card.sectionLabel().getText()).isEqualTo("Fill Alpha");

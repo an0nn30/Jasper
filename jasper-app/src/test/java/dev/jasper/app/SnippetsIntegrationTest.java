@@ -20,8 +20,8 @@ class SnippetsIntegrationTest {
         return new SnippetStore(file, opened::add, SnippetStoreTest.inlineWorker(), Runnable::run);
     }
 
-    static WindowContent owner(boolean mac, SnippetStore snippets) {
-        return new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
+    static WindowContent owner(boolean mac, SnippetStore snippets, java.util.Queue<Runnable> pending) {
+        return new WindowContent(launcher(pending), HOME, path -> {}, () -> {}, () -> {},
             new ThemeController(), KeyBindings.defaults(mac), System::nanoTime, new CommandHistory(), mac,
             new ShellHistoryIndex(List.of()), snippets);
     }
@@ -35,18 +35,25 @@ class SnippetsIntegrationTest {
             .contains(KeyStroke.getKeyStroke(KeyEvent.VK_J, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertThat(KeyBindings.effectiveDefaultBinding(ActionId.SNIPPETS_PALETTE, false)).isEqualTo("ctrl+shift+j");
         assertThat(PaletteKeyRouter.scopeFor(ActionId.SNIPPETS_PALETTE)).isEqualTo(PaletteScope.SNIPPETS_ID);
-        edt(() -> {
-            try (var store = inlineStore(file, new ArrayList<>()); var owner = owner(true, store)) {
-                store.reload();
-                var root = CommandPaletteShortcutsTest.install(owner);
-                var router = PaletteKeyRouterTest.router(owner, true, root);
-                assertThat(owner.action(ActionId.SNIPPETS_PALETTE).isEnabled()).isTrue();
-                assertThat(owner.commands().entries()).noneMatch(e -> e.command().id().equals("snippets_palette"));
-                var view = owner.chrome().menuBar().getMenu(2);
-                assertThat(view.getItem(2).getAction()).isSameAs(owner.action(ActionId.SNIPPETS_PALETTE));
+        var pending = new ArrayDeque<Runnable>();
+        var store = new SnippetStore[1];
+        var win = new WindowContent[1];
+        try {
+            edt(() -> { store[0] = inlineStore(file, new ArrayList<>()); win[0] = owner(true, store[0], pending); store[0].reload(); });
+            // The default pending launcher only queues its launch task; run and wait for it so the
+            // origin pane is live, as the Paste verb now requires (Important 1).
+            pending.remove().run();
+            until(() -> win[0].currentPane().running());
+            edt(() -> {
+                var root = CommandPaletteShortcutsTest.install(win[0]);
+                var router = PaletteKeyRouterTest.router(win[0], true, root);
+                assertThat(win[0].action(ActionId.SNIPPETS_PALETTE).isEnabled()).isTrue();
+                assertThat(win[0].commands().entries()).noneMatch(e -> e.command().id().equals("snippets_palette"));
+                var view = win[0].chrome().menuBar().getMenu(2);
+                assertThat(view.getItem(2).getAction()).isSameAs(win[0].action(ActionId.SNIPPETS_PALETTE));
                 assertThat(view.getMenuComponent(3)).isInstanceOf(javax.swing.JSeparator.class);
-                assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_J, InputEvent.META_DOWN_MASK))).isTrue();
-                var palette = owner.commandPalette(); var card = palette.component();
+                assertThat(router.dispatch(PaletteKeyRouterTest.press(win[0], KeyEvent.VK_J, InputEvent.META_DOWN_MASK))).isTrue();
+                var palette = win[0].commandPalette(); var card = palette.component();
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.SNIPPETS_ID);
                 assertThat(card.chip().getText()).isEqualTo("Snippets");
                 assertThat(card.footer().getText()).isEqualTo("⏎ Paste  ⌘⏎ Paste and run  ⇧⏎ Edit file");
@@ -62,11 +69,13 @@ class SnippetsIntegrationTest {
                 assertThat(card.sectionLabel().getText()).isEqualTo("Rebase");
                 palette.escape();
                 assertThat(palette.stepOpen()).isFalse();
-                router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_J));
-                router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_J, InputEvent.META_DOWN_MASK));
+                router.dispatch(PaletteKeyRouterTest.release(win[0], KeyEvent.VK_J));
+                router.dispatch(PaletteKeyRouterTest.press(win[0], KeyEvent.VK_J, InputEvent.META_DOWN_MASK));
                 assertThat(palette.isOpen()).isFalse();
-            }
-        });
+            });
+        } finally {
+            edt(() -> { if (win[0] != null) win[0].close(); if (store[0] != null) store[0].close(); });
+        }
         edt(() -> {
             try (var owner = CommandPaletteShortcutsTest.owner(true)) {
                 assertThat(owner.scopes().find(PaletteScope.SNIPPETS_ID)).isEmpty();
@@ -109,6 +118,39 @@ class SnippetsIntegrationTest {
                     assertThat(Files.readString(file).split("\\n\\[\\[snippet]]")).hasSize(2);
                 }
             } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+        });
+    }
+
+    @Test void reopenAfterSavingBeyondTheResultCapSetsTheQueryToTheNewName() throws Exception {
+        Path file = dir.resolve("snippets.toml");
+        var names = List.of("Alpha one", "Bravo two", "Charlie three", "Delta four", "Echo five", "Foxtrot six");
+        var seed = new StringBuilder();
+        for (String name : names) seed.append("[[snippet]]\nname = \"").append(name).append("\"\ncommand = \"echo ").append(name).append("\"\n\n");
+        Files.writeString(file, seed.toString());
+        edt(() -> {
+            try (var store = inlineStore(file, new ArrayList<>()); var index = new ShellHistoryIndex(List.of(),
+                    SnippetStoreTest.inlineWorker(), Runnable::run)) {
+                var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
+                    new ThemeController(), KeyBindings.defaults(true), System::nanoTime, new CommandHistory(), true, index, store);
+                try (owner) {
+                    index.record(ShellHistoryEntry.of("echo zed", 5, "zsh"));
+                    var root = CommandPaletteShortcutsTest.install(owner);
+                    var router = PaletteKeyRouterTest.router(owner, true, root);
+                    var palette = owner.commandPalette(); var card = palette.component();
+                    palette.setMaxResults(3);
+                    palette.open(PaletteScope.HISTORY_ID);
+                    assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK))).isTrue();
+                    router.dispatch(PaletteKeyRouterTest.release(owner, KeyEvent.VK_ENTER));
+                    assertThat(palette.stepOpen()).isTrue();
+                    card.stepFields().getFirst().setText("Zed last");
+                    assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_ENTER, 0))).isTrue();
+                    assertThat(palette.isOpen()).isTrue();
+                    assertThat(palette.stepOpen()).isFalse();
+                    assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.SNIPPETS_ID);
+                    assertThat(card.queryField().getText()).isEqualTo("Zed last");
+                    assertThat(card.resultList().getSelectedValue().title()).isEqualTo("Zed last");
+                }
+            }
         });
     }
 

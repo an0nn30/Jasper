@@ -57,7 +57,7 @@ final class ShellHistoryScope implements PaletteScope {
             List.of(new PaletteStep.Field("name", "Name", suggestedName(entry.command()))),
             (values, done) -> snippets.append(values.get("name"), entry.command(), (saved, error) ->
                 done.accept(error != null ? PaletteStep.Result.error(error)
-                    : PaletteStep.Result.reopen(SNIPPETS_ID, SnippetsScope.rowId(saved.name())))));
+                    : PaletteStep.Result.reopen(SNIPPETS_ID, SnippetsScope.rowId(saved.name()), saved.name()))));
     }
 
     private record Ranked(ShellHistoryEntry entry, int tier, int directory, int position) {}

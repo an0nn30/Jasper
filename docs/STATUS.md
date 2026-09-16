@@ -23,8 +23,13 @@ gained a verb parameter so History refuses Paste on a dead pane but still allows
 Save; the controller ignores Enter while a step's asynchronous `complete()` is
 pending (a `completing` guard) so two quick presses cannot double-submit; the
 History duplicate-name message names the *existing* snippet's own canonical
-name, not the typed one; and `WindowContent` now assigns its snippet store
-before building the History scope, fixing a constructor-order bug in passing.
+name, not the typed one; `WindowContent` now assigns its snippet store
+before building the History scope, fixing a constructor-order bug in passing;
+Snippets' paste verbs (`available`) require a live target while Edit file does
+not, and the error row is likewise available only for Edit file; and reopening
+the palette after a save sets the query field to the new snippet's name (a new
+`PaletteStep.Result.reopen(scopeId, rowId, query)` overload) so the row is
+still visible under `palette.max_results` even when it sorts last in the file.
 
 Task 6 extended the [headless render matrix](design/command-palette/README.md)
 with three new states — the Snippets list, the `Deploy` fill-in step and the

@@ -116,7 +116,7 @@ final class WindowCommandPalette implements AutoCloseable {
     int maxResults() { return maxResults; }
 
     void dismiss() { if (open) restoreAndHide(); }
-    void openPicker() { if (open && !picker) palette.queryField().setText(">"); }
+    void openPicker() { if (open && step == null && !picker) palette.queryField().setText(">"); }
     boolean isOpen() { return open; }
     boolean pickerOpen() { return open && picker; }
     String activeScopeId() { return active == null ? null : active.id(); }
@@ -168,18 +168,25 @@ final class WindowCommandPalette implements AutoCloseable {
         PaletteStep current = step;
         completing = true;
         palette.setStepError(null);
-        current.complete().accept(palette.stepValues(), result -> {
+        try {
+            current.complete().accept(palette.stepValues(), result -> {
+                completing = false;
+                if (step != current || !open) return;
+                if (result.error() != null) { palette.setStepError(result.error()); layoutOverlay(); return; }
+                step = null;
+                palette.hideStep();
+                restoreAndHide();
+                if (result.reopenScopeId() != null) {
+                    open(result.reopenScopeId());
+                    if (open && result.reopenQuery() != null) palette.queryField().setText(result.reopenQuery());
+                    if (open && result.reopenRowId() != null) palette.selectRow(result.reopenRowId());
+                }
+            });
+        } catch (RuntimeException failure) {
             completing = false;
-            if (step != current || !open) return;
-            if (result.error() != null) { palette.setStepError(result.error()); layoutOverlay(); return; }
-            step = null;
-            palette.hideStep();
-            restoreAndHide();
-            if (result.reopenScopeId() != null) {
-                open(result.reopenScopeId());
-                if (open && result.reopenRowId() != null) palette.selectRow(result.reopenRowId());
-            }
-        });
+            LOG.log(System.Logger.Level.ERROR, "Palette step completion failed", failure);
+            palette.setStepError("Could not complete: " + failure.getMessage());
+        }
     }
 
     private void queryChanged(String query) {

@@ -160,7 +160,10 @@ you fix the file and Reload Config.
 `PaletteScope` is the internal seam behind every scope; it is not a public
 plugin SDK. A scope supplies its own rows and verbs and never touches Swing —
 one shared renderer paints every scope's rows, and a scope's `search` and
-`execute` methods see only a `PaletteContext`, never a window or pane:
+`execute` methods see only a `PaletteContext`, never a window or pane. Two more
+hooks are optional: `available` is rechecked right before a verb runs (a scope
+can refuse a verb per row, for example when its target is no longer live), and
+`step` can show a small form in the card instead of running the verb directly:
 
 ```java
 final class FakeFeatureScope implements PaletteScope {
@@ -173,6 +176,12 @@ final class FakeFeatureScope implements PaletteScope {
     @Override public PaletteResults search(String query, PaletteContext context) {
         return new PaletteResults(List.of(new PaletteRow("fake.1", "Example result", null, null, null, true, null)),
             "Suggested", null);
+    }
+    @Override public boolean available(PaletteRow row, PaletteVerb verb, PaletteContext context) {
+        return row.enabled(); // refuse a verb per row; a false answer refreshes the list instead of executing
+    }
+    @Override public PaletteStep step(PaletteRow row, PaletteVerb verb, PaletteContext context) {
+        return null; // return a PaletteStep to show a form instead of calling execute for this verb
     }
     @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {
         context.target().paste().accept(row.title());

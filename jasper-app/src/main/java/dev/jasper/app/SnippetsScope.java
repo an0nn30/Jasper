@@ -87,7 +87,9 @@ final class SnippetsScope implements PaletteScope {
     }
 
     @Override public boolean available(PaletteRow row, PaletteVerb verb, PaletteContext context) {
-        return row.token() instanceof Snippet snippet ? store.snapshot().byName(snippet.name()).isPresent() : ERROR_ROW.equals(row.id());
+        if (row.token() instanceof Snippet snippet)
+            return store.snapshot().byName(snippet.name()).isPresent() && (verb.equals(EDIT) || context.target().live().getAsBoolean());
+        return ERROR_ROW.equals(row.id()) && verb.equals(EDIT);
     }
 
     @Override public PaletteStep step(PaletteRow row, PaletteVerb verb, PaletteContext context) {
@@ -104,7 +106,7 @@ final class SnippetsScope implements PaletteScope {
 
     @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {
         if (verb.equals(EDIT)) { store.openInEditor(onError); return; }
-        if (row.token() instanceof Snippet snippet) paste(snippet.command(), verb, context);
+        if (row.token() instanceof Snippet snippet) paste(snippet.fill(Map.of()), verb, context);
     }
 
     @Override public CommandRegistry.Subscription onChanged(Runnable listener) { return store.onChanged(listener); }
