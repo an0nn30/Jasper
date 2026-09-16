@@ -111,4 +111,29 @@ class SnippetsIntegrationTest {
             } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
         });
     }
+
+    @Test void pasteOnADeadTargetIsRefusedButSaveAsSnippetStillOpensItsStep() throws Exception {
+        Path file = dir.resolve("snippets.toml");
+        edt(() -> {
+            try (var store = inlineStore(file, new ArrayList<>()); var index = new ShellHistoryIndex(List.of(),
+                    SnippetStoreTest.inlineWorker(), Runnable::run)) {
+                // The default pending launcher never runs its launch task, so the pane's shell never
+                // starts and the target stays dead for the whole test.
+                var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
+                    new ThemeController(), KeyBindings.defaults(true), System::nanoTime, new CommandHistory(), true, index, store);
+                try (owner) {
+                    index.record(ShellHistoryEntry.of("npm run dev", 5, "zsh"));
+                    CommandPaletteShortcutsTest.install(owner);
+                    var palette = owner.commandPalette(); var card = palette.component();
+                    palette.open(PaletteScope.HISTORY_ID);
+                    palette.enterPressed(0);
+                    assertThat(palette.isOpen()).isTrue();
+                    assertThat(palette.stepOpen()).isFalse();
+                    palette.enterPressed(2);
+                    assertThat(palette.stepOpen()).isTrue();
+                    assertThat(card.stepFields().getFirst().getText()).isEqualTo("npm run");
+                }
+            }
+        });
+    }
 }

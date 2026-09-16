@@ -53,12 +53,12 @@ final class CommandsScope implements PaletteScope {
             rows(CommandSearch.find(registry.entries(), query, history.recent(), context.maxResults())), null, null);
     }
 
-    @Override public boolean available(PaletteRow row, PaletteContext context) {
+    @Override public boolean available(PaletteRow row, PaletteVerb verb, PaletteContext context) {
         return row.token() instanceof Command command && registry.contains(command) && command.action().isEnabled();
     }
 
     @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {
-        if (!available(row, context)) return;
+        if (!available(row, verb, context)) return;
         Command command = (Command) row.token();
         dispatch.accept(command);
         history.record(command.id());

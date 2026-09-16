@@ -77,14 +77,14 @@ class CommandsScopeTest {
                 var staleRow = scope.rows(List.of(stale)).getFirst();
                 registration.close();
                 registry.register(command("custom", "Custom", null));
-                assertThat(scope.available(staleRow, context)).isFalse();
+                assertThat(scope.available(staleRow, CommandsScope.RUN, context)).isFalse();
                 scope.execute(staleRow, CommandsScope.RUN, context);
                 assertThat(calls.get()).isZero();
                 var disabled = command("off", "Off", null);
                 registry.register(disabled);
                 var row = scope.rows(List.of(disabled)).getFirst();
                 disabled.action().setEnabled(false);
-                assertThat(scope.available(row, context)).isFalse();
+                assertThat(scope.available(row, CommandsScope.RUN, context)).isFalse();
                 scope.execute(row, CommandsScope.RUN, context);
                 assertThat(calls.get()).isZero();
                 assertThat(history.recent()).isEmpty();

@@ -96,8 +96,8 @@ class SnippetsScopeTest {
                 assertThat(result.get().error()).isNull();
                 assertThat(store.lastValues()).containsEntry("env", "prod").containsEntry("tag", "v2");
                 assertThat(scope.step(rows.get(2), SnippetsScope.EDIT, context)).isNull();
-                assertThat(scope.available(rows.get(2), context)).isTrue();
-                assertThat(scope.available(PaletteRow.of("x", "x"), context)).isFalse();
+                assertThat(scope.available(rows.get(2), SnippetsScope.PASTE, context)).isTrue();
+                assertThat(scope.available(PaletteRow.of("x", "x"), SnippetsScope.PASTE, context)).isFalse();
             } catch (Exception e) { throw new RuntimeException(e); }
         });
     }
@@ -113,7 +113,7 @@ class SnippetsScopeTest {
                 assertThat(rows).hasSize(1);
                 assertThat(rows.getFirst().title()).isEqualTo("Snippets file has errors");
                 assertThat(rows.getFirst().enabled()).isFalse();
-                assertThat(scope.available(rows.getFirst(), context)).isTrue();
+                assertThat(scope.available(rows.getFirst(), SnippetsScope.EDIT, context)).isTrue();
                 scope.execute(rows.getFirst(), SnippetsScope.EDIT, context);
                 assertThat(opened).containsExactly(store.file());
             } catch (Exception e) { throw new RuntimeException(e); }

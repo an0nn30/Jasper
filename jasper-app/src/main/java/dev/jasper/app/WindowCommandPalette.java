@@ -253,9 +253,9 @@ final class WindowCommandPalette implements AutoCloseable {
         PaletteScope scope = active;
         if (!validOrigin() || !scopes.contains(scope)) { dismiss(); return; }
         if (verbIndex < 0 || verbIndex >= scope.verbs().size()) return;
-        owner.updateActions();
-        if (!validOrigin() || !scopes.contains(scope) || !scope.available(row, context)) { refresh(); return; }
         PaletteVerb verb = scope.verbs().get(verbIndex);
+        owner.updateActions();
+        if (!validOrigin() || !scopes.contains(scope) || !scope.available(row, verb, context)) { refresh(); return; }
         PaletteStep pending = scope.step(row, verb, context);
         if (pending != null) { showStep(pending); return; }
         PaletteContext target = context;

@@ -100,7 +100,7 @@ class ShellHistoryScopeTest {
                 var pasted = new ArrayList<String>(); var returns = new AtomicInteger();
                 var live = new PaletteContext(true, target(pasted, returns, null, true));
                 var row = scope.search("", live).rows().getFirst();
-                assertThat(scope.available(row, live)).isTrue();
+                assertThat(scope.available(row, ShellHistoryScope.PASTE, live)).isTrue();
                 scope.execute(row, ShellHistoryScope.PASTE, live);
                 assertThat(pasted).containsExactly("ls -la");
                 assertThat(returns.get()).isZero();
@@ -108,8 +108,8 @@ class ShellHistoryScopeTest {
                 assertThat(pasted).containsExactly("ls -la", "ls -la");
                 assertThat(returns.get()).isEqualTo(1);
                 var dead = new PaletteContext(true, target(pasted, returns, null, false));
-                assertThat(scope.available(row, dead)).isFalse();
-                assertThat(scope.available(PaletteRow.of("x", "x"), live)).isFalse();
+                assertThat(scope.available(row, ShellHistoryScope.PASTE, dead)).isFalse();
+                assertThat(scope.available(PaletteRow.of("x", "x"), ShellHistoryScope.PASTE, live)).isFalse();
                 var changes = new AtomicInteger();
                 var subscription = scope.onChanged(changes::incrementAndGet);
                 scope.activated(live);
@@ -134,6 +134,10 @@ class ShellHistoryScopeTest {
                 assertThat(ShellHistoryScope.suggestedName("x".repeat(200) + " y")).hasSize(128);
                 var context = new PaletteContext(true, target(new ArrayList<>(), new AtomicInteger(), null, true));
                 var row = scope.search("", context).rows().getFirst();
+                var dead = new PaletteContext(true, target(new ArrayList<>(), new AtomicInteger(), null, false));
+                assertThat(scope.available(row, ShellHistoryScope.PASTE, dead)).isFalse();
+                assertThat(scope.available(row, ShellHistoryScope.SAVE, dead)).isTrue();
+                assertThat(scope.available(row, ShellHistoryScope.PASTE, context)).isTrue();
                 assertThat(scope.step(row, ShellHistoryScope.PASTE, context)).isNull();
                 var step = scope.step(row, ShellHistoryScope.SAVE, context);
                 assertThat(step.title()).isEqualTo("Save as snippet: git rebase -i origin/main");

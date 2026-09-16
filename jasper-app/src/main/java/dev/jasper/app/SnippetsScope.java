@@ -86,7 +86,7 @@ final class SnippetsScope implements PaletteScope {
         return tier;
     }
 
-    @Override public boolean available(PaletteRow row, PaletteContext context) {
+    @Override public boolean available(PaletteRow row, PaletteVerb verb, PaletteContext context) {
         return row.token() instanceof Snippet snippet ? store.snapshot().byName(snippet.name()).isPresent() : ERROR_ROW.equals(row.id());
     }
 

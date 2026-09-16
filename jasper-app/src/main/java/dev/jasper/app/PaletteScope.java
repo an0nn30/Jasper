@@ -26,7 +26,7 @@ interface PaletteScope {
     /** At most {@code context.maxResults()} rows; the palette is a hard-capped list, never a scrolling one. */
     PaletteResults search(String query, PaletteContext context);
     /** Rechecked immediately before execution; a false answer refreshes the list instead of executing. */
-    default boolean available(PaletteRow row, PaletteContext context) { return row.enabled(); }
+    default boolean available(PaletteRow row, PaletteVerb verb, PaletteContext context) { return row.enabled(); }
     /**
      * Consulted before {@link #execute}: a non-null step is shown in the card instead of running the verb,
      * and {@code execute} is not called for that action. The step's completion does the work.

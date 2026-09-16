@@ -108,10 +108,10 @@ final class ShellHistoryScope implements PaletteScope {
         return false;
     }
 
-    // Save as snippet needs no live target, and available() cannot see which verb was chosen;
-    // once a store is attached a row stays available so Shift+Enter always reaches its step.
-    @Override public boolean available(PaletteRow row, PaletteContext context) {
-        return row.token() instanceof ShellHistoryEntry && (snippets != null || context.target().live().getAsBoolean());
+    // Save as snippet needs no live target; the paste verbs still refuse a dead one.
+    @Override public boolean available(PaletteRow row, PaletteVerb verb, PaletteContext context) {
+        return row.token() instanceof ShellHistoryEntry
+            && (verb.equals(SAVE) || context.target().live().getAsBoolean());
     }
 
     @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {
