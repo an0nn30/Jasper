@@ -19,21 +19,37 @@ record ShellHistorySnapshot(List<ShellHistoryEntry> entries, Set<String> shells)
         shells = Set.copyOf(shells);
     }
 
-    private record Keyed(ShellHistoryEntry entry, long timestamp, long sequence) {}
+    /** One history file's entries, oldest first, with its last-modified time in epoch seconds (0 when unknown). */
+    record Source(List<ShellHistoryEntry> entries, long modified) {
+        Source {
+            entries = List.copyOf(entries);
+        }
+    }
+
+    private record Keyed(ShellHistoryEntry entry, long rank, long sequence) {}
 
     /**
-     * Each per-source list is oldest first. Known timestamps order first; entries without one keep their
-     * file order behind them. Live entries beat file entries at the same timestamp. The most recent
-     * occurrence of a command wins and the shells that ran it are merged into it.
+     * Each source's list is oldest first. An entry with a known timestamp ranks by it; one without ranks
+     * just before its file was last written, stepping back a second per entry from the end. bash records
+     * no timestamps unless HISTTIMEFORMAT is set, and treating its 0 as a real time buried every bash
+     * command beneath every timestamped zsh one however recently it ran. Live entries beat file entries
+     * at the same rank. The most recent occurrence of a command wins and the shells that ran it merge.
      */
-    static ShellHistorySnapshot build(Collection<List<ShellHistoryEntry>> perSource, List<ShellHistoryEntry> live, int cap) {
+    static ShellHistorySnapshot build(Collection<Source> perSource, List<ShellHistoryEntry> live, int cap) {
         var keyed = new ArrayList<Keyed>();
         long sequence = 0;
-        for (List<ShellHistoryEntry> list : perSource)
-            for (ShellHistoryEntry entry : list) keyed.add(new Keyed(entry, entry.timestamp(), sequence++));
+        for (Source source : perSource) {
+            List<ShellHistoryEntry> entries = source.entries();
+            for (int i = 0; i < entries.size(); i++) {
+                ShellHistoryEntry entry = entries.get(i);
+                long rank = entry.timestamp() > 0 ? entry.timestamp()
+                    : Math.max(0, source.modified() - (entries.size() - i));
+                keyed.add(new Keyed(entry, rank, sequence++));
+            }
+        }
         for (int i = 0; i < live.size(); i++)
             keyed.add(new Keyed(live.get(i), live.get(i).timestamp(), Long.MAX_VALUE - live.size() + i));
-        keyed.sort(Comparator.comparingLong(Keyed::timestamp).thenComparingLong(Keyed::sequence).reversed());
+        keyed.sort(Comparator.comparingLong(Keyed::rank).thenComparingLong(Keyed::sequence).reversed());
         Map<String, ShellHistoryEntry> byCommand = new LinkedHashMap<>();
         for (Keyed item : keyed) byCommand.merge(item.entry().command(), item.entry(), ShellHistorySnapshot::merge);
         List<ShellHistoryEntry> ordered = byCommand.values().stream().limit(Math.max(0, cap)).toList();

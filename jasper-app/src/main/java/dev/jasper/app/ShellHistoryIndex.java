@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.RejectedExecutionException;
 import javax.swing.SwingUtilities;
 
@@ -47,7 +48,7 @@ final class ShellHistoryIndex implements AutoCloseable {
     private final Executor deliver;
     // Worker-only state.
     private final Map<ShellHistorySource, FileState> states = new HashMap<>();
-    private final Map<ShellHistorySource, List<ShellHistoryEntry>> perSource = new LinkedHashMap<>();
+    private final Map<ShellHistorySource, ShellHistorySnapshot.Source> perSource = new LinkedHashMap<>();
     private final List<ShellHistoryEntry> live = new ArrayList<>();
     private final Set<ShellHistorySource> warned = new HashSet<>();
     // EDT-only state.
@@ -184,7 +185,8 @@ final class ShellHistoryIndex implements AutoCloseable {
         // Always the last 64 bytes of the file before the offset, not just of this read: a small tail
         // read must not narrow the window, and a read that consumed nothing keeps the last good one.
         if (progressed) state.fingerprint = read(file, Math.max(0, state.offset - FINGERPRINT_BYTES), state.offset);
-        perSource.put(source, state.entries);
+        perSource.put(source, new ShellHistorySnapshot.Source(state.entries,
+            state.modified == null ? 0 : state.modified.to(TimeUnit.SECONDS)));
     }
 
     /**

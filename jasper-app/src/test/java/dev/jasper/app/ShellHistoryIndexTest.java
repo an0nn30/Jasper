@@ -41,6 +41,9 @@ class ShellHistoryIndexTest {
         Path bash = home.resolve(".bash_history");
         Files.writeString(zsh, ": 100:0;ls\n: 200:0;git status\n");
         Files.writeString(bash, "make\n");
+        // bash records no timestamps, so its entries rank from the file's mtime. Pin it below the zsh
+        // stamps above, or the wall clock would make this stale fixture the newest thing in the index.
+        Files.setLastModifiedTime(bash, FileTime.fromMillis(50_000));
         var sources = List.of(new ShellHistorySource(HistoryShell.ZSH, zsh),
             new ShellHistorySource(HistoryShell.BASH, bash),
             new ShellHistorySource(HistoryShell.FISH, home.resolve("missing")));
@@ -212,8 +215,10 @@ class ShellHistoryIndexTest {
                     Files.setLastModifiedTime(zsh, FileTime.fromMillis(System.currentTimeMillis() + 10_000));
                     index.refresh();
                     assertThat(index.stats(sources.get(0)).fullReads()).isEqualTo(2);
+                    // The rewritten prefix carries no timestamp, so it ranks from the file's mtime —
+                    // which this fixture just set to now, ahead of the 1970-era stamps on the rest.
                     assertThat(index.snapshot().entries()).extracting(ShellHistoryEntry::command)
-                        .containsExactly("docker ps", "cd /tmp", "x".repeat((int) offset - tail.length() - 1));
+                        .containsExactly("x".repeat((int) offset - tail.length() - 1), "docker ps", "cd /tmp");
                 }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

@@ -21,12 +21,12 @@ public final class ShellHistorySearchMeasurement {
         if (args.length == 0) throw new IllegalArgumentException("Provide an output directory");
         Path output = Path.of(args[0]).toAbsolutePath();
         Files.createDirectories(output);
-        var entries = new ArrayList<List<ShellHistoryEntry>>();
+        var entries = new ArrayList<ShellHistorySnapshot.Source>();
         var list = new ArrayList<ShellHistoryEntry>(ENTRIES);
         for (int i = 0; i < ENTRIES; i++)
             list.add(ShellHistoryEntry.of(String.format(Locale.ROOT, "git commit -m \"change %05d in module %d\"", i, i % 40),
                 1_600_000_000L + i, i % 2 == 0 ? "zsh" : "bash"));
-        entries.add(list);
+        entries.add(new ShellHistorySnapshot.Source(list, 1_600_000_000L + ENTRIES));
         var snapshot = ShellHistorySnapshot.build(entries, List.of(), ShellHistorySnapshot.MAX_ENTRIES);
         var index = new ShellHistoryIndex(List.of(), new java.util.concurrent.AbstractExecutorService() {
             @Override public void execute(Runnable task) { task.run(); }
