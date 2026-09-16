@@ -135,6 +135,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     FindBar findBar() { return findBar; }
     TerminalSession session() { return session; }
     boolean running() { return !closed && session != null && !session.exitFuture().isDone(); }
+    boolean shellIntegrationDetected() { return session != null && session.shellIntegrationDetected(); }
     Path directory() { return session == null ? launchDirectory : session.workingDirectory().orElse(launchDirectory); }
     String title() { return session == null ? "" : session.title(); }
     String shellLabel() { return shellLabel; }

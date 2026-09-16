@@ -90,6 +90,8 @@ public final class TerminalSession implements AutoCloseable {
     private long commandStartRow = -1;
     private int commandStartColumn;
     private String pendingCommand;
+    private volatile boolean shellIntegrationDetected;
+    private String pendingCommandText;
 
     /** Starts {@code command} in a new pseudo-terminal and begins emulating its output. */
     public static TerminalSession start(List<String> command, Map<String, String> environment, Path workingDirectory,
@@ -284,6 +286,11 @@ public final class TerminalSession implements AutoCloseable {
     /** The directory the shell last reported with OSC 7, if any. */
     public Optional<Path> workingDirectory() {
         return Optional.ofNullable(workingDirectory);
+    }
+
+    /** True once the shell has reported its first prompt (mark A) through Jasper's shell integration. */
+    public boolean shellIntegrationDetected() {
+        return shellIntegrationDetected;
     }
 
     @Override
@@ -618,10 +625,14 @@ public final class TerminalSession implements AutoCloseable {
                 workingDirectory = directory;
                 listeners.forEach(l -> l.workingDirectoryChanged(directory));
             });
+            case "cmd" -> pendingCommandText = args.size() > 2 ? decodeCommand(args.get(2)) : null;
             case "mark" -> {
                 String mark = args.size() > 2 ? args.get(2) : "";
                 switch (mark) {
-                    case "A" -> { flushPendingCommand(OptionalInt.empty()); recordPrompt(); commandStartRow = -1; }
+                    case "A" -> {
+                        flushPendingCommand(OptionalInt.empty()); recordPrompt(); commandStartRow = -1;
+                        pendingCommandText = null;
+                    }
                     case "B" -> markCommandStart();
                     case "C" -> captureCommand();
                     case "D" -> flushPendingCommand(exitStatus(args));
@@ -638,6 +649,7 @@ public final class TerminalSession implements AutoCloseable {
     }
 
     private void recordPrompt() {
+        shellIntegrationDetected = true;
         buffer.lock();
         try {
             long row = absoluteRow(terminal.getCursorY() - 1);
@@ -659,18 +671,37 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
-    /** At C the shell has echoed the command and moved on; the rows from B to the cursor are what was typed. */
+    /**
+     * At C the shell has echoed the command and moved on. Jasper's shell-integration scripts send the exact
+     * command line first (the {@code cmd} custom command); when that is missing or malformed, fall back to
+     * reading the rows from B to the cursor.
+     */
     private void captureCommand() {
+        String reported = pendingCommandText;
+        pendingCommandText = null;
         buffer.lock();
         try {
-            if (commandStartRow < 0) return;
-            long endRow = absoluteRow(terminal.getCursorY() - 1);
-            if (terminal.getCursorX() - 1 == 0) endRow--; // Enter moved the cursor to a fresh line
-            String text = CommandCapture.text(commandStartRow, commandStartColumn, endRow, buffer.getWidth(), this::lineAtLocked);
+            String text = reported;
+            if (text == null) {
+                if (commandStartRow < 0) return;
+                long endRow = absoluteRow(terminal.getCursorY() - 1);
+                if (terminal.getCursorX() - 1 == 0) endRow--; // Enter moved the cursor to a fresh line
+                text = CommandCapture.text(commandStartRow, commandStartColumn, endRow, buffer.getWidth(), this::lineAtLocked);
+            }
             commandStartRow = -1;
             pendingCommand = text.isEmpty() ? null : text;
         } finally {
             buffer.unlock();
+        }
+    }
+
+    /** Decodes the base64 UTF-8 {@code cmd} payload from Jasper's shell-integration scripts, or null if malformed. */
+    private static String decodeCommand(String encoded) {
+        try {
+            String text = new String(java.util.Base64.getDecoder().decode(encoded.trim()), StandardCharsets.UTF_8).strip();
+            return text.isEmpty() ? null : text;
+        } catch (IllegalArgumentException malformed) {
+            return null;
         }
     }
 

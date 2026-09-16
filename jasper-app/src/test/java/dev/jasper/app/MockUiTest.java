@@ -86,6 +86,19 @@ class MockUiTest {
         });
     }
 
+    @Test void statusShowsAFilledOrHollowDotForShellIntegrationDetection() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var status = owner.status();
+            status.setMetadata("bash", "/tmp", "91 \u00d7 35", true, true);
+            assertThat(status.getText()).contains("bash \u25cf");
+            status.setMetadata("bash", "/tmp", "91 \u00d7 35", true, false);
+            assertThat(status.getText()).contains("bash \u25cb");
+            status.setMetadata("bash", "/tmp", "91 \u00d7 35", true);
+            assertThat(status.getText()).contains("bash \u25cb");
+        });
+    }
+
     @Test void toolbarCompactsWithoutLosingActionsAndModeChangesKeepTheContentHeight() throws Exception {
         edt(() -> {
             var pending = new ArrayDeque<Runnable>();

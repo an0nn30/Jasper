@@ -187,4 +187,26 @@ class ShellIntegrationSessionTest {
         Await.until(() -> "done".equals(session.snapshot().lineText(0)), "text after the command");
         assertThat(session.workingDirectory()).isEmpty();
     }
+
+    @Test void theCmdPayloadIsPreferredOverTheScreenAndMalformedPayloadsAreIgnored() throws Exception {
+        listenForCommands();
+        String encoded = java.util.Base64.getEncoder().encodeToString("echo \"one\ntwo\"".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        connector.feed("\033]133;A\007$ \033]133;B\007echo \"one\r\ndquote> two\"\r\n\033]1341;jasper;cmd;" + encoded
+            + "\007\033]133;C\007one\r\ntwo\r\n\033]133;D;0\007\033]133;A\007$ ");
+        Await.until(() -> captured.size() == 1, "captured through cmd");
+        assertThat(captured).containsExactly("echo \"one\ntwo\"");
+        assertThat(session.shellIntegrationDetected()).isTrue();
+        connector.feed("\033]133;B\007ls\r\n\033]1341;jasper;cmd;***not base64***\007\033]133;C\007\033]133;D;0\007");
+        Await.until(() -> captured.size() == 2, "fell back to the screen");
+        assertThat(captured.get(1)).isEqualTo("ls");
+    }
+
+    @Test void aCmdPayloadWithoutABMarkStillCapturesTheCommand() throws Exception {
+        listenForCommands();
+        assertThat(session.shellIntegrationDetected()).isFalse();
+        String encoded = java.util.Base64.getEncoder().encodeToString("pwd".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        connector.feed("\033]133;A\007$ pwd\r\n\033]1341;jasper;cmd;" + encoded + "\007\033]133;C\007/tmp\r\n\033]133;D;0\007");
+        Await.until(() -> captured.size() == 1, "captured from cmd alone");
+        assertThat(captured).containsExactly("pwd");
+    }
 }

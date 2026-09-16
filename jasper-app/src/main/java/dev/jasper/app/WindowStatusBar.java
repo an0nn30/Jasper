@@ -15,6 +15,7 @@ final class WindowStatusBar extends JPanel {
     private String configColor = "Jasper.configSuccessForeground";
     private String shell = "", directory = "", dimensions = "";
     private boolean running;
+    private boolean integration;
     private Palette palette = Palette.jasperDark();
     private String text = "Built-in defaults";
 
@@ -29,9 +30,16 @@ final class WindowStatusBar extends JPanel {
     }
 
     void setMetadata(String shell, String directory, String dimensions, boolean running) {
+        setMetadata(shell, directory, dimensions, running, false);
+    }
+
+    void setMetadata(String shell, String directory, String dimensions, boolean running, boolean integration) {
         this.running = running; this.shell = shell; this.directory = directory; this.dimensions = dimensions;
-        left.setParts(shell, directory);
+        this.integration = integration;
+        String shown = shell.isEmpty() ? "" : shell + (integration ? " \u25cf" : " \u25cb");
+        left.setParts(shown, directory);
         left.setToolTipText(directory);
+        left.setFirstToolTip(shell.isEmpty() ? null : integration ? "Shell integration active" : "Shell integration not detected");
         updateText();
     }
 
@@ -50,7 +58,8 @@ final class WindowStatusBar extends JPanel {
     private void updateText() {
         right.setParts(dimensions, configText);
         configButton.getAccessibleContext().setAccessibleName(configText);
-        text = shell.isEmpty() ? configText : shell + "  |  " + directory + "  |  " + dimensions + "  |  " + configText;
+        String shown = shell.isEmpty() ? "" : shell + (integration ? " \u25cf" : " \u25cb");
+        text = shell.isEmpty() ? configText : shown + "  |  " + directory + "  |  " + dimensions + "  |  " + configText;
         getAccessibleContext().setAccessibleDescription(text);
         revalidate(); repaint();
     }
@@ -78,6 +87,7 @@ final class WindowStatusBar extends JPanel {
             else ((JButton) this.last).setText(last);
             slash.setVisible(!first.isEmpty());
         }
+        void setFirstToolTip(String tip) { first.setToolTipText(tip); }
         void refreshTheme() {
             for (JComponent label : new JComponent[]{first, slash, last}) {
                 label.setForeground(label == slash ? UIManager.getColor("Separator.foreground") : muted());
