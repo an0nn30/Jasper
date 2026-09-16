@@ -1,5 +1,71 @@
 # Jasper — Status and Handoff
 
+**History ranking, freshness and tmux (2026-09-16):** On
+`claude/history-scope-ranking` (from main `18fd513`), three confirmed defects in
+the shipped History scope and one preference, each measured against the dev
+machine before anything was changed.
+
+*Ranking.* `ShellHistorySnapshot` sorted on `timestamp`, which is `0` when
+unknown, so `0` meant both "unknown" and "older than everything". bash writes no
+timestamps unless `HISTTIMEFORMAT` is set — measured here: 10,004 timestamped
+zsh entries against 500 untimestamped bash ones, and `HISTTIMEFORMAT` set
+nowhere — so no bash command could ever rank however recently it ran. An entry
+without a timestamp now ranks just before its source file was last written,
+stepping back a second per entry from the end. `build` takes
+`Source(entries, modified)` instead of a bare list.
+
+*Freshness.* The index had exactly two refresh triggers: the first window, and
+the History scope being activated. A one-second Swing timer now calls the
+existing `refresh()`, started on the first listener and stopped on the last, so
+a window with no palette pays nothing. `refresh()` already coalesces and
+`readSource` already returns on unchanged size and mtime, so a quiet tick is one
+stat per source — pinned by `aQuietTickCostsNoRead`.
+
+*tmux.* `inject` matched only `zsh`, `bash` and `fish`, so a user whose
+configured shell is tmux got no integration at all. Measured: a pane of a tmux
+server Jasper started *does* inherit `ZDOTDIR` and `JASPER_SHELL_INTEGRATION`,
+but tmux replaces `TERM_PROGRAM` with `tmux` and every script guarded on that.
+Jasper now exports `JASPER_TERMINAL=1`, which tmux leaves alone, and `inject`
+gains a tmux arm applying the environment mechanism for the basename of
+`$SHELL`. Driving a real tmux 3.5a then exposed a second problem, introduced by
+the previous feature: tmux runs its `default-command` as `$SHELL -c ...`, so
+under `set -g default-command ${SHELL}` — which this machine's `~/.tmux.conf`
+sets — the interactive shell is the child of a non-interactive one, and the
+`.zshenv` fix that stopped a non-interactive zsh leaking `ZDOTDIR` stranded it.
+`JASPER_INTEGRATION_LOADED` separates the two cases. Verified against real tmux
+with that configuration: the integration loads and `__jasper_precmd` is defined.
+
+*Trivial de-ranking.* `history.deprioritize_trivial` (default `true`, live)
+partitions rather than scores: `exit`, `clear`, `ls`, `ll`, `la`, `cd`, `pwd`,
+`c`, `q` and `logout` keep their order among themselves and follow everything
+else, and are still listed and searchable. Only a short command whose first word
+is trivial counts, so `cd deep/path && ./gradlew build` is real work.
+
+Deviations from the plan: the flag rides on `PaletteContext` beside
+`maxResults`, not on a config snapshot the scope never receives, so the
+partition lives in `ShellHistoryScope` and `ShellHistorySnapshot` stays pure
+merged data; `ShellIntegrationEndToEndTest`-style prompt-row coverage was not
+extended, since `promptRows()` is package-private in `jasper-terminal`. Three
+existing tests asserted orders that only held under the old sentinel or the old
+ranking and were updated, each with a comment saying why: two index fixtures
+stamped zsh entries at epoch 100–500 while the bash file's mtime was the wall
+clock, and one scope test pinned a row position that `ls` being de-ranked moves.
+
+**Known gap:** bash inside tmux still gets nothing, because bash's mechanism is
+a `--rcfile` argument tmux never passes; documented with the manual `source`
+line. Attaching to a tmux server started before Jasper gets nothing either.
+
+Fresh `./gradlew check --rerun-tasks`: jasper-app 523 tests, 522 passed and one
+fish skip; jasper-terminal 316 tests, 315 passed and one existing font skip.
+Total 839 tests, 837 passed, two skipped, zero failures/errors. [Configuration
+guide](configuration.md#shell-history), [palette
+guide](command-palette.md#shell-history), [design
+spec](superpowers/specs/2026-09-16-jasper-history-ranking-design.md),
+[plan](superpowers/plans/2026-09-16-jasper-history-ranking.md). Still user-run:
+the History palette inside tmux on the real desktop, confirming a just-run
+command appears within about a second and that bash entries interleave sensibly.
+No GUI, merge or push.
+
 **Shell integration scripts (2026-09-16):** On `claude/shell-integration`
 (from main `27999fe`), Jasper ships and auto-loads its own zsh, bash and fish
 integration scripts instead of relying on the user's own shell configuration.

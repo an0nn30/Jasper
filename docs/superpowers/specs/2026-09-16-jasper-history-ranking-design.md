@@ -1,6 +1,6 @@
 # History scope ranking and freshness — design
 
-**Status:** Designed. Development branch: `claude/history-scope-ranking`, from main `18fd513`.
+**Status:** Implemented. Development branch: `claude/history-scope-ranking`, from main `18fd513`.
 
 **Builds on:** the [palette scopes design](2026-09-15-jasper-palette-scopes-design.md) (the History scope and `ShellHistoryIndex`) and the [shell integration design](2026-09-16-jasper-shell-integration-design.md) (OSC 133 live capture and script injection).
 
@@ -54,6 +54,14 @@ Each script's guard becomes: interactive, **and** (`TERM_PROGRAM` is `Jasper` **
 - `$SHELL` is `fish` → set `XDG_DATA_DIRS`, as the `fish` arm does. Same mechanism, same propagation.
 - `$SHELL` is `bash` → **nothing**. bash has no environment variable for an rc file, and `--rcfile` cannot be passed to a shell tmux starts without taking over `default-command`, which is the user's setting. Documented as a manual `source` line.
 
+**Discovered during implementation.** Driving a real tmux 3.5a showed the environment reaches the
+pane but the integration still did not load under `set -g default-command ${SHELL}`, which this
+machine's `~/.tmux.conf` sets. tmux runs its default-command as `$SHELL -c ...`, so the interactive
+shell is the *child* of a non-interactive one, and the previous feature had taught `.zshenv` to strip
+`ZDOTDIR` for a non-interactive shell — correct for a command the user runs, fatal here.
+`JASPER_INTEGRATION_LOADED` separates the two: unset during tmux's startup chain, set for any
+`zsh -c` run from an already-integrated prompt. `.zshenv` now hands `ZDOTDIR` back in the former case.
+
 The command line is never rewritten for tmux; only environment variables are set. A user attaching to a tmux server that was already running gets nothing, because that server's environment predates Jasper — documented.
 
 ## Trivial de-ranking
@@ -67,7 +75,10 @@ When true, an entry whose command is one of a built-in set — `exit`, `clear`, 
 
 The set is deliberately built in and short. A user-supplied list is a larger surface (validation, matching semantics) than the problem warrants; if it is wanted later, the setting can grow from a boolean to a list without changing the ranking code.
 
-`ShellHistoryScope` reads the flag from the config snapshot it already receives and passes it to `build`.
+**Correction after implementation.** `ShellHistoryScope` receives no config snapshot. The flag rides
+on `PaletteContext` beside `maxResults`, which is how `palette.max_results` already reaches a scope,
+and the partition happens in the scope rather than in `ShellHistorySnapshot.build` — so the snapshot
+stays pure merged data and presentation order stays a presentation concern.
 
 ## Errors and edge cases
 

@@ -80,6 +80,7 @@ variant = "dark"
 | `window.lines` | `45` | Integer 2–200 | New windows |
 | `buddy.enabled` | `true` | Boolean | Live |
 | `history.enabled` | `true` | Boolean | Live |
+| `history.deprioritize_trivial` | `true` | Boolean | Live |
 | `palette.max_results` | `5` | Integer 1–20 | Live |
 | `font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
 | `font.size` | `16.0` | Finite number 6–72 points | Live |
@@ -119,6 +120,13 @@ scrolling. Cmd/Ctrl+1–5 always act on the first five rows, so a larger cap onl
 arrow keys. Changes apply live, including to an open palette.
 
 ### Shell history
+
+`history.deprioritize_trivial` ranks a handful of commands below more substantial ones in the
+History palette: `exit`, `clear`, `ls`, `ll`, `la`, `cd`, `pwd`, `c`, `q` and `logout`. Those are
+often the most recent thing you typed, so strict recency pushed the work you came back for off the
+first page. Only a short command whose first word is one of them counts, so `cd ..` is trivial while
+`cd deep/path && ./gradlew build` is not. They are still listed and still searchable — searching for
+`clear` finds it — they just never sort above real work. Set it to `false` for strict recency.
 
 `history.enabled` adds the History scope to the [command palette](command-palette.md): Cmd+R on
 macOS or Ctrl+Shift+R elsewhere searches every shell history file Jasper can find plus commands
@@ -201,6 +209,15 @@ Injection only applies to a resolved program whose basename is exactly `zsh`, `b
 - **zsh** runs with `ZDOTDIR` pointed at a directory of wrapper files. Each wrapper restores your own `ZDOTDIR` (carried as `JASPER_ORIGINAL_ZDOTDIR` when you had one set), sources your counterpart file (`.zshenv`, `.zprofile`, `.zshrc`, `.zlogin`), and points `ZDOTDIR` back at the wrapper directory for any startup file still to come; `.zshrc`'s wrapper sources `jasper.zsh` after your own `.zshrc` runs. By the time the shell is interactive, `ZDOTDIR` is your value again.
 - **bash** runs with `--rcfile <dir>/bash/rc.bash` inserted after the program. Because bash ignores `--rcfile` for a login shell, a `-l` or `--login` argument is removed and `JASPER_LOGIN_SHELL=1` is exported instead; `rc.bash` then reads the same files a login shell would (`/etc/profile`, then the first of `~/.bash_profile`, `~/.bash_login`, `~/.profile`) or, for a non-login shell, one of `/etc/bash.bashrc` or `/etc/bashrc` and then `~/.bashrc`, and finally `jasper.bash`. This emulation means `shopt -q login_shell` reports false even when you asked for `-l`, and the `logout` builtin is unavailable. `--noprofile` suppresses the login emulation, so those profile files are not read even when you also passed `-l`. If your arguments already include `--norc`, `--rcfile`, `--init-file` or any form of `-c`, bash would ignore or override Jasper's own rc file, so Jasper injects nothing at all and leaves your command exactly as you wrote it — your startup is untouched and you get the exported variables only.
 - **fish** runs with `XDG_DATA_DIRS` prefixed by the integration directory's `fish` folder (your previous `XDG_DATA_DIRS`, or `/usr/local/share:/usr/share` when it was unset, follows). fish loads a vendor snippet from there that sources `jasper.fish` after your own configuration. fish loads vendor snippets *before* `config.fish`, so a prompt you define there replaces Jasper's wrapper; `jasper.fish` re-wraps it at every prompt, exactly as the zsh and bash scripts re-wrap `PROMPT` and `PS1`. The fish script has not yet been exercised against a real fish, so treat it as the least proven of the three.
+
+**tmux.** Launching tmux as your shell works: tmux passes its own environment to every pane, so the
+`ZDOTDIR` (zsh) and `XDG_DATA_DIRS` (fish) mechanisms reach the shell it starts. tmux replaces
+`TERM_PROGRAM` with `tmux` in each pane, so Jasper also exports `JASPER_TERMINAL=1`, which tmux
+leaves alone, and the scripts accept either marker. Two limits: **bash inside tmux gets nothing**,
+because bash's mechanism is a `--rcfile` argument that tmux never passes — add
+`source "$JASPER_SHELL_INTEGRATION/jasper.bash"` to your `.bashrc` instead; and attaching to a tmux
+server that was already running before Jasper started gets nothing either, because that server's
+environment predates Jasper. Start the server from Jasper, or source the script by hand.
 
 `TERM_PROGRAM=Jasper` is always set, in every mode, before the `[terminal.env]` overlay is applied, so a configured `TERM_PROGRAM` entry overrides it — unlike the truly reserved `TERM` and `COLORTERM`, which are applied after and always win. Because the scripts only mark once `TERM_PROGRAM` is `Jasper`, overriding it also turns marking off even when `shell_integration` is `"auto"`. The scripts only take effect in an interactive shell and set `JASPER_INTEGRATION_LOADED=1` once loaded, so a nested shell you start by hand gets no marks unless you source the script yourself in it.
 

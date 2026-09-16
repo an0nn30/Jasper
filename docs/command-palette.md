@@ -88,6 +88,15 @@ panes; see [Shell integration](configuration.md#shell-integration). A command
 you hide from your shell's own history with a leading space under bash's
 `HISTCONTROL=ignorespace` is left out of this list too.
 
+The list refreshes about once a second while the palette is open, so a command
+you just ran appears without reopening it — for any shell that writes its
+history file promptly, with no shell integration needed. Integration is still
+the instant path, and the only one that records the working directory and exit
+status. A shell that records no timestamps in its history file — bash, unless
+you set `HISTTIMEFORMAT` — is ranked by when that file was last written rather
+than sinking below every timestamped entry, so a bash command from minutes ago
+sits above a zsh command from last week.
+
 Jasper writes no history file of its own — your shell's files are only ever
 read, never modified. On a History row, Enter pastes the command into the
 focused pane and Cmd+Enter (Ctrl+Enter elsewhere) pastes and runs it, exactly as

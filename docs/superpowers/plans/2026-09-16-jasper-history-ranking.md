@@ -10,6 +10,13 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-16-jasper-history-ranking-design.md`
 
+**Status: complete.** All five tasks executed on `claude/history-scope-ranking`.
+Deviations beyond the one already recorded above: Task 3 grew a `.zshenv` change
+that was not planned — driving a real tmux showed `default-command ${SHELL}`
+runs the interactive shell as the child of a non-interactive one, which the
+previous feature's ZDOTDIR fix stranded. Three pre-existing tests were updated
+where they pinned orders that only held under the old ranking.
+
 ## Global Constraints
 
 - Java 25 on the **JetBrains Runtime**. Use `./gradlew`, never a system `gradle`.
@@ -37,7 +44,7 @@ The spec says "`ShellHistoryScope` reads the flag from the config snapshot it al
 - Produces: `ShellHistorySnapshot.Source(List<ShellHistoryEntry> entries, long modified)` — `modified` is epoch seconds, `0` when unknown.
 - Produces: `ShellHistorySnapshot.build(Collection<Source> perSource, List<ShellHistoryEntry> live, int cap)` — replaces the `Collection<List<ShellHistoryEntry>>` overload.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```java
     private static ShellHistoryEntry entry(String command, long timestamp, String shell) {
@@ -98,12 +105,12 @@ The spec says "`ShellHistoryScope` reads the flag from the config snapshot it al
     }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellHistorySnapshotTest' --rerun-tasks`
 Expected: compile failure — `ShellHistorySnapshot.Source` does not exist. That counts as red for the first run; once it compiles, the two ordering tests must fail on the assertion, not on a missing type.
 
-- [ ] **Step 3: Add the Source record and rank the entries**
+- [x] **Step 3: Add the Source record and rank the entries**
 
 In `ShellHistorySnapshot`:
 
@@ -156,7 +163,7 @@ Rename the `Keyed` component `timestamp` to `rank` so the name states what it no
     private record Keyed(ShellHistoryEntry entry, long rank, long sequence) {}
 ```
 
-- [ ] **Step 4: Feed the modification time through the index**
+- [x] **Step 4: Feed the modification time through the index**
 
 In `ShellHistoryIndex`, change the worker map to carry the time:
 
@@ -173,12 +180,12 @@ In `ShellHistoryIndex`, change the worker map to carry the time:
 
 `publish` needs no change beyond the type: `ShellHistorySnapshot.build(perSource.values(), live, ShellHistorySnapshot.MAX_ENTRIES)`.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `./gradlew :jasper-app:test --rerun-tasks`
 Expected: PASS, including every existing `ShellHistoryIndexTest` case. Existing tests that call the old `build` overload must be updated to pass `Source` values; do that in this task rather than keeping a deprecated overload.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add jasper-app/src/main/java/dev/jasper/app/ShellHistorySnapshot.java \
@@ -198,7 +205,7 @@ git commit -m "fix: rank history entries that carry no timestamp by file positio
 **Interfaces:**
 - Produces: `ShellHistoryIndex.pollTimer()` — package-private test seam returning the `javax.swing.Timer`, or null when none was created.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```java
     @Test void theIndexPollsOnlyWhileSomethingIsListening() throws Exception {
@@ -233,12 +240,12 @@ git commit -m "fix: rank history entries that carry no timestamp by file positio
 
 `tick(Timer)` fires every `ActionListener` on the timer with a synthetic event, the way the terminal tests drive their timers. `drain(worker)` submits a no-op and waits for it, so the serial worker has finished.
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellHistoryIndexTest' --rerun-tasks`
 Expected: compile failure on `pollTimer()`, then a failure showing `fresh` absent.
 
-- [ ] **Step 3: Add the poll**
+- [x] **Step 3: Add the poll**
 
 In `ShellHistoryIndex`, add EDT-only state and start/stop it with the listener count:
 
@@ -281,12 +288,12 @@ and in `close()`, before `worker.shutdownNow()`:
         if (poll != null) poll.stop();
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellHistoryIndexTest' --rerun-tasks`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add jasper-app/src/main/java/dev/jasper/app/ShellHistoryIndex.java \
@@ -308,7 +315,7 @@ git commit -m "feat: poll shell history files so a new command appears without r
 
 Measured on the dev machine: a pane in a tmux server Jasper started inherits `ZDOTDIR` and `JASPER_SHELL_INTEGRATION`, but tmux overwrites `TERM_PROGRAM` with `tmux`. The plumbing already reaches the pane; only the guard rejects it.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `LaunchSettingsTest`:
 
@@ -375,12 +382,12 @@ In `ShellIntegrationScriptTest`, prove the guard accepts the tmux case:
     }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.LaunchSettingsTest' --tests 'dev.jasper.app.ShellIntegrationScriptTest' --rerun-tasks`
 Expected: no `JASPER_TERMINAL`, no `ZDOTDIR` for tmux, and no `C` mark under `TERM_PROGRAM=tmux`.
 
-- [ ] **Step 3: Export the marker and add the tmux arm**
+- [x] **Step 3: Export the marker and add the tmux arm**
 
 In `LaunchSettings.resolve`, beside the existing `TERM_PROGRAM` put — it is already scrubbed by the `JASPER_` prefix rule, and goes before the `[terminal.env]` overlay so a user can still override it:
 
@@ -415,7 +422,7 @@ In `inject`, add before the `default` arm:
 
 Calling `inject` recursively with a throwaway command list reuses the zsh and fish arms exactly, so the two mechanisms cannot drift apart. The real command list is never touched.
 
-- [ ] **Step 4: Widen the guard in all three scripts**
+- [x] **Step 4: Widen the guard in all three scripts**
 
 `jasper.zsh` and `jasper.bash`, replacing the single `TERM_PROGRAM` line:
 
@@ -433,12 +440,12 @@ if status is-interactive
 
 Check the line budgets after editing: `wc -l` must be at most 115 for `jasper.bash` and 90 for the other two.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `./gradlew :jasper-app:test --rerun-tasks`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add jasper-app/src/main/java/dev/jasper/app/LaunchSettings.java \
@@ -467,7 +474,7 @@ git commit -m "feat: load shell integration inside tmux, which overwrites TERM_P
 - Produces: `PaletteContext.deprioritizeTrivial()` — `boolean`, carried per query like `maxResults`.
 - Produces: `ShellHistoryScope.TRIVIAL` — the built-in set, package-private for the test.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```java
     @Test void trivialCommandsSortBelowRealWorkWhenTheSettingIsOn() {
@@ -508,12 +515,12 @@ and in `ConfigLoaderTest`, following the shape of the existing `history.enabled`
     }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellHistoryScopeTest' --tests 'dev.jasper.app.ConfigLoaderTest' --rerun-tasks`
 Expected: compile failure on the new accessors, then ordering failures.
 
-- [ ] **Step 3: Add the setting**
+- [x] **Step 3: Add the setting**
 
 `ConfigLoader`: add `"deprioritize_trivial"` to the `history` field set, a `private boolean deprioritizeTrivial = true;`, the case
 
@@ -532,7 +539,7 @@ and pass it into the `ConfigSnapshot` it builds. `ConfigSnapshot` gains the comp
 deprioritize_trivial = true
 ```
 
-- [ ] **Step 4: Carry it to the scope and apply it**
+- [x] **Step 4: Carry it to the scope and apply it**
 
 `PaletteContext` gains a `boolean deprioritizeTrivial` component, defaulting to `true` in the short constructors. `WindowCommandPalette` sets it where it sets `maxResults`, and `WindowContent.applyConfiguration` pushes it the same way `commandPalette.setMaxResults(next.maxResults())` is pushed.
 
@@ -572,12 +579,12 @@ In `search`, for the empty query, partition before taking `maxResults`:
 
 For a non-empty query, add a trivial flag as the **last** component of the existing `Ranked` comparator, so a search for `clear` still finds it but a broad query prefers real work. Keep the existing `tier`/`directory`/`position` ordering ahead of it.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `./gradlew check --rerun-tasks`
 Expected: PASS. Read exact counts from `*/build/test-results/test/TEST-*.xml`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add jasper-app/src config.example.toml
@@ -594,21 +601,21 @@ git commit -m "feat: add history.deprioritize_trivial so exit and clear stop cro
 - Modify: `docs/STATUS.md`
 - Modify: `docs/superpowers/specs/2026-09-16-jasper-history-ranking-design.md`
 
-- [ ] **Step 1: Document the setting and the new behaviour**
+- [x] **Step 1: Document the setting and the new behaviour**
 
 `docs/configuration.md` gains `history.deprioritize_trivial` in the settings table and a short section naming the built-in set. The Shell integration section records that tmux now works for zsh and fish, that bash inside tmux still needs the manual `source` line, and that attaching to a tmux server started before Jasper gets nothing because its environment predates Jasper.
 
 `docs/command-palette.md` records that the History list now refreshes about once a second while the palette is subscribed, and that a shell which records no timestamps is ranked by when its file was written rather than sinking to the bottom.
 
-- [ ] **Step 2: Correct the spec's one wrong claim**
+- [x] **Step 2: Correct the spec's one wrong claim**
 
 The spec says the scope "reads the flag from the config snapshot it already receives". Replace with the truth: the flag rides on `PaletteContext` beside `maxResults`, and the partition happens in the scope rather than in `ShellHistorySnapshot.build`.
 
-- [ ] **Step 3: Add the STATUS entry**
+- [x] **Step 3: Add the STATUS entry**
 
 Describe the four changes, the measured evidence behind each, the deviation above, the bash-inside-tmux gap, and the real test counts read from the result XML. Record as user-run: the History palette inside tmux on the real desktop.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/
