@@ -101,7 +101,7 @@ The Commands scope keeps its dispatch: recheck registration, owner validity and 
 
 ## Layout and rendering
 
-The approved geometry stays: 560px preferred width, 56px input row, 40px rows, 12px outer corners, 6px row corners, centered one-third down the terminal area with the existing small-window clamps. Additions:
+The approved geometry stays: 560px preferred width, 56px input row, 40px rows, 12px outer corners, 6px row corners, and the card's top anchored one-fifth down the terminal area (2026-09-16; it was the card's centre one-third down) with the existing small-window clamps. Additions:
 
 - **Chip:** a 24px rounded pill inside the input row, left of the text, icon plus label in the accent colour on the raised surface. Placeholder and typed text start after it. At narrow widths the chip drops its label and keeps its icon.
 - **Rows:** title, optional muted detail line, optional trailing tag, and the numbered badge for the top five. Commands rows are unchanged apart from being produced as `PaletteRow`. History rows show the command text in the terminal's monospace font, the shell name as the tag, and the working directory as the detail line only when live capture recorded one. Rows stay 40px.

@@ -26,7 +26,46 @@ class WindowCommandPaletteTest {
             @Override public void actionPerformed(ActionEvent event) { run.run(); }
         }, List.of());
     }
-    @Test void overlayDoesNotResizeTerminalAndUsesUpperThirdOfWholeDeck() throws Exception {
+    @Test void theCardTopIsFixedSoTheInputRowNeverMovesAsResultsChange() {
+        var deck = new Rectangle(0, 100, 900, 600);
+        int anchor = deck.y + deck.height / 5;
+        for (int height : new int[] {96, 160, 304, 420}) {
+            var placed = WindowCommandPalette.positioned(deck, new Dimension(560, height), deck, 16);
+            assertThat(placed.y).as("card top for height %d", height).isEqualTo(anchor);
+        }
+    }
+    @Test void aCardTallerThanTheDeckIsPulledUpToStayOnScreen() {
+        var deck = new Rectangle(0, 100, 900, 300);
+        var placed = WindowCommandPalette.positioned(deck, new Dimension(560, 400), deck, 16);
+        assertThat(placed.y).isEqualTo(deck.y + 16);
+        assertThat(placed.height).isEqualTo(300 - 32);
+    }
+    @Test void neitherAScopeSwitchNorANewRowCountMovesTheInputRow() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var root = install(owner);
+                var fake = new PaletteScopesTest.FakeScope();
+                owner.scopes().register(fake);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.toggle(); MockUiTest.layoutTree(root);
+                int anchor = card.getBounds().y; int commandsHeight = card.getBounds().height;
+                palette.open(fake.id()); MockUiTest.layoutTree(root);
+                assertThat(card.getBounds().y).as("after a scope switch").isEqualTo(anchor);
+                fake.rows = List.of();
+                fake.listeners.forEach(Runnable::run); MockUiTest.layoutTree(root);
+                assertThat(card.getBounds().y).as("with no rows").isEqualTo(anchor);
+                int emptyHeight = card.getBounds().height;
+                fake.rows = List.of(PaletteRow.of("a", "A"), PaletteRow.of("b", "B"), PaletteRow.of("c", "C"),
+                    PaletteRow.of("d", "D"), PaletteRow.of("e", "E"));
+                fake.listeners.forEach(Runnable::run); MockUiTest.layoutTree(root);
+                assertThat(card.getBounds().y).as("with five rows").isEqualTo(anchor);
+                // The card must actually have changed height, or the assertions above prove nothing.
+                assertThat(card.getBounds().height).isGreaterThan(emptyHeight);
+                assertThat(commandsHeight).isNotEqualTo(emptyHeight);
+            }
+        });
+    }
+    @Test void overlayDoesNotResizeTerminalAndAnchorsTheCardTopInTheWholeDeck() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
                 var root = install(owner); var before = owner.tabStrip().getBounds();
@@ -35,7 +74,7 @@ class WindowCommandPaletteTest {
                 var palette = owner.commandPalette().component();
                 var deck = SwingUtilities.convertRectangle(owner.tabStrip().getParent(), before, palette.getParent());
                 assertThat(Math.abs(palette.getBounds().getCenterX() - deck.getCenterX())).isLessThanOrEqualTo(1);
-                assertThat(Math.abs(palette.getBounds().getCenterY() - (deck.y + deck.height / 3.0))).isLessThanOrEqualTo(1);
+                assertThat(palette.getBounds().y).isEqualTo(deck.y + deck.height / 5);
                 owner.setActive(false); assertThat(owner.commandPalette().isOpen()).isFalse();
             }
         });

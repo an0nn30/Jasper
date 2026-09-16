@@ -154,10 +154,23 @@ expanded into baseline cleanup.
 
 ## Placement adjustment — 2026-09-13
 
-The user requested a higher position. The card now targets one-third of the way
+The user requested a higher position. The card targeted one-third of the way
 down the full terminal area with its vertical center, while retaining horizontal
 centering and the existing small-window clearance clamps. The PNGs and separate
-2× UI-scale artifact were regenerated for this placement.
+2× UI-scale artifact were regenerated for this placement. Superseded on
+2026-09-16, below.
+
+## Placement adjustment — 2026-09-16
+
+Anchoring the card's *center* meant every scope put the input row somewhere
+different: the card grows with its result count, so half of each height change
+was subtracted from the top. Switching scopes made the text box jump up and
+down. The card's *top* is now anchored one-fifth of the way down the terminal
+area and the card grows downwards only, so the input row keeps one position in
+every scope and at every result count; only the small-window clearance clamp
+may still move it, and only when the card would otherwise not fit. One-fifth
+was chosen because it leaves the default Commands card within a few pixels of
+where 2026-09-13 put it. The PNGs and the 2× UI-scale artifact were regenerated.
 
 ## Main integration — 2026-09-13
 
