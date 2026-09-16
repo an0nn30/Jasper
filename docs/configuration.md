@@ -50,6 +50,7 @@ dim_inactive_panes = 0.3
 copy_on_select = false
 bell = "visual"
 on_exit = "keep_open"
+shell_integration = "auto"
 
 [terminal.shell]
 program = ""
@@ -96,6 +97,7 @@ variant = "dark"
 | `terminal.copy_on_select` | `false` | Boolean | Live |
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
+| `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.variant` | `"dark"` | `"dark"`, `"light"` | Live, shared across windows |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 

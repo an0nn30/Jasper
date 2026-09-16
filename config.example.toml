@@ -56,6 +56,9 @@ bell = "visual"
 # Only the exited pane closes; its tab/window closes when empty. Live for future exits;
 # reloading never closes previously retained output. A program returning to the shell is not a shell exit.
 on_exit = "keep_open"
+# New panes only. "auto" loads Jasper's shell integration script (zsh, bash, fish) after your startup files;
+# "manual" only exports JASPER_SHELL_INTEGRATION for you to source; "off" does neither.
+shell_integration = "auto"
 
 [terminal.shell]
 # New panes only. An empty program selects the platform default login shell.

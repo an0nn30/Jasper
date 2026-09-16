@@ -267,6 +267,19 @@ class ConfigLoaderTest {
         assertDiagnostic(unknown, "history.shells", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
 
+    @Test void shellIntegrationParsesItsThreeChoicesAndRejectsOthers() {
+        assertThat(parse("[terminal]\nshell_integration = \"manual\"\n").snapshot().terminal().shellIntegration())
+            .isEqualTo(ShellIntegrationMode.MANUAL);
+        assertThat(parse("[terminal]\nshell_integration = \"off\"\n").snapshot().terminal().shellIntegration())
+            .isEqualTo(ShellIntegrationMode.OFF);
+        assertThat(ConfigSnapshot.defaults().terminal().shellIntegration()).isEqualTo(ShellIntegrationMode.AUTO);
+        var bad = parse("[terminal]\nshell_integration = \"sometimes\"\n");
+        assertThat(bad.snapshot().terminal().shellIntegration()).isEqualTo(ShellIntegrationMode.AUTO);
+        assertDiagnostic(bad, "terminal.shell_integration", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        var wrongType = parse("[terminal]\nshell_integration = true\n");
+        assertThat(wrongType.rejected()).isTrue();
+    }
+
     private void assertDiagnostic(ConfigLoader.Result result, String key, int line, int column, ConfigDiagnostic.Severity severity) {
         assertThat(result.diagnostics()).filteredOn(d -> d.key().equals(key)).singleElement().satisfies(d -> {
             assertThat(d.file()).isEqualTo(FILE);

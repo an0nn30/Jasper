@@ -75,6 +75,9 @@ final class ConfigTemplate {
             # Only the exited pane closes; its tab/window closes when empty. Live for future exits.
             # "keep_open" retains output from the stopped shell; reload never closes retained output.
             # on_exit = "keep_open"
+            # Shell integration: "auto" loads Jasper's zsh/bash/fish script after your own startup files (new panes only),
+            # "manual" only exports JASPER_SHELL_INTEGRATION so you can source it yourself, "off" does neither.
+            # shell_integration = "auto"
 
             [terminal.shell]
             # New panes only. Empty program resolves the default shell and appends configured args.

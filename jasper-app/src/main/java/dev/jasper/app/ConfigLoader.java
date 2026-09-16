@@ -38,7 +38,7 @@ final class ConfigLoader {
         Map.entry(List.of("ui"), Set.of("theme")),
         Map.entry(List.of("ui", "theme"), Set.of("variant")),
         Map.entry(List.of("terminal"), Set.of("shell", "env", "scrollback", "option_as_meta", "cursor",
-            "dim_inactive_panes", "copy_on_select", "bell", "on_exit")),
+            "dim_inactive_panes", "copy_on_select", "bell", "on_exit", "shell_integration")),
         Map.entry(List.of("terminal", "shell"), Set.of("program", "args")),
         Map.entry(List.of("terminal", "cursor"), Set.of("shape", "blink")));
 
@@ -71,6 +71,7 @@ final class ConfigLoader {
     private boolean copyOnSelect;
     private BellMode bell = BellMode.VISUAL;
     private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
+    private ShellIntegrationMode shellIntegration = ShellIntegrationMode.AUTO;
     private Appearance variant = Appearance.DARK;
     private Map<String, String> keybindings = Map.of();
 
@@ -96,7 +97,8 @@ final class ConfigLoader {
         var snapshot = new ConfigSnapshot(tabHeight, toolbar, statusBar,
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
-                cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit), buddyEnabled, historyEnabled, maxResults);
+                cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
+                buddyEnabled, historyEnabled, maxResults);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -161,6 +163,9 @@ final class ConfigLoader {
             case "terminal.on_exit" -> onExit = choice(path, value, Map.of(
                 "keep_open", ShellExitBehavior.KEEP_OPEN, "close_on_success", ShellExitBehavior.CLOSE_ON_SUCCESS,
                 "close", ShellExitBehavior.CLOSE), onExit);
+            case "terminal.shell_integration" -> shellIntegration = choice(path, value, Map.of(
+                "auto", ShellIntegrationMode.AUTO, "manual", ShellIntegrationMode.MANUAL, "off", ShellIntegrationMode.OFF),
+                shellIntegration);
             default -> throw new IllegalStateException("Unrecognized validated field.");
         }
     }

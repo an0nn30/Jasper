@@ -11,12 +11,20 @@ import java.util.Objects;
 /** Validated session defaults and terminal behavior saved in the configuration. */
 record TerminalConfig(Shell shell, Map<String, String> env, int scrollback, OptionAsMeta optionAsMeta,
                       CursorStyle cursorShape, boolean cursorBlink, float dimInactivePanes,
-                      boolean copyOnSelect, BellMode bell, ShellExitBehavior onExit) {
+                      boolean copyOnSelect, BellMode bell, ShellExitBehavior onExit,
+                      ShellIntegrationMode shellIntegration) {
     TerminalConfig(Shell shell, Map<String, String> env, int scrollback, OptionAsMeta optionAsMeta,
                    CursorStyle cursorShape, boolean cursorBlink, float dimInactivePanes,
                    boolean copyOnSelect, BellMode bell) {
         this(shell, env, scrollback, optionAsMeta, cursorShape, cursorBlink, dimInactivePanes,
             copyOnSelect, bell, ShellExitBehavior.KEEP_OPEN);
+    }
+
+    TerminalConfig(Shell shell, Map<String, String> env, int scrollback, OptionAsMeta optionAsMeta,
+                   CursorStyle cursorShape, boolean cursorBlink, float dimInactivePanes,
+                   boolean copyOnSelect, BellMode bell, ShellExitBehavior onExit) {
+        this(shell, env, scrollback, optionAsMeta, cursorShape, cursorBlink, dimInactivePanes,
+            copyOnSelect, bell, onExit, ShellIntegrationMode.AUTO);
     }
 
     record Shell(String program, List<String> args) {
@@ -50,6 +58,7 @@ record TerminalConfig(Shell shell, Map<String, String> env, int scrollback, Opti
         }
         Objects.requireNonNull(bell, "bell");
         Objects.requireNonNull(onExit, "onExit");
+        Objects.requireNonNull(shellIntegration, "shellIntegration");
     }
 
     static boolean validEnvName(String name) {

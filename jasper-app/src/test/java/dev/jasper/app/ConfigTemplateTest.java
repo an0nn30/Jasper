@@ -50,7 +50,7 @@ class ConfigTemplateTest {
             .containsExactlyInAnyOrder("family", "size", "fallback", "ligatures", "line_height");
         assertThat(toml.getTable("terminal").keySet())
             .containsExactlyInAnyOrder("scrollback", "option_as_meta", "dim_inactive_panes", "copy_on_select",
-                "bell", "on_exit", "shell", "cursor", "env");
+                "bell", "on_exit", "shell_integration", "shell", "cursor", "env");
         assertThat(toml.getTable("terminal.shell").keySet()).containsExactlyInAnyOrder("program", "args");
         assertThat(toml.getTable("terminal.cursor").keySet()).containsExactlyInAnyOrder("shape", "blink");
         assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
