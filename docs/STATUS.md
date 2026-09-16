@@ -103,10 +103,20 @@ also found the five wrapper files had never been made unset-safe (round one
 fixed only the three main scripts, so under `set -u` Jasper silently skipped the
 user's own `~/.bashrc`/`~/.zshrc`), two bare `printf` calls left in the bash
 DEBUG trap, `-o`/`-O` option arguments ending the bash option scan early, and a
-staged extraction path that could itself be a symlink. Fresh
-`./gradlew check --rerun-tasks`: jasper-app 502 tests, 501 passed and one fish
-skip; jasper-terminal 313 tests, 312 passed and one existing font skip. Total
-815 tests, 813 passed, two skipped, zero failures/errors. Still user-run: each
+staged extraction path that could itself be a symlink.
+
+A direct check of the `HISTCONTROL` matrix against real bash afterwards caught
+a hole none of the tests had: a space-hidden command typed as the **first**
+command of a session leaves history empty, which the "history is switched off"
+carve-out then read as permission to report it — the exact case of opening a
+terminal and typing ` export TOKEN=…`. Suppression now keys on whether history
+is enabled (`[[ -o history ]]` and `HISTSIZE`), not on whether it has entries.
+The eight-row matrix (hidden/visible × ignorespace/ignoreboth/ignoredups/none ×
+history on/off) is verified against `/bin/bash`, and the new test fails if the
+condition is reverted. Fresh `./gradlew check --rerun-tasks`: jasper-app 503
+tests, 502 passed and one fish skip; jasper-terminal 313 tests, 312 passed and
+one existing font skip. Total 816 tests, 814 passed, two skipped, zero
+failures/errors. Still user-run: each
 shell (zsh, bash, and fish if installed) on the real macOS desktop with the
 user's own dotfiles and prompt theme, confirming marks, the status-bar dot and
 that nested shells stay quiet; plus a look at the two adjacent status-bar dots

@@ -66,14 +66,13 @@ __jasper_debug_trap() {
     number="$(builtin printf '%s\n' "$entry" | command sed -E '1!d; s/^ *([0-9]+).*/\1/')"
     line="$(builtin printf '%s\n' "$entry" | command sed -E '1s/^ *[0-9]+ +//')"
     if [[ -z "$number" || "$number" == "$__jasper_prompt_history" ]]; then
-        # History refused the line. When its newest entry IS this command, bash only dropped a
-        # duplicate (ignoredups/ignoreboth) and the text is safe to report. An entry that differs
-        # means ignorespace hid it deliberately, so Jasper forgets it too and skips C as well:
-        # emitting C alone would let the screen read recapture what the user meant to hide. An
-        # empty number means history is off entirely, which says nothing about privacy.
-        # A repeated compound command still suppresses, because BASH_COMMAND holds only its
-        # first simple command; that costs a history entry, never a disclosure.
-        if [[ -n "$number" && "$line" != "$BASH_COMMAND" ]]; then
+        # History refused the line. A newest entry equal to this command means bash dropped a
+        # duplicate (ignoredups), so the text is safe. One that differs — including none at all,
+        # when every line so far was hidden — means ignorespace hid it, so Jasper drops the text
+        # and C alike; C alone would let the screen read recapture it. History off or HISTSIZE=0
+        # keeps nothing either way and so says nothing about privacy. A repeated compound command
+        # also suppresses: BASH_COMMAND holds only its first simple command, costing an entry.
+        if [[ -o history && "${HISTSIZE-}" != 0 && "$line" != "$BASH_COMMAND" ]]; then
             case ":${HISTCONTROL-}:" in
                 *:ignorespace:*|*:ignoreboth:*) return 0 ;;
             esac

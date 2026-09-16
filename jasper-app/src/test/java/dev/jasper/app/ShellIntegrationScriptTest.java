@@ -266,4 +266,21 @@ class ShellIntegrationScriptTest {
         env.put("JASPER_SHELL_INTEGRATION", scripts().toString());
         return ShellRun.runSeparate(List.of("/bin/zsh", "-u", "-i"), env, home, "echo rc=$RC_RAN\nexit\n");
     }
+
+    /**
+     * The case a user protecting a secret actually hits: open a terminal and immediately type
+     * " export TOKEN=...". History is still empty then, so "the number did not advance" cannot be
+     * read as "history is off". Asserts on the real payload — base64 of the whole line.
+     */
+    @Test void ignorespaceHidesEvenTheFirstCommandOfTheSession() throws Exception {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/bash")));
+        ShellRun.Result result = interactive("/bin/bash", "PS1='$ '\nHISTCONTROL=ignorespace\n",
+            " echo SECRET\n");
+        assertThat(result.output()).doesNotContain(ShellRun.CMD(" echo SECRET"))
+            .doesNotContain(ShellRun.CMD("echo SECRET"));
+        // Only `exit` is marked; the hidden line gets no command-start mark to capture it by.
+        assertThat(result.output().split(java.util.regex.Pattern.quote(ShellRun.C), -1).length - 1).isEqualTo(1);
+        // The prompt carries A and B, and bash writes its prompt to stderr.
+        assertThat(result.errors()).contains(ShellRun.A);
+    }
 }
