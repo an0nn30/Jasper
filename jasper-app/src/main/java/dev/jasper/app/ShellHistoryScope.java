@@ -8,18 +8,26 @@ import java.util.Locale;
 import java.util.TreeSet;
 import javax.swing.Icon;
 
-/** The History scope: substring search over the shared index; Enter pastes, Cmd/Ctrl+Enter pastes and runs. */
+/**
+ * The History scope: substring search over the shared index. Enter pastes, Cmd/Ctrl+Enter pastes and runs;
+ * Shift+Enter saves the command as a snippet when a {@link SnippetStore} is attached.
+ */
 final class ShellHistoryScope implements PaletteScope {
     static final PaletteVerb PASTE = new PaletteVerb("paste", "Paste");
     static final PaletteVerb PASTE_RUN = new PaletteVerb("paste_run", "Paste and run");
+    static final PaletteVerb SAVE = new PaletteVerb("save_snippet", "Save as snippet…");
 
     private final ShellHistoryIndex index;
+    private final SnippetStore snippets;
     private final Icon icon;
 
-    ShellHistoryScope(ShellHistoryIndex index) { this(index, AppIcons.icon("history")); }
+    ShellHistoryScope(ShellHistoryIndex index) { this(index, null, AppIcons.icon("history")); }
 
-    ShellHistoryScope(ShellHistoryIndex index, Icon icon) {
+    ShellHistoryScope(ShellHistoryIndex index, Icon icon) { this(index, null, icon); }
+
+    ShellHistoryScope(ShellHistoryIndex index, SnippetStore snippets, Icon icon) {
         this.index = java.util.Objects.requireNonNull(index);
+        this.snippets = snippets;
         this.icon = icon;
     }
 
@@ -29,9 +37,28 @@ final class ShellHistoryScope implements PaletteScope {
     @Override public String description() { return "Search shell history and paste or run a command"; }
     @Override public String placeholder() { return "Search shell history, or > to switch scope"; }
     @Override public List<String> aliases() { return List.of("hist", "shell"); }
-    @Override public List<PaletteVerb> verbs() { return List.of(PASTE, PASTE_RUN); }
+    @Override public List<PaletteVerb> verbs() {
+        return snippets == null ? List.of(PASTE, PASTE_RUN) : List.of(PASTE, PASTE_RUN, SAVE);
+    }
     @Override public boolean monospaceRows() { return true; }
     @Override public void activated(PaletteContext context) { index.refresh(); }
+
+    /** The command's first two words on its first line, cut to a valid snippet name length. */
+    static String suggestedName(String command) {
+        String[] words = command.strip().lines().findFirst().orElse("").strip().split("\\s+");
+        String name = words.length > 1 && !words[1].isEmpty() ? words[0] + " " + words[1] : words[0];
+        return name.length() > Snippet.MAX_NAME ? name.substring(0, Snippet.MAX_NAME) : name;
+    }
+
+    @Override public PaletteStep step(PaletteRow row, PaletteVerb verb, PaletteContext context) {
+        if (!verb.equals(SAVE) || snippets == null || !(row.token() instanceof ShellHistoryEntry entry)) return null;
+        String shown = entry.command().replace("\r", "").replace("\n", " ↵ ");
+        return new PaletteStep("Save as snippet: " + shown,
+            List.of(new PaletteStep.Field("name", "Name", suggestedName(entry.command()))),
+            (values, done) -> snippets.append(values.get("name"), entry.command(), (saved, error) ->
+                done.accept(error != null ? PaletteStep.Result.error(error)
+                    : PaletteStep.Result.reopen(SNIPPETS_ID, SnippetsScope.rowId(saved.name())))));
+    }
 
     private record Ranked(ShellHistoryEntry entry, int tier, int directory, int position) {}
 
@@ -81,8 +108,10 @@ final class ShellHistoryScope implements PaletteScope {
         return false;
     }
 
+    // Save as snippet needs no live target, and available() cannot see which verb was chosen;
+    // once a store is attached a row stays available so Shift+Enter always reaches its step.
     @Override public boolean available(PaletteRow row, PaletteContext context) {
-        return row.token() instanceof ShellHistoryEntry && context.target().live().getAsBoolean();
+        return row.token() instanceof ShellHistoryEntry && (snippets != null || context.target().live().getAsBoolean());
     }
 
     @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {

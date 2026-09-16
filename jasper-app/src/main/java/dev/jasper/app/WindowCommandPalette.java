@@ -31,6 +31,9 @@ final class WindowCommandPalette implements AutoCloseable {
     private TerminalPane originPane;
     private Component priorFocus;
     private boolean open, closed, dirty = true;
+    // A step's complete() may deliver asynchronously; without this, two quick Enter presses
+    // would call complete() twice before the first result arrives.
+    private boolean completing;
     private int maxResults = PaletteContext.DEFAULT_MAX_RESULTS;
 
     WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, String defaultScopeId, boolean macOs) {
@@ -89,6 +92,7 @@ final class WindowCommandPalette implements AutoCloseable {
 
     private void activate(PaletteScope scope, boolean keepQuery) {
         if (step != null) { step = null; palette.hideStep(); }
+        completing = false;
         if (scopeListener != null) scopeListener.close();
         active = scope; picker = false;
         scopeListener = scope.onChanged(this::changed);
@@ -122,7 +126,7 @@ final class WindowCommandPalette implements AutoCloseable {
     /** Enter and its modifier variants: completes an open step, otherwise runs that verb on the selected row. */
     void enterPressed(int verb) {
         if (!open) return;
-        if (step != null) completeStep(); else palette.executeSelected(verb);
+        if (step != null) { if (!completing) completeStep(); } else palette.executeSelected(verb);
     }
 
     void executeNumber(int number) { if (open && step == null) palette.executeNumber(number); }
@@ -154,6 +158,7 @@ final class WindowCommandPalette implements AutoCloseable {
 
     private void closeStep() {
         step = null;
+        completing = false;
         palette.hideStep();
         rebuild(true);
         palette.queryField().requestFocusInWindow();
@@ -161,8 +166,10 @@ final class WindowCommandPalette implements AutoCloseable {
 
     private void completeStep() {
         PaletteStep current = step;
+        completing = true;
         palette.setStepError(null);
         current.complete().accept(palette.stepValues(), result -> {
+            completing = false;
             if (step != current || !open) return;
             if (result.error() != null) { palette.setStepError(result.error()); layoutOverlay(); return; }
             step = null;
@@ -266,7 +273,7 @@ final class WindowCommandPalette implements AutoCloseable {
         // in the old pane may still be showing, but restoring it would undo that transition.
         boolean restorePriorFocus = validOrigin();
         open = false; picker = false;
-        step = null; palette.hideStep();
+        step = null; completing = false; palette.hideStep();
         palette.setVisible(false); overlay.setVisible(overlay.swallowing);
         if (scopeListener != null) { scopeListener.close(); scopeListener = null; }
         active = null;

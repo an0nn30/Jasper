@@ -1,16 +1,21 @@
 package dev.jasper.app;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 class ShellHistoryScopeTest {
+    @TempDir Path dir;
     private static ShellHistoryIndex indexOf(ShellHistoryEntry... entries) {
         var index = new ShellHistoryIndex(List.of(), new java.util.concurrent.AbstractExecutorService() {
             @Override public void execute(Runnable task) { task.run(); }
@@ -112,6 +117,39 @@ class ShellHistoryScopeTest {
                 assertThat(changes.get()).isGreaterThanOrEqualTo(1);
                 subscription.close();
             }
+        });
+    }
+
+    @Test void saveAsSnippetIsAThirdVerbOnlyWithAStoreAndAppendsThroughANameStep() throws Exception {
+        Path file = dir.resolve("snippets.toml");
+        SwingUtilities.invokeAndWait(() -> {
+            try (var index = indexOf(ShellHistoryEntry.of("git rebase -i origin/main", 1, "zsh"));
+                 var store = new SnippetStore(file, path -> {}, SnippetStoreTest.inlineWorker(), Runnable::run)) {
+                assertThat(new ShellHistoryScope(index, null).verbs()).containsExactly(ShellHistoryScope.PASTE, ShellHistoryScope.PASTE_RUN);
+                var scope = new ShellHistoryScope(index, store, null);
+                assertThat(scope.verbs()).containsExactly(ShellHistoryScope.PASTE, ShellHistoryScope.PASTE_RUN, ShellHistoryScope.SAVE);
+                assertThat(ShellHistoryScope.suggestedName("git rebase -i origin/main")).isEqualTo("git rebase");
+                assertThat(ShellHistoryScope.suggestedName("  ls  ")).isEqualTo("ls");
+                assertThat(ShellHistoryScope.suggestedName("echo a\necho b")).isEqualTo("echo a");
+                assertThat(ShellHistoryScope.suggestedName("x".repeat(200) + " y")).hasSize(128);
+                var context = new PaletteContext(true, target(new ArrayList<>(), new AtomicInteger(), null, true));
+                var row = scope.search("", context).rows().getFirst();
+                assertThat(scope.step(row, ShellHistoryScope.PASTE, context)).isNull();
+                var step = scope.step(row, ShellHistoryScope.SAVE, context);
+                assertThat(step.title()).isEqualTo("Save as snippet: git rebase -i origin/main");
+                assertThat(step.fields()).singleElement().satisfies(field -> {
+                    assertThat(field.name()).isEqualTo("name");
+                    assertThat(field.prefill()).isEqualTo("git rebase");
+                });
+                var result = new AtomicReference<PaletteStep.Result>();
+                step.complete().accept(Map.of("name", "Interactive rebase"), result::set);
+                assertThat(result.get().error()).isNull();
+                assertThat(result.get().reopenScopeId()).isEqualTo(PaletteScope.SNIPPETS_ID);
+                assertThat(result.get().reopenRowId()).isEqualTo(SnippetsScope.rowId("Interactive rebase"));
+                assertThat(Files.readString(file)).contains("name = \"Interactive rebase\"\ncommand = \"git rebase -i origin/main\"");
+                step.complete().accept(Map.of("name", "interactive REBASE"), result::set);
+                assertThat(result.get().error()).isEqualTo("A snippet named Interactive rebase exists");
+            } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
         });
     }
 }

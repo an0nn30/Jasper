@@ -20,6 +20,8 @@ class PaletteScopesTest {
         List<PaletteRow> rows = List.of(PaletteRow.of("alpha", "Alpha"), PaletteRow.of("beta", "Beta"));
         PaletteStep.Result stepResult = PaletteStep.Result.done();
         final List<Map<String, String>> completed = new ArrayList<>();
+        boolean deferCompletion;
+        java.util.function.Consumer<PaletteStep.Result> pending;
         @Override public String id() { return "test.fake"; }
         @Override public String label() { return "Fake"; }
         @Override public String description() { return "Fixture scope"; }
@@ -32,7 +34,10 @@ class PaletteScopesTest {
             if (!verb.id().equals("three")) return null;
             return new PaletteStep("Fill " + row.title(),
                 List.of(new PaletteStep.Field("first", "First", "pre"), new PaletteStep.Field("second", "Second", "")),
-                (values, done) -> { completed.add(values); done.accept(stepResult); });
+                (values, done) -> {
+                    completed.add(values);
+                    if (deferCompletion) pending = done; else done.accept(stepResult);
+                });
         }
         @Override public void activated(PaletteContext context) { activations++; }
         @Override public PaletteResults search(String query, PaletteContext context) {
@@ -324,6 +329,26 @@ class PaletteScopesTest {
                 assertThat(owner.commandPalette().stepOpen()).isFalse();
                 assertThat(fake.executed).isEmpty();
                 assertThat(owner.commandPalette().isOpen()).isTrue();
+            }
+        });
+    }
+
+    @Test void aSecondEnterWhileAStepsAsyncCompletionIsPendingDoesNothing() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner); var fake = new FakeScope(); owner.scopes().register(fake);
+                var palette = owner.commandPalette();
+                palette.open("test.fake");
+                fake.deferCompletion = true;
+                palette.enterPressed(2);
+                assertThat(palette.stepOpen()).isTrue();
+                palette.enterPressed(0);
+                palette.enterPressed(0);
+                assertThat(fake.completed).hasSize(1);
+                assertThat(palette.stepOpen()).isTrue();
+                assertThat(palette.isOpen()).isTrue();
+                fake.pending.accept(PaletteStep.Result.done());
+                assertThat(palette.isOpen()).isFalse();
             }
         });
     }

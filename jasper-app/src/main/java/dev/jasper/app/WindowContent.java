@@ -128,8 +128,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
         scopes.register(commandsScope);
         commandPalette = new WindowCommandPalette(this, scopes, PaletteScope.COMMANDS_ID, macOs);
         this.shellHistory = shellHistory;
-        syncHistoryScope();
         this.snippets = snippets;
+        syncHistoryScope();
         if (snippets != null) snippetsRegistration = scopes.register(new SnippetsScope(snippets, message -> onError.accept(message)));
         paletteKeys = new PaletteKeyRouter(commandPalette, () -> this.bindings, macOs,
             source -> !closed && active && bindingRoot != null && source != null
@@ -575,7 +575,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
 
     private void syncHistoryScope() {
         boolean wanted = shellHistory != null && historyEnabled && !closed;
-        if (wanted && historyRegistration == null) historyRegistration = scopes.register(new ShellHistoryScope(shellHistory));
+        if (wanted && historyRegistration == null)
+            historyRegistration = scopes.register(new ShellHistoryScope(shellHistory, snippets, AppIcons.icon("history")));
         else if (!wanted && historyRegistration != null) { historyRegistration.close(); historyRegistration = null; }
     }
 
