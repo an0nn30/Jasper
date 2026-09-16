@@ -42,8 +42,8 @@ class ConfigTemplateTest {
         var toml = Toml.parse(text);
         assertThat(toml.errors()).isEmpty();
         assertThat(toml.getTable("buddy").keySet()).containsExactly("enabled");
-        assertThat(toml.getTable("history").keySet()).containsExactlyInAnyOrder("enabled", "trivial_commands");
-        assertThat(toml.getTable("palette").keySet()).containsExactly("max_results");
+        assertThat(toml.getTable("palette.scopes.history").keySet()).containsExactlyInAnyOrder("enabled", "trivial_commands");
+        assertThat(toml.getTable("palette").keySet()).containsExactlyInAnyOrder("max_results", "scopes");
         assertThat(toml.getTable("window").keySet())
             .containsExactlyInAnyOrder("tab_height", "toolbar", "status_bar", "columns", "lines");
         assertThat(toml.getTable("font").keySet())

@@ -18,7 +18,12 @@ lines = 45
 # View > Show Jasper (also in the command palette) and right-click > Hide Jasper toggle him for the session.
 enabled = true
 
-[history]
+[palette]
+# Live. Rows the command palette shows in every scope (Commands and History). Range: 1-20.
+# Cmd/Ctrl+1-5 still act on the first five rows.
+max_results = 5
+
+[palette.scopes.history]
 # Live. Search shell history from the palette with Cmd+R (macOS) or Ctrl+Shift+R.
 # Jasper only reads zsh, bash, fish, nushell and PowerShell history files; it writes no history of its own.
 enabled = true
@@ -27,11 +32,6 @@ enabled = true
 # Still listed and still searchable, just never above real work. An empty list turns this off;
 # setting the key replaces the default list entirely rather than adding to it.
 trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
-
-[palette]
-# Live. Rows the command palette shows in every scope (Commands and History). Range: 1-20.
-# Cmd/Ctrl+1-5 still act on the first five rows.
-max_results = 5
 
 [font]
 # Live across existing and new panes. Missing fonts use JBR/system fallback.

@@ -30,10 +30,13 @@ final class ConfigLoader {
     }
 
     private static final Map<List<String>, Set<String>> FIELDS = Map.ofEntries(
-        Map.entry(List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy", "history", "palette")),
+        Map.entry(List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy", "palette")),
         Map.entry(List.of("buddy"), Set.of("enabled")),
-        Map.entry(List.of("history"), Set.of("enabled", "trivial_commands")),
-        Map.entry(List.of("palette"), Set.of("max_results")),
+        Map.entry(List.of("palette"), Set.of("max_results", "scopes")),
+        // Per-scope settings live under palette.scopes.<scope>, so a new scope adds a table here
+        // rather than another top-level one.
+        Map.entry(List.of("palette", "scopes"), Set.of("history")),
+        Map.entry(List.of("palette", "scopes", "history"), Set.of("enabled", "trivial_commands")),
         Map.entry(List.of("window"), Set.of("tab_height", "toolbar", "status_bar", "columns", "lines")),
         Map.entry(List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height")),
         Map.entry(List.of("ui"), Set.of("theme")),
@@ -138,8 +141,8 @@ final class ConfigLoader {
                 "icons", WindowContent.ToolbarMode.ICONS, "hidden", WindowContent.ToolbarMode.HIDDEN), toolbar);
             case "window.status_bar" -> statusBar = bool(path, value, statusBar);
             case "buddy.enabled" -> buddyEnabled = bool(path, value, buddyEnabled);
-            case "history.enabled" -> historyEnabled = bool(path, value, historyEnabled);
-            case "history.trivial_commands" -> trivialCommands = lowercased(strings(path, value,
+            case "palette.scopes.history.enabled" -> historyEnabled = bool(path, value, historyEnabled);
+            case "palette.scopes.history.trivial_commands" -> trivialCommands = lowercased(strings(path, value,
                 ConfigLoader::trivialName, trivialCommands));
             case "palette.max_results" -> maxResults = integer(path, value, PaletteContext.MIN_MAX_RESULTS, PaletteContext.MAX_MAX_RESULTS, maxResults);
             case "font.family" -> fontFamily = string(path, value, ConfigLoader::fontName,

@@ -38,7 +38,11 @@ final class ConfigTemplate {
             # View > Show Jasper and a right-click on Jasper toggle him for this session only.
             # enabled = true
 
-            [history]
+            [palette]
+            # Rows the command palette shows in every scope, 1-20; updates live. Cmd/Ctrl+1-5 still number the first five.
+            # max_results = 5
+
+            [palette.scopes.history]
             # Search shell history from the palette (Cmd+R on macOS, Ctrl+Shift+R elsewhere); updates live.
             # Reads zsh, bash, fish, nushell and PowerShell history files; Jasper writes no history of its own.
             # enabled = true
@@ -47,10 +51,6 @@ final class ConfigTemplate {
             # "cd path && build" is not. Still listed and searchable, just never above real work.
             # An empty list turns this off; setting the key replaces the default list entirely.
             # trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
-
-            [palette]
-            # Rows the command palette shows in every scope, 1-20; updates live. Cmd/Ctrl+1-5 still number the first five.
-            # max_results = 5
 
             [font]
             # Font family and ordered fallbacks update live. Missing fonts use JBR/system fallback.

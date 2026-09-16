@@ -79,8 +79,8 @@ variant = "dark"
 | `window.columns` | `150` | Integer 5–500 | New windows |
 | `window.lines` | `45` | Integer 2–200 | New windows |
 | `buddy.enabled` | `true` | Boolean | Live |
-| `history.enabled` | `true` | Boolean | Live |
-| `history.trivial_commands` | see below | Array of single words | Live |
+| `palette.scopes.history.enabled` | `true` | Boolean | Live |
+| `palette.scopes.history.trivial_commands` | see below | Array of single words | Live |
 | `palette.max_results` | `5` | Integer 1–20 | Live |
 | `font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
 | `font.size` | `16.0` | Finite number 6–72 points | Live |
@@ -121,7 +121,7 @@ arrow keys. Changes apply live, including to an open palette.
 
 ### Shell history
 
-`history.trivial_commands` lists the commands ranked below more substantial ones in the History
+`palette.scopes.history.trivial_commands` lists the commands ranked below more substantial ones in the History
 palette. It defaults to `["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]` —
 often the most recent thing you typed, so strict recency pushed the work you came back for off the
 first page.
@@ -136,7 +136,7 @@ want to keep. An empty list (`trivial_commands = []`) turns de-ranking off entir
 strict recency. De-ranked commands are still listed and still searchable — searching for `clear`
 finds it — they just never sort above real work.
 
-`history.enabled` adds the History scope to the [command palette](command-palette.md): Cmd+R on
+`palette.scopes.history.enabled` adds the History scope to the [command palette](command-palette.md): Cmd+R on
 macOS or Ctrl+Shift+R elsewhere searches every shell history file Jasper can find plus commands
 it saw run through shell integration. Disabling it removes the scope and its shortcut does
 nothing. If you already bound Cmd+R (macOS) or Ctrl+Shift+R (elsewhere) to something else, that

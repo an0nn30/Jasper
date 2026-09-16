@@ -67,10 +67,15 @@ The command line is never rewritten for tmux; only environment variables are set
 ## Trivial de-ranking
 
 ```toml
-[history]
+[palette.scopes.history]
 # live; new setting. Replaces the default list; an empty list turns de-ranking off.
 trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
 ```
+
+**Namespace moved on request.** Both History-scope settings live under
+`[palette.scopes.history]` rather than a top-level `[history]`, so a future scope adds a table beside
+it instead of another top-level one. `palette.max_results` stays where it is: it applies to every
+scope, not one of them.
 
 When true, an entry whose command is one of a built-in set — `exit`, `clear`, `ll`, `ls`, `cd`, `pwd`, plus `cd` with a single argument — sorts after every non-trivial entry, keeping its relative order within the trivial group. It is a partition, not a score adjustment, so the rule is predictable: trivial commands are still present, still searchable, just never above real work.
 

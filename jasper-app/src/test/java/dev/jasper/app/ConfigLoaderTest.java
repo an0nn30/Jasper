@@ -254,17 +254,17 @@ class ConfigLoaderTest {
     }
 
     @Test void historyEnabledParsesAndRejectsNonBooleans() {
-        var off = parse("[history]\nenabled = false\n");
+        var off = parse("[palette.scopes.history]\nenabled = false\n");
         assertThat(off.rejected()).isFalse();
         assertThat(off.diagnostics()).isEmpty();
         assertThat(off.snapshot().historyEnabled()).isFalse();
         assertThat(ConfigSnapshot.defaults().historyEnabled()).isTrue();
-        var bad = parse("[history]\nenabled = \"yes\"\n");
+        var bad = parse("[palette.scopes.history]\nenabled = \"yes\"\n");
         assertThat(bad.rejected()).isTrue();
         assertThat(bad.snapshot().historyEnabled()).isTrue();
-        assertDiagnostic(bad, "history.enabled", 2, 1, ConfigDiagnostic.Severity.ERROR);
-        var unknown = parse("[history]\nshells = [\"zsh\"]\n");
-        assertDiagnostic(unknown, "history.shells", 2, 1, ConfigDiagnostic.Severity.WARNING);
+        assertDiagnostic(bad, "palette.scopes.history.enabled", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        var unknown = parse("[palette.scopes.history]\nshells = [\"zsh\"]\n");
+        assertDiagnostic(unknown, "palette.scopes.history.shells", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
 
     @Test void shellIntegrationParsesItsThreeChoicesAndRejectsOthers() {
@@ -294,20 +294,29 @@ class ConfigLoaderTest {
             .isEqualTo(ShellHistoryScope.DEFAULT_TRIVIAL)
             .contains("exit", "clear", "cd");
 
-        assertThat(parse("[history]\ntrivial_commands=['foo','BAR']\n").snapshot().trivialCommands())
+        assertThat(parse("[palette.scopes.history]\ntrivial_commands=['foo','BAR']\n").snapshot().trivialCommands())
             .as("the user's list replaces the default, normalized to lower case")
             .containsExactly("foo", "bar");
 
-        assertThat(parse("[history]\ntrivial_commands=[]\n").snapshot().trivialCommands())
+        assertThat(parse("[palette.scopes.history]\ntrivial_commands=[]\n").snapshot().trivialCommands())
             .as("an empty list turns de-ranking off").isEmpty();
 
         // An entry with whitespace could never match: only a command's first word is compared.
-        var spaced = parse("[history]\ntrivial_commands=['git status']\n");
+        var spaced = parse("[palette.scopes.history]\ntrivial_commands=['git status']\n");
         assertThat(spaced.snapshot().trivialCommands()).isEqualTo(ShellHistoryScope.DEFAULT_TRIVIAL);
         assertThat(spaced.diagnostics()).isNotEmpty();
 
-        var wrongType = parse("[history]\ntrivial_commands='exit'\n");
+        var wrongType = parse("[palette.scopes.history]\ntrivial_commands='exit'\n");
         assertThat(wrongType.snapshot().trivialCommands()).isEqualTo(ShellHistoryScope.DEFAULT_TRIVIAL);
         assertThat(wrongType.diagnostics()).isNotEmpty();
+    }
+
+    /** The scope settings moved under palette.scopes so other scopes can gain their own. */
+    @Test void historyScopeSettingsLiveUnderPaletteScopes() {
+        assertThat(parse("[palette.scopes.history]\nenabled=false\n").snapshot().historyEnabled()).isFalse();
+        // The old top-level table is no longer part of the schema and is reported, not silently kept.
+        var old = parse("[history]\nenabled=false\n");
+        assertThat(old.snapshot().historyEnabled()).as("the old key no longer applies").isTrue();
+        assertThat(old.diagnostics()).isNotEmpty();
     }
 }
