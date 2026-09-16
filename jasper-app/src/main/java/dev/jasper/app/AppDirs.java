@@ -19,6 +19,10 @@ record AppDirs(Path root, Path configFile, Path logs) {
         return root.resolve("snippets.toml");
     }
 
+    Path shellIntegration() {
+        return root.resolve("shell-integration");
+    }
+
     static AppDirs resolve(String osName, Map<String, String> env, Path home) {
         String os = osName.toLowerCase(Locale.ROOT);
         Path base;
