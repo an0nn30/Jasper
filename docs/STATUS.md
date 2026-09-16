@@ -1,53 +1,106 @@
 # Jasper — Status and Handoff
 
-**Shell integration scripts (2026-09-16):** On `claude/shell-integration` in
-`.worktrees/shell-integration` (from main `27999fe`), Jasper ships and
-auto-loads its own zsh, bash and fish integration scripts instead of relying
-on the user's own shell configuration. `ShellIntegrationScripts.install`
-extracts `jasper.zsh`/`jasper.bash`/`jasper.fish` plus their per-shell
-wrapper files (zsh `ZDOTDIR` wrappers, `bash/rc.bash`, the fish vendor
-snippet) to `shell-integration` under the application directory, writing only
-files whose content changed so upgrades replace stale copies in place. Each
-script emits OSC 7 on directory change, OSC 133 A/B/C/D with the exit status
-in D, and the exact command line just before C on Jasper's own OSC 1341
-channel; it guards on an interactive shell, `TERM_PROGRAM=Jasper` and an
-unset `JASPER_INTEGRATION_LOADED`, so a nested shell gets no marks unless it
-sources the script itself. `terminal.shell_integration` (`"auto"`/`"manual"`/
-`"off"`, default `"auto"`, new panes only) controls whether `LaunchSettings`
-injects the script for a launch whose resolved program is exactly `zsh`,
-`bash` or `fish` (zsh via `ZDOTDIR`, bash via `--rcfile` with `-l`/`--login`
-emulated through `JASPER_LOGIN_SHELL`, fish via `XDG_DATA_DIRS`) or only
-exports `JASPER_SHELL_INTEGRATION`; `TERM_PROGRAM=Jasper` is always set and a
+**Shell integration scripts (2026-09-16):** On `claude/shell-integration`
+(from main `27999fe`), Jasper ships and auto-loads its own zsh, bash and fish
+integration scripts instead of relying on the user's own shell configuration.
+`ShellIntegrationScripts.install` extracts `jasper.zsh`/`jasper.bash`/
+`jasper.fish` plus their per-shell wrapper files (zsh `ZDOTDIR` wrappers,
+`bash/rc.bash`, the fish vendor snippet) to `shell-integration` under the
+application directory, writing only files whose content changed so upgrades
+replace stale copies in place. Each script emits OSC 7 on directory change,
+OSC 133 A/B/C/D with the exit status in D, and the exact command line just
+before C on Jasper's own OSC 1341 channel; it guards on an interactive shell,
+`TERM_PROGRAM=Jasper` and an unset `JASPER_INTEGRATION_LOADED`, so a nested
+shell gets no marks unless it sources the script itself.
+`terminal.shell_integration` (`"auto"`/`"manual"`/`"off"`, default `"auto"`,
+new panes only) controls whether `LaunchSettings` injects the script for a
+launch whose resolved program is exactly `zsh`, `bash` or `fish` (zsh via
+`ZDOTDIR`, bash via `--rcfile` with `-l`/`--login` emulated through
+`JASPER_LOGIN_SHELL`, fish via `XDG_DATA_DIRS`) or only exports
+`JASPER_SHELL_INTEGRATION`; `TERM_PROGRAM=Jasper` is always set and a
 `[terminal.env]` override wins. `TerminalSession` learns the `cmd` payload
 (base64-decoded, preferred over the screen read) and a
 `shellIntegrationDetected()` flag that goes true at the first A mark; the
-status bar shows a filled dot after the shell name once detected and a
-hollow one otherwise, with matching tooltips. `Main` now extracts the
-scripts and passes the resulting directory into `JasperApplication` and
-`ShellLauncher` before the first window opens.
+status bar shows a filled dot after the shell name once detected and a hollow
+one otherwise, with matching tooltips. `Main` extracts the scripts and passes
+the resulting directory into `JasperApplication` and `ShellLauncher` before the
+first window opens.
 
-Deviations from the plan text, recorded in the plan and spec status banners:
-extraction runs on the main thread in `Main` before the application is
-created (a few small file writes), not on a configuration worker as the spec
-proposed; `jasper.bash` is 89 lines against the spec's "under about 80"
-guidance, accepted with a revised bash budget of "under about 100" because
-of the `DEBUG`-trap and `PROMPT_COMMAND` plumbing bash needs that zsh and
-fish do not. Known limitations surfaced by the real-shell tests (Task 2):
-a bash `DEBUG` trap the user installs after the first prompt displaces
-Jasper's own trap; the chained user trap then sees `$?`/`$_`/`BASH_COMMAND`
-from Jasper's wrapper function rather than from the user's own command;
-`jasper.fish` itself is untested on the dev Mac because fish is not
-installed there (covered by the user-run item below); fish 4 emits some
-marks itself, and Jasper deduplicates the resulting repeats. [Configuration
+**Whole-branch review and its fixes (2026-09-16):** Three reviewers covered the
+scripts, the launch/extraction Java and the receiving side plus tests and docs.
+No Critical findings; everything below was fixed on the branch under
+[plan](superpowers/plans/2026-09-16-jasper-shell-integration-review-fixes.md),
+each with a test that fails without the fix.
+
+*Scripts.* fish wrapped the prompt once at load with no marker check, and fish
+sources `vendor_conf.d` before `config.fish`, so starship, Tide or any
+hand-written `fish_prompt` replaced the wrapper for the session and the B mark
+was lost — the wrap now happens in the `fish_prompt` event with a marker check,
+like zsh and bash, and the invented `prompt_pwd` fallback is gone. `set -u`
+printed "unbound variable" on every new pane; a readonly `PS1` or
+`PROMPT_COMMAND` printed an error every prompt and aborted the hook; a command
+containing the substring `__jasper_` was dropped entirely; `printf`, `base64`
+and `tr` were callable as user functions. `rc.bash` sourced both
+`/etc/bash.bashrc` and `/etc/bashrc`; `.zshenv` left `ZDOTDIR` pointing at the
+wrapper directory for a top-level non-interactive zsh.
+
+*Launch and extraction.* `JASPER_*` is now scrubbed from the inherited
+environment — the scripts export `JASPER_INTEGRATION_LOADED` and return early on
+it, so a Jasper launched from an integrated pane (including `gradlew run`, the
+way this branch gets tested by hand) had integration silently off in every
+pane. bash injection is skipped when the user passed `--norc`, `--rcfile`,
+`--init-file` or any form of `-c`, because bash would ignore Jasper's rc file
+while `-l` had already been stripped, leaving a login shell with neither login
+emulation nor an rc file; `-l` is recognised in a short cluster and left alone
+past `--`; `--noprofile` no longer sets `JASPER_LOGIN_SHELL`; `XDG_DATA_DIRS`
+no longer accumulates. Extraction writes through a staged file and an atomic
+move, never through a symlink, owner-only.
+
+*Receiving side.* A repeated A flushed the cycle with no status, so fish 4 —
+the one shell with no automated coverage — lost the marker for every command.
+The `cmd` text survived D, RIS and the alternate-screen switch. The payload had
+no bound while `ShellHistoryParser` caps disk lines at 16 KiB. Invalid UTF-8
+was substituted to U+FFFD and reported as the command. Detection now notifies
+listeners: the A mark draws nothing, so the status dot previously updated only
+when the following prompt happened to trigger a repaint — it worked by luck,
+and the new `ConfiguredTerminalBehaviorTest` case fails without the fix. This
+one was not in any reviewer's report; writing the wiring test found it.
+
+*Behaviour change to review.* `HISTCONTROL=ignorespace` (or `ignoreboth`) is now
+honoured: a space-hidden command sends neither the `cmd` payload nor C, so it
+reaches neither shell history nor Jasper's. The reviewer raised this as a
+spec-level privacy question rather than a bug, and the previous behaviour was
+pinned by a passing test; that test is now inverted. Revert the `HISTCONTROL`
+case in `jasper.bash` if the original behaviour was intended.
+
+*Deliberately not done.* The status bar now draws a running/stopped dot and an
+integration dot side by side ("● zsh ○"), and `Segment.doLayout` clips the
+integration dot first at narrow widths. Both are visual judgements that cannot
+be verified headlessly and would churn the design render fixtures on a guess —
+left for the user's desktop pass.
+
+Deviations from the plan text: extraction runs on the **EDT** in `Main` before
+the first window is created (a few small file writes, measured at ~9 ms cold),
+not on a configuration worker as the spec proposed — the earlier STATUS wording
+said "main thread", which was wrong. The script line budget is now per-shell:
+`jasper.bash` is 109 lines against zsh's 57 and fish's 55, because only bash
+needs the `DEBUG`-trap plumbing, both `PROMPT_COMMAND` forms, the readonly
+guards and the `HISTCONTROL` check. Known limitations, all disclosed in the
+[configuration guide](configuration.md#shell-integration): a bash `DEBUG` trap
+the user installs after the first prompt displaces Jasper's; the chained user
+trap sees `$?`/`$_`/`BASH_COMMAND` from Jasper's wrapper; `jasper.fish` is still
+untested on the dev Mac because fish is not installed, though it now has a test
+that reports as a skip rather than being absent. [Configuration
 guide](configuration.md#shell-integration), [design
 spec](superpowers/specs/2026-09-16-jasper-shell-integration-design.md),
 [plan](superpowers/plans/2026-09-16-jasper-shell-integration.md). Fresh
-`./gradlew check --rerun-tasks`: jasper-app 482 tests passed; jasper-terminal
-305 tests, 304 passed and one existing font skip. Total 787 tests, 786
-passed, one skipped, zero failures/errors. Still user-run: each shell (zsh,
-bash, and fish if installed) on the real macOS desktop with the user's own
-dotfiles and prompt theme, confirming marks, the status-bar dot and that
-nested shells stay quiet. No GUI, merge or push.
+`./gradlew check --rerun-tasks`: jasper-app 498 tests, 497 passed and one fish
+skip; jasper-terminal 310 tests, 309 passed and one existing font skip. Total
+808 tests, 806 passed, two skipped, zero failures/errors. Still user-run: each
+shell (zsh, bash, and fish if installed) on the real macOS desktop with the
+user's own dotfiles and prompt theme, confirming marks, the status-bar dot and
+that nested shells stay quiet; plus a look at the two adjacent status-bar dots
+and at the status bar at a narrow window width. No GUI, merge or push.
 
 **Palette snippets (2026-09-16):** On `claude/snippets` in `.worktrees/snippets` (from
 main `b9efd41`), the command palette gains a third scope, `SnippetsScope` (id
