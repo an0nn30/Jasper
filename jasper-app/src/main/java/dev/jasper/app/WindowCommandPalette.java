@@ -10,6 +10,8 @@ import javax.swing.*;
 /** Window-local palette ownership: one active scope, the scope picker, validated dispatch and focus restore. */
 final class WindowCommandPalette implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(WindowCommandPalette.class.getName());
+    /** The card's top edge sits this fraction of the way down the terminal area. */
+    private static final int TOP_ANCHOR_DIVISOR = 5;
     private final WindowContent owner;
     private final ScopeRegistry scopes;
     private final String defaultScopeId;
@@ -316,8 +318,10 @@ final class WindowCommandPalette implements AutoCloseable {
         int width = Math.min(preferred.width, Math.max(0, available.width - 2 * insetX));
         int height = Math.min(preferred.height, Math.max(0, available.height - 2 * insetY));
         int x = terminal.x + (terminal.width - width) / 2;
-        // Anchor the card in the upper half while keeping clearance in small windows.
-        int y = terminal.y + terminal.height / 3 - height / 2;
+        // Anchor the card's TOP, never its centre: the input row is the first thing in the card, so
+        // a height that depends on the result count must grow downwards only. Anchoring the centre
+        // moved the input row every time a scope returned a different number of rows.
+        int y = terminal.y + terminal.height / TOP_ANCHOR_DIVISOR;
         x = Math.max(available.x + insetX, Math.min(x, available.x + available.width - insetX - width));
         y = Math.max(available.y + insetY, Math.min(y, available.y + available.height - insetY - height));
         return new Rectangle(x, y, width, height);

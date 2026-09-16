@@ -10,7 +10,7 @@ This user-requested design brings the palette forward from the Phase 1 spec's la
 
 ## Confirmed requirements
 
-- A floating, Spotlight-like text box matching Jasper's aesthetic, horizontally centered in the upper half of the terminal window (placement updated by the user on 2026-09-13).
+- A floating, Spotlight-like text box matching Jasper's aesthetic, horizontally centered in the upper half of the terminal window (placement updated by the user on 2026-09-13, and again on 2026-09-16: the input row keeps one fixed vertical position and the card grows downwards).
 - Default activation with Cmd+K on macOS and Ctrl+K elsewhere.
 - Commands register throughout the app and execute through the palette. Include toolbar capabilities, vertical/horizontal splits, new window and Settings.
 - Search shows at most five results, numbered 1–5.
@@ -40,7 +40,7 @@ This is internal application functionality, without a public binary compatibilit
 
 ## Placement and visual treatment
 
-Placement is horizontally centered across the selected tab's whole terminal pane area, across all splits, excluding title/tabs, toolbar and status bar. Following the user's 2026-09-13 adjustment, anchor the card's vertical center one-third of the way down that area, subject to the existing small-window clearance clamps. It does not anchor on the focused split or physical display. Recompute placement on resize and as its result count changes.
+Placement is horizontally centered across the selected tab's whole terminal pane area, across all splits, excluding title/tabs, toolbar and status bar. Following the user's 2026-09-16 adjustment, anchor the card's top edge one-fifth of the way down that area and let the card grow downwards, so the input row sits at the same height in every scope no matter how many rows the results have; this replaces the 2026-09-13 vertical-center anchor, which moved the input row with the result count. The existing small-window clearance clamps still apply, and only they may move the top edge. It does not anchor on the focused split or physical display. Recompute placement on resize and as its result count changes.
 
 Use a lightweight Swing overlay owned by `WindowContent`, above existing content, without reparenting terminal views or changing layout/PTY dimensions. Do not create a separate native window. Outside clicks dismiss and are consumed, preventing click-through into terminal applications.
 

@@ -57,14 +57,36 @@ line. Attaching to a tmux server started before Jasper gets nothing either.
 
 Fresh `./gradlew check --rerun-tasks`: jasper-app 523 tests, 522 passed and one
 fish skip; jasper-terminal 316 tests, 315 passed and one existing font skip.
-Total 839 tests, 837 passed, two skipped, zero failures/errors. [Configuration
+Total 839 tests, 837 passed, two skipped, zero failures/errors; after merging
+`main`, which had brought in the palette input-row anchor and its three tests,
+842 tests, 840 passed, two skipped, zero failures. [Configuration
 guide](configuration.md#shell-history), [palette
 guide](command-palette.md#shell-history), [design
 spec](superpowers/specs/2026-09-16-jasper-history-ranking-design.md),
 [plan](superpowers/plans/2026-09-16-jasper-history-ranking.md). Still user-run:
 the History palette inside tmux on the real desktop, confirming a just-run
 command appears within about a second and that bash entries interleave sensibly.
-No GUI, merge or push.
+Merged to `main` and pushed. No GUI.
+
+**Palette input-row anchor (2026-09-16):** On `claude/command-palette-y-axis`
+(from `18fd513`), the palette card is anchored by its **top** edge, one-fifth of
+the way down the terminal area, instead of by its vertical center one-third
+down. The old anchor subtracted half the card height from the top, so every
+change in result count — and therefore every scope, since Commands, History and
+Snippets return different numbers of rows — put the text box at a different
+height; the user reported the jump from screenshots. Only the small-window
+clearance clamp may still move the top edge, and only when the card would not
+otherwise fit. One-fifth keeps the default Commands card within a few pixels of
+its 2026-09-13 position. `WindowCommandPalette.positioned` carries the change;
+three tests cover it (a pure geometry check across four card heights, the
+clamped small-window case, and a real scope switch plus two row-count changes
+asserting the card's `y` never moves while its height does) and all three fail
+against the old formula. `./gradlew check`: 821 tests, 0 failures, 2 pre-existing
+skips (`FontSetTest.fallsBackWhenPrimaryCannotDisplay`, and the fish script test
+that needs fish installed). The binding spec, the scopes spec, the palette plan
+and `docs/design/command-palette/README.md` record the new anchor, and the
+24-image render matrix plus the 2× UI-scale artifact were regenerated headlessly
+with `commandPalettePreview`. Native GUI confirmation remains user-run.
 
 **Shell integration scripts (2026-09-16):** On `claude/shell-integration`
 (from main `27999fe`), Jasper ships and auto-loads its own zsh, bash and fish

@@ -20,7 +20,9 @@
 
 **Final review correction:** The original `setResults` recipe reset or preserved selection without revealing it in a previously scrolled short card. `28a7ff0` performs bounded scroll-pane/viewport layout using the updated result count, then reveals the selected row. Real query-reset, preserved-ID reorder and result-growth regressions failed before the fix and passed afterward (27 covering tests). Final full-check evidence is 365 app tests and 296 terminal tests, including one existing font skip. Scoped review approved; no findings remain open.
 
-**2026-09-13 placement follow-up:** The user requested the upper half instead of the vertical center. The current implementation targets the card's center at one-third of the terminal area's height while preserving horizontal centering and small-window clamps; this supersedes the original Task 4 Y-coordinate recipe below.
+**2026-09-13 placement follow-up:** The user requested the upper half instead of the vertical center. The implementation targeted the card's center at one-third of the terminal area's height while preserving horizontal centering and small-window clamps; this superseded the original Task 4 Y-coordinate recipe below.
+
+**2026-09-16 placement follow-up:** Anchoring the center moved the input row whenever the result count changed the card's height, so scopes disagreed about where the text box sat. The card's top is now anchored one-fifth down the terminal area and the card grows downwards; horizontal centering and the small-window clamps are unchanged.
 
 ## Global Constraints
 
