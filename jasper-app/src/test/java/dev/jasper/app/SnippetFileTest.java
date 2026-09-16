@@ -75,6 +75,6 @@ class SnippetFileTest {
         String fresh = SnippetFile.append("", new Snippet("First", "ls", List.of()));
         assertThat(fresh).startsWith(SnippetFile.HEADER);
         assertThat(SnippetFile.parse(fresh).snippets()).extracting(Snippet::name).containsExactly("First");
-        assertThat(SnippetFile.tomlString("a\nb")).isEqualTo("\"a\\nb\\u0001\"");
+        assertThat(SnippetFile.tomlString("a\nb\u0001")).isEqualTo("\"a\\nb\\u0001\"");
     }
 }
