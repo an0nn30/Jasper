@@ -1,6 +1,6 @@
 # Jasper snippets — design
 
-**Status:** Approved in discussion by the user on 2026-09-15; awaiting the user's review of this written spec before an implementation plan is written.
+**Status:** Implemented on `claude/snippets` in `.worktrees/snippets`, commits `d80d1b0..bb06700` plus the Task 6 documentation commit that records this status. Fresh `./gradlew check --rerun-tasks`: 767 tests, 766 passed, one existing font skip, zero failures/errors. No GUI, merge or push.
 
 **Development branch:** `claude/snippets` in `.worktrees/snippets`, from main `b9efd41`.
 

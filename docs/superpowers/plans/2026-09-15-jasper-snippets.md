@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-15-jasper-snippets-design.md` (approved 2026-09-15).
 
-**Status:** Not started. Development branch `claude/snippets` in `.worktrees/snippets` from main `b9efd41`.
+**Status:** Complete through Task 6. Development branch `claude/snippets` in `.worktrees/snippets` from main `b9efd41`, commits `d80d1b0..bb06700` plus the Task 6 documentation commit. Fresh `./gradlew check --rerun-tasks`: 767 tests, 766 passed, one existing font skip, zero failures/errors. No GUI, merge or push.
 
 **Recorded deviation from the spec text:** the spec says `PaletteScope.execute` "may return a `PaletteStep`". This plan realises that as a separate default method `PaletteScope.step(row, verb, context)` that the controller consults before hiding the palette; `execute` stays `void` and is only called when `step` returns null. The behaviour is identical and the Commands dispatch order (hide, restore focus, then dispatch) is untouched. Record any further deviation in this banner and in `docs/STATUS.md`.
 

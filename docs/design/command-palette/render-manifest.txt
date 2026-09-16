@@ -31,3 +31,15 @@ scope-picker-dark-900x600-1x.png
 scope-picker-dark-900x600-2x.png
 scope-picker-light-900x600-1x.png
 scope-picker-light-900x600-2x.png
+snippets-dark-900x600-1x.png
+snippets-dark-900x600-2x.png
+snippets-light-900x600-1x.png
+snippets-light-900x600-2x.png
+snippet-fill-in-dark-900x600-1x.png
+snippet-fill-in-dark-900x600-2x.png
+snippet-fill-in-light-900x600-1x.png
+snippet-fill-in-light-900x600-2x.png
+history-save-name-dark-900x600-1x.png
+history-save-name-dark-900x600-2x.png
+history-save-name-light-900x600-1x.png
+history-save-name-light-900x600-2x.png

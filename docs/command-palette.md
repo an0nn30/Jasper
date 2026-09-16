@@ -3,20 +3,31 @@
 The palette holds more than one kind of searchable thing, called a **scope**.
 Cmd+K on macOS or Ctrl+K on Windows and Linux (or View → Command Palette) always
 opens the **Commands** scope; Cmd+R on macOS or Ctrl+Shift+R elsewhere always
-opens the **History** scope. Pressing the shortcut for the scope that is already
+opens the **History** scope; Cmd+J on macOS or Ctrl+Shift+J elsewhere always
+opens the **Snippets** scope. Pressing the shortcut for the scope that is already
 active dismisses the palette instead of reopening it. Each scope shows a chip —
 its icon and label — at the left of the input; type `>` at the start of an empty
-query to open the scope picker, use Tab or Enter to switch to the highlighted
-scope, and Escape to leave the picker and keep the previous scope. Clicking the
-chip opens the picker too.
+query to open the scope picker (or type `>snip` to jump straight to Snippets), use
+Tab or Enter to switch to the highlighted scope, and Escape to leave the picker
+and keep the previous scope. Clicking the chip opens the picker too.
 
-Within a scope, Enter runs the first verb and Cmd+Enter (Ctrl+Enter elsewhere)
-runs the second verb, shown as a footer hint whenever a scope has more than one
-verb. Commands has one verb, Run, so its footer stays hidden, as before. History
-has two: Enter pastes, Cmd+Enter pastes and runs. Escape, the active scope's own
-opening shortcut again, or an outside click closes the palette. Use Up/Down and
-Enter, or Cmd+1–5 / Ctrl+1–5 to act on a numbered result; plain digits are search
-text.
+Within a scope, Enter runs the first verb, Cmd+Enter (Ctrl+Enter elsewhere) runs
+the second verb, and Shift+Enter runs the third verb where a scope has one; all
+three are shown as a footer hint whenever a scope has more than one verb.
+Commands has one verb, Run, so its footer stays hidden, as before. History has
+three: Enter pastes, Cmd+Enter pastes and runs, Shift+Enter opens a step to save
+the selected command as a snippet. Snippets also has three: Enter pastes,
+Cmd+Enter pastes and runs, Shift+Enter opens `snippets.toml` in the OS editor.
+Escape, the active scope's own opening shortcut again, or an outside click closes
+the palette (Escape first leaves an open step, keeping the list underneath). Use
+Up/Down and Enter, or Cmd+1–5 / Ctrl+1–5 to act on a numbered result; plain
+digits are search text.
+
+| Scope | Enter | Cmd/Ctrl+Enter | Shift+Enter |
+|---|---|---|---|
+| Commands | Run | | |
+| History | Paste | Paste and run | Save as snippet… |
+| Snippets | Paste | Paste and run | Edit file |
 
 ## Commands
 
@@ -93,6 +104,57 @@ Set `history.enabled = false` under `[history]` to remove the History scope
 entirely: it disappears from the scope picker and its shortcut does nothing.
 See [configuration](configuration.md#shell-history).
 
+## Snippets
+
+Snippets are named commands you save yourself: shell aliases the traditional way don't fit,
+since Jasper ships no shell-integration script and each shell spells aliases differently.
+`snippets.toml` lives in Jasper's application directory, beside `command-history.toml`,
+independent of `--config`; it is never read or written by the configuration loader. Jasper
+only ever appends new `[[snippet]]` tables, so hand edits and comments survive:
+
+```toml
+# Jasper snippets. Edit freely; Jasper only ever appends new [[snippet]] tables.
+
+[[snippet]]
+name = "Rebase onto main"
+command = "git fetch origin && git rebase origin/{{branch}}"
+keywords = ["git", "rebase"]
+```
+
+`name` is required, nonblank, at most 128 characters and unique ignoring case and surrounding
+whitespace. `command` is required, nonblank, may be multi-line, and at most 16 KiB. `keywords`
+is an optional array of nonblank strings that also rank in search. File order is the order the
+empty query shows.
+
+Placeholders are `{{identifier}}` tokens, where `identifier` matches
+`[A-Za-z_][A-Za-z0-9_]*`; a backslash before the opening braces, `\{{`, produces a literal
+`{{` instead. A snippet with placeholders opens a fill-in step before Paste or
+Paste-and-run: one labelled field per distinct placeholder, in the order it first appears in
+the command, the first field focused. Tab and Shift+Tab move between fields and wrap; each
+field is prefilled with the value you last typed for that placeholder name in this process.
+Enter substitutes every occurrence and runs the verb you chose; Escape returns to the list
+with your search intact. A snippet without placeholders skips the step entirely.
+
+Enter pastes the filled-in command into the focused pane; Cmd+Enter (Ctrl+Enter elsewhere)
+pastes and runs it, the same as a History paste. Shift+Enter is Edit file: it creates
+`snippets.toml` with its header comment if missing, then opens it in the OS editor, the same
+mechanism Settings uses for `config.toml` — there is no in-app editor.
+
+From the History scope, Shift+Enter is "Save as snippet…": it opens a one-field name step
+prefilled with the command's first word and its first argument (for example `git rebase`),
+with the command itself as the step's heading. Enter appends the snippet to `snippets.toml`;
+on success the palette dismisses and reopens in Snippets with the new row selected. A name
+that already exists (case-insensitive) is refused with "A snippet named … exists" shown under
+the field, keeping focus so you can pick a different name; a write failure shows its message
+the same way. Escape returns to the History list.
+
+Snippets rows are capped at `palette.max_results` like every other scope (see
+[configuration](configuration.md#palette)), with no scrolling; each row's tag shows its
+placeholder count ("1 field", "2 fields") when nonzero, and the command itself shows as a
+muted detail line under the name. If `snippets.toml` fails to parse, the last good snapshot
+keeps working but the scope's list also shows an error row, "Snippets file has errors", until
+you fix the file and Reload Config.
+
 ## Scopes for features
 
 `PaletteScope` is the internal seam behind every scope; it is not a public
@@ -127,7 +189,7 @@ var registration = owner.scopes().register(new FakeFeatureScope());
 This is the seam a future plugin API would expose unchanged: a scope sees only
 its own query, produces only data rows, and receives no `WindowContent`,
 `TerminalPane` or JediTerm type. No plugin loading or discovery exists yet; this
-deliverable ships exactly two scopes, Commands and History.
+deliverable ships exactly three scopes: Commands, History and Snippets.
 
 The Commands scope itself wraps the existing command registry, which stays the
 same internal facility it always was. A feature that already belongs to a
@@ -178,6 +240,8 @@ locking.
 
 The [actual Swing renders, pure-search and shell-history-search measurements, and
 reproduction commands](design/command-palette/README.md) cover the headless
-verification, including scopes, the picker and History rows. Native focus, input
-methods, accessibility, chip rendering on the real title-bar theme, and
-physical-display placement remain in the [manual acceptance checklist](superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md).
+verification, including scopes, the picker, History rows, the Snippets list and
+its fill-in and name steps. Native focus, input methods, accessibility, chip
+rendering on the real title-bar theme, physical-display placement and editing
+`snippets.toml` in the real OS editor remain in the [manual acceptance
+checklist](superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md).

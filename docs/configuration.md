@@ -126,6 +126,15 @@ override now collides with the new `history_palette` default and is rejected, re
 your keybinding overrides to their defaults until you either set `history_palette = "none"` or
 rebind the colliding action.
 
+### Snippets
+
+The Snippets scope (Cmd+J on macOS, Ctrl+Shift+J elsewhere; `>snip` from the picker) reads
+and appends `snippets.toml`, which sits beside `config.toml` in Jasper's application
+directory. It is a separate file: it is not part of the configuration file, is never read or
+written by the configuration loader, and has no enable flag — an empty or missing file is an
+empty scope. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
+name steps.
+
 ### Live settings and temporary choices
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
@@ -185,7 +194,7 @@ A window captures its grid defaults once. Later reloads do not resize or repack 
 
 ## Shortcuts
 
-The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `clear_scrollback`, `open_settings` and `reload_config`.
+The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `open_settings` and `reload_config`.
 
 On macOS, `cmd` means Command and `alt`/`option` means Option. For example:
 
@@ -217,7 +226,8 @@ Each shortcut must be unique. Invalid or colliding shortcut overrides restore th
 
 The [command palette](command-palette.md) opens with Cmd+K on macOS and Ctrl+K on
 Windows/Linux. Clear Scrollback uses Cmd+Shift+K on macOS and Ctrl+Shift+K
-elsewhere. Search Shell History uses Cmd+R on macOS and Ctrl+Shift+R elsewhere. While
+elsewhere. Search Shell History uses Cmd+R on macOS and Ctrl+Shift+R elsewhere.
+Snippets uses Cmd+J on macOS and Ctrl+Shift+J elsewhere. While
 the palette is open, Cmd/Ctrl+1–5 runs the corresponding visible result; plain digits
 continue to edit the search field.
 
@@ -240,6 +250,11 @@ A prior override that already used Cmd+R (macOS) or Ctrl+Shift+R (elsewhere) for
 action now collides with the `history_palette` default; a colliding override is rejected and
 all of your keybinding overrides revert to their defaults until you set
 `history_palette = "none"` or rebind the colliding action.
+
+A prior override that already used Cmd+J (macOS) or Ctrl+Shift+J (elsewhere) for another
+action now collides with the `snippets_palette` default in exactly the same way; a
+colliding override is rejected and all of your keybinding overrides revert to their
+defaults until you set `snippets_palette = "none"` or rebind the colliding action.
 
 Outside macOS, the compatibility token `cmd` still means Ctrl+Shift; it was not
 redefined for the palette. Use literal `ctrl+k` or `ctrl+p` when that is the

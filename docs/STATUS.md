@@ -1,5 +1,44 @@
 # Jasper — Status and Handoff
 
+**Palette snippets (2026-09-16):** On `claude/snippets` in `.worktrees/snippets` (from
+main `b9efd41`), the command palette gains a third scope, `SnippetsScope` (id
+`jasper.snippets`, bookmark icon, aliases `snip`/`snippets`), backed by an
+application-wide `SnippetStore` over `snippets.toml` (one serial worker, EDT
+snapshots, append-only writes, so hand edits and comments survive). Snippets are
+named commands with `{{placeholder}}` tokens (`\{{` for a literal); Paste and
+Paste-and-run on a snippet with placeholders open a fill-in step — one field per
+placeholder in first-appearance order, Tab/Shift+Tab wrap, values remembered per
+placeholder for the process — and Shift+Enter is "Edit file" (creates
+`snippets.toml` with its header if missing, then opens it in the OS editor).
+From History, Shift+Enter is "Save as snippet…": a one-field name step prefilled
+with the command's first word and argument, appending to the store and, on
+success, reopening Snippets with the new row selected; a duplicate name or a
+write failure keeps the step open with an error message. Cmd+J/Ctrl+Shift+J
+always opens Snippets (a prior override collides with the new `snippets_palette`
+default exactly as `history_palette` does). Deviations from the plan text,
+recorded in the plan and spec status banners: scopes expose steps through
+`PaletteScope.step(row, verb, context)`, consulted before `execute`, rather than
+`execute` itself returning a step as the spec's prose suggested; `available`
+gained a verb parameter so History refuses Paste on a dead pane but still allows
+Save; the controller ignores Enter while a step's asynchronous `complete()` is
+pending (a `completing` guard) so two quick presses cannot double-submit; the
+History duplicate-name message names the *existing* snippet's own canonical
+name, not the typed one; and `WindowContent` now assigns its snippet store
+before building the History scope, fixing a constructor-order bug in passing.
+
+Task 6 extended the [headless render matrix](design/command-palette/README.md)
+with three new states — the Snippets list, the `Deploy` fill-in step and the
+History save-name step — rendered from a six-snippet fixture file (two of them
+with placeholders) written into a temporary directory, all inspected in dark and
+light. [Guide](command-palette.md#snippets),
+[design spec](superpowers/specs/2026-09-15-jasper-snippets-design.md),
+[plan](superpowers/plans/2026-09-15-jasper-snippets.md). Fresh
+`./gradlew check --rerun-tasks`: jasper-app 464 tests passed; jasper-terminal 303
+tests, 302 passed and one existing font skip. Total 767 tests, 766 passed, one
+skipped, zero failures/errors. Still user-run: Cmd+J on a real macOS desktop,
+editing `snippets.toml` in the real OS editor, and the fill-in step with an input
+method active. No GUI, merge or push.
+
 **Palette result cap (2026-09-15):** `palette.max_results` (1–20, default 5, live) is now the
 hard cap every scope returns: `PaletteContext` carries it to `CommandsScope` (through a
 `CommandSearch.find` limit) and `ShellHistoryScope` (which no longer holds fifty rows and

@@ -29,6 +29,9 @@ the rest carry no directory. Every third synthetic entry is bash and the rest ar
 | History, most recent (15 entries, the newest 5 shown) | [1×](history-recent-dark-900x600-1x.png) / [2×](history-recent-dark-900x600-2x.png) | [1×](history-recent-light-900x600-1x.png) / [2×](history-recent-light-900x600-2x.png) |
 | History, `git` query, two results | [1×](history-query-dark-900x600-1x.png) / [2×](history-query-dark-900x600-2x.png) | [1×](history-query-light-900x600-1x.png) / [2×](history-query-light-900x600-2x.png) |
 | Scope picker (`>`) | [1×](scope-picker-dark-900x600-1x.png) / [2×](scope-picker-dark-900x600-2x.png) | [1×](scope-picker-light-900x600-1x.png) / [2×](scope-picker-light-900x600-2x.png) |
+| Snippets, five of six shown | [1×](snippets-dark-900x600-1x.png) / [2×](snippets-dark-900x600-2x.png) | [1×](snippets-light-900x600-1x.png) / [2×](snippets-light-900x600-2x.png) |
+| Snippet fill-in step (`Deploy`, two fields) | [1×](snippet-fill-in-dark-900x600-1x.png) / [2×](snippet-fill-in-dark-900x600-2x.png) | [1×](snippet-fill-in-light-900x600-1x.png) / [2×](snippet-fill-in-light-900x600-2x.png) |
+| History save-name step (`npm run dev`) | [1×](history-save-name-dark-900x600-1x.png) / [2×](history-save-name-dark-900x600-2x.png) | [1×](history-save-name-light-900x600-1x.png) / [2×](history-save-name-light-900x600-2x.png) |
 
 The 1×/2× labels above describe output pixels: both paint the same logical Swing
 geometry. A separate fresh JVM with `flatlaf.uiScale=2x` produced the
@@ -182,3 +185,39 @@ existing font skip. Total 739 tests, 738 passed, one skipped, zero
 failures/errors — the same total as before this task, since it adds no new
 `@Test` methods. Source hygiene over both modules and `git diff --check` passed.
 No GUI, merge or push was performed.
+
+## Palette snippets — 2026-09-16
+
+Task 6 of the [palette snippets plan](../../superpowers/plans/2026-09-15-jasper-snippets.md)
+extended this matrix with the three Snippets/save-step states above. `Fixture.create`
+writes a `snippets.toml` with six snippets into a temporary directory
+(`Files.createTempDirectory("jasper-preview-snippets")`, deleted in `close()`), two
+of them carrying placeholders (`Rebase onto main` has `{{branch}}`; `Deploy` has
+`{{env}}` and `{{tag}}`), and opens a `SnippetStore` over it with the same inline
+worker/delivery executor used for the synthetic history so every snippet is indexed
+before the palette opens. The store is the twelfth `WindowContent` constructor
+argument, matching the production wiring.
+
+`snippets` shows the Snippets scope with its bookmark chip, the five-of-six row cap
+(`palette.max_results`), an `n field`/`n fields` tag on each row with placeholders,
+the command text as a muted detail line under each name, and the three-verb footer
+"⏎ Paste  ⌘⏎ Paste and run  ⇧⏎ Edit file". `snippet-fill-in` selects the `Deploy` row with
+`card.selectRow(SnippetsScope.rowId("Deploy"))` and presses Enter
+(`owner.commandPalette().enterPressed(0)`); the card shows the snippet name
+("Deploy") as its heading and two labelled fields, `env` and `tag`, in the order
+the placeholders first appear in the command. `history-save-name` opens the
+History scope and presses Shift+Enter's verb (`owner.commandPalette().enterPressed(2)`)
+on the default-selected newest entry, `npm run dev`; the card heads with "Save as
+snippet: npm run dev" and one field, `Name`, prefilled `npm run` by
+`ShellHistoryScope.suggestedName`. All twelve new PNGs (three scenarios, two
+themes, two pixel scales) were inspected with the image tool and match this
+description; the existing seven scenarios were re-rendered by the same run and
+were spot-checked for no unintended change, including the scope picker, which now
+lists three rows (Commands, History, Snippets) instead of two.
+
+Fresh `./gradlew check --rerun-tasks` executed all eight tasks: jasper-app 464
+tests passed; jasper-terminal 303 tests, 302 passed and one existing font skip.
+Total 767 tests, 766 passed, one skipped, zero failures/errors — the same total
+as before this task, since it adds no new `@Test` methods (`CommandPalettePreview`
+is an opt-in `main`, not a JUnit test). Source hygiene over `jasper-app/src` and
+`git diff --check` passed. No GUI, merge or push was performed.
