@@ -647,11 +647,13 @@ public final class TerminalSession implements AutoCloseable {
                             shellIntegrationDetected = true;
                             listeners.forEach(Listener::screenChanged);
                         }
-                        if (recordPrompt()) {
-                            flushPendingCommand(OptionalInt.empty());
-                            commandStartRow = -1;
-                            pendingCommandText = null;
-                        }
+                        // Only the flush is conditional. A prompt never sits inside a cycle, so a
+                        // half-started capture and a payload no C consumed are dropped either way;
+                        // a prompt redrawn in place (zle reset-prompt) repeats the row and would
+                        // otherwise leave both behind for the next C to pick up.
+                        if (recordPrompt()) flushPendingCommand(OptionalInt.empty());
+                        commandStartRow = -1;
+                        pendingCommandText = null;
                     }
                     case "B" -> markCommandStart();
                     case "C" -> captureCommand();

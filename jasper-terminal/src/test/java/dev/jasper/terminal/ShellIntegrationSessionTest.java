@@ -218,7 +218,7 @@ class ShellIntegrationSessionTest {
         connector.feed("\033]133;A\007$ \033]133;B\007\033]1341;jasper;cmd;ZmFsc2U=\007\033]133;C\007");
         connector.feed("\033]133;A\007\033]133;A\007\033]133;D;1\007");
 
-        Await.until(() -> !captured.isEmpty(), "command reported");
+        Await.until(() -> captured.size() == 1, "one captured command");
         assertThat(captured).containsExactly("false");
         assertThat(statuses).containsExactly(OptionalInt.of(1));
     }
@@ -228,7 +228,7 @@ class ShellIntegrationSessionTest {
         connector.feed("\033]1341;jasper;cmd;U1RBTEU=\007\033]133;D;0\007");
         connector.feed("\033]133;B\007typed\033]133;C\007\033]133;D;0\007");
 
-        Await.until(() -> !captured.isEmpty(), "command reported");
+        Await.until(() -> captured.size() == 1, "one captured command");
         assertThat(captured).containsExactly("typed");
     }
 
@@ -237,7 +237,7 @@ class ShellIntegrationSessionTest {
         connector.feed("\033]1341;jasper;cmd;QkVGT1JF\007\033c");
         connector.feed("\033]133;B\007typed\033]133;C\007\033]133;D;0\007");
 
-        Await.until(() -> !captured.isEmpty(), "command reported");
+        Await.until(() -> captured.size() == 1, "one captured command");
         assertThat(captured).containsExactly("typed");
     }
 
@@ -247,7 +247,7 @@ class ShellIntegrationSessionTest {
         connector.feed("\033]133;A\007$ \033]133;B\007typed\033]1341;jasper;cmd;" + huge
             + "\007\033]133;C\007\033]133;D;0\007");
 
-        Await.until(() -> !captured.isEmpty(), "command reported");
+        Await.until(() -> captured.size() == 1, "one captured command");
         assertThat(captured).containsExactly("typed");
     }
 
@@ -257,7 +257,35 @@ class ShellIntegrationSessionTest {
         connector.feed("\033]133;A\007$ \033]133;B\007typed\033]1341;jasper;cmd;" + invalid
             + "\007\033]133;C\007\033]133;D;0\007");
 
-        Await.until(() -> !captured.isEmpty(), "command reported");
+        Await.until(() -> captured.size() == 1, "one captured command");
+        assertThat(captured).containsExactly("typed");
+    }
+
+    /** A prompt never sits inside a cycle, even when it repeats the row Jasper already marked. */
+    @Test void aRepeatedPromptMarkStillDiscardsAHalfStartedCapture() throws Exception {
+        listenForCommands();
+        connector.feed("\033]133;A\007$ \033]133;B\007typed");
+        connector.feed("\r\033]133;A\007$ \033]133;C\007\033]133;D;0\007");
+
+        Await.until(() -> session.promptRows().size() == 1, "the redrawn prompt did not add a row");
+        assertThat(captured).isEmpty();
+    }
+
+    @Test void aRepeatedPromptMarkStillDiscardsAnUnusedCommandText() throws Exception {
+        listenForCommands();
+        connector.feed("\033]133;A\007$ \033]1341;jasper;cmd;U1RBTEU=\007");
+        connector.feed("\r\033]133;A\007$ \033]133;B\007typed\033]133;C\007\033]133;D;0\007");
+
+        Await.until(() -> captured.size() == 1, "one captured command");
+        assertThat(captured).containsExactly("typed");
+    }
+
+    @Test void theAlternateScreenDiscardsAnUnusedCommandText() throws Exception {
+        listenForCommands();
+        connector.feed("\033]1341;jasper;cmd;U1RBTEU=\007\033[?1049h");
+        connector.feed("\033]133;B\007typed\033]133;C\007\033]133;D;0\007");
+
+        Await.until(() -> captured.size() == 1, "one captured command");
         assertThat(captured).containsExactly("typed");
     }
 }

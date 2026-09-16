@@ -10,6 +10,29 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-16-jasper-shell-integration-design.md`
 
+**Status: complete.** All nine tasks executed on `claude/shell-integration`.
+Deviations from the plan text, and what a second whole-branch review then found:
+
+- Tasks 1-3 landed as one commit rather than three, because all three edit the
+  same two test files and splitting the diff would have been artificial.
+- Task 7's per-file budget assertion had to change: `jasper.bash` reached 109
+  lines against a flat 90-line cap, so the budget is now per-shell (bash 115,
+  zsh and fish 90) and the spec sentence it derived from was amended too.
+- Task 8 dropped its `promptRows()` assertion: that accessor is package-private
+  in `dev.jasper.terminal`, and widening production API for a test would breach
+  the module's API discipline. Prompt rows stay covered inside that module.
+- **The second review found three regressions introduced by these fixes**, all
+  since fixed with their own tests: honouring `HISTCONTROL` suppressed repeated
+  commands under `ignoreboth` (Ubuntu's default) and every command when history
+  was disabled; and tightening the `A` arm moved `commandStartRow = -1` and the
+  payload clear behind the row check, reopening the stale-capture leak the same
+  round had closed. Only the flush belongs behind that check.
+- It also found the five wrapper files were never made unset-safe (the first
+  round fixed only the three main scripts), two `printf` calls in the bash
+  DEBUG trap were still bare, `-o`/`-O` option arguments ended the bash option
+  scan early, and the staged extraction path could itself be a symlink.
+
+
 ## Global Constraints
 
 - Java 25 on the **JetBrains Runtime**. Use `./gradlew`, never a system `gradle`.
@@ -42,7 +65,7 @@
 - Consumes: the existing `ShellRun` helpers and mark constants.
 - Produces: `ShellRun.interactive(String shell, String rcBody, String input)` returning a record with `output()` and `errors()` — Tasks 2 and 3 reuse it.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add a helper to `ShellRun` that writes `rcBody` into the temporary `HOME`'s rc file, launches the shell interactively through the same environment builder the class already uses, feeds `input` on stdin, and captures stdout and stderr separately. Then add to `ShellIntegrationScriptTest`:
 
@@ -77,12 +100,12 @@ Add a helper to `ShellRun` that writes `rcBody` into the temporary `HOME`'s rc f
     }
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellIntegrationScriptTest' --rerun-tasks`
 Expected: FAIL — `unbound variable` present, `readonly variable` present, no `CMD` for the `__jasper_probe` line, `U0VDUkVU` present.
 
-- [ ] **Step 3: Harden `jasper.zsh`**
+- [x] **Step 3: Harden `jasper.zsh`**
 
 Lines 4–5 become unset-safe:
 
@@ -107,7 +130,7 @@ The `PROMPT` assignment in `__jasper_precmd` checks writability, because assigni
 
 In `__jasper_preexec`, `base64` becomes `command base64` and `tr` becomes `command tr`.
 
-- [ ] **Step 4: Harden `jasper.bash`**
+- [x] **Step 4: Harden `jasper.bash`**
 
 Lines 4–5 become unset-safe the same way. `__jasper_osc` uses `builtin printf`, as do both `printf` calls in `__jasper_encode`. Add a writability helper that reads only the flag word, so a value containing the letter `r` is not mistaken for a readonly flag:
 
@@ -164,12 +187,12 @@ and in the `else` arm:
     __jasper_existing="$(IFS=';'; builtin printf '%s' "${PROMPT_COMMAND[*]-}")"
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellIntegrationScriptTest' --rerun-tasks`
 Expected: PASS, including every pre-existing test in the class.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add jasper-app/src/main/resources/dev/jasper/app/shell-integration/jasper.zsh \
@@ -189,7 +212,7 @@ git commit -m "fix: keep the shell scripts quiet under set -u, readonly prompts 
 
 The spec requires every script to check "for its own marker first so themes that rebuild the prompt are re-wrapped and never double-wrapped". fish wraps once at load with no marker check, and fish sources `vendor_conf.d` **before** `config.fish`, so any prompt defined there (starship, Tide, oh-my-fish, a hand-written `fish_prompt`) overwrites Jasper's wrapper for the life of the session.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
     @Test void fishReWrapsAPromptDefinedAfterTheIntegrationLoaded() throws Exception {
@@ -203,12 +226,12 @@ The spec requires every script to check "for its own marker first so themes that
 
 `ShellRun.interactiveFish` writes the body into `$HOME/.config/fish/config.fish` and launches fish with the `XDG_DATA_DIRS` mechanism `LaunchSettings` uses.
 
-- [ ] **Step 2: Run it and confirm the skip is reported**
+- [x] **Step 2: Run it and confirm the skip is reported**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellIntegrationScriptTest' --rerun-tasks`
 Expected: SKIPPED on this Mac (no fish). Read `jasper-app/build/test-results/test/TEST-dev.jasper.app.ShellIntegrationScriptTest.xml` and confirm `skipped="1"` — the branch currently has no fish test at all, so a reported skip is itself the deliverable.
 
-- [ ] **Step 3: Move the wrap into the prompt event**
+- [x] **Step 3: Move the wrap into the prompt event**
 
 Replace the load-time block (`if functions -q fish_prompt … end` through the `function fish_prompt … end` that follows it) with:
 
@@ -229,12 +252,12 @@ Replace the load-time block (`if functions -q fish_prompt … end` through the `
 
 and add `__jasper_wrap_prompt` as the last statement of `__jasper_precmd`, which runs on the `fish_prompt` event before the prompt function itself is called. The invented `printf '%s> ' (prompt_pwd)` fallback is deleted: fish autoloads its own default `fish_prompt`, so the branch was dead code that would silently rewrite the user's prompt.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellIntegrationScriptTest' --rerun-tasks`
 Expected: PASS or SKIP. Then confirm by inspection that `jasper.fish` contains no `prompt_pwd` and that `__jasper_wrap_prompt` is called from `__jasper_precmd`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add jasper-app/src/main/resources/dev/jasper/app/shell-integration/jasper.fish \
@@ -252,7 +275,7 @@ git commit -m "fix: re-wrap the fish prompt every cycle like zsh and bash"
 - Modify: `jasper-app/src/main/resources/dev/jasper/app/shell-integration/zsh/.zshenv`
 - Test: `jasper-app/src/test/java/dev/jasper/app/ShellIntegrationScriptTest.java`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
     @Test void aNonInteractiveZshLeavesZdotdirAlone() throws Exception {
@@ -263,11 +286,11 @@ git commit -m "fix: re-wrap the fish prompt every cycle like zsh and bash"
 
 `ShellRun.nonInteractiveZdotdir` runs `zsh -c 'printf %s "$ZDOTDIR"'` with the wrapper `ZDOTDIR` exactly as `LaunchSettings` sets it, and returns stdout.
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Expected: FAIL — returns the Jasper wrapper directory rather than an empty string.
 
-- [ ] **Step 3: Fix `.zshenv`**
+- [x] **Step 3: Fix `.zshenv`**
 
 Only hand `ZDOTDIR` back to the wrapper when more startup files actually follow:
 
@@ -280,7 +303,7 @@ else
 fi
 ```
 
-- [ ] **Step 4: Fix `rc.bash`**
+- [x] **Step 4: Fix `rc.bash`**
 
 The spec says "`/etc/bashrc` (or `/etc/bash.bashrc`)", but two unconditional `source` lines read both:
 
@@ -290,7 +313,7 @@ The spec says "`/etc/bashrc` (or `/etc/bash.bashrc`)", but two unconditional `so
     fi
 ```
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellIntegrationScriptTest' --rerun-tasks`
 Expected: PASS.
@@ -314,7 +337,7 @@ git commit -m "fix: source one system bashrc and leave ZDOTDIR alone for non-int
 **Interfaces:**
 - Produces: `LaunchSettings.resolve(ConfigSnapshot, String osName, Map<String,String> inherited, int columns, int lines, Path integrationDir)` — signature unchanged.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `resolveBash(List<String> args)` and `snapshotWith(String program, ShellIntegrationMode mode)` (plus an overload taking a `Map<String,String>` env overlay) helpers following the class's existing construction style, then:
 
@@ -365,12 +388,12 @@ Add `resolveBash(List<String> args)` and `snapshotWith(String program, ShellInte
     }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.LaunchSettingsTest' --rerun-tasks`
 Expected: FAIL on all six.
 
-- [ ] **Step 3: Scrub Jasper's markers and move the export before the overlay**
+- [x] **Step 3: Scrub Jasper's markers and move the export before the overlay**
 
 ```java
         environment.keySet().removeIf(name -> name.equals("TERM_PROGRAM") || name.equals("TERM_PROGRAM_VERSION")
@@ -396,7 +419,7 @@ The scrub matters because the scripts export `JASPER_INTEGRATION_LOADED=1` and g
         }
 ```
 
-- [ ] **Step 4: Make the bash arm option-aware**
+- [x] **Step 4: Make the bash arm option-aware**
 
 ```java
             case "bash" -> {
@@ -430,7 +453,7 @@ The scrub matters because the scripts export `JASPER_INTEGRATION_LOADED=1` and g
             }
 ```
 
-- [ ] **Step 5: Stop the fish data directory accumulating**
+- [x] **Step 5: Stop the fish data directory accumulating**
 
 ```java
             case "fish" -> {
@@ -444,7 +467,7 @@ The scrub matters because the scripts export `JASPER_INTEGRATION_LOADED=1` and g
 
 Add to `inject`'s javadoc that it mutates `command` in place and so needs a mutable list, and add a one-line comment in the `default ->` arm noting that Windows basenames (`bash.exe`) never match, which is intended.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.LaunchSettingsTest' --rerun-tasks`
 Expected: PASS, including every pre-existing test.
@@ -463,7 +486,7 @@ git commit -m "fix: scrub Jasper markers and respect the user's own bash startup
 - Modify: `jasper-app/src/main/java/dev/jasper/app/ShellIntegrationScripts.java`
 - Test: `jasper-app/src/test/java/dev/jasper/app/ShellIntegrationScriptsTest.java`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```java
     @Test void installReplacesASymlinkRatherThanWritingThroughIt() throws Exception {
@@ -497,12 +520,12 @@ git commit -m "fix: scrub Jasper markers and respect the user's own bash startup
     }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellIntegrationScriptsTest' --rerun-tasks`
 Expected: FAIL — the symlink test finds `outside.txt` overwritten; the permission test finds `rw-r--r--`.
 
-- [ ] **Step 3: Write atomically, never through a link, owner-only**
+- [x] **Step 3: Write atomically, never through a link, owner-only**
 
 ```java
     /** Writes each bundled file whose on-disk content differs; unchanged files keep their timestamps. */
@@ -539,7 +562,7 @@ Expected: FAIL — the symlink test finds `outside.txt` overwritten; the permiss
     }
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellIntegrationScriptsTest' --rerun-tasks`
 Expected: PASS.
@@ -561,7 +584,7 @@ git commit -m "fix: extract the integration scripts atomically, owner-only, neve
 **Interfaces:**
 - Produces: `TerminalSession.shellIntegrationDetected()` — `boolean`, signature unchanged. `recordPrompt()` changes from `void` to `boolean` and is called only from the `A` arm.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```java
     @Test void aRepeatedPromptMarkDoesNotStealTheExitStatus() throws Exception {
@@ -613,12 +636,12 @@ git commit -m "fix: extract the integration scripts atomically, owner-only, neve
     }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `./gradlew :jasper-terminal:test --tests 'dev.jasper.terminal.ShellIntegrationSessionTest' --rerun-tasks`
 Expected: FAIL — the status is `OptionalInt.empty`, `STALE` and `BEFORE` are captured, and the huge and invalid payloads are delivered instead of the screen text.
 
-- [ ] **Step 3: Make `recordPrompt` report whether the prompt is new**
+- [x] **Step 3: Make `recordPrompt` report whether the prompt is new**
 
 ```java
     /** Records the prompt row; false when this A repeats the row Jasper already marked. */
@@ -650,11 +673,11 @@ Rewrite the `A` arm so a shell that emits its own `A` (fish 4) cannot flush the 
 
 If `shellIntegrationDetected = true` currently lives inside `recordPrompt`, move it to the `A` arm as shown, so a repeated `A` still counts as detection.
 
-- [ ] **Step 4: Stop the command text outliving its cycle**
+- [x] **Step 4: Stop the command text outliving its cycle**
 
 Add `pendingCommandText = null;` as the first statement of `flushPendingCommand`, and to both reset paths beside the existing `absoluteRowEpoch` / `promptRows` handling — the `historyCleared()` callback and the alternate-buffer consumer passed to `SessionDisplay`.
 
-- [ ] **Step 5: Bound and strictly decode the payload**
+- [x] **Step 5: Bound and strictly decode the payload**
 
 ```java
     /** Longer than this is not a command line; the history index caps its own lines the same way. */
@@ -684,7 +707,7 @@ Add `pendingCommandText = null;` as the first statement of `flushPendingCommand`
 
 Move the `shellIntegrationDetected` field declaration above the `// Reader thread only:` comment, beside the other `volatile` fields — it is read from the EDT.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: `./gradlew :jasper-terminal:test --rerun-tasks`
 Expected: PASS, every class.
@@ -706,7 +729,7 @@ git commit -m "fix: keep the exit status through a repeated prompt mark and boun
 
 The branch's only status-bar test calls `setMetadata` directly, so `WindowContent`'s call site and `TerminalPane.shellIntegrationDetected()` could both be deleted and the suite would stay green. Both tooltip strings the spec names are asserted nowhere.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```java
     @Test void theIntegrationDotCarriesItsMeaningForToolTipsAndScreenReaders() {
@@ -733,12 +756,12 @@ and, in `ConfiguredTerminalBehaviorTest`, the wiring assertion that fails if `Wi
 
 Extend the controlled `/bin/sh` fixture in that class's `start()` with a `mark) printf '\033]133;A\007' ;;` case, matching the existing `bell)` case, rather than adding production API for the test.
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.MockUiTest' --tests 'dev.jasper.app.ConfiguredTerminalBehaviorTest' --rerun-tasks`
 Expected: FAIL — the accessible description holds the bare glyph, and the status text never gains the filled dot.
 
-- [ ] **Step 3: Delete the dead overload and give the glyph its words**
+- [x] **Step 3: Delete the dead overload and give the glyph its words**
 
 Remove the 4-argument `setMetadata` entirely and update its four test call sites to pass the integration flag explicitly — it silently defaulted `integration` to `false` and would mask a wiring regression. Extract the expression duplicated between `setMetadata` and `updateText`:
 
@@ -760,7 +783,7 @@ and make the accessible description name the state rather than read out the glyp
 
 `getText()` keeps returning the glyph form, so the existing render fixtures are unchanged.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `./gradlew :jasper-app:test --rerun-tasks`
 Expected: PASS.
@@ -781,7 +804,7 @@ git commit -m "test: prove the status bar reports integration from a real prompt
 
 The spec's Testing section specifies real shells driven "through `TerminalSession.start`" with assertions "through the listener". The branch tests the scripts on pipes and the receiving side on hand-written feeds, so the two halves never meet; prompt rows and the empty-Enter case have no real-shell coverage at all.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```java
 @DisabledOnOs(OS.WINDOWS)
@@ -823,12 +846,12 @@ class ShellIntegrationEndToEndTest {
 
 `snapshotFor(zsh)` builds a `ConfigSnapshot` whose shell program is the zsh path with `ShellIntegrationMode.AUTO`, so the test exercises the real injection rather than a hand-built copy of it. `until(...)` polls with the 5-second deadline the other tests in this package use.
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ShellIntegrationEndToEndTest' --rerun-tasks`
 Expected: PASS once Tasks 1–6 are in. A failure here is a real defect in the branch, not in the test — diagnose before touching the assertions.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add jasper-app/src/test/java/dev/jasper/app/ShellIntegrationEndToEndTest.java
@@ -844,24 +867,24 @@ git commit -m "test: drive a real zsh through TerminalSession and assert through
 - Modify: `docs/superpowers/specs/2026-09-16-jasper-shell-integration-design.md`
 - Modify: `docs/STATUS.md`
 
-- [ ] **Step 1: Disclose the limitations where users hit them**
+- [x] **Step 1: Disclose the limitations where users hit them**
 
 In `docs/configuration.md`, the bash bullet gains: a `DEBUG` trap installed after the first prompt displaces Jasper's, and a chained user trap sees `$?`, `$_` and `BASH_COMMAND` from Jasper's wrapper rather than from the user's own command — the case a `bash-preexec` or `direnv` user lands in. A new sentence records that a command hidden from history by `HISTCONTROL=ignorespace` is hidden from Jasper too: no History entry and no `C` mark. The fish bullet records that the scripts are unverified against a real fish. A sentence records that `--norc`, `--rcfile`, `--init-file` or `-c` turns injection off and leaves the user's startup exactly as written.
 
-- [ ] **Step 2: Amend the spec**
+- [x] **Step 2: Amend the spec**
 
 Under "The scripts", record that bash honours `ignorespace`. Under "Injection at launch", record that `--norc`/`--rcfile`/`--init-file`/`-c` skip injection, that `-l` inside a short cluster counts, and that `JASPER_*` markers are scrubbed from the inherited environment. Under "Jasper's receiving side", record the 16 KiB payload bound and that a repeated `A` does not flush the cycle. Under "Testing", record that the script tests run on pipes while `ShellIntegrationEndToEndTest` covers the session path.
 
-- [ ] **Step 3: Rewrite the STATUS entry**
+- [x] **Step 3: Rewrite the STATUS entry**
 
 Describe the code as it now stands, list the fixes, keep the two original deviations, correct "main thread" to "on the EDT before the first window", and record the remaining user-run items: each shell on the real desktop, fish if installed, and a look at the two adjacent status-bar dots and the status bar at a narrow window width.
 
-- [ ] **Step 4: Run the whole suite and record real numbers**
+- [x] **Step 4: Run the whole suite and record real numbers**
 
 Run: `./gradlew check --rerun-tasks`
 Read exact counts from `*/build/test-results/test/TEST-*.xml` and put those numbers — not estimates — into STATUS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/configuration.md docs/STATUS.md \

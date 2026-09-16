@@ -84,7 +84,9 @@ from the terminal, tagged with that pane's shell. A shell that never emits a B
 mark — because it has no shell integration configured — contributes nothing
 live and is covered by its history file alone. Jasper's own zsh, bash and fish
 scripts emit those marks and the exact command line automatically for new
-panes; see [Shell integration](configuration.md#shell-integration).
+panes; see [Shell integration](configuration.md#shell-integration). A command
+you hide from your shell's own history with a leading space under bash's
+`HISTCONTROL=ignorespace` is left out of this list too.
 
 Jasper writes no history file of its own — your shell's files are only ever
 read, never modified. On a History row, Enter pastes the command into the

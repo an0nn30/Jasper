@@ -18,7 +18,7 @@ Jasper understands OSC 7 (working directory) and OSC 133 A/B/C/D (prompt and com
 
 ## The scripts
 
-Three files, bundled as resources and extracted to `<app dir>/shell-integration/`: `jasper.zsh`, `jasper.bash`, `jasper.fish`. Each is under about 80 lines, self-contained, and safe to `source` by hand. Every script:
+Three files, bundled as resources and extracted to `<app dir>/shell-integration/`: `jasper.zsh`, `jasper.bash`, `jasper.fish`. zsh and fish are under about 80 lines; **(review)** bash is under about 115, because only bash needs the `DEBUG`-trap plumbing, both `PROMPT_COMMAND` forms, the readonly guards and the `HISTCONTROL` check. Each is self-contained, and safe to `source` by hand. Every script:
 
 - returns immediately unless the shell is interactive, `TERM_PROGRAM` is `Jasper`, and `JASPER_INTEGRATION_LOADED` is unset; then exports `JASPER_INTEGRATION_LOADED=1` so nested shells started by the user do not double-mark (and get no integration unless they source the script themselves);
 - writes every sequence as `ESC ] … BEL` through one helper;
@@ -37,7 +37,7 @@ Per shell:
 
 ## Extraction
 
-`ShellIntegrationScripts.install(Path dir)` runs once at startup on the configuration worker before the first window opens: it creates the directory and writes each bundled file only when the on-disk content differs, so upgrades propagate and unchanged files keep their timestamps. Failures are logged and leave integration off for that run. Layout:
+`ShellIntegrationScripts.install(Path dir)` runs once at startup **(review: on the Event Dispatch Thread in `Main`, not on a configuration worker as first proposed — a few small file writes, measured at about 9 ms cold)** before the first window opens: it creates the directory and writes each bundled file only when the on-disk content differs, so upgrades propagate and unchanged files keep their timestamps. Failures are logged and leave integration off for that run. Layout:
 
 ```
 shell-integration/

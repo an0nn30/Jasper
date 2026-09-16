@@ -4,7 +4,7 @@ if status is-interactive; and test "$TERM_PROGRAM" = Jasper; and not set -q JASP
     set -gx JASPER_INTEGRATION_LOADED 1
 
     function __jasper_osc
-        printf '\033]%s\007' $argv[1]
+        command printf '\033]%s\007' $argv[1]
     end
 
     function __jasper_encode
@@ -33,7 +33,7 @@ if status is-interactive; and test "$TERM_PROGRAM" = Jasper; and not set -q JASP
     end
 
     function __jasper_preexec --on-event fish_preexec
-        set -l encoded (printf '%s' $argv[1] | command base64 2>/dev/null | string join '')
+        set -l encoded (command printf '%s' $argv[1] | command base64 2>/dev/null | string join '')
         if test -n "$encoded"
             __jasper_osc "1341;jasper;cmd;$encoded"
         end

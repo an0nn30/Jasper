@@ -93,10 +93,20 @@ untested on the dev Mac because fish is not installed, though it now has a test
 that reports as a skip rather than being absent. [Configuration
 guide](configuration.md#shell-integration), [design
 spec](superpowers/specs/2026-09-16-jasper-shell-integration-design.md),
-[plan](superpowers/plans/2026-09-16-jasper-shell-integration.md). Fresh
-`./gradlew check --rerun-tasks`: jasper-app 498 tests, 497 passed and one fish
-skip; jasper-terminal 310 tests, 309 passed and one existing font skip. Total
-808 tests, 806 passed, two skipped, zero failures/errors. Still user-run: each
+[plan](superpowers/plans/2026-09-16-jasper-shell-integration.md). A **second whole-branch review** then found three regressions these fixes had
+introduced, all since fixed with their own tests: honouring `HISTCONTROL`
+suppressed repeated commands under `ignoreboth` (Ubuntu's stock value) and every
+command when history was disabled, and tightening the `A` arm moved
+`commandStartRow = -1` and the payload clear behind the row check, reopening the
+stale-capture leak the same round had closed — only the flush belongs there. It
+also found the five wrapper files had never been made unset-safe (round one
+fixed only the three main scripts, so under `set -u` Jasper silently skipped the
+user's own `~/.bashrc`/`~/.zshrc`), two bare `printf` calls left in the bash
+DEBUG trap, `-o`/`-O` option arguments ending the bash option scan early, and a
+staged extraction path that could itself be a symlink. Fresh
+`./gradlew check --rerun-tasks`: jasper-app 502 tests, 501 passed and one fish
+skip; jasper-terminal 313 tests, 312 passed and one existing font skip. Total
+815 tests, 813 passed, two skipped, zero failures/errors. Still user-run: each
 shell (zsh, bash, and fish if installed) on the real macOS desktop with the
 user's own dotfiles and prompt theme, confirming marks, the status-bar dot and
 that nested shells stay quiet; plus a look at the two adjacent status-bar dots

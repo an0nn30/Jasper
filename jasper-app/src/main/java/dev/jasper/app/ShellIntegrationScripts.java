@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -42,11 +43,17 @@ final class ShellIntegrationScripts {
             // must never leave a half-written script, and a planted link must not redirect the write.
             Path staged = target.resolveSibling(target.getFileName() + ".jasper-new");
             try {
-                Files.write(staged, content);
+                // CREATE_NEW after the delete, so the staged path cannot be a planted link either.
+                Files.deleteIfExists(staged);
+                Files.write(staged, content, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
                 restrict(staged, EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
                 Files.move(staged, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } finally {
-                Files.deleteIfExists(staged);
+                try {
+                    Files.deleteIfExists(staged);
+                } catch (IOException cleanupFailure) {
+                    // Never mask the real failure with one from tidying up after it.
+                }
             }
         }
         return dir;

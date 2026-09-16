@@ -11,7 +11,7 @@ __jasper_osc() { builtin printf '\033]%s\007' "$1"; }
 # prompt. Read only the flag word, so a value that happens to contain "r" is not mistaken for one.
 __jasper_writable() {
     local spec
-    spec="$(declare -p "$1" 2>/dev/null)"
+    spec="$(builtin declare -p "$1" 2>/dev/null)"
     spec="${spec#declare }"
     spec="${spec%% *}"
     [[ "$spec" != *r* ]]
@@ -49,7 +49,7 @@ __jasper_prompt_command() {
     if [[ "$PS1" != *"$__jasper_mark_a"* ]] && __jasper_writable PS1; then
         PS1="\[$__jasper_mark_a\]$PS1\[$__jasper_mark_b\]"
     fi
-    __jasper_prompt_history="$(HISTTIMEFORMAT= builtin history 1 | sed -E '1!d; s/^ *([0-9]+).*/\1/')"
+    __jasper_prompt_history="$(HISTTIMEFORMAT= builtin history 1 | command sed -E '1!d; s/^ *([0-9]+).*/\1/')"
     __jasper_in_prompt=1
 }
 
@@ -63,17 +63,22 @@ __jasper_debug_trap() {
     __jasper_in_prompt="" __jasper_command_ran=1
     local entry number line encoded
     entry="$(HISTTIMEFORMAT= builtin history 1)"
-    number="$(printf '%s\n' "$entry" | sed -E '1!d; s/^ *([0-9]+).*/\1/')"
+    number="$(builtin printf '%s\n' "$entry" | command sed -E '1!d; s/^ *([0-9]+).*/\1/')"
+    line="$(builtin printf '%s\n' "$entry" | command sed -E '1s/^ *[0-9]+ +//')"
     if [[ -z "$number" || "$number" == "$__jasper_prompt_history" ]]; then
-        case ":${HISTCONTROL-}:" in
-            *:ignorespace:*|*:ignoreboth:*)
-                # bash was told to forget this line, so Jasper forgets it too: emitting C would let
-                # the screen read recapture it. D still fires, so the prompt cycle stays intact.
-                return 0 ;;
-        esac
+        # History refused the line. When its newest entry IS this command, bash only dropped a
+        # duplicate (ignoredups/ignoreboth) and the text is safe to report. An entry that differs
+        # means ignorespace hid it deliberately, so Jasper forgets it too and skips C as well:
+        # emitting C alone would let the screen read recapture what the user meant to hide. An
+        # empty number means history is off entirely, which says nothing about privacy.
+        # A repeated compound command still suppresses, because BASH_COMMAND holds only its
+        # first simple command; that costs a history entry, never a disclosure.
+        if [[ -n "$number" && "$line" != "$BASH_COMMAND" ]]; then
+            case ":${HISTCONTROL-}:" in
+                *:ignorespace:*|*:ignoreboth:*) return 0 ;;
+            esac
+        fi
         line="$BASH_COMMAND"
-    else
-        line="$(printf '%s\n' "$entry" | sed -E '1s/^ *[0-9]+ +//')"
     fi
     if encoded="$(builtin printf '%s' "$line" | command base64 2>/dev/null | command tr -d '\n')" && [[ -n "$encoded" ]]; then
         __jasper_osc "1341;jasper;cmd;$encoded"
@@ -96,7 +101,7 @@ __jasper_writable PROMPT_COMMAND || return 0
 
 # An array PROMPT_COMMAND is run element by element only from bash 5.1; before that bash runs
 # element 0 alone, so an array from an older rc file is flattened back into the string form.
-if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]] &&
+if [[ "$(builtin declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]] &&
     (( BASH_VERSINFO[0] > 5 || (BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] >= 1) )); then
     PROMPT_COMMAND=(__jasper_capture_status 'eval "$__jasper_install_debug"' "${PROMPT_COMMAND[@]}" __jasper_prompt_command)
 else

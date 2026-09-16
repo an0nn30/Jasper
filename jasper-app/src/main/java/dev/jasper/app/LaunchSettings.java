@@ -91,12 +91,17 @@ record LaunchSettings(List<String> command, Map<String, String> environment,
                 boolean noProfile = false;
                 for (int i = 1; i < command.size(); i++) {
                     String argument = command.get(i);
-                    boolean cluster = argument.length() > 1 && argument.charAt(0) == '-' && argument.charAt(1) != '-';
-                    if (argument.equals("--") || argument.equals("-") || !argument.startsWith("-")) { options = i; break; }
+                    boolean cluster = argument.length() > 1 && (argument.charAt(0) == '-' || argument.charAt(0) == '+')
+                        && argument.charAt(1) != '-';
+                    if (argument.equals("--") || argument.equals("-") || argument.equals("+")
+                        || !(argument.startsWith("-") || argument.startsWith("+"))) { options = i; break; }
                     if (argument.equals("--norc") || argument.equals("--rcfile") || argument.equals("--init-file")
                         || argument.equals("-c") || (cluster && argument.indexOf('c') > 0)) return;
                     noProfile |= argument.equals("--noprofile");
                     login |= argument.equals("--login") || (cluster && argument.indexOf('l') > 0);
+                    // -o and -O take a following word. It is an option argument, not an operand, so
+                    // skipping it keeps the scan going instead of ending it on "vi" or "extglob".
+                    if (cluster && (argument.endsWith("o") || argument.endsWith("O"))) i++;
                 }
                 for (int i = options - 1; i >= 1; i--) {
                     String argument = command.get(i);

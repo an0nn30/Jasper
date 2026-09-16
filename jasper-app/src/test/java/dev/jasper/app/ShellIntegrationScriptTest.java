@@ -162,13 +162,21 @@ class ShellIntegrationScriptTest {
 
     /** The rc body is sourced before Jasper's script, exactly as a real user's rc file would be. */
     private ShellRun.Result interactive(String shell, String rcBody, String input) throws Exception {
+        return interactive(shell, rcBody, input, List.of("-i"));
+    }
+
+    private ShellRun.Result interactive(String shell, String rcBody, String input, List<String> arguments)
+            throws Exception {
         String flavour = shell.endsWith("zsh") ? "zsh" : "bash";
-        Path home = Files.createDirectories(dir.resolve("home-" + flavour + "-" + Math.abs(rcBody.hashCode())));
+        Path home = Files.createDirectories(dir.resolve(
+            "home-" + flavour + "-" + Math.abs((rcBody + arguments).hashCode())));
         Files.writeString(home.resolve("." + flavour + "rc"),
             rcBody + "source \"" + scripts() + "/jasper." + flavour + "\"\n");
         var env = environment(home);
         if (flavour.equals("zsh")) env.put("ZDOTDIR", home.toString());
-        return ShellRun.runSeparate(List.of(shell, "-i"), env, home, input + "exit\n");
+        var command = new java.util.ArrayList<>(List.of(shell));
+        command.addAll(arguments);
+        return ShellRun.runSeparate(command, env, home, input + "exit\n");
     }
 
     @Test void scriptsStaySilentUnderNounset() throws Exception {
@@ -215,5 +223,47 @@ class ShellIntegrationScriptTest {
         env.put("JASPER_SHELL_INTEGRATION", scripts().toString());
         String output = ShellRun.run(List.of(fish.toString(), "-i"), env, home, "printf 'done\\n'\nexit\n");
         assertThat(output).contains("mine> ").contains(ShellRun.B);
+    }
+
+    /** ignoreboth is ignorespace plus ignoredups; a repeat is not something the user hid. */
+    @Test void ignorebothStillReportsARepeatedCommand() throws Exception {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/bash")));
+        ShellRun.Result result = interactive("/bin/bash", "PS1='$ '\nHISTCONTROL=ignoreboth\n",
+            "echo same\necho same\n");
+        assertThat(result.output().split(java.util.regex.Pattern.quote(ShellRun.CMD("echo same")), -1).length - 1)
+            .as("both runs of the repeated command are reported").isEqualTo(2);
+    }
+
+    /** With history off, "the history number did not advance" says nothing about privacy. */
+    @Test void aShellWithHistoryDisabledStillReportsItsCommands() throws Exception {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/bash")));
+        ShellRun.Result result = interactive("/bin/bash", "PS1='$ '\nHISTCONTROL=ignorespace\nHISTSIZE=0\n",
+            "echo visible\n");
+        assertThat(result.output()).contains(ShellRun.CMD("echo visible")).contains(ShellRun.C);
+    }
+
+    /** The wrapper files run before the rc file, so -u has to be set on the command line to reach them. */
+    @Test void wrapperFilesStaySilentUnderNounsetSetBeforeTheyRun() throws Exception {
+        if (Files.isExecutable(Path.of("/bin/bash"))) {
+            ShellRun.Result bash = interactive("/bin/bash", "export RC_RAN=yes\nPS1='$ '\n",
+                "echo rc=$RC_RAN\n", List.of("-u", "-i"));
+            assertThat(bash.errors()).doesNotContain("unbound variable");
+            assertThat(bash.output()).contains("rc=yes");
+        }
+        if (Files.isExecutable(Path.of("/bin/zsh"))) {
+            ShellRun.Result zsh = interactiveZshWrappers();
+            assertThat(zsh.errors()).doesNotContain("parameter not set");
+            assertThat(zsh.output()).contains("rc=yes");
+        }
+    }
+
+    /** zsh through the real ZDOTDIR wrappers, with nounset on before any of them runs. */
+    private ShellRun.Result interactiveZshWrappers() throws Exception {
+        Path home = Files.createDirectories(dir.resolve("home-zsh-wrappers"));
+        Files.writeString(home.resolve(".zshrc"), "export RC_RAN=yes\nPROMPT='rc%% '\n");
+        var env = environment(home);
+        env.put("ZDOTDIR", scripts().resolve("zsh").toString());
+        env.put("JASPER_SHELL_INTEGRATION", scripts().toString());
+        return ShellRun.runSeparate(List.of("/bin/zsh", "-u", "-i"), env, home, "echo rc=$RC_RAN\nexit\n");
     }
 }

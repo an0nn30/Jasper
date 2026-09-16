@@ -112,6 +112,20 @@ class LaunchSettingsTest {
     }
 
     /** A -l after -c or -- is the command's own argument, not a request for a login shell. */
+    /** -o and -O take a following word; it is an option argument, not the end of the options. */
+    @Test void anOptionArgumentDoesNotEndTheOptionScan() {
+        Path dir = Path.of("/opt/jasper/shell-integration");
+        for (List<String> args : List.of(List.of("-o", "vi", "-l"), List.of("-O", "extglob", "-l"),
+                List.of("+o", "vi", "-l"))) {
+            var command = new java.util.ArrayList<>(List.of("/bin/bash"));
+            command.addAll(args);
+            var env = new HashMap<String, String>();
+            LaunchSettings.inject(command, env, dir);
+            assertThat(command).as("%s", args).doesNotContain("-l");
+            assertThat(env).as("%s", args).containsEntry("JASPER_LOGIN_SHELL", "1");
+        }
+    }
+
     @Test void aLoginFlagPastTheOptionsIsLeftWhereItIs() {
         Path dir = Path.of("/opt/jasper/shell-integration");
         var command = new java.util.ArrayList<>(List.of("/bin/bash", "--", "-l"));
