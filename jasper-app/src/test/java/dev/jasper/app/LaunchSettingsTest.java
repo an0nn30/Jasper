@@ -1,5 +1,6 @@
 package dev.jasper.app;
 
+import java.nio.file.Path;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
@@ -11,6 +12,68 @@ class LaunchSettingsTest {
         return new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.variant(), d.keybindings(),
             columns, lines, new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback,
             t.optionAsMeta(), t.cursorShape(), t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell()));
+    }
+
+    private static ConfigSnapshot withShell(String program, List<String> args, ShellIntegrationMode mode) {
+        var d = ConfigSnapshot.defaults();
+        var t = d.terminal();
+        var terminal = new TerminalConfig(new TerminalConfig.Shell(program, args), t.env(), t.scrollback(), t.optionAsMeta(),
+            t.cursorShape(), t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell(), t.onExit(), mode);
+        return new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.variant(), Map.of(), d.columns(),
+            d.lines(), terminal, d.buddyEnabled(), d.historyEnabled(), d.maxResults());
+    }
+
+    @Test void termProgramIsAlwaysJasperAndOnlyAutoInjects() {
+        Path dir = Path.of("/opt/jasper/shell-integration");
+        var off = LaunchSettings.resolve(withShell("/bin/zsh", List.of("-l"), ShellIntegrationMode.OFF), "Mac OS X", Map.of(), 150, 45, dir);
+        assertThat(off.environment()).containsEntry("TERM_PROGRAM", "Jasper").doesNotContainKey("JASPER_SHELL_INTEGRATION").doesNotContainKey("ZDOTDIR");
+        var manual = LaunchSettings.resolve(withShell("/bin/zsh", List.of("-l"), ShellIntegrationMode.MANUAL), "Mac OS X", Map.of(), 150, 45, dir);
+        assertThat(manual.environment()).containsEntry("JASPER_SHELL_INTEGRATION", dir.toString()).doesNotContainKey("ZDOTDIR");
+        assertThat(manual.command()).containsExactly("/bin/zsh", "-l");
+        var auto = LaunchSettings.resolve(withShell("/bin/zsh", List.of("-l"), ShellIntegrationMode.AUTO), "Mac OS X",
+            Map.of("ZDOTDIR", "/Users/me/dots"), 150, 45, dir);
+        assertThat(auto.environment()).containsEntry("ZDOTDIR", dir.resolve("zsh").toString())
+            .containsEntry("JASPER_ORIGINAL_ZDOTDIR", "/Users/me/dots").containsEntry("JASPER_SHELL_INTEGRATION", dir.toString());
+        assertThat(auto.command()).containsExactly("/bin/zsh", "-l");
+        var noDir = LaunchSettings.resolve(withShell("/bin/zsh", List.of(), ShellIntegrationMode.AUTO), "Mac OS X", Map.of(), 150, 45, null);
+        assertThat(noDir.environment()).containsEntry("TERM_PROGRAM", "Jasper").doesNotContainKey("JASPER_SHELL_INTEGRATION");
+        assertThat(LaunchSettings.resolve(withShell("/bin/zsh", List.of(), ShellIntegrationMode.AUTO), "Mac OS X", Map.of(), 150, 45).environment())
+            .doesNotContainKey("ZDOTDIR");
+    }
+
+    @Test void injectHandlesEachShellAndLeavesOthersAlone() {
+        Path dir = Path.of("/opt/jasper/shell-integration");
+        var zsh = new java.util.ArrayList<>(List.of("/usr/local/bin/zsh")); var zshEnv = new HashMap<String, String>();
+        LaunchSettings.inject(zsh, zshEnv, dir);
+        assertThat(zshEnv).containsEntry("ZDOTDIR", dir.resolve("zsh").toString()).doesNotContainKey("JASPER_ORIGINAL_ZDOTDIR");
+        var bash = new java.util.ArrayList<>(List.of("/bin/bash", "-l", "--noprofile", "--login")); var bashEnv = new HashMap<String, String>();
+        LaunchSettings.inject(bash, bashEnv, dir);
+        assertThat(bash).containsExactly("/bin/bash", "--rcfile", dir.resolve("bash/rc.bash").toString(), "--noprofile");
+        assertThat(bashEnv).containsEntry("JASPER_LOGIN_SHELL", "1");
+        var bashPlain = new java.util.ArrayList<>(List.of("bash")); var plainEnv = new HashMap<String, String>();
+        LaunchSettings.inject(bashPlain, plainEnv, dir);
+        assertThat(bashPlain).containsExactly("bash", "--rcfile", dir.resolve("bash/rc.bash").toString());
+        assertThat(plainEnv).doesNotContainKey("JASPER_LOGIN_SHELL");
+        var fish = new java.util.ArrayList<>(List.of("/opt/homebrew/bin/fish")); var fishEnv = new HashMap<String, String>(Map.of("XDG_DATA_DIRS", "/x:/y"));
+        LaunchSettings.inject(fish, fishEnv, dir);
+        assertThat(fishEnv).containsEntry("XDG_DATA_DIRS", dir.resolve("fish") + ":/x:/y");
+        var fishDefault = new java.util.ArrayList<>(List.of("fish")); var fishDefaultEnv = new HashMap<String, String>();
+        LaunchSettings.inject(fishDefault, fishDefaultEnv, dir);
+        assertThat(fishDefaultEnv).containsEntry("XDG_DATA_DIRS", dir.resolve("fish") + ":/usr/local/share:/usr/share");
+        var other = new java.util.ArrayList<>(List.of("/bin/sh", "-l")); var otherEnv = new HashMap<String, String>();
+        LaunchSettings.inject(other, otherEnv, dir);
+        assertThat(other).containsExactly("/bin/sh", "-l");
+        assertThat(otherEnv).isEmpty();
+    }
+
+    @Test void userEnvOverlayCanStillOverrideTermProgram() {
+        var d = ConfigSnapshot.defaults(); var t = d.terminal();
+        var terminal = new TerminalConfig(t.shell(), Map.of("TERM_PROGRAM", "Other"), t.scrollback(), t.optionAsMeta(), t.cursorShape(),
+            t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell(), t.onExit(), ShellIntegrationMode.AUTO);
+        var snapshot = new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.variant(), Map.of(), d.columns(),
+            d.lines(), terminal, d.buddyEnabled(), d.historyEnabled(), d.maxResults());
+        assertThat(LaunchSettings.resolve(snapshot, "Linux", Map.of(), 150, 45, Path.of("/tmp/si")).environment())
+            .containsEntry("TERM_PROGRAM", "Other");
     }
 
     @Test void explicitExecutableKeepsArgumentBoundariesAndCopiesEnvironment() {
@@ -49,8 +112,9 @@ class LaunchSettingsTest {
             "TERM_SESSION_ID", "old", "TMUX", "socket", "TMUX_PANE", "%1",
             "ITERM_SESSION_ID", "old", "ITERM_PROFILE", "old", "PATH", "/bin"));
         var result = LaunchSettings.resolve(ConfigSnapshot.defaults(), "Mac OS X", inherited, 80, 24);
-        assertThat(result.environment()).doesNotContainKeys("TERM_PROGRAM", "TERM_PROGRAM_VERSION",
+        assertThat(result.environment()).doesNotContainKeys("TERM_PROGRAM_VERSION",
             "TERM_SESSION_ID", "TMUX", "TMUX_PANE", "ITERM_SESSION_ID", "ITERM_PROFILE");
+        assertThat(result.environment()).containsEntry("TERM_PROGRAM", "Jasper");
         assertThat(result.environment()).containsEntry("PATH", "/bin");
         assertThat(inherited).containsEntry("TMUX", "socket").containsEntry("ITERM_PROFILE", "old");
         var config = snapshot("", List.of(), Map.of("TERM_PROGRAM", "custom", "ITERM_PROFILE", "chosen"), 100, 80, 24);

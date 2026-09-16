@@ -23,6 +23,12 @@ record LaunchSettings(List<String> command, Map<String, String> environment,
 
     static LaunchSettings resolve(ConfigSnapshot snapshot, String osName, Map<String, String> inherited,
                                   int windowColumns, int windowLines) {
+        return resolve(snapshot, osName, inherited, windowColumns, windowLines, null);
+    }
+
+    /** {@code integrationDir} is the extracted script directory, or null when extraction failed or tests want none. */
+    static LaunchSettings resolve(ConfigSnapshot snapshot, String osName, Map<String, String> inherited,
+                                  int windowColumns, int windowLines, Path integrationDir) {
         TerminalConfig terminal = snapshot.terminal();
         var command = new ArrayList<>(terminal.shell().program().isEmpty()
             ? DefaultShell.command(osName, inherited) : List.of(terminal.shell().program()));
@@ -31,6 +37,7 @@ record LaunchSettings(List<String> command, Map<String, String> environment,
         environment.keySet().removeIf(name -> name.equals("TERM_PROGRAM") || name.equals("TERM_PROGRAM_VERSION")
             || name.equals("TERM_SESSION_ID") || name.equals("TMUX") || name.equals("TMUX_PANE")
             || name.startsWith("ITERM_"));
+        environment.put("TERM_PROGRAM", "Jasper");
         environment.putAll(terminal.env());
         if (osName.toLowerCase(Locale.ROOT).startsWith("mac")
                 && environment.getOrDefault("LANG", "").isBlank()) {
@@ -38,7 +45,47 @@ record LaunchSettings(List<String> command, Map<String, String> environment,
         }
         environment.put("TERM", "xterm-256color");
         environment.put("COLORTERM", "truecolor");
+        if (integrationDir != null && terminal.shellIntegration() != ShellIntegrationMode.OFF) {
+            environment.put("JASPER_SHELL_INTEGRATION", integrationDir.toString());
+            if (terminal.shellIntegration() == ShellIntegrationMode.AUTO) inject(command, environment, integrationDir);
+        }
         return new LaunchSettings(command, environment, windowColumns, windowLines, terminal.scrollback());
+    }
+
+    /** Auto mode for one shell: zsh through ZDOTDIR wrappers, bash through --rcfile, fish through XDG_DATA_DIRS. */
+    static void inject(List<String> command, Map<String, String> environment, Path dir) {
+        String shell;
+        try {
+            Path name = Path.of(command.getFirst()).getFileName();
+            shell = name == null ? "" : name.toString();
+        } catch (InvalidPathException failure) {
+            return;
+        }
+        switch (shell) {
+            case "zsh" -> {
+                String original = environment.get("ZDOTDIR");
+                if (original != null && !original.isBlank()) environment.put("JASPER_ORIGINAL_ZDOTDIR", original);
+                else environment.remove("JASPER_ORIGINAL_ZDOTDIR");
+                environment.put("ZDOTDIR", dir.resolve("zsh").toString());
+            }
+            case "bash" -> {
+                boolean login = false;
+                for (int i = command.size() - 1; i >= 1; i--) {
+                    if (command.get(i).equals("-l") || command.get(i).equals("--login")) { command.remove(i); login = true; }
+                }
+                command.add(1, "--rcfile");
+                command.add(2, dir.resolve("bash/rc.bash").toString());
+                if (login) environment.put("JASPER_LOGIN_SHELL", "1");
+            }
+            case "fish" -> {
+                String existing = environment.get("XDG_DATA_DIRS");
+                String rest = existing == null || existing.isBlank() ? "/usr/local/share:/usr/share" : existing;
+                environment.put("XDG_DATA_DIRS", dir.resolve("fish") + ":" + rest);
+            }
+            default -> {
+                // Only the exported variables reach other programs.
+            }
+        }
     }
 
     String label() {
