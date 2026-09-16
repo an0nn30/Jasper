@@ -40,6 +40,9 @@ record LaunchSettings(List<String> command, Map<String, String> environment,
             || name.equals("TERM_SESSION_ID") || name.equals("TMUX") || name.equals("TMUX_PANE")
             || name.startsWith("ITERM_") || name.startsWith("JASPER_"));
         environment.put("TERM_PROGRAM", "Jasper");
+        // tmux overwrites TERM_PROGRAM with "tmux" in every pane, so the scripts need a marker it
+        // leaves alone. Measured: arbitrary variables do reach a pane of a server Jasper started.
+        environment.put("JASPER_TERMINAL", "1");
         // Before the overlay, so a [terminal.env] override wins here as it does for TERM_PROGRAM.
         if (integrationDir != null && terminal.shellIntegration() != ShellIntegrationMode.OFF) {
             environment.put("JASPER_SHELL_INTEGRATION", integrationDir.toString());
@@ -117,6 +120,24 @@ record LaunchSettings(List<String> command, Map<String, String> environment,
                 command.add(2, dir.resolve("bash/rc.bash").toString());
                 // rc.bash reads the profile files whenever this is set, which --noprofile forbids.
                 if (login && !noProfile) environment.put("JASPER_LOGIN_SHELL", "1");
+            }
+            case "tmux" -> {
+                // tmux runs the user's $SHELL per pane and passes its own environment down, so the
+                // injection that reaches that shell is the environment kind. Recursing keeps the zsh
+                // and fish arms as the single definition of each mechanism. bash's is --rcfile, an
+                // argument tmux never sees, so bash inside tmux is left to the manual source line.
+                String inner = environment.get("SHELL");
+                if (inner == null || inner.isBlank()) return;
+                String innerShell;
+                try {
+                    Path name = Path.of(inner).getFileName();
+                    innerShell = name == null ? "" : name.toString();
+                } catch (InvalidPathException notAPath) {
+                    return;
+                }
+                if (innerShell.equals("zsh") || innerShell.equals("fish")) {
+                    inject(new ArrayList<>(List.of(inner)), environment, dir);
+                }
             }
             case "fish" -> {
                 String jasper = dir.resolve("fish").toString();

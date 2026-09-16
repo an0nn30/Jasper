@@ -237,4 +237,46 @@ class LaunchSettingsTest {
         var malformed = LaunchSettings.resolve(ConfigSnapshot.defaults(), "Linux", Map.of("SHELL", "bad\0path"), 150, 45);
         assertThat(malformed.label()).isNotBlank().doesNotContain("\0");
     }
+
+    /** tmux overwrites TERM_PROGRAM in every pane, so the scripts need a marker it leaves alone. */
+    @Test void aMarkerTmuxCannotOverwriteIsExportedInEveryMode() {
+        Path dir = Path.of("/opt/jasper/shell-integration");
+        for (ShellIntegrationMode mode : ShellIntegrationMode.values()) {
+            var settings = LaunchSettings.resolve(withShell("/bin/zsh", List.of(), mode), "Mac OS X",
+                Map.of("JASPER_TERMINAL", "stale"), 150, 45, dir);
+            assertThat(settings.environment()).as("%s", mode).containsEntry("JASPER_TERMINAL", "1");
+        }
+    }
+
+    /**
+     * tmux runs the user's $SHELL per pane and passes its own environment down, so the injection that
+     * reaches that shell is the environment kind. Measured: a pane of a server Jasper started does
+     * inherit ZDOTDIR and JASPER_SHELL_INTEGRATION.
+     */
+    @Test void tmuxGetsTheInjectionItsOwnShellWillUse() {
+        Path dir = Path.of("/opt/jasper/shell-integration");
+        var zsh = new java.util.ArrayList<>(List.of("/opt/homebrew/bin/tmux"));
+        var zshEnv = new HashMap<>(Map.of("SHELL", "/bin/zsh"));
+        LaunchSettings.inject(zsh, zshEnv, dir);
+        assertThat(zsh).as("the tmux command line is never rewritten").containsExactly("/opt/homebrew/bin/tmux");
+        assertThat(zshEnv).containsEntry("ZDOTDIR", dir.resolve("zsh").toString());
+
+        var fish = new java.util.ArrayList<>(List.of("tmux"));
+        var fishEnv = new HashMap<>(Map.of("SHELL", "/usr/local/bin/fish"));
+        LaunchSettings.inject(fish, fishEnv, dir);
+        assertThat(fishEnv).containsEntry("XDG_DATA_DIRS", dir.resolve("fish") + ":/usr/local/share:/usr/share");
+
+        // bash's mechanism is --rcfile, an argument tmux never sees, so there is nothing to set.
+        var bash = new java.util.ArrayList<>(List.of("tmux"));
+        var bashEnv = new HashMap<>(Map.of("SHELL", "/bin/bash"));
+        LaunchSettings.inject(bash, bashEnv, dir);
+        assertThat(bash).containsExactly("tmux");
+        assertThat(bashEnv).containsOnlyKeys("SHELL");
+
+        // No SHELL, or one that is not a path, leaves everything alone rather than guessing.
+        var unknown = new java.util.ArrayList<>(List.of("tmux"));
+        var unknownEnv = new HashMap<String, String>();
+        LaunchSettings.inject(unknown, unknownEnv, dir);
+        assertThat(unknownEnv).isEmpty();
+    }
 }

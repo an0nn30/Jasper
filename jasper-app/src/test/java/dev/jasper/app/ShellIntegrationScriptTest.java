@@ -203,13 +203,32 @@ class ShellIntegrationScriptTest {
         assertThat(result.output()).contains(ShellRun.CMD("echo __jasper_probe")).contains(ShellRun.C);
     }
 
-    @Test void aNonInteractiveZshLeavesZdotdirAlone() throws Exception {
+    /** A `zsh -c` the user runs from an already-integrated shell is a plain child: no Jasper ZDOTDIR. */
+    @Test void aNonInteractiveZshBelowAnIntegratedShellLeavesZdotdirAlone() throws Exception {
         Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/zsh")));
         Path home = Files.createDirectories(dir.resolve("home-zdotdir"));
         var env = environment(home);
         env.put("ZDOTDIR", scripts().resolve("zsh").toString());
+        env.put("JASPER_INTEGRATION_LOADED", "1");
         String reported = ShellRun.run(List.of("/bin/zsh", "-c", "printf %s \"$ZDOTDIR\""), env, home, "");
         assertThat(reported).isEmpty();
+    }
+
+    /**
+     * tmux runs its default-command as `$SHELL -c ...`, so the interactive shell is the child of a
+     * non-interactive one. Stripping ZDOTDIR in that outer shell strands the inner one with no
+     * integration — the exact shape of a `set -g default-command ${SHELL}` tmux configuration.
+     */
+    @Test void aNonInteractiveZshBeforeIntegrationHandsZdotdirToItsChild() throws Exception {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/zsh")));
+        Path home = Files.createDirectories(dir.resolve("home-nested"));
+        Files.writeString(home.resolve(".zshrc"), "PROMPT='rc%% '\n");
+        var env = environment(home);
+        env.put("ZDOTDIR", scripts().resolve("zsh").toString());
+        env.put("JASPER_SHELL_INTEGRATION", scripts().toString());
+        env.remove("JASPER_INTEGRATION_LOADED");
+        String reported = ShellRun.run(List.of("/bin/zsh", "-c", "printf %s \"$ZDOTDIR\""), env, home, "");
+        assertThat(reported).isEqualTo(scripts().resolve("zsh").toString());
     }
 
     @Test void fishReWrapsAPromptDefinedAfterTheIntegrationLoaded() throws Exception {
@@ -282,5 +301,31 @@ class ShellIntegrationScriptTest {
         assertThat(result.output().split(java.util.regex.Pattern.quote(ShellRun.C), -1).length - 1).isEqualTo(1);
         // The prompt carries A and B, and bash writes its prompt to stderr.
         assertThat(result.errors()).contains(ShellRun.A);
+    }
+
+    /** Inside tmux, TERM_PROGRAM says "tmux"; only Jasper's own marker identifies the terminal. */
+    @Test void theScriptsLoadUnderTmuxWhichOverwritesTermProgram() throws Exception {
+        for (String shell : List.of("/bin/zsh", "/bin/bash")) {
+            if (!Files.isExecutable(Path.of(shell))) continue;
+            String flavour = shell.endsWith("zsh") ? "zsh" : "bash";
+            Path home = Files.createDirectories(dir.resolve("home-tmux-" + flavour));
+            Files.writeString(home.resolve("." + flavour + "rc"),
+                "source \"" + scripts() + "/jasper." + flavour + "\"\n");
+            var env = environment(home);
+            env.put("TERM_PROGRAM", "tmux");
+            env.put("JASPER_TERMINAL", "1");
+            if (flavour.equals("zsh")) env.put("ZDOTDIR", home.toString());
+            assertThat(ShellRun.run(List.of(shell, "-i"), env, home, "true\nexit\n")).as(shell).contains(ShellRun.C);
+        }
+    }
+
+    @Test void theScriptsStayQuietWithNeitherMarker() throws Exception {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/zsh")));
+        Path home = Files.createDirectories(dir.resolve("home-nomarker"));
+        Files.writeString(home.resolve(".zshrc"), "source \"" + scripts() + "/jasper.zsh\"\n");
+        var env = environment(home);
+        env.put("TERM_PROGRAM", "iTerm.app");
+        env.put("ZDOTDIR", home.toString());
+        assertThat(ShellRun.run(List.of("/bin/zsh", "-i"), env, home, "true\nexit\n")).doesNotContain(ShellRun.A);
     }
 }

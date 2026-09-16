@@ -1,7 +1,7 @@
 # Jasper shell integration for zsh. Jasper loads this automatically when terminal.shell_integration = "auto";
 # otherwise add `source "$JASPER_SHELL_INTEGRATION/jasper.zsh"` to your .zshrc.
 [[ -o interactive ]] || return 0
-[[ "${TERM_PROGRAM-}" == "Jasper" ]] || return 0
+[[ "${TERM_PROGRAM-}" == "Jasper" || "${JASPER_TERMINAL-}" == "1" ]] || return 0
 [[ -n "${JASPER_INTEGRATION_LOADED-}" ]] && return 0
 export JASPER_INTEGRATION_LOADED=1
 
