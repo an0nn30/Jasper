@@ -29,15 +29,10 @@ final class WindowStatusBar extends JPanel {
         getAccessibleContext().setAccessibleName("Terminal status");
     }
 
-    void setMetadata(String shell, String directory, String dimensions, boolean running) {
-        setMetadata(shell, directory, dimensions, running, false);
-    }
-
     void setMetadata(String shell, String directory, String dimensions, boolean running, boolean integration) {
         this.running = running; this.shell = shell; this.directory = directory; this.dimensions = dimensions;
         this.integration = integration;
-        String shown = shell.isEmpty() ? "" : shell + (integration ? " \u25cf" : " \u25cb");
-        left.setParts(shown, directory);
+        left.setParts(shellLabel(), directory);
         left.setToolTipText(directory);
         left.setFirstToolTip(shell.isEmpty() ? null : integration ? "Shell integration active" : "Shell integration not detected");
         updateText();
@@ -55,12 +50,21 @@ final class WindowStatusBar extends JPanel {
         updateText(); refreshTheme();
     }
 
+    /** The shell name with its integration dot: filled once the shell has marked a prompt. */
+    private String shellLabel() {
+        return shell.isEmpty() ? "" : shell + (integration ? " \u25cf" : " \u25cb");
+    }
+
     private void updateText() {
         right.setParts(dimensions, configText);
         configButton.getAccessibleContext().setAccessibleName(configText);
-        String shown = shell.isEmpty() ? "" : shell + (integration ? " \u25cf" : " \u25cb");
-        text = shell.isEmpty() ? configText : shown + "  |  " + directory + "  |  " + dimensions + "  |  " + configText;
-        getAccessibleContext().setAccessibleDescription(text);
+        text = shell.isEmpty() ? configText
+            : shellLabel() + "  |  " + directory + "  |  " + dimensions + "  |  " + configText;
+        // A screen reader would otherwise announce the dot's Unicode name; say what it means instead.
+        String spoken = shell.isEmpty() ? ""
+            : shell + (integration ? ", shell integration active" : ", shell integration not detected");
+        getAccessibleContext().setAccessibleDescription(shell.isEmpty() ? text
+            : spoken + "  |  " + directory + "  |  " + dimensions + "  |  " + configText);
         revalidate(); repaint();
     }
     JButton configButton() { return configButton; }

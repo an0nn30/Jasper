@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -208,5 +210,54 @@ class ShellIntegrationSessionTest {
         connector.feed("\033]133;A\007$ pwd\r\n\033]1341;jasper;cmd;" + encoded + "\007\033]133;C\007/tmp\r\n\033]133;D;0\007");
         Await.until(() -> captured.size() == 1, "captured from cmd alone");
         assertThat(captured).containsExactly("pwd");
+    }
+
+    /** fish 4 emits its own A marks; a repeat must not flush the cycle and lose the exit status. */
+    @Test void aRepeatedPromptMarkDoesNotStealTheExitStatus() throws Exception {
+        listenForCommands();
+        connector.feed("\033]133;A\007$ \033]133;B\007\033]1341;jasper;cmd;ZmFsc2U=\007\033]133;C\007");
+        connector.feed("\033]133;A\007\033]133;A\007\033]133;D;1\007");
+
+        Await.until(() -> !captured.isEmpty(), "command reported");
+        assertThat(captured).containsExactly("false");
+        assertThat(statuses).containsExactly(OptionalInt.of(1));
+    }
+
+    @Test void aCommandTextThatWasNeverUsedDoesNotLeakIntoTheNextCommand() throws Exception {
+        listenForCommands();
+        connector.feed("\033]1341;jasper;cmd;U1RBTEU=\007\033]133;D;0\007");
+        connector.feed("\033]133;B\007typed\033]133;C\007\033]133;D;0\007");
+
+        Await.until(() -> !captured.isEmpty(), "command reported");
+        assertThat(captured).containsExactly("typed");
+    }
+
+    @Test void aResetDiscardsAnUnusedCommandText() throws Exception {
+        listenForCommands();
+        connector.feed("\033]1341;jasper;cmd;QkVGT1JF\007\033c");
+        connector.feed("\033]133;B\007typed\033]133;C\007\033]133;D;0\007");
+
+        Await.until(() -> !captured.isEmpty(), "command reported");
+        assertThat(captured).containsExactly("typed");
+    }
+
+    @Test void anOverlongCommandPayloadFallsBackToTheScreen() throws Exception {
+        listenForCommands();
+        String huge = Base64.getEncoder().encodeToString("x".repeat(64 * 1024).getBytes(StandardCharsets.UTF_8));
+        connector.feed("\033]133;A\007$ \033]133;B\007typed\033]1341;jasper;cmd;" + huge
+            + "\007\033]133;C\007\033]133;D;0\007");
+
+        Await.until(() -> !captured.isEmpty(), "command reported");
+        assertThat(captured).containsExactly("typed");
+    }
+
+    @Test void aPayloadThatIsNotUtf8FallsBackToTheScreen() throws Exception {
+        listenForCommands();
+        String invalid = Base64.getEncoder().encodeToString(new byte[] {(byte) 0xC3, (byte) 0x28});
+        connector.feed("\033]133;A\007$ \033]133;B\007typed\033]1341;jasper;cmd;" + invalid
+            + "\007\033]133;C\007\033]133;D;0\007");
+
+        Await.until(() -> !captured.isEmpty(), "command reported");
+        assertThat(captured).containsExactly("typed");
     }
 }

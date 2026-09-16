@@ -24,9 +24,12 @@ import com.pty4j.PtyProcessBuilder;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -44,6 +47,8 @@ public final class TerminalSession implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(TerminalSession.class.getName());
     /** Schemes an OSC 8 hyperlink may open; anything else could launch an application or a custom handler. */
     private static final Set<String> OSC8_SCHEMES = Set.of("http", "https", "ftp", "mailto");
+    /** Longer than this is not a command line; ShellHistoryParser bounds its own lines the same way. */
+    private static final int MAX_COMMAND_BYTES = 16 * 1024;
 
     /** Callbacks arrive on the session's reader thread. */
     public interface Listener {
@@ -86,11 +91,12 @@ public final class TerminalSession implements AutoCloseable {
     private volatile Path workingDirectory;
     private volatile int columns;
     private volatile int rows;
+    /** Set on the reader thread at the first prompt mark, read on the Event Dispatch Thread. */
+    private volatile boolean shellIntegrationDetected;
     // Reader thread only: tracks the command typed between OSC 133 B and C.
     private long commandStartRow = -1;
     private int commandStartColumn;
     private String pendingCommand;
-    private volatile boolean shellIntegrationDetected;
     private String pendingCommandText;
 
     /** Starts {@code command} in a new pseudo-terminal and begins emulating its output. */
@@ -125,6 +131,7 @@ public final class TerminalSession implements AutoCloseable {
             () -> listeners.forEach(Listener::screenChanged),
             alternate -> {
                 absoluteRowEpoch.incrementAndGet();
+                pendingCommandText = null;
                 listeners.forEach(l -> l.alternateBufferChanged(alternate));
             });
         terminal = new JediTerminal(display, buffer, styleState) {
@@ -168,6 +175,7 @@ public final class TerminalSession implements AutoCloseable {
             public void historyCleared() {
                 absoluteRowEpoch.incrementAndGet();
                 promptRows.clear();
+                pendingCommandText = null;
                 listeners.forEach(Listener::scrollbackReset);
             }
         });
@@ -625,13 +633,25 @@ public final class TerminalSession implements AutoCloseable {
                 workingDirectory = directory;
                 listeners.forEach(l -> l.workingDirectoryChanged(directory));
             });
-            case "cmd" -> pendingCommandText = args.size() > 2 ? decodeCommand(args.get(2)) : null;
+            case "cmd" -> pendingCommandText = args.size() > 2
+                ? decodeCommand(String.join(";", args.subList(2, args.size()))) : null;
             case "mark" -> {
                 String mark = args.size() > 2 ? args.get(2) : "";
                 switch (mark) {
                     case "A" -> {
-                        flushPendingCommand(OptionalInt.empty()); recordPrompt(); commandStartRow = -1;
-                        pendingCommandText = null;
+                        // A shell that emits its own A (fish 4) must not flush the cycle early:
+                        // the command would be reported without the status its own D carries.
+                        if (!shellIntegrationDetected) {
+                            // The mark draws nothing, so without this the owner only learns that
+                            // integration is live when the prompt that follows happens to repaint.
+                            shellIntegrationDetected = true;
+                            listeners.forEach(Listener::screenChanged);
+                        }
+                        if (recordPrompt()) {
+                            flushPendingCommand(OptionalInt.empty());
+                            commandStartRow = -1;
+                            pendingCommandText = null;
+                        }
                     }
                     case "B" -> markCommandStart();
                     case "C" -> captureCommand();
@@ -648,14 +668,14 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
-    private void recordPrompt() {
-        shellIntegrationDetected = true;
+    /** Records the prompt row; false when this A repeats the row Jasper already marked. */
+    private boolean recordPrompt() {
         buffer.lock();
         try {
             long row = absoluteRow(terminal.getCursorY() - 1);
-            if (promptRows.isEmpty() || promptRows.getLast() != row) {
-                promptRows.add(row);
-            }
+            if (!promptRows.isEmpty() && promptRows.getLast() == row) return false;
+            promptRows.add(row);
+            return true;
         } finally {
             buffer.unlock();
         }
@@ -695,12 +715,21 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
-    /** Decodes the base64 UTF-8 {@code cmd} payload from Jasper's shell-integration scripts, or null if malformed. */
+    /**
+     * Decodes the base64 UTF-8 {@code cmd} payload from Jasper's shell-integration scripts, or null if
+     * malformed — the caller then falls back to reading the command off the screen. The payload is the
+     * exact command line, so it is not trimmed; it is only bounded, because OSC 1341 is an open channel
+     * and the history index enforces the same limit on the lines it parses from disk.
+     */
     private static String decodeCommand(String encoded) {
+        String trimmed = encoded.trim();
+        if (trimmed.length() > (MAX_COMMAND_BYTES / 3 + 1) * 4) return null;
         try {
-            String text = new String(java.util.Base64.getDecoder().decode(encoded.trim()), StandardCharsets.UTF_8).strip();
+            byte[] bytes = Base64.getDecoder().decode(trimmed);
+            if (bytes.length > MAX_COMMAND_BYTES) return null;
+            String text = StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();
             return text.isEmpty() ? null : text;
-        } catch (IllegalArgumentException malformed) {
+        } catch (IllegalArgumentException | CharacterCodingException malformed) {
             return null;
         }
     }
@@ -708,6 +737,7 @@ public final class TerminalSession implements AutoCloseable {
     private void flushPendingCommand(OptionalInt exitStatus) {
         String command = pendingCommand;
         pendingCommand = null;
+        pendingCommandText = null;
         if (command == null) return;
         Optional<Path> directory = workingDirectory();
         listeners.forEach(l -> l.commandExecuted(command, exitStatus, directory));

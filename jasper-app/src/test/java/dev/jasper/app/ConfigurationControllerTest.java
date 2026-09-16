@@ -139,7 +139,7 @@ class ConfigurationControllerTest {
             assertThat(text.isEditable()).isFalse();
             assertThat(text.getText()).contains(directory.resolve("config.toml").toString(), ":3:");
             text.selectAll(); assertThat(text.getSelectedText()).isEqualTo(text.getText());
-            owner.status().setMetadata("<html>shell", "<html>directory", "80 × 24", true);
+            owner.status().setMetadata("<html>shell", "<html>directory", "80 × 24", true, false);
             assertThat(owner.status().getText()).contains("<html>shell", "80 × 24", "Config error");
         });
         reload("unknown=true\n[window]\ntab_height=46\n");

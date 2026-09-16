@@ -41,6 +41,7 @@ class ConfiguredTerminalBehaviorTest {
                         while IFS= read -r command; do
                             case "$command" in
                                 bell) printf '\\007' ;;
+                                mark) printf '\\033]133;A\\007' ;;
                                 *) : ;;
                             esac
                         done
@@ -143,5 +144,20 @@ class ConfiguredTerminalBehaviorTest {
             var method = TerminalView.class.getDeclaredMethod(name, parameters);
             method.setAccessible(true); method.invoke(view, args);
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+
+    /**
+     * The whole chain, not just the label: a real prompt mark from the child reaches
+     * TerminalSession, TerminalPane and WindowContent before the status bar can show the dot.
+     */
+    @Test void theStatusBarReportsShellIntegrationOnceTheShellMarksAPrompt() throws Exception {
+        edt(() -> {
+            owner.update();
+            assertThat(owner.status().getText()).contains("\u25cb").doesNotContain("\u25cf");
+        });
+
+        session.write("mark\n");
+
+        until(() -> owner.status().getText().contains("\u25cf"));
     }
 }
