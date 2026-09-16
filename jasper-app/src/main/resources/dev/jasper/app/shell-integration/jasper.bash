@@ -1,11 +1,21 @@
 # Jasper shell integration for bash 3.2 and newer. Jasper loads this automatically when
 # terminal.shell_integration = "auto"; otherwise add `source "$JASPER_SHELL_INTEGRATION/jasper.bash"` to your .bashrc.
 [[ $- == *i* ]] || return 0
-[[ "$TERM_PROGRAM" == "Jasper" ]] || return 0
-[[ -n "$JASPER_INTEGRATION_LOADED" ]] && return 0
+[[ "${TERM_PROGRAM-}" == "Jasper" ]] || return 0
+[[ -n "${JASPER_INTEGRATION_LOADED-}" ]] && return 0
 export JASPER_INTEGRATION_LOADED=1
 
-__jasper_osc() { printf '\033]%s\007' "$1"; }
+__jasper_osc() { builtin printf '\033]%s\007' "$1"; }
+
+# Assigning to a readonly PS1 or PROMPT_COMMAND aborts the function and prints an error every
+# prompt. Read only the flag word, so a value that happens to contain "r" is not mistaken for one.
+__jasper_writable() {
+    local spec
+    spec="$(declare -p "$1" 2>/dev/null)"
+    spec="${spec#declare }"
+    spec="${spec%% *}"
+    [[ "$spec" != *r* ]]
+}
 
 # Percent-encodes a path byte by byte, keeping unreserved characters and slashes.
 __jasper_encode() {
@@ -14,10 +24,10 @@ __jasper_encode() {
         c="${input:i:1}"
         case "$c" in
             [A-Za-z0-9/._~-]) out+="$c" ;;
-            *) code=$(printf '%d' "'$c"); out+="$(printf '%%%02X' $(( code & 255 )))" ;;
+            *) code=$(builtin printf '%d' "'$c"); out+="$(builtin printf '%%%02X' $(( code & 255 )))" ;;
         esac
     done
-    printf '%s' "$out"
+    builtin printf '%s' "$out"
 }
 
 __jasper_mark_a=$'\033]133;A\007' __jasper_mark_b=$'\033]133;B\007'
@@ -36,7 +46,7 @@ __jasper_prompt_command() {
         __jasper_last_pwd="$PWD"
         __jasper_osc "7;file://${HOSTNAME:-$(hostname)}$(__jasper_encode "$PWD")"
     fi
-    if [[ "$PS1" != *"$__jasper_mark_a"* ]]; then
+    if [[ "$PS1" != *"$__jasper_mark_a"* ]] && __jasper_writable PS1; then
         PS1="\[$__jasper_mark_a\]$PS1\[$__jasper_mark_b\]"
     fi
     __jasper_prompt_history="$(HISTTIMEFORMAT= builtin history 1 | sed -E '1!d; s/^ *([0-9]+).*/\1/')"
@@ -47,17 +57,25 @@ __jasper_prompt_command() {
 # it as typed; one kept out of history (HISTCONTROL) keeps the number, so $BASH_COMMAND serves.
 __jasper_debug_trap() {
     [[ -n "$__jasper_in_prompt" ]] || return 0
-    case "$BASH_COMMAND" in *__jasper_*) return 0 ;; esac
+    case "$BASH_COMMAND" in
+        __jasper_*|'eval "$__jasper_install_debug"') return 0 ;;
+    esac
     __jasper_in_prompt="" __jasper_command_ran=1
     local entry number line encoded
     entry="$(HISTTIMEFORMAT= builtin history 1)"
     number="$(printf '%s\n' "$entry" | sed -E '1!d; s/^ *([0-9]+).*/\1/')"
     if [[ -z "$number" || "$number" == "$__jasper_prompt_history" ]]; then
+        case ":${HISTCONTROL-}:" in
+            *:ignorespace:*|*:ignoreboth:*)
+                # bash was told to forget this line, so Jasper forgets it too: emitting C would let
+                # the screen read recapture it. D still fires, so the prompt cycle stays intact.
+                return 0 ;;
+        esac
         line="$BASH_COMMAND"
     else
         line="$(printf '%s\n' "$entry" | sed -E '1s/^ *[0-9]+ +//')"
     fi
-    if encoded="$(printf '%s' "$line" | base64 2>/dev/null | tr -d '\n')" && [[ -n "$encoded" ]]; then
+    if encoded="$(builtin printf '%s' "$line" | command base64 2>/dev/null | command tr -d '\n')" && [[ -n "$encoded" ]]; then
         __jasper_osc "1341;jasper;cmd;$encoded"
     fi
     __jasper_osc "133;C"
@@ -74,13 +92,15 @@ eval "__jasper_previous_debug_body=${__jasper_previous_debug% DEBUG}"
 unset __jasper_previous_debug
 trap "__jasper_debug_trap; eval \"\$__jasper_previous_debug_body\"" DEBUG'
 
+__jasper_writable PROMPT_COMMAND || return 0
+
 # An array PROMPT_COMMAND is run element by element only from bash 5.1; before that bash runs
 # element 0 alone, so an array from an older rc file is flattened back into the string form.
 if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]] &&
     (( BASH_VERSINFO[0] > 5 || (BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] >= 1) )); then
     PROMPT_COMMAND=(__jasper_capture_status 'eval "$__jasper_install_debug"' "${PROMPT_COMMAND[@]}" __jasper_prompt_command)
 else
-    __jasper_existing="$(IFS=';'; printf '%s' "${PROMPT_COMMAND[*]}")"
+    __jasper_existing="$(IFS=';'; builtin printf '%s' "${PROMPT_COMMAND[*]-}")"
     while [[ "$__jasper_existing" == *";" || "$__jasper_existing" == *" " ]]; do __jasper_existing="${__jasper_existing%?}"; done
     PROMPT_COMMAND='__jasper_capture_status;eval "$__jasper_install_debug"'
     [[ -n "$__jasper_existing" ]] && PROMPT_COMMAND="$PROMPT_COMMAND;$__jasper_existing"

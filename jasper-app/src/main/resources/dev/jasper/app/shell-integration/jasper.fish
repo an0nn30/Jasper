@@ -29,25 +29,27 @@ if status is-interactive; and test "$TERM_PROGRAM" = Jasper; and not set -q JASP
             __jasper_osc "7;file://$hostname"(__jasper_encode $PWD)
         end
         __jasper_osc "133;A"
+        __jasper_wrap_prompt
     end
 
     function __jasper_preexec --on-event fish_preexec
-        set -l encoded (printf '%s' $argv[1] | base64 2>/dev/null | string join '')
+        set -l encoded (printf '%s' $argv[1] | command base64 2>/dev/null | string join '')
         if test -n "$encoded"
             __jasper_osc "1341;jasper;cmd;$encoded"
         end
         __jasper_osc "133;C"
     end
 
-    if functions -q fish_prompt
-        functions -c fish_prompt __jasper_original_prompt
-    else
-        function __jasper_original_prompt
-            printf '%s> ' (prompt_pwd)
+    # fish loads vendor_conf.d before config.fish, so a prompt defined there replaces this wrapper.
+    # Re-check every prompt, the way the zsh and bash scripts re-check PROMPT and PS1.
+    function __jasper_wrap_prompt
+        if functions -q fish_prompt
+            and not functions fish_prompt | string match -q '*__jasper_osc "133;B"*'
+            functions -c fish_prompt __jasper_original_prompt
+            function fish_prompt
+                __jasper_original_prompt
+                __jasper_osc "133;B"
+            end
         end
-    end
-    function fish_prompt
-        __jasper_original_prompt
-        __jasper_osc "133;B"
     end
 end

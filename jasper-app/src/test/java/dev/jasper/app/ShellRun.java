@@ -49,6 +49,42 @@ final class ShellRun {
         return output.toString(StandardCharsets.UTF_8);
     }
 
+    /** What the shell printed, with its own diagnostics kept apart so a test can assert the shell stayed quiet. */
+    record Result(String output, String errors) {}
+
+    /** As {@link #run}, but without merging stderr, so warnings from the shell itself are visible on their own. */
+    static Result runSeparate(List<String> command, Map<String, String> environment, Path directory, String input)
+            throws IOException, InterruptedException {
+        var builder = new ProcessBuilder(command).directory(directory.toFile());
+        builder.environment().clear();
+        builder.environment().putAll(environment);
+        Process process = builder.start();
+        var output = new ByteArrayOutputStream();
+        var errors = new ByteArrayOutputStream();
+        Thread out = drain(process.getInputStream(), output, "shell-output");
+        Thread err = drain(process.getErrorStream(), errors, "shell-errors");
+        try (var stdin = process.getOutputStream()) {
+            stdin.write(input.getBytes(StandardCharsets.UTF_8));
+        }
+        if (!process.waitFor(10, TimeUnit.SECONDS)) process.destroyForcibly();
+        out.join(TimeUnit.SECONDS.toMillis(5));
+        err.join(TimeUnit.SECONDS.toMillis(5));
+        return new Result(output.toString(StandardCharsets.UTF_8), errors.toString(StandardCharsets.UTF_8));
+    }
+
+    private static Thread drain(InputStream source, ByteArrayOutputStream sink, String name) {
+        Thread reader = new Thread(() -> {
+            try (InputStream in = source) {
+                in.transferTo(sink);
+            } catch (IOException closedByDestroy) {
+                // Keep what was read before the process was destroyed.
+            }
+        }, name);
+        reader.setDaemon(true);
+        reader.start();
+        return reader;
+    }
+
     static String hostname() throws IOException, InterruptedException {
         Process process = new ProcessBuilder("hostname").redirectErrorStream(true).start();
         String name = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();

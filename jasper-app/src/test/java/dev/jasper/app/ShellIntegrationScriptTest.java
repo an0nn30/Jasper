@@ -144,7 +144,7 @@ class ShellIntegrationScriptTest {
         indexAfter(output, ShellRun.D(0), at);
     }
 
-    @Test void bashKeepsAPromptCommandArrayAndIgnoresSpaceHiddenHistoryOnBash5() throws Exception {
+    @Test void bashKeepsAPromptCommandArrayAndHidesSpaceHiddenHistoryFromJasperTooOnBash5() throws Exception {
         Path bash5 = Path.of("/opt/homebrew/bin/bash");
         Assumptions.assumeTrue(Files.isExecutable(bash5));
         Path home = Files.createDirectories(dir.resolve("home"));
@@ -152,7 +152,68 @@ class ShellIntegrationScriptTest {
         String output = ShellRun.run(List.of(bash5.toString(), "-i"), environment(home), home, "echo $PC_ONE$PC_TWO\n echo hidden\nexit\n");
         int at = indexAfter(output, ShellRun.CMD("echo $PC_ONE$PC_TWO"), 0);
         at = indexAfter(output, "12", at);
-        at = indexAfter(output, ShellRun.CMD("echo hidden"), at);
+        // The user hid this line from bash's own history, so Jasper reports neither the text nor a
+        // C mark: emitting C would let the screen read recapture what HISTCONTROL was meant to hide.
+        // Three commands run; only the visible one and `exit` are marked.
+        assertThat(output).doesNotContain(ShellRun.CMD("echo hidden"));
+        assertThat(output.split(java.util.regex.Pattern.quote(ShellRun.C), -1).length - 1).isEqualTo(2);
         indexAfter(output, ShellRun.D(0), at);
+    }
+
+    /** The rc body is sourced before Jasper's script, exactly as a real user's rc file would be. */
+    private ShellRun.Result interactive(String shell, String rcBody, String input) throws Exception {
+        String flavour = shell.endsWith("zsh") ? "zsh" : "bash";
+        Path home = Files.createDirectories(dir.resolve("home-" + flavour + "-" + Math.abs(rcBody.hashCode())));
+        Files.writeString(home.resolve("." + flavour + "rc"),
+            rcBody + "source \"" + scripts() + "/jasper." + flavour + "\"\n");
+        var env = environment(home);
+        if (flavour.equals("zsh")) env.put("ZDOTDIR", home.toString());
+        return ShellRun.runSeparate(List.of(shell, "-i"), env, home, input + "exit\n");
+    }
+
+    @Test void scriptsStaySilentUnderNounset() throws Exception {
+        for (String shell : List.of("/bin/zsh", "/bin/bash")) {
+            if (!Files.isExecutable(Path.of(shell))) continue;
+            String rc = shell.endsWith("zsh") ? "setopt nounset\n" : "set -u\n";
+            ShellRun.Result result = interactive(shell, rc, "printf 'done\\n'\n");
+            assertThat(result.errors()).as("%s under nounset", shell)
+                .doesNotContain("unbound variable").doesNotContain("parameter not set");
+            assertThat(result.output()).contains(ShellRun.C);
+        }
+    }
+
+    @Test void aReadonlyPromptDoesNotBreakTheShellOrTheMarks() throws Exception {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/bash")));
+        ShellRun.Result result = interactive("/bin/bash", "readonly PS1='P> '\n", "printf 'done\\n'\n");
+        assertThat(result.errors()).doesNotContain("readonly variable");
+        assertThat(result.output()).contains(ShellRun.C).contains(ShellRun.CMD("printf 'done\\n'"));
+    }
+
+    @Test void aCommandNamingJasperOwnFunctionsIsStillReported() throws Exception {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/bash")));
+        ShellRun.Result result = interactive("/bin/bash", "PS1='$ '\n", "echo __jasper_probe\n");
+        assertThat(result.output()).contains(ShellRun.CMD("echo __jasper_probe")).contains(ShellRun.C);
+    }
+
+    @Test void aNonInteractiveZshLeavesZdotdirAlone() throws Exception {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/zsh")));
+        Path home = Files.createDirectories(dir.resolve("home-zdotdir"));
+        var env = environment(home);
+        env.put("ZDOTDIR", scripts().resolve("zsh").toString());
+        String reported = ShellRun.run(List.of("/bin/zsh", "-c", "printf %s \"$ZDOTDIR\""), env, home, "");
+        assertThat(reported).isEmpty();
+    }
+
+    @Test void fishReWrapsAPromptDefinedAfterTheIntegrationLoaded() throws Exception {
+        Path fish = Path.of("/opt/homebrew/bin/fish");
+        Assumptions.assumeTrue(Files.isExecutable(fish), "fish is not installed");
+        Path home = Files.createDirectories(dir.resolve("home-fish"));
+        Path config = Files.createDirectories(home.resolve(".config/fish"));
+        Files.writeString(config.resolve("config.fish"), "function fish_prompt\n    printf 'mine> '\nend\n");
+        var env = environment(home);
+        env.put("XDG_DATA_DIRS", scripts().resolve("fish") + ":/usr/local/share:/usr/share");
+        env.put("JASPER_SHELL_INTEGRATION", scripts().toString());
+        String output = ShellRun.run(List.of(fish.toString(), "-i"), env, home, "printf 'done\\n'\nexit\n");
+        assertThat(output).contains("mine> ").contains(ShellRun.B);
     }
 }

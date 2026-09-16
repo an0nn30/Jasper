@@ -7,8 +7,10 @@ if [[ -n "$JASPER_LOGIN_SHELL" ]]; then
     done
     unset __jasper_profile
 else
-    [[ -r /etc/bash.bashrc ]] && source /etc/bash.bashrc
-    [[ -r /etc/bashrc ]] && source /etc/bashrc
+    # One system file, not both: Debian ships /etc/bash.bashrc, macOS and Fedora /etc/bashrc.
+    if [[ -r /etc/bash.bashrc ]]; then source /etc/bash.bashrc
+    elif [[ -r /etc/bashrc ]]; then source /etc/bashrc
+    fi
     [[ -r "$HOME/.bashrc" ]] && source "$HOME/.bashrc"
 fi
 source "${JASPER_SHELL_INTEGRATION:-$(dirname "${BASH_SOURCE[0]}")/..}/jasper.bash"
