@@ -31,6 +31,9 @@ final class ShellHistoryIndex implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(ShellHistoryIndex.class.getName());
     private static final int MAX_READ = 16 * 1024 * 1024;
     private static final int FINGERPRINT_BYTES = 64;
+    /** Short enough to feel immediate; a quiet tick is one stat per source, because readSource
+     *  returns as soon as size and mtime are unchanged. */
+    private static final int POLL_MILLIS = 1000;
 
     record SourceStats(long offset, int fullReads, int tailReads) {}
 
@@ -54,6 +57,7 @@ final class ShellHistoryIndex implements AutoCloseable {
     // EDT-only state.
     private final List<Runnable> listeners = new ArrayList<>();
     private ShellHistorySnapshot snapshot = ShellHistorySnapshot.EMPTY;
+    private javax.swing.Timer poll;
     private boolean refreshing, refreshQueued;
     private volatile boolean closed;
 
@@ -79,8 +83,29 @@ final class ShellHistoryIndex implements AutoCloseable {
     CommandRegistry.Subscription onChanged(Runnable listener) {
         CommandRegistry.requireEdt();
         listeners.add(listener);
-        return new CommandRegistry.Subscription(() -> { CommandRegistry.requireEdt(); listeners.remove(listener); });
+        startPolling();
+        return new CommandRegistry.Subscription(() -> {
+            CommandRegistry.requireEdt();
+            listeners.remove(listener);
+            if (listeners.isEmpty() && poll != null) poll.stop();
+        });
     }
+
+    /**
+     * History files change without anyone asking, so the index looks for itself rather than waiting for
+     * the palette to be opened. Only while something is listening: a window with no palette pays nothing.
+     */
+    private void startPolling() {
+        if (closed) return;
+        if (poll == null) {
+            poll = new javax.swing.Timer(POLL_MILLIS, event -> refresh());
+            poll.setRepeats(true);
+        }
+        poll.start();
+    }
+
+    /** Test seam: the poll timer, or null before the first listener subscribes. */
+    javax.swing.Timer pollTimer() { return poll; }
 
     /** Re-reads changed files on the worker; at most one refresh runs and one more waits. */
     void refresh() {
@@ -232,6 +257,7 @@ final class ShellHistoryIndex implements AutoCloseable {
     @Override public void close() {
         closed = true;
         listeners.clear();
+        if (poll != null) poll.stop();
         worker.shutdownNow();
     }
 }

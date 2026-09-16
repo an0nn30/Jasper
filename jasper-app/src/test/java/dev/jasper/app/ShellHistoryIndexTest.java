@@ -266,4 +266,87 @@ class ShellHistoryIndexTest {
             }
         });
     }
+
+    /** Fires a Swing timer's listeners directly, so the test never waits on wall-clock time. */
+    private static void tick(javax.swing.Timer timer) {
+        for (java.awt.event.ActionListener listener : timer.getActionListeners())
+            listener.actionPerformed(new java.awt.event.ActionEvent(timer, java.awt.event.ActionEvent.ACTION_PERFORMED, "tick"));
+    }
+
+    @Test void theIndexPollsOnlyWhileSomethingIsListening() throws Exception {
+        Path zsh = home.resolve(".zsh_history");
+        Files.writeString(zsh, ": 100:0;ls\n");
+        var sources = List.of(new ShellHistorySource(HistoryShell.ZSH, zsh));
+        SwingUtilities.invokeAndWait(() -> {
+            try (var index = inline(sources)) {
+                assertThat(index.pollTimer()).as("no timer before anyone subscribes").isNull();
+
+                var first = index.onChanged(() -> {});
+                assertThat(index.pollTimer().isRunning()).isTrue();
+                var second = index.onChanged(() -> {});
+
+                first.close();
+                assertThat(index.pollTimer().isRunning()).as("one listener left").isTrue();
+
+                second.close();
+                assertThat(index.pollTimer().isRunning()).as("no listeners left").isFalse();
+            }
+        });
+    }
+
+    @Test void aCommandAppendedToAFileIsPublishedWithoutTheScopeBeingActivated() throws Exception {
+        Path zsh = home.resolve(".zsh_history");
+        Files.writeString(zsh, ": 100:0;old\n");
+        var sources = List.of(new ShellHistorySource(HistoryShell.ZSH, zsh));
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                try (var index = inline(sources)) {
+                    var seen = new java.util.ArrayList<List<String>>();
+                    index.onChanged(() -> seen.add(index.snapshot().entries().stream()
+                        .map(ShellHistoryEntry::command).toList()));
+                    index.refresh();
+                    assertThat(seen.getLast()).containsExactly("old");
+
+                    Files.writeString(zsh, ": 200:0;fresh\n", StandardOpenOption.APPEND);
+                    Files.setLastModifiedTime(zsh, FileTime.fromMillis(System.currentTimeMillis() + 5_000));
+                    tick(index.pollTimer());   // nobody opened the palette
+
+                    assertThat(seen.getLast()).containsExactly("fresh", "old");
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
+    @Test void aQuietTickCostsNoRead() throws Exception {
+        Path zsh = home.resolve(".zsh_history");
+        Files.writeString(zsh, ": 100:0;ls\n");
+        var sources = List.of(new ShellHistorySource(HistoryShell.ZSH, zsh));
+        SwingUtilities.invokeAndWait(() -> {
+            try (var index = inline(sources)) {
+                index.onChanged(() -> {});
+                index.refresh();
+                var after = index.stats(sources.getFirst());
+
+                tick(index.pollTimer());
+                tick(index.pollTimer());
+
+                assertThat(index.stats(sources.getFirst())).as("unchanged file is not re-read").isEqualTo(after);
+            }
+        });
+    }
+
+    @Test void closingStopsThePoll() throws Exception {
+        Path zsh = home.resolve(".zsh_history");
+        Files.writeString(zsh, ": 100:0;ls\n");
+        var sources = List.of(new ShellHistorySource(HistoryShell.ZSH, zsh));
+        SwingUtilities.invokeAndWait(() -> {
+            var index = inline(sources);
+            index.onChanged(() -> {});
+            javax.swing.Timer timer = index.pollTimer();
+            index.close();
+            assertThat(timer.isRunning()).isFalse();
+        });
+    }
 }
