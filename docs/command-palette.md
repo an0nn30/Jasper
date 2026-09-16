@@ -82,9 +82,9 @@ OSC 133 B (command start) and C (output start) marks its shell integration
 emits and records the command text, working directory and exit status straight
 from the terminal, tagged with that pane's shell. A shell that never emits a B
 mark — because it has no shell integration configured — contributes nothing
-live and is covered by its history file alone. Jasper ships no shell-integration
-script of its own; wiring one up is a separate future feature, and it remains
-the main limit on live capture today.
+live and is covered by its history file alone. Jasper's own zsh, bash and fish
+scripts emit those marks and the exact command line automatically for new
+panes; see [Shell integration](configuration.md#shell-integration).
 
 Jasper writes no history file of its own — your shell's files are only ever
 read, never modified. On a History row, Enter pastes the command into the
@@ -107,7 +107,7 @@ See [configuration](configuration.md#shell-history).
 ## Snippets
 
 Snippets are named commands you save yourself: shell aliases the traditional way don't fit,
-since Jasper ships no shell-integration script and each shell spells aliases differently.
+since each shell spells aliases differently.
 `snippets.toml` lives in Jasper's application directory, beside `command-history.toml`,
 independent of `--config`; it is never read or written by the configuration loader. Jasper
 only ever appends new `[[snippet]]` tables, so hand edits and comments survive:

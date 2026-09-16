@@ -37,6 +37,7 @@ final class JasperApplication {
     private final Runnable terminate;
     private final ShellHistoryIndex shellHistory;
     private final SnippetStore snippets;
+    private final Path shellIntegrationDir;
     private final Set<TerminalSession> sessions = ConcurrentHashMap.newKeySet();
     private final BuddyVisibility buddyVisibility = new BuddyVisibility();
     private final Path buddyStateFile;
@@ -73,18 +74,25 @@ final class JasperApplication {
         this(service, suppliedLauncher, history, buddyStateFile, terminate, shellHistory, null);
     }
 
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, ShellHistoryIndex shellHistory, SnippetStore snippets) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellHistory, snippets, null);
+    }
+
     /**
      * {@code buddyStateFile} may be null: the buddy then starts in the default corner and forgets drags.
      * {@code terminate} runs once, off the EDT, after shutdown's bounded cleanup; production passes the JVM exit.
+     * {@code shellIntegrationDir} is the extracted script directory, or null when extraction failed or tests want none.
      */
     JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
-                      Runnable terminate, ShellHistoryIndex shellHistory, SnippetStore snippets) {
+                      Runnable terminate, ShellHistoryIndex shellHistory, SnippetStore snippets, Path shellIntegrationDir) {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         this.buddyStateFile = buddyStateFile;
         this.terminate = terminate;
         this.shellHistory = shellHistory;
         this.snippets = snippets;
+        this.shellIntegrationDir = shellIntegrationDir;
         configuration = service == null ? null : new ConfigurationController(themes, service);
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddyVisibility.configure(snapshot.buddyEnabled()); syncBuddy();
@@ -101,7 +109,7 @@ final class JasperApplication {
         boolean first = windows.isEmpty();
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
-            (path, settings) -> track(startSession(path, settings)));
+            (path, settings) -> track(startSession(path, settings)), shellIntegrationDir);
         TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history, shellHistory, snippets);
         windows.add(window); window.show();
         if (first) shellHistory.refresh();
@@ -111,9 +119,14 @@ final class JasperApplication {
 
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
                                         BiFunction<Path, LaunchSettings, TerminalSession> start) {
+        return windowLauncher(executor, snapshots, start, null);
+    }
+
+    static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
+                                        BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir) {
         ConfigSnapshot initial = snapshots.get();
         return new ShellLauncher(executor, () -> LaunchSettings.resolve(snapshots.get(),
-            System.getProperty("os.name"), System.getenv(), initial.columns(), initial.lines()), start);
+            System.getProperty("os.name"), System.getenv(), initial.columns(), initial.lines(), integrationDir), start);
     }
 
     private static TerminalSession startSession(Path directory, LaunchSettings settings) {

@@ -1,6 +1,6 @@
 # Jasper shell integration scripts — design
 
-**Status:** Approved in discussion by the user on 2026-09-16; the user asked for spec, plan and execution without further prompts.
+**Status:** Implemented on `claude/shell-integration` in `.worktrees/shell-integration`, commits `38e511b..this commit`.
 
 **Development branch:** `claude/shell-integration` in `.worktrees/shell-integration`, from main `27999fe`.
 

@@ -2,6 +2,7 @@ package dev.jasper.app;
 
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -450,6 +451,19 @@ class ConfigurationControllerTest {
             assertThat(first.currentPane().shellLabel()).isEqualTo("second-shell");
             assertThat(first.currentPane().view().fontSize()).isEqualTo(22);
         });
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS)
+    void windowLauncherPassesTheIntegrationDirectoryIntoResolvedLaunchSettings() throws Exception {
+        start("");
+        var captured = new AtomicReference<LaunchSettings>();
+        edt(() -> owner(JasperApplication.windowLauncher(pending::add, controller::snapshot, (path, settings) -> {
+            captured.set(settings); return shell(path);
+        }, Path.of("/opt/si"))));
+        launchAll();
+        assertThat(captured.get().environment())
+            .containsEntry("JASPER_SHELL_INTEGRATION", "/opt/si")
+            .containsEntry("TERM_PROGRAM", "Jasper");
     }
 
     @Test void reloadActionRetriesFailedSavedInstallationWithUnchangedFiles() throws Exception {

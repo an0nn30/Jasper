@@ -188,6 +188,26 @@ To opt into closing successful exits, add or edit this setting in the existing `
 on_exit = "close_on_success"
 ```
 
+### Shell integration
+
+`terminal.shell_integration` controls whether Jasper's own zsh, bash and fish scripts load in new panes. Each script marks every prompt cycle with OSC 7 (the working directory, whenever it changed) and OSC 133 A/B/C/D (prompt start, prompt end, command start, command end with the exit status), and sends the exact command line just before C on Jasper's own channel. Jasper prefers that exact text over reading it back off the screen. These marks drive prompt jumping, the status bar's directory, and shell history's live capture of command text, working directory and exit status — see [Shell history](command-palette.md#shell-history).
+
+- `"auto"` (the default) loads the script automatically, after your own shell startup files, with no dotfile edits.
+- `"manual"` only exports `JASPER_SHELL_INTEGRATION=<dir>` so you can `source` the script yourself: zsh `source "$JASPER_SHELL_INTEGRATION/jasper.zsh"`, bash `source "$JASPER_SHELL_INTEGRATION/jasper.bash"`, fish `source "$JASPER_SHELL_INTEGRATION/jasper.fish"`.
+- `"off"` exports nothing and injects nothing.
+
+Injection only applies to a resolved program whose basename is exactly `zsh`, `bash` or `fish`; any other program (`sh`, nushell, PowerShell, a custom binary) only sees the exported variables. Each shell loads the script through a mechanism that leaves your own startup files in charge:
+
+- **zsh** runs with `ZDOTDIR` pointed at a directory of wrapper files. Each wrapper restores your own `ZDOTDIR` (carried as `JASPER_ORIGINAL_ZDOTDIR` when you had one set), sources your counterpart file (`.zshenv`, `.zprofile`, `.zshrc`, `.zlogin`), and points `ZDOTDIR` back at the wrapper directory for any startup file still to come; `.zshrc`'s wrapper sources `jasper.zsh` after your own `.zshrc` runs. By the time the shell is interactive, `ZDOTDIR` is your value again.
+- **bash** runs with `--rcfile <dir>/bash/rc.bash` inserted after the program. Because bash ignores `--rcfile` for a login shell, a `-l` or `--login` argument is removed and `JASPER_LOGIN_SHELL=1` is exported instead; `rc.bash` then reads the same files a login shell would (`/etc/profile`, then the first of `~/.bash_profile`, `~/.bash_login`, `~/.profile`) or, for a non-login shell, `/etc/bashrc`/`/etc/bash.bashrc` and `~/.bashrc`, and finally `jasper.bash`. This emulation means `shopt -q login_shell` reports false even when you asked for `-l`, and the `logout` builtin is unavailable.
+- **fish** runs with `XDG_DATA_DIRS` prefixed by the integration directory's `fish` folder (your previous `XDG_DATA_DIRS`, or `/usr/local/share:/usr/share` when it was unset, follows). fish loads a vendor snippet from there that sources `jasper.fish` after your own configuration.
+
+`TERM_PROGRAM=Jasper` is always set, in every mode, before the `[terminal.env]` overlay is applied, so a configured `TERM_PROGRAM` entry overrides it — unlike the truly reserved `TERM` and `COLORTERM`, which are applied after and always win. Because the scripts only mark once `TERM_PROGRAM` is `Jasper`, overriding it also turns marking off even when `shell_integration` is `"auto"`. The scripts only take effect in an interactive shell and set `JASPER_INTEGRATION_LOADED=1` once loaded, so a nested shell you start by hand gets no marks unless you source the script yourself in it.
+
+The script files live in `shell-integration` under Jasper's application directory, extracted the first time they're needed and rewritten on later launches only when their content changed, so an upgrade replaces stale copies without disturbing unrelated timestamps. If extraction fails, integration is off for that run and the failure is logged.
+
+To check whether integration is active in a given pane, look at the status bar: the shell name is followed by a filled dot (●) once the first prompt mark arrives, or a hollow dot (○) when none has — "Shell integration active" and "Shell integration not detected" are the corresponding tooltips.
+
 ### Initial window grid
 
 Columns and lines specify the desired first terminal grid of a new window. Jasper derives the initial pixel area from the saved font metrics and adds 4px pane padding on each side (8px total per dimension); Swing adds chrome and window decorations. The packed window respects its minimum constraints and is capped to the current display's usable area. If the display is smaller than those constraints, its usable area is the cap. Thus a large requested grid may not fit exactly, and native minimums may enlarge a small request.

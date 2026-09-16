@@ -10,9 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-16-jasper-shell-integration-design.md`.
 
-**Status:** Not started. Development branch `claude/shell-integration` in `.worktrees/shell-integration` from main `27999fe`.
+**Status:** Complete. Development branch `claude/shell-integration` in `.worktrees/shell-integration` from main `27999fe`, commits `38e511b..this commit`. Final `./gradlew check --rerun-tasks`: jasper-app 482 tests passed; jasper-terminal 305 tests, 304 passed and one existing font skip; total 787, 786 passed, one skipped, zero failures/errors.
 
-**Recorded deviation from the spec text:** extraction runs on the main thread in `Main` before the application is created (a few small file writes), not on the configuration worker. Record any further deviation in this banner and in `docs/STATUS.md`.
+**Recorded deviation from the spec text:** extraction runs on the main thread in `Main` before the application is created (a few small file writes), not on the configuration worker. `jasper.bash` is 89 lines against the "under about 80" guidance in Global Constraints, accepted with a revised bash budget of "under about 100" because of the `DEBUG`-trap and `PROMPT_COMMAND` plumbing bash needs that zsh and fish do not. Record any further deviation in this banner and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -1164,16 +1164,16 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `JasperApplication.windowLauncher(Executor, Supplier<ConfigSnapshot>, BiFunction<Path, LaunchSettings, TerminalSession>, Path integrationDir)` (the three-argument form delegates with `null`); `JasperApplication(service, launcher, history, buddyStateFile, terminate, shellHistory, snippets, Path shellIntegrationDir)` (the seven-argument form delegates with `null`); `Main` installs the scripts before creating the application.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `ConfigurationControllerTest`, add a test that builds `JasperApplication.windowLauncher(pending::add, controller::snapshot, (path, settings) -> { captured.set(settings); return DesktopTestSupport.shell(path); }, Path.of("/opt/si"))`, launches once, and asserts the captured settings' environment contains `JASPER_SHELL_INTEGRATION=/opt/si` and `TERM_PROGRAM=Jasper` (follow the shape of the existing `windowLauncher` tests at lines ~411 and ~434).
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.ConfigurationControllerTest'`
 Expected: compilation failure.
 
-- [ ] **Step 3: Wire it**
+- [x] **Step 3: Wire it**
 
 `JasperApplication`: field `private final Path shellIntegrationDir;`; eight-argument constructor storing it (seven-argument delegates `null`); `windowLauncher` gains the `Path integrationDir` parameter and passes it to `LaunchSettings.resolve(..., integrationDir)`; `newWindow` passes `shellIntegrationDir`.
 
@@ -1190,7 +1190,7 @@ Expected: compilation failure.
 
 and pass `integrationDir` as the eighth argument.
 
-- [ ] **Step 4: Documentation**
+- [x] **Step 4: Documentation**
 
 `docs/configuration.md`: a `### Shell integration` section after "Shell exit behavior": what the scripts emit (directory, prompt marks, exit status, exact command line) and what Jasper does with them (status-bar directory, prompt jumping, History with directory and status); the three modes; the mechanisms per shell (zsh `ZDOTDIR` wrappers that restore your `ZDOTDIR`, bash `--rcfile` with `-l` emulated so `shopt -q login_shell` is false and `logout` is unavailable, fish `XDG_DATA_DIRS` vendor snippet); the manual `source` line for each shell; `TERM_PROGRAM=Jasper` and that a `[terminal.env]` override wins; nested shells get no marks unless they source the script; the status-bar dot and tooltip for troubleshooting; where the files live (`shell-integration` under the app directory, rewritten on upgrade).
 
@@ -1200,11 +1200,11 @@ and pass `integrationDir` as the eighth argument.
 
 Spec banner: **Status** → implemented with the commit range. This plan's banner: complete with the final counts.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `./gradlew check --rerun-tasks`, the source-hygiene snippet from `AGENTS.md` over both modules, `git diff --check`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add jasper-app docs

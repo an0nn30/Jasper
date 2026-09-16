@@ -1,4 +1,4 @@
-# Jasper shell integration for fish 3.0 and newer. Jasper loads this automatically when
+# Jasper shell integration for fish 3.1 and newer. Jasper loads this automatically when
 # terminal.shell_integration = "auto"; otherwise add `source "$JASPER_SHELL_INTEGRATION/jasper.fish"` to config.fish.
 if status is-interactive; and test "$TERM_PROGRAM" = Jasper; and not set -q JASPER_INTEGRATION_LOADED
     set -gx JASPER_INTEGRATION_LOADED 1

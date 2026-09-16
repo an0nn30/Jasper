@@ -35,9 +35,16 @@ public final class Main {
                     try {
                         history = new CommandHistory(dirs.commandHistory());
                         ApplicationIcon.installTaskbarIcon();
+                        Path integrationDir = null;
+                        try {
+                            integrationDir = ShellIntegrationScripts.install(dirs.shellIntegration());
+                        } catch (java.io.IOException failure) {
+                            LOG.log(System.Logger.Level.WARNING,
+                                "Shell integration scripts could not be installed; integration is off", failure);
+                        }
                         application = new JasperApplication(service, null, history, dirs.buddyState(),
                             () -> System.exit(0), ShellHistoryIndex.discovered(),
-                            new SnippetStore(dirs.snippets(), new ConfigEditor()::open));
+                            new SnippetStore(dirs.snippets(), new ConfigEditor()::open), integrationDir);
                         application.newWindow(Path.of(System.getProperty("user.home")));
                     }
                     catch (RuntimeException failure) {
