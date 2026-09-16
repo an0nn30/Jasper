@@ -19,10 +19,11 @@ class ConfigTemplateTest {
 
     @Test void paletteAndClearCommentsShowTheirLiteralPlatformDefaults() {
         assertThat(ConfigTemplate.text(true)).contains("# command_palette = \"cmd+k\"", "# clear_scrollback = \"cmd+shift+k\"");
-        assertThat(ConfigTemplate.text(true)).contains("# history_palette = \"cmd+r\"");
+        assertThat(ConfigTemplate.text(true)).contains("# history_palette = \"cmd+r\"", "# snippets_palette = \"cmd+j\"");
         assertThat(ConfigTemplate.text(false)).contains("# command_palette = \"ctrl+k\"", "# clear_scrollback = \"ctrl+shift+k\"",
             "Command Palette uses plain Ctrl+K");
-        assertThat(ConfigTemplate.text(false)).contains("# history_palette = \"ctrl+shift+r\"", "Search Shell History uses Ctrl+Shift+R");
+        assertThat(ConfigTemplate.text(false)).contains("# history_palette = \"ctrl+shift+r\"", "Search Shell History uses Ctrl+Shift+R",
+            "# snippets_palette = \"ctrl+shift+j\"", "Snippets uses Ctrl+Shift+J");
     }
 
     @Test void commentedTemplatesParseCleanlyWithBuiltInDefaultsOnBothPlatforms() {

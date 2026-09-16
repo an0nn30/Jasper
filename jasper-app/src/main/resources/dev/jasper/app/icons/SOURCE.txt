@@ -4,5 +4,5 @@ Source commit: 6d128ed935d4546607b1e4d5d08c8b27bdbe7758.
 Copied from /Users/dustin/projects/tabler-icons/icons/outline on 2026-09-11.
 Adaptation: currentColor stroke replaced by #6e6e6e for live neutral FlatLaf theme recoloring.
 Original plain outline geometry and fill="none" are preserved. No color fields or face fills.
-Nine icons: square-plus, app-window, columns-2, maximize, search, settings, refresh, command, history.
+Ten icons: square-plus, app-window, columns-2, maximize, search, settings, refresh, command, history, bookmark.
 License: MIT; see LICENSE.txt.

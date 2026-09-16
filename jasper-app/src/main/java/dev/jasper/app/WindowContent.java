@@ -64,6 +64,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private boolean historyEnabled = true;
     private ShellHistoryIndex shellHistory;
     private CommandRegistry.Subscription historyRegistration;
+    private SnippetStore snippets;
+    private CommandRegistry.Subscription snippetsRegistration;
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty) {
         this(launcher, directory, newWindow, quit, onEmpty, new ThemeController());
@@ -95,6 +97,13 @@ final class WindowContent extends JPanel implements AutoCloseable {
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock,
                   CommandHistory history, boolean macOs, ShellHistoryIndex shellHistory) {
+        this(launcher, directory, newWindow, quit, onEmpty, themes, bindings, animationClock, history, macOs,
+            shellHistory, null);
+    }
+
+    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+                  ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock,
+                  CommandHistory history, boolean macOs, ShellHistoryIndex shellHistory, SnippetStore snippets) {
         super(new BorderLayout());
         this.bindings = bindings;
         this.macOs = macOs;
@@ -120,6 +129,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
         commandPalette = new WindowCommandPalette(this, scopes, PaletteScope.COMMANDS_ID, macOs);
         this.shellHistory = shellHistory;
         syncHistoryScope();
+        this.snippets = snippets;
+        if (snippets != null) snippetsRegistration = scopes.register(new SnippetsScope(snippets, message -> onError.accept(message)));
         paletteKeys = new PaletteKeyRouter(commandPalette, () -> this.bindings, macOs,
             source -> !closed && active && bindingRoot != null && source != null
                 && SwingUtilities.isDescendingFrom(this, bindingRoot)
@@ -297,10 +308,12 @@ final class WindowContent extends JPanel implements AutoCloseable {
         ActionId id = switch (scopeId) {
             case PaletteScope.COMMANDS_ID -> ActionId.COMMAND_PALETTE;
             case PaletteScope.HISTORY_ID -> ActionId.HISTORY_PALETTE;
+            case PaletteScope.SNIPPETS_ID -> ActionId.SNIPPETS_PALETTE;
             default -> null;
         };
         return id == null ? null : CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
     }
+    SnippetStore snippets() { return snippets; }
     WindowCommandPalette commandPalette() { return commandPalette; }
     WindowChrome chrome() { return chrome; }
     WindowCommands windowCommands() { return windowCommands; }
@@ -389,7 +402,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     void invoke(ActionId id) {
-        if (commandPalette != null && commandPalette.isOpen() && id != ActionId.COMMAND_PALETTE && id != ActionId.HISTORY_PALETTE) return;
+        if (commandPalette != null && commandPalette.isOpen()
+            && id != ActionId.COMMAND_PALETTE && id != ActionId.HISTORY_PALETTE && id != ActionId.SNIPPETS_PALETTE) return;
         updateActions();
         if (!action(id).isEnabled()) return;
         TerminalTab tab = currentTab();
@@ -398,6 +412,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         switch (id) {
             case COMMAND_PALETTE -> commandPalette.open(PaletteScope.COMMANDS_ID);
             case HISTORY_PALETTE -> commandPalette.open(PaletteScope.HISTORY_ID);
+            case SNIPPETS_PALETTE -> commandPalette.open(PaletteScope.SNIPPETS_ID);
             case NEW_TAB -> newTab(directory());
             case NEW_WINDOW -> newWindow.accept(directory());
             case QUIT -> quit.run();
@@ -455,6 +470,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                     case RELOAD_CONFIG -> reloadConfiguration != null;
                     case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT -> true;
                     case HISTORY_PALETTE -> scopes.find(PaletteScope.HISTORY_ID).isPresent();
+                    case SNIPPETS_PALETTE -> scopes.find(PaletteScope.SNIPPETS_ID).isPresent();
                     case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
                     case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
@@ -568,6 +584,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         paletteKeys.close();
         commandPalette.close(); windowCommands.close(); commands.close();
         if (historyRegistration != null) { historyRegistration.close(); historyRegistration = null; }
+        if (snippetsRegistration != null) { snippetsRegistration.close(); snippetsRegistration = null; }
         scopes.close();
         closed = true;
         syncPaletteDispatcher();

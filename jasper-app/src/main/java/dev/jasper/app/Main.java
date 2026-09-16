@@ -36,7 +36,8 @@ public final class Main {
                         history = new CommandHistory(dirs.commandHistory());
                         ApplicationIcon.installTaskbarIcon();
                         application = new JasperApplication(service, null, history, dirs.buddyState(),
-                            () -> System.exit(0), ShellHistoryIndex.discovered());
+                            () -> System.exit(0), ShellHistoryIndex.discovered(),
+                            new SnippetStore(dirs.snippets(), new ConfigEditor()::open));
                         application.newWindow(Path.of(System.getProperty("user.home")));
                     }
                     catch (RuntimeException failure) {

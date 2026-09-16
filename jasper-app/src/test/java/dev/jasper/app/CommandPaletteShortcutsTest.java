@@ -48,7 +48,8 @@ class CommandPaletteShortcutsTest {
                 var view = owner.chrome().menuBar().getMenu(2);
                 assertThat(view.getItem(0).getAction()).isSameAs(owner.action(ActionId.COMMAND_PALETTE));
                 assertThat(view.getItem(1).getAction()).isSameAs(owner.action(ActionId.HISTORY_PALETTE));
-                assertThat(view.getMenuComponent(2)).isInstanceOf(JSeparator.class);
+                assertThat(view.getItem(2).getAction()).isSameAs(owner.action(ActionId.SNIPPETS_PALETTE));
+                assertThat(view.getMenuComponent(3)).isInstanceOf(JSeparator.class);
             }
         });
     }

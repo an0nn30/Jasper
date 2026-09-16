@@ -43,10 +43,16 @@ final class TerminalWindow implements AutoCloseable {
 
     TerminalWindow(JasperApplication application, ShellLauncher launcher, Path directory, ThemeController themes,
                    ConfigurationController configuration, CommandHistory history, ShellHistoryIndex shellHistory) {
+        this(application, launcher, directory, themes, configuration, history, shellHistory, null);
+    }
+
+    TerminalWindow(JasperApplication application, ShellLauncher launcher, Path directory, ThemeController themes,
+                   ConfigurationController configuration, CommandHistory history, ShellHistoryIndex shellHistory,
+                   SnippetStore snippets) {
         this.application = application;
         frame.setIconImages(ApplicationIcon.images(SystemInfo.isMacOS));
         content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes,
-            KeyBindings.defaults(SystemInfo.isMacOS), System::nanoTime, history, SystemInfo.isMacOS, shellHistory);
+            KeyBindings.defaults(SystemInfo.isMacOS), System::nanoTime, history, SystemInfo.isMacOS, shellHistory, snippets);
         content.onToggleBuddy = application::toggleBuddy;
         content.buddyEnabled = application::buddyEnabled;
         if (configuration != null) {

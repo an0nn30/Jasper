@@ -111,7 +111,7 @@ final class ConfigTemplate {
             """);
         text.append(macOs
             ? "# cmd is the Command key on macOS.\n"
-            : "# cmd means Ctrl+Shift; some defaults add Alt to keep actions distinct.\n# Command Palette uses plain Ctrl+K; Clear Scrollback uses Ctrl+Shift+K; Search Shell History uses Ctrl+Shift+R.\n");
+            : "# cmd means Ctrl+Shift; some defaults add Alt to keep actions distinct.\n# Command Palette uses plain Ctrl+K; Clear Scrollback uses Ctrl+Shift+K; Search Shell History uses Ctrl+Shift+R; Snippets uses Ctrl+Shift+J.\n");
         for (ActionId action : ActionId.values()) {
             text.append("# ").append(action.label()).append('\n');
             text.append("# ").append(action.id()).append(" = \"")

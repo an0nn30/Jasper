@@ -8,7 +8,7 @@ import javax.swing.UIManager;
 final class AppIcons {
     private AppIcons() {}
     static FlatSVGIcon icon(String name) {
-        if (!java.util.Set.of("square-plus", "app-window", "columns-2", "maximize", "search", "settings", "refresh", "command", "history").contains(name))
+        if (!java.util.Set.of("square-plus", "app-window", "columns-2", "maximize", "search", "settings", "refresh", "command", "history", "bookmark").contains(name))
             throw new IllegalArgumentException("Unknown application icon: " + name);
         FlatSVGIcon icon = new FlatSVGIcon("dev/jasper/app/icons/" + name + ".svg", 16, 16);
         return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Jasper.chromeForeground", source)));

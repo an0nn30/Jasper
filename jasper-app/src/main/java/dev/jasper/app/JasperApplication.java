@@ -36,6 +36,7 @@ final class JasperApplication {
     private final ShellLauncher suppliedLauncher;
     private final Runnable terminate;
     private final ShellHistoryIndex shellHistory;
+    private final SnippetStore snippets;
     private final Set<TerminalSession> sessions = ConcurrentHashMap.newKeySet();
     private final BuddyVisibility buddyVisibility = new BuddyVisibility();
     private final Path buddyStateFile;
@@ -67,20 +68,27 @@ final class JasperApplication {
         this(service, suppliedLauncher, history, buddyStateFile, terminate, new ShellHistoryIndex(List.of()));
     }
 
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, ShellHistoryIndex shellHistory) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellHistory, null);
+    }
+
     /**
      * {@code buddyStateFile} may be null: the buddy then starts in the default corner and forgets drags.
      * {@code terminate} runs once, off the EDT, after shutdown's bounded cleanup; production passes the JVM exit.
      */
     JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
-                      Runnable terminate, ShellHistoryIndex shellHistory) {
+                      Runnable terminate, ShellHistoryIndex shellHistory, SnippetStore snippets) {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         this.buddyStateFile = buddyStateFile;
         this.terminate = terminate;
         this.shellHistory = shellHistory;
+        this.snippets = snippets;
         configuration = service == null ? null : new ConfigurationController(themes, service);
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddyVisibility.configure(snapshot.buddyEnabled()); syncBuddy();
+            if (snippets != null) snippets.reload();
         });
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler((event, response) -> {
             // Cancel the native immediate JVM exit; pane close owns bounded child cleanup.
@@ -94,9 +102,10 @@ final class JasperApplication {
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(startSession(path, settings)));
-        TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history, shellHistory);
+        TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history, shellHistory, snippets);
         windows.add(window); window.show();
         if (first) shellHistory.refresh();
+        if (first && configuration == null && snippets != null) snippets.reload();
         return window;
     }
 
@@ -231,6 +240,7 @@ final class JasperApplication {
         if (buddy != null) buddy.dispose();
         history.close();
         shellHistory.close();
+        if (snippets != null) snippets.close();
         if (configuration != null) configuration.close();
         if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler(null);
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
