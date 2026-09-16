@@ -22,13 +22,11 @@ __jasper_encode() {
 
 __jasper_mark_a=$'\033]133;A\007'
 __jasper_mark_b=$'\033]133;B\007'
-__jasper_command_ran=""
-__jasper_last_pwd=""
-__jasper_last_status=0
-__jasper_in_prompt=""
-__jasper_prompt_history=""
+__jasper_command_ran="" __jasper_last_pwd="" __jasper_last_status=0
+__jasper_in_prompt="" __jasper_prompt_history="" __jasper_previous_debug_body=""
 
-__jasper_capture_status() { __jasper_last_status=$?; }
+# First in PROMPT_COMMAND: keeps the status, and stops the trap mistaking the rest of it for typing.
+__jasper_capture_status() { __jasper_last_status=$?; __jasper_in_prompt=""; }
 
 __jasper_prompt_command() {
     if [[ -n "$__jasper_command_ran" ]]; then
@@ -46,12 +44,12 @@ __jasper_prompt_command() {
     __jasper_in_prompt=1
 }
 
-# Fires before each simple command; the first one after a prompt is the user's command line.
+# Fires before each simple command; the first after a prompt is the user's line. History holds
+# it as typed; one kept out of history (HISTCONTROL) keeps the number, so $BASH_COMMAND serves.
 __jasper_debug_trap() {
     [[ -n "$__jasper_in_prompt" ]] || return 0
     case "$BASH_COMMAND" in *__jasper_*) return 0 ;; esac
-    __jasper_in_prompt=""
-    __jasper_command_ran=1
+    __jasper_in_prompt="" __jasper_command_ran=1
     local entry number line encoded
     entry="$(HISTTIMEFORMAT= builtin history 1)"
     number="$(printf '%s\n' "$entry" | sed -E '1!d; s/^ *([0-9]+).*/\1/')"
@@ -64,27 +62,26 @@ __jasper_debug_trap() {
         __jasper_osc "1341;jasper;cmd;$encoded"
     fi
     __jasper_osc "133;C"
+    return 0
 }
 
+# Unless functrace is set, bash hides the DEBUG trap from a sourced file and restores the old one
+# when it returns, so it must be installed from the shell's top level: PROMPT_COMMAND evaluates
+# this once at the first prompt, chaining the user's own trap, then blanks it.
+__jasper_install_debug='__jasper_install_debug=
+__jasper_previous_debug="$(trap -p DEBUG)"
+__jasper_previous_debug="${__jasper_previous_debug#trap -- }"
+eval "__jasper_previous_debug_body=${__jasper_previous_debug% DEBUG}"
+unset __jasper_previous_debug
+trap "__jasper_debug_trap; eval \"\$__jasper_previous_debug_body\"" DEBUG'
+
 if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
-    PROMPT_COMMAND=(__jasper_capture_status "${PROMPT_COMMAND[@]}" __jasper_prompt_command)
+    PROMPT_COMMAND=(__jasper_capture_status 'eval "$__jasper_install_debug"' "${PROMPT_COMMAND[@]}" __jasper_prompt_command)
 else
     __jasper_existing="${PROMPT_COMMAND}"
     while [[ "$__jasper_existing" == *";" || "$__jasper_existing" == *" " ]]; do __jasper_existing="${__jasper_existing%?}"; done
-    if [[ -n "$__jasper_existing" ]]; then
-        PROMPT_COMMAND="__jasper_capture_status;${__jasper_existing};__jasper_prompt_command"
-    else
-        PROMPT_COMMAND="__jasper_capture_status;__jasper_prompt_command"
-    fi
+    PROMPT_COMMAND='__jasper_capture_status;eval "$__jasper_install_debug"'
+    [[ -n "$__jasper_existing" ]] && PROMPT_COMMAND="$PROMPT_COMMAND;$__jasper_existing"
+    PROMPT_COMMAND="$PROMPT_COMMAND;__jasper_prompt_command"
     unset __jasper_existing
 fi
-
-__jasper_previous_debug="$(trap -p DEBUG)"
-__jasper_previous_debug="${__jasper_previous_debug#trap -- }"
-__jasper_previous_debug="${__jasper_previous_debug% DEBUG}"
-if [[ -n "$__jasper_previous_debug" && "$__jasper_previous_debug" != "''" ]]; then
-    eval "trap '__jasper_debug_trap; '$__jasper_previous_debug DEBUG"
-else
-    trap '__jasper_debug_trap' DEBUG
-fi
-unset __jasper_previous_debug
