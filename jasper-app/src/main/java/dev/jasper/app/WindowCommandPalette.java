@@ -23,6 +23,7 @@ final class WindowCommandPalette implements AutoCloseable {
     };
     private CommandRegistry.Subscription scopeListener;
     private PaletteScope active;
+    private PaletteStep step;
     private PaletteContext context;
     private boolean picker;
     private JRootPane root;
@@ -87,6 +88,7 @@ final class WindowCommandPalette implements AutoCloseable {
     }
 
     private void activate(PaletteScope scope, boolean keepQuery) {
+        if (step != null) { step = null; palette.hideStep(); }
         if (scopeListener != null) scopeListener.close();
         active = scope; picker = false;
         scopeListener = scope.onChanged(this::changed);
@@ -110,8 +112,6 @@ final class WindowCommandPalette implements AutoCloseable {
     int maxResults() { return maxResults; }
 
     void dismiss() { if (open) restoreAndHide(); }
-    /** Escape leaves the picker with the previous scope; outside the picker it dismisses. */
-    void escape() { if (pickerOpen()) palette.queryField().setText(""); else dismiss(); }
     void openPicker() { if (open && !picker) palette.queryField().setText(">"); }
     boolean isOpen() { return open; }
     boolean pickerOpen() { return open && picker; }
@@ -119,12 +119,60 @@ final class WindowCommandPalette implements AutoCloseable {
     boolean composing() { return palette.composing(); }
     CommandPalette component() { return palette; }
 
-    /** Tab commits the picker's highlighted scope; elsewhere Tab has no palette meaning. */
-    boolean tabPressed() {
+    /** Enter and its modifier variants: completes an open step, otherwise runs that verb on the selected row. */
+    void enterPressed(int verb) {
+        if (!open) return;
+        if (step != null) completeStep(); else palette.executeSelected(verb);
+    }
+
+    void executeNumber(int number) { if (open && step == null) palette.executeNumber(number); }
+    void moveSelection(int delta) { if (open && step == null) palette.selectRelative(delta); }
+    boolean stepOpen() { return open && step != null; }
+
+    /** Escape leaves a step, then the picker, and otherwise dismisses. */
+    void escape() {
+        if (step != null) { closeStep(); return; }
+        if (pickerOpen()) palette.queryField().setText(""); else dismiss();
+    }
+
+    boolean tabPressed() { return tabPressed(false); }
+
+    /** Tab moves between step fields, or commits the picker's highlighted scope; elsewhere it has no meaning. */
+    boolean tabPressed(boolean backwards) {
+        if (step != null) { palette.focusStepField(backwards ? -1 : 1); return true; }
         if (!pickerOpen()) return false;
         PaletteRow row = palette.resultList().getSelectedValue();
         if (row != null) scopes.find(row.id()).ifPresent(scope -> activate(scope, false));
         return true;
+    }
+
+    private void showStep(PaletteStep pending) {
+        step = pending;
+        palette.showStep(pending.title(), pending.fields());
+        layoutOverlay();
+    }
+
+    private void closeStep() {
+        step = null;
+        palette.hideStep();
+        rebuild(true);
+        palette.queryField().requestFocusInWindow();
+    }
+
+    private void completeStep() {
+        PaletteStep current = step;
+        palette.setStepError(null);
+        current.complete().accept(palette.stepValues(), result -> {
+            if (step != current || !open) return;
+            if (result.error() != null) { palette.setStepError(result.error()); layoutOverlay(); return; }
+            step = null;
+            palette.hideStep();
+            restoreAndHide();
+            if (result.reopenScopeId() != null) {
+                open(result.reopenScopeId());
+                if (open && result.reopenRowId() != null) palette.selectRow(result.reopenRowId());
+            }
+        });
     }
 
     private void queryChanged(String query) {
@@ -158,6 +206,7 @@ final class WindowCommandPalette implements AutoCloseable {
 
     private void rebuild(boolean preserve) {
         if (!open || active == null) return;
+        if (step != null) { dirty = true; return; }
         dirty = false;
         PaletteRow selected = palette.resultList().getSelectedValue();
         String query = palette.queryField().getText();
@@ -200,6 +249,8 @@ final class WindowCommandPalette implements AutoCloseable {
         owner.updateActions();
         if (!validOrigin() || !scopes.contains(scope) || !scope.available(row, context)) { refresh(); return; }
         PaletteVerb verb = scope.verbs().get(verbIndex);
+        PaletteStep pending = scope.step(row, verb, context);
+        if (pending != null) { showStep(pending); return; }
         PaletteContext target = context;
         restoreAndHide();
         try {
@@ -214,7 +265,9 @@ final class WindowCommandPalette implements AutoCloseable {
         // Pane changes notify us after choosing the new logical target. A captured component
         // in the old pane may still be showing, but restoring it would undo that transition.
         boolean restorePriorFocus = validOrigin();
-        open = false; picker = false; palette.setVisible(false); overlay.setVisible(overlay.swallowing);
+        open = false; picker = false;
+        step = null; palette.hideStep();
+        palette.setVisible(false); overlay.setVisible(overlay.swallowing);
         if (scopeListener != null) { scopeListener.close(); scopeListener = null; }
         active = null;
         if (restorePriorFocus && priorFocus != null && priorFocus.isShowing()

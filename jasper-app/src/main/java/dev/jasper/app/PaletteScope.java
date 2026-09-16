@@ -10,6 +10,7 @@ import javax.swing.Icon;
 interface PaletteScope {
     String COMMANDS_ID = "jasper.commands";
     String HISTORY_ID = "jasper.history";
+    String SNIPPETS_ID = "jasper.snippets";
 
     String id();
     String label();
@@ -17,6 +18,7 @@ interface PaletteScope {
     default String description() { return ""; }
     String placeholder();
     default List<String> aliases() { return List.of(); }
+    /** One to three verbs, bound in order to Enter, Cmd/Ctrl+Enter and Shift+Enter. */
     List<PaletteVerb> verbs();
     default boolean monospaceRows() { return false; }
     /** The scope became active in an open palette; a scope may ask its index for a background refresh here. */
@@ -25,6 +27,11 @@ interface PaletteScope {
     PaletteResults search(String query, PaletteContext context);
     /** Rechecked immediately before execution; a false answer refreshes the list instead of executing. */
     default boolean available(PaletteRow row, PaletteContext context) { return row.enabled(); }
+    /**
+     * Consulted before {@link #execute}: a non-null step is shown in the card instead of running the verb,
+     * and {@code execute} is not called for that action. The step's completion does the work.
+     */
+    default PaletteStep step(PaletteRow row, PaletteVerb verb, PaletteContext context) { return null; }
     void execute(PaletteRow row, PaletteVerb verb, PaletteContext context);
     CommandRegistry.Subscription onChanged(Runnable listener);
 

@@ -12,6 +12,7 @@ import java.text.AttributedString;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -340,6 +341,50 @@ class CommandPaletteTest {
             first.doLayout();
             assertThat(visibleLabels(first)).contains("row 0", "detail 0", "zsh", "⌘1");
             assertThat(sixthLabels).contains("row 5", "detail 5", "zsh").doesNotContain("⌘6");
+        });
+    }
+
+    @Test void threeVerbsShowInTheFooterAndAStepReplacesTheListWithFields() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var palette = new CommandPalette(true, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
+            var verbs = List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run"),
+                new PaletteVerb("save", "Save as snippet…"));
+            palette.setScope("History", null, "x", verbs, 5, true);
+            assertThat(palette.footer().getText())
+                .isEqualTo("⏎ Paste  ⌘⏎ Paste and run  ⇧⏎ Save as snippet…");
+            assertThat(CommandPalette.footerText(verbs, false))
+                .isEqualTo("Enter Paste  Ctrl+Enter Paste and run  Shift+Enter Save as snippet…");
+            palette.setResults(List.of(PaletteRow.of("a", "A"), PaletteRow.of("b", "B")), null, null);
+            palette.showStep("Rebase", List.of(new PaletteStep.Field("branch", "branch", "main"),
+                new PaletteStep.Field("remote", "remote", "")));
+            assertThat(palette.stepShowing()).isTrue();
+            assertThat(palette.stepFields()).hasSize(2);
+            assertThat(palette.stepFields().getFirst().getText()).isEqualTo("main");
+            assertThat(palette.stepFields().getFirst().getAccessibleContext().getAccessibleName()).isEqualTo("branch");
+            assertThat(palette.stepFocusIndex()).isZero();
+            assertThat(palette.sectionLabel().getText()).isEqualTo("Rebase");
+            assertThat(palette.sectionLabel().isVisible()).isTrue();
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(56 + 24 + 2 * 40 + 24));
+            palette.focusStepField(1);
+            assertThat(palette.stepFocusIndex()).isEqualTo(1);
+            palette.focusStepField(1);
+            assertThat(palette.stepFocusIndex()).isZero();
+            palette.focusStepField(-1);
+            assertThat(palette.stepFocusIndex()).isEqualTo(1);
+            palette.stepFields().get(1).setText("origin");
+            assertThat(palette.stepValues()).hasSize(2).containsEntry("branch", "main").containsEntry("remote", "origin");
+            palette.setStepError("Nope");
+            assertThat(palette.stepError().isVisible()).isTrue();
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(56 + 24 + 2 * 40 + 24 + 24));
+            palette.setStepError(null);
+            assertThat(palette.stepError().isVisible()).isFalse();
+            palette.hideStep();
+            assertThat(palette.stepShowing()).isFalse();
+            assertThat(palette.stepFields()).isEmpty();
+            palette.selectRow("b");
+            assertThat(palette.resultList().getSelectedValue().id()).isEqualTo("b");
+            palette.selectRow("missing");
+            assertThat(palette.resultList().getSelectedValue().id()).isEqualTo("b");
         });
     }
 

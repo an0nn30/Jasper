@@ -74,15 +74,19 @@ final class PaletteKeyRouter implements AutoCloseable {
         if (palette.composing() && modifiers == 0 && code != KeyEvent.VK_ESCAPE) return false;
         boolean numbered = modifiers == primary && code >= KeyEvent.VK_1 && code <= KeyEvent.VK_5;
         boolean secondVerb = modifiers == primary && code == KeyEvent.VK_ENTER;
+        boolean thirdVerb = modifiers == InputEvent.SHIFT_DOWN_MASK && code == KeyEvent.VK_ENTER;
+        boolean backTab = modifiers == InputEvent.SHIFT_DOWN_MASK && code == KeyEvent.VK_TAB;
         Runnable operation = null;
-        if (numbered) operation = () -> palette.component().executeNumber(code - KeyEvent.VK_1 + 1);
-        else if (secondVerb) operation = () -> palette.component().executeSelected(1);
+        if (numbered) operation = () -> palette.executeNumber(code - KeyEvent.VK_1 + 1);
+        else if (secondVerb) operation = () -> palette.enterPressed(1);
+        else if (thirdVerb) operation = () -> palette.enterPressed(2);
+        else if (backTab) operation = () -> palette.tabPressed(true);
         else if (modifiers == 0) operation = switch (code) {
             case KeyEvent.VK_ESCAPE -> palette::escape;
-            case KeyEvent.VK_ENTER -> palette.component()::executeSelected;
-            case KeyEvent.VK_TAB -> palette::tabPressed;
-            case KeyEvent.VK_UP -> () -> palette.component().selectRelative(-1);
-            case KeyEvent.VK_DOWN -> () -> palette.component().selectRelative(1);
+            case KeyEvent.VK_ENTER -> () -> palette.enterPressed(0);
+            case KeyEvent.VK_TAB -> () -> palette.tabPressed(false);
+            case KeyEvent.VK_UP -> () -> palette.moveSelection(-1);
+            case KeyEvent.VK_DOWN -> () -> palette.moveSelection(1);
             default -> null;
         };
         if (operation != null) {

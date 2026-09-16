@@ -17,12 +17,16 @@ import java.awt.event.InputMethodListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.text.AttributedCharacterIterator;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.ObjIntConsumer;
 import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.Icon;
 import javax.swing.JButton;
@@ -64,6 +68,13 @@ final class CommandPalette extends JPanel {
     private final JScrollPane scrollingResults = new JScrollPane(results, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
         JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
     private final ResultRenderer renderer;
+    private final JPanel stepPanel = new JPanel();
+    private final List<JTextField> stepFields = new ArrayList<>();
+    private final List<String> stepNames = new ArrayList<>();
+    private final List<JLabel> stepLabels = new ArrayList<>();
+    private final JLabel stepError = new JLabel();
+    private int stepFocus = -1;
+    private Color foregroundColor, mutedColor, borderColor, accentColor, selectionColor, selectionForegroundColor;
     private Color surfaceBorder;
     private boolean composing;
     private String scopeLabel = "Commands";
@@ -154,6 +165,15 @@ final class CommandPalette extends JPanel {
         empty.setPreferredSize(new Dimension(0, UIScale.scale(ROW_HEIGHT)));
         scrollingResults.setBorder(BorderFactory.createEmptyBorder());
         scrollingResults.setOpaque(false); scrollingResults.getViewport().setOpaque(false);
+        stepPanel.setLayout(new BoxLayout(stepPanel, BoxLayout.Y_AXIS));
+        stepPanel.setOpaque(false);
+        stepError.setOpaque(false);
+        stepError.putClientProperty("html.disable", Boolean.TRUE);
+        stepError.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(16), 0, UIScale.scale(16)));
+        stepError.setPreferredSize(new Dimension(0, UIScale.scale(LABEL_HEIGHT)));
+        stepError.setMaximumSize(new Dimension(Integer.MAX_VALUE, UIScale.scale(LABEL_HEIGHT)));
+        stepError.setVisible(false);
+        cards.add(stepPanel, "step");
         cards.add(scrollingResults, "results");
         cards.add(empty, "empty");
         cardLayout.show(cards, "empty");
@@ -191,9 +211,14 @@ final class CommandPalette extends JPanel {
 
     static String footerText(List<PaletteVerb> verbs, boolean macOs) {
         if (verbs.size() < 2) return "";
-        String enter = macOs ? "⏎" : "Enter";
-        String primary = macOs ? "⌘⏎" : "Ctrl+Enter";
-        return enter + " " + verbs.get(0).label() + "  " + primary + " " + verbs.get(1).label();
+        String[] keys = macOs ? new String[]{"⏎", "⌘⏎", "⇧⏎"}
+            : new String[]{"Enter", "Ctrl+Enter", "Shift+Enter"};
+        var text = new StringBuilder();
+        for (int i = 0; i < Math.min(3, verbs.size()); i++) {
+            if (i > 0) text.append("  ");
+            text.append(keys[i]).append(' ').append(verbs.get(i).label());
+        }
+        return text.toString();
     }
 
     void setResults(List<PaletteRow> rows, String label, String selectionId) {
@@ -221,6 +246,94 @@ final class CommandPalette extends JPanel {
         repaint();
     }
 
+    /** Shows a form instead of the list; the query and chip stay. The first field takes focus. */
+    void showStep(String title, List<PaletteStep.Field> fields) {
+        stepPanel.removeAll(); stepFields.clear(); stepNames.clear(); stepLabels.clear();
+        for (PaletteStep.Field field : fields) {
+            var row = new FixedHeightPanel(ROW_HEIGHT);
+            row.setOpaque(false);
+            row.setLayout(new BorderLayout(UIScale.scale(10), 0));
+            row.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(16), UIScale.scale(6), UIScale.scale(16)));
+            var label = new JLabel(field.label());
+            label.putClientProperty("html.disable", Boolean.TRUE);
+            label.setPreferredSize(new Dimension(UIScale.scale(140), 0));
+            var text = new JTextField(field.prefill());
+            text.setOpaque(false);
+            text.getAccessibleContext().setAccessibleName(field.label());
+            row.add(label, BorderLayout.LINE_START);
+            row.add(text, BorderLayout.CENTER);
+            stepPanel.add(row);
+            stepFields.add(text); stepNames.add(field.name()); stepLabels.add(label);
+        }
+        stepError.setText(""); stepError.setVisible(false);
+        stepPanel.add(stepError);
+        applyStepColors();
+        sectionLabel.setText(title); sectionLabel.setVisible(true);
+        cardLayout.show(cards, "step");
+        stepFocus = 0;
+        stepFields.getFirst().requestFocusInWindow();
+        stepFields.getFirst().selectAll();
+        revalidate(); repaint();
+    }
+
+    void hideStep() {
+        stepPanel.removeAll(); stepFields.clear(); stepNames.clear(); stepLabels.clear();
+        stepFocus = -1;
+        cardLayout.show(cards, model.isEmpty() ? "empty" : "results");
+        revalidate(); repaint();
+    }
+
+    boolean stepShowing() { return stepFocus >= 0; }
+    List<JTextField> stepFields() { return List.copyOf(stepFields); }
+    int stepFocusIndex() { return stepFocus; }
+    JLabel stepError() { return stepError; }
+
+    /** Moves focus to the next (or previous) field, wrapping. */
+    void focusStepField(int delta) {
+        if (stepFields.isEmpty()) return;
+        stepFocus = Math.floorMod(stepFocus + delta, stepFields.size());
+        JTextField field = stepFields.get(stepFocus);
+        field.requestFocusInWindow();
+        field.selectAll();
+    }
+
+    Map<String, String> stepValues() {
+        var values = new LinkedHashMap<String, String>();
+        for (int i = 0; i < stepFields.size(); i++) values.put(stepNames.get(i), stepFields.get(i).getText());
+        return values;
+    }
+
+    void setStepError(String message) {
+        stepError.setText(message == null ? "" : message);
+        stepError.setVisible(message != null);
+        revalidate(); repaint();
+    }
+
+    void selectRow(String id) {
+        for (int i = 0; i < model.size(); i++) {
+            if (!model.get(i).id().equals(id)) continue;
+            results.setSelectedIndex(i);
+            results.ensureIndexIsVisible(i);
+            return;
+        }
+    }
+
+    private void applyStepColors() {
+        if (foregroundColor == null) return;
+        for (JLabel label : stepLabels) { label.setForeground(mutedColor); label.setFont(footer.getFont()); }
+        for (JTextField field : stepFields) {
+            field.setForeground(foregroundColor);
+            field.setCaretColor(accentColor);
+            field.setSelectionColor(selectionColor);
+            field.setSelectedTextColor(selectionForegroundColor);
+            field.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(borderColor, UIScale.scale(1), true),
+                BorderFactory.createEmptyBorder(0, UIScale.scale(6), 0, UIScale.scale(6))));
+        }
+        stepError.setForeground(accentColor);
+        stepError.setFont(footer.getFont());
+    }
+
     void refreshTheme() {
         Color background = color("Jasper.paletteBackground", "Panel.background", Color.DARK_GRAY);
         Color foreground = color("Jasper.paletteForeground", "Label.foreground", Color.WHITE);
@@ -229,6 +342,8 @@ final class CommandPalette extends JPanel {
         Color accent = color("Jasper.paletteAccent", "Component.focusedBorderColor", foreground);
         Color selection = color("Jasper.paletteSelectionBackground", "List.selectionBackground", background);
         Color selectionForeground = color("Jasper.paletteSelectionForeground", "List.selectionForeground", foreground);
+        foregroundColor = foreground; mutedColor = muted; borderColor = border; accentColor = accent;
+        selectionColor = selection; selectionForegroundColor = selectionForeground;
 
         setBackground(background);
         setForeground(foreground);
@@ -257,6 +372,7 @@ final class CommandPalette extends JPanel {
         results.setSelectionBackground(selection);
         results.setSelectionForeground(selectionForeground);
         renderer.refreshTheme(foreground, muted, border, selection, selectionForeground);
+        applyStepColors();
         revalidate(); repaint();
     }
 
@@ -286,6 +402,12 @@ final class CommandPalette extends JPanel {
     }
 
     @Override public Dimension getPreferredSize() {
+        if (stepShowing()) {
+            int footerHeight = footer.isVisible() ? FOOTER_HEIGHT : 0;
+            int errorHeight = stepError.isVisible() ? LABEL_HEIGHT : 0;
+            return new Dimension(UIScale.scale(WIDTH),
+                UIScale.scale(INPUT_HEIGHT + LABEL_HEIGHT + stepFields.size() * ROW_HEIGHT + errorHeight + footerHeight));
+        }
         int rows = Math.max(1, Math.min(model.size(), preferredRows));
         int label = sectionLabel.isVisible() ? LABEL_HEIGHT : 0;
         int footerHeight = footer.isVisible() ? FOOTER_HEIGHT : 0;
