@@ -1,5 +1,26 @@
 # Jasper — Status and Handoff
 
+**Configured cursor shape under tmux (2026-09-16):** On
+`claude/shell-cursor-shape-bug-9981da`, `terminal.cursor.shape` was ignored for
+anyone whose shell sends a terminal query. Only `CSI ... SP q` is DECSCUSR, but
+jediterm-core 3.76 reads *every* CSI ending in `q` as one — measured:
+`CSI > q` (XTVERSION), `CSI Ps q` (DECLL) and `CSI ? q` all arrive as
+`BLINK_BLOCK`, indistinguishable from an application asking for a block cursor.
+tmux sends XTVERSION when it opens a session, so `display.cursorShape()` was
+non-null within milliseconds of launch and `CursorStyle.effective` returned the
+program's shape forever after; the config never lost a value, it was outranked.
+`ShellIntegrationFilter` now parses CSI properly (parameter bytes `0x30–0x3F`,
+intermediates `0x20–0x2F`, final `0x40–0x7E`) and **drops** a `q`-final sequence
+that carries no space intermediate, which also retires the `CSI_ZERO`/`CSI_SPACE`
+states. JediTerm answers none of these queries (verified: no reply bytes), so
+nothing is lost. Real DECSCUSR is untouched: `CSI 0 SP q` / `CSI SP q` still pass
+through and append `cursor-reset`, `CSI 5 SP q` still sets a beam, and a query
+arriving afterwards no longer discards it. Verified end to end against the user's
+own `config.toml` and real tmux: shape stays null, effective style `UNDERLINE`.
+`./gradlew check`: 773 tests, zero failures, one existing font skip. Jasper does
+not reply to XTVERSION — deliberate, matching the previous behaviour; worth
+revisiting only if a program needs the answer. No GUI, merge or push.
+
 **Palette snippets (2026-09-16):** On `claude/snippets` in `.worktrees/snippets` (from
 main `b9efd41`), the command palette gains a third scope, `SnippetsScope` (id
 `jasper.snippets`, bookmark icon, aliases `snip`/`snippets`), backed by an

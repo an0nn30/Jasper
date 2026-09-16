@@ -46,6 +46,19 @@ class ShellIntegrationFilterTest {
         assertThat(run(input)).isEqualTo(input);
     }
 
+    /**
+     * Only {@code CSI ... SP q} is DECSCUSR, but jediterm-core 3.76 reads every CSI ending in {@code q}
+     * as one. tmux opens a session with the XTVERSION query {@code CSI > q}, which would otherwise
+     * arrive as a request for a blinking block cursor and outrank the configured shape forever.
+     */
+    @Test
+    void csiQueriesEndingInQAreDroppedBecauseTheEmulatorMisreadsThemAsCursorRequests() {
+        assertThat(run("a\033[>qb")).isEqualTo("ab");
+        assertThat(run("\033[>0;1q")).isEmpty();
+        assertThat(run("\033[0q")).isEmpty();
+        assertThat(run("\033[?q")).isEmpty();
+    }
+
     @Test
     void sequencesSplitAcrossReadsAreStillRewritten() {
         String input = "x\033]7;file:///tmp\033\\y\033[0 qz";
