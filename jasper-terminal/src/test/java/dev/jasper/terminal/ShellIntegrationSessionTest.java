@@ -182,6 +182,27 @@ class ShellIntegrationSessionTest {
         Await.until(() -> session.display().cursorShape() == null, "back to the configured cursor");
     }
 
+    /** tmux sends XTVERSION when it opens a session; it says nothing about the cursor. */
+    @Test
+    void theTerminalVersionQueryLeavesTheConfiguredCursorAlone() throws Exception {
+        connector.feed("\033[>qready");
+
+        Await.until(() -> "ready".equals(session.snapshot().lineText(0)), "text after the query");
+        assertThat(session.display().cursorShape()).isNull();
+    }
+
+    /** A query must not discard a shape the running program asked for either. */
+    @Test
+    void theTerminalVersionQueryKeepsAShapeTheProgramAlreadyRequested() throws Exception {
+        connector.feed("\033[6 q");
+        Await.until(() -> session.display().cursorShape() == CursorShape.STEADY_VERTICAL_BAR, "beam requested");
+
+        connector.feed("\033[>qready");
+
+        Await.until(() -> "ready".equals(session.snapshot().lineText(0)), "text after the query");
+        assertThat(session.display().cursorShape()).isEqualTo(CursorShape.STEADY_VERTICAL_BAR);
+    }
+
     @Test
     void customCommandsFromOtherToolsAreIgnored() throws Exception {
         connector.feed("\033]1341;other;cwd;file:///tmp\007done");

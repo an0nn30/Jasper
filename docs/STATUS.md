@@ -113,14 +113,38 @@ terminal and typing ` export TOKEN=…`. Suppression now keys on whether history
 is enabled (`[[ -o history ]]` and `HISTSIZE`), not on whether it has entries.
 The eight-row matrix (hidden/visible × ignorespace/ignoreboth/ignoredups/none ×
 history on/off) is verified against `/bin/bash`, and the new test fails if the
-condition is reverted. Fresh `./gradlew check --rerun-tasks`: jasper-app 503
-tests, 502 passed and one fish skip; jasper-terminal 313 tests, 312 passed and
-one existing font skip. Total 816 tests, 814 passed, two skipped, zero
-failures/errors. Still user-run: each
+condition is reverted. Fresh `./gradlew check --rerun-tasks` on the branch: jasper-app
+503 tests, 502 passed and one fish skip; jasper-terminal 313 tests, 312 passed
+and one existing font skip — 816 tests, 814 passed, two skipped. After merging
+`main` (which had brought in the cursor-shape fix and its three tests): 819
+tests, 817 passed, two skipped, zero failures/errors. Still user-run: each
 shell (zsh, bash, and fish if installed) on the real macOS desktop with the
 user's own dotfiles and prompt theme, confirming marks, the status-bar dot and
 that nested shells stay quiet; plus a look at the two adjacent status-bar dots
-and at the status bar at a narrow window width. No GUI, merge or push.
+and at the status bar at a narrow window width. Merged to `main` and pushed.
+No GUI.
+
+**Configured cursor shape under tmux (2026-09-16):** On
+`claude/shell-cursor-shape-bug-9981da`, `terminal.cursor.shape` was ignored for
+anyone whose shell sends a terminal query. Only `CSI ... SP q` is DECSCUSR, but
+jediterm-core 3.76 reads *every* CSI ending in `q` as one — measured:
+`CSI > q` (XTVERSION), `CSI Ps q` (DECLL) and `CSI ? q` all arrive as
+`BLINK_BLOCK`, indistinguishable from an application asking for a block cursor.
+tmux sends XTVERSION when it opens a session, so `display.cursorShape()` was
+non-null within milliseconds of launch and `CursorStyle.effective` returned the
+program's shape forever after; the config never lost a value, it was outranked.
+`ShellIntegrationFilter` now parses CSI properly (parameter bytes `0x30–0x3F`,
+intermediates `0x20–0x2F`, final `0x40–0x7E`) and **drops** a `q`-final sequence
+that carries no space intermediate, which also retires the `CSI_ZERO`/`CSI_SPACE`
+states. JediTerm answers none of these queries (verified: no reply bytes), so
+nothing is lost. Real DECSCUSR is untouched: `CSI 0 SP q` / `CSI SP q` still pass
+through and append `cursor-reset`, `CSI 5 SP q` still sets a beam, and a query
+arriving afterwards no longer discards it. Verified end to end against the user's
+own `config.toml` and real tmux: shape stays null, effective style `UNDERLINE`.
+`./gradlew check`: 773 tests, zero failures, one existing font skip. Jasper does
+not reply to XTVERSION — deliberate, matching the previous behaviour; worth
+revisiting only if a program needs the answer. Merged to `main` and pushed; the
+branch is deleted. No GUI.
 
 **Palette snippets (2026-09-16):** On `claude/snippets` in `.worktrees/snippets` (from
 main `b9efd41`), the command palette gains a third scope, `SnippetsScope` (id

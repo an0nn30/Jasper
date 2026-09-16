@@ -7,7 +7,14 @@ package dev.jasper.terminal;
  *   OSC 7 ; data ST        →  OSC 1341 ; jasper ; cwd ; data BEL
  *   OSC 133 ; data ST      →  OSC 1341 ; jasper ; mark ; data BEL
  *   CSI 0 SP q, CSI SP q   →  unchanged, then OSC 1341 ; jasper ; cursor-reset BEL
+ *   CSI ... q without SP   →  dropped
  * </pre>
+ * The last rule is a guard rather than an integration: only {@code CSI ... SP q} is DECSCUSR, but
+ * JediTerm reads every CSI ending in {@code q} as one, so the XTVERSION query {@code CSI > q} that
+ * tmux sends when it opens a session would arrive as a request for a blinking block cursor and
+ * outrank the configured shape for the rest of the session. JediTerm answers none of these queries,
+ * so dropping them costs nothing.
+ * <p>
  * Everything else passes through unchanged. Reader thread only.
  */
 final class ShellIntegrationFilter {
@@ -17,13 +24,15 @@ final class ShellIntegrationFilter {
     private static final char BEL = '\007';
     private static final int MAX_HELD = 4096;
 
-    private enum State { TEXT, ESCAPE, OSC_NUMBER, OSC_DATA, OSC_DATA_ESCAPE, CSI, CSI_ZERO, CSI_SPACE }
+    private enum State { TEXT, ESCAPE, OSC_NUMBER, OSC_DATA, OSC_DATA_ESCAPE, CSI }
 
     private final StringBuilder held = new StringBuilder();
     private final StringBuilder oscNumber = new StringBuilder();
+    private final StringBuilder csiParameters = new StringBuilder();
     private State state = State.TEXT;
     private String command;
     private int dataStart;
+    private boolean csiSpaced;
 
     void filter(char[] input, int offset, int length, StringBuilder out) {
         for (int i = offset; i < offset + length; i++) {
@@ -91,23 +100,19 @@ final class ShellIntegrationFilter {
                 }
             }
             case CSI -> {
-                if (c == '0') {
-                    state = State.CSI_ZERO;
-                } else if (c == ' ') {
-                    state = State.CSI_SPACE;
-                } else {
+                if (c >= '0' && c <= '?') {
+                    csiParameters.append(c);
+                    if (held.length() > MAX_HELD) pass(out);
+                } else if (c >= ' ' && c <= '/') {
+                    csiSpaced |= c == ' ';
+                    if (held.length() > MAX_HELD) pass(out);
+                } else if (c < '@' || c > '~') {
+                    pass(out); // ESC or a control character abandons the sequence
+                } else if (c != 'q') {
                     pass(out);
-                }
-            }
-            case CSI_ZERO -> {
-                if (c == ' ') {
-                    state = State.CSI_SPACE;
-                } else {
-                    pass(out);
-                }
-            }
-            case CSI_SPACE -> {
-                if (c == 'q') {
+                } else if (!csiSpaced) {
+                    reset(); // a query JediTerm would misread as DECSCUSR; drop it
+                } else if (csiParameters.isEmpty() || csiParameters.toString().equals("0")) {
                     out.append(held).append(PREFIX).append("cursor-reset").append(BEL);
                     reset();
                 } else {
@@ -143,6 +148,8 @@ final class ShellIntegrationFilter {
 
     private void reset() {
         held.setLength(0);
+        csiParameters.setLength(0);
+        csiSpaced = false;
         state = State.TEXT;
         command = null;
     }
