@@ -1,6 +1,8 @@
 package dev.jasper.app;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Base64;
@@ -27,16 +29,30 @@ final class ShellRun {
         builder.environment().clear();
         builder.environment().putAll(environment);
         Process process = builder.start();
+        // Drained on its own thread so the child never blocks on a full pipe and so the timeout
+        // below is real: a shell that never exits is destroyed and whatever it printed is kept.
+        var output = new ByteArrayOutputStream();
+        Thread reader = new Thread(() -> {
+            try (InputStream out = process.getInputStream()) {
+                out.transferTo(output);
+            } catch (IOException closedByDestroy) {
+                // Keep what was read before the process was destroyed.
+            }
+        }, "shell-output");
+        reader.setDaemon(true);
+        reader.start();
         try (var stdin = process.getOutputStream()) {
             stdin.write(input.getBytes(StandardCharsets.UTF_8));
         }
-        byte[] output = process.getInputStream().readAllBytes();
         if (!process.waitFor(10, TimeUnit.SECONDS)) process.destroyForcibly();
-        return new String(output, StandardCharsets.UTF_8);
+        reader.join(TimeUnit.SECONDS.toMillis(5));
+        return output.toString(StandardCharsets.UTF_8);
     }
 
     static String hostname() throws IOException, InterruptedException {
         Process process = new ProcessBuilder("hostname").redirectErrorStream(true).start();
-        return new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+        String name = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+        process.waitFor();
+        return name;
     }
 }

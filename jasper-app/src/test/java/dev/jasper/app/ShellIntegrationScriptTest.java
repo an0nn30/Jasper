@@ -66,6 +66,7 @@ class ShellIntegrationScriptTest {
         int emptyA = indexAfter(output, ShellRun.A, at);
         int nextD = output.indexOf("\033]133;D;", emptyA);
         int nextC = output.indexOf(ShellRun.C, emptyA);
+        assertThat(nextC).isGreaterThanOrEqualTo(0);
         assertThat(nextD == -1 || nextD > nextC).isTrue();
         assertThat(output.split(java.util.regex.Pattern.quote(ShellRun.A), -1).length - 1).isEqualTo(6);
         // "dquote> " is zsh's stock PROMPT2 and appears without the script too; what must not
@@ -93,9 +94,10 @@ class ShellIntegrationScriptTest {
         Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/bash")));
         Path home = Files.createDirectories(dir.resolve("home with space"));
         Path work = Files.createDirectories(home.resolve("my dir"));
-        Files.writeString(home.resolve(".bashrc"), "export RC_RAN=yes\nPS1='rc$ '\nPROMPT_COMMAND='export PC_RAN=yes'\ntrap 'export TRAP_RAN=yes' DEBUG\nsource \"" + scripts() + "/jasper.bash\"\n");
+        Files.writeString(home.resolve(".bashrc"), "export RC_RAN=yes\nPS1='rc$ '\nPROMPT_COMMAND='export PC_RAN=yes'\ntrap 'export TRAP_RAN=yes; echo USERTRAP >> \"$HOME/ut\"' DEBUG\nsource \"" + scripts() + "/jasper.bash\"\n");
         var env = environment(home);
-        String output = ShellRun.run(List.of("/bin/bash", "-i"), env, work, "echo $RC_RAN $PC_RAN $TRAP_RAN\ncd ..\nfalse\necho \"one\ntwo\"\n\nexit\n");
+        String output = ShellRun.run(List.of("/bin/bash", "-i"), env, work,
+            "echo $RC_RAN $PC_RAN $TRAP_RAN\ncd ..\nfalse\necho \"one\ntwo\"\nrm -f \"$HOME/ut\"; cat \"$HOME/ut\"\n\nexit\n");
         String host = ShellRun.hostname();
         int at = indexAfter(output, ShellRun.CWD(host, work.toRealPath().toString().replace(" ", "%20")), 0);
         at = indexAfter(output, ShellRun.A, at);
@@ -113,8 +115,33 @@ class ShellIntegrationScriptTest {
         at = indexAfter(output, "\033]1341;jasper;cmd;", at);
         at = indexAfter(output, ShellRun.C, at);
         at = indexAfter(output, ShellRun.D(0), at);
-        assertThat(output.split(java.util.regex.Pattern.quote(ShellRun.A), -1).length - 1).isEqualTo(6);
+        // The rc file's own DEBUG trap must still run for every command, not just until Jasper
+        // installs its own: it re-creates the file the same line just deleted, so cat succeeds.
+        at = indexAfter(output, ShellRun.CMD("rm -f \"$HOME/ut\"; cat \"$HOME/ut\""), at);
+        at = indexAfter(output, ShellRun.C, at);
+        at = indexAfter(output, "USERTRAP", at);
+        at = indexAfter(output, ShellRun.D(0), at);
+        // The empty Enter yields a prompt with A and B but no D between them.
+        int emptyA = indexAfter(output, ShellRun.A, at);
+        int nextD = output.indexOf("\033]133;D;", emptyA);
+        int nextC = output.indexOf(ShellRun.C, emptyA);
+        assertThat(nextC).isGreaterThanOrEqualTo(0);
+        assertThat(nextD == -1 || nextD > nextC).isTrue();
+        assertThat(output.split(java.util.regex.Pattern.quote(ShellRun.A), -1).length - 1).isEqualTo(7);
         assertThat(output).doesNotContain("> \033]133;C");
+    }
+
+    @Test void bashFlattensAnArrayPromptCommandWhereTheShellRunsOnlyItsFirstElement() throws Exception {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of("/bin/bash")));
+        Path home = Files.createDirectories(dir.resolve("home"));
+        Files.writeString(home.resolve(".bashrc"), "PS1='$ '\nPROMPT_COMMAND=('export PC=1')\nsource \"" + scripts() + "/jasper.bash\"\n");
+        String output = ShellRun.run(List.of("/bin/bash", "-i"), environment(home), home, "echo pc=$PC\nexit\n");
+        int at = indexAfter(output, ShellRun.A, 0);
+        at = indexAfter(output, ShellRun.B, at);
+        at = indexAfter(output, ShellRun.CMD("echo pc=$PC"), at);
+        at = indexAfter(output, ShellRun.C, at);
+        at = indexAfter(output, "pc=1", at);
+        indexAfter(output, ShellRun.D(0), at);
     }
 
     @Test void bashKeepsAPromptCommandArrayAndIgnoresSpaceHiddenHistoryOnBash5() throws Exception {

@@ -20,8 +20,7 @@ __jasper_encode() {
     printf '%s' "$out"
 }
 
-__jasper_mark_a=$'\033]133;A\007'
-__jasper_mark_b=$'\033]133;B\007'
+__jasper_mark_a=$'\033]133;A\007' __jasper_mark_b=$'\033]133;B\007'
 __jasper_command_ran="" __jasper_last_pwd="" __jasper_last_status=0
 __jasper_in_prompt="" __jasper_prompt_history="" __jasper_previous_debug_body=""
 
@@ -75,10 +74,13 @@ eval "__jasper_previous_debug_body=${__jasper_previous_debug% DEBUG}"
 unset __jasper_previous_debug
 trap "__jasper_debug_trap; eval \"\$__jasper_previous_debug_body\"" DEBUG'
 
-if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+# An array PROMPT_COMMAND is run element by element only from bash 5.1; before that bash runs
+# element 0 alone, so an array from an older rc file is flattened back into the string form.
+if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]] &&
+    (( BASH_VERSINFO[0] > 5 || (BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] >= 1) )); then
     PROMPT_COMMAND=(__jasper_capture_status 'eval "$__jasper_install_debug"' "${PROMPT_COMMAND[@]}" __jasper_prompt_command)
 else
-    __jasper_existing="${PROMPT_COMMAND}"
+    __jasper_existing="$(IFS=';'; printf '%s' "${PROMPT_COMMAND[*]}")"
     while [[ "$__jasper_existing" == *";" || "$__jasper_existing" == *" " ]]; do __jasper_existing="${__jasper_existing%?}"; done
     PROMPT_COMMAND='__jasper_capture_status;eval "$__jasper_install_debug"'
     [[ -n "$__jasper_existing" ]] && PROMPT_COMMAND="$PROMPT_COMMAND;$__jasper_existing"
