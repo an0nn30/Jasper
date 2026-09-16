@@ -15,6 +15,10 @@ record AppDirs(Path root, Path configFile, Path logs) {
         return root.resolve("buddy.toml");
     }
 
+    Path snippets() {
+        return root.resolve("snippets.toml");
+    }
+
     static AppDirs resolve(String osName, Map<String, String> env, Path home) {
         String os = osName.toLowerCase(Locale.ROOT);
         Path base;
