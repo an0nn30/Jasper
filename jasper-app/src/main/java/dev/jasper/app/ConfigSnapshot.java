@@ -10,7 +10,7 @@ import java.util.Objects;
 record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
                       FontConfig font, Appearance variant, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                      boolean historyEnabled, int maxResults) {
+                      boolean historyEnabled, int maxResults, boolean deprioritizeTrivial) {
     ConfigSnapshot {
         if (maxResults < PaletteContext.MIN_MAX_RESULTS || maxResults > PaletteContext.MAX_MAX_RESULTS)
             throw new IllegalArgumentException("Max results must be 1\u201320.");
@@ -52,6 +52,14 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
                    int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, boolean historyEnabled) {
         this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled,
             historyEnabled, PaletteContext.DEFAULT_MAX_RESULTS);
+    }
+
+    ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
+                   FontConfig font, Appearance variant, Map<String, String> keybindings,
+                   int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, boolean historyEnabled,
+                   int maxResults) {
+        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled,
+            historyEnabled, maxResults, true);
     }
 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,

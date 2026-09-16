@@ -42,6 +42,9 @@ final class ConfigTemplate {
             # Search shell history from the palette (Cmd+R on macOS, Ctrl+Shift+R elsewhere); updates live.
             # Reads zsh, bash, fish, nushell and PowerShell history files; Jasper writes no history of its own.
             # enabled = true
+            # Rank exit, clear, ls, ll, la, cd, pwd, c, q and logout below more substantial commands.
+            # They are still listed and still searchable, just never above real work.
+            # deprioritize_trivial = true
 
             [palette]
             # Rows the command palette shows in every scope, 1-20; updates live. Cmd/Ctrl+1-5 still number the first five.

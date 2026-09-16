@@ -35,6 +35,7 @@ final class WindowCommandPalette implements AutoCloseable {
     // would call complete() twice before the first result arrives.
     private boolean completing;
     private int maxResults = PaletteContext.DEFAULT_MAX_RESULTS;
+    private boolean deprioritizeTrivial = true;
 
     WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, String defaultScopeId, boolean macOs) {
         this.owner = owner; this.scopes = scopes; this.defaultScopeId = defaultScopeId; this.macOs = macOs;
@@ -84,7 +85,8 @@ final class WindowCommandPalette implements AutoCloseable {
         owner.updateActions();
         originTab = owner.currentTab(); originPane = owner.currentPane();
         priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
-        context = new PaletteContext(macOs, originPane == null ? PaletteTarget.none() : PaletteTarget.of(originPane), maxResults);
+        context = new PaletteContext(macOs, originPane == null ? PaletteTarget.none() : PaletteTarget.of(originPane),
+            maxResults, deprioritizeTrivial);
         open = true; overlay.swallowing = false; palette.setVisible(true); overlay.setVisible(true);
         activate(scope, false);
         palette.queryField().requestFocusInWindow();
@@ -106,7 +108,7 @@ final class WindowCommandPalette implements AutoCloseable {
     void setMaxResults(int value) {
         if (value == maxResults) return;
         maxResults = value;
-        context = new PaletteContext(macOs, context.target(), maxResults);
+        context = new PaletteContext(macOs, context.target(), maxResults, deprioritizeTrivial);
         if (open && active != null) {
             palette.setScope(active.label(), active.icon(), active.placeholder(), active.verbs(), maxResults, active.monospaceRows());
             rebuild(true);
@@ -114,6 +116,16 @@ final class WindowCommandPalette implements AutoCloseable {
     }
 
     int maxResults() { return maxResults; }
+
+    /** Live: the next query uses the new value, and an open palette re-runs its search. */
+    void setDeprioritizeTrivial(boolean value) {
+        if (value == deprioritizeTrivial) return;
+        deprioritizeTrivial = value;
+        context = new PaletteContext(macOs, context.target(), maxResults, deprioritizeTrivial);
+        changed();
+    }
+
+    boolean deprioritizeTrivial() { return deprioritizeTrivial; }
 
     void dismiss() { if (open) restoreAndHide(); }
     void openPicker() { if (open && step == null && !picker) palette.queryField().setText(">"); }

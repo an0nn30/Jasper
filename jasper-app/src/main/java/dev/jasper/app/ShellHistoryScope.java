@@ -60,6 +60,19 @@ final class ShellHistoryScope implements PaletteScope {
                     : PaletteStep.Result.reopen(SNIPPETS_ID, SnippetsScope.rowId(saved.name()), saved.name()))));
     }
 
+    /**
+     * Commands that are noise at the top of a recency list. They are still listed and still searchable —
+     * de-ranking never removes a row — but they stop crowding out the work you actually came back for.
+     */
+    static final java.util.Set<String> TRIVIAL =
+        java.util.Set.of("exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout");
+
+    /** True for a short command whose first word is trivial; "cd deep/path && build" is real work. */
+    static boolean trivial(String command) {
+        String[] words = command.strip().split("\\s+");
+        return words.length <= 2 && TRIVIAL.contains(words[0].toLowerCase(Locale.ROOT));
+    }
+
     private record Ranked(ShellHistoryEntry entry, int tier, int directory, int position) {}
 
     @Override public PaletteResults search(String query, PaletteContext context) {
@@ -67,8 +80,18 @@ final class ShellHistoryScope implements PaletteScope {
         boolean tagged = snapshot.shells().size() > 1;
         String q = CommandSearch.normalize(query);
         if (q.isEmpty()) {
+            List<ShellHistoryEntry> ordered = snapshot.entries();
+            if (context.deprioritizeTrivial()) {
+                // A partition, not a score tweak: trivial commands keep their order among themselves
+                // and simply follow everything else, so the rule stays predictable.
+                var work = new ArrayList<ShellHistoryEntry>();
+                var noise = new ArrayList<ShellHistoryEntry>();
+                for (ShellHistoryEntry entry : ordered) (trivial(entry.command()) ? noise : work).add(entry);
+                work.addAll(noise);
+                ordered = work;
+            }
             var rows = new ArrayList<PaletteRow>();
-            for (ShellHistoryEntry entry : snapshot.entries()) {
+            for (ShellHistoryEntry entry : ordered) {
                 if (rows.size() == context.maxResults()) break;
                 rows.add(row(entry, tagged));
             }

@@ -22,6 +22,9 @@ enabled = true
 # Live. Search shell history from the palette with Cmd+R (macOS) or Ctrl+Shift+R.
 # Jasper only reads zsh, bash, fish, nushell and PowerShell history files; it writes no history of its own.
 enabled = true
+# Live. Rank exit, clear, ls, ll, la, cd, pwd, c, q and logout below more substantial commands.
+# They are still listed and still searchable, just never above real work.
+deprioritize_trivial = true
 
 [palette]
 # Live. Rows the command palette shows in every scope (Commands and History). Range: 1-20.

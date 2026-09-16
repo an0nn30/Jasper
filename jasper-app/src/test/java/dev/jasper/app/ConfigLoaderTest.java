@@ -288,4 +288,12 @@ class ConfigLoaderTest {
             assertThat(d.severity()).isEqualTo(severity);
         });
     }
+
+    @Test void deprioritizeTrivialParsesValidatesAndDefaultsToOn() {
+        assertThat(parse("").snapshot().deprioritizeTrivial()).isTrue();
+        assertThat(parse("[history]\ndeprioritize_trivial=false\n").snapshot().deprioritizeTrivial()).isFalse();
+        var bad = parse("[history]\ndeprioritize_trivial='yes'\n");
+        assertThat(bad.snapshot().deprioritizeTrivial()).as("an invalid value keeps the default").isTrue();
+        assertThat(bad.diagnostics()).isNotEmpty();
+    }
 }

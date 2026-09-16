@@ -88,7 +88,10 @@ class ShellHistoryScopeTest {
                 assertThat(rows.getFirst().title()).isEqualTo("echo a ↵ echo b");
                 assertThat(rows.getFirst().id()).isEqualTo(ShellHistoryScope.rowId("echo a\necho b"));
                 index.record(ShellHistoryEntry.of("ls", 2, "bash"));
-                assertThat(scope.search("", context).rows().get(1).tag()).isEqualTo("zsh");
+                // Which row it lands on is not this test's subject — "ls" is trivial and gets
+                // de-ranked — so find the multi-line row and check the tag it carries.
+                assertThat(scope.search("", context).rows()).filteredOn(r -> r.title().contains("echo a"))
+                    .singleElement().extracting(PaletteRow::tag).isEqualTo("zsh");
             }
         });
     }
@@ -155,5 +158,63 @@ class ShellHistoryScopeTest {
                 assertThat(result.get().error()).isEqualTo("A snippet named Interactive rebase exists");
             } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
         });
+    }
+
+    private static PaletteContext context(boolean deprioritizeTrivial) {
+        return new PaletteContext(true,
+            new PaletteTarget(s -> {}, () -> {}, Optional::empty, () -> "zsh", () -> true),
+            PaletteContext.DEFAULT_MAX_RESULTS, deprioritizeTrivial);
+    }
+
+    /** exit and clear are genuinely the most recent commands; they are still not what you are looking for. */
+    @Test void trivialCommandsSortBelowRealWorkWhenTheSettingIsOn() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var index = indexOf(
+                    ShellHistoryEntry.of("./gradlew build", 100, "zsh"),
+                    ShellHistoryEntry.of("clear", 200, "zsh"))) {
+                var scope = new ShellHistoryScope(index, null);
+                assertThat(scope.search("", context(true)).rows()).extracting(PaletteRow::title)
+                    .containsExactly("./gradlew build", "clear");
+                assertThat(scope.search("", context(false)).rows()).extracting(PaletteRow::title)
+                    .containsExactly("clear", "./gradlew build");
+            }
+        });
+    }
+
+    @Test void trivialCommandsKeepTheirOrderAmongThemselves() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var index = indexOf(
+                    ShellHistoryEntry.of("./gradlew build", 100, "zsh"),
+                    ShellHistoryEntry.of("clear", 200, "zsh"),
+                    ShellHistoryEntry.of("exit", 300, "zsh"))) {
+                var scope = new ShellHistoryScope(index, null);
+                assertThat(scope.search("", context(true)).rows()).extracting(PaletteRow::title)
+                    .containsExactly("./gradlew build", "exit", "clear");
+            }
+        });
+    }
+
+    /** De-ranking never removes a row: searching for a trivial command still finds it. */
+    @Test void trivialCommandsAreStillFoundWhenSearchedFor() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var index = indexOf(
+                    ShellHistoryEntry.of("./gradlew build", 100, "zsh"),
+                    ShellHistoryEntry.of("clear", 200, "zsh"))) {
+                var scope = new ShellHistoryScope(index, null);
+                assertThat(scope.search("clear", context(true)).rows()).extracting(PaletteRow::title)
+                    .contains("clear");
+            }
+        });
+    }
+
+    @Test void onlyAShortCommandWhoseFirstWordIsTrivialCounts() {
+        assertThat(ShellHistoryScope.trivial("clear")).isTrue();
+        assertThat(ShellHistoryScope.trivial("cd ..")).isTrue();
+        assertThat(ShellHistoryScope.trivial("ls -la")).isTrue();
+        assertThat(ShellHistoryScope.trivial("exit")).isTrue();
+        // A real command that merely starts with a trivial word is not trivial.
+        assertThat(ShellHistoryScope.trivial("cd /very/deep/path && ./gradlew build")).isFalse();
+        assertThat(ShellHistoryScope.trivial("clearcache --all")).isFalse();
+        assertThat(ShellHistoryScope.trivial("./gradlew build")).isFalse();
     }
 }
