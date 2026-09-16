@@ -34,10 +34,16 @@ record LaunchSettings(List<String> command, Map<String, String> environment,
             ? DefaultShell.command(osName, inherited) : List.of(terminal.shell().program()));
         command.addAll(terminal.shell().args());
         var environment = new HashMap<>(inherited);
+        // JASPER_* goes too: the scripts export JASPER_INTEGRATION_LOADED and return early when they
+        // see it, so a Jasper launched from an integrated pane would get no marks in any pane.
         environment.keySet().removeIf(name -> name.equals("TERM_PROGRAM") || name.equals("TERM_PROGRAM_VERSION")
             || name.equals("TERM_SESSION_ID") || name.equals("TMUX") || name.equals("TMUX_PANE")
-            || name.startsWith("ITERM_"));
+            || name.startsWith("ITERM_") || name.startsWith("JASPER_"));
         environment.put("TERM_PROGRAM", "Jasper");
+        // Before the overlay, so a [terminal.env] override wins here as it does for TERM_PROGRAM.
+        if (integrationDir != null && terminal.shellIntegration() != ShellIntegrationMode.OFF) {
+            environment.put("JASPER_SHELL_INTEGRATION", integrationDir.toString());
+        }
         environment.putAll(terminal.env());
         if (osName.toLowerCase(Locale.ROOT).startsWith("mac")
                 && environment.getOrDefault("LANG", "").isBlank()) {
@@ -45,14 +51,22 @@ record LaunchSettings(List<String> command, Map<String, String> environment,
         }
         environment.put("TERM", "xterm-256color");
         environment.put("COLORTERM", "truecolor");
-        if (integrationDir != null && terminal.shellIntegration() != ShellIntegrationMode.OFF) {
-            environment.put("JASPER_SHELL_INTEGRATION", integrationDir.toString());
-            if (terminal.shellIntegration() == ShellIntegrationMode.AUTO) inject(command, environment, integrationDir);
+        if (integrationDir != null && terminal.shellIntegration() == ShellIntegrationMode.AUTO) {
+            String effective = environment.get("JASPER_SHELL_INTEGRATION");
+            try {
+                if (effective != null && !effective.isBlank()) inject(command, environment, Path.of(effective));
+            } catch (InvalidPathException notAPath) {
+                // A [terminal.env] value that is not a path: the variables only, as for any other program.
+            }
         }
         return new LaunchSettings(command, environment, windowColumns, windowLines, terminal.scrollback());
     }
 
-    /** Auto mode for one shell: zsh through ZDOTDIR wrappers, bash through --rcfile, fish through XDG_DATA_DIRS. */
+    /**
+     * Auto mode for one shell: zsh through ZDOTDIR wrappers, bash through --rcfile, fish through
+     * XDG_DATA_DIRS. Both {@code command} and {@code environment} are edited in place, so both must
+     * be mutable; anything other than those three shells is left exactly as it was.
+     */
     static void inject(List<String> command, Map<String, String> environment, Path dir) {
         String shell;
         try {
@@ -69,21 +83,46 @@ record LaunchSettings(List<String> command, Map<String, String> environment,
                 environment.put("ZDOTDIR", dir.resolve("zsh").toString());
             }
             case "bash" -> {
+                // bash honours only the last --rcfile and ignores it entirely under --norc or -c. In
+                // those cases Jasper's wrapper would never run, so stripping -l would leave a login
+                // shell with nothing to emulate it: keep the user's command exactly as written.
+                int options = command.size();
                 boolean login = false;
-                for (int i = command.size() - 1; i >= 1; i--) {
-                    if (command.get(i).equals("-l") || command.get(i).equals("--login")) { command.remove(i); login = true; }
+                boolean noProfile = false;
+                for (int i = 1; i < command.size(); i++) {
+                    String argument = command.get(i);
+                    boolean cluster = argument.length() > 1 && argument.charAt(0) == '-' && argument.charAt(1) != '-';
+                    if (argument.equals("--") || argument.equals("-") || !argument.startsWith("-")) { options = i; break; }
+                    if (argument.equals("--norc") || argument.equals("--rcfile") || argument.equals("--init-file")
+                        || argument.equals("-c") || (cluster && argument.indexOf('c') > 0)) return;
+                    noProfile |= argument.equals("--noprofile");
+                    login |= argument.equals("--login") || (cluster && argument.indexOf('l') > 0);
+                }
+                for (int i = options - 1; i >= 1; i--) {
+                    String argument = command.get(i);
+                    if (argument.equals("-l") || argument.equals("--login")) {
+                        command.remove(i);
+                    } else if (argument.length() > 1 && argument.charAt(0) == '-' && argument.charAt(1) != '-'
+                        && argument.indexOf('l') > 0) {
+                        String stripped = argument.replace("l", "");
+                        if (stripped.equals("-")) command.remove(i); else command.set(i, stripped);
+                    }
                 }
                 command.add(1, "--rcfile");
                 command.add(2, dir.resolve("bash/rc.bash").toString());
-                if (login) environment.put("JASPER_LOGIN_SHELL", "1");
+                // rc.bash reads the profile files whenever this is set, which --noprofile forbids.
+                if (login && !noProfile) environment.put("JASPER_LOGIN_SHELL", "1");
             }
             case "fish" -> {
+                String jasper = dir.resolve("fish").toString();
                 String existing = environment.get("XDG_DATA_DIRS");
                 String rest = existing == null || existing.isBlank() ? "/usr/local/share:/usr/share" : existing;
-                environment.put("XDG_DATA_DIRS", dir.resolve("fish") + ":" + rest);
+                environment.put("XDG_DATA_DIRS",
+                    rest.equals(jasper) || rest.startsWith(jasper + ":") ? rest : jasper + ":" + rest);
             }
             default -> {
-                // Only the exported variables reach other programs.
+                // Only the exported variables reach other programs. A Windows basename ("bash.exe")
+                // never matches an arm above, which is intended: those shells are out of scope.
             }
         }
     }

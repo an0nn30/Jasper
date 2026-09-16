@@ -46,10 +46,16 @@ class LaunchSettingsTest {
         var zsh = new java.util.ArrayList<>(List.of("/usr/local/bin/zsh")); var zshEnv = new HashMap<String, String>();
         LaunchSettings.inject(zsh, zshEnv, dir);
         assertThat(zshEnv).containsEntry("ZDOTDIR", dir.resolve("zsh").toString()).doesNotContainKey("JASPER_ORIGINAL_ZDOTDIR");
-        var bash = new java.util.ArrayList<>(List.of("/bin/bash", "-l", "--noprofile", "--login")); var bashEnv = new HashMap<String, String>();
+        var bash = new java.util.ArrayList<>(List.of("/bin/bash", "-l", "--login")); var bashEnv = new HashMap<String, String>();
         LaunchSettings.inject(bash, bashEnv, dir);
-        assertThat(bash).containsExactly("/bin/bash", "--rcfile", dir.resolve("bash/rc.bash").toString(), "--noprofile");
+        assertThat(bash).containsExactly("/bin/bash", "--rcfile", dir.resolve("bash/rc.bash").toString());
         assertThat(bashEnv).containsEntry("JASPER_LOGIN_SHELL", "1");
+        // --noprofile asked for no profile files; rc.bash reads them whenever JASPER_LOGIN_SHELL is
+        // set, so the two must not both be in force.
+        var noProfile = new java.util.ArrayList<>(List.of("/bin/bash", "-l", "--noprofile")); var noProfileEnv = new HashMap<String, String>();
+        LaunchSettings.inject(noProfile, noProfileEnv, dir);
+        assertThat(noProfile).containsExactly("/bin/bash", "--rcfile", dir.resolve("bash/rc.bash").toString(), "--noprofile");
+        assertThat(noProfileEnv).doesNotContainKey("JASPER_LOGIN_SHELL");
         var bashPlain = new java.util.ArrayList<>(List.of("bash")); var plainEnv = new HashMap<String, String>();
         LaunchSettings.inject(bashPlain, plainEnv, dir);
         assertThat(bashPlain).containsExactly("bash", "--rcfile", dir.resolve("bash/rc.bash").toString());
@@ -64,6 +70,72 @@ class LaunchSettingsTest {
         LaunchSettings.inject(other, otherEnv, dir);
         assertThat(other).containsExactly("/bin/sh", "-l");
         assertThat(otherEnv).isEmpty();
+    }
+
+    /**
+     * The scripts export JASPER_INTEGRATION_LOADED and return early when they see it, so a Jasper
+     * launched from an integrated pane would otherwise get no marks in any pane.
+     */
+    @Test void jasperOwnMarkersNeverReachTheChildFromTheParentEnvironment() {
+        Path dir = Path.of("/opt/jasper/shell-integration");
+        var inherited = Map.of("JASPER_INTEGRATION_LOADED", "1", "JASPER_LOGIN_SHELL", "1",
+            "JASPER_ORIGINAL_ZDOTDIR", "/stale", "KEEP", "yes");
+        var settings = LaunchSettings.resolve(withShell("/bin/zsh", List.of(), ShellIntegrationMode.AUTO),
+            "Mac OS X", inherited, 150, 45, dir);
+        assertThat(settings.environment()).doesNotContainKey("JASPER_INTEGRATION_LOADED")
+            .doesNotContainKey("JASPER_LOGIN_SHELL").doesNotContainKey("JASPER_ORIGINAL_ZDOTDIR")
+            .containsEntry("JASPER_SHELL_INTEGRATION", dir.toString()).containsEntry("KEEP", "yes");
+    }
+
+    /** bash honours only the last --rcfile and ignores it under --norc or -c, so Jasper stays out. */
+    @Test void bashKeepsItsOwnStartupWhenTheUserAlreadyChoseAnRcFile() {
+        Path dir = Path.of("/opt/jasper/shell-integration");
+        for (List<String> args : List.of(List.of("-l", "--norc"), List.of("-l", "--rcfile", "/my/rc"),
+                List.of("-l", "--init-file", "/my/rc"), List.of("-c", "echo hi"), List.of("-lc", "echo hi"))) {
+            var command = new java.util.ArrayList<>(List.of("/bin/bash"));
+            command.addAll(args);
+            var env = new HashMap<String, String>();
+            LaunchSettings.inject(command, env, dir);
+            assertThat(command).as("%s", args).doesNotContain(dir.resolve("bash/rc.bash").toString());
+            assertThat(command.subList(1, command.size())).as("%s", args).isEqualTo(args);
+            assertThat(env).as("%s", args).doesNotContainKey("JASPER_LOGIN_SHELL");
+        }
+    }
+
+    @Test void bashLoginFlagsAreRecognisedInsideAShortCluster() {
+        Path dir = Path.of("/opt/jasper/shell-integration");
+        var command = new java.util.ArrayList<>(List.of("/bin/bash", "-il"));
+        var env = new HashMap<String, String>();
+        LaunchSettings.inject(command, env, dir);
+        assertThat(command).containsExactly("/bin/bash", "--rcfile", dir.resolve("bash/rc.bash").toString(), "-i");
+        assertThat(env).containsEntry("JASPER_LOGIN_SHELL", "1");
+    }
+
+    /** A -l after -c or -- is the command's own argument, not a request for a login shell. */
+    @Test void aLoginFlagPastTheOptionsIsLeftWhereItIs() {
+        Path dir = Path.of("/opt/jasper/shell-integration");
+        var command = new java.util.ArrayList<>(List.of("/bin/bash", "--", "-l"));
+        LaunchSettings.inject(command, new HashMap<>(), dir);
+        assertThat(command).containsExactly("/bin/bash", "--rcfile", dir.resolve("bash/rc.bash").toString(), "--", "-l");
+    }
+
+    @Test void repeatedLaunchesDoNotAccumulateTheFishDataDirectory() {
+        Path dir = Path.of("/opt/jasper/shell-integration");
+        var env = new HashMap<>(Map.of("XDG_DATA_DIRS", dir.resolve("fish") + ":/x"));
+        LaunchSettings.inject(new java.util.ArrayList<>(List.of("fish")), env, dir);
+        assertThat(env).containsEntry("XDG_DATA_DIRS", dir.resolve("fish") + ":/x");
+    }
+
+    @Test void userEnvOverlayCanStillOverrideTheIntegrationDirectory() {
+        var d = ConfigSnapshot.defaults(); var t = d.terminal();
+        var terminal = new TerminalConfig(new TerminalConfig.Shell("/bin/zsh", List.of()),
+            Map.of("JASPER_SHELL_INTEGRATION", "/my/own"), t.scrollback(), t.optionAsMeta(), t.cursorShape(),
+            t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell(), t.onExit(), ShellIntegrationMode.AUTO);
+        var snapshot = new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.variant(), Map.of(),
+            d.columns(), d.lines(), terminal, d.buddyEnabled(), d.historyEnabled(), d.maxResults());
+        var settings = LaunchSettings.resolve(snapshot, "Mac OS X", Map.of(), 150, 45, Path.of("/opt/jasper/si"));
+        assertThat(settings.environment()).containsEntry("JASPER_SHELL_INTEGRATION", "/my/own")
+            .containsEntry("ZDOTDIR", "/my/own/zsh");
     }
 
     @Test void userEnvOverlayCanStillOverrideTermProgram() {

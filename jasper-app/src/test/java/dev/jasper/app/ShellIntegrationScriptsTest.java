@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assumptions;
@@ -37,10 +38,12 @@ class ShellIntegrationScriptsTest {
 
     @Test void everyScriptIsGuardedAndSyntacticallyValidWhereShellsExist() throws Exception {
         Path target = ShellIntegrationScripts.install(dir.resolve("shell-integration"));
-        for (String name : List.of("jasper.zsh", "jasper.bash", "jasper.fish")) {
-            String text = Files.readString(target.resolve(name), StandardCharsets.UTF_8);
+        // bash gets a larger budget than zsh and fish because only bash needs the DEBUG-trap
+        // plumbing, both PROMPT_COMMAND forms, the readonly guards and the HISTCONTROL check.
+        for (Map.Entry<String, Integer> budget : Map.of("jasper.zsh", 90, "jasper.fish", 90, "jasper.bash", 115).entrySet()) {
+            String text = Files.readString(target.resolve(budget.getKey()), StandardCharsets.UTF_8);
             assertThat(text).contains("TERM_PROGRAM").contains("JASPER_INTEGRATION_LOADED").contains("133;C").contains("1341;jasper;cmd;");
-            assertThat(text.lines().count()).isLessThanOrEqualTo(90);
+            assertThat(text.lines().count()).as(budget.getKey()).isLessThanOrEqualTo(budget.getValue());
         }
         if (Files.isExecutable(Path.of("/bin/zsh")))
             for (String name : List.of("jasper.zsh", "zsh/.zshenv", "zsh/.zprofile", "zsh/.zshrc", "zsh/.zlogin"))
@@ -55,5 +58,39 @@ class ShellIntegrationScriptsTest {
         Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
         process.getInputStream().readAllBytes();
         return process.waitFor();
+    }
+
+    /** These are sourced by the user's login shell, so a planted link must not redirect the write. */
+    @Test void installReplacesASymlinkRatherThanWritingThroughIt() throws Exception {
+        Path target = dir.resolve("shell-integration");
+        ShellIntegrationScripts.install(target);
+        Path outside = dir.resolve("outside.txt");
+        Files.writeString(outside, "untouched");
+        Files.delete(target.resolve("jasper.zsh"));
+        Files.createSymbolicLink(target.resolve("jasper.zsh"), outside);
+
+        ShellIntegrationScripts.install(target);
+
+        assertThat(Files.readString(outside)).isEqualTo("untouched");
+        assertThat(Files.isSymbolicLink(target.resolve("jasper.zsh"))).isFalse();
+        assertThat(Files.readAllBytes(target.resolve("jasper.zsh")))
+            .isEqualTo(ShellIntegrationScripts.bundled("jasper.zsh"));
+    }
+
+    @Test void extractedFilesAreReadableOnlyByTheirOwner() throws Exception {
+        Path target = dir.resolve("shell-integration");
+        ShellIntegrationScripts.install(target);
+        Assumptions.assumeTrue(target.getFileSystem().supportedFileAttributeViews().contains("posix"));
+        assertThat(Files.getPosixFilePermissions(target.resolve("jasper.zsh")))
+            .containsExactlyInAnyOrder(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
+        assertThat(Files.getPosixFilePermissions(target)).containsExactlyInAnyOrder(
+            PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE);
+    }
+
+    @Test void aFailedInstallReportsRatherThanLeavingAPartialTree() throws Exception {
+        Path blocked = dir.resolve("blocked");
+        Files.writeString(blocked, "not a directory");
+        assertThatThrownBy(() -> ShellIntegrationScripts.install(blocked.resolve("shell-integration")))
+            .isInstanceOf(IOException.class);
     }
 }
