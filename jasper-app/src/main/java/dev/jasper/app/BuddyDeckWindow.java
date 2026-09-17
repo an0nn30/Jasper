@@ -41,6 +41,7 @@ final class BuddyDeckWindow {
                 // Moving within the panel still reports an exit for child bounds; only a real one counts.
                 if (panel.contains(event.getPoint())) return;
                 panel.handleExit();
+                hide();
             }
             // A macOS control-click is the popup trigger yet reports the left button; it must not activate.
             @Override public void mouseClicked(MouseEvent event) {
@@ -68,7 +69,7 @@ final class BuddyDeckWindow {
 
     void hide() {
         if (disposed) return;
-        panel.collapse();
+        panel.reset();
         window.setVisible(false);
     }
 
