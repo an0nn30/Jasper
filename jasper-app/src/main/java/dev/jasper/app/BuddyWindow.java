@@ -39,6 +39,7 @@ final class BuddyWindow {
     private final Timer timer = new Timer(1, event -> tick());
     private BuddyBubble bubble;
     private BuddyDeckWindow drawer;
+    private BuddyColumnWindow column;
     private Point pressScreen;
     private Point pressOrigin;
     private boolean dragged;
@@ -104,8 +105,9 @@ final class BuddyWindow {
             }
             @Override public void mouseClicked(MouseEvent event) {
                 // A macOS control-click is the popup trigger yet reports the left button; it must not raise.
-                if (SwingUtilities.isLeftMouseButton(event) && !event.isControlDown()
-                        && event.getClickCount() == 2 && !dragged) raiseTerminal.run();
+                if (!SwingUtilities.isLeftMouseButton(event) || event.isControlDown() || dragged) return;
+                if (event.getClickCount() == 2) raiseTerminal.run();
+                else if (event.getClickCount() == 1) openDrawer();
             }
         };
         canvas.addMouseListener(mouse);
@@ -130,17 +132,30 @@ final class BuddyWindow {
         return new BuddyWindow(sprite, stateFile, raiseTerminal, toggle);
     }
 
-    /** The application owns the drawer's contents; the buddy only gives it somewhere to sit. */
+    /** The application owns the contents; the buddy only gives the two surfaces somewhere to sit. */
     void attachDeck(BuddyDeck deck) {
         if (disposed || drawer != null) return;
         drawer = new BuddyDeckWindow(deck);
+        column = new BuddyColumnWindow(deck, this::openDrawer);
         refreshDeck();
     }
 
-    /** A notice was posted, dismissed or cleared: re-place the drawer beside him. */
+    /** A notice was posted, dismissed or cleared: re-place both surfaces around him. */
     void refreshDeck() {
-        if (drawer == null) return;
-        if (window.isVisible()) drawer.showBeside(window.getBounds()); else drawer.hide();
+        if (column == null) return;
+        if (window.isVisible()) {
+            column.showBeside(window.getBounds());
+            if (drawer.isShowing()) drawer.showBeside(window.getBounds());
+        } else {
+            column.hide();
+            drawer.hide();
+        }
+    }
+
+    /** Single click: double-click already raises the terminal and right-click opens his menu. */
+    private void openDrawer() {
+        if (drawer == null || !window.isVisible()) return;
+        drawer.showBeside(window.getBounds());
     }
 
     /** A long command is in flight: he sits down with the laptop until it finishes. */
@@ -176,6 +191,7 @@ final class BuddyWindow {
         timer.stop();
         if (bubble != null) bubble.hide();
         if (drawer != null) drawer.hide();
+        if (column != null) column.hide();
         animator.hidden();
         window.setVisible(false);
     }
@@ -186,6 +202,7 @@ final class BuddyWindow {
         timer.stop();
         if (bubble != null) bubble.dispose();
         if (drawer != null) drawer.dispose();
+        if (column != null) column.dispose();
         window.dispose();
     }
 
