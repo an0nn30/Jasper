@@ -1,0 +1,111 @@
+package dev.jasper.app;
+
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+
+class BuddyDeckTest {
+    private final BuddyDeck deck = new BuddyDeck();
+
+    private static BuddyNotice notice(String source, Object key, String title) {
+        return new BuddyNotice(source, key, title, BuddyNotice.State.DONE, () -> "done", () -> { });
+    }
+
+    @Test void noticesComeBackNewestFirst() {
+        deck.post(notice("terminal", "a", "first"));
+        deck.post(notice("terminal", "b", "second"));
+
+        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("second", "first");
+    }
+
+    @Test void postingOverTheSameKeyReplacesInPlaceAndPromotesToTheTop() {
+        deck.post(notice("terminal", "a", "first"));
+        deck.post(notice("terminal", "b", "second"));
+        deck.post(notice("terminal", "a", "first again"));
+
+        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("first again", "second");
+    }
+
+    /** The whole point of the source being part of the identity: producers cannot collide. */
+    @Test void twoProducersWithTheSameKeyAreTwoNotices() {
+        deck.post(notice("terminal", "1", "a build"));
+        deck.post(notice("sftp", "1", "a transfer"));
+
+        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("a transfer", "a build");
+    }
+
+    @Test void dismissingRemovesOneAndSaysWhetherThereWasOne() {
+        deck.post(notice("terminal", "a", "first"));
+
+        assertThat(deck.dismiss("terminal", "a")).isTrue();
+        assertThat(deck.dismiss("terminal", "a")).isFalse();
+        assertThat(deck.isEmpty()).isTrue();
+    }
+
+    @Test void clearingEmptiesTheDrawer() {
+        deck.post(notice("terminal", "a", "first"));
+        deck.post(notice("terminal", "b", "second"));
+
+        deck.clear();
+
+        assertThat(deck.notices()).isEmpty();
+    }
+
+    /**
+     * The regression this design is shaped to avoid: a pane closed after a successful build must
+     * still say the build succeeded. Orphaning is a lost action, not a lost outcome.
+     */
+    @Test void orphaningKeepsTheOutcomeAndOnlyTakesAwayTheAction() {
+        deck.post(new BuddyNotice("terminal", "a", "./gradlew build", BuddyNotice.State.DONE,
+            () -> "Finished in 1m 12s", () -> { }));
+
+        deck.orphan("terminal", "a", "Finished in 1m 12s");
+
+        BuddyNotice orphan = deck.notices().getFirst();
+        assertThat(orphan.state()).isEqualTo(BuddyNotice.State.DONE);
+        assertThat(orphan.title()).isEqualTo("./gradlew build");
+        assertThat(orphan.detail().get()).isEqualTo("Finished in 1m 12s");
+        assertThat(orphan.orphaned()).isTrue();
+        assertThat(orphan.activate()).isNull();
+    }
+
+    @Test void orphaningFreezesARunningNoticeSoItStopsTicking() {
+        deck.post(new BuddyNotice("terminal", "a", "sleep 600", BuddyNotice.State.ACTIVE,
+            () -> "Running · " + System.nanoTime(), () -> { }));
+
+        deck.orphan("terminal", "a", "Stopped after 1m 12s");
+
+        assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Stopped after 1m 12s");
+    }
+
+    @Test void orphaningKeepsThePlaceRatherThanPromotingToTheTop() {
+        deck.post(notice("terminal", "a", "older"));
+        deck.post(notice("terminal", "b", "newer"));
+
+        deck.orphan("terminal", "a", "gone");
+
+        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("newer", "older");
+    }
+
+    @Test void orphaningSomethingThatIsNotThereDoesNothing() {
+        deck.post(notice("terminal", "a", "only"));
+
+        deck.orphan("terminal", "missing", "gone");
+
+        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("only");
+    }
+
+    @Test void theOldestFallOffOnceTheDrawerIsFull() {
+        for (int i = 0; i < BuddyDeck.MAX_NOTICES + 5; i++) deck.post(notice("terminal", i, "n" + i));
+
+        assertThat(deck.size()).isEqualTo(BuddyDeck.MAX_NOTICES);
+        assertThat(deck.notices().getFirst().title()).isEqualTo("n" + (BuddyDeck.MAX_NOTICES + 4));
+        assertThat(deck.notices().getLast().title()).isEqualTo("n5");
+    }
+
+    @Test void aNoticeNeedsAnIdentityAndSomethingToSay() {
+        assertThatIllegalArgumentException().isThrownBy(() ->
+            new BuddyNotice("terminal", "a", "  ", BuddyNotice.State.DONE, () -> "d", () -> { }));
+    }
+}
