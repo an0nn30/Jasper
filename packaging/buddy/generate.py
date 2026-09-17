@@ -22,7 +22,8 @@ ASE = HERE / "jasper-buddy.ase"
 W, H = 42, 48
 FRAMES = ["idle", "blink", "wink", "wave_a", "wave_b", "hop", "lean_left", "lean_right",
           "sit", "sit_blink", "tuck", "sleep_a", "sleep_b", "sleep_c",
-          "sparkle_a", "sparkle_b", "sparkle_c"]
+          "sparkle_a", "sparkle_b", "sparkle_c",
+          "type_a", "type_b", "type_rest"]
 
 OUT = (0x33, 0x2F, 0x27, 255)
 SKIN = (0xA7, 0xAE, 0x70, 255)
@@ -36,6 +37,10 @@ GLINT = (255, 255, 255, 255)
 STAR = (0xFF, 0xF3, 0xB0, 255)
 STAR_HI = (255, 255, 255, 255)
 CLEAR = (0, 0, 0, 0)
+# The laptop borrows the terminal's own colours so it reads as a screen, not another shell part.
+LAPTOP_SCREEN = (0x1E, 0x22, 0x2A, 255)
+LAPTOP_TEXT = (0x7F, 0xD9, 0xA8, 255)
+LAPTOP_BASE = (0x5A, 0x62, 0x6E, 255)
 
 
 def mask():
@@ -174,6 +179,32 @@ def frame(eyes=("open", "open"), right_arm="down", left_arm="down", dy=0, lean=0
     return c
 
 
+def laptop(c, hands):
+    """A compact laptop in his lap: small enough that the shell, belly and glasses stay visible,
+    which is what makes the pose read as *him* typing rather than a screen with a head behind it.
+    `hands` is "left", "right" or "rest"; the typing poses raise one hand off the keys."""
+    # Arms come down and forward to the deck, drawn before the laptop so the keys cover the wrists.
+    part(c, ellipse((4, 30, 10, 39)), SKIN)
+    part(c, ellipse((31, 30, 37, 39)), SKIN)
+    # Screen, standing in his lap and leaving the head and belly clear above it.
+    part(c, rect((13, 33, 29, 40)), LAPTOP_SCREEN)
+    glyph(c, ("#..", ".#.", "..#", ".#.", "#.."), 15, 35, LAPTOP_TEXT)
+    put(c, [(20, 39), (21, 39)], LAPTOP_TEXT)
+    # Key deck in front of the screen.
+    part(c, rect((11, 41, 31, 43)), LAPTOP_BASE)
+    # Hands on the key row; the raised one is a pixel higher, so A and B read as alternating.
+    left_y, right_y = {"left": (39, 41), "right": (41, 39), "rest": (42, 42)}[hands]
+    put(c, [(x, y) for x in range(9, 13) for y in (left_y, left_y + 1)], SKIN)
+    put(c, [(x, y) for x in range(30, 34) for y in (right_y, right_y + 1)], SKIN)
+
+
+def typing(hands):
+    """The sitting pose with a laptop in his lap; the head dips a little toward the screen."""
+    c = frame(dy=1, legs="sit", head_dy=3, arms=False)
+    laptop(c, hands)
+    return c
+
+
 def frames():
     shell_only = dict(legs="none", arms=False, head_at="none", shell_dy=2)
     return [
@@ -191,7 +222,7 @@ def frames():
         frame(z_glyphs=[(Z_BIG, 22, 13), (Z_SMALL, 28, 6)], **shell_only),
         frame(z_glyphs=[(Z_BIG, 23, 9), (Z_SMALL, 29, 3)], **shell_only),
         frame(z_glyphs=[(Z_BIG, 24, 5), (Z_SMALL, 28, 15)], **shell_only),
-    ] + [stars(specs) for specs in SPARKLES]
+    ] + [stars(specs) for specs in SPARKLES] + [typing("left"), typing("right"), typing("rest")]
 
 
 def write_png(images):
