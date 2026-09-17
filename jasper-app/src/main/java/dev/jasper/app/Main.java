@@ -9,7 +9,7 @@ public final class Main {
     private Main() {}
 
     public static void main(String[] args) {
-        int result = start(args, System.out, System.err, service -> {
+        int result = start(args, System.out, System.err, (service, options) -> {
             AppDirs dirs = AppDirs.resolve(System.getProperty("os.name"), System.getenv(),
                 Path.of(System.getProperty("user.home")));
             AppLog log = AppLog.open(dirs.logs());
@@ -32,7 +32,20 @@ public final class Main {
                 SwingUtilities.invokeLater(() -> {
                     CommandHistory history = null;
                     JasperApplication application = null;
+                    HandoffSocket endpoint = null;
                     try {
+                        boolean resident = service.initialState().snapshot().backgroundEnabled();
+                        Path home = Path.of(System.getProperty("user.home"));
+                        String appPath = System.getProperty("jpackage.app-path");
+                        reconcileLoginItem(resident, appPath, home);
+                        // A login item that outlived the setting: leave rather than sit resident.
+                        if (options.background() && !resident) {
+                            LOG.log(System.Logger.Level.INFO,
+                                "Started with --background while background.enabled is off; exiting");
+                            service.close();
+                            System.exit(0);
+                            return;
+                        }
                         history = new CommandHistory(dirs.commandHistory());
                         ApplicationIcon.installTaskbarIcon();
                         Path integrationDir = null;
@@ -45,10 +58,41 @@ public final class Main {
                         application = new JasperApplication(service, null, history, dirs.buddyState(),
                             () -> System.exit(0), ShellHistoryIndex.discovered(),
                             new SnippetStore(dirs.snippets(), new ConfigEditor()::open), integrationDir);
-                        application.newWindow(Path.of(System.getProperty("user.home")));
+                        // The login item tracks the setting while Jasper runs; residency does not.
+                        application.loginItems(enabled -> reconcileLoginItem(enabled, appPath, home));
+                        if (resident) {
+                            JasperApplication owner = application;
+                            Path source = HandoffSocket.codeSource();
+                            long modified = HandoffSocket.lastModified(source);
+                            endpoint = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(), dirs.daemonLock(),
+                                request -> {
+                                    // An older build must not serve windows built from newer code.
+                                    if (!request.codeSource().equals(source == null ? Path.of("") : source)
+                                            || request.codeSourceModified() != modified) {
+                                        return LaunchRequest.Response.STALE;
+                                    }
+                                    SwingUtilities.invokeLater(() -> owner.openOrRaise(home));
+                                    return LaunchRequest.Response.OK;
+                                });
+                            // Residency needs the endpoint: without it a windowless JVM has nothing
+                            // holding it alive and nothing to be reached through.
+                            application.residency(endpoint != null);
+                        }
+                        if (options.background()) {
+                            if (!application.resident()) {
+                                // Unreachable without an endpoint: exiting beats popping a window
+                                // onto the screen of someone who asked for a background process.
+                                LOG.log(System.Logger.Level.WARNING,
+                                    "Started with --background but the handoff endpoint is unavailable; exiting");
+                                application.quit();
+                                return;
+                            }
+                            application.warmUp();
+                        } else application.newWindow(Path.of(System.getProperty("user.home")));
                     }
                     catch (RuntimeException failure) {
                         LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
+                        if (endpoint != null) endpoint.close();
                         if (application != null) application.quit();
                         else if (history != null) history.close();
                         service.close();
@@ -113,9 +157,9 @@ public final class Main {
         }
     }
 
-    /** Startup boundary: parsing and the first read finish before the desktop callback runs. */
+    /** Startup boundary: parsing, the handoff attempt and the first read finish before the desktop callback runs. */
     static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error,
-                     java.util.function.Consumer<ConfigService> launch) {
+                     java.util.function.BiConsumer<ConfigService, AppArguments> launch) {
         AppArguments options;
         try { options = AppArguments.parse(args, Path.of(System.getProperty("user.dir"))); }
         catch (IllegalArgumentException failure) { error.println(failure.getMessage()); return 2; }
@@ -123,11 +167,34 @@ public final class Main {
         String os = System.getProperty("os.name");
         Path home = Path.of(System.getProperty("user.home"));
         AppDirs dirs = AppDirs.resolve(os, System.getenv(), home);
+        // Before any toolkit initialization: a handed-off launch must cost almost nothing and must
+        // not settle a second icon into the Dock on its way out.
+        if (handsOff(options, dirs)) return 0;
         Path file = options.configOverride() == null ? dirs.configFile() : options.configOverride();
         ConfigService service = new ConfigService(file, os.startsWith("Mac"));
-        try { launch.accept(service); }
+        try { launch.accept(service, options); }
         catch (RuntimeException failure) { service.close(); throw failure; }
         return 0;
+    }
+
+    /**
+     * True when a resident process accepted this launch and there is nothing left to do. A launch
+     * pointed at another configuration file never hands off, because the resident process is
+     * holding a different one; neither does a resident process starting up.
+     */
+    static boolean handsOff(AppArguments options, AppDirs dirs) {
+        if (options.background() || options.configOverride() != null) return false;
+        Path source = HandoffSocket.codeSource();
+        return HandoffSocket.handOff(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source));
+    }
+
+    /** Makes the user's login items match the setting. Never throws; autostart is not worth a failed launch. */
+    static void reconcileLoginItem(boolean enabled, String appPath, Path home) {
+        if (enabled && (appPath == null || appPath.isBlank())) {
+            LOG.log(System.Logger.Level.INFO,
+                "Background residency is on, but this Jasper is not an installed package, so it will not start at login");
+        }
+        LoginItem.apply(LoginItem.plan(System.getProperty("os.name"), enabled, appPath, home));
     }
 
     /** The window title for a shell-reported title; "Jasper" when the shell has not set one. */
