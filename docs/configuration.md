@@ -79,6 +79,7 @@ variant = "dark"
 | `window.columns` | `150` | Integer 5–500 | New windows |
 | `window.lines` | `45` | Integer 2–200 | New windows |
 | `buddy.enabled` | `true` | Boolean | Live |
+| `background.enabled` | `false` | Boolean | Next start (residency); live (login item) |
 | `palette.scopes.history.enabled` | `true` | Boolean | Live |
 | `palette.scopes.history.trivial_commands` | see below | Array of single words | Live |
 | `palette.max_results` | `5` | Integer 1–20 | Live |
@@ -111,6 +112,51 @@ active terminal window forward. Left alone he sits down after 20 seconds and ret
 shell to sleep after a minute; hovering wakes him and earns a one-second wave. View → Show
 Jasper, the command palette and right-click → Hide Jasper toggle him for the current session; a
 saved change to `buddy.enabled` resets that session choice.
+
+### Background residency
+
+```toml
+[background]
+enabled = false
+```
+
+With `enabled = true`, closing the last window no longer ends Jasper. The process stays with no
+windows, holding the initialized toolkit, fonts and theme, so the next launch reveals a window
+without a cold start. **Quit (Cmd+Q, the palette's Quit, or Quit from the Dock) still exits
+completely** — closing a window and quitting are different things, and quitting is the off switch.
+
+Nothing of yours keeps running: a resident Jasper holds no shell, no PTY and no child process.
+Your shells have already exited through the usual pane-close path before the last window goes.
+
+Enabling it also registers Jasper to start in the background at login:
+
+- **macOS** writes `~/Library/LaunchAgents/dev.jasper.background.plist`. It takes effect at your
+  next login.
+- **Windows** adds a `Jasper` value under
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+
+Both are removed as soon as you set `enabled = false` and save. Autostart needs an installed
+Jasper: a `./gradlew run` development session stays resident but never registers a login item.
+
+The two halves of the key have different timing. The login item is reconciled every time the
+configuration is read, so turning it on or off applies at once. **Residency itself applies from
+the next start** — whether a given process owns the handoff endpoint is settled when it starts,
+not renegotiated while it runs.
+
+Jasper keeps a socket, a token and a lock in a `daemon` directory beside `config.toml`,
+owner-only. A second launch hands its request to the resident process over that socket and
+exits; on macOS a Dock click never creates a process at all. After you upgrade, the first launch
+of the new build retires the old resident process — which exits if it has no windows open, or
+otherwise keeps running, no longer resident, until those windows are closed or it is quit —
+rather than being served a window built from the old code.
+
+**A launch with `--config` is fully standalone.** It never hands off to a resident process, never
+binds the shared endpoint itself, is never itself resident, and never touches the login item. Any
+resident process was itself started without `--config`, so it is always holding the default
+configuration, never the one named on the command line; and the login item always points at the
+installed app with no `--config`, so an override's `background.enabled` could never arm autostart
+for the default configuration. `background.enabled` inside a `--config` file is therefore never
+acted on.
 
 ### Palette
 

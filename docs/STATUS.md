@@ -1,5 +1,138 @@
 # Jasper — Status and Handoff
 
+**Background residency (2026-09-17):** On `claude/background-daemon` (from main `1f1afeb`;
+`main` has since advanced to `b56d098` and was not merged into this branch), Jasper gains an
+opt-in `[background] enabled` setting (default `false`) that keeps the process running with no
+windows after the last one closes, so the next launch reveals a window from an already-warm JVM
+instead of paying a full cold start — JVM, AWT toolkit, FlatLaf, font resolution, theme,
+shell-integration extraction, shell-history discovery. **Quit still exits completely**; that is
+the off switch. A resident Jasper holds no shell, no PTY and no child process — sessions have
+already exited through the normal pane-close path before the last window goes.
+
+*Roles and handoff.* Startup now resolves one of four roles. **Launcher** (default) attempts an
+`AF_UNIX` handoff before any AWT/Swing initialization and exits 0 if a resident process accepts.
+**Resident** (`--background`, the form written into the login item) runs a full warm-up pass —
+install FlatLaf and realize the toolkit, resolve the font family and fallbacks, resolve the
+theme, extract the shell-integration scripts, refresh the shell-history index — binds the socket,
+and opens no window; if the bind fails, it logs a warning and exits instead of opening a window
+at login, which the plan's pre-flight scan caught as a real conflict (the spec's "log and
+continue as an ordinary app" is written for a foreground launch, not an unattended one). **App**
+(today's path) additionally binds the socket and, with the setting on, stays resident when its
+last window closes; a reopen listener (`AppReopenedListener`/`APP_EVENT_REOPENED`, confirmed
+present on JBR 25) is registered unconditionally beside the existing quit handler, so a Dock
+click on a running, windowless Jasper raises a window through the same `openOrRaise` path the
+socket uses, with no new process created. **Standalone** (`--config <path>`) is today's path and
+nothing else — see below. The endpoint is a `daemon` subdirectory of the per-user config root
+(`AppDirs.daemonDir/daemonSocket/daemonToken/daemonLock`), bound under a `FileLock` that makes
+stale-socket recovery (check, connect, unlink, bind) atomic across concurrent launches, gated by
+an owner-only token, and carrying the launcher's own code-source path and modification time so a
+resident process from an older build replies `refused stale`, unbinds, and exits only if it has
+no windows open — an upgrade is never served a window built from stale code and never kills a
+running terminal.
+
+*Login item.* Enabling the setting also plans a per-platform login item through `LoginItem.plan`,
+a pure resolver in the style of `AppDirs.resolve`/`LaunchSettings.resolve`: macOS gets
+`~/Library/LaunchAgents/dev.jasper.background.plist` (`RunAtLoad` true, `KeepAlive` false, no
+`launchctl` call), Windows gets a `Jasper` value under
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` via `reg add`/`reg delete`. Only a packaged
+install (detected through the `jpackage.app-path` system property) registers; a `./gradlew run`
+session stays resident but logs a warning and skips the login item. The login item is reconciled
+on every config load, immediately; residency itself is decided once at startup and is never
+renegotiated while the process runs.
+
+*A `--config` launch is fully standalone — a gap the review found in the spec, not just the
+code.* The design originally said only that a `--config` launch never hands off, because the
+resident process holds a different configuration; it did not say such a launch must not *bind*.
+Since the endpoint's path comes from the real `AppDirs` rather than the override, `jasper
+--config other.toml` with `background.enabled = true` inside `other.toml` would have bound the
+shared endpoint, and a later plain `jasper` would have handed off to it and received a window
+built from `other.toml` — exactly the invariant refusing the handoff exists to protect. Both the
+spec and the code now make a `--config` launch fully standalone: no handoff, no bind, never
+resident, login item untouched, regardless of what `other.toml` sets.
+
+**Deviations from the plan.** Two of the plan's code blocks did not compile as written. Task 3's
+wire-format code declared both `static LaunchRequest decode(String line)` and a
+same-erasure `private static Path decode(String encoded)`, so the private helper is
+`decodePath` instead. Task 4's `codeSource()` catch list read `URISyntaxException |
+InvalidPathException | RuntimeException`, which javac rejects because `InvalidPathException` is a
+`RuntimeException` subclass listed beside it; it was dropped from the catch list with no behavior
+change, since `RuntimeException` already covers it. Several tests initially proved nothing:
+mutation testing during Task 6's review found `openOrRaise`'s shutdown guard could be deleted
+with the suite still green, because `newWindow`'s own guard covers every headlessly reachable
+case, so the test was renamed to `openOrRaiseDoesNotThrowOnceTheApplicationHasQuit` with a
+comment on exactly what it does and does not cover, and the raise-during-shutdown branch moved to
+the manual checklist below instead; the warm-up test did not fail when `shellHistory.refresh()`
+was removed until the implementer also stopped the shell-history index's poll timer that
+`onChanged` starts; Task 4's first fix round separately found two tests that asserted a refusal
+they reached for the wrong reason. The handoff's read deadline had to be split into two constants
+after a regression test proved flaky: fixing a wedged accept thread (a silent client) first set
+the server's read deadline equal to the launcher's own 2000ms reply budget, and a test
+pitting a stalled peer against a concurrent handoff then raced those two clocks toward *different*
+outcomes, passing 3 times in 10; `serve` now reads with its own 500ms `READ_TIMEOUT_MILLIS`
+and the launcher's wait uses a separate 2000ms `HANDOFF_TIMEOUT_MILLIS`, and the regression
+test is 10/10, confirmed to fail deterministically without the fix. The login item's live-reload
+test needed its trigger fixed, not its assertion: `ConfigService.start()` queues its own initial
+publish, so constructing `JasperApplication` and reconciling the login item in the same EDT turn
+let that queued duplicate land as a second event on the freshly installed listener; the test now
+spans two EDT turns with an intervening pump, matching the existing `ConfigurationControllerTest`
+pattern, and no assertion changed.
+
+Accepted without new coverage: `LoginItem.run()`'s 10-second timeout and `destroyForcibly` path
+(the only commands it ever runs are `reg add`/`reg delete`, which do not hang in practice, and a
+10-second test was judged not worth adding to a suite this size); `shutdown()` clears the quit
+handler but never removes the constructor's reopen listener (inert, since the JVM is exiting
+anyway, but asymmetric). Separately worth knowing before searching for it: `config.example.toml`'s
+`[background]` table round-trips through
+`ConfigTemplateTest.repositoryExampleIsCompleteAndParsesAsBuiltInDefaultsOnBothPlatforms`, not
+`ExpandedConfigTest`, which never reads the example file at all.
+
+`main` gained a `[notifications]` config table and a substantially rewritten `JasperApplication`
+(NativeNotifier, BuddyDeck, CommandNotifier, new listener wiring) after this branch started;
+expect mechanical conflicts in `ConfigLoader.FIELDS`'s root set, `ConfigSnapshot`'s record
+components, `config.example.toml`/`ConfigTemplate`'s table insertion, and `JasperApplication`'s
+listener/constructor wiring at merge time. Not acted on here; merging is a separate step with the
+user's say-so.
+
+**Next step:** each of tasks 1–7 is individually reviewed clean (task 4 after three fix rounds,
+tasks 3 and 5–7 after one each, tasks 1–2 with none needed), but the whole-branch review the plan
+calls for after this task has not run yet. The plan asks it to pay particular attention to the
+accept loop's error handling (the only non-daemon thread; a thrown error there would silently end
+residency), whether anything in `shutdown()` is now reachable twice or not at all on the residency
+path, and the stale-build handoff, which is the one path that deliberately closes the endpoint
+from inside a request.
+
+Fresh `./gradlew check --rerun-tasks`: jasper-app 568 tests, 0 failures, 1 skip
+(`ShellIntegrationScriptTest.fishReWrapsAPromptDefinedAfterTheIntegrationLoaded`, fish not
+installed on this machine); jasper-terminal 316 tests, 0 failures, 1 skip
+(`FontSetTest.fallsBackWhenPrimaryCannotDisplay`) — 884 tests, 0 failures, 2 skips overall,
+unchanged from the end of Task 7 since this task adds no code or tests. A second, plain
+`./gradlew check` run after the documentation edits matched exactly. [Design
+spec](superpowers/specs/2026-09-17-jasper-background-daemon-design.md),
+[plan](superpowers/plans/2026-09-17-jasper-background-daemon.md), [configuration
+guide](configuration.md#background-residency), [packaging
+checklist](packaging.md#native-acceptance-checklist).
+
+**Still user-run.** Nothing about this feature's actual purpose has been verified, and no GUI was
+launched at any point during this work:
+
+- Cold-versus-warm launch timing — the number this whole feature is judged on.
+- The resident process's idle memory (`ps -o rss= -p <pid>`).
+- Login start on macOS (LaunchAgent, log out/in) and on Windows (`Run` value, sign out/in), both
+  from a real packaged install.
+- `AF_UNIX` sockets on Windows at all.
+- The macOS Dock icon persisting with zero windows, and a Dock click producing a window
+  noticeably faster than a cold start.
+- Quit really exiting completely and the next launch being cold.
+- Survival across sleep/wake and a monitor change while resident.
+- The plist/`Run` value being removed the moment `enabled = false` is saved, without restarting
+  Jasper.
+- A handoff request or a Dock click arriving while Jasper is quitting not raising a window that
+  is being disposed — the `openOrRaise` guard is inspected and unit-tested for the reachable
+  branch, but the disposing-window branch itself needs a live window and cannot be exercised
+  headlessly.
+
+No GUI, merge or push.
+
 **History ranking, freshness and tmux (2026-09-16):** On
 `claude/history-scope-ranking` (from main `18fd513`), three confirmed defects in
 the shipped History scope and one preference, each measured against the dev
