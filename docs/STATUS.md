@@ -33,38 +33,52 @@ sits in his lap.
 before the tuck and sleep deadlines, so a working buddy never falls asleep —
 pinned by ninety seconds of ticks.
 
-*The drawer.* The bubble is now a standing notification drawer. `BuddyDeck` holds
-`BuddyNotice`s keyed by `(source, key)` and knows nothing about panes: the terminal
-is one producer and passes the pane as its key, which is what makes "one card per
-tab/pane/window" true today without the deck learning why. A future sftp transfer
-or SSH session posts per-item notices through the same deck unchanged. `detail` is
-a `Supplier<String>` so a running card ticks without being re-posted, and so a
-transfer can report bytes through the same field — a start timestamp would have
-needed a zero sentinel, the mistake this repository has already made twice.
+*Two surfaces.* Live notices rise in a **thought column above his head**;
+everything that happened lives in a **drawer** he opens on a single click.
+Position is a claim about lifetime, and a permanent stack of finished cards
+beside him was a record pretending to be a status display.
 
-Nothing auto-hides. The drawer is bounded at 50 with the oldest falling off, every
-card has a dismiss ×, the expanded list has **Clear all** and scrolls rather than
-capping, and nothing is persisted — it starts empty each run. Closing a pane
-*orphans* its card rather than removing it: the action goes, the outcome stays, so
-a pane closed after a successful build still says the build succeeded.
+`BuddyDeck` holds `BuddyNotice`s keyed by `(source, key)` and knows nothing
+about panes: the terminal is one producer and passes the pane as its key,
+which is what makes "one card per tab/pane/window" true today without the
+deck learning why. `Kind` splits **task** (begins and ends) from
+**connection** (up until it is not), because a tunnel never completes and a
+model built only around completion could not express one; `State.fits(Kind)`
+makes an impossible notice unconstructible. `detail` is a `Supplier<String>`
+so a running card ticks without being re-posted and a future transfer can
+report bytes through the same field.
 
-`BuddyDeckLayout` and `BubbleMotion` are pure, so the peek offsets, the scroll
-clamp, the hit tests and the bounce curve are all tested headlessly.
-`BuddyDeckPanel` takes input through package-private handlers the way
-`TerminalView` does. Its backing cards are shape only — every assertion passed
-while the cards behind read straight through the translucent top card, and only
-rendering it showed that; the test now pins the property rather than the pixels.
+Column membership is `live() || !acknowledged`. Acknowledgement is deck
+state, not notice state, because it is a fact about the reader. Focusing a
+pane acknowledges it; a command finishing in the focused pane is
+acknowledged on the spot and never appears; closing a pane acknowledges as
+well as orphans, since its pane can never be focused again. `live()`
+excludes orphans — a pane closed mid-command is left `RUNNING` but nothing
+is still happening, and without that it sat above his head all session.
 
-`TerminalSession.Listener.commandStarted` is new. Nothing previously reached the
-app at the C mark, so `CommandNotifier.passedThreshold` had no production caller
-at all and the typing animation could never have run.
+`BuddyCard` paints one card for both surfaces. `BuddyDeckLayout` and
+`BubbleMotion` stay pure, so the column offsets, the flip, the scroll clamp,
+the hit tests and the bounce curve are all tested headlessly. Rendering the
+column under the sprite is what showed the tail was invisible at 7px on a
+dark desktop and trailed off his centre line; no assertion would have.
 
-Notification widened from the tab to the pane: only the pane you were typing in is
-quiet. `CommandNotifier.Channel` was deleted rather than given a second
-implementation — a hidden buddy no longer changes where a notice goes, so it had
-one real implementation left. `NativeNotifier` still passes the command line to
-`osascript` as argv rather than inside an interpolated AppleScript string, which a
-test asserts with a command containing quotes and a newline.
+`NEEDS_INPUT` is defined and rendered but set by nothing yet: OSC 133 `A`
+means "at a prompt, ready for input", so for the shell it is the same event
+as a finished command. Catching a blocked **sub-process** (`sudo`, `[y/N]`)
+needs the pty's foreground process group and is its own work. Connection
+producers, and grouping healthy connections into one "2 tunnels up" bubble,
+are deliberately deferred until something posts one rather than shipping
+untested machinery for a caller that does not exist.
+
+`TerminalSession.Listener.commandStarted` is new. Nothing previously reached
+the app at the C mark, so `CommandNotifier.passedThreshold` had no
+production caller at all and the typing animation could never have run.
+
+Notification widened from the tab to the pane: only the pane you were typing
+in is quiet. `CommandNotifier.Channel` was deleted rather than given a second
+implementation. `NativeNotifier` passes the command line to `osascript` as
+argv rather than inside an interpolated AppleScript string, which a test
+asserts with a command containing quotes and a newline.
 
 *tmux.* The scripts wrap every OSC in tmux's passthrough sequence when `$TMUX`
 is set, and turn on `allow-passthrough` for their own pane. Measured against tmux

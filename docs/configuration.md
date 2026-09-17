@@ -130,23 +130,25 @@ command-start and command-end marks the integration scripts emit, so a shell tha
 produces no notifications and no cards at all — Jasper cannot know how long anything took. There is
 no fallback guess.
 
-Past the threshold the desk buddy sits down and types on a laptop, and the command grows a **card**
-beside him. The card appears whatever you are looking at: it is status, not an interruption. It shows
-the command, how long it has been running, and when the command ends a check or a cross with the
-final time.
+Past the threshold the desk buddy sits down and types on a laptop, and a **bubble rises above his
+head** with a thought tail pointing back at him. The bubble appears whatever you are looking at: it
+is status, not an interruption. It shows the command, how long it has been running, and when the
+command ends a check or a cross with the final time.
 
-Cards never disappear on their own — the drawer is a record of what has been going on, not a message
-that flashes past. They stack newest-on-top, with a count once there are more than three. Clicking
-the stack opens it as a list; clicking an entry takes you to the pane it ran in; the × on a card
-dismisses that one, and **Clear all** empties the drawer. At most 50 are kept, the oldest falling
-off, and the drawer starts empty each time Jasper starts. A card whose pane you have closed stays
-readable but dims and no longer responds — there is nowhere left for it to take you.
+**Looking at it clears it.** Focusing the pane a bubble came from takes it out of the column, so the
+column empties as you work rather than needing to be tidied. A command that finishes in the pane you
+were already typing in never produces a bubble at all — you watched it happen. When nothing is
+running and nothing is unseen there is nothing above his head, which is the resting state.
 
-**Inside tmux** the marks need tmux's passthrough wrapper: tmux parses every escape its panes emit
-and forwards almost none, so without it not one OSC 133 mark reaches Jasper and integration is
-silently dead. The scripts detect `$TMUX` and wrap automatically, and turn on `allow-passthrough`
-for their own pane only — your global tmux configuration is left exactly as you wrote it. It needs
-tmux 3.3 or newer, which is when the option was added.
+At most three bubbles are shown, newest nearest his head, with a count on the newest when there are
+more. The column flips below him when he is too near the top of the screen, and the order inverts so
+the newest is still the one closest to him.
+
+**Single-clicking him opens the drawer**: everything from this run, newest first, whether or not you
+have seen it, with the × on a card to dismiss one and **Clear all** to empty it. At most 50 are kept,
+the oldest falling off, and the drawer starts empty each time Jasper starts. A card whose pane you
+have closed stays readable but dims and no longer responds — there is nowhere left for it to take
+you. Double-clicking him still raises the terminal and right-clicking still opens his menu.
 
 A **system notification** is sent as well, unless the command finished in the pane you were actually
 typing in. That includes a command finishing in a visible but unfocused split pane, which is easy to

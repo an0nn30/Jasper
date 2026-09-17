@@ -1,6 +1,6 @@
 # Buddy thought column — design
 
-**Status:** Designed. Development branch: `claude/command-notifications` (continuing), from `9e8d61a`.
+**Status:** Implemented. Development branch: `claude/command-notifications` (continuing), from `9e8d61a`.
 
 **Revises:** the [buddy bubble deck design](2026-09-17-jasper-buddy-bubble-deck-design.md), which is
 implemented and shipped on this branch. That design put a permanent stack of cards beside the buddy.
