@@ -27,7 +27,7 @@ class BuddyColumnPanelTest {
     private void post(String key, String title, BuddyNotice.State state) {
         deck.post(new BuddyNotice("terminal", key, BuddyNotice.Kind.TASK, title, state,
             () -> "detail", () -> activated.add(title)));
-        panel.arrived();
+        panel.refresh();
     }
 
     private void layout() { panel.setSize(panel.getPreferredSize()); }
@@ -249,5 +249,33 @@ class BuddyColumnPanelTest {
             }
         }
         return false;
+    }
+
+    /**
+     * The bug: nothing in production ever called the arrival, so bubbles appeared instantly at full
+     * size while this very test passed by calling it directly. The panel must work it out itself.
+     */
+    @Test void aPostedNoticeStartsTheArrivalWithoutAnyoneHavingToSaySo() {
+        now = BubbleMotion.IN_NANOS * 10;
+        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "one",
+            BuddyNotice.State.RUNNING, () -> "d", () -> { }));
+
+        panel.refresh();
+
+        assertThat(panel.topScale()).as("small, and about to grow").isEqualTo(BubbleMotion.IN_FROM);
+        assertThat(panel.animating()).isTrue();
+    }
+
+    /** Only a posting is an arrival; a dismissal or an acknowledgement must not restart the spring. */
+    @Test void refreshingWithoutANewNoticeDoesNotRestartTheSpring() {
+        post("a", "one", BuddyNotice.State.RUNNING);
+        now += BubbleMotion.IN_NANOS + BubbleMotion.SETTLE_NANOS + 1;
+        assertThat(panel.animating()).isFalse();
+
+        deck.acknowledge("terminal", "a");
+        panel.refresh();
+
+        assertThat(panel.topScale()).isEqualTo(1f);
+        assertThat(panel.animating()).as("nothing arrived, so nothing moves").isFalse();
     }
 }

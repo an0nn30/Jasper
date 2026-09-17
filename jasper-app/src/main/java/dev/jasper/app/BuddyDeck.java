@@ -23,6 +23,12 @@ final class BuddyDeck {
     private final List<BuddyNotice> notices = new ArrayList<>();
     /** Notices the reader has already looked at. About the reader, not about the thing. */
     private final Set<Id> seen = new HashSet<>();
+    /**
+     * Bumped only by {@link #post}. A surface compares it to the last value it drew to know a notice
+     * genuinely arrived, rather than being told separately — being told separately is exactly how
+     * the arrival animation came to have no production caller at all.
+     */
+    private int generation;
 
     /** Adds a notice, or replaces the one with the same source and key and promotes it to the top. */
     void post(BuddyNotice notice) {
@@ -31,6 +37,7 @@ final class BuddyDeck {
         // A new state is new news: a tunnel that drops after you acknowledged it must speak up again.
         seen.remove(new Id(notice.source(), notice.key()));
         notices.addFirst(notice);
+        generation++;
         while (notices.size() > MAX_NOTICES) seen.remove(idOf(notices.removeLast()));
     }
 
@@ -86,6 +93,9 @@ final class BuddyDeck {
 
     /** Newest first. A copy: the caller may be painting while a producer posts. */
     List<BuddyNotice> notices() { return List.copyOf(notices); }
+
+    /** Changes when, and only when, something is posted. */
+    int generation() { return generation; }
 
     boolean isEmpty() { return notices.isEmpty(); }
 

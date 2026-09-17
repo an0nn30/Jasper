@@ -74,10 +74,10 @@ final class BuddyColumnWindow {
     void showBeside(Rectangle anchorOnScreen) {
         if (disposed) return;
         anchor = new Rectangle(anchorOnScreen);
-        layout();
+        panel.refresh();
     }
 
-    void refresh() { layout(); }
+    void refresh() { panel.refresh(); }
 
     void hide() {
         if (disposed) return;

@@ -39,6 +39,8 @@ final class BuddyColumnPanel extends JComponent {
     private long settleStartedAt;
     /** Zero until something has arrived, so an idle column does not claim to be mid-animation. */
     private boolean everArrived;
+    /** The deck generation this panel has already played an arrival for. */
+    private int drawnGeneration;
 
     BuddyColumnPanel(BuddyDeck deck, Runnable onLayoutChanged, Runnable onOpenDrawer) {
         this.deck = Objects.requireNonNull(deck, "deck");
@@ -60,11 +62,21 @@ final class BuddyColumnPanel extends JComponent {
 
     boolean below() { return below; }
 
-    /** A notice was posted: the nearest bubble springs in and the ones above it slide up over it. */
-    void arrived() {
-        topArrivedAt = clock.getAsLong();
-        settleStartedAt = topArrivedAt;
-        everArrived = true;
+    /**
+     * The deck changed. If something was genuinely posted the nearest bubble springs in and the ones
+     * above it slide up over it; anything else — a dismissal, an acknowledgement — just re-lays out.
+     *
+     * <p>The panel works this out from the deck rather than being told, because the version that had
+     * to be told had no production caller at all: the bubbles appeared instantly at full size while
+     * a test that called the method directly passed.
+     */
+    void refresh() {
+        if (deck.generation() != drawnGeneration) {
+            drawnGeneration = deck.generation();
+            topArrivedAt = clock.getAsLong();
+            settleStartedAt = topArrivedAt;
+            everArrived = true;
+        }
         revalidate();
         repaint();
         onLayoutChanged.run();
