@@ -40,8 +40,10 @@ final class HandoffSocket implements AutoCloseable {
     /** macOS caps sun_path at 104 bytes; a long home directory can reach it. */
     private static final int MAX_SOCKET_PATH_BYTES = 100;
     private static final long HANDOFF_TIMEOUT_MILLIS = 2_000;
-    /** A peer that connects and sends nothing must not hold the endpoint open indefinitely. */
-    private static final long READ_TIMEOUT_MILLIS = 2_000;
+    /** How long one stalled peer may hold the accept thread. Deliberately far below the launcher's
+     *  own wait (HANDOFF_TIMEOUT_MILLIS), so a request queued behind such a peer is still served
+     *  inside its budget. A real client writes its line immediately. */
+    private static final long READ_TIMEOUT_MILLIS = 500;
 
     private final ServerSocketChannel channel;
     private final Path socketPath;
@@ -118,7 +120,10 @@ final class HandoffSocket implements AutoCloseable {
         Thread worker = Thread.ofPlatform().daemon().name("jasper-handoff").start(() -> {
             try (SocketChannel client = SocketChannel.open(UnixDomainSocketAddress.of(socketPath))) {
                 write(client, request.encode());
-                answer.complete(LaunchRequest.Response.of(readLine(client, READ_TIMEOUT_MILLIS)));
+                // The launcher's own budget, not the server's silent-peer tolerance: this reply may
+                // legitimately be queued behind a stalled peer, and must not give up just as it
+                // is about to be served. The future below is the hard outer bound either way.
+                answer.complete(LaunchRequest.Response.of(readLine(client, HANDOFF_TIMEOUT_MILLIS)));
             } catch (IOException | RuntimeException failure) {
                 answer.complete(LaunchRequest.Response.PROTOCOL);
             }

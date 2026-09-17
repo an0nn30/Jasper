@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -128,6 +129,19 @@ class HandoffSocketTest {
             }
             assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L))
                 .as("still serving after junk").isTrue();
+        }
+    }
+
+    @Test void aClientThatConnectsAndSaysNothingCannotHoldTheEndpoint() throws Exception {
+        try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK);
+             SocketChannel silent = SocketChannel.open(UnixDomainSocketAddress.of(socket()))) {
+            // The silent peer occupies the accept thread until its read deadline expires. Without
+            // that deadline this request is never served and the endpoint is wedged for good.
+            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isTrue();
+        }
+        // And the endpoint is still usable once the silent peer is gone.
+        try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
+            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isTrue();
         }
     }
 
