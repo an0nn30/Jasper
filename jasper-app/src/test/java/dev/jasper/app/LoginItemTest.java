@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 class LoginItemTest {
     @TempDir Path home;
@@ -80,5 +81,34 @@ class LoginItemTest {
         assertThat(plist).doesNotExist();
         LoginItem.apply(LoginItem.Plan.NONE);  // Does nothing at all.
         assertThat(Files.exists(home.resolve("Library"))).isTrue();
+    }
+
+    @Test void applyDoesNotThrowWhenTheExecutableDoesNotExist() {
+        // ProcessBuilder.start throws IOException here; apply must log and carry on. A launch is
+        // never worth failing over a login item.
+        var missing = java.util.List.of("jasper-no-such-command-" + java.util.UUID.randomUUID());
+        assertThatNoException().isThrownBy(() ->
+            LoginItem.apply(new LoginItem.Plan(null, null, java.util.List.of(missing))));
+    }
+
+    @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    @Test void applyToleratesACommandThatExitsNonzero() {
+        // `reg delete` exits nonzero when the value is already absent, which is the state we want.
+        // Nothing here touches the registry or launchd: it is a shell that exits 1 and nothing else.
+        assertThatNoException().isThrownBy(() -> LoginItem.apply(new LoginItem.Plan(null, null,
+            java.util.List.of(java.util.List.of("/bin/sh", "-c", "exit 1")))));
+    }
+
+    @Test void applyDoesNotThrowWhenTheFileCannotBeWritten() throws Exception {
+        // A regular file where the parent directory should be: createDirectories fails.
+        Path blocked = home.resolve("blocked");
+        Files.createFile(blocked);
+        Path target = blocked.resolve("dev.jasper.background.plist");
+        assertThatNoException().isThrownBy(() ->
+            LoginItem.apply(new LoginItem.Plan(target, "<plist/>", java.util.List.of())));
+        assertThat(target).doesNotExist();
+        // And the delete direction is just as forgiving.
+        assertThatNoException().isThrownBy(() ->
+            LoginItem.apply(new LoginItem.Plan(target, null, java.util.List.of())));
     }
 }
