@@ -64,7 +64,7 @@ final class BuddyBubblePanel extends JComponent {
     static Font detailFont() { return font(Font.PLAIN, 14f); }
 
     private static Font font(int style, float size) {
-        return BuddyFonts.system(style, size);
+        return SystemFonts.system(style, size);
     }
 
     void setContent(BuddyBubbleContent content) {

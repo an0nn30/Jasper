@@ -5,18 +5,18 @@ import java.util.Locale;
 import javax.swing.UIManager;
 
 /**
- * The OS system font for the buddy's surfaces. Asking the look and feel is not the same as asking the
+ * The OS system font for title bars and buddy surfaces. Asking the look and feel is not the same as asking the
  * system: FlatLaf sets {@code Label.font} to Helvetica Neue, which is a real face but the pre-2015
  * macOS system font, so a bubble that trusts it looks a decade old rather than obviously broken.
  */
-final class BuddyFonts {
+final class SystemFonts {
     /**
      * The only name under which macOS exposes its system font to Java. "SF Pro" and "SF Pro Text"
      * resolve to Dialog instead — silently, which is how a wrong choice goes unnoticed.
      */
     static final String MAC_SYSTEM_FONT = ".AppleSystemUIFont";
 
-    private BuddyFonts() { }
+    private SystemFonts() { }
 
     /** The system font, falling back to the look and feel's label font and then to a generic sans. */
     static Font system(int style, float size) {

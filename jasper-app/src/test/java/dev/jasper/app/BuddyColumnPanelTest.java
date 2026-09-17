@@ -28,15 +28,14 @@ class BuddyColumnPanelTest {
         deck.post(new BuddyNotice("terminal", key, BuddyNotice.Kind.TASK, title, state,
             () -> "detail", () -> activated.add(title)));
         panel.refresh();
+        now += BubbleMotion.IN_NANOS;
     }
 
     private void layout() { panel.setSize(panel.getPreferredSize()); }
 
     private Point inBubble(int index) {
-        int count = deck.column().size();
-        Rectangle card = BuddyDeckLayout.column(index, count, BuddyCard.WIDTH,
-            BuddyCard.height(panel), panel.below());
-        return new Point(BuddyColumnPanel.MARGIN + 30, BuddyColumnPanel.MARGIN + card.y + 4);
+        Rectangle card = panel.cardBounds(index);
+        return new Point(card.x + card.width / 2, card.y + card.height / 2);
     }
 
     @Test void anEmptyColumnAsksForNoRoomAtAll() {
@@ -61,7 +60,7 @@ class BuddyColumnPanelTest {
         layout();
 
         assertThat(panel.getPreferredSize().height).isEqualTo(
-            BuddyDeckLayout.columnHeight(2, BuddyCard.height(panel)) + 2 * BuddyColumnPanel.MARGIN);
+            BuddyDeckLayout.columnHeight(2, BuddyCard.height(panel)) + 2 * BuddyColumnPanel.MARGIN + BuddyColumnPanel.ARRIVAL_ROOM);
     }
 
     @Test void pastThreeTheColumnStopsGrowingAndTheNewestCarriesTheCount() {
@@ -69,7 +68,7 @@ class BuddyColumnPanelTest {
         layout();
 
         assertThat(panel.getPreferredSize().height).isEqualTo(
-            BuddyDeckLayout.columnHeight(3, BuddyCard.height(panel)) + 2 * BuddyColumnPanel.MARGIN);
+            BuddyDeckLayout.columnHeight(3, BuddyCard.height(panel)) + 2 * BuddyColumnPanel.MARGIN + BuddyColumnPanel.ARRIVAL_ROOM);
         assertThat(paintDoesNotThrow()).isTrue();
     }
 
@@ -96,12 +95,12 @@ class BuddyColumnPanelTest {
     }
 
     /** The gap and the tail are not bubbles; a click there opens the drawer instead. */
-    @Test void clickingTheTailOpensTheDrawer() {
+    @Test void clickingOutsideTheCapsulesOpensTheDrawer() {
         post("a", "one", BuddyNotice.State.RUNNING);
         layout();
         int height = BuddyDeckLayout.columnHeight(1, BuddyCard.height(panel));
 
-        panel.handleClick(new Point(BuddyColumnPanel.MARGIN + 30, BuddyColumnPanel.MARGIN + height - 3));
+        panel.handleClick(new Point(1, 1));
 
         assertThat(drawerOpened).isEqualTo(1);
         assertThat(activated).isEmpty();
@@ -134,16 +133,6 @@ class BuddyColumnPanelTest {
         assertThat(activated).containsExactly("newer");
     }
 
-    @Test void aNewNoticeRestartsTheArrivalBounce() {
-        post("a", "one", BuddyNotice.State.RUNNING);
-        now = BubbleMotion.IN_NANOS * 4;
-        assertThat(panel.topScale()).isEqualTo(1f);
-
-        post("b", "two", BuddyNotice.State.RUNNING);
-
-        assertThat(panel.topScale()).isEqualTo(BubbleMotion.IN_FROM);
-    }
-
     @Test void everyArrangementPaintsWithoutBlowingUp() {
         post("a", "running", BuddyNotice.State.RUNNING);
         post("b", "waiting", BuddyNotice.State.NEEDS_INPUT);
@@ -168,21 +157,17 @@ class BuddyColumnPanelTest {
         return true;
     }
 
-    /**
-     * The bug this replaced: nothing repainted the column, so it painted one frame at elapsed zero —
-     * scale 0.6 and opacity 0 — and the bubble was invisible until an unrelated repaint happened.
-     * The panel has to be able to say it is still moving, or the window cannot drive the frames.
-     */
     @Test void anArrivingBubbleKeepsAskingForFramesUntilItHasSettled() {
-        assertThat(panel.animating()).as("an idle column is not mid-animation").isFalse();
-
-        post("a", "one", BuddyNotice.State.RUNNING);
-
+        assertThat(panel.animating()).isFalse();
+        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "one",
+            BuddyNotice.State.RUNNING, () -> "detail", () -> { }));
+        panel.refresh();
         assertThat(panel.animating()).isTrue();
         now = BubbleMotion.IN_NANOS / 2;
         assertThat(panel.animating()).isTrue();
-        now = Math.max(BubbleMotion.IN_NANOS, BubbleMotion.SETTLE_NANOS) + 1;
-        assertThat(panel.animating()).as("and stops once it has settled").isFalse();
+        now = BubbleMotion.IN_NANOS + 1;
+        assertThat(panel.animating()).isFalse();
+        assertThat(panel.needsDetailUpdates()).as("elapsed time must still tick after settling").isTrue();
     }
 
     @Test void hoveringAsksForFramesAndStopsWhenTheGrowthIsDone() {
@@ -202,34 +187,43 @@ class BuddyColumnPanelTest {
         assertThat(panel.animating()).as("leaving animates back too").isTrue();
     }
 
-    /** The bubble genuinely starts small and transparent, and genuinely ends full size and opaque. */
-    @Test void theArrivalActuallyTravelsFromSmallAndInvisibleToFullSize() {
+    @Test void updatingTheSameNoticeKeepsItsPositionAndDoesNotReplayArrival() {
         post("a", "one", BuddyNotice.State.RUNNING);
-
-        assertThat(panel.topScale()).isEqualTo(BubbleMotion.IN_FROM);
-        assertThat(BubbleMotion.inOpacity(0)).isZero();
-
-        now = BubbleMotion.IN_NANOS;
-        assertThat(panel.topScale()).isEqualTo(1f);
-        assertThat(BubbleMotion.inOpacity(BubbleMotion.IN_NANOS)).isEqualTo(1f);
+        Rectangle before = panel.cardBounds(0);
+        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "one",
+            BuddyNotice.State.DONE, () -> "Finished", () -> { }));
+        panel.refresh();
+        assertThat(panel.cardBounds(0)).isEqualTo(before);
+        assertThat(panel.animating()).isFalse();
+        assertThat(panel.needsDetailUpdates()).isFalse();
     }
 
-    /** The stack above a new arrival slides up over it rather than jumping. */
-    @Test void theBubblesAboveANewArrivalStartOutOfPlaceAndArrive() {
+    @Test void resizingForANewArrivalDoesNotTeleportTheExistingCapsuleOnScreen() {
         post("a", "older", BuddyNotice.State.RUNNING);
-        now = BubbleMotion.SETTLE_NANOS * 4;
-        layout();
-        BufferedImage settled = paint();
+        int before = panel.cardBounds(0).y - panel.getPreferredSize().height;
+        deck.post(new BuddyNotice("terminal", "b", BuddyNotice.Kind.TASK, "newer",
+            BuddyNotice.State.RUNNING, () -> "d", () -> { }));
+        panel.refresh();
+        assertThat(panel.cardBounds(1).y - panel.getPreferredSize().height).isEqualTo(before);
+        now += BubbleMotion.IN_NANOS / 6;
+        int interrupted = panel.cardBounds(1).y - panel.getPreferredSize().height;
+        deck.post(new BuddyNotice("terminal", "c", BuddyNotice.Kind.TASK, "newest",
+            BuddyNotice.State.RUNNING, () -> "d", () -> { }));
+        panel.refresh();
+        assertThat(panel.cardBounds(2).y - panel.getPreferredSize().height).isEqualTo(interrupted);
+    }
 
-        post("b", "newer", BuddyNotice.State.RUNNING);
-        layout();
-        BufferedImage arriving = paint();
-
-        now += BubbleMotion.SETTLE_NANOS + 1;
-        BufferedImage done = paint();
-
-        assertThat(differs(arriving, done)).as("mid-settle the stack is not where it ends up").isTrue();
-        assertThat(settled).isNotNull();
+    @Test void inputFollowsTheMovingCapsuleAndIgnoresItsTransparentCorners() {
+        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "one",
+            BuddyNotice.State.RUNNING, () -> "d", () -> activated.add("one")));
+        panel.refresh();
+        Rectangle bounds = panel.cardBounds(0);
+        panel.handleMove(new Point(bounds.x + 1, bounds.y + 1));
+        assertThat(panel.hovered()).isEqualTo(-1);
+        assertThat(panel.handleClick(inBubble(0))).isFalse();
+        assertThat(activated).containsExactly("one");
+        now += BubbleMotion.IN_NANOS;
+        assertThat(panel.cardBounds(0).y - bounds.y).isEqualTo((int) BubbleMotion.IN_TRAVEL);
     }
 
     private BufferedImage paint() {
@@ -251,31 +245,9 @@ class BuddyColumnPanelTest {
         return false;
     }
 
-    /**
-     * The bug: nothing in production ever called the arrival, so bubbles appeared instantly at full
-     * size while this very test passed by calling it directly. The panel must work it out itself.
-     */
-    @Test void aPostedNoticeStartsTheArrivalWithoutAnyoneHavingToSaySo() {
-        now = BubbleMotion.IN_NANOS * 10;
-        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "one",
-            BuddyNotice.State.RUNNING, () -> "d", () -> { }));
-
-        panel.refresh();
-
-        assertThat(panel.topScale()).as("small, and about to grow").isEqualTo(BubbleMotion.IN_FROM);
-        assertThat(panel.animating()).isTrue();
-    }
-
-    /** Only a posting is an arrival; a dismissal or an acknowledgement must not restart the spring. */
-    @Test void refreshingWithoutANewNoticeDoesNotRestartTheSpring() {
+    @Test void refreshingWithoutAChangeDoesNotRestartMotion() {
         post("a", "one", BuddyNotice.State.RUNNING);
-        now += BubbleMotion.IN_NANOS + BubbleMotion.SETTLE_NANOS + 1;
-        assertThat(panel.animating()).isFalse();
-
-        deck.acknowledge("terminal", "a");
         panel.refresh();
-
-        assertThat(panel.topScale()).isEqualTo(1f);
-        assertThat(panel.animating()).as("nothing arrived, so nothing moves").isFalse();
+        assertThat(panel.animating()).isFalse();
     }
 }

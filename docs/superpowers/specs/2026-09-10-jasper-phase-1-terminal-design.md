@@ -8,6 +8,8 @@
 
 > Command palette amendment, 2026-09-12: the user moved the [approved command palette](2026-09-12-jasper-command-palette-design.md) into Phase 1. It uses Cmd+K on macOS and Ctrl+K on Windows/Linux; Clear Scrollback moves to Cmd+Shift+K on macOS and remains Ctrl+Shift+K elsewhere. The existing `cmd` token semantics do not change. The approved palette design governs registration, search, persistent recents, focus, routing, verification, and its explicit exclusion of a plugin framework.
 
+> iTerm tab amendment, 2026-09-17: the user's screenshots and explicit request supersede the fixed-width tabs, duplicate right-hand window title, terminal icons and sliding underline. One session hides the strip and uses a centered native-header title. Multiple tabs stretch equally across the title bar, show centered system-font titles, hover close controls and actual shortcut labels, and retain the far-right add button. Automatic titles combine the OSC title (or directory) with the foreground job. [Reference and validation](../../design/iterm-title-bar-reference.md) records geometry, tmux handling and remaining native acceptance.
+
 **Date:** 2026-09-10
 **Status:** Approved (2026-09-10). Plans 1–3 implemented and merged (2026-09-11). User-requested [Plan 3.5](../plans/2026-09-11-jasper-plan-3-5-chrome-and-themes.md) adds custom macOS chrome, coordinated Atom-inspired themes and a colored-toolbar design discussion before Plan 4 (configuration and packaging). Current state: `docs/STATUS.md`.
 **Repo:** `~/projects/jasper`

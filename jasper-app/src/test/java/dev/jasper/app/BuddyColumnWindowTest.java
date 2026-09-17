@@ -22,8 +22,18 @@ class BuddyColumnWindowTest {
 
     /** Exactly enough room is still room; the boundary must not flip for a single pixel. */
     @Test void theBoundaryIsInclusive() {
-        assertThat(BuddyColumnWindow.fitsAbove(new Rectangle(400, 220, 84, 96), 220, SCREEN)).isTrue();
-        assertThat(BuddyColumnWindow.fitsAbove(new Rectangle(400, 219, 84, 96), 220, SCREEN)).isFalse();
+        assertThat(BuddyColumnWindow.fitsAbove(new Rectangle(400, 218, 84, 96), 220, SCREEN)).isTrue();
+        assertThat(BuddyColumnWindow.fitsAbove(new Rectangle(400, 217, 84, 96), 220, SCREEN)).isFalse();
+    }
+
+    @Test void theBodyGapDoesNotIncludeItsTransparentShadowAndAnimationRoom() {
+        Rectangle anchor = new Rectangle(600, 500, 84, 96);
+        var size = new java.awt.Dimension(BuddyCard.WIDTH + 2 * BuddyColumnPanel.MARGIN,
+            BuddyCard.HEIGHT + 2 * BuddyColumnPanel.MARGIN + BuddyColumnPanel.ARRIVAL_ROOM);
+        var above = BuddyColumnWindow.place(anchor, size, SCREEN, false);
+        assertThat(anchor.y - (above.y + size.height - BuddyColumnPanel.MARGIN)).isEqualTo(30);
+        var below = BuddyColumnWindow.place(anchor, size, SCREEN, true);
+        assertThat(below.y + BuddyColumnPanel.MARGIN - anchor.y - anchor.height).isEqualTo(30);
     }
 
     @Test void aScreenWithAnOffsetOriginIsAccountedFor() {

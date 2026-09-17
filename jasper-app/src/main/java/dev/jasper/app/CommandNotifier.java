@@ -28,9 +28,6 @@ final class CommandNotifier {
     /** Every notice this class posts is the terminal's; a transfer or an SSH session brings its own. */
     static final String SOURCE = "terminal";
 
-    /** A command title longer than this is cut; the pane it points at is unaffected. */
-    private static final int MAX_TITLE = 60;
-
     private final Supplier<Duration> threshold;
     private final BuddyDeck deck;
     private final Runnable onDeckChanged;
@@ -102,16 +99,27 @@ final class CommandNotifier {
         onDeckChanged.run();
     }
 
+    /** Refresh wording without promoting the card, clearing acknowledgement, or replaying arrival. */
+    void titleChanged(Object key, String programTitle) {
+        InFlight flight = inFlight.get(key);
+        if (flight == null) return; // Prompt titles cannot rename completed history.
+        String updated = TerminalTitle.singleLine(programTitle);
+        if (updated.isBlank() || updated.equals(flight.title)) return;
+        flight.title = updated;
+        if (flight.passed && deck.updateTitle(SOURCE, key, updated)) onDeckChanged.run();
+    }
+
     /** A command ended. Its card becomes the outcome, and the OS hears about it if you were elsewhere. */
     void finished(Object key, String command, OptionalInt exitStatus, Duration ran,
                   CommandNotice.Origin origin, Runnable activate) {
+        InFlight flight = inFlight.get(key);
+        String title = flight == null ? title(command) : flight.title;
         cancel(key);
         Duration wait = threshold.get();
         if (wait.isZero() || ran.compareTo(wait) < 0) return;
         boolean succeeded = exitStatus.isEmpty() || exitStatus.getAsInt() == 0;
         String detail = succeeded ? "Finished in " + humanize(ran)
             : "Exited " + exitStatus.getAsInt() + " · " + humanize(ran);
-        String title = title(command);
         deck.post(new BuddyNotice(SOURCE, key, BuddyNotice.Kind.TASK, title,
             succeeded ? BuddyNotice.State.DONE : BuddyNotice.State.FAILED, () -> detail, activate));
         // You were looking straight at it, so it is already seen and never reaches the column.
@@ -152,10 +160,9 @@ final class CommandNotifier {
         if (flight.passed && running > 0 && --running == 0) onWorkingChanged.accept(false);
     }
 
-    /** One line, newlines shown the way the History palette shows them, cut to a readable length. */
+    /** Keep the full content; the tab and capsule renderers fit it to their own available width. */
     static String title(String command) {
-        String single = command.strip().replace("\r", "").replace("\n", " ↵ ");
-        return single.length() > MAX_TITLE ? single.substring(0, MAX_TITLE - 1) + "…" : single;
+        return TerminalTitle.singleLine(command.strip());
     }
 
     /** "45s", "1m 12s", "2m", "2h 5m" — the way a person would say it, not ISO-8601. */

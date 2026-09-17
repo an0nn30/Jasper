@@ -1,6 +1,6 @@
 package dev.jasper.app;
 
-/** One scalar on the shared quick, eased tab-entry/underline curve. EDT-confined. */
+/** One scalar on the shared quick, eased tab width curve. EDT-confined. */
 final class TabMotion {
     private static final long DURATION = 180_000_000L;
     private double from, to;

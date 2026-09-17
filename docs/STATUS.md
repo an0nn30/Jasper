@@ -1,5 +1,106 @@
 # Jasper — Status and Handoff
 
+**iTerm-style tabs and title correction (2026-09-17):** Continuing on
+`claude/command-notifications` in `.claude/worktrees/practical-shamir-1252c5`.
+The user's three screenshots supersede the fixed 160-point tabs, duplicate
+right-hand window title and sliding underline. A single session now hides the
+strip and uses a centered window title; multiple tabs stretch across the macOS
+title bar with centered system-font text, thin dividers, hover close buttons,
+actual shortcut labels and a fixed right-edge add button. The 38-point default,
+native stoplights/gestures, tab ordering and overflow navigation remain.
+
+Automatic tab/native titles now combine the OSC title (or directory) with the
+foreground job: `~ (-zsh)`, `~ (sleep)`, `Reviewing files (tmux)`. A small Unix PTY
+metadata query reads the foreground process group, then Java process metadata,
+every 500ms off the EDT. It needs no shell integration or helper subprocess and
+stops polling on exit/disposal. Unsupported process metadata falls back to the
+configured program. Manual names remain overrides. Buddy titles remain the
+program's text without the job suffix, with the captured command as fallback;
+finished-notification ordering and the matched bubble motion remain unchanged.
+The existing system-font resolver is shared as `SystemFonts`.
+
+The title wrapper was also present in iTerm: tmux's default `set-titles-string`
+added the session/window number and quoted pane title. With explicit user
+permission, `~/.tmux.conf` now forwards custom pane titles and shortens its default
+hostname/user@hostname:path shell title to `~` or the directory basename. The
+running server received only this option; no plugin/config reload. Original
+saved as `~/.tmux.conf.jasper-backup-20260917-145844`. The running shell evaluates
+to `~`, while custom task titles stay intact.
+
+Validation: `./gradlew check` passes **994 tests: 992 passed, two existing skips,
+zero failures/errors** (app 672/671/1, terminal 322/321/1). Real PTY tests cover
+foreground job changes, background jobs, login shells, real tmux forwarding,
+OSC 0/1/2, manual naming and completed-notice snapshots. Headless title-bar
+renders cover single/multiple/narrow layouts in both themes; source hygiene and
+diff checks pass. One pre-existing dangling Javadoc warning remains in
+`LaunchSettingsTest`. Native desktop acceptance remains user-run under AGENTS.md;
+no GUI, commit or push. [Reference and reproduction](design/iterm-title-bar-reference.md).
+
+
+
+**Program titles in tabs and buddy notices (2026-09-17):** Continuing in
+`.claude/worktrees/practical-shamir-1252c5` on `claude/command-notifications`.
+The user requested using the title set by the command/application for the tab
+and bubble. OSC 0/1/2 reception and automatic tab/window titles already existed;
+the missing connection was from title events to notices, and tabs had no command
+fallback when no OSC title was supplied. The running local tmux server was also
+observed with `set-titles off`, which prevents its pane titles reaching Jasper.
+Optional session-scoped forwarding settings are now documented; the user's tmux
+configuration is unchanged.
+
+`TerminalPane` keeps ordered EDT snapshots of title/start/end events. Reading
+`session.title()` later would race with a subsequent prompt title, so a real PTY
+test holds Swing until the full title/finish/prompt burst has been parsed and
+checks the completed notice still names the command's last task. Automatic tabs,
+the native window and live bubbles use the program title, then running-command
+fallback; idle automatic tabs still fall back to the directory. Manual tab names
+remain explicit overrides. Finished notices/native notifications retain the last
+title from that execution.
+
+A title update changes a notice in place, preserving order, acknowledgement and
+arrival state, and cannot resurrect a dismissed notice. Full titles are retained;
+renderers fit them to available width, with code-point-safe binary truncation for
+the capsule instead of repeatedly shortening a potentially long title one
+character at a time. No terminal-module API or shell script changes were needed.
+
+Validation: eight new tests cover OSC 0/1/2 through the actual PTY/parser/tab/window/
+bubble path, command fallback and title clearing, preserved manual names,
+completion ordering, per-pane identity, pre-threshold titles, dismissal and long
+Unicode titles. `./gradlew check`: app 674 (673 passed, one fish skip), terminal
+320 (319 passed, one existing font skip): **994 total, 992 passed, two skipped,
+zero failures/errors**. Source hygiene and diff checks pass. Native GUI remains
+user-run. [Title behavior and tmux settings](configuration.md#automatic-tab-and-notification-titles).
+
+**Buddy notification reference correction (2026-09-17):** On
+`claude/command-notifications` in `.claude/worktrees/practical-shamir-1252c5`, the
+user supplied light/dark recordings and asked to replace the notification styling
+and animation. ffmpeg extracted every original frame and ffprobe supplied its
+variable-rate timestamp. The replacement uses 330 × 56 logical-pixel capsules,
+13-point macOS system text, measured light/dark fills, partial transparency and a
+cached soft outer shadow. Thought-tail dots, card overlap and scale/hover growth
+are removed. The capsule descends 32 logical pixels with a fitted 600ms spring;
+the actual headless render tracks the recorded arrival with 0.95 physical-pixel
+RMS error and a maximum two-pixel difference.
+
+Motion is keyed by notice identity: status updates stay in place and interrupted
+stack moves preserve the current position. Live detail text ticks once a second
+after motion settles; theme changes repaint visible capsules. Drawer dismissal
+now refreshes the column, and input ignores transparent rounded corners. Existing
+notice routing, three-visible limit and drawer history remain. The reference's
+stop-task control has no corresponding Jasper cancellation API; existing open
+and dismiss actions are retained rather than adding a misleading button.
+
+`./gradlew check` passes: app 666 tests (665 passed, one fish skip), terminal 320
+(319 passed, one existing font skip): **986 total, 984 passed, two skipped, zero
+failures/errors**. `:jasper-app:buddyNotificationPreview` renders actual components
+without a window or shell. Light/dark frames, the visual comparison and a
+reference-left/Jasper-right motion MP4 are in
+`jasper-app/build/reports/buddy-notifications/`. Source hygiene and diff checks
+pass. Native desktop acceptance remains user-run, especially transparency over
+a textured background: a flat video does not uniquely identify source alpha or
+native blur. [Measurements, evidence limits and reproduction](design/buddy-notification-reference.md).
+The thought-column spec and plan banners record this user-requested deviation.
+
 **Finished-command notifications (2026-09-16):** On
 `claude/command-notifications` (from main `1f1afeb`), a command that ran past a
 threshold and finished in a tab you were not looking at now tells you, through

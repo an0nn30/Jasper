@@ -41,6 +41,19 @@ final class BuddyDeck {
         while (notices.size() > MAX_NOTICES) seen.remove(idOf(notices.removeLast()));
     }
 
+    /** A live producer changed its wording; this is neither a new notice nor new attention. */
+    boolean updateTitle(String source, Object key, String title) {
+        for (int i = 0; i < notices.size(); i++) {
+            BuddyNotice notice = notices.get(i);
+            if (!notice.sameAs(source, key)) continue;
+            if (notice.title().equals(title)) return false;
+            notices.set(i, new BuddyNotice(notice.source(), notice.key(), notice.kind(), title,
+                notice.state(), notice.detail(), notice.activate()));
+            return true;
+        }
+        return false;
+    }
+
     /** Removes one notice; true when there was one to remove. */
     boolean dismiss(String source, Object key) {
         seen.remove(new Id(source, key));

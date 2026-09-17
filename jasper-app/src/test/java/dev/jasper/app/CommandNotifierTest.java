@@ -383,4 +383,53 @@ class CommandNotifierTest {
 
         assertThat(deck.notices()).isEmpty();
     }
+    @Test void programTitleChangesUpdateOnlyTheirPaneWithoutReorderingOrReacknowledging() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("a", "worker a", () -> 0L, () -> {}, UNWATCHED);
+        notifier.started("b", "worker b", () -> 0L, () -> {}, UNWATCHED);
+        deck.acknowledge(CommandNotifier.SOURCE, "a");
+        int generation = deck.generation();
+        notifier.titleChanged("a", "Reviewing database migration");
+        assertThat(deck.notices()).extracting(BuddyNotice::title)
+            .containsExactly("worker b", "Reviewing database migration");
+        assertThat(deck.generation()).isEqualTo(generation);
+        assertThat(deck.acknowledged(CommandNotifier.SOURCE, "a")).isTrue();
+        assertThat(working).containsExactly(true);
+    }
+
+    @Test void titlesReceivedBeforeTheThresholdAreUsedWhenTheBubbleAppears() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("a", "worker", () -> 0L, () -> {}, WATCHED);
+        notifier.titleChanged("a", "Indexing the repository");
+        assertThat(deck.notices()).isEmpty();
+        passThreshold();
+        assertThat(deck.notices().getFirst().title()).isEqualTo("Indexing the repository");
+    }
+
+    @Test void finishedNoticesKeepTheirFinalProgramTitleAfterTheShellChangesBackToItsPrompt() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("a", "worker", () -> 0L, () -> {}, UNWATCHED);
+        notifier.titleChanged("a", "Review complete");
+        notifier.finished("a", "worker", OptionalInt.of(0), Duration.ofSeconds(11), HIDDEN_TAB, () -> {});
+        notifier.titleChanged("a", "user@host: ~/projects");
+        assertThat(deck.notices().getFirst().title()).isEqualTo("Review complete");
+        assertThat(os).containsExactly(new Sent("Review complete", "Finished in 11s"));
+    }
+
+    @Test void changingATitleDoesNotResurrectADismissedRunningNotice() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("a", "worker", () -> 0L, () -> {}, UNWATCHED);
+        deck.dismiss(CommandNotifier.SOURCE, "a");
+        notifier.titleChanged("a", "Still working");
+        assertThat(deck.notices()).isEmpty();
+    }
+
+    @Test void longTitlesKeepTheirFullContentAndUnicodeForTheRendererToFit() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("a", "worker", () -> 0L, () -> {}, UNWATCHED);
+        String title = "review ".repeat(20) + new String(Character.toChars(0x1F422));
+        notifier.titleChanged("a", title);
+        assertThat(deck.notices().getFirst().title()).isEqualTo(title);
+    }
+
 }

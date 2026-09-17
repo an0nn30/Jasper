@@ -11,31 +11,22 @@ import java.awt.Rectangle;
  */
 final class BuddyDeckLayout {
     static final int ROW_GAP = 6;
-    /**
-     * Negative: the bubbles overlap rather than sitting apart, so the column reads as a stack of
-     * things resting on each other. Six pixels eats into a card's ten of bottom padding and never
-     * into its text.
-     */
-    static final int COLUMN_GAP = -6;
-    /** Beyond this the nearest bubble carries a count; a taller column would cover the screen. */
+    /** Preserve the existing multi-notice order, with air between the rounded capsules. */
+    static final int COLUMN_GAP = 6;
     static final int MAX_IN_COLUMN = 3;
-    /** The band between his head and the nearest bubble, where the thought tail sits. */
-    static final int TAIL_HEIGHT = 22;
-    static final int TAIL_BIG = 11;
-    static final int TAIL_SMALL = 7;
-    static final int DISMISS_SIZE = 14;
-    static final int DISMISS_INSET = 6;
+    static final int DISMISS_SIZE = 32;
+    static final int DISMISS_INSET = 12;
     static final int CLEAR_ROW_HEIGHT = 26;
 
     private BuddyDeckLayout() { }
 
     static int visibleInColumn(int count) { return Math.min(Math.max(count, 0), MAX_IN_COLUMN); }
 
-    /** The bubbles, the gaps between them, and the band the tail lives in. */
+    /** The capsules and the gaps between them. */
     static int columnHeight(int count, int cardHeight) {
         int visible = visibleInColumn(count);
         if (visible == 0) return 0;
-        return visible * cardHeight + (visible - 1) * COLUMN_GAP + TAIL_HEIGHT;
+        return visible * cardHeight + (visible - 1) * COLUMN_GAP;
     }
 
     /**
@@ -45,28 +36,11 @@ final class BuddyDeckLayout {
     static Rectangle column(int index, int count, int width, int cardHeight, boolean below) {
         int visible = visibleInColumn(count);
         int pitch = cardHeight + COLUMN_GAP;
-        int y = below ? TAIL_HEIGHT + index * pitch : (visible - 1 - index) * pitch;
+        int y = below ? index * pitch : (visible - 1 - index) * pitch;
         return new Rectangle(0, y, width, cardHeight);
     }
 
-    /**
-     * Two circles tapering from his head towards the nearest bubble, largest first. Without them the
-     * column is a floating list rather than something he is thinking.
-     */
-    static Rectangle[] tail(int width, int columnHeight, boolean below) {
-        int centre = width / 2;
-        int band = below ? 0 : columnHeight - TAIL_HEIGHT;
-        int bigY = below ? band + TAIL_HEIGHT - TAIL_BIG - 2 : band + 2;
-        int smallY = below ? band + 2 : band + TAIL_HEIGHT - TAIL_SMALL - 2;
-        // Both sit on his centre line, with the small one trailing a little: the column is centred on
-        // him, so a tail that wanders sideways stops pointing at the head it is supposed to come from.
-        return new Rectangle[] {
-            new Rectangle(centre - TAIL_BIG / 2, bigY, TAIL_BIG, TAIL_BIG),
-            new Rectangle(centre - TAIL_SMALL / 2 + TAIL_BIG / 2, smallY, TAIL_SMALL, TAIL_SMALL)
-        };
-    }
-
-    /** The bubble at {@code y} in the column, or -1 in a gap or the tail band. */
+    /** The bubble at {@code y} in the column, or -1 in a gap. */
     static int columnAt(int y, int count, int cardHeight, boolean below) {
         int visible = visibleInColumn(count);
         for (int index = 0; index < visible; index++) {

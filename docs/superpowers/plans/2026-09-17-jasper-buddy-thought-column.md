@@ -1,5 +1,21 @@
 # Buddy thought column Implementation Plan
 
+**Status amendment (2026-09-17):** The original implementation is complete. A user-requested visual
+correction replaces its tail, overlapping cards, scale bounce and hover enlargement with the
+[recording-measured capsule](../../design/buddy-notification-reference.md). This bounded follow-up
+also fixes replay on status updates, interrupted movement, live detail repaint cadence, theme
+refresh and drawer-to-column dismissal refresh. It is verified with headless actual-component
+renders and regression tests; native desktop acceptance remains user-run.
+
+**Title follow-up (2026-09-17):** User requested that program-set terminal titles
+also label notifications. Reuse existing OSC title reception, add the command
+fallback to automatic tab titles, and forward ordered title events to live
+notices without reposting them. Completed notices keep their final title.
+Tests cover the actual PTY/parser/tab/window/bubble path and a queued burst that
+returns to a prompt before Swing processes it. tmux title forwarding remains a
+session option owned by the user, documented in the configuration guide.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move live notices to a thought column above the buddy's head that empties as you look at things, and demote the full history to a drawer he opens on a single click.

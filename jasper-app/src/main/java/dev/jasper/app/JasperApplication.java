@@ -139,6 +139,7 @@ final class JasperApplication {
             notifications.started(pane, command, elapsed, focus, watched);
         window.content().onCommandFinished = (command, exitStatus, duration, origin, pane, focus) ->
             notifications.finished(pane, command, exitStatus, duration, origin, focus);
+        window.content().onPaneTitleChanged = notifications::titleChanged;
         window.content().onPaneClosed = notifications::closed;
         window.content().onPaneFocused = notifications::looked;
         window.content().onPaneBlurred = notifications::hidden;

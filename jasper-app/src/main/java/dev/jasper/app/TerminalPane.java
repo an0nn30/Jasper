@@ -20,6 +20,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     private final AtomicBoolean updateQueued = new AtomicBoolean();
     private volatile String shellLabel;
     private TerminalSession session;
+    /** EDT snapshots preserve the order of titles, command starts and command ends from the reader. */
+    private String reportedTitle = "";
+    private String runningCommand = "";
+    private String foregroundJob = "";
+    private boolean jobQueryPending;
+    private final Timer jobTimer = new Timer(500, event -> refreshJob());
     private TerminalView view;
     private FindBar findBar;
     private boolean closed;
@@ -43,6 +49,8 @@ final class TerminalPane extends JPanel implements AutoCloseable {
 
     /** A command began. Delivered on the EDT. */
     Consumer<String> onCommandStarted = command -> {};
+    /** Effective program title, including the command fallback; delivered on the EDT. */
+    Consumer<String> onTitleChanged = title -> {};
 
     /** This pane is gone: anything holding it as a key should let go. Fired once, on the EDT. */
     Runnable onClosed = () -> {};
@@ -63,10 +71,24 @@ final class TerminalPane extends JPanel implements AutoCloseable {
 
         @Override public void commandStarted(String command) {
             // commandStarted arrives on the reader thread; everything downstream is Swing.
-            Consumer<String> started = onCommandStarted;
-            javax.swing.SwingUtilities.invokeLater(() -> started.accept(command));
+            SwingUtilities.invokeLater(() -> {
+                if (closed) return;
+                runningCommand = command;
+                onCommandStarted.accept(command);
+                onTitleChanged.accept(title());
+                onChanged.run();
+            });
         }
-        @Override public void titleChanged(String title) { queueUpdate(); }
+        @Override public void titleChanged(String title) {
+            // Do not read session.title() later: another OSC (including the next prompt's title)
+            // may already have overwritten it by the time this event reaches Swing.
+            SwingUtilities.invokeLater(() -> {
+                if (closed) return;
+                reportedTitle = title == null ? "" : title;
+                onTitleChanged.accept(title());
+                onChanged.run();
+            });
+        }
         @Override public void workingDirectoryChanged(Path directory) { queueUpdate(); }
 
         @Override public void commandExecuted(String command, java.util.OptionalInt exitStatus,
@@ -79,8 +101,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
                 LOG.log(System.Logger.Level.WARNING, "History listener failed for a captured command", failure);
             }
             // commandExecuted arrives on the reader thread; everything downstream is Swing.
-            CommandFinished finished = onCommandFinished;
-            javax.swing.SwingUtilities.invokeLater(() -> finished.accept(command, exitStatus, duration));
+            SwingUtilities.invokeLater(() -> {
+                if (closed) return;
+                onCommandFinished.accept(command, exitStatus, duration);
+                runningCommand = "";
+                onChanged.run();
+            });
         }
     };
 
@@ -129,10 +155,13 @@ final class TerminalPane extends JPanel implements AutoCloseable {
                 @Override public void componentResized(ComponentEvent event) { queueUpdate(); }
             });
             session.addListener(listener);
+            reportedTitle = session.title();
+            refreshJob(); jobTimer.start();
             // Always defer: the process may already have exited before launch delivery.
             // Read the policy on the EDT after onReady has applied the latest configuration.
             created.exitFuture().whenComplete((code, error) -> SwingUtilities.invokeLater(() -> {
                 if (closed || session != created) return;
+                jobTimer.stop();
                 if (onExit == ShellExitBehavior.CLOSE
                     || (onExit == ShellExitBehavior.CLOSE_ON_SUCCESS && error == null && Integer.valueOf(0).equals(code))) {
                     onClose.run();
@@ -145,6 +174,20 @@ final class TerminalPane extends JPanel implements AutoCloseable {
             revalidate(); repaint(); onChanged.run();
             // A shell finishing its launch must not steal focus from a newer pane or a find field.
             if (active && isShowing() && allowLaunchFocus.getAsBoolean()) focusTerminal();
+        });
+    }
+
+    private void refreshJob() {
+        if (jobQueryPending || !running()) return;
+        jobQueryPending = true;
+        TerminalSession current = session;
+        Thread.ofVirtual().name("jasper-foreground-job").start(() -> {
+            String job = current.foregroundJob().orElse("");
+            SwingUtilities.invokeLater(() -> {
+                jobQueryPending = false;
+                if (closed || current != session || !running()) return;
+                if (!job.equals(foregroundJob)) { foregroundJob = job; onChanged.run(); }
+            });
         });
     }
 
@@ -180,7 +223,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     boolean running() { return !closed && session != null && !session.exitFuture().isDone(); }
     boolean shellIntegrationDetected() { return session != null && session.shellIntegrationDetected(); }
     Path directory() { return session == null ? launchDirectory : session.workingDirectory().orElse(launchDirectory); }
-    String title() { return session == null ? "" : session.title(); }
+    String title() {
+        return TerminalTitle.singleLine(!reportedTitle.isBlank() ? reportedTitle : runningCommand.strip());
+    }
+    String tabTitle() {
+        return TerminalTitle.tab(reportedTitle, directory(), foregroundJob.isBlank() ? shellLabel : foregroundJob);
+    }
     String shellLabel() { return shellLabel; }
     void focusTerminal() { if (view != null) view.requestFocusInWindow(); }
     void setActive(boolean selected) {
@@ -208,6 +256,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        jobTimer.stop();
         Runnable closedHook = onClosed;
         onClosed = () -> {};
         closedHook.run();
@@ -218,6 +267,8 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         if (session != null) { session.removeListener(listener); session.close(); }
         onChanged = () -> {}; onFocused = () -> {}; onClose = () -> {}; onCommandStarted = command -> {};
         onPaneFocused = () -> {}; onPaneBlurred = () -> {};
+        onTitleChanged = title -> {};
+        onCommandFinished = (command, exitStatus, duration) -> {};
         allowLaunchFocus = () -> false;
         onReady = terminal -> {}; onFailure = message -> {};
         onCommandExecuted = entry -> {};

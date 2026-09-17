@@ -18,13 +18,16 @@ class WindowTabsTest {
             JComponent strip = named(owner, "windowTabs");
             assertThat(strip).as("integrated tab strip").isNotNull();
             assertThat(strip.getPreferredSize().height).isEqualTo(38);
+            assertThat(strip.isVisible()).isFalse();
             var first = owner.currentTab();
             first.rename("first"); owner.newTab(HOME);
             var second = owner.currentTab(); second.rename("second"); owner.update();
+            assertThat(strip.isVisible()).isTrue();
             ((AbstractButton) named(strip, "select:first")).doClick();
             assertThat(owner.currentTab()).isSameAs(first);
             ((AbstractButton) named(strip, "close:second")).doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+            assertThat(strip.isVisible()).isFalse();
             assertThat(owner.currentTab()).isSameAs(first);
             ((AbstractButton) named(strip, "newTab")).doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
@@ -32,6 +35,33 @@ class WindowTabsTest {
             assertThat(owner.tabStrip().getTabComponentAt(0)).isNull();
             owner.tabStrip().setSize(600, 300); owner.tabStrip().doLayout();
             assertThat(owner.tabStrip().getComponentAt(1).getY()).isLessThanOrEqualTo(1);
+        });
+    }
+
+    @Test void tabsFillTheHeaderWithCenteredTextHoverCloseAndRealShortcuts() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.currentTab().rename("first");
+            owner.newTab(HOME); owner.currentTab().rename("second");
+            var strip = owner.windowTabs(); layout(strip, 800, 38);
+            var first = (AbstractButton) named(strip, "select:first");
+            var second = (AbstractButton) named(strip, "select:second");
+            assertThat(first.getIcon()).isNull();
+            assertThat(first.getHorizontalAlignment()).isEqualTo(SwingConstants.CENTER);
+            assertThat(first.getParent().getWidth()).isEqualTo(388);
+            assertThat(second.getParent().getBounds()).isEqualTo(new Rectangle(388, 0, 388, 38));
+            assertThat(named(strip, "newTab").getBounds()).isEqualTo(new Rectangle(776, 0, 24, 38));
+            assertThat(((JLabel) named(strip, "shortcut:second")).getText()).isEqualTo("⌘2");
+            owner.setBindings(KeyBindings.withOverrides(true, java.util.Map.of("select_tab_2", "ctrl+alt+2")));
+            assertThat(((JLabel) named(strip, "shortcut:second")).getText()).isEqualTo("⌃⌥2");
+            owner.setBindings(KeyBindings.withOverrides(true, java.util.Map.of("select_tab_2", "none")));
+            assertThat(((JLabel) named(strip, "shortcut:second")).getText()).isEmpty();
+            var close = named(strip, "close:first");
+            assertThat(close.isVisible()).isFalse();
+            mouse(first, MouseEvent.MOUSE_ENTERED, 10, 10, MouseEvent.NOBUTTON);
+            assertThat(close.isVisible()).isTrue();
+            mouse(first, MouseEvent.MOUSE_EXITED, -100, -100, MouseEvent.NOBUTTON);
+            assertThat(close.isVisible()).isFalse();
         });
     }
 

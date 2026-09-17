@@ -92,6 +92,32 @@ class PtyConnectorTest {
         }
     }
 
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void foregroundJobFollowsJobControlWithoutOscOrShellIntegration() throws Exception {
+        try (TerminalSession session = start(List.of("/bin/bash", "--noprofile", "--norc", "-i"))) {
+            Await.until(() -> session.foregroundJob().orElse("").equals("bash"), "idle bash foreground job");
+            session.write("sleep 30\r");
+            Await.until(() -> session.foregroundJob().orElse("").equals("sleep"), "sleep foreground job");
+            session.write(new byte[]{3});
+            Await.until(() -> session.foregroundJob().orElse("").equals("bash"), "shell restored after interrupt");
+            session.write("sleep 30 &\r");
+            Await.until(() -> screenText(session).contains("[1]"), "background job started");
+            assertThat(session.foregroundJob()).contains("bash");
+            session.write("kill %1; exit\r");
+            session.exitFuture().get(5, TimeUnit.SECONDS);
+            assertThat(session.foregroundJob()).isEmpty();
+        }
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void loginShellGetsTheConventionalLeadingDash() throws Exception {
+        try (TerminalSession session = start(List.of("/bin/bash", "--noprofile", "--norc", "-l", "-i"))) {
+            Await.until(() -> session.foregroundJob().orElse("").equals("-bash"), "login shell name");
+        }
+    }
+
     private static TerminalSession start(List<String> command) throws Exception {
         return TerminalSession.start(command, System.getenv(), Path.of(System.getProperty("user.home")), 80, 24, 100);
     }

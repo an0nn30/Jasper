@@ -22,7 +22,7 @@ class BuddyCardTest {
             BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
         try {
-            BuddyCard.paint(g, owner, notice, bounds, false, 1f, 1f, dismissable, count);
+            BuddyCard.paint(g, owner, notice, bounds, 0f, 1f, dismissable, count);
         } finally { g.dispose(); }
     }
 
@@ -41,7 +41,7 @@ class BuddyCardTest {
             Rectangle bounds = new Rectangle(0, 0, BuddyCard.WIDTH, BuddyCard.height(owner));
             BufferedImage image = new BufferedImage(bounds.width, bounds.height, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = image.createGraphics();
-            try { BuddyCard.paint(g, owner, any, bounds, true, 1.04f, 1f, true, 0); } finally { g.dispose(); }
+            try { BuddyCard.paint(g, owner, any, bounds, 1f, 1f, true, 0); } finally { g.dispose(); }
         }
     }
 
@@ -59,4 +59,38 @@ class BuddyCardTest {
         paint(notice(BuddyNotice.State.DONE, "Finished in 3s"), true, 0);
         paint(notice(BuddyNotice.State.RUNNING, "Running · 3s"), false, 7);
     }
+    @Test void bothThemesMatchTheRecordedMaterialAndRemainTranslucent() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var previous = javax.swing.UIManager.getLookAndFeel();
+            try {
+                for (BuiltinTheme theme : new BuiltinTheme[] {BuiltinTheme.DARK, BuiltinTheme.LIGHT}) {
+                    ThemeController.install(theme);
+                    BufferedImage layer = new BufferedImage(420, 150, BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D g = layer.createGraphics();
+                    try {
+                        BuddyCard.paint(g, owner, notice(BuddyNotice.State.RUNNING, "Thinking"),
+                            new Rectangle(40, 40, 330, 56), 0, 1, false, 0);
+                    } finally { g.dispose(); }
+                    var fill = new java.awt.Color(layer.getRGB(330, 65), true);
+                    assertThat(fill.getAlpha()).as("actual desktop translucency").isBetween(215, 240);
+                    BufferedImage composed = new BufferedImage(420, 150, BufferedImage.TYPE_INT_RGB);
+                    Graphics2D composite = composed.createGraphics();
+                    try {
+                        composite.setColor(new java.awt.Color(253, 253, 253));
+                        composite.fillRect(0, 0, 420, 150);
+                        composite.drawImage(layer, 0, 0, null);
+                    } finally { composite.dispose(); }
+                    int expected = theme == BuiltinTheme.DARK ? 65 : 249;
+                    assertThat(new java.awt.Color(composed.getRGB(330, 65)).getRed())
+                        .as("recorded fill over reference white").isBetween(expected - 1, expected + 1);
+                    assertThat((layer.getRGB(41, 41) >>> 24)).as("rounded corner is outside the material").isLessThan(20);
+                    assertThat((layer.getRGB(200, 108) >>> 24)).as("soft shadow outside the body").isBetween(1, 30);
+                }
+            } finally {
+                try { javax.swing.UIManager.setLookAndFeel(previous); }
+                catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+            }
+        });
+    }
+
 }

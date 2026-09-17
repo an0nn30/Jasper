@@ -24,13 +24,14 @@ import javax.swing.JComponent;
  * the tests drive it without a visible window or a real pointer.
  */
 final class BuddyDeckPanel extends JComponent {
-    /** Slack so a card at its largest scale is not clipped by its own window. */
-    static final int MOTION_MARGIN = 10;
+    /** Space for the soft capsule shadow. */
+    static final int MOTION_MARGIN = BuddyCard.SHADOW_MARGIN;
     static final int WHEEL_STEP = 24;
     private static final String CLEAR_ALL = "Clear all";
 
     private final BuddyDeck deck;
     private final Runnable onLayoutChanged;
+    private final Runnable onNoticesChanged;
     private LongSupplier clock = System::nanoTime;
     /**
      * How tall the list may grow. Supplied by the window, which knows the screen: querying a
@@ -44,6 +45,11 @@ final class BuddyDeckPanel extends JComponent {
     private long hoverChangedAt;
 
     BuddyDeckPanel(BuddyDeck deck, Runnable onLayoutChanged) {
+        this(deck, onLayoutChanged, () -> { });
+    }
+
+    BuddyDeckPanel(BuddyDeck deck, Runnable onLayoutChanged, Runnable onNoticesChanged) {
+        this.onNoticesChanged = Objects.requireNonNull(onNoticesChanged, "onNoticesChanged");
         this.deck = Objects.requireNonNull(deck, "deck");
         this.onLayoutChanged = Objects.requireNonNull(onLayoutChanged, "onLayoutChanged");
         setOpaque(false);
@@ -60,9 +66,11 @@ final class BuddyDeckPanel extends JComponent {
 
     int hovered() { return hovered; }
 
+    boolean needsDetailUpdates() { return deck.notices().stream().anyMatch(BuddyNotice::live); }
+
     int cardHeight() { return BuddyCard.height(this); }
 
-    /** Whether the hover growth is still moving; the window drives frames only while it is. */
+    /** Whether the hover affordance is still fading. */
     boolean animating() {
         return (hovered >= 0 || leaving >= 0)
             && clock.getAsLong() - hoverChangedAt < BubbleMotion.HOVER_NANOS;
@@ -130,16 +138,18 @@ final class BuddyDeckPanel extends JComponent {
         Rectangle clear = BuddyDeckLayout.clearRow(deck.size(), BuddyCard.WIDTH, cardHeight(), scroll);
         if (clear != null && clear.contains(local)) {
             deck.clear();
+            onNoticesChanged.run();
             reset();
             return false;
         }
-        int index = BuddyDeckLayout.cardAt(local.y, deck.size(), cardHeight(), scroll);
+        int index = indexAt(point);
         if (index < 0) return true;
         List<BuddyNotice> notices = deck.notices();
         BuddyNotice notice = notices.get(index);
         Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, cardHeight(), scroll);
         if (BuddyDeckLayout.dismissTarget(card).contains(local)) {
             deck.dismiss(notice.source(), notice.key());
+            onNoticesChanged.run();
             hovered = -1;
             leaving = -1;
             if (deck.isEmpty()) { reset(); return false; }
@@ -155,7 +165,13 @@ final class BuddyDeckPanel extends JComponent {
 
     private int indexAt(Point point) {
         if (deck.isEmpty()) return -1;
-        return BuddyDeckLayout.cardAt(point.y - MOTION_MARGIN, deck.size(), cardHeight(), scroll);
+        Point local = new Point(point.x - MOTION_MARGIN, point.y - MOTION_MARGIN);
+        if (local.y < 0 || local.y >= viewportHeight()) return -1;
+        int index = BuddyDeckLayout.cardAt(local.y, deck.size(), cardHeight(), scroll);
+        if (index < 0) return -1;
+        Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, cardHeight(), scroll);
+        return new java.awt.geom.RoundRectangle2D.Float(card.x, card.y, card.width, card.height,
+            card.height, card.height).contains(local) ? index : -1;
     }
 
     private void changed() {
@@ -180,24 +196,23 @@ final class BuddyDeckPanel extends JComponent {
             for (int index = 0; index < notices.size(); index++) {
                 Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, height, scroll);
                 if (card.y + card.height < 0 || card.y > getHeight()) continue;
-                BuddyCard.paint(g2, this, notices.get(index), card, hovered == index,
-                    hoverScale(index), 1f, true, 0);
+                BuddyCard.paint(g2, this, notices.get(index), card, hoverAmount(index), 1f, true, 0);
             }
             Rectangle clear = BuddyDeckLayout.clearRow(notices.size(), BuddyCard.WIDTH, height, scroll);
             if (clear == null) return;
             g2.setFont(BuddyCard.detailFont());
             FontMetrics metrics = g2.getFontMetrics();
-            g2.setColor(BuddyCard.MUTED_COLOR);
+            g2.setColor(BuddyCard.detailColor());
             g2.drawString(CLEAR_ALL, clear.x + BuddyCard.WIDTH - BuddyCard.PAD_X - metrics.stringWidth(CLEAR_ALL),
                 clear.y + (clear.height - metrics.getHeight()) / 2 + metrics.getAscent());
         } finally { g2.dispose(); }
     }
 
-    /** Only the hovered card grows, and only the one just left animates back. */
-    private float hoverScale(int index) {
+    /** Only the hovered card reveals its affordance; the one just left fades it away. */
+    private float hoverAmount(int index) {
         long elapsed = clock.getAsLong() - hoverChangedAt;
-        if (index == hovered) return BubbleMotion.hoverScale(elapsed, true);
-        if (index == leaving) return BubbleMotion.hoverScale(elapsed, false);
-        return 1f;
+        if (index == hovered) return BubbleMotion.hover(elapsed, true);
+        if (index == leaving) return BubbleMotion.hover(elapsed, false);
+        return 0f;
     }
 }

@@ -2,6 +2,12 @@
 
 **Status:** Implemented. Development branch: `claude/command-notifications` (continuing), from `9e8d61a`.
 
+**Visual amendment (2026-09-17):** The user supplied light/dark reference recordings and requested
+that their notification appearance and arrival replace this design's thought-tail/scale-bounce
+presentation. [Measured replacement](../../design/buddy-notification-reference.md) governs the
+capsule geometry, material, typography, motion and hover presentation. Membership and routing below
+still apply; the historical tail and overlapping-card description is superseded.
+
 **Revises:** the [buddy bubble deck design](2026-09-17-jasper-buddy-bubble-deck-design.md), which is
 implemented and shipped on this branch. That design put a permanent stack of cards beside the buddy.
 This moves the live ones above his head and demotes the rest to a history he holds for you.
@@ -115,6 +121,14 @@ acknowledged it comes back.
   the common one.
 
 ## What a bubble says
+
+**Title amendment (2026-09-17):** Use the originating pane's app/shell-supplied OSC
+0/1/2 title, with the running command as fallback. Live title updates preserve the
+notice's order, acknowledgement and animation. Freeze the final title on command
+completion so subsequent prompt titles do not rename history. Keep manually
+renamed tabs as explicit overrides; their bubbles still describe the program.
+The table's “the command” is therefore the fallback, not a separate title source.
+
 
 | Kind | State | Title | Detail |
 |---|---|---|---|

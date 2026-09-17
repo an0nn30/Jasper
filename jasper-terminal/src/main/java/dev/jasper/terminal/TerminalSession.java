@@ -96,6 +96,7 @@ public final class TerminalSession implements AutoCloseable {
 
     private final LongSupplier clock;
     private final TtyConnector connector;
+    private final PtyConnector pty;
     private final TerminalTextBuffer buffer;
     private final JediTerminal terminal;
     private final SessionDisplay display;
@@ -137,7 +138,7 @@ public final class TerminalSession implements AutoCloseable {
             .setInitialRows(rows)
             .setUnixOpenTtyToPreserveOutputAfterTermination(true)
             .start();
-        TerminalSession session = new TerminalSession(new PtyConnector(process), columns, rows, scrollback);
+        TerminalSession session = new TerminalSession(new PtyConnector(process, command), columns, rows, scrollback);
         session.startReading();
         return session;
     }
@@ -150,6 +151,7 @@ public final class TerminalSession implements AutoCloseable {
     TerminalSession(TtyConnector connector, int columns, int rows, int scrollback, LongSupplier clock) {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.connector = new ShellIntegrationConnector(connector);
+        this.pty = connector instanceof PtyConnector value ? value : null;
         this.columns = columns;
         this.rows = rows;
         StyleState styleState = new StyleState();
@@ -301,6 +303,11 @@ public final class TerminalSession implements AutoCloseable {
 
     public int rows() {
         return rows;
+    }
+
+    /** Current foreground job's executable name, when the OS exposes it. Query off the EDT. */
+    public Optional<String> foregroundJob() {
+        return pty == null ? Optional.empty() : pty.foregroundJob();
     }
 
     public String title() {

@@ -36,6 +36,11 @@ final class BuddyWindow {
     private final Path stateFile;
     private final Runnable raiseTerminal;
     private final Runnable toggle;
+    private final java.beans.PropertyChangeListener appearanceListener = event -> {
+        if ("lookAndFeel".equals(event.getPropertyName())) SwingUtilities.invokeLater(() -> {
+            if (!this.disposed) refreshDeck();
+        });
+    };
     private final Timer timer = new Timer(1, event -> tick());
     private BuddyBubble bubble;
     private BuddyDeckWindow drawer;
@@ -112,6 +117,7 @@ final class BuddyWindow {
         };
         canvas.addMouseListener(mouse);
         canvas.addMouseMotionListener(mouse);
+        javax.swing.UIManager.addPropertyChangeListener(appearanceListener);
     }
 
     /** Null when headless or the toolkit lacks always-on-top or per-pixel translucency; logs once. */
@@ -135,7 +141,7 @@ final class BuddyWindow {
     /** The application owns the contents; the buddy only gives the two surfaces somewhere to sit. */
     void attachDeck(BuddyDeck deck) {
         if (disposed || drawer != null) return;
-        drawer = new BuddyDeckWindow(deck);
+        drawer = new BuddyDeckWindow(deck, () -> column.refresh());
         column = new BuddyColumnWindow(deck, this::openDrawer);
         refreshDeck();
     }
@@ -199,6 +205,7 @@ final class BuddyWindow {
     void dispose() {
         if (disposed) return;
         disposed = true;
+        javax.swing.UIManager.removePropertyChangeListener(appearanceListener);
         timer.stop();
         if (bubble != null) bubble.dispose();
         if (drawer != null) drawer.dispose();

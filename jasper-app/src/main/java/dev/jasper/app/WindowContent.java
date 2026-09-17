@@ -66,6 +66,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
     CommandFinishedSink onCommandFinished;
     /** Set by the application; null in tests. */
     CommandStartedSink onCommandStarted;
+    /** Title updates identify their originating pane, including inactive tabs and splits. */
+    java.util.function.BiConsumer<Object, String> onPaneTitleChanged = (pane, title) -> {};
     /** Set by the application: a pane is gone, so anything keyed on it should be released. */
     java.util.function.Consumer<Object> onPaneClosed = pane -> {};
     /** Set by the application: this pane took focus, so whatever it posted has been seen. */
@@ -251,6 +253,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
             action(id).putValue(Action.ACCELERATOR_KEY, bindings.strokeFor(id).orElse(null));
         if (root != null) installRootBindings(root);
         toolbar().revalidate(); toolbar().repaint();
+        windowTabs.refresh();
     }
 
     void connectConfiguration(Runnable settings, Runnable reload, Runnable unregister) {
@@ -339,6 +342,11 @@ final class WindowContent extends JPanel implements AutoCloseable {
         };
         return id == null ? null : CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
     }
+    String tabShortcut(int index) {
+        if (index < 0 || index >= 9) return "";
+        ActionId id = ActionId.valueOf("SELECT_TAB_" + (index + 1));
+        return CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
+    }
     SnippetStore snippets() { return snippets; }
     WindowCommandPalette commandPalette() { return commandPalette; }
     WindowChrome chrome() { return chrome; }
@@ -385,6 +393,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                 () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); },
                 pane.watched() && isActiveAndOpen() && tab == currentTab());
         };
+        pane.onTitleChanged = title -> onPaneTitleChanged.accept(pane, title);
         pane.onClosed = () -> onPaneClosed.accept(pane);
         pane.onPaneFocused = () -> onPaneFocused.accept(pane);
         pane.onPaneBlurred = () -> onPaneBlurred.accept(pane);

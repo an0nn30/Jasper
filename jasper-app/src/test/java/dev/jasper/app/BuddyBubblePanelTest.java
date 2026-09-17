@@ -149,6 +149,6 @@ class BuddyBubblePanelTest {
 
     @Test void theBubbleUsesTheSystemFontRatherThanTheLookAndFeelsLabelFont() {
         assertThat(BuddyBubblePanel.detailFont().getFamily())
-            .isEqualTo(BuddyFonts.system(java.awt.Font.PLAIN, 14f).getFamily());
+            .isEqualTo(SystemFonts.system(java.awt.Font.PLAIN, 14f).getFamily());
     }
 }

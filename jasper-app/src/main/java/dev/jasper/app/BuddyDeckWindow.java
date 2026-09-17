@@ -24,14 +24,14 @@ final class BuddyDeckWindow {
     private final JWindow window = new JWindow();
     private final BuddyDeck deck;
     private final BuddyDeckPanel panel;
-    /** Drives the hover growth; the buddy's own timer repaints only his sprite canvas. */
+    /** Animates hover affordances, then ticks live detail text once per second. */
     private final Timer frames = new Timer(16, event -> tick());
     private Rectangle anchor;
     private boolean disposed;
 
-    BuddyDeckWindow(BuddyDeck deck) {
+    BuddyDeckWindow(BuddyDeck deck, Runnable onNoticesChanged) {
         this.deck = Objects.requireNonNull(deck, "deck");
-        this.panel = new BuddyDeckPanel(deck, this::onPanelChanged);
+        this.panel = new BuddyDeckPanel(deck, this::onPanelChanged, onNoticesChanged);
         panel.setMaxListHeight(this::usableHeight);
         window.setType(Window.Type.UTILITY);
         window.setAlwaysOnTop(true);
@@ -63,12 +63,18 @@ final class BuddyDeckWindow {
     private void tick() {
         if (disposed || !window.isVisible()) { frames.stop(); return; }
         panel.repaint();
-        if (!panel.animating()) frames.stop();
+        if (!panel.animating() && !panel.needsDetailUpdates()) frames.stop();
+        else frames.setDelay(panel.animating() ? 16 : 1000);
     }
 
     private void onPanelChanged() {
         layout();
-        if (!disposed && window.isVisible() && panel.animating() && !frames.isRunning()) frames.start();
+        if (!disposed && window.isVisible() && (panel.animating() || panel.needsDetailUpdates())) {
+            int delay = panel.animating() ? 16 : 1000;
+            boolean speedUp = delay < frames.getDelay();
+            frames.setDelay(delay);
+            if (!frames.isRunning() || speedUp) frames.restart();
+        }
     }
 
     /** Remembers where the buddy is and shows the drawer there, if there is anything in it. */
@@ -108,10 +114,15 @@ final class BuddyDeckWindow {
     private void layout() {
         if (disposed || anchor == null) return;
         Dimension size = panel.getPreferredSize();
-        if (!shows(false, anchor, deck.isEmpty(), size)) { window.setVisible(false); return; }
+        if (!shows(false, anchor, deck.isEmpty(), size)) { frames.stop(); window.setVisible(false); return; }
         window.setSize(size);
         window.setLocation(BuddyBubblePlacement.beside(anchor, size, screenFor(anchor)));
         window.setVisible(true);
+        panel.repaint();
+        if (panel.needsDetailUpdates() && !frames.isRunning()) {
+            frames.setDelay(1000);
+            frames.start();
+        }
     }
 
     /** How tall the expanded list may grow: the screen it sits on, less room to breathe. */

@@ -16,14 +16,11 @@ import javax.swing.Timer;
 
 /** The window the thought column lives in: translucent, always on top, never focused. */
 final class BuddyColumnWindow {
+    static final int BUBBLE_GAP = 30;
     private final JWindow window = new JWindow();
     private final BuddyDeck deck;
     private final BuddyColumnPanel panel;
-    /**
-     * Drives the frames while anything is moving. The buddy's own timer repaints only his sprite
-     * canvas, so without this the column painted exactly one frame per event — at elapsed zero,
-     * which is scale 0.6 and opacity 0, leaving the bubble invisible until some unrelated repaint.
-     */
+    /** Animate at 60 Hz; once settled, only live detail text needs a one-second tick. */
     private final Timer frames = new Timer(16, event -> tick());
     private Rectangle anchor;
     private boolean disposed;
@@ -52,13 +49,18 @@ final class BuddyColumnWindow {
     private void tick() {
         if (disposed || !window.isVisible()) { frames.stop(); return; }
         panel.repaint();
-        if (!panel.animating()) frames.stop();
+        if (!panel.animating() && !panel.needsDetailUpdates()) frames.stop();
+        else frames.setDelay(panel.animating() ? 16 : 1000);
     }
 
     /** Called whenever the panel starts something moving; harmless when it is already running. */
     private void animate() {
-        if (disposed || !window.isVisible() || !panel.animating()) return;
-        if (!frames.isRunning()) frames.start();
+        if (disposed || !window.isVisible() || (!panel.animating() && !panel.needsDetailUpdates())) return;
+        int delay = panel.animating() ? 16 : 1000;
+        boolean speedUp = delay < frames.getDelay();
+        frames.setDelay(delay);
+        // setDelay alone does not cancel the already queued one-second detail tick.
+        if (!frames.isRunning() || speedUp) frames.restart();
     }
 
     private void onPanelChanged() {
@@ -68,7 +70,7 @@ final class BuddyColumnWindow {
 
     /** Whether the column fits between the top of the screen and the top of his head. */
     static boolean fitsAbove(Rectangle anchor, int columnHeight, Rectangle screen) {
-        return anchor.y - columnHeight >= screen.y;
+        return anchor.y - BUBBLE_GAP - columnHeight + BuddyColumnPanel.MARGIN >= screen.y;
     }
 
     void showBeside(Rectangle anchorOnScreen) {
@@ -96,7 +98,7 @@ final class BuddyColumnWindow {
 
     private void layout() {
         if (disposed || anchor == null) return;
-        if (deck.column().isEmpty()) { window.setVisible(false); return; }
+        if (deck.column().isEmpty()) { frames.stop(); window.setVisible(false); return; }
         Rectangle screen = screenFor(anchor);
         // Decide the direction before measuring again: the panel lays its bubbles out the other way
         // round, and its height does not depend on the direction, so one measurement settles it.
@@ -109,14 +111,17 @@ final class BuddyColumnWindow {
         animate();
     }
 
-    /** Centred on him, above when there is room and below when there is not. */
+    /** Account for transparent shadow/motion room: the visible body is 30px from his head. */
     private Point place(Dimension size, Rectangle screen) {
-        if (!panel.below()) return BuddyBubblePlacement.above(anchor, size, screen);
+        return place(anchor, size, screen, panel.below());
+    }
+
+    static Point place(Rectangle anchor, Dimension size, Rectangle screen, boolean below) {
         int x = anchor.x + (anchor.width - size.width) / 2;
-        int y = anchor.y + anchor.height + BuddyBubblePlacement.ABOVE_GAP;
-        int clampedX = Math.max(screen.x, Math.min(x, screen.x + screen.width - size.width));
-        int clampedY = Math.max(screen.y, Math.min(y, screen.y + screen.height - size.height));
-        return new Point(clampedX, clampedY);
+        int y = below ? anchor.y + anchor.height + BUBBLE_GAP - BuddyColumnPanel.MARGIN
+            : anchor.y - BUBBLE_GAP - size.height + BuddyColumnPanel.MARGIN;
+        return new Point(Math.max(screen.x, Math.min(x, screen.x + screen.width - size.width)),
+            Math.max(screen.y, Math.min(y, screen.y + screen.height - size.height)));
     }
 
     private static Rectangle screenFor(Rectangle anchor) {

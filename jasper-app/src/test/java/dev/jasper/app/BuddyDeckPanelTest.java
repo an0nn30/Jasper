@@ -38,7 +38,7 @@ class BuddyDeckPanelTest {
 
     private Point inCard(int index) {
         Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, BuddyCard.height(panel), panel.scroll());
-        return new Point(BuddyDeckPanel.MOTION_MARGIN + 30, BuddyDeckPanel.MOTION_MARGIN + card.y + 4);
+        return new Point(BuddyDeckPanel.MOTION_MARGIN + 80, BuddyDeckPanel.MOTION_MARGIN + card.y + card.height / 2);
     }
 
     private Point dismissOf(int index) {
@@ -55,11 +55,8 @@ class BuddyDeckPanelTest {
         assertThat(paintDoesNotThrow()).isTrue();
     }
 
-    /** A card that grows on hover must not be clipped by the window it lives in. */
-    @Test void thePanelReservesEnoughMarginForTheLargestScale() {
-        int overflow = (int) Math.ceil(BuddyCard.WIDTH * (BubbleMotion.HOVER_SCALE - 1f) / 2f);
-
-        assertThat(BuddyDeckPanel.MOTION_MARGIN).isGreaterThanOrEqualTo(overflow);
+    @Test void thePanelReservesRoomForTheShadow() {
+        assertThat(BuddyDeckPanel.MOTION_MARGIN).isGreaterThanOrEqualTo(BuddyCard.SHADOW_MARGIN);
     }
 
     @Test void clickingACardRunsItsActionAndClosesTheDrawer() {
@@ -201,4 +198,22 @@ class BuddyDeckPanelTest {
         try { panel.paint(g); } finally { g.dispose(); }
         return true;
     }
+    @Test void dismissingRefreshesTheLiveColumnAsWellAsTheDrawer() {
+        post("a", "one");
+        int[] notified = {0};
+        BuddyDeckPanel connected = new BuddyDeckPanel(deck, () -> { }, () -> notified[0]++);
+        connected.setSize(connected.getPreferredSize());
+        connected.handleClick(dismissOf(0));
+        assertThat(notified[0]).isEqualTo(1);
+        assertThat(deck.column()).isEmpty();
+    }
+
+    @Test void transparentMarginsAndRoundedCornersDoNotActivateACard() {
+        post("a", "one");
+        layout();
+        panel.handleClick(new Point(1, BuddyDeckPanel.MOTION_MARGIN + 25));
+        panel.handleClick(new Point(BuddyDeckPanel.MOTION_MARGIN + 1, BuddyDeckPanel.MOTION_MARGIN + 1));
+        assertThat(activated).isEmpty();
+    }
+
 }

@@ -68,97 +68,25 @@ class BuddyDeckLayoutTest {
         assertThat(target.y).isEqualTo(card.y + BuddyDeckLayout.DISMISS_INSET);
     }
 
-    @Test void atMostThreeBubblesAreDrawnAndTheRestBecomeACount() {
-        assertThat(BuddyDeckLayout.visibleInColumn(0)).isZero();
-        assertThat(BuddyDeckLayout.visibleInColumn(2)).isEqualTo(2);
-        assertThat(BuddyDeckLayout.visibleInColumn(9)).isEqualTo(BuddyDeckLayout.MAX_IN_COLUMN);
-    }
-
-    /** They rest on each other rather than sitting apart, so the column reads as a stack. */
-    @Test void theBubblesOverlapRatherThanSittingApart() {
-        assertThat(BuddyDeckLayout.COLUMN_GAP).isNegative();
-        Rectangle newest = BuddyDeckLayout.column(0, 2, WIDTH, CARD, false);
-        Rectangle older = BuddyDeckLayout.column(1, 2, WIDTH, CARD, false);
-
-        assertThat(newest.y).as("the newest starts before the older one ends").isLessThan(older.y + older.height);
-        assertThat(newest.y).isGreaterThan(older.y);
-        assertThat(Math.abs(BuddyDeckLayout.COLUMN_GAP)).as("never into the text").isLessThan(BuddyCard.PAD_Y);
-    }
-
-    @Test void theColumnIsItsBubblesPlusTheTail() {
+    @Test void capsulesHaveAGapAndNoThoughtTail() {
         assertThat(BuddyDeckLayout.columnHeight(0, CARD)).isZero();
-        assertThat(BuddyDeckLayout.columnHeight(1, CARD)).isEqualTo(CARD + BuddyDeckLayout.TAIL_HEIGHT);
-        assertThat(BuddyDeckLayout.columnHeight(3, CARD)).isEqualTo(
-            3 * CARD + 2 * BuddyDeckLayout.COLUMN_GAP + BuddyDeckLayout.TAIL_HEIGHT);
-        assertThat(BuddyDeckLayout.columnHeight(20, CARD))
-            .as("past the cap the column stops growing").isEqualTo(BuddyDeckLayout.columnHeight(3, CARD));
-    }
-
-    /** Above him, the newest sits at the bottom of the column: nearest his head. */
-    @Test void aboveHimTheNewestIsLowestAndOlderOnesRiseAwayFromHim() {
+        assertThat(BuddyDeckLayout.columnHeight(1, CARD)).isEqualTo(CARD);
+        assertThat(BuddyDeckLayout.columnHeight(3, CARD)).isEqualTo(3 * CARD + 2 * BuddyDeckLayout.COLUMN_GAP);
+        assertThat(BuddyDeckLayout.columnHeight(20, CARD)).isEqualTo(BuddyDeckLayout.columnHeight(3, CARD));
         Rectangle newest = BuddyDeckLayout.column(0, 3, WIDTH, CARD, false);
         Rectangle middle = BuddyDeckLayout.column(1, 3, WIDTH, CARD, false);
-        Rectangle oldest = BuddyDeckLayout.column(2, 3, WIDTH, CARD, false);
-
-        assertThat(newest.y).isGreaterThan(middle.y);
-        assertThat(middle.y).isGreaterThan(oldest.y);
-        assertThat(oldest.y).isZero();
-        assertThat(newest.y + newest.height)
-            .isEqualTo(BuddyDeckLayout.columnHeight(3, CARD) - BuddyDeckLayout.TAIL_HEIGHT);
-        assertThat(newest.x).isZero();
-        assertThat(newest.width).isEqualTo(WIDTH);
+        assertThat(newest.y - middle.y - middle.height).isEqualTo(BuddyDeckLayout.COLUMN_GAP).isPositive();
     }
 
-    /** Flipped below him the order inverts, so the newest is still the one nearest his head. */
-    @Test void belowHimTheNewestIsHighestSoItStaysNearestHisHead() {
-        Rectangle newest = BuddyDeckLayout.column(0, 3, WIDTH, CARD, true);
-        Rectangle oldest = BuddyDeckLayout.column(2, 3, WIDTH, CARD, true);
-
-        assertThat(newest.y).isLessThan(oldest.y);
-        assertThat(newest.y).isEqualTo(BuddyDeckLayout.TAIL_HEIGHT);
-    }
-
-    @Test void everyBubbleSitsInsideTheColumn() {
+    @Test void flippingKeepsNewestNearestTheBuddy() {
+        assertThat(BuddyDeckLayout.column(0, 3, WIDTH, CARD, false).y).isEqualTo(2 * (CARD + BuddyDeckLayout.COLUMN_GAP));
+        assertThat(BuddyDeckLayout.column(0, 3, WIDTH, CARD, true).y).isZero();
         for (boolean below : new boolean[] {false, true}) {
-            int height = BuddyDeckLayout.columnHeight(3, CARD);
-            for (int index = 0; index < 3; index++) {
-                Rectangle card = BuddyDeckLayout.column(index, 3, WIDTH, CARD, below);
-                assertThat(card.y).as("below=%s index=%d", below, index).isNotNegative();
-                assertThat(card.y + card.height).isLessThanOrEqualTo(height);
+            for (int i = 0; i < 3; i++) {
+                Rectangle card = BuddyDeckLayout.column(i, 3, WIDTH, CARD, below);
+                assertThat(BuddyDeckLayout.columnAt(card.y + 4, 3, CARD, below)).isEqualTo(i);
+                assertThat(card.y + card.height).isLessThanOrEqualTo(BuddyDeckLayout.columnHeight(3, CARD));
             }
         }
-    }
-
-    /** Without the tail it is a floating list, not a thought. */
-    @Test void theTailRunsFromHisHeadTowardsTheNearestBubble() {
-        int height = BuddyDeckLayout.columnHeight(2, CARD);
-        Rectangle[] above = BuddyDeckLayout.tail(WIDTH, height, false);
-
-        assertThat(above).hasSize(2);
-        assertThat(above[0].width).isGreaterThan(above[1].width);
-        assertThat(above[1].y).as("the small one is nearest him, at the bottom").isGreaterThan(above[0].y);
-        for (Rectangle circle : above) {
-            assertThat(circle.y).isGreaterThanOrEqualTo(height - BuddyDeckLayout.TAIL_HEIGHT);
-            assertThat(circle.y + circle.height).isLessThanOrEqualTo(height);
-            assertThat(circle.x).isGreaterThan(0);
-        }
-    }
-
-    @Test void flippedBelowHimTheTailIsAtTheTopAndStillPointsAtHim() {
-        int height = BuddyDeckLayout.columnHeight(2, CARD);
-        Rectangle[] below = BuddyDeckLayout.tail(WIDTH, height, true);
-
-        assertThat(below[1].y).as("the small one is nearest him, at the top").isLessThan(below[0].y);
-        for (Rectangle circle : below) {
-            assertThat(circle.y).isNotNegative();
-            assertThat(circle.y + circle.height).isLessThanOrEqualTo(BuddyDeckLayout.TAIL_HEIGHT);
-        }
-    }
-
-    @Test void aPointInAColumnBubbleNamesIt() {
-        assertThat(BuddyDeckLayout.columnAt(
-            BuddyDeckLayout.column(1, 3, WIDTH, CARD, false).y + 4, 3, CARD, false)).isEqualTo(1);
-        assertThat(BuddyDeckLayout.columnAt(
-            BuddyDeckLayout.columnHeight(3, CARD) - 2, 3, CARD, false)).as("in the tail").isEqualTo(-1);
     }
 }
