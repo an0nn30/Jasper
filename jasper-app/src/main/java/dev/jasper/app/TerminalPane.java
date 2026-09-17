@@ -46,6 +46,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
 
     /** This pane is gone: anything holding it as a key should let go. Fired once, on the EDT. */
     Runnable onClosed = () -> {};
+
+    /**
+     * This pane took keyboard focus. Separate from {@link #onFocused}, which the tab owns to track
+     * its active pane; this one is for whoever cares that the user is now looking here.
+     */
+    Runnable onPaneFocused = () -> {};
     private final TerminalSession.Listener listener = new TerminalSession.Listener() {
         @Override public void screenChanged() { queueUpdate(); }
 
@@ -139,7 +145,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
 
     private void trackFocus(Component component) {
         component.addFocusListener(new FocusAdapter() {
-            @Override public void focusGained(FocusEvent event) { onFocused.run(); }
+            @Override public void focusGained(FocusEvent event) { onFocused.run(); onPaneFocused.run(); }
         });
         if (component instanceof Container container) {
             for (Component child : container.getComponents()) trackFocus(child);
@@ -197,6 +203,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         }
         if (session != null) { session.removeListener(listener); session.close(); }
         onChanged = () -> {}; onFocused = () -> {}; onClose = () -> {}; onCommandStarted = command -> {};
+        onPaneFocused = () -> {};
         allowLaunchFocus = () -> false;
         onReady = terminal -> {}; onFailure = message -> {};
         onCommandExecuted = entry -> {};

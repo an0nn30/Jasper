@@ -47,10 +47,14 @@ record BuddyNotice(String source, Object key, Kind kind, String title, State sta
         if (!state.fits(kind)) throw new IllegalArgumentException(state + " is not a state a " + kind + " can be in");
     }
 
-    /** Still happening, so it belongs above his head whether or not you have seen it. */
+    /**
+     * Still happening, so it belongs above his head whether or not you have seen it. An orphan never
+     * is: its pane is gone, so a command left in {@code RUNNING} is not running any more — nothing
+     * will ever move it on, and without this it would sit above his head for the rest of the session.
+     */
     boolean live() {
-        return state == State.RUNNING || state == State.NEEDS_INPUT
-            || state == State.UP || state == State.DEGRADED;
+        return !orphaned() && (state == State.RUNNING || state == State.NEEDS_INPUT
+            || state == State.UP || state == State.DEGRADED);
     }
 
     /** Wants you specifically: it ended, it broke, or it is waiting on you. */

@@ -53,4 +53,15 @@ class BuddyNoticeTest {
             assertThat(of(kind, state).wantsAttention()).as("%s", state).isTrue();
         }
     }
+
+    /** Nothing is still happening once its origin is gone, whatever state it was left in. */
+    @Test void anOrphanIsNeverLiveEvenIfItWasLeftRunning() {
+        BuddyNotice orphan = new BuddyNotice("terminal", "k", BuddyNotice.Kind.TASK, "sleep 600",
+            BuddyNotice.State.RUNNING, () -> "d", null);
+
+        assertThat(orphan.orphaned()).isTrue();
+        assertThat(orphan.live()).isFalse();
+        assertThat(orphan.state()).as("but it still says what it was doing")
+            .isEqualTo(BuddyNotice.State.RUNNING);
+    }
 }

@@ -96,8 +96,16 @@ final class CommandNotifier {
         String title = title(command);
         deck.post(new BuddyNotice(SOURCE, key, BuddyNotice.Kind.TASK, title,
             succeeded ? BuddyNotice.State.DONE : BuddyNotice.State.FAILED, () -> detail, activate));
+        // You were looking straight at it, so it is already seen and never reaches the column.
+        if (origin.ownPaneFocused()) deck.acknowledge(SOURCE, key);
         onDeckChanged.run();
         if (CommandNotice.shouldNotify(origin, ran, wait)) operatingSystem.accept(title, detail);
+    }
+
+    /** That pane took focus: whatever it posted has now been seen. */
+    void looked(Object key) {
+        deck.acknowledge(SOURCE, key);
+        onDeckChanged.run();
     }
 
     /**
@@ -113,6 +121,8 @@ final class CommandNotifier {
         // closed after a successful build must still say the build succeeded.
         if (stillRunning) deck.orphan(SOURCE, key, "Stopped after " + humanize(ran));
         else deck.orphan(SOURCE, key);
+        // Its pane is gone, so it can never be looked at and would sit in the column all session.
+        deck.acknowledge(SOURCE, key);
         onDeckChanged.run();
     }
 

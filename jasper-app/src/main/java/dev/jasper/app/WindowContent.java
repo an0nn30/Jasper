@@ -68,6 +68,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
     CommandStartedSink onCommandStarted;
     /** Set by the application: a pane is gone, so anything keyed on it should be released. */
     java.util.function.Consumer<Object> onPaneClosed = pane -> {};
+    /** Set by the application: this pane took focus, so whatever it posted has been seen. */
+    java.util.function.Consumer<Object> onPaneFocused = pane -> {};
     /** Whether any Jasper window has focus; the application knows, a single window does not. */
     java.util.function.BooleanSupplier anyWindowActive = () -> true;
 
@@ -380,6 +382,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
                 () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); });
         };
         pane.onClosed = () -> onPaneClosed.accept(pane);
+        pane.onPaneFocused = () -> onPaneFocused.accept(pane);
         pane.onCommandFinished = (command, exitStatus, duration) -> {
             if (onCommandFinished == null) return;
             onCommandFinished.accept(command, exitStatus, duration,
@@ -640,6 +643,6 @@ final class WindowContent extends JPanel implements AutoCloseable {
         confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
-        onCommandStarted = null; onPaneClosed = pane -> {};
+        onCommandStarted = null; onPaneClosed = pane -> {}; onPaneFocused = pane -> {};
     }
 }

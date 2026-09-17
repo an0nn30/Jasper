@@ -242,4 +242,77 @@ class CommandNotifierTest {
 
         assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Stopped after 2m 34s");
     }
+
+    /** You were watching it happen; he does not need to tell you about it. */
+    @Test void aCommandThatEndsUnderYourEyesNeverReachesTheColumn() {
+        CommandNotifier notifier = notifier(10);
+
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        passThreshold();
+        notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
+            FOCUSED_PANE, () -> {});
+
+        assertThat(deck.column()).isEmpty();
+        assertThat(deck.notices()).as("but it is still in the drawer").hasSize(1);
+    }
+
+    @Test void aCommandThatEndsOutOfSightWaitsInTheColumnUntilYouLook() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        passThreshold();
+        notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
+            HIDDEN_TAB, () -> {});
+        assertThat(deck.column()).hasSize(1);
+
+        notifier.looked("pane");
+
+        assertThat(deck.column()).isEmpty();
+        assertThat(deck.notices()).hasSize(1);
+    }
+
+    @Test void lookingAtOnePaneLeavesEveryOtherPanesNoticeAlone() {
+        CommandNotifier notifier = notifier(10);
+        for (String key : List.of("a", "b")) notifier.started(key, "cmd " + key, () -> 0L, () -> {});
+        passThreshold();
+        for (String key : List.of("a", "b")) {
+            notifier.finished(key, "cmd " + key, OptionalInt.of(0), Duration.ofSeconds(11),
+                HIDDEN_TAB, () -> {});
+        }
+
+        notifier.looked("a");
+
+        assertThat(deck.column()).extracting(BuddyNotice::title).containsExactly("cmd b");
+    }
+
+    /** Its pane is gone, so it can never be looked at; it would sit in the column all session. */
+    @Test void aClosedPaneLeavesTheColumnEvenThoughYouNeverSawIt() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "sleep 600", () -> Duration.ofSeconds(72).toNanos(), () -> {});
+        passThreshold();
+
+        notifier.closed("pane");
+
+        assertThat(deck.column()).isEmpty();
+        assertThat(deck.notices()).hasSize(1);
+        assertThat(deck.notices().getFirst().orphaned()).isTrue();
+    }
+
+    @Test void aRunningCommandStaysInTheColumnEvenWhileYouWatchIt() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "sleep 600", () -> 0L, () -> {});
+        passThreshold();
+
+        notifier.looked("pane");
+
+        assertThat(deck.column()).hasSize(1);
+    }
+
+    @Test void everyNoticeThisProducerPostsIsATask() {
+        CommandNotifier notifier = notifier(10);
+
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        passThreshold();
+
+        assertThat(deck.notices().getFirst().kind()).isEqualTo(BuddyNotice.Kind.TASK);
+    }
 }
