@@ -137,19 +137,17 @@ class JasperApplicationResidencyTest {
         edt(() -> { });
     }
 
-    @Test void aStaleRequestEndsResidencySoTheLastWindowCloseStillCleansUp() throws Exception {
+    @Test void aStaleRequestEndsResidencyAndShutsDownWhenNoWindowsRemain() throws Exception {
         java.util.concurrent.atomic.AtomicInteger terminations = new java.util.concurrent.atomic.AtomicInteger();
         JasperApplication application = application(terminations::incrementAndGet);
         edt(() -> application.residency(true));
         var handler = Main.handoffHandler(application, Path.of("/old.jar"), 1L, DesktopTestSupport.HOME);
-        // A request from a different build: the endpoint is released with this reply, so the
-        // process must stop being resident or its last window close cleans up nothing.
         assertThat(handler.apply(new LaunchRequest("t", Path.of("/new.jar"), 2L)))
             .isEqualTo(LaunchRequest.Response.STALE);
         edt(() -> { });
         assertThat(application.resident()).isFalse();
-        // And the proof that this matters: shutdown now runs where it previously would not have.
-        edt(() -> application.windowClosed(null));
+        // With no windows left there is nothing to wait for. Previously this process exited only
+        // when the JVM starved after the accept thread ended, skipping every close.
         DesktopTestSupport.until(() -> terminations.get() == 1);
     }
 

@@ -209,7 +209,7 @@ public final class Main {
             JasperApplication application, Path source, long modified, Path home) {
         return request -> {
             if (stale(request, source, modified)) {
-                SwingUtilities.invokeLater(() -> application.residency(false));
+                SwingUtilities.invokeLater(() -> application.endpointReleased());
                 return LaunchRequest.Response.STALE;
             }
             SwingUtilities.invokeLater(() -> application.openOrRaise(home));

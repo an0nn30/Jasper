@@ -136,6 +136,22 @@ final class JasperApplication {
     boolean resident() { return resident; }
 
     /**
+     * The handoff endpoint is gone, so nothing can reach this process any more. It stops being
+     * resident, and with no windows left there is nothing to wait for: shut down properly rather
+     * than letting the JVM starve once the accept thread ends, which skips every close.
+     * Distinct from {@link #residency} because that is also how startup reports a failed bind,
+     * before any window exists.
+     *
+     * <p>When windows are still open, this only clears residency and shutdown waits for the last
+     * one to close, the same path {@link #windowClosed} already takes. That branch needs a live
+     * window and is not covered by a headless test — a known gap, not an oversight.
+     */
+    void endpointReleased() {
+        resident = false;
+        if (windows.isEmpty()) requestShutdown();
+    }
+
+    /**
      * Who reconciles the user's login items with the setting. Injected, because reconciling from
      * here would have these tests write into the developer's real login items. Setting it replays
      * the current value at once: the constructor's own listener registration has already fired by
