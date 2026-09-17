@@ -9,21 +9,20 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import javax.swing.Icon;
 import javax.swing.JComponent;
-import javax.swing.UIManager;
 
 /** Paints one bubble: a dark translucent rounded rectangle with a title, an optional detail line and a glyph. */
 final class BuddyBubblePanel extends JComponent {
     // Message style (status bubbles): roomy, bold title. Menu style: a compact regular-weight pill.
     static final int MESSAGE_PAD_X = 18;
     static final int MESSAGE_PAD_Y = 14;
-    static final int MESSAGE_RADIUS = 14;
     static final int MESSAGE_MIN_WIDTH = 120;
     static final int MENU_PAD_X = 12;
     static final int MENU_PAD_Y = 7;
-    static final int MENU_RADIUS = 9;
     static final int LINE_GAP = 4;
     static final int GLYPH_GAP = 16;
     static final int MAX_WIDTH = 320;
+    /** A pill's radius is half its height; past this a two-line card would read as a lozenge. */
+    static final int MAX_RADIUS = 22;
 
     private static final Color FILL = new Color(30, 30, 32, 235);
     private static final Color FILL_HIGHLIGHTED = new Color(58, 58, 62, 242);
@@ -55,15 +54,17 @@ final class BuddyBubblePanel extends JComponent {
 
     private int padY() { return menu() ? MENU_PAD_Y : MESSAGE_PAD_Y; }
 
-    private int radius() { return menu() ? MENU_RADIUS : MESSAGE_RADIUS; }
+    /** A pill: half the height, capped so a two-line card stays a rounded rectangle. */
+    static int radiusFor(int height) {
+        return Math.min(Math.max(0, height) / 2, MAX_RADIUS);
+    }
 
     private int minWidth() { return menu() ? 0 : MESSAGE_MIN_WIDTH; }
 
     static Font detailFont() { return font(Font.PLAIN, 14f); }
 
     private static Font font(int style, float size) {
-        Font base = UIManager.getFont("Label.font");
-        return base != null ? base.deriveFont(style, size) : new Font(Font.DIALOG, style, (int) size);
+        return BuddyFonts.system(style, size);
     }
 
     void setContent(BuddyBubbleContent content) {
@@ -116,7 +117,7 @@ final class BuddyBubblePanel extends JComponent {
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             int width = getWidth(), height = getHeight();
             g2.setColor(highlighted ? FILL_HIGHLIGHTED : FILL);
-            int arc = radius() * 2;
+            int arc = radiusFor(height) * 2;
             g2.fillRoundRect(0, 0, width, height, arc, arc);
             g2.setColor(BORDER);
             g2.drawRoundRect(0, 0, width - 1, height - 1, arc, arc);

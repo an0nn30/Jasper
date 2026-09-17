@@ -135,4 +135,20 @@ class BuddyBubblePanelTest {
     @Test void theBubbleIsNotOpaque() {
         assertThat(new BuddyBubblePanel().isOpaque()).isFalse();
     }
+
+    @Test void aSingleLineBubbleIsAFullPill() {
+        assertThat(BuddyBubblePanel.radiusFor(28)).isEqualTo(14);
+        assertThat(BuddyBubblePanel.radiusFor(0)).isZero();
+    }
+
+    /** Half of a two-line card's height would be a lozenge, so the radius is capped. */
+    @Test void aTallCardIsCappedRatherThanRoundedIntoALozenge() {
+        assertThat(BuddyBubblePanel.radiusFor(80)).isEqualTo(BuddyBubblePanel.MAX_RADIUS);
+        assertThat(BuddyBubblePanel.MAX_RADIUS).isLessThan(40);
+    }
+
+    @Test void theBubbleUsesTheSystemFontRatherThanTheLookAndFeelsLabelFont() {
+        assertThat(BuddyBubblePanel.detailFont().getFamily())
+            .isEqualTo(BuddyFonts.system(java.awt.Font.PLAIN, 14f).getFamily());
+    }
 }
