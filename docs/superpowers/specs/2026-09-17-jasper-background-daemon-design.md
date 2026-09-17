@@ -60,19 +60,23 @@ The reopen listener is registered next to the existing `Desktop.setQuitHandler` 
 
 ## Handoff protocol
 
-An `AF_UNIX` socket at `<AppDirs.root>/daemon.sock`. Verified on JBR 25: bind, connect, transfer and an owner-only parent directory all work. Java supports `AF_UNIX` on Windows 10 1803 and later; **this is unverified on Windows and is a flagged acceptance check.**
+An `AF_UNIX` socket in a **`daemon` subdirectory** of the per-user root: `AppDirs` gains `daemonDir()` and, under it, `daemonSocket()`, `daemonToken()` and `daemonLock()`, beside the existing `commandHistory()`, `buddyState()` and `snippets()`, still touching no filesystem. A subdirectory rather than the root itself, because the endpoint needs its parent to be `rwx------` and the root also holds the user's `config.toml` — tightening a directory the user may have deliberately shared is not this feature's business.
 
-`AppDirs` gains `daemonSocket()`, `daemonToken()` and `daemonLock()` beside the existing `commandHistory()`, `buddyState()` and `snippets()`, resolving against the same per-user root and still touching no filesystem.
+Verified on JBR 25: bind, connect, transfer and an owner-only parent directory all work. Java supports `AF_UNIX` on Windows 10 1803 and later; **this is unverified on Windows and is a flagged acceptance check.**
+
+macOS caps a Unix socket path at 104 bytes (`sun_path`), and a long home directory can exceed it. Binding therefore checks the encoded length first and declines residency with a logged warning rather than failing obscurely at bind time.
 
 One request line, one response line, UTF-8, newline-terminated:
 
 ```
-jasper<TAB>1<TAB><token><TAB><base64 cwd><TAB><base64 code source><TAB><mtime millis>\n
+jasper<TAB>1<TAB><token><TAB><base64 code source><TAB><mtime millis>\n
 ```
 
 Response is `ok\n`, or `refused\t<reason>\n` with reason one of `token`, `stale`, `protocol`. `ok` acknowledges that the resident process has **accepted** the request, not that a window is on screen; the launcher exits as soon as it reads the line rather than waiting for the window, so a slow first paint never holds a process open.
 
-Base64 for paths because a working directory may contain tabs, newlines or invalid UTF-16; the shell integration already carries its command payload the same way. `1` is the protocol version of the wire format itself.
+Base64 for the path because it may contain tabs, newlines or invalid UTF-16; the shell integration already carries its command payload the same way. `1` is the protocol version of the wire format itself.
+
+**The request carries no working directory,** and the resident process opens a window exactly where a cold launch would — the user's home directory, as `Main` does today. Sending the launching directory would be more useful, but it would make `jasper` from a shell behave differently depending on whether a daemon happened to be running, which is invisible state producing visible divergence. Opening new windows in the launching directory is a worthwhile change; it belongs to both paths at once, not to this one.
 
 **Token.** 256 random bits, base64, written to `<AppDirs.root>/daemon.token` at bind time with owner-only permissions, and the socket's parent directory is set to `rwx------` where POSIX permissions apply. Without this, any local user could make the resident process open a terminal window running the user's login shell on the user's display. It is roughly twenty lines and closes a real if minor local hole. On Windows the per-user `%APPDATA%` ACL is the directory gate and the token still applies.
 
@@ -110,10 +114,10 @@ The last two already happen at startup or first window; the first three are the 
 
 `LoginItem.plan(osName, enabled, installLocation, home, env)` returns a description of files to write or delete and commands to run, touching nothing. A thin executor applies it. This mirrors the existing pure resolvers `AppDirs.resolve` and `LaunchSettings.resolve`, and it means both platforms' output is asserted in `./gradlew check` on any host. There is no `LoginItem` interface: one resolver switching on the OS name, as `AppDirs` and `LaunchSettings` already do.
 
-- **macOS** — `~/Library/LaunchAgents/dev.jasper.background.plist` with `RunAtLoad` true, `KeepAlive` false and `LimitLoadToSessionType: Aqua`, then `launchctl bootstrap gui/<uid>` to load it (and `bootout` to remove it). `KeepAlive` is false deliberately: a crashed Jasper should stay down until the user asks for it, not respawn in a loop.
-- **Windows** — a value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` written with `reg add` and removed with `reg delete`. User scope, no elevation. Rejected: a `.lnk` in the Startup folder, which needs a COM call or a PowerShell shell-out to create.
+- **macOS** — write `~/Library/LaunchAgents/dev.jasper.background.plist` with `RunAtLoad` true, `KeepAlive` false and `LimitLoadToSessionType: Aqua`; delete it to disable. **No `launchctl` call, and therefore no subprocess and no need to discover the user's uid.** launchd loads a agent in that directory at the next login, which is exactly and only what this feature wants: the process is already running when the user enables the setting, so making it take effect *this* session would achieve nothing. `KeepAlive` is false deliberately — a crashed Jasper should stay down until the user asks for it, not respawn in a loop.
+- **Windows** — a value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` written with `reg add` and removed with `reg delete`. User scope, no elevation. `reg delete` exits nonzero when the value is already absent, which is success for our purposes and the executor treats it as such. Rejected: a `.lnk` in the Startup folder, which needs a COM call or a PowerShell shell-out to create.
 
-**Only a packaged install registers.** The plan resolves the install location from the running code source and produces no plan when that is not a jpackage image — so a `./gradlew run` development session stays resident but never writes a login item pointing into a build directory.
+**Only a packaged install registers.** jpackage's launcher sets the `jpackage.app-path` system property to its own executable path, which serves as both the "this is a real install" test and the path the login item points at. When it is absent — a `./gradlew run` development session — the plan is empty, so a dev session stays resident but never writes a login item pointing into a build directory. Enabling the setting there logs a warning saying autostart was skipped, rather than failing silently.
 
 ## Documentation
 
@@ -128,7 +132,8 @@ The last two already happen at startup or first window; the first three are the 
 - **The socket cannot be bound** (permissions, a path too long, `AF_UNIX` unsupported). Log a warning and continue as an ordinary non-resident app. Residency is an optimization; failing to get it is never fatal.
 - **A request arrives with a bad token.** Refuse with `token`, log, keep listening. The launcher starts standalone.
 - **A request arrives while a window is already open.** Raise the last active window rather than opening a second one — the same handler the reopen event uses. A window is opened only when none exists.
-- **The requested working directory no longer exists or is not a directory.** Open the window at the user's home directory, as `Main` does today.
+- **The socket path is too long for `sun_path`.** Log and decline residency; run as an ordinary app.
+- **`jpackage.app-path` is absent while the setting is on.** Log that autostart was skipped and stay resident anyway; residency itself does not need a packaged install.
 - **Jasper is uninstalled while a login item remains.** launchd fails the job at login and, with `KeepAlive` false, stops. Noisy in the system log, harmless. Unavoidable from inside an app that is no longer there.
 - **The resident process is killed externally.** Its socket file is left behind and the next launch unlinks it under the lock.
 - **Sleep, wake, display changes, fast user switching.** A process resident across these is new exposure for Swing. Nothing in the design addresses it; it is on the manual checklist.
@@ -141,7 +146,8 @@ Headless, in `./gradlew check`:
 - Every refusal: a wrong token, a differing code source, a differing mtime, a malformed line, an unknown protocol version.
 - Stale-socket recovery: a socket file with nothing listening is unlinked and rebound; a live one is not.
 - Two concurrent bind attempts under the lock: exactly one owner.
-- `LoginItem.plan` for macOS and Windows, enabled and disabled, with an install path containing spaces, and the empty plan for a non-packaged code source.
+- `LoginItem.plan` for macOS and Windows, enabled and disabled, with an install path containing spaces and one containing XML metacharacters, and the empty plan when `jpackage.app-path` is absent.
+- The socket path length guard: a root long enough to overflow `sun_path` declines rather than throwing.
 - `ConfigLoader`: the key defaults to `false`, a non-boolean is rejected with a clear message, an unknown key in `[background]` is reported.
 - `JasperApplication`: with residency on, closing the last window does not run `terminate` and does not close `history`, `shellHistory` or `snippets`; `quit()` does all of it. With residency off, today's behaviour is unchanged.
 - `AppArguments`: `--background` parses, duplicates are rejected, the usage string is updated.
@@ -162,5 +168,6 @@ The user's, on the desktop, because none of it can be verified headlessly:
 - A tray or menu-bar icon.
 - Pre-spawning a shell or a PTY.
 - A pre-built hidden window, and the invisible anchor frame that would pre-warm peer creation.
+- Opening a new window in the launching shell's working directory. It is a good idea and a separate one: it has to change the cold path and the handoff path together, or the two diverge.
 - Any Linux login-item support. The residency and handoff mechanisms are portable and would work; only `LoginItem` is macOS and Windows.
 - Crash supervision or automatic restart of a resident process.
