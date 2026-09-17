@@ -30,6 +30,8 @@ final class JasperApplication {
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory());
     private final ConfigurationController configuration;
     private boolean quitting;
+    private boolean resident;
+    private java.util.function.Consumer<Boolean> loginItems = enabled -> { };
     private boolean shutdownQueued;
     private boolean stopped;
     private final CommandHistory history;
@@ -97,11 +99,19 @@ final class JasperApplication {
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddyVisibility.configure(snapshot.buddyEnabled()); syncBuddy();
             if (snippets != null) snippets.reload();
+            loginItems.accept(snapshot.backgroundEnabled());
         });
-        if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler((event, response) -> {
+        if (supports(Desktop.Action.APP_QUIT_HANDLER)) Desktop.getDesktop().setQuitHandler((event, response) -> {
             // Cancel the native immediate JVM exit; pane close owns bounded child cleanup.
             response.cancelQuit(); SwingUtilities.invokeLater(this::quit);
         });
+        // Clicking the Dock icon of a running Jasper creates no process: AppKit sends this instead.
+        // Registered whether or not residency is on, because a window that is merely minimized
+        // should come back the same way.
+        if (supports(Desktop.Action.APP_EVENT_REOPENED)) {
+            Desktop.getDesktop().addAppEventListener((java.awt.desktop.AppReopenedListener) event ->
+                SwingUtilities.invokeLater(() -> openOrRaise(Path.of(System.getProperty("user.home")))));
+        }
     }
 
     TerminalWindow newWindow(Path directory) {
@@ -115,6 +125,49 @@ final class JasperApplication {
         if (first) shellHistory.refresh();
         if (first && configuration == null && snippets != null) snippets.reload();
         return window;
+    }
+
+    /**
+     * Whether this process outlives its windows. Decided once at startup: which process owns the
+     * handoff endpoint is not something to renegotiate while running.
+     */
+    void residency(boolean resident) { this.resident = resident; }
+
+    boolean resident() { return resident; }
+
+    /**
+     * Who reconciles the user's login items with the setting. Injected, because reconciling from
+     * here would have these tests write into the developer's real login items. Setting it replays
+     * the current value at once: the constructor's own listener registration has already fired by
+     * the time production can install this.
+     */
+    void loginItems(java.util.function.Consumer<Boolean> reconcile) {
+        loginItems = Objects.requireNonNull(reconcile, "reconcile");
+        if (configuration != null) loginItems.accept(configuration.snapshot().backgroundEnabled());
+    }
+
+    /** The handoff and the macOS reopen event share this: raise what is open, or open the first window. */
+    void openOrRaise(Path directory) {
+        if (quitting || stopped) return;
+        if (windows.isEmpty()) newWindow(directory);
+        else raiseTerminal();
+    }
+
+    /**
+     * Pays the first window's one-time costs with no window on screen. Constructing this
+     * application already installed the look and feel; the font set is the remaining expensive
+     * piece, and building one realizes the toolkit's font machinery and the cell metrics.
+     */
+    void warmUp() {
+        ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
+        FontConfig font = snapshot.font();
+        try {
+            new dev.jasper.terminal.FontSet(font.family(), font.size(), font.fallback(),
+                font.ligatures(), font.lineHeight());
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Font warm-up failed; the first window will pay for it", failure);
+        }
+        shellHistory.refresh();
     }
 
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
@@ -150,7 +203,10 @@ final class JasperApplication {
         windows.remove(window);
         buddyVisibility.remove(window);
         if (lastActive == window) lastActive = null;
-        if (windows.isEmpty()) requestShutdown();
+        // Residency keeps the warm process: the command history, the shell-history index, the
+        // snippets and the configuration watcher are precisely what makes the next window fast,
+        // and shutdown would close all of them. Quit still terminates.
+        if (windows.isEmpty() && !resident) requestShutdown();
         else syncBuddy();
     }
 
@@ -255,7 +311,7 @@ final class JasperApplication {
         shellHistory.close();
         if (snippets != null) snippets.close();
         if (configuration != null) configuration.close();
-        if (supportsNativeQuit()) Desktop.getDesktop().setQuitHandler(null);
+        if (supports(Desktop.Action.APP_QUIT_HANDLER)) Desktop.getDesktop().setQuitHandler(null);
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
         long started = System.nanoTime();
         List<CompletableFuture<?>> pending = new ArrayList<>();
@@ -270,8 +326,8 @@ final class JasperApplication {
             }));
     }
 
-    private static boolean supportsNativeQuit() {
+    private static boolean supports(Desktop.Action action) {
         return !GraphicsEnvironment.isHeadless() && Desktop.isDesktopSupported()
-            && Desktop.getDesktop().isSupported(Desktop.Action.APP_QUIT_HANDLER);
+            && Desktop.getDesktop().isSupported(action);
     }
 }
