@@ -42,7 +42,17 @@ final class JasperApplication {
     private final BuddyVisibility buddyVisibility = new BuddyVisibility();
     private final Path buddyStateFile;
     private BuddyWindow buddy;
+    private final NativeNotifier nativeNotifier = new NativeNotifier();
+    private final CommandNotifier notifications = new CommandNotifier(
+        () -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
+        (title, detail, succeeded, activate) -> { if (buddy != null) buddy.showMessage(title, detail, succeeded, activate); },
+        nativeNotifier,
+        working -> { if (buddy != null) buddy.setWorking(working); });
     private boolean buddyUnavailable;
+
+    private int configuredLongCommandSeconds() {
+        return configuration == null ? 10 : configuration.snapshot().longCommandSeconds();
+    }
     private AWTEventListener keyWatch;
     private long lastPokeNanos;
     private TerminalWindow lastActive;
@@ -111,6 +121,9 @@ final class JasperApplication {
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(startSession(path, settings)), shellIntegrationDir);
         TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history, shellHistory, snippets);
+        window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
+        window.content().onCommandFinished = (command, exitStatus, duration, origin, focus) ->
+            notifications.finished(command, exitStatus, duration, origin, buddyVisibility.enabled(), focus);
         windows.add(window); window.show();
         if (first) shellHistory.refresh();
         if (first && configuration == null && snippets != null) snippets.reload();

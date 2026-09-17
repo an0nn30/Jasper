@@ -62,6 +62,16 @@ final class WindowContent extends JPanel implements AutoCloseable {
     Runnable onToggleBuddy = () -> {};
     java.util.function.BooleanSupplier buddyEnabled = () -> false;
     private boolean historyEnabled = true;
+    /** Set by the application so a finished command can reach the notifier; null in tests. */
+    CommandFinishedSink onCommandFinished;
+    /** Whether any Jasper window has focus; the application knows, a single window does not. */
+    java.util.function.BooleanSupplier anyWindowActive = () -> true;
+
+    /** What the application wants to know about a finished command. */
+    interface CommandFinishedSink {
+        void accept(String command, java.util.OptionalInt exitStatus, java.time.Duration duration,
+                    CommandNotice.Origin origin, Runnable focus);
+    }
     private ShellHistoryIndex shellHistory;
     private CommandRegistry.Subscription historyRegistration;
     private SnippetStore snippets;
@@ -352,6 +362,12 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private void configurePane(TerminalTab tab, TerminalPane pane) {
         pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
         pane.onCommandExecuted = entry -> { if (shellHistory != null) shellHistory.record(entry); };
+        pane.onCommandFinished = (command, exitStatus, duration) -> {
+            if (onCommandFinished == null) return;
+            onCommandFinished.accept(command, exitStatus, duration,
+                new CommandNotice.Origin(anyWindowActive.getAsBoolean(), isActiveAndOpen(), tab == currentTab()),
+                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); });
+        };
         pane.applyTheme(themes.current().palette());
         if (configured == null) {
             pane.view().setFontSize(configuredFontSize);

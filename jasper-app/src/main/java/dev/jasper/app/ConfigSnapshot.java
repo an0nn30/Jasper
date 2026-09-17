@@ -11,8 +11,11 @@ import java.util.Objects;
 record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
                       FontConfig font, Appearance variant, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                      boolean historyEnabled, int maxResults, List<String> trivialCommands) {
+                      boolean historyEnabled, int maxResults, List<String> trivialCommands,
+                      int longCommandSeconds) {
     ConfigSnapshot {
+        if (longCommandSeconds < 0 || longCommandSeconds > 3600)
+            throw new IllegalArgumentException("Long-command seconds must be 0\u20133600.");
         if (maxResults < PaletteContext.MIN_MAX_RESULTS || maxResults > PaletteContext.MAX_MAX_RESULTS)
             throw new IllegalArgumentException("Max results must be 1\u201320.");
         if (tabHeight < 28 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 28–72.");
@@ -61,7 +64,7 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
                    int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, boolean historyEnabled,
                    int maxResults) {
         this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled,
-            historyEnabled, maxResults, ShellHistoryScope.DEFAULT_TRIVIAL);
+            historyEnabled, maxResults, ShellHistoryScope.DEFAULT_TRIVIAL, 10);
     }
 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,

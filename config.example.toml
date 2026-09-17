@@ -18,6 +18,11 @@ lines = 45
 # View > Show Jasper (also in the command palette) and right-click > Hide Jasper toggle him for the session.
 enabled = true
 
+[notifications]
+# Live. Notify when a command that ran at least this long finishes in a tab you are not looking at.
+# Needs shell integration: the duration comes from its command marks. Zero disables. Range 0-3600.
+long_command_seconds = 10
+
 [palette]
 # Live. Rows the command palette shows in every scope (Commands and History). Range: 1-20.
 # Cmd/Ctrl+1-5 still act on the first five rows.

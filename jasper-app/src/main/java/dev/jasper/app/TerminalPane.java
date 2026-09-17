@@ -33,6 +33,13 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     Consumer<String> onFailure = message -> {};
     Consumer<TerminalView> onReady = terminal -> {};
     Consumer<ShellHistoryEntry> onCommandExecuted = entry -> {};
+
+    /** A command finished: its text, exit status and how long it ran. Delivered on the EDT. */
+    interface CommandFinished {
+        void accept(String command, java.util.OptionalInt exitStatus, java.time.Duration duration);
+    }
+
+    CommandFinished onCommandFinished = (command, exitStatus, duration) -> {};
     private final TerminalSession.Listener listener = new TerminalSession.Listener() {
         @Override public void screenChanged() { queueUpdate(); }
         @Override public void titleChanged(String title) { queueUpdate(); }
@@ -47,6 +54,9 @@ final class TerminalPane extends JPanel implements AutoCloseable {
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "History listener failed for a captured command", failure);
             }
+            // commandExecuted arrives on the reader thread; everything downstream is Swing.
+            CommandFinished finished = onCommandFinished;
+            javax.swing.SwingUtilities.invokeLater(() -> finished.accept(command, exitStatus, duration));
         }
     };
 

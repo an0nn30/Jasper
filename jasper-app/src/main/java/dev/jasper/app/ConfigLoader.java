@@ -30,8 +30,9 @@ final class ConfigLoader {
     }
 
     private static final Map<List<String>, Set<String>> FIELDS = Map.ofEntries(
-        Map.entry(List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy", "palette")),
+        Map.entry(List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy", "palette", "notifications")),
         Map.entry(List.of("buddy"), Set.of("enabled")),
+        Map.entry(List.of("notifications"), Set.of("long_command_seconds")),
         Map.entry(List.of("palette"), Set.of("max_results", "scopes")),
         // Per-scope settings live under palette.scopes.<scope>, so a new scope adds a table here
         // rather than another top-level one.
@@ -56,6 +57,7 @@ final class ConfigLoader {
     private boolean statusBar = true;
     private boolean buddyEnabled = true;
     private boolean historyEnabled = true;
+    private int longCommandSeconds = 10;
     private List<String> trivialCommands = ShellHistoryScope.DEFAULT_TRIVIAL;
     private int maxResults = PaletteContext.DEFAULT_MAX_RESULTS;
     private int columns = 150;
@@ -103,7 +105,7 @@ final class ConfigLoader {
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, historyEnabled, maxResults, trivialCommands);
+                buddyEnabled, historyEnabled, maxResults, trivialCommands, longCommandSeconds);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -141,6 +143,8 @@ final class ConfigLoader {
                 "icons", WindowContent.ToolbarMode.ICONS, "hidden", WindowContent.ToolbarMode.HIDDEN), toolbar);
             case "window.status_bar" -> statusBar = bool(path, value, statusBar);
             case "buddy.enabled" -> buddyEnabled = bool(path, value, buddyEnabled);
+            case "notifications.long_command_seconds" ->
+                longCommandSeconds = integer(path, value, 0, 3600, longCommandSeconds);
             case "palette.scopes.history.enabled" -> historyEnabled = bool(path, value, historyEnabled);
             case "palette.scopes.history.trivial_commands" -> trivialCommands = lowercased(strings(path, value,
                 ConfigLoader::trivialName, trivialCommands));

@@ -38,6 +38,12 @@ final class ConfigTemplate {
             # View > Show Jasper and a right-click on Jasper toggle him for this session only.
             # enabled = true
 
+            [notifications]
+            # Live. Notify when a command that ran at least this long finishes in a tab you are not
+            # looking at. Needs shell integration: the duration comes from its command marks.
+            # Zero disables notifications. Range 0-3600.
+            # long_command_seconds = 10
+
             [palette]
             # Rows the command palette shows in every scope, 1-20; updates live. Cmd/Ctrl+1-5 still number the first five.
             # max_results = 5
