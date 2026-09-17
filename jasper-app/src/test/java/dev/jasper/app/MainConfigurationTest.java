@@ -48,23 +48,41 @@ class MainConfigurationTest {
         }
     }
 
-    @Test void aLaunchPointedAtAnotherConfigurationNeverHandsOff(@TempDir Path dir) {
-        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
-        // A different configuration file is a different Jasper; the resident one is holding another.
-        assertThat(Main.handsOff(new AppArguments(dir.resolve("other.toml"), false, false), dirs)).isFalse();
-        // Neither does the resident process itself.
-        assertThat(Main.handsOff(new AppArguments(null, false, true), dirs)).isFalse();
-        // And with nothing listening there is nothing to hand off to.
-        assertThat(Main.handsOff(new AppArguments(null, false, false), dirs)).isFalse();
-    }
-
-    @Test void aHandedOffLaunchExitsZeroWithoutRunningTheApplication(@TempDir Path dir) throws Exception {
+    @Test void neitherAnotherConfigurationNorAResidentProcessHandsOff(@TempDir Path dir) throws Exception {
         AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
         try (HandoffSocket endpoint = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(),
                 dirs.daemonLock(), request -> LaunchRequest.Response.OK)) {
             assertThat(endpoint).isNotNull();
+            // The control: with this endpoint listening, an ordinary launch does hand off. That is
+            // what makes the two refusals below attributable to the guard rather than to silence.
             assertThat(Main.handsOff(new AppArguments(null, false, false), dirs)).isTrue();
+            // A different configuration file is a different Jasper; the resident one holds another.
+            assertThat(Main.handsOff(new AppArguments(dir.resolve("other.toml"), false, false), dirs)).isFalse();
+            // And a resident process never hands off to itself.
+            assertThat(Main.handsOff(new AppArguments(null, false, true), dirs)).isFalse();
         }
+    }
+
+    @Test void withNothingListeningThereIsNothingToHandOffTo(@TempDir Path dir) {
+        AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
+        assertThat(Main.handsOff(new AppArguments(null, false, false), dirs)).isFalse();
+    }
+
+    @Test void residentRoleIsOnlyTrueWithTheSettingOnAndNoConfigOverride() {
+        assertThat(Main.residentRole(new AppArguments(null, false, false), true)).isTrue();
+        assertThat(Main.residentRole(new AppArguments(null, false, false), false)).isFalse();
+        // A --config launch is standalone: it never claims the shared endpoint, setting or not.
+        assertThat(Main.residentRole(new AppArguments(Path.of("other.toml"), false, false), true)).isFalse();
+        assertThat(Main.residentRole(new AppArguments(Path.of("other.toml"), false, false), false)).isFalse();
+    }
+
+    @Test void staleFlagsADifferentPathOrModificationTimeButNotAMatchingUnresolvedSource() {
+        Path source = Path.of("/app.jar");
+        assertThat(Main.stale(new LaunchRequest("t", source, 100L), source, 100L)).isFalse();
+        assertThat(Main.stale(new LaunchRequest("t", Path.of("/other.jar"), 100L), source, 100L)).isTrue();
+        assertThat(Main.stale(new LaunchRequest("t", source, 999L), source, 100L)).isTrue();
+        // An unresolvable code source normalises to the same empty path on both sides.
+        assertThat(Main.stale(new LaunchRequest("t", Path.of(""), 0L), null, 0L)).isFalse();
     }
 
     @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.MAC)

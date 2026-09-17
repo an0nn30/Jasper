@@ -37,14 +37,19 @@ public final class Main {
                         boolean resident = service.initialState().snapshot().backgroundEnabled();
                         Path home = Path.of(System.getProperty("user.home"));
                         String appPath = System.getProperty("jpackage.app-path");
-                        reconcileLoginItem(resident, appPath, home);
-                        // A login item that outlived the setting: leave rather than sit resident.
-                        if (options.background() && !resident) {
-                            LOG.log(System.Logger.Level.INFO,
-                                "Started with --background while background.enabled is off; exiting");
-                            service.close();
-                            System.exit(0);
-                            return;
+                        // A --config launch is a standalone Jasper: it must not hand autostart or
+                        // residency to a process that is running someone else's configuration.
+                        boolean standalone = options.configOverride() != null;
+                        if (!standalone) {
+                            reconcileLoginItem(resident, appPath, home);
+                            // A login item that outlived the setting: leave rather than sit resident.
+                            if (options.background() && !resident) {
+                                LOG.log(System.Logger.Level.INFO,
+                                    "Started with --background while background.enabled is off; exiting");
+                                service.close();
+                                System.exit(0);
+                                return;
+                            }
                         }
                         history = new CommandHistory(dirs.commandHistory());
                         ApplicationIcon.installTaskbarIcon();
@@ -58,19 +63,18 @@ public final class Main {
                         application = new JasperApplication(service, null, history, dirs.buddyState(),
                             () -> System.exit(0), ShellHistoryIndex.discovered(),
                             new SnippetStore(dirs.snippets(), new ConfigEditor()::open), integrationDir);
-                        // The login item tracks the setting while Jasper runs; residency does not.
-                        application.loginItems(enabled -> reconcileLoginItem(enabled, appPath, home));
-                        if (resident) {
+                        if (!standalone) {
+                            // The login item tracks the setting while Jasper runs; residency does not.
+                            application.loginItems(enabled -> reconcileLoginItem(enabled, appPath, home));
+                        }
+                        if (residentRole(options, resident)) {
                             JasperApplication owner = application;
                             Path source = HandoffSocket.codeSource();
                             long modified = HandoffSocket.lastModified(source);
                             endpoint = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(), dirs.daemonLock(),
                                 request -> {
                                     // An older build must not serve windows built from newer code.
-                                    if (!request.codeSource().equals(source == null ? Path.of("") : source)
-                                            || request.codeSourceModified() != modified) {
-                                        return LaunchRequest.Response.STALE;
-                                    }
+                                    if (stale(request, source, modified)) return LaunchRequest.Response.STALE;
                                     SwingUtilities.invokeLater(() -> owner.openOrRaise(home));
                                     return LaunchRequest.Response.OK;
                                 });
@@ -188,13 +192,30 @@ public final class Main {
         return HandoffSocket.handOff(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source));
     }
 
+    /** Residency needs the shared endpoint, so a launch pointed at another configuration never
+     *  claims it: a later plain launch would otherwise be handed a window built from that file. */
+    static boolean residentRole(AppArguments options, boolean enabled) {
+        return enabled && options.configOverride() == null;
+    }
+
+    /** True when a request comes from a different build than this one. A resident process must not
+     *  serve windows built from code it is not running. */
+    static boolean stale(LaunchRequest request, Path source, long modified) {
+        return !request.codeSource().equals(source == null ? Path.of("") : source)
+            || request.codeSourceModified() != modified;
+    }
+
     /** Makes the user's login items match the setting. Never throws; autostart is not worth a failed launch. */
     static void reconcileLoginItem(boolean enabled, String appPath, Path home) {
         if (enabled && (appPath == null || appPath.isBlank())) {
             LOG.log(System.Logger.Level.INFO,
                 "Background residency is on, but this Jasper is not an installed package, so it will not start at login");
         }
-        LoginItem.apply(LoginItem.plan(System.getProperty("os.name"), enabled, appPath, home));
+        try {
+            LoginItem.apply(LoginItem.plan(System.getProperty("os.name"), enabled, appPath, home));
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Could not reconcile the login item", failure);
+        }
     }
 
     /** The window title for a shell-reported title; "Jasper" when the shell has not set one. */
