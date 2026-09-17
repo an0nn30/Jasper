@@ -417,15 +417,19 @@ class LaunchRequestTest {
 
     @Test void anythingThisBuildCannotUnderstandDecodesToNullRatherThanThrowing() {
         var valid = new LaunchRequest("t", Path.of("/x.jar"), 1L).encode();
+        // Five fields, except where the case is about the field count. `L3guamFy` is base64 of
+        // "/x.jar": a path that decodes cleanly, so each line fails for the reason its comment
+        // names instead of being masked by an earlier check.
         for (String line : new String[]{
                 "", "\n", "garbage\n",
-                "jasper\t1\tt\n",                                   // too few fields
-                "jasper\t1\tt\tAA==\tAA==\t1\textra\n",             // too many fields
-                "notjasper\t1\tt\tAA==\tAA==\t1\n",                 // wrong magic
-                "jasper\t2\tt\tAA==\tAA==\t1\n",                    // a future protocol
-                "jasper\tx\tt\tAA==\tAA==\t1\n",                    // unparseable protocol
-                "jasper\t1\tt\tAA==\tAA==\tx\n",                    // unparseable timestamp
-                "jasper\t1\tt\t!not base64!\tAA==\t1\n"}) {         // undecodable path
+                "jasper\t1\tt\n",                                  // too few fields
+                "jasper\t1\tt\tL3guamFy\t1\textra\n",              // too many fields
+                "notjasper\t1\tt\tL3guamFy\t1\n",                  // wrong magic
+                "jasper\t2\tt\tL3guamFy\t1\n",                     // a future protocol
+                "jasper\tx\tt\tL3guamFy\t1\n",                     // unparseable protocol
+                "jasper\t1\tt\tL3guamFy\tx\n",                     // unparseable timestamp
+                "jasper\t1\tt\t!not base64!\t1\n",                 // undecodable base64
+                "jasper\t1\tt\tAA==\t1\n"}) {                      // decodes to an illegal path
             assertThat(LaunchRequest.decode(line)).as(line.strip()).isNull();
         }
         assertThat(LaunchRequest.decode(valid)).isNotNull();
@@ -495,7 +499,7 @@ record LaunchRequest(String token, Path codeSource, long codeSourceModified) {
         if (parts.length != FIELDS || !MAGIC.equals(parts[0])) return null;
         try {
             if (Integer.parseInt(parts[1]) != PROTOCOL) return null;
-            return new LaunchRequest(parts[2], decode(parts[3]), Long.parseLong(parts[4]));
+            return new LaunchRequest(parts[2], decodePath(parts[3]), Long.parseLong(parts[4]));
         } catch (IllegalArgumentException malformed) {
             // Covers NumberFormatException, a bad base64 body and an unusable path alike.
             return null;
@@ -506,7 +510,9 @@ record LaunchRequest(String token, Path codeSource, long codeSourceModified) {
         return Base64.getEncoder().encodeToString(path.toString().getBytes(StandardCharsets.UTF_8));
     }
 
-    private static Path decode(String encoded) {
+    // Named decodePath, not decode: a private `decode(String)` would collide with the static
+    // factory above — same erasure, so the file would not compile.
+    private static Path decodePath(String encoded) {
         return Path.of(new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8));
     }
 
