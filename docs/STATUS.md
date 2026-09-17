@@ -66,6 +66,14 @@ one real implementation left. `NativeNotifier` still passes the command line to
 `osascript` as argv rather than inside an interpolated AppleScript string, which a
 test asserts with a command containing quotes and a newline.
 
+*tmux.* The scripts wrap every OSC in tmux's passthrough sequence when `$TMUX`
+is set, and turn on `allow-passthrough` for their own pane. Measured against tmux
+3.5a: without the wrapper **none** of the marks reach the outer terminal, so the
+whole feature was silently dead in a pane while history — which is read from the
+shell's history file, not the marks — kept working and hid it. With the wrapper
+all four marks, the OSC 1341 command payload and OSC 7 arrive. The option is set
+pane-scoped so a user's global tmux configuration is untouched.
+
 *Setting.* `notifications.long_command_seconds`, default 10, live, 0 disables.
 **It needs shell integration**: the duration comes from the OSC 133 marks, so a
 shell without them produces no notifications and no cards at all, which the

@@ -40,9 +40,14 @@ class ShellIntegrationScriptsTest {
         Path target = ShellIntegrationScripts.install(dir.resolve("shell-integration"));
         // bash gets a larger budget than zsh and fish because only bash needs the DEBUG-trap
         // plumbing, both PROMPT_COMMAND forms, the readonly guards and the HISTCONTROL check.
-        for (Map.Entry<String, Integer> budget : Map.of("jasper.zsh", 90, "jasper.fish", 90, "jasper.bash", 115).entrySet()) {
+        // Raised from 115 to 125 for the tmux passthrough wrapper, which all three scripts carry;
+        // zsh and fish absorbed it inside their existing budgets and bash was already the closest
+        // to its ceiling. The budgets exist to keep these scripts readable, not to freeze them.
+        for (Map.Entry<String, Integer> budget : Map.of("jasper.zsh", 90, "jasper.fish", 90, "jasper.bash", 125).entrySet()) {
             String text = Files.readString(target.resolve(budget.getKey()), StandardCharsets.UTF_8);
             assertThat(text).contains("TERM_PROGRAM").contains("JASPER_INTEGRATION_LOADED").contains("133;C").contains("1341;jasper;cmd;");
+            // Without this every mark dies inside a tmux pane, and nothing else here would notice.
+            assertThat(text).as(budget.getKey() + " handles tmux").contains("TMUX").contains("Ptmux;").contains("allow-passthrough");
             assertThat(text.lines().count()).as(budget.getKey()).isLessThanOrEqualTo(budget.getValue());
         }
         if (Files.isExecutable(Path.of("/bin/zsh")))

@@ -7,7 +7,16 @@ export JASPER_INTEGRATION_LOADED=1
 
 autoload -Uz add-zsh-hook
 
-__jasper_osc() { builtin printf '\033]%s\007' "$1"; }
+# tmux forwards almost no escape out of a pane: measured on 3.5a, not one OSC 133 mark reaches the
+# terminal, so integration is silently dead there. Its passthrough wrapper is the way out, and needs
+# allow-passthrough on - set pane-scoped, leaving a global tmux configuration exactly as written.
+if [[ -n "${TMUX-}" ]]; then
+    command tmux set-option -p allow-passthrough on 2>/dev/null
+    __jasper_open=$'\033Ptmux;\033\033]' __jasper_close=$'\007\033\\'
+else
+    __jasper_open=$'\033]' __jasper_close=$'\007'
+fi
+__jasper_osc() { builtin printf '%s%s%s' "$__jasper_open" "$1" "$__jasper_close"; }
 
 # Percent-encodes a path byte by byte, keeping unreserved characters and slashes.
 __jasper_encode() {
@@ -24,8 +33,8 @@ __jasper_encode() {
     builtin printf '%s' "$out"
 }
 
-__jasper_mark_a=$'\033]133;A\007'
-__jasper_mark_b=$'\033]133;B\007'
+__jasper_mark_a="${__jasper_open}133;A${__jasper_close}"
+__jasper_mark_b="${__jasper_open}133;B${__jasper_close}"
 __jasper_command_ran=""
 __jasper_last_pwd=""
 

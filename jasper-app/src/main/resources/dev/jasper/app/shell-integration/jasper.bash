@@ -5,7 +5,16 @@
 [[ -n "${JASPER_INTEGRATION_LOADED-}" ]] && return 0
 export JASPER_INTEGRATION_LOADED=1
 
-__jasper_osc() { builtin printf '\033]%s\007' "$1"; }
+# tmux forwards almost no escape out of a pane: measured on 3.5a, not one OSC 133 mark reaches the
+# terminal, so integration is silently dead there. Its passthrough wrapper is the way out, and needs
+# allow-passthrough on - set pane-scoped, leaving a global tmux configuration exactly as written.
+if [[ -n "${TMUX-}" ]]; then
+    command tmux set-option -p allow-passthrough on 2>/dev/null
+    __jasper_open=$'\033Ptmux;\033\033]' __jasper_close=$'\007\033\\'
+else
+    __jasper_open=$'\033]' __jasper_close=$'\007'
+fi
+__jasper_osc() { builtin printf '%s%s%s' "$__jasper_open" "$1" "$__jasper_close"; }
 
 # Assigning to a readonly PS1 or PROMPT_COMMAND aborts the function and prints an error every
 # prompt. Read only the flag word, so a value that happens to contain "r" is not mistaken for one.
@@ -30,7 +39,7 @@ __jasper_encode() {
     builtin printf '%s' "$out"
 }
 
-__jasper_mark_a=$'\033]133;A\007' __jasper_mark_b=$'\033]133;B\007'
+__jasper_mark_a="${__jasper_open}133;A${__jasper_close}" __jasper_mark_b="${__jasper_open}133;B${__jasper_close}"
 __jasper_command_ran="" __jasper_last_pwd="" __jasper_last_status=0
 __jasper_in_prompt="" __jasper_prompt_history="" __jasper_previous_debug_body=""
 

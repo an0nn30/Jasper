@@ -142,6 +142,12 @@ dismisses that one, and **Clear all** empties the drawer. At most 50 are kept, t
 off, and the drawer starts empty each time Jasper starts. A card whose pane you have closed stays
 readable but dims and no longer responds — there is nowhere left for it to take you.
 
+**Inside tmux** the marks need tmux's passthrough wrapper: tmux parses every escape its panes emit
+and forwards almost none, so without it not one OSC 133 mark reaches Jasper and integration is
+silently dead. The scripts detect `$TMUX` and wrap automatically, and turn on `allow-passthrough`
+for their own pane only — your global tmux configuration is left exactly as you wrote it. It needs
+tmux 3.3 or newer, which is when the option was added.
+
 A **system notification** is sent as well, unless the command finished in the pane you were actually
 typing in. That includes a command finishing in a visible but unfocused split pane, which is easy to
 miss. System notifications are macOS-only; elsewhere the drawer is the only channel.
