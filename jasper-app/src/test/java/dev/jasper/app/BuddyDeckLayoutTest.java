@@ -74,6 +74,17 @@ class BuddyDeckLayoutTest {
         assertThat(BuddyDeckLayout.visibleInColumn(9)).isEqualTo(BuddyDeckLayout.MAX_IN_COLUMN);
     }
 
+    /** They rest on each other rather than sitting apart, so the column reads as a stack. */
+    @Test void theBubblesOverlapRatherThanSittingApart() {
+        assertThat(BuddyDeckLayout.COLUMN_GAP).isNegative();
+        Rectangle newest = BuddyDeckLayout.column(0, 2, WIDTH, CARD, false);
+        Rectangle older = BuddyDeckLayout.column(1, 2, WIDTH, CARD, false);
+
+        assertThat(newest.y).as("the newest starts before the older one ends").isLessThan(older.y + older.height);
+        assertThat(newest.y).isGreaterThan(older.y);
+        assertThat(Math.abs(BuddyDeckLayout.COLUMN_GAP)).as("never into the text").isLessThan(BuddyCard.PAD_Y);
+    }
+
     @Test void theColumnIsItsBubblesPlusTheTail() {
         assertThat(BuddyDeckLayout.columnHeight(0, CARD)).isZero();
         assertThat(BuddyDeckLayout.columnHeight(1, CARD)).isEqualTo(CARD + BuddyDeckLayout.TAIL_HEIGHT);

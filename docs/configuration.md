@@ -130,9 +130,11 @@ command-start and command-end marks the integration scripts emit, so a shell tha
 produces no notifications and no cards at all — Jasper cannot know how long anything took. There is
 no fallback guess.
 
-Past the threshold the desk buddy sits down and types on a laptop, and a **bubble rises above his
-head** with a thought tail pointing back at him. The bubble appears whatever you are looking at: it
-is status, not an interruption. It shows the command, how long it has been running, and when the
+A running command grows a **bubble above the buddy's head**, with a thought tail pointing back at
+him, and he sits down and types while it runs. The bubble appears **the moment you look away** —
+switching tab, switching window, or sending Jasper to the background — because out of sight is the
+whole reason it exists. If you stay in the pane and watch, it appears once the command passes
+`long_command_seconds` instead. It shows the command, how long it has been running, and when the
 command ends a check or a cross with the final time.
 
 **Looking at it clears it.** Focusing the pane a bubble came from takes it out of the column, so the
@@ -141,7 +143,8 @@ were already typing in never produces a bubble at all — you watched it happen.
 running and nothing is unseen there is nothing above his head, which is the resting state.
 
 At most three bubbles are shown, newest nearest his head, with a count on the newest when there are
-more. The column flips below him when he is too near the top of the screen, and the order inverts so
+more. A new one springs in and the ones above it slide up and settle over its place; nothing moves
+once it has settled. The column flips below him when he is too near the top of the screen, and the order inverts so
 the newest is still the one closest to him.
 
 **Single-clicking him opens the drawer**: everything from this run, newest first, whether or not you

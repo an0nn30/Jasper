@@ -12,18 +12,25 @@ import java.util.List;
 import java.util.Objects;
 import javax.swing.JWindow;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 
 /** The window the thought column lives in: translucent, always on top, never focused. */
 final class BuddyColumnWindow {
     private final JWindow window = new JWindow();
     private final BuddyDeck deck;
     private final BuddyColumnPanel panel;
+    /**
+     * Drives the frames while anything is moving. The buddy's own timer repaints only his sprite
+     * canvas, so without this the column painted exactly one frame per event — at elapsed zero,
+     * which is scale 0.6 and opacity 0, leaving the bubble invisible until some unrelated repaint.
+     */
+    private final Timer frames = new Timer(16, event -> tick());
     private Rectangle anchor;
     private boolean disposed;
 
     BuddyColumnWindow(BuddyDeck deck, Runnable onOpenDrawer) {
         this.deck = Objects.requireNonNull(deck, "deck");
-        this.panel = new BuddyColumnPanel(deck, this::layout, Objects.requireNonNull(onOpenDrawer, "onOpenDrawer"));
+        this.panel = new BuddyColumnPanel(deck, this::onPanelChanged, Objects.requireNonNull(onOpenDrawer, "onOpenDrawer"));
         window.setType(Window.Type.UTILITY);
         window.setAlwaysOnTop(true);
         window.setFocusableWindowState(false);
@@ -42,6 +49,23 @@ final class BuddyColumnWindow {
         panel.addMouseMotionListener(mouse);
     }
 
+    private void tick() {
+        if (disposed || !window.isVisible()) { frames.stop(); return; }
+        panel.repaint();
+        if (!panel.animating()) frames.stop();
+    }
+
+    /** Called whenever the panel starts something moving; harmless when it is already running. */
+    private void animate() {
+        if (disposed || !window.isVisible() || !panel.animating()) return;
+        if (!frames.isRunning()) frames.start();
+    }
+
+    private void onPanelChanged() {
+        layout();
+        animate();
+    }
+
     /** Whether the column fits between the top of the screen and the top of his head. */
     static boolean fitsAbove(Rectangle anchor, int columnHeight, Rectangle screen) {
         return anchor.y - columnHeight >= screen.y;
@@ -57,12 +81,14 @@ final class BuddyColumnWindow {
 
     void hide() {
         if (disposed) return;
+        frames.stop();
         window.setVisible(false);
     }
 
     void dispose() {
         if (disposed) return;
         disposed = true;
+        frames.stop();
         window.dispose();
     }
 
@@ -80,6 +106,7 @@ final class BuddyColumnWindow {
         window.setSize(size);
         window.setLocation(place(size, screen));
         window.setVisible(true);
+        animate();
     }
 
     /** Centred on him, above when there is room and below when there is not. */

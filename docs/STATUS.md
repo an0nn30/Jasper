@@ -48,6 +48,21 @@ makes an impossible notice unconstructible. `detail` is a `Supplier<String>`
 so a running card ticks without being re-posted and a future transfer can
 report bytes through the same field.
 
+A bubble appears the moment its pane stops being watched — `focusLost` covers
+another pane, another tab, another window and Jasper itself going to the
+background — with `long_command_seconds` as the fallback for a command
+running in the pane you are still watching.
+
+The surfaces run their own repaint timers. They previously had none: the
+buddy's timer repaints only his sprite canvas, so the column painted a
+single frame per event at elapsed zero — scale 0.6, and opacity 0 because it
+rode the same spring curve — and the bubble was invisible until an unrelated
+repaint happened. Opacity now fades over the first 40% of the arrival rather
+than riding the spring, and the timers stop as soon as `animating()` goes
+false, so a settled column costs nothing. Bubbles overlap by six pixels so
+the column reads as a stack, and the ones above a new arrival spring up over
+its place and overshoot once before settling.
+
 Column membership is `live() || !acknowledged`. Acknowledgement is deck
 state, not notice state, because it is a fact about the reader. Focusing a
 pane acknowledges it; a command finishing in the focused pane is

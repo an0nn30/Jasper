@@ -35,6 +35,10 @@ final class BuddyColumnPanel extends JComponent {
     private int leaving = -1;
     private long topArrivedAt;
     private long hoverChangedAt;
+    /** When the bubbles above the newest started sliding up over its place. */
+    private long settleStartedAt;
+    /** Zero until something has arrived, so an idle column does not claim to be mid-animation. */
+    private boolean everArrived;
 
     BuddyColumnPanel(BuddyDeck deck, Runnable onLayoutChanged, Runnable onOpenDrawer) {
         this.deck = Objects.requireNonNull(deck, "deck");
@@ -56,12 +60,25 @@ final class BuddyColumnPanel extends JComponent {
 
     boolean below() { return below; }
 
-    /** A notice was posted: the nearest bubble bounces in and the window re-sizes around the column. */
+    /** A notice was posted: the nearest bubble springs in and the ones above it slide up over it. */
     void arrived() {
         topArrivedAt = clock.getAsLong();
+        settleStartedAt = topArrivedAt;
+        everArrived = true;
         revalidate();
         repaint();
         onLayoutChanged.run();
+    }
+
+    /**
+     * Whether anything is still moving. The window drives repaints while this is true and stops when
+     * it is not, so a settled column costs nothing — which is why nothing here sways forever.
+     */
+    boolean animating() {
+        long now = clock.getAsLong();
+        if (everArrived && now - topArrivedAt < BubbleMotion.IN_NANOS) return true;
+        if (everArrived && now - settleStartedAt < BubbleMotion.SETTLE_NANOS) return true;
+        return (hovered >= 0 || leaving >= 0) && now - hoverChangedAt < BubbleMotion.HOVER_NANOS;
     }
 
     int hovered() { return hovered; }
@@ -84,6 +101,7 @@ final class BuddyColumnPanel extends JComponent {
         hovered = index;
         hoverChangedAt = clock.getAsLong();
         repaint();
+        onLayoutChanged.run();
     }
 
     void handleExit() {
@@ -92,6 +110,7 @@ final class BuddyColumnPanel extends JComponent {
         hovered = -1;
         hoverChangedAt = clock.getAsLong();
         repaint();
+        onLayoutChanged.run();
     }
 
     /**
@@ -137,9 +156,14 @@ final class BuddyColumnPanel extends JComponent {
             paintTail(g2, height);
             int visible = BuddyDeckLayout.visibleInColumn(column.size());
             // Furthest first, so the newest lands on top of anything that overlaps it.
+            // Everything except the newest starts one pitch away and springs into place over it.
+            float settle = everArrived
+                ? BubbleMotion.settleOffset(clock.getAsLong() - settleStartedAt, cardHeight + BuddyDeckLayout.COLUMN_GAP)
+                : 0f;
             for (int index = visible - 1; index >= 0; index--) {
                 Rectangle card = BuddyDeckLayout.column(index, column.size(), BuddyCard.WIDTH, cardHeight, below);
                 boolean nearest = index == 0;
+                if (!nearest) card.y += (int) (below ? -settle : settle);
                 float scale = (nearest ? topScale() : 1f) * hoverScale(index);
                 float opacity = nearest ? BubbleMotion.inOpacity(clock.getAsLong() - topArrivedAt) : 1f;
                 int count = nearest && column.size() > visible ? column.size() : 0;

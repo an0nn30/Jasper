@@ -11,7 +11,12 @@ import java.awt.Rectangle;
  */
 final class BuddyDeckLayout {
     static final int ROW_GAP = 6;
-    static final int COLUMN_GAP = 6;
+    /**
+     * Negative: the bubbles overlap rather than sitting apart, so the column reads as a stack of
+     * things resting on each other. Six pixels eats into a card's ten of bottom padding and never
+     * into its text.
+     */
+    static final int COLUMN_GAP = -6;
     /** Beyond this the nearest bubble carries a count; a taller column would cover the screen. */
     static final int MAX_IN_COLUMN = 3;
     /** The band between his head and the nearest bubble, where the thought tail sits. */

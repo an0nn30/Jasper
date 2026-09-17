@@ -52,6 +52,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
      * its active pane; this one is for whoever cares that the user is now looking here.
      */
     Runnable onPaneFocused = () -> {};
+
+    /**
+     * This pane stopped being watched — another pane, another tab, another window, or Jasper itself
+     * going to the background. Swing reports all four as a focus loss, the last as a temporary one.
+     */
+    Runnable onPaneBlurred = () -> {};
     private final TerminalSession.Listener listener = new TerminalSession.Listener() {
         @Override public void screenChanged() { queueUpdate(); }
 
@@ -88,6 +94,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         setBackground(UIManager.getColor("Panel.background"));
         setActive(false);
     }
+
+    /**
+     * Whether the user is watching this pane right now. The focus owner only exists inside the
+     * active window, so this is false whenever Jasper itself is in the background.
+     */
+    boolean watched() { return view != null && view.isFocusOwner(); }
 
     @Override public Dimension getMinimumSize() {
         Dimension layout = super.getMinimumSize();
@@ -146,6 +158,8 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     private void trackFocus(Component component) {
         component.addFocusListener(new FocusAdapter() {
             @Override public void focusGained(FocusEvent event) { onFocused.run(); onPaneFocused.run(); }
+
+            @Override public void focusLost(FocusEvent event) { onPaneBlurred.run(); }
         });
         if (component instanceof Container container) {
             for (Component child : container.getComponents()) trackFocus(child);
@@ -203,7 +217,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         }
         if (session != null) { session.removeListener(listener); session.close(); }
         onChanged = () -> {}; onFocused = () -> {}; onClose = () -> {}; onCommandStarted = command -> {};
-        onPaneFocused = () -> {};
+        onPaneFocused = () -> {}; onPaneBlurred = () -> {};
         allowLaunchFocus = () -> false;
         onReady = terminal -> {}; onFailure = message -> {};
         onCommandExecuted = entry -> {};

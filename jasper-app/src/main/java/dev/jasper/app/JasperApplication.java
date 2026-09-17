@@ -135,12 +135,13 @@ final class JasperApplication {
             (path, settings) -> track(startSession(path, settings)), shellIntegrationDir);
         TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history, shellHistory, snippets);
         window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
-        window.content().onCommandStarted = (command, pane, elapsed, focus) ->
-            notifications.started(pane, command, elapsed, focus);
+        window.content().onCommandStarted = (command, pane, elapsed, focus, watched) ->
+            notifications.started(pane, command, elapsed, focus, watched);
         window.content().onCommandFinished = (command, exitStatus, duration, origin, pane, focus) ->
             notifications.finished(pane, command, exitStatus, duration, origin, focus);
         window.content().onPaneClosed = notifications::closed;
         window.content().onPaneFocused = notifications::looked;
+        window.content().onPaneBlurred = notifications::hidden;
         windows.add(window); window.show();
         if (first) shellHistory.refresh();
         if (first && configuration == null && snippets != null) snippets.reload();

@@ -47,6 +47,9 @@ final class CommandNotifier {
         boolean passed;
         /** How long it has been going, so a pane closed mid-command can freeze the real figure. */
         LongSupplier elapsed = () -> 0L;
+        String title = "";
+        java.util.function.Supplier<String> detail = () -> "";
+        Runnable activate = () -> {};
     }
 
     CommandNotifier(Supplier<Duration> threshold, BuddyDeck deck, Runnable onDeckChanged,
@@ -65,23 +68,38 @@ final class CommandNotifier {
      * the buddy does not twitch for every {@code ls}. {@code elapsedNanos} lets the card tick without
      * being re-posted every second.
      */
-    void started(Object key, String command, LongSupplier elapsedNanos, Runnable activate) {
+    void started(Object key, String command, LongSupplier elapsedNanos, Runnable activate, boolean watched) {
         Duration wait = threshold.get();
         cancel(key);
         if (wait.isZero()) return;
         InFlight flight = new InFlight();
         flight.elapsed = elapsedNanos;
+        flight.title = title(command);
+        flight.detail = () -> "Running · " + humanize(Duration.ofNanos(elapsedNanos.getAsLong()));
+        flight.activate = activate;
         inFlight.put(key, flight);
-        String title = title(command);
-        flight.cancel = schedule.apply(wait, () -> {
-            if (inFlight.get(key) != flight) return;
-            flight.passed = true;
-            flight.cancel = () -> {};
-            if (running++ == 0) onWorkingChanged.accept(true);
-            deck.post(new BuddyNotice(SOURCE, key, BuddyNotice.Kind.TASK, title, BuddyNotice.State.RUNNING,
-                () -> "Running · " + humanize(Duration.ofNanos(elapsedNanos.getAsLong())), activate));
-            onDeckChanged.run();
-        });
+        // Out of sight is the whole reason a bubble exists, so there is nothing to wait for. The
+        // threshold stays as the fallback for a command running in the pane you are still watching.
+        if (!watched) { promote(key, flight); return; }
+        flight.cancel = schedule.apply(wait, () -> promote(key, flight));
+    }
+
+    /** The pane stopped being watched: anything running in it is now worth showing. */
+    void hidden(Object key) {
+        InFlight flight = inFlight.get(key);
+        if (flight != null && !flight.passed) promote(key, flight);
+    }
+
+    /** Turns an in-flight command into a bubble, once. */
+    private void promote(Object key, InFlight flight) {
+        if (inFlight.get(key) != flight || flight.passed) return;
+        flight.passed = true;
+        flight.cancel.run();
+        flight.cancel = () -> {};
+        if (running++ == 0) onWorkingChanged.accept(true);
+        deck.post(new BuddyNotice(SOURCE, key, BuddyNotice.Kind.TASK, flight.title,
+            BuddyNotice.State.RUNNING, flight.detail, flight.activate));
+        onDeckChanged.run();
     }
 
     /** A command ended. Its card becomes the outcome, and the OS hears about it if you were elsewhere. */

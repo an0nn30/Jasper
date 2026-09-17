@@ -167,4 +167,87 @@ class BuddyColumnPanelTest {
         try { panel.paint(g); } finally { g.dispose(); }
         return true;
     }
+
+    /**
+     * The bug this replaced: nothing repainted the column, so it painted one frame at elapsed zero —
+     * scale 0.6 and opacity 0 — and the bubble was invisible until an unrelated repaint happened.
+     * The panel has to be able to say it is still moving, or the window cannot drive the frames.
+     */
+    @Test void anArrivingBubbleKeepsAskingForFramesUntilItHasSettled() {
+        assertThat(panel.animating()).as("an idle column is not mid-animation").isFalse();
+
+        post("a", "one", BuddyNotice.State.RUNNING);
+
+        assertThat(panel.animating()).isTrue();
+        now = BubbleMotion.IN_NANOS / 2;
+        assertThat(panel.animating()).isTrue();
+        now = Math.max(BubbleMotion.IN_NANOS, BubbleMotion.SETTLE_NANOS) + 1;
+        assertThat(panel.animating()).as("and stops once it has settled").isFalse();
+    }
+
+    @Test void hoveringAsksForFramesAndStopsWhenTheGrowthIsDone() {
+        post("a", "one", BuddyNotice.State.RUNNING);
+        post("b", "two", BuddyNotice.State.RUNNING);
+        layout();
+        now = Math.max(BubbleMotion.IN_NANOS, BubbleMotion.SETTLE_NANOS) * 4;
+        assertThat(panel.animating()).isFalse();
+
+        panel.handleMove(inBubble(1));
+        assertThat(panel.animating()).isTrue();
+
+        now += BubbleMotion.HOVER_NANOS + 1;
+        assertThat(panel.animating()).isFalse();
+
+        panel.handleExit();
+        assertThat(panel.animating()).as("leaving animates back too").isTrue();
+    }
+
+    /** The bubble genuinely starts small and transparent, and genuinely ends full size and opaque. */
+    @Test void theArrivalActuallyTravelsFromSmallAndInvisibleToFullSize() {
+        post("a", "one", BuddyNotice.State.RUNNING);
+
+        assertThat(panel.topScale()).isEqualTo(BubbleMotion.IN_FROM);
+        assertThat(BubbleMotion.inOpacity(0)).isZero();
+
+        now = BubbleMotion.IN_NANOS;
+        assertThat(panel.topScale()).isEqualTo(1f);
+        assertThat(BubbleMotion.inOpacity(BubbleMotion.IN_NANOS)).isEqualTo(1f);
+    }
+
+    /** The stack above a new arrival slides up over it rather than jumping. */
+    @Test void theBubblesAboveANewArrivalStartOutOfPlaceAndArrive() {
+        post("a", "older", BuddyNotice.State.RUNNING);
+        now = BubbleMotion.SETTLE_NANOS * 4;
+        layout();
+        BufferedImage settled = paint();
+
+        post("b", "newer", BuddyNotice.State.RUNNING);
+        layout();
+        BufferedImage arriving = paint();
+
+        now += BubbleMotion.SETTLE_NANOS + 1;
+        BufferedImage done = paint();
+
+        assertThat(differs(arriving, done)).as("mid-settle the stack is not where it ends up").isTrue();
+        assertThat(settled).isNotNull();
+    }
+
+    private BufferedImage paint() {
+        Dimension size = panel.getPreferredSize();
+        BufferedImage image = new BufferedImage(Math.max(1, size.width), Math.max(1, size.height),
+            BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = image.createGraphics();
+        try { panel.paint(g); } finally { g.dispose(); }
+        return image;
+    }
+
+    private static boolean differs(BufferedImage a, BufferedImage b) {
+        if (a.getWidth() != b.getWidth() || a.getHeight() != b.getHeight()) return true;
+        for (int y = 0; y < a.getHeight(); y++) {
+            for (int x = 0; x < a.getWidth(); x++) {
+                if (a.getRGB(x, y) != b.getRGB(x, y)) return true;
+            }
+        }
+        return false;
+    }
 }

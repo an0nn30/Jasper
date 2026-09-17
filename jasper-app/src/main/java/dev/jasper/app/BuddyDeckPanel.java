@@ -62,6 +62,12 @@ final class BuddyDeckPanel extends JComponent {
 
     int cardHeight() { return BuddyCard.height(this); }
 
+    /** Whether the hover growth is still moving; the window drives frames only while it is. */
+    boolean animating() {
+        return (hovered >= 0 || leaving >= 0)
+            && clock.getAsLong() - hoverChangedAt < BubbleMotion.HOVER_NANOS;
+    }
+
     /** The drawer was closed: forget where you were, so it reopens at the top. */
     void reset() {
         if (scroll == 0 && hovered < 0) return;
@@ -95,6 +101,7 @@ final class BuddyDeckPanel extends JComponent {
         hovered = index;
         hoverChangedAt = clock.getAsLong();
         repaint();
+        onLayoutChanged.run();
     }
 
     void handleExit() {
@@ -103,6 +110,7 @@ final class BuddyDeckPanel extends JComponent {
         hovered = -1;
         hoverChangedAt = clock.getAsLong();
         repaint();
+        onLayoutChanged.run();
     }
 
     void handleWheel(int units) {

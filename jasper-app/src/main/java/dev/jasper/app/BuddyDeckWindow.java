@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import javax.swing.JWindow;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 
 /**
  * The drawer's window: translucent, always on top and never focused, like the bubble it replaces.
@@ -23,12 +24,14 @@ final class BuddyDeckWindow {
     private final JWindow window = new JWindow();
     private final BuddyDeck deck;
     private final BuddyDeckPanel panel;
+    /** Drives the hover growth; the buddy's own timer repaints only his sprite canvas. */
+    private final Timer frames = new Timer(16, event -> tick());
     private Rectangle anchor;
     private boolean disposed;
 
     BuddyDeckWindow(BuddyDeck deck) {
         this.deck = Objects.requireNonNull(deck, "deck");
-        this.panel = new BuddyDeckPanel(deck, this::layout);
+        this.panel = new BuddyDeckPanel(deck, this::onPanelChanged);
         panel.setMaxListHeight(this::usableHeight);
         window.setType(Window.Type.UTILITY);
         window.setAlwaysOnTop(true);
@@ -57,6 +60,17 @@ final class BuddyDeckWindow {
         panel.addMouseWheelListener(mouse);
     }
 
+    private void tick() {
+        if (disposed || !window.isVisible()) { frames.stop(); return; }
+        panel.repaint();
+        if (!panel.animating()) frames.stop();
+    }
+
+    private void onPanelChanged() {
+        layout();
+        if (!disposed && window.isVisible() && panel.animating() && !frames.isRunning()) frames.start();
+    }
+
     /** Remembers where the buddy is and shows the drawer there, if there is anything in it. */
     void showBeside(Rectangle anchorOnScreen) {
         if (disposed) return;
@@ -69,6 +83,7 @@ final class BuddyDeckWindow {
 
     void hide() {
         if (disposed) return;
+        frames.stop();
         panel.reset();
         window.setVisible(false);
     }
@@ -76,6 +91,7 @@ final class BuddyDeckWindow {
     void dispose() {
         if (disposed) return;
         disposed = true;
+        frames.stop();
         window.dispose();
     }
 

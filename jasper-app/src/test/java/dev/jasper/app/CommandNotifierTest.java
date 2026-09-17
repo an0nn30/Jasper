@@ -28,6 +28,10 @@ class CommandNotifierTest {
         List.copyOf(scheduled).forEach(Runnable::run);
     }
 
+    /** Started in the pane the user is looking at, so the threshold is what promotes it. */
+    private static final boolean WATCHED = true;
+    private static final boolean UNWATCHED = false;
+
     private static final CommandNotice.Origin HIDDEN_TAB = new CommandNotice.Origin(true, true, false, false);
     private static final CommandNotice.Origin FOCUSED_PANE = new CommandNotice.Origin(true, true, true, true);
     private static final CommandNotice.Origin UNFOCUSED_SPLIT = new CommandNotice.Origin(true, true, true, false);
@@ -35,7 +39,7 @@ class CommandNotifierTest {
     @Test void aCommandThatPassesTheThresholdGetsARunningCardAndNoNotification() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
         passThreshold();
 
         assertThat(deck.notices()).singleElement().satisfies(notice -> {
@@ -50,7 +54,7 @@ class CommandNotifierTest {
     @Test void theRunningCardAppearsEvenWhenYouAreLookingRightAtThePane() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
         passThreshold();
         notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
             FOCUSED_PANE, () -> {});
@@ -64,7 +68,7 @@ class CommandNotifierTest {
         CommandNotifier notifier = notifier(10);
         long[] elapsed = {Duration.ofSeconds(11).toNanos()};
 
-        notifier.started("pane", "sleep 600", () -> elapsed[0], () -> {});
+        notifier.started("pane", "sleep 600", () -> elapsed[0], () -> {}, WATCHED);
         passThreshold();
 
         assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Running · 11s");
@@ -75,7 +79,7 @@ class CommandNotifierTest {
     @Test void finishingReplacesTheRunningCardInPlaceRatherThanAddingASecond() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
         passThreshold();
         notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
             HIDDEN_TAB, () -> {});
@@ -88,7 +92,7 @@ class CommandNotifierTest {
     @Test void aFailureSaysSoAndCarriesItsExitStatus() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("pane", "make", () -> 0L, () -> {});
+        notifier.started("pane", "make", () -> 0L, () -> {}, WATCHED);
         passThreshold();
         notifier.finished("pane", "make", OptionalInt.of(2), Duration.ofSeconds(45), HIDDEN_TAB, () -> {});
 
@@ -101,7 +105,7 @@ class CommandNotifierTest {
     @Test void aCommandThatFinishesOutOfSightAlsoReachesTheOperatingSystem() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
         passThreshold();
         notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
             HIDDEN_TAB, () -> {});
@@ -113,7 +117,7 @@ class CommandNotifierTest {
     @Test void aVisibleButUnfocusedSplitPaneStillNotifies() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("pane", "make", () -> 0L, () -> {});
+        notifier.started("pane", "make", () -> 0L, () -> {}, WATCHED);
         passThreshold();
         notifier.finished("pane", "make", OptionalInt.of(0), Duration.ofSeconds(30), UNFOCUSED_SPLIT, () -> {});
 
@@ -123,7 +127,7 @@ class CommandNotifierTest {
     @Test void aShortCommandLeavesNoCardAndNotifiesNobody() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("pane", "ls", () -> 0L, () -> {});
+        notifier.started("pane", "ls", () -> 0L, () -> {}, WATCHED);
         notifier.finished("pane", "ls", OptionalInt.of(0), Duration.ofSeconds(2), HIDDEN_TAB, () -> {});
 
         assertThat(deck.notices()).isEmpty();
@@ -135,7 +139,7 @@ class CommandNotifierTest {
     @Test void aZeroThresholdTurnsTheWholeFeatureOff() {
         CommandNotifier notifier = notifier(0);
 
-        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
         passThreshold();
         notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofHours(1),
             HIDDEN_TAB, () -> {});
@@ -147,8 +151,8 @@ class CommandNotifierTest {
     @Test void aSecondLongCommandDoesNotRestartTheTypingAndTheLastOneEndsIt() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("a", "one", () -> 0L, () -> {});
-        notifier.started("b", "two", () -> 0L, () -> {});
+        notifier.started("a", "one", () -> 0L, () -> {}, WATCHED);
+        notifier.started("b", "two", () -> 0L, () -> {}, WATCHED);
         passThreshold();
         assertThat(working).containsExactly(true);
 
@@ -162,7 +166,7 @@ class CommandNotifierTest {
     /** Never removed: the drawer is what you look at to remember, so a closed pane leaves its card. */
     @Test void aPaneClosingOrphansItsCardAndStopsTheTyping() {
         CommandNotifier notifier = notifier(10);
-        notifier.started("pane", "sleep 600", () -> Duration.ofSeconds(72).toNanos(), () -> {});
+        notifier.started("pane", "sleep 600", () -> Duration.ofSeconds(72).toNanos(), () -> {}, WATCHED);
         passThreshold();
 
         notifier.closed("pane");
@@ -175,7 +179,7 @@ class CommandNotifierTest {
 
     @Test void aPaneClosingBeforeTheThresholdLeavesNothingBehind() {
         CommandNotifier notifier = notifier(10);
-        notifier.started("pane", "ls", () -> 0L, () -> {});
+        notifier.started("pane", "ls", () -> 0L, () -> {}, WATCHED);
 
         notifier.closed("pane");
 
@@ -186,9 +190,9 @@ class CommandNotifierTest {
 
     @Test void aSecondCommandInTheSamePaneSupersedesTheFirstRatherThanStacking() {
         CommandNotifier notifier = notifier(10);
-        notifier.started("pane", "first", () -> 0L, () -> {});
+        notifier.started("pane", "first", () -> 0L, () -> {}, WATCHED);
 
-        notifier.started("pane", "second", () -> 0L, () -> {});
+        notifier.started("pane", "second", () -> 0L, () -> {}, WATCHED);
         passThreshold();
 
         assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("second");
@@ -198,7 +202,7 @@ class CommandNotifierTest {
     @Test void multiLineCommandsCollapseForTheTitle() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("pane", "echo a\necho b", () -> 0L, () -> {});
+        notifier.started("pane", "echo a\necho b", () -> 0L, () -> {}, WATCHED);
         passThreshold();
 
         assertThat(deck.notices().getFirst().title()).isEqualTo("echo a ↵ echo b");
@@ -217,7 +221,7 @@ class CommandNotifierTest {
      */
     @Test void closingThePaneAfterTheCommandFinishedKeepsWhatItSaid() {
         CommandNotifier notifier = notifier(10);
-        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
         passThreshold();
         notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
             HIDDEN_TAB, () -> {});
@@ -234,7 +238,7 @@ class CommandNotifierTest {
     @Test void closingThePaneMidCommandFreezesTheRealElapsedTime() {
         CommandNotifier notifier = notifier(10);
         long[] elapsed = {Duration.ofSeconds(11).toNanos()};
-        notifier.started("pane", "sleep 600", () -> elapsed[0], () -> {});
+        notifier.started("pane", "sleep 600", () -> elapsed[0], () -> {}, WATCHED);
         passThreshold();
         elapsed[0] = Duration.ofSeconds(154).toNanos();
 
@@ -247,7 +251,7 @@ class CommandNotifierTest {
     @Test void aCommandThatEndsUnderYourEyesNeverReachesTheColumn() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
         passThreshold();
         notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
             FOCUSED_PANE, () -> {});
@@ -258,7 +262,7 @@ class CommandNotifierTest {
 
     @Test void aCommandThatEndsOutOfSightWaitsInTheColumnUntilYouLook() {
         CommandNotifier notifier = notifier(10);
-        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
         passThreshold();
         notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
             HIDDEN_TAB, () -> {});
@@ -272,7 +276,7 @@ class CommandNotifierTest {
 
     @Test void lookingAtOnePaneLeavesEveryOtherPanesNoticeAlone() {
         CommandNotifier notifier = notifier(10);
-        for (String key : List.of("a", "b")) notifier.started(key, "cmd " + key, () -> 0L, () -> {});
+        for (String key : List.of("a", "b")) notifier.started(key, "cmd " + key, () -> 0L, () -> {}, WATCHED);
         passThreshold();
         for (String key : List.of("a", "b")) {
             notifier.finished(key, "cmd " + key, OptionalInt.of(0), Duration.ofSeconds(11),
@@ -287,7 +291,7 @@ class CommandNotifierTest {
     /** Its pane is gone, so it can never be looked at; it would sit in the column all session. */
     @Test void aClosedPaneLeavesTheColumnEvenThoughYouNeverSawIt() {
         CommandNotifier notifier = notifier(10);
-        notifier.started("pane", "sleep 600", () -> Duration.ofSeconds(72).toNanos(), () -> {});
+        notifier.started("pane", "sleep 600", () -> Duration.ofSeconds(72).toNanos(), () -> {}, WATCHED);
         passThreshold();
 
         notifier.closed("pane");
@@ -299,7 +303,7 @@ class CommandNotifierTest {
 
     @Test void aRunningCommandStaysInTheColumnEvenWhileYouWatchIt() {
         CommandNotifier notifier = notifier(10);
-        notifier.started("pane", "sleep 600", () -> 0L, () -> {});
+        notifier.started("pane", "sleep 600", () -> 0L, () -> {}, WATCHED);
         passThreshold();
 
         notifier.looked("pane");
@@ -310,9 +314,73 @@ class CommandNotifierTest {
     @Test void everyNoticeThisProducerPostsIsATask() {
         CommandNotifier notifier = notifier(10);
 
-        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
         passThreshold();
 
         assertThat(deck.notices().getFirst().kind()).isEqualTo(BuddyNotice.Kind.TASK);
+    }
+
+    /** Out of sight is the whole reason a bubble exists, so there is nothing to wait for. */
+    @Test void aCommandStartedInAPaneYouAreNotWatchingShowsAtOnce() {
+        CommandNotifier notifier = notifier(10);
+
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, UNWATCHED);
+
+        assertThat(deck.column()).extracting(BuddyNotice::title).containsExactly("./gradlew build");
+        assertThat(scheduled).as("it did not wait for the threshold").isEmpty();
+        assertThat(working).containsExactly(true);
+    }
+
+    @Test void backgroundingThePaneShowsWhateverIsRunningInItImmediately() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
+        assertThat(deck.column()).as("watched, so it is waiting for the threshold").isEmpty();
+
+        notifier.hidden("pane");
+
+        assertThat(deck.column()).extracting(BuddyNotice::title).containsExactly("./gradlew build");
+        assertThat(scheduled).as("its timer was cancelled").isEmpty();
+    }
+
+    /** The threshold is the fallback for a command running in the pane you are still watching. */
+    @Test void aWatchedCommandStillGetsItsBubbleWhenItRunsLongEnough() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
+        assertThat(deck.column()).isEmpty();
+
+        passThreshold();
+
+        assertThat(deck.column()).hasSize(1);
+    }
+
+    @Test void backgroundingAPaneTwiceDoesNotCountItsCommandTwice() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, WATCHED);
+
+        notifier.hidden("pane");
+        notifier.hidden("pane");
+        passThreshold();
+
+        assertThat(deck.notices()).hasSize(1);
+        assertThat(working).as("one command, one typing buddy").containsExactly(true);
+    }
+
+    @Test void backgroundingAPaneWithNothingRunningDoesNothing() {
+        CommandNotifier notifier = notifier(10);
+
+        notifier.hidden("pane");
+
+        assertThat(deck.notices()).isEmpty();
+        assertThat(working).isEmpty();
+    }
+
+    /** Zero still means off, however you leave the pane. */
+    @Test void aZeroThresholdIgnoresBackgroundingToo() {
+        CommandNotifier notifier = notifier(0);
+
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {}, UNWATCHED);
+        notifier.hidden("pane");
+
+        assertThat(deck.notices()).isEmpty();
     }
 }

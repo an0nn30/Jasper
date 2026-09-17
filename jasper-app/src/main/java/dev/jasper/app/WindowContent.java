@@ -70,6 +70,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
     java.util.function.Consumer<Object> onPaneClosed = pane -> {};
     /** Set by the application: this pane took focus, so whatever it posted has been seen. */
     java.util.function.Consumer<Object> onPaneFocused = pane -> {};
+    /** Set by the application: this pane is no longer being watched. */
+    java.util.function.Consumer<Object> onPaneBlurred = pane -> {};
     /** Whether any Jasper window has focus; the application knows, a single window does not. */
     java.util.function.BooleanSupplier anyWindowActive = () -> true;
 
@@ -81,7 +83,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
 
     /** What the application wants to know about a command that has just begun. */
     interface CommandStartedSink {
-        void accept(String command, Object pane, java.util.function.LongSupplier elapsedNanos, Runnable focus);
+        void accept(String command, Object pane, java.util.function.LongSupplier elapsedNanos,
+                    Runnable focus, boolean watched);
     }
     private ShellHistoryIndex shellHistory;
     private CommandRegistry.Subscription historyRegistration;
@@ -379,10 +382,12 @@ final class WindowContent extends JPanel implements AutoCloseable {
             // authoritative for the finished card, and this only has to make a ticking card read right.
             long startedAt = System.nanoTime();
             onCommandStarted.accept(command, pane, () -> System.nanoTime() - startedAt,
-                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); });
+                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); },
+                pane.watched() && isActiveAndOpen() && tab == currentTab());
         };
         pane.onClosed = () -> onPaneClosed.accept(pane);
         pane.onPaneFocused = () -> onPaneFocused.accept(pane);
+        pane.onPaneBlurred = () -> onPaneBlurred.accept(pane);
         pane.onCommandFinished = (command, exitStatus, duration) -> {
             if (onCommandFinished == null) return;
             onCommandFinished.accept(command, exitStatus, duration,
@@ -643,6 +648,6 @@ final class WindowContent extends JPanel implements AutoCloseable {
         confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
-        onCommandStarted = null; onPaneClosed = pane -> {}; onPaneFocused = pane -> {};
+        onCommandStarted = null; onPaneClosed = pane -> {}; onPaneFocused = pane -> {}; onPaneBlurred = pane -> {};
     }
 }
