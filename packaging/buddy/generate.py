@@ -179,29 +179,68 @@ def frame(eyes=("open", "open"), right_arm="down", left_arm="down", dy=0, lean=0
     return c
 
 
-def laptop(c, hands):
-    """A compact laptop in his lap: small enough that the shell, belly and glasses stay visible,
-    which is what makes the pose read as *him* typing rather than a screen with a head behind it.
-    `hands` is "left", "right" or "rest"; the typing poses raise one hand off the keys."""
-    # Arms come down and forward to the deck, drawn before the laptop so the keys cover the wrists.
-    part(c, ellipse((4, 30, 10, 39)), SKIN)
-    part(c, ellipse((31, 30, 37, 39)), SKIN)
-    # Screen, standing in his lap and leaving the head and belly clear above it.
-    part(c, rect((13, 33, 29, 40)), LAPTOP_SCREEN)
-    glyph(c, ("#..", ".#.", "..#", ".#.", "#.."), 15, 35, LAPTOP_TEXT)
-    put(c, [(20, 39), (21, 39)], LAPTOP_TEXT)
-    # Key deck in front of the screen.
-    part(c, rect((11, 41, 31, 43)), LAPTOP_BASE)
-    # Hands on the key row; the raised one is a pixel higher, so A and B read as alternating.
-    left_y, right_y = {"left": (39, 41), "right": (41, 39), "rest": (42, 42)}[hands]
-    put(c, [(x, y) for x in range(9, 13) for y in (left_y, left_y + 1)], SKIN)
-    put(c, [(x, y) for x in range(30, 34) for y in (right_y, right_y + 1)], SKIN)
+def polygon(points):
+    m = mask()
+    ImageDraw.Draw(m).polygon(points, fill=255)
+    return m
 
 
 def typing(hands):
-    """The sitting pose with a laptop in his lap; the head dips a little toward the screen."""
-    c = frame(dy=1, legs="sit", head_dy=3, arms=False)
-    laptop(c, hands)
+    """Three-quarter seated pose: gaze and hands point toward the laptop at right.
+
+    Only the hands move. The lid, hinge, feet and head stay registered between
+    frames so alternating keystrokes do not make the whole computer wobble.
+    """
+    c = Image.new("RGBA", (W, H), CLEAR)
+    d = ImageDraw.Draw(c)
+    # Back of the shell is visible at left; the narrow belly faces right.
+    part(c, ellipse((5, 24, 25, 43)), RIM)
+    part(c, ellipse((6, 25, 20, 41)), SKIN)
+    d.line([(10, 27), (14, 30), (14, 36), (9, 39)], fill=RIM_LO)
+    d.line([(7, 33), (14, 30), (19, 32)], fill=RIM_LO)
+    part(c, ellipse((17, 26, 29, 42)), BELLY)
+    d.line([(23, 29), (26, 38)], fill=BELLY_LINE)
+    d.line([(19, 34), (28, 34)], fill=BELLY_LINE)
+    part(c, ellipse((25, 39, 33, 44)), SKIN)
+    part(c, ellipse((12, 39, 22, 45)), SKIN)
+    put(c, [(15, 40), (16, 40), (17, 40)], SKIN_HI)
+    # Head turns right: a large near lens and compressed far lens, with the
+    # glasses' temple visible on the left side of the head.
+    part(c, rect((19, 21, 26, 28)), SKIN)
+    part(c, ellipse((5, 4, 32, 25)), SKIN)
+    part(c, ellipse((25, 18, 34, 25)), SKIN, outline=False)
+    put(c, [(11, 6), (12, 5), (13, 5), (14, 5), (15, 4), (16, 4), (17, 4)], SKIN_HI)
+    d.line([(6, 14), (12, 16)], fill=OUT)
+    part(c, ellipse((12, 11, 24, 23)), OUT, outline=False)
+    part(c, ellipse((13, 12, 23, 22)), EYE, outline=False)
+    part(c, ellipse((26, 13, 33, 23)), OUT, outline=False)
+    part(c, ellipse((27, 14, 32, 22)), EYE, outline=False)
+    put(c, [(24, 17), (25, 17), (26, 17)], OUT)
+    # Pupils sit low and to the right, aimed at the open screen rather than us.
+    part(c, ellipse((19, 17, 22, 21)), OUT, outline=False)
+    part(c, ellipse((30, 18, 32, 21)), OUT, outline=False)
+    put(c, [(20, 18), (31, 19)], GLINT)
+    put(c, [(27, 25), (28, 26), (29, 26), (30, 26), (31, 25)], OUT)
+    # Thin keyboard deck projects left from the hinge; its stepped edge gives
+    # the laptop depth even at the native 42x48 art resolution.
+    part(c, polygon([(14, 35), (27, 32), (36, 37), (25, 41), (14, 38)]), LAPTOP_BASE)
+    d.line([(15, 38), (25, 40), (34, 37)], fill=RIM_LO)
+    put(c, [(20, 35), (23, 34), (23, 36), (26, 35), (26, 37)], LAPTOP_SCREEN)
+    # Far forearm, then near forearm. The hands lift by one pixel on alternate
+    # beats while the elbows stay anchored to the body.
+    near, far = {"left": (-1, 0), "right": (0, -1), "rest": (0, 0)}[hands]
+    part(c, polygon([(25, 28), (27, 29), (27, 31 + far), (30, 32 + far),
+                     (29, 34 + far), (25, 33), (23, 30)]), SKIN)
+    part(c, polygon([(12, 28), (15, 29), (16, 32 + near), (22, 33 + near),
+                     (23, 35 + near), (20, 36 + near), (14, 35), (11, 31)]), SKIN)
+    put(c, [(17, 33 + near), (18, 33 + near), (19, 33 + near),
+            (27, 32 + far), (28, 32 + far)], SKIN_HI)
+    # Outer face of the tilted lid, seen obliquely. Its bottom edge meets the
+    # keyboard hinge, leaving the near hand and deck visible to the left.
+    part(c, polygon([(29, 27), (39, 26), (35, 38), (24, 39)]), LAPTOP_SCREEN)
+    d.line([(29, 27), (38, 27)], fill=LAPTOP_BASE)
+    d.line([(29, 28), (26, 37)], fill=LAPTOP_BASE)
+    glyph(c, ("#..", ".#.", "..#", ".#.", "#.."), 31, 30, LAPTOP_TEXT)
     return c
 
 
