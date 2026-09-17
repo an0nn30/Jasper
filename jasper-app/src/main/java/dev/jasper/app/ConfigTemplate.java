@@ -38,6 +38,13 @@ final class ConfigTemplate {
             # View > Show Jasper and a right-click on Jasper toggle him for this session only.
             # enabled = true
 
+            [background]
+            # Keep Jasper running with no windows after the last one closes, so the next launch is
+            # instant, and start it in the background at login. Quit still exits completely.
+            # Residency applies from the next start; the login item updates as soon as you save.
+            # Autostart needs an installed Jasper, not a development run.
+            # enabled = false
+
             [palette]
             # Rows the command palette shows in every scope, 1-20; updates live. Cmd/Ctrl+1-5 still number the first five.
             # max_results = 5

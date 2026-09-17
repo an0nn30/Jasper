@@ -30,7 +30,8 @@ final class ConfigLoader {
     }
 
     private static final Map<List<String>, Set<String>> FIELDS = Map.ofEntries(
-        Map.entry(List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy", "palette")),
+        Map.entry(List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy", "palette", "background")),
+        Map.entry(List.of("background"), Set.of("enabled")),
         Map.entry(List.of("buddy"), Set.of("enabled")),
         Map.entry(List.of("palette"), Set.of("max_results", "scopes")),
         // Per-scope settings live under palette.scopes.<scope>, so a new scope adds a table here
@@ -55,6 +56,7 @@ final class ConfigLoader {
     private WindowContent.ToolbarMode toolbar = WindowContent.ToolbarMode.ICONS_AND_LABELS;
     private boolean statusBar = true;
     private boolean buddyEnabled = true;
+    private boolean backgroundEnabled;
     private boolean historyEnabled = true;
     private List<String> trivialCommands = ShellHistoryScope.DEFAULT_TRIVIAL;
     private int maxResults = PaletteContext.DEFAULT_MAX_RESULTS;
@@ -103,7 +105,7 @@ final class ConfigLoader {
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, historyEnabled, maxResults, trivialCommands);
+                buddyEnabled, historyEnabled, maxResults, trivialCommands, backgroundEnabled);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -141,6 +143,7 @@ final class ConfigLoader {
                 "icons", WindowContent.ToolbarMode.ICONS, "hidden", WindowContent.ToolbarMode.HIDDEN), toolbar);
             case "window.status_bar" -> statusBar = bool(path, value, statusBar);
             case "buddy.enabled" -> buddyEnabled = bool(path, value, buddyEnabled);
+            case "background.enabled" -> backgroundEnabled = bool(path, value, backgroundEnabled);
             case "palette.scopes.history.enabled" -> historyEnabled = bool(path, value, historyEnabled);
             case "palette.scopes.history.trivial_commands" -> trivialCommands = lowercased(strings(path, value,
                 ConfigLoader::trivialName, trivialCommands));

@@ -11,7 +11,8 @@ import java.util.Objects;
 record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
                       FontConfig font, Appearance variant, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                      boolean historyEnabled, int maxResults, List<String> trivialCommands) {
+                      boolean historyEnabled, int maxResults, List<String> trivialCommands,
+                      boolean backgroundEnabled) {
     ConfigSnapshot {
         if (maxResults < PaletteContext.MIN_MAX_RESULTS || maxResults > PaletteContext.MAX_MAX_RESULTS)
             throw new IllegalArgumentException("Max results must be 1\u201320.");
@@ -35,6 +36,15 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
                 throw new IllegalArgumentException("Keybindings must name known actions and valid, noncolliding shortcuts.");
             }
         }
+    }
+
+    /** Residency is opt-in, so every constructor that predates it means "not resident". */
+    ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
+                   FontConfig font, Appearance variant, Map<String, String> keybindings,
+                   int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
+                   boolean historyEnabled, int maxResults, List<String> trivialCommands) {
+        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal,
+            buddyEnabled, historyEnabled, maxResults, trivialCommands, false);
     }
 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,

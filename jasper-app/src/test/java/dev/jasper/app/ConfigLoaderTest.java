@@ -233,6 +233,22 @@ class ConfigLoaderTest {
         assertDiagnostic(unknown, "buddy.visible", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
 
+    @Test void backgroundEnabledDefaultsToOffAndRejectsNonBooleans() {
+        var on = parse("[background]\nenabled = true\n");
+        assertThat(on.rejected()).isFalse();
+        assertThat(on.diagnostics()).isEmpty();
+        assertThat(on.snapshot().backgroundEnabled()).isTrue();
+        // Residency is opt-in: an absent table and an empty file both mean off.
+        assertThat(ConfigSnapshot.defaults().backgroundEnabled()).isFalse();
+        assertThat(parse("# empty").snapshot().backgroundEnabled()).isFalse();
+        var bad = parse("[background]\nenabled = 1\n");
+        assertThat(bad.rejected()).isTrue();
+        assertThat(bad.snapshot().backgroundEnabled()).isFalse();
+        assertDiagnostic(bad, "background.enabled", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        var unknown = parse("[background]\nstart_at_login = true\n");
+        assertDiagnostic(unknown, "background.start_at_login", 2, 1, ConfigDiagnostic.Severity.WARNING);
+    }
+
     @Test void paletteMaxResultsParsesWithinRangeAndRejectsOthers() {
         var three = parse("[palette]\nmax_results = 3\n");
         assertThat(three.rejected()).isFalse();

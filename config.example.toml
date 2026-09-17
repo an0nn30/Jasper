@@ -18,6 +18,13 @@ lines = 45
 # View > Show Jasper (also in the command palette) and right-click > Hide Jasper toggle him for the session.
 enabled = true
 
+[background]
+# Restart required for residency; the login item updates on reload. Keep Jasper running with no
+# windows after the last one closes so the next launch is instant, and start it in the background
+# at login. Quit (Cmd+Q) still exits completely. Autostart requires an installed Jasper: a
+# ./gradlew run development session stays resident but never registers a login item.
+enabled = false
+
 [palette]
 # Live. Rows the command palette shows in every scope (Commands and History). Range: 1-20.
 # Cmd/Ctrl+1-5 still act on the first five rows.
