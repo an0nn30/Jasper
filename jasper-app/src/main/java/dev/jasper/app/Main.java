@@ -41,9 +41,14 @@ public final class Main {
                         // residency to a process that is running someone else's configuration.
                         boolean standalone = options.configOverride() != null;
                         if (!standalone) {
-                            reconcileLoginItem(resident, appPath, home);
                             // A login item that outlived the setting: leave rather than sit resident.
+                            // This process exits immediately below, so reconcile directly and
+                            // synchronously right here rather than racing our own cleanup with a
+                            // background thread. The general startup reconcile below (wired through
+                            // loginItems) never runs in this branch, since it is registered on the
+                            // application this branch returns before constructing.
                             if (options.background() && !resident) {
+                                reconcileLoginItem(resident, appPath, home);
                                 LOG.log(System.Logger.Level.INFO,
                                     "Started with --background while background.enabled is off; exiting");
                                 service.close();
@@ -64,8 +69,12 @@ public final class Main {
                             () -> System.exit(0), ShellHistoryIndex.discovered(),
                             new SnippetStore(dirs.snippets(), new ConfigEditor()::open), integrationDir);
                         if (!standalone) {
-                            // The login item tracks the setting while Jasper runs; residency does not.
-                            application.loginItems(enabled -> reconcileLoginItem(enabled, appPath, home));
+                            // The login item tracks the setting while Jasper runs; residency does
+                            // not. Setting the consumer replays the current value at once, which is
+                            // this process's startup reconcile -- deduped and off the EDT the same
+                            // as every later replay from a saved config, so this covers the general
+                            // startup case without running it twice.
+                            application.loginItems(loginItemReconciler(enabled -> reconcileLoginItem(enabled, appPath, home)));
                         }
                         if (residentRole(options, resident)) {
                             JasperApplication owner = application;
@@ -81,8 +90,15 @@ public final class Main {
                             if (!application.resident()) {
                                 // Unreachable without an endpoint: exiting beats popping a window
                                 // onto the screen of someone who asked for a background process.
-                                LOG.log(System.Logger.Level.WARNING,
-                                    "Started with --background but the handoff endpoint is unavailable; exiting");
+                                if (standalone) {
+                                    // residentRole() never attempts a bind for a --config launch, so
+                                    // there was never an endpoint to become unavailable.
+                                    LOG.log(System.Logger.Level.WARNING, "Started with --config and "
+                                        + "--background, but a --config launch is always standalone and cannot be resident; exiting");
+                                } else {
+                                    LOG.log(System.Logger.Level.WARNING,
+                                        "Started with --background but the handoff endpoint is unavailable; exiting");
+                                }
                                 application.quit();
                                 return;
                             }
@@ -214,6 +230,22 @@ public final class Main {
             }
             SwingUtilities.invokeLater(() -> application.openOrRaise(home));
             return LaunchRequest.Response.OK;
+        };
+    }
+
+    /**
+     * Wraps a login-item reconcile action so a run of equal values collapses to one call, and so
+     * the call itself never runs on the EDT. {@code ConfigurationController.accept} publishes on
+     * every saved config, not only when {@code background.enabled} changed, and on a packaged
+     * Windows install the wrapped action can shell out to {@code reg add} with a ten-second
+     * timeout -- long enough to freeze the UI if it ran inline.
+     */
+    static java.util.function.Consumer<Boolean> loginItemReconciler(java.util.function.Consumer<Boolean> reconcile) {
+        Boolean[] lastApplied = {null};
+        return enabled -> {
+            if (enabled.equals(lastApplied[0])) return;
+            lastApplied[0] = enabled;
+            Thread.ofPlatform().name("jasper-login-item").daemon().start(() -> reconcile.accept(enabled));
         };
     }
 

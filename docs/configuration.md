@@ -125,6 +125,10 @@ windows, holding the initialized toolkit, fonts and theme, so the next launch re
 without a cold start. **Quit (Cmd+Q, the palette's Quit, or Quit from the Dock) still exits
 completely** — closing a window and quitting are different things, and quitting is the off switch.
 
+On Windows, that windowless process has no UI at all — no tray icon, nothing to Quit from (Jasper
+does not put an icon in the notification area). It is not a lockout: launch Jasper again and the
+handoff reveals a window, from which Quit works normally.
+
 Nothing of yours keeps running: a resident Jasper holds no shell, no PTY and no child process.
 Your shells have already exited through the usual pane-close path before the last window goes.
 

@@ -42,9 +42,12 @@ class LoginItemTest {
         String exe = "C:\\Program Files\\Jasper\\Jasper.exe";
         var on = LoginItem.plan("Windows 11", true, exe, Path.of("C:\\Users\\example"));
         assertThat(on.file()).isNull();
+        // The interior quotes are escaped so that ProcessBuilder's own quoting of this argument
+        // (it contains a space, from "Program Files") reproduces "<exe>" --background verbatim on
+        // reg.exe's side rather than a corrupted argument. See LoginItem.plan's comment.
         assertThat(on.commands()).containsExactly(java.util.List.of("reg", "add",
             "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-            "/v", "Jasper", "/t", "REG_SZ", "/d", "\"" + exe + "\" --background", "/f"));
+            "/v", "Jasper", "/t", "REG_SZ", "/d", "\\\"" + exe + "\\\" --background", "/f"));
         var off = LoginItem.plan("Windows 11", false, exe, Path.of("C:\\Users\\example"));
         assertThat(off.commands()).containsExactly(java.util.List.of("reg", "delete",
             "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Jasper", "/f"));
@@ -97,6 +100,40 @@ class LoginItemTest {
         // Nothing here touches the registry or launchd: it is a shell that exits 1 and nothing else.
         assertThatNoException().isThrownBy(() -> LoginItem.apply(new LoginItem.Plan(null, null,
             java.util.List.of(java.util.List.of("/bin/sh", "-c", "exit 1")))));
+    }
+
+    @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    @Test void onlyACommandNamedDeleteIsToleratedWhenItExitsNonzero() {
+        // Nothing here touches the registry or launchd: it is a shell that exits 1 and nothing
+        // else. Whether "delete" is one of the command's own words is what run() now uses to
+        // decide leniency, rather than guessing leniency from the exit code alone.
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(LoginItem.class.getName());
+        java.util.logging.Level previousLevel = logger.getLevel();
+        boolean previousUseParentHandlers = logger.getUseParentHandlers();
+        java.util.List<java.util.logging.LogRecord> records = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.logging.Handler handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        logger.setLevel(java.util.logging.Level.ALL);
+        logger.setUseParentHandlers(false);
+        logger.addHandler(handler);
+        try {
+            // No "delete" anywhere: a real failure, and it must be loud.
+            LoginItem.apply(new LoginItem.Plan(null, null,
+                java.util.List.of(java.util.List.of("/bin/sh", "-c", "exit 1"))));
+            // "delete" is one of the command's own words, the same shape as `reg delete`: tolerated.
+            LoginItem.apply(new LoginItem.Plan(null, null,
+                java.util.List.of(java.util.List.of("/bin/sh", "-c", "exit 1", "delete"))));
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(previousLevel);
+            logger.setUseParentHandlers(previousUseParentHandlers);
+        }
+        assertThat(records).extracting(java.util.logging.LogRecord::getLevel)
+            .as("one WARNING for the real failure, one INFO for the delete-shaped tolerated case")
+            .containsExactly(java.util.logging.Level.WARNING, java.util.logging.Level.INFO);
     }
 
     @Test void applyDoesNotThrowWhenTheFileCannotBeWritten() throws Exception {

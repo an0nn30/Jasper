@@ -1,6 +1,8 @@
 package dev.jasper.app;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -13,6 +15,7 @@ import static dev.jasper.app.DesktopTestSupport.launcher;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Residency changes exactly one thing: the last window closing no longer ends the process. */
+@DisabledOnOs(OS.WINDOWS)
 class JasperApplicationResidencyTest {
 
     private JasperApplication application(Runnable terminate) throws Exception {
@@ -159,5 +162,8 @@ class JasperApplicationResidencyTest {
         assertThat(handler.apply(new LaunchRequest("t", Path.of("/same.jar"), 7L)))
             .isEqualTo(LaunchRequest.Response.OK);
         edt(() -> { });
+        // Unlike a stale request, a matching one never touches residency -- this is the assertion
+        // the test's name actually promises.
+        assertThat(application.resident()).as("a matching request does not touch residency").isTrue();
     }
 }

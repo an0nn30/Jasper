@@ -44,6 +44,9 @@ final class HandoffSocket implements AutoCloseable {
      *  own wait (HANDOFF_TIMEOUT_MILLIS), so a request queued behind such a peer is still served
      *  inside its budget. A real client writes its line immediately. */
     private static final long READ_TIMEOUT_MILLIS = 500;
+    /** Backoff after an accept-loop failure, so a persistent error (e.g. exhausted file
+     *  descriptors) cannot spin the loop at 100% CPU retrying instantly. */
+    private static final long ACCEPT_FAILURE_BACKOFF_MILLIS = 50;
 
     private final ServerSocketChannel channel;
     private final Path socketPath;
@@ -186,6 +189,16 @@ final class HandoffSocket implements AutoCloseable {
             } catch (IOException | RuntimeException failure) {
                 if (closed) return;
                 LOG.log(System.Logger.Level.WARNING, "A handoff request failed", failure);
+                // A persistent failure -- accept() itself throwing, e.g. because file descriptors
+                // are exhausted -- must not spin this loop at 100% CPU: a long-lived resident
+                // process has no window on screen for anyone to notice from. A close() during the
+                // sleep is still picked up by the loop guard above, at most this much later.
+                try {
+                    Thread.sleep(ACCEPT_FAILURE_BACKOFF_MILLIS);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
         }
     }
@@ -199,7 +212,16 @@ final class HandoffSocket implements AutoCloseable {
             LOG.log(System.Logger.Level.WARNING, "A handoff request presented the wrong token; refused");
             response = LaunchRequest.Response.TOKEN;
         } else response = handler.apply(request);
-        write(client, response.line());
+        try {
+            write(client, response.line());
+        } catch (IOException peerGone) {
+            // owned() probes for a live owner by connecting and disconnecting without writing:
+            // from here that looks identical to a peer that hung up before the reply arrived. It
+            // runs on every upgrade check, so it is ordinary traffic, not a stack-trace-worthy
+            // failure -- a genuine failure earlier in this method (reading the request) still
+            // propagates and is logged as one by acceptLoop.
+            LOG.log(System.Logger.Level.DEBUG, "Could not reply to a handoff request; the peer had already gone");
+        }
         // An older build must release the endpoint so the newer launcher can own it. The reply is
         // already written, and the caller starts normally once it reads the refusal.
         if (response == LaunchRequest.Response.STALE) close();

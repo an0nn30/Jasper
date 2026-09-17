@@ -50,9 +50,17 @@ final class LoginItem {
             return new Plan(plist, enabled ? plist(appPath) : null, List.of());
         }
         if (os.startsWith("windows")) {
+            // The registry value must be the quoted path followed by an unquoted argument --
+            // "C:\Program Files\Jasper\Jasper.exe" --background -- so Windows can tell where the
+            // path ends despite its spaces. That string itself contains a space (in "Program
+            // Files"), so ProcessBuilder will wrap this whole /d argument in a fresh pair of
+            // quotes before handing it to reg.exe; escaping the two interior quotes here is what
+            // makes that wrapping produce the value above instead of a corrupted one. Checked by
+            // hand against Windows's CRT argv-parsing rules -- there is no Windows machine here to
+            // run it on, so treat this as reviewed, not proven.
             return new Plan(null, null, List.of(enabled
                 ? List.of("reg", "add", RUN_KEY, "/v", VALUE, "/t", "REG_SZ",
-                    "/d", "\"" + appPath + "\" --background", "/f")
+                    "/d", "\\\"" + appPath + "\\\" --background", "/f")
                 : List.of("reg", "delete", RUN_KEY, "/v", VALUE, "/f")));
         }
         return Plan.NONE;
@@ -83,11 +91,18 @@ final class LoginItem {
                 LOG.log(System.Logger.Level.WARNING, "Timed out running " + String.join(" ", command));
                 return;
             }
-            // "reg delete" exits nonzero when the value is already absent, which is the state we want.
             int status = process.exitValue();
             if (status != 0) {
-                LOG.log(System.Logger.Level.INFO,
-                    String.join(" ", command) + " exited " + status + "; the login item may already be as requested");
+                // "reg delete" exits nonzero when the value is already absent, which is the state
+                // we want; every other command exiting nonzero failed to do what it was asked, and
+                // that must be loud rather than logged as if it were the same harmless case.
+                if (command.contains("delete")) {
+                    LOG.log(System.Logger.Level.INFO, String.join(" ", command)
+                        + " exited " + status + "; the login item may already be as requested");
+                } else {
+                    LOG.log(System.Logger.Level.WARNING, String.join(" ", command)
+                        + " exited " + status + "; the login item was not updated");
+                }
             }
         } catch (IOException failure) {
             LOG.log(System.Logger.Level.WARNING, "Could not run " + String.join(" ", command), failure);

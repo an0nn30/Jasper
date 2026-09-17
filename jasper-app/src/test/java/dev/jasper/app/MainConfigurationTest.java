@@ -85,6 +85,29 @@ class MainConfigurationTest {
         assertThat(Main.stale(new LaunchRequest("t", Path.of(""), 0L), null, 0L)).isFalse();
     }
 
+    @Test void loginItemReconcilerDedupesAndRunsOffTheCallingThread() throws Exception {
+        var applied = new java.util.concurrent.LinkedBlockingQueue<Boolean>();
+        var threadNames = new java.util.concurrent.LinkedBlockingQueue<String>();
+        var reconciler = Main.loginItemReconciler(enabled -> {
+            threadNames.add(Thread.currentThread().getName());
+            applied.add(enabled);
+        });
+
+        reconciler.accept(true);
+        assertThat(applied.poll(2, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(true);
+        assertThat(threadNames.poll(2, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo("jasper-login-item");
+
+        // Repeating the same value is exactly what an unrelated config save replays: no call.
+        reconciler.accept(true);
+        reconciler.accept(true);
+        assertThat(applied.poll(300, java.util.concurrent.TimeUnit.MILLISECONDS))
+            .as("an unchanged value must be deduped, not reconciled again").isNull();
+
+        // A value that actually changed still runs.
+        reconciler.accept(false);
+        assertThat(applied.poll(2, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(false);
+    }
+
     @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.MAC)
     @Test void reconcilingTheLoginItemWritesAndRemovesIt(@TempDir Path fakeHome) {
         Path plist = fakeHome.resolve("Library/LaunchAgents/dev.jasper.background.plist");

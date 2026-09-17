@@ -105,6 +105,71 @@ class HandoffSocketTest {
         }
     }
 
+    @Test void aLivenessProbeLogsQuietlyRatherThanAlarmingly() throws Exception {
+        // The second bind() above finding a live owner is the ordinary upgrade path, and it always
+        // probes with owned(): connect and disconnect without writing. From the live owner's side
+        // that is indistinguishable from a peer that hung up before the reply arrived, and must not
+        // read like a real failure.
+        java.util.logging.Logger logger = java.util.logging.Logger.getLogger(HandoffSocket.class.getName());
+        java.util.logging.Level previousLevel = logger.getLevel();
+        boolean previousUseParentHandlers = logger.getUseParentHandlers();
+        List<java.util.logging.LogRecord> records = new CopyOnWriteArrayList<>();
+        java.util.logging.Handler handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        logger.setLevel(java.util.logging.Level.ALL);
+        logger.setUseParentHandlers(false);
+        logger.addHandler(handler);
+        try {
+            try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
+                assertThat(HandoffSocket.bind(socket(), token(), lock(), request -> LaunchRequest.Response.OK))
+                    .isNull();
+                DesktopTestSupport.until(() -> !records.isEmpty());
+            }
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(previousLevel);
+            logger.setUseParentHandlers(previousUseParentHandlers);
+        }
+        // DEBUG bridges to FINE through java.util.logging; a WARNING (with a stack trace) is what
+        // the ordinary path used to log before this fix.
+        assertThat(records).as("a normal liveness probe must not log an alarming, stack-trace-bearing WARNING")
+            .allSatisfy(record -> {
+                assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.FINE);
+                assertThat(record.getThrown()).as("no stack trace for ordinary traffic").isNull();
+            });
+    }
+
+    @Test void aPersistentHandlerFailureBacksOffButTheLoopKeepsServing() throws Exception {
+        var callCount = new java.util.concurrent.atomic.AtomicInteger();
+        int failuresBeforeSuccess = 2;
+        try (HandoffSocket endpoint = bind(request -> {
+            if (callCount.incrementAndGet() <= failuresBeforeSuccess) {
+                // Exercises the same acceptLoop catch block a persistently failing accept() would
+                // (e.g. file descriptors exhausted), without needing a fake ServerSocketChannel:
+                // the handler throwing before serve() replies is indistinguishable to that loop
+                // from accept() itself throwing.
+                throw new RuntimeException("simulated failure");
+            }
+            return LaunchRequest.Response.OK;
+        })) {
+            long started = System.nanoTime();
+            for (int i = 0; i < failuresBeforeSuccess; i++) {
+                assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isFalse();
+            }
+            long elapsedMillis = (System.nanoTime() - started) / 1_000_000;
+            // Two failures means one backoff sleep must land strictly between them. The bound is
+            // well under the 50ms configured sleep to absorb scheduling jitter, while still failing
+            // clearly if the loop is not backing off at all (which completes in a few ms here).
+            assertThat(elapsedMillis).as("the loop must back off between failures, not spin").isGreaterThanOrEqualTo(40);
+            // And the loop survived the failures: it is still serving, not spun out or wedged.
+            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isTrue();
+            assertThat(callCount.get()).isEqualTo(failuresBeforeSuccess + 1);
+        }
+    }
+
     @Test void aPathTooLongForTheOperatingSystemDeclinesInsteadOfThrowing() throws Exception {
         Path deep = dir;
         for (int i = 0; i < 12; i++) deep = deep.resolve("a-directory-with-a-long-name");
