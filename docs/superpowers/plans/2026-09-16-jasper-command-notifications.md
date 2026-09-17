@@ -10,6 +10,16 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-16-jasper-finished-command-notifications-design.md`
 
+**Status: complete.** All six tasks executed on `claude/command-notifications`.
+Deviations: the plan expected one commit on the sprite master and there were
+four, so the safety check it specified actually mattered — the script turned out
+to be the source of truth anyway, proven byte-for-byte. The loader case anchor
+the plan named (`history.enabled`) no longer existed after the morning's
+palette.scopes move, so the new case went in against a current one. The first
+laptop drawing was rejected on sight at 8x and redrawn smaller. `BuddySpriteTest`
+already had a `pixels` helper, and two of its assertions hardcoded the old frame
+count; they now derive from `BuddyFrame`.
+
 ## Global Constraints
 
 - Java 25 on the **JetBrains Runtime**. Use `./gradlew`, never a system `gradle`.
@@ -33,7 +43,7 @@
 - Produces: `TerminalSession.Listener.commandExecuted(String command, OptionalInt exitStatus, Optional<Path> workingDirectory, Duration duration)` — a fourth argument; `Duration.ZERO` when the cycle had no C mark.
 - Produces: `TerminalSession(TtyConnector, int columns, int rows, int scrollback, LongSupplier clock)` — the existing four-argument constructor delegates with `System::nanoTime`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```java
     @Test void aCommandReportsHowLongItRan() throws Exception {
@@ -75,12 +85,12 @@
         var timed = new TerminalSession(connector, 20, 4, 100, clock::get);
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `./gradlew :jasper-terminal:test --tests 'dev.jasper.terminal.ShellIntegrationSessionTest' --rerun-tasks`
 Expected: compile failure — no five-argument constructor and no fourth listener argument.
 
-- [ ] **Step 3: Time the command in the session**
+- [x] **Step 3: Time the command in the session**
 
 Add the clock and the start stamp beside the other reader-thread fields:
 
@@ -128,7 +138,7 @@ In `flushPendingCommand`, measure and clear:
 
 Update the `Listener` javadoc to say the duration is measured from the command-start mark and is zero when there was none. Import `java.time.Duration` and `java.util.function.LongSupplier`.
 
-- [ ] **Step 4: Update the one call site**
+- [x] **Step 4: Update the one call site**
 
 `TerminalPane` builds a `ShellHistoryEntry` in its listener. Widen the override to four arguments and ignore the duration for now — Task 4 uses it:
 
@@ -137,12 +147,12 @@ Update the `Listener` javadoc to say the duration is measured from the command-s
                     Optional<Path> workingDirectory, Duration duration) {
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `./gradlew check --rerun-tasks`
 Expected: PASS. Read exact counts from `*/build/test-results/test/TEST-*.xml`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add jasper-terminal/src jasper-app/src/main/java/dev/jasper/app/TerminalPane.java
@@ -163,7 +173,7 @@ git commit -m "feat: report how long a command ran alongside its exit status"
 
 Keeping the rule in one pure function means the eight combinations are tested without a window, and the one case the user excluded is a single line to change.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 class CommandNoticeTest {
@@ -205,12 +215,12 @@ class CommandNoticeTest {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.CommandNoticeTest' --rerun-tasks`
 Expected: compile failure — `CommandNotice` does not exist.
 
-- [ ] **Step 3: Write the rule**
+- [x] **Step 3: Write the rule**
 
 ```java
 package dev.jasper.app;
@@ -237,7 +247,7 @@ final class CommandNotice {
 }
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.CommandNoticeTest' --rerun-tasks`
 Expected: PASS.
@@ -264,7 +274,7 @@ git commit -m "feat: decide when a finished command is worth interrupting for"
 
 `generate.py` was written as a bootstrap and its header says not to rerun it after hand edits. The `.ase` master has not in fact been hand-edited since — `git log` shows one commit — so regenerating is safe. Confirm that before running it; if the master has diverged, stop and ask rather than overwriting art.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
     @Test void theStripCarriesEveryFrameIncludingTyping() throws Exception {
@@ -291,11 +301,11 @@ git commit -m "feat: decide when a finished command is worth interrupting for"
 
 with a `pixels(BufferedImage)` helper returning the ARGB array.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Expected: compile failure on the new enum constants, then — once they exist but the PNG has not been regenerated — a failure from `BuddySprite`'s own width validation, which is the real red.
 
-- [ ] **Step 3: Add the frames to the enum**
+- [x] **Step 3: Add the frames to the enum**
 
 ```java
 enum BuddyFrame {
@@ -307,7 +317,7 @@ enum BuddyFrame {
 
 with a javadoc line: the three `TYPE_` cells are sitting poses behind a laptop, cycled while a long command runs.
 
-- [ ] **Step 4: Draw them in generate.py**
+- [x] **Step 4: Draw them in generate.py**
 
 Append `"type_a", "type_b", "type_rest"` to `FRAMES`, and add a laptop helper beside the existing `shell` and `head` helpers, reusing the palette constants already defined at the top of the file:
 
@@ -324,7 +334,7 @@ def laptop(c, hands):
 
 Build the three frames from the existing sitting body with the laptop over it, the head tilted down one pixel, and the hands alternating between two key positions plus a lowered rest pose. Keep every colour in the existing palette apart from the two laptop-screen colours, which the README documents.
 
-- [ ] **Step 5: Regenerate and verify**
+- [x] **Step 5: Regenerate and verify**
 
 ```bash
 git log --oneline -- packaging/buddy/jasper-buddy.ase   # expect exactly one commit
@@ -336,7 +346,7 @@ Expected: `(840, 48)` — twenty frames. Then `./gradlew :jasper-app:test --test
 
 Render the three new frames to a scratch PNG at 8× and look at them before moving on; a sprite that passes "some pixels are opaque" can still be unreadable.
 
-- [ ] **Step 6: Update the README table and commit**
+- [x] **Step 6: Update the README table and commit**
 
 Add rows 17–19 to the frame table and the two laptop colours to the palette table.
 
@@ -358,7 +368,7 @@ git commit -m "feat: add typing sprites so the buddy works while a command runs"
 **Interfaces:**
 - Produces: `BuddyAnimator.setWorking(boolean)` — idempotent; true enters `WORKING`, false returns to resting.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```java
     @Test void workingCyclesTheTypingFramesAndOutlastsTheSleepTimers() {
@@ -396,11 +406,11 @@ git commit -m "feat: add typing sprites so the buddy works while a command runs"
 
 Match the existing test class's construction and clock conventions; read it before writing these.
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Expected: compile failure on `setWorking`.
 
-- [ ] **Step 3: Add the mode**
+- [x] **Step 3: Add the mode**
 
 Add `WORKING` to the private `Mode` enum, a `private boolean working;` flag and:
 
@@ -416,7 +426,7 @@ Add `WORKING` to the private `Mode` enum, a `private boolean working;` flag and:
 
 `canInterrupt()` is false during `SPAWNING` and `GREETING`, so a short celebration is never cut off; `advance` enters `WORKING` at the end of those modes when `working` is still set. In `advance`, the `WORKING` branch cycles `TYPE_A`, `TYPE_B` and occasionally `TYPE_REST` on a 250 ms step and — critically — returns before the tuck and sleep deadlines are consulted, which is what the "does not fall asleep" assertion pins.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.BuddyAnimatorTest' --rerun-tasks`
 Expected: PASS, including every existing animator test.
@@ -442,7 +452,7 @@ git commit -m "feat: give the buddy a working mode that types and never sleeps"
 - Produces: `CommandNotifier.Channel` — one method, `deliver(String command, String detail, boolean succeeded, Runnable onActivate)`. Two real implementations: the buddy bubble and `NativeNotifier`.
 - Produces: `ConfigSnapshot.longCommandSeconds()` — `int`, default 10.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```java
     @Test void aLongCommandInAHiddenTabReachesTheBuddyWithItsStatus() {
@@ -481,11 +491,11 @@ and in `ConfigLoaderTest`:
     }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Expected: compile failures on `CommandNotifier` and `longCommandSeconds()`.
 
-- [ ] **Step 3: Write the notifier**
+- [x] **Step 3: Write the notifier**
 
 `CommandNotifier` holds no Swing state and takes its two channels and its threshold as constructor arguments, so the test above needs no window:
 
@@ -517,11 +527,11 @@ Expected: compile failures on `CommandNotifier` and `longCommandSeconds()`.
 
 The command line is whatever ran, so it can contain quotes, backslashes and newlines; interpolating it into an AppleScript string would be an injection hole. Passing it as `argv` removes the problem rather than escaping it. Log a failure once per session, not per notification, and do nothing at all when the OS is not macOS.
 
-- [ ] **Step 4: Add the setting**
+- [x] **Step 4: Add the setting**
 
 `notifications` joins the root field set with `long_command_seconds`, validated `integer(path, value, 0, 3600, longCommandSeconds)`. `ConfigSnapshot` gains the component and a defaulting constructor, exactly as `maxResults` has. `ConfigTemplate` and `config.example.toml` gain the commented and live forms respectively — `ConfigTemplateTest` asserts the example covers every key, so both must be updated together.
 
-- [ ] **Step 5: Wire it up**
+- [x] **Step 5: Wire it up**
 
 `TerminalPane`'s `commandExecuted` override now has the duration. It hops to the EDT and calls the notifier with an `Origin` built from `WindowContent`: `ownTabSelected` from `tab == currentTab()`, `ownWindowActive` from `isActiveAndOpen()`, `anyWindowActive` from the application's window list. `onActivate` selects the window, tab and pane.
 
@@ -529,7 +539,7 @@ The buddy channel calls `BuddyWindow` to show a `BuddyBubbleContent.message(titl
 
 The tracker that drives `setWorking` lives beside the notifier: a count of commands that have been running past the threshold, incremented by a per-pane timer and decremented on finish or pane close. `setWorking(count > 0)`.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: `./gradlew check --rerun-tasks`
 Expected: PASS. Read exact counts from the XML.
@@ -547,15 +557,15 @@ git commit -m "feat: notify through the buddy when a long command finishes out o
 - Modify: `docs/configuration.md`, `docs/STATUS.md`, `packaging/buddy/README.md`
 - Modify: `docs/superpowers/specs/2026-09-16-jasper-finished-command-notifications-design.md`
 
-- [ ] **Step 1: Document the setting and its one hard requirement**
+- [x] **Step 1: Document the setting and its one hard requirement**
 
 `docs/configuration.md` gains `notifications.long_command_seconds` in the settings table and a short section. It must say plainly that **duration comes from the shell-integration marks, so without integration there are no notifications at all** — and link to the Shell integration section. It also records which cases notify and which deliberately do not, and that the native fallback is macOS-only.
 
-- [ ] **Step 2: Record deviations in the spec and STATUS**
+- [x] **Step 2: Record deviations in the spec and STATUS**
 
 Anything that differed from the spec goes in both, with the measured test counts read from `*/build/test-results/test/TEST-*.xml`. Record as user-run: a long command in a background tab on the real desktop, watching the typing animation and the bubble, and the same with the buddy disabled.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs packaging/buddy/README.md

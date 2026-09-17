@@ -79,6 +79,7 @@ variant = "dark"
 | `window.columns` | `150` | Integer 5–500 | New windows |
 | `window.lines` | `45` | Integer 2–200 | New windows |
 | `buddy.enabled` | `true` | Boolean | Live |
+| `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
 | `palette.scopes.history.enabled` | `true` | Boolean | Live |
 | `palette.scopes.history.trivial_commands` | see below | Array of single words | Live |
 | `palette.max_results` | `5` | Integer 1–20 | Live |
@@ -118,6 +119,31 @@ saved change to `buddy.enabled` resets that session choice.
 best `max_results` matches and History the most recent or best-matching `max_results` commands, with no
 scrolling. Cmd/Ctrl+1–5 always act on the first five rows, so a larger cap only adds rows you reach with the
 arrow keys. Changes apply live, including to an open palette.
+
+### Finished-command notifications
+
+`notifications.long_command_seconds` sets how long a command must run before finishing it is worth
+telling you about. The default is 10 seconds; `0` turns notifications off entirely.
+
+**This needs [shell integration](#shell-integration).** The duration is measured between the
+command-start and command-end marks the integration scripts emit, so a shell that does not emit them
+produces no notifications at all — Jasper cannot know how long anything took. There is no fallback
+guess.
+
+You are told only when the command finished somewhere you were not looking:
+
+- another tab of the window you are using, or
+- anywhere at all when Jasper is in the background.
+
+Deliberately quiet: the tab you are currently looking at, and a command in a *different* Jasper
+window while another Jasper window has focus — you are still looking at Jasper, and that window's
+tab strip already shows it.
+
+The desk buddy delivers it. While a command is past the threshold he sits down and types on a
+laptop; when it ends he shows a bubble with the command, how long it took and a check or a cross.
+Clicking the bubble focuses the pane it ran in. If the buddy is hidden or `buddy.enabled = false`,
+the notice goes to a macOS notification instead, so turning him off does not silently turn the
+feature off. On Windows and Linux the buddy is the only channel.
 
 ### Shell history
 

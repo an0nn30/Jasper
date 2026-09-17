@@ -1,6 +1,6 @@
 # Finished-command notifications — design
 
-**Status:** Designed. Development branch: `claude/command-notifications`, from main `1f1afeb`.
+**Status:** Implemented. Development branch: `claude/command-notifications`, from main `1f1afeb`.
 
 **Builds on:** the [desk buddy design](2026-09-14-jasper-desk-buddy-design.md) (the floating window, sprite strip, animator and bubble) and the [shell integration design](2026-09-16-jasper-shell-integration-design.md) (the OSC 133 C and D marks that bracket a command).
 
@@ -28,7 +28,14 @@ default void commandExecuted(String command, OptionalInt exitStatus, Optional<Pa
 }
 ```
 
-The session timestamps the **C** mark in `captureCommand` and subtracts in `flushPendingCommand`. A cycle that never saw a C — a prompt mark flushing a stale command — reports `Duration.ZERO`, which no threshold above zero can match, so it can never notify.
+The session timestamps the **C** mark in `captureCommand` and subtracts in `flushPendingCommand`.
+
+**Corrected during implementation.** The first cut used `commandStartedAt == 0` to mean "never
+started" — the same sentinel mistake as history ranking treating a zero timestamp as "older than
+everything", caught because the injected test clock legitimately starts at zero. No sentinel is
+needed: only `captureCommand` sets `pendingCommand` and it stamps the clock in the same breath, so a
+non-null command always has a real start, and a cycle with no start mark has no command to report and
+fires no callback at all.
 
 Timing uses a `LongSupplier` nanosecond clock defaulting to `System::nanoTime`, injected through the package-private constructor so tests drive it without sleeping. `System.nanoTime` is monotonic, so a wall-clock change mid-command cannot produce a negative or absurd duration.
 

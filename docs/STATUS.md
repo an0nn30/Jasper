@@ -1,5 +1,59 @@
 # Jasper — Status and Handoff
 
+**Finished-command notifications (2026-09-16):** On
+`claude/command-notifications` (from main `1f1afeb`), a command that ran past a
+threshold and finished in a tab you were not looking at now tells you, through
+the desk buddy — who also gains the status bubble that was built and deferred.
+
+*Duration.* `commandExecuted` carried no elapsed time, so `TerminalSession` now
+stamps a monotonic clock at the command-start mark and subtracts at the end; the
+clock is injectable so tests drive it without sleeping. The first cut used
+`commandStartedAt == 0` as a "never started" sentinel — the same mistake as
+history ranking treating timestamp 0 as "older than everything" — and the test
+clock, which legitimately starts at zero, caught it. No sentinel is needed.
+
+*The rule.* `CommandNotice.shouldNotify` is pure over three booleans the app
+already tracks, so all eight combinations are tested without a window. It
+notifies for another tab of the focused window, and for anything while Jasper is
+in the background. Deliberately quiet: the tab you are looking at, and a command
+in a different Jasper window while another Jasper window has focus.
+
+*Sprites.* Three frames appended — `TYPE_A`, `TYPE_B`, `TYPE_REST` — so existing
+column indices are untouched; the strip is 840x48. The plan said to check the
+`.ase` master had not been hand-edited, because `generate.py` warns that
+rerunning it destroys hand edits. It had four commits rather than the expected
+one, so the check earned its place: `generate.py` changed in all four and
+rerunning it reproduces the committed PNG byte for byte. The script has always
+been the source of truth and the README now says so. The first laptop was drawn
+large and centred and read as a buddy behind a monitor, with shell, belly and
+glasses all hidden; rendering at 8x showed it at once, and it is now compact and
+sits in his lap.
+
+*Animation and routing.* `BuddyAnimator` gains a `WORKING` mode that returns
+before the tuck and sleep deadlines, so a working buddy never falls asleep —
+pinned by ninety seconds of ticks. `CommandNotifier` formats the notice and picks
+the channel; `NativeNotifier` is the second implementation, passing the command
+line to `osascript` as argv rather than inside an interpolated AppleScript
+string, which a test asserts with a command containing quotes and a newline.
+
+*Setting.* `notifications.long_command_seconds`, default 10, live, 0 disables.
+**It needs shell integration**: the duration comes from the OSC 133 marks, so a
+shell without them produces no notifications at all, which the configuration
+guide states plainly rather than guessing a duration.
+
+Fresh `./gradlew check --rerun-tasks`: jasper-app 554 tests,
+553 passed and one fish skip;
+jasper-terminal 318 tests,
+317 passed and one existing
+font skip. Total 872 tests, 870 passed, 2 skipped,
+zero failures/errors. [Configuration
+guide](configuration.md#finished-command-notifications), [design
+spec](superpowers/specs/2026-09-16-jasper-finished-command-notifications-design.md),
+[plan](superpowers/plans/2026-09-16-jasper-command-notifications.md). Still
+user-run: a long command in a background tab on the real desktop, watching the
+typing animation and the bubble, and the same with the buddy disabled. No GUI,
+merge or push.
+
 **History ranking, freshness and tmux (2026-09-16):** On
 `claude/history-scope-ranking` (from main `18fd513`), three confirmed defects in
 the shipped History scope and one preference, each measured against the dev
