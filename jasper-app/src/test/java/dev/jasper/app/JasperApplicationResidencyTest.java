@@ -2,6 +2,7 @@ package dev.jasper.app;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -133,6 +134,32 @@ class JasperApplicationResidencyTest {
         // existing window during shutdown -- needs a live window and cannot be covered headlessly.
         // It is on the manual checklist instead.
         edt(() -> application.openOrRaise(DesktopTestSupport.HOME));
+        edt(() -> { });
+    }
+
+    @Test void aStaleRequestEndsResidencySoTheLastWindowCloseStillCleansUp() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger terminations = new java.util.concurrent.atomic.AtomicInteger();
+        JasperApplication application = application(terminations::incrementAndGet);
+        edt(() -> application.residency(true));
+        var handler = Main.handoffHandler(application, Path.of("/old.jar"), 1L, DesktopTestSupport.HOME);
+        // A request from a different build: the endpoint is released with this reply, so the
+        // process must stop being resident or its last window close cleans up nothing.
+        assertThat(handler.apply(new LaunchRequest("t", Path.of("/new.jar"), 2L)))
+            .isEqualTo(LaunchRequest.Response.STALE);
+        edt(() -> { });
+        assertThat(application.resident()).isFalse();
+        // And the proof that this matters: shutdown now runs where it previously would not have.
+        edt(() -> application.windowClosed(null));
+        DesktopTestSupport.until(() -> terminations.get() == 1);
+    }
+
+    @Test void aMatchingRequestIsAcceptedAndLeavesResidencyAlone() throws Exception {
+        JasperApplication application = application(() -> { });
+        edt(() -> application.residency(true));
+        edt(application::quit);   // So the queued openOrRaise is inert and no window is created.
+        var handler = Main.handoffHandler(application, Path.of("/same.jar"), 7L, DesktopTestSupport.HOME);
+        assertThat(handler.apply(new LaunchRequest("t", Path.of("/same.jar"), 7L)))
+            .isEqualTo(LaunchRequest.Response.OK);
         edt(() -> { });
     }
 }

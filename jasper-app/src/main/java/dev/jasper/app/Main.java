@@ -72,12 +72,7 @@ public final class Main {
                             Path source = HandoffSocket.codeSource();
                             long modified = HandoffSocket.lastModified(source);
                             endpoint = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(), dirs.daemonLock(),
-                                request -> {
-                                    // An older build must not serve windows built from newer code.
-                                    if (stale(request, source, modified)) return LaunchRequest.Response.STALE;
-                                    SwingUtilities.invokeLater(() -> owner.openOrRaise(home));
-                                    return LaunchRequest.Response.OK;
-                                });
+                                handoffHandler(owner, source, modified, home));
                             // Residency needs the endpoint: without it a windowless JVM has nothing
                             // holding it alive and nothing to be reached through.
                             application.residency(endpoint != null);
@@ -203,6 +198,23 @@ public final class Main {
     static boolean stale(LaunchRequest request, Path source, long modified) {
         return !request.codeSource().equals(source == null ? Path.of("") : source)
             || request.codeSourceModified() != modified;
+    }
+
+    /**
+     * The resident process's side of a handoff. A stale request also ends residency: the endpoint
+     * goes away with the reply, so the last window closing must run the normal bounded shutdown
+     * rather than leaving a process with nothing to reach it and no cleanup on the way out.
+     */
+    static java.util.function.Function<LaunchRequest, LaunchRequest.Response> handoffHandler(
+            JasperApplication application, Path source, long modified, Path home) {
+        return request -> {
+            if (stale(request, source, modified)) {
+                SwingUtilities.invokeLater(() -> application.residency(false));
+                return LaunchRequest.Response.STALE;
+            }
+            SwingUtilities.invokeLater(() -> application.openOrRaise(home));
+            return LaunchRequest.Response.OK;
+        };
     }
 
     /** Makes the user's login items match the setting. Never throws; autostart is not worth a failed launch. */
