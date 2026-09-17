@@ -1,6 +1,6 @@
 # Buddy bubble deck — design
 
-**Status:** Designed. Development branch: `claude/command-notifications` (continuing), from `612a7d6`.
+**Status:** Implemented. Development branch: `claude/command-notifications` (continuing), from `612a7d6`.
 
 **Revises:** the [finished-command notifications design](2026-09-16-jasper-finished-command-notifications-design.md). That design's bubble was a transient message on completion. This replaces it with a standing drawer of cards that never auto-hide, and moves completion notices to the OS.
 

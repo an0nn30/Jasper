@@ -1,66 +1,120 @@
 package dev.jasper.app;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 /**
- * Turns a finished command into a notice, and keeps the buddy typing while long ones are in flight.
- * Holds no Swing state, so the routing is testable without a window.
+ * The terminal's producer for the buddy's drawer: it posts a running card once a command has taken
+ * long enough to be worth remembering, replaces that card with the outcome, and sends the outcome to
+ * the OS when the command did not finish under your hands.
+ *
+ * <p>Holds no Swing state. Every seam is a standard functional type rather than a new interface —
+ * including {@code schedule}, which is Swing's {@code Timer} in the application and a list a test
+ * runs by hand. The previous {@code Channel} interface is gone: the buddy being hidden no longer
+ * changes where a notice goes, so it had one real implementation left.
+ *
+ * <p>EDT only.
  */
 final class CommandNotifier {
-    /** Where a notice is shown. Two implementations: the buddy's bubble, and {@link NativeNotifier}. */
-    interface Channel {
-        void deliver(String title, String detail, boolean succeeded, Runnable onActivate);
-    }
+    /** Every notice this class posts is the terminal's; a transfer or an SSH session brings its own. */
+    static final String SOURCE = "terminal";
 
-    /** A command title longer than this is cut; the row it points at is unaffected. */
+    /** A command title longer than this is cut; the pane it points at is unaffected. */
     private static final int MAX_TITLE = 60;
 
     private final Supplier<Duration> threshold;
-    private final Channel buddy;
-    private final Channel operatingSystem;
+    private final BuddyDeck deck;
+    private final Runnable onDeckChanged;
+    private final BiConsumer<String, String> operatingSystem;
     private final Consumer<Boolean> onWorkingChanged;
-    /** Commands that have been running past the threshold; EDT only. */
+    private final BiFunction<Duration, Runnable, Runnable> schedule;
+    private final Map<Object, InFlight> inFlight = new HashMap<>();
+    /** Commands that have been running past the threshold. */
     private int running;
 
-    CommandNotifier(Supplier<Duration> threshold, Channel buddy, Channel operatingSystem,
-                    Consumer<Boolean> onWorkingChanged) {
+    /** A command between its start mark and its end, with the timer that will promote it to a card. */
+    private static final class InFlight {
+        Runnable cancel = () -> {};
+        boolean passed;
+    }
+
+    CommandNotifier(Supplier<Duration> threshold, BuddyDeck deck, Runnable onDeckChanged,
+                    BiConsumer<String, String> operatingSystem, Consumer<Boolean> onWorkingChanged,
+                    BiFunction<Duration, Runnable, Runnable> schedule) {
         this.threshold = Objects.requireNonNull(threshold, "threshold");
-        this.buddy = Objects.requireNonNull(buddy, "buddy");
+        this.deck = Objects.requireNonNull(deck, "deck");
+        this.onDeckChanged = Objects.requireNonNull(onDeckChanged, "onDeckChanged");
         this.operatingSystem = Objects.requireNonNull(operatingSystem, "operatingSystem");
         this.onWorkingChanged = Objects.requireNonNull(onWorkingChanged, "onWorkingChanged");
-    }
-
-    /** A command has now been running long enough to be worth a notice when it ends. */
-    void passedThreshold() {
-        if (running++ == 0) onWorkingChanged.accept(true);
-    }
-
-    /** A pane closed with a long command still running; it will never report a finish. */
-    void abandoned() {
-        release();
+        this.schedule = Objects.requireNonNull(schedule, "schedule");
     }
 
     /**
-     * A command ended. {@code buddyAvailable} picks the channel; {@code onActivate} focuses the pane
-     * the command ran in, and is only ever invoked by the channel that delivered the notice.
+     * A command began. Nothing is shown yet: after {@code threshold} it becomes a running card, so
+     * the buddy does not twitch for every {@code ls}. {@code elapsedNanos} lets the card tick without
+     * being re-posted every second.
      */
-    void finished(String command, OptionalInt exitStatus, Duration ran, CommandNotice.Origin origin,
-                  boolean buddyAvailable, Runnable onActivate) {
-        if (ran.compareTo(threshold.get()) >= 0) release();
-        if (!CommandNotice.shouldNotify(origin, ran, threshold.get())) return;
+    void started(Object key, String command, LongSupplier elapsedNanos, Runnable activate) {
+        Duration wait = threshold.get();
+        cancel(key);
+        if (wait.isZero()) return;
+        InFlight flight = new InFlight();
+        inFlight.put(key, flight);
+        String title = title(command);
+        flight.cancel = schedule.apply(wait, () -> {
+            if (inFlight.get(key) != flight) return;
+            flight.passed = true;
+            flight.cancel = () -> {};
+            if (running++ == 0) onWorkingChanged.accept(true);
+            deck.post(new BuddyNotice(SOURCE, key, title, BuddyNotice.State.ACTIVE,
+                () -> "Running · " + humanize(Duration.ofNanos(elapsedNanos.getAsLong())), activate));
+            onDeckChanged.run();
+        });
+    }
+
+    /** A command ended. Its card becomes the outcome, and the OS hears about it if you were elsewhere. */
+    void finished(Object key, String command, OptionalInt exitStatus, Duration ran,
+                  CommandNotice.Origin origin, Runnable activate) {
+        cancel(key);
+        Duration wait = threshold.get();
+        if (wait.isZero() || ran.compareTo(wait) < 0) return;
         boolean succeeded = exitStatus.isEmpty() || exitStatus.getAsInt() == 0;
         String detail = succeeded ? "Finished in " + humanize(ran)
             : "Exited " + exitStatus.getAsInt() + " · " + humanize(ran);
-        (buddyAvailable ? buddy : operatingSystem).deliver(title(command), detail, succeeded, onActivate);
+        String title = title(command);
+        deck.post(new BuddyNotice(SOURCE, key, title,
+            succeeded ? BuddyNotice.State.DONE : BuddyNotice.State.FAILED, () -> detail, activate));
+        onDeckChanged.run();
+        if (CommandNotice.shouldNotify(origin, ran, wait)) operatingSystem.accept(title, detail);
     }
 
-    private void release() {
-        if (running > 0 && --running == 0) onWorkingChanged.accept(false);
+    /**
+     * The pane is gone. Its card stays — the drawer is what you look at to remember — but stops
+     * ticking and stops responding, because there is no longer anywhere for a click to go.
+     */
+    void closed(Object key, Duration ran) {
+        InFlight flight = inFlight.get(key);
+        boolean hadCard = flight != null && flight.passed;
+        cancel(key);
+        deck.orphan(SOURCE, key, hadCard ? "Stopped after " + humanize(ran) : "Stopped");
+        onDeckChanged.run();
+    }
+
+    /** Drops any in-flight command for this key, releasing the typing animation if it had claimed it. */
+    private void cancel(Object key) {
+        InFlight flight = inFlight.remove(key);
+        if (flight == null) return;
+        flight.cancel.run();
+        if (flight.passed && running > 0 && --running == 0) onWorkingChanged.accept(false);
     }
 
     /** One line, newlines shown the way the History palette shows them, cut to a readable length. */

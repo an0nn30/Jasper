@@ -5,64 +5,203 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
-import static org.assertj.core.api.Assertions.*;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class CommandNotifierTest {
-    private record Sent(String title, String detail, boolean succeeded) {}
+    private record Sent(String title, String detail) {}
 
-    private final List<Sent> buddy = new ArrayList<>();
+    private final BuddyDeck deck = new BuddyDeck();
     private final List<Sent> os = new ArrayList<>();
     private final List<Boolean> working = new ArrayList<>();
+    private final List<Runnable> scheduled = new ArrayList<>();
+    private int refreshes;
 
+    /** Nothing fires by itself: a test runs the scheduled task when it wants the threshold to pass. */
     private CommandNotifier notifier(int seconds) {
-        return new CommandNotifier(() -> Duration.ofSeconds(seconds),
-            (title, detail, succeeded, activate) -> buddy.add(new Sent(title, detail, succeeded)),
-            (title, detail, succeeded, activate) -> os.add(new Sent(title, detail, succeeded)),
-            working::add);
+        return new CommandNotifier(() -> Duration.ofSeconds(seconds), deck, () -> refreshes++,
+            (title, detail) -> os.add(new Sent(title, detail)), working::add,
+            (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); });
     }
 
-    private static final CommandNotice.Origin HIDDEN_TAB = new CommandNotice.Origin(true, true, false);
-    private static final CommandNotice.Origin VISIBLE_TAB = new CommandNotice.Origin(true, true, true);
+    private void passThreshold() {
+        List.copyOf(scheduled).forEach(Runnable::run);
+    }
 
-    @Test void aLongCommandInAHiddenTabReachesTheBuddyWithHowLongItTook() {
-        notifier(10).finished("./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72), HIDDEN_TAB, true, () -> {});
+    private static final CommandNotice.Origin HIDDEN_TAB = new CommandNotice.Origin(true, true, false, false);
+    private static final CommandNotice.Origin FOCUSED_PANE = new CommandNotice.Origin(true, true, true, true);
+    private static final CommandNotice.Origin UNFOCUSED_SPLIT = new CommandNotice.Origin(true, true, true, false);
 
-        assertThat(buddy).containsExactly(new Sent("./gradlew build", "Finished in 1m 12s", true));
+    @Test void aCommandThatPassesTheThresholdGetsARunningCardAndNoNotification() {
+        CommandNotifier notifier = notifier(10);
+
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        passThreshold();
+
+        assertThat(deck.notices()).singleElement().satisfies(notice -> {
+            assertThat(notice.title()).isEqualTo("./gradlew build");
+            assertThat(notice.state()).isEqualTo(BuddyNotice.State.ACTIVE);
+        });
         assertThat(os).isEmpty();
+        assertThat(working).containsExactly(true);
+    }
+
+    /** The card is status, not an interruption: it appears whatever has focus. */
+    @Test void theRunningCardAppearsEvenWhenYouAreLookingRightAtThePane() {
+        CommandNotifier notifier = notifier(10);
+
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        passThreshold();
+        notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
+            FOCUSED_PANE, () -> {});
+
+        assertThat(deck.notices()).singleElement()
+            .extracting(BuddyNotice::state).isEqualTo(BuddyNotice.State.DONE);
+        assertThat(os).as("the pane had focus, so the OS is not involved").isEmpty();
+    }
+
+    @Test void theRunningCardTicksFromTheSuppliedElapsedTime() {
+        CommandNotifier notifier = notifier(10);
+        long[] elapsed = {Duration.ofSeconds(11).toNanos()};
+
+        notifier.started("pane", "sleep 600", () -> elapsed[0], () -> {});
+        passThreshold();
+
+        assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Running · 11s");
+        elapsed[0] = Duration.ofSeconds(72).toNanos();
+        assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Running · 1m 12s");
+    }
+
+    @Test void finishingReplacesTheRunningCardInPlaceRatherThanAddingASecond() {
+        CommandNotifier notifier = notifier(10);
+
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        passThreshold();
+        notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
+            HIDDEN_TAB, () -> {});
+
+        assertThat(deck.size()).isEqualTo(1);
+        assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Finished in 1m 12s");
+        assertThat(working).containsExactly(true, false);
     }
 
     @Test void aFailureSaysSoAndCarriesItsExitStatus() {
-        notifier(10).finished("make", OptionalInt.of(2), Duration.ofSeconds(45), HIDDEN_TAB, true, () -> {});
+        CommandNotifier notifier = notifier(10);
 
-        assertThat(buddy).containsExactly(new Sent("make", "Exited 2 · 45s", false));
+        notifier.started("pane", "make", () -> 0L, () -> {});
+        passThreshold();
+        notifier.finished("pane", "make", OptionalInt.of(2), Duration.ofSeconds(45), HIDDEN_TAB, () -> {});
+
+        assertThat(deck.notices().getFirst()).satisfies(notice -> {
+            assertThat(notice.state()).isEqualTo(BuddyNotice.State.FAILED);
+            assertThat(notice.detail().get()).isEqualTo("Exited 2 · 45s");
+        });
     }
 
-    @Test void aTabYouAreLookingAtIsNotWorthInterruptingFor() {
-        notifier(10).finished("./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72), VISIBLE_TAB, true, () -> {});
+    @Test void aCommandThatFinishesOutOfSightAlsoReachesTheOperatingSystem() {
+        CommandNotifier notifier = notifier(10);
 
-        assertThat(buddy).isEmpty();
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        passThreshold();
+        notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
+            HIDDEN_TAB, () -> {});
+
+        assertThat(os).containsExactly(new Sent("./gradlew build", "Finished in 1m 12s"));
+    }
+
+    /** The deliberate widening: a visible split pane you are not typing in still notifies. */
+    @Test void aVisibleButUnfocusedSplitPaneStillNotifies() {
+        CommandNotifier notifier = notifier(10);
+
+        notifier.started("pane", "make", () -> 0L, () -> {});
+        passThreshold();
+        notifier.finished("pane", "make", OptionalInt.of(0), Duration.ofSeconds(30), UNFOCUSED_SPLIT, () -> {});
+
+        assertThat(os).hasSize(1);
+    }
+
+    @Test void aShortCommandLeavesNoCardAndNotifiesNobody() {
+        CommandNotifier notifier = notifier(10);
+
+        notifier.started("pane", "ls", () -> 0L, () -> {});
+        notifier.finished("pane", "ls", OptionalInt.of(0), Duration.ofSeconds(2), HIDDEN_TAB, () -> {});
+
+        assertThat(deck.notices()).isEmpty();
+        assertThat(os).isEmpty();
+        assertThat(working).as("it never passed the threshold").isEmpty();
+        assertThat(scheduled).as("its timer was cancelled").isEmpty();
+    }
+
+    @Test void aZeroThresholdTurnsTheWholeFeatureOff() {
+        CommandNotifier notifier = notifier(0);
+
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        passThreshold();
+        notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofHours(1),
+            HIDDEN_TAB, () -> {});
+
+        assertThat(deck.notices()).isEmpty();
         assertThat(os).isEmpty();
     }
 
-    @Test void aShortCommandNotifiesNobody() {
-        notifier(10).finished("ls", OptionalInt.of(0), Duration.ofSeconds(2), HIDDEN_TAB, true, () -> {});
+    @Test void aSecondLongCommandDoesNotRestartTheTypingAndTheLastOneEndsIt() {
+        CommandNotifier notifier = notifier(10);
 
-        assertThat(buddy).isEmpty();
-        assertThat(os).isEmpty();
+        notifier.started("a", "one", () -> 0L, () -> {});
+        notifier.started("b", "two", () -> 0L, () -> {});
+        passThreshold();
+        assertThat(working).containsExactly(true);
+
+        notifier.finished("a", "one", OptionalInt.of(0), Duration.ofSeconds(11), HIDDEN_TAB, () -> {});
+        assertThat(working).as("one still running").containsExactly(true);
+
+        notifier.finished("b", "two", OptionalInt.of(0), Duration.ofSeconds(11), HIDDEN_TAB, () -> {});
+        assertThat(working).containsExactly(true, false);
     }
 
-    @Test void theOperatingSystemTakesOverWhenTheBuddyIsAway() {
-        notifier(10).finished("./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72), HIDDEN_TAB, false, () -> {});
+    /** Never removed: the drawer is what you look at to remember, so a closed pane leaves its card. */
+    @Test void aPaneClosingOrphansItsCardAndStopsTheTyping() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "sleep 600", () -> Duration.ofSeconds(72).toNanos(), () -> {});
+        passThreshold();
 
-        assertThat(os).containsExactly(new Sent("./gradlew build", "Finished in 1m 12s", true));
-        assertThat(buddy).isEmpty();
+        notifier.closed("pane", Duration.ofSeconds(72));
+
+        assertThat(deck.size()).isEqualTo(1);
+        assertThat(deck.notices().getFirst().orphaned()).isTrue();
+        assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Stopped after 1m 12s");
+        assertThat(working).containsExactly(true, false);
     }
 
-    /** The History palette already renders a multi-line command this way; the bubble matches it. */
+    @Test void aPaneClosingBeforeTheThresholdLeavesNothingBehind() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "ls", () -> 0L, () -> {});
+
+        notifier.closed("pane", Duration.ofSeconds(1));
+
+        assertThat(deck.notices()).isEmpty();
+        assertThat(scheduled).isEmpty();
+        assertThat(working).isEmpty();
+    }
+
+    @Test void aSecondCommandInTheSamePaneSupersedesTheFirstRatherThanStacking() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "first", () -> 0L, () -> {});
+
+        notifier.started("pane", "second", () -> 0L, () -> {});
+        passThreshold();
+
+        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("second");
+        assertThat(working).as("one pane, one typing buddy").containsExactly(true);
+    }
+
     @Test void multiLineCommandsCollapseForTheTitle() {
-        notifier(10).finished("echo a\necho b", OptionalInt.of(0), Duration.ofSeconds(11), HIDDEN_TAB, true, () -> {});
+        CommandNotifier notifier = notifier(10);
 
-        assertThat(buddy).singleElement().extracting(Sent::title).isEqualTo("echo a ↵ echo b");
+        notifier.started("pane", "echo a\necho b", () -> 0L, () -> {});
+        passThreshold();
+
+        assertThat(deck.notices().getFirst().title()).isEqualTo("echo a ↵ echo b");
     }
 
     @Test void durationsReadAsPeopleSayThem() {
@@ -70,37 +209,5 @@ class CommandNotifierTest {
         assertThat(CommandNotifier.humanize(Duration.ofSeconds(72))).isEqualTo("1m 12s");
         assertThat(CommandNotifier.humanize(Duration.ofSeconds(120))).isEqualTo("2m");
         assertThat(CommandNotifier.humanize(Duration.ofSeconds(7500))).isEqualTo("2h 5m");
-    }
-
-    /** The typing animation starts when a command passes the threshold, not when it starts. */
-    @Test void theBuddyWorksWhileALongCommandIsInFlightAndStopsWhenTheLastOneEnds() {
-        CommandNotifier notifier = notifier(10);
-
-        notifier.passedThreshold();
-        assertThat(working).containsExactly(true);
-        notifier.passedThreshold();
-        assertThat(working).as("a second long command does not restart the animation").containsExactly(true);
-
-        notifier.finished("a", OptionalInt.of(0), Duration.ofSeconds(11), HIDDEN_TAB, true, () -> {});
-        assertThat(working).as("one still running").containsExactly(true);
-
-        notifier.finished("b", OptionalInt.of(0), Duration.ofSeconds(11), HIDDEN_TAB, true, () -> {});
-        assertThat(working).containsExactly(true, false);
-    }
-
-    @Test void aPaneClosingDropsItsRunningCommand() {
-        CommandNotifier notifier = notifier(10);
-        notifier.passedThreshold();
-
-        notifier.abandoned();
-
-        assertThat(working).containsExactly(true, false);
-    }
-
-    @Test void aZeroThresholdTurnsTheWholeFeatureOff() {
-        notifier(0).finished("./gradlew build", OptionalInt.of(0), Duration.ofHours(1), HIDDEN_TAB, true, () -> {});
-
-        assertThat(buddy).isEmpty();
-        assertThat(os).isEmpty();
     }
 }

@@ -20,9 +20,9 @@ class NativeNotifierTest {
             .as("no element interpolates the text").noneMatch(part -> part.contains("echo"));
     }
 
-    @Test void anUnsupportedPlatformDeliversNothing() {
+    @Test void anUnsupportedPlatformSendsNothing() {
         try (var notifier = new NativeNotifier(false)) {
-            notifier.deliver("build", "Finished in 1m", true, () -> fail("should not activate"));
+            notifier.send("build", "Finished in 1m");
         }
     }
 }

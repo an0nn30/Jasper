@@ -38,6 +38,7 @@ final class BuddyWindow {
     private final Runnable toggle;
     private final Timer timer = new Timer(1, event -> tick());
     private BuddyBubble bubble;
+    private BuddyDeckWindow drawer;
     private Point pressScreen;
     private Point pressOrigin;
     private boolean dragged;
@@ -93,6 +94,7 @@ final class BuddyWindow {
                 if (!dragged && Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
                 dragged = true;
                 window.setLocation(pressOrigin.x + dx, pressOrigin.y + dy);
+                refreshDeck();
             }
             @Override public void mouseReleased(MouseEvent event) {
                 if (event.isPopupTrigger()) { popup(); pressScreen = null; return; }
@@ -128,13 +130,17 @@ final class BuddyWindow {
         return new BuddyWindow(sprite, stateFile, raiseTerminal, toggle);
     }
 
-    /** A finished command, as a status bubble beside him. Clicking it runs {@code onActivate}. */
-    void showMessage(String title, String detail, boolean succeeded, Runnable onActivate) {
-        if (!window.isVisible()) return;
-        BuddyBubble message = new BuddyBubble(onActivate);
-        message.showBeside(window.getBounds(), BuddyBubbleContent.message(title, detail, statusGlyph(succeeded)));
-        if (bubble != null) bubble.hide();
-        bubble = message;
+    /** The application owns the drawer's contents; the buddy only gives it somewhere to sit. */
+    void attachDeck(BuddyDeck deck) {
+        if (disposed || drawer != null) return;
+        drawer = new BuddyDeckWindow(deck);
+        refreshDeck();
+    }
+
+    /** A notice was posted, dismissed or cleared: re-place the drawer beside him. */
+    void refreshDeck() {
+        if (drawer == null) return;
+        if (window.isVisible()) drawer.showBeside(window.getBounds()); else drawer.hide();
     }
 
     /** A long command is in flight: he sits down with the laptop until it finishes. */
@@ -143,40 +149,12 @@ final class BuddyWindow {
         window.repaint();
     }
 
-    /** A check or a cross in the same colours the status bar already uses for success and failure. */
-    private static javax.swing.Icon statusGlyph(boolean succeeded) {
-        java.awt.Color colour = javax.swing.UIManager.getColor(
-            succeeded ? "Jasper.configSuccessForeground" : "Jasper.configErrorForeground");
-        java.awt.Color ink = colour == null ? (succeeded ? new java.awt.Color(0x5A, 0xB0, 0x7A)
-            : new java.awt.Color(0xC4, 0x5A, 0x53)) : colour;
-        return new javax.swing.Icon() {
-            @Override public int getIconWidth() { return 12; }
-            @Override public int getIconHeight() { return 12; }
-            @Override public void paintIcon(java.awt.Component c, java.awt.Graphics g, int x, int y) {
-                java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
-                try {
-                    g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
-                        java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-                    g2.setColor(ink);
-                    g2.setStroke(new java.awt.BasicStroke(2f, java.awt.BasicStroke.CAP_ROUND,
-                        java.awt.BasicStroke.JOIN_ROUND));
-                    if (succeeded) {
-                        g2.drawLine(x + 2, y + 6, x + 5, y + 9);
-                        g2.drawLine(x + 5, y + 9, x + 10, y + 3);
-                    } else {
-                        g2.drawLine(x + 3, y + 3, x + 9, y + 9);
-                        g2.drawLine(x + 9, y + 3, x + 3, y + 9);
-                    }
-                } finally { g2.dispose(); }
-            }
-        };
-    }
-
     void show() {
         if (disposed || window.isVisible()) return;
         animator.shown(System.nanoTime());
         window.setVisible(true);
         paintAndSchedule();
+        refreshDeck();
     }
 
     /** The user came back to a Jasper window: wave, waking him out of his shell first if need be. */
@@ -197,6 +175,7 @@ final class BuddyWindow {
         if (disposed) return;
         timer.stop();
         if (bubble != null) bubble.hide();
+        if (drawer != null) drawer.hide();
         animator.hidden();
         window.setVisible(false);
     }
@@ -206,6 +185,7 @@ final class BuddyWindow {
         disposed = true;
         timer.stop();
         if (bubble != null) bubble.dispose();
+        if (drawer != null) drawer.dispose();
         window.dispose();
     }
 

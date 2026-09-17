@@ -76,6 +76,15 @@ public final class TerminalSession implements AutoCloseable {
         }
 
         /**
+         * The shell marked the start of a command it is about to run (OSC 133 C). Reader thread, and
+         * fired outside the buffer lock. Exactly one start per {@link #commandExecuted}, except when
+         * the pane is closed mid-command — then there is a start and no finish, which is precisely
+         * the case a running notice exists to show.
+         */
+        default void commandStarted(String command) {
+        }
+
+        /**
          * The shell ran a command it marked with OSC 133 B/C (and D when it sends one). Reader thread.
          * {@code duration} is measured from the command-start mark. A cycle that never saw one has no
          * command to report either, so it fires no callback at all rather than one with a zero duration.
@@ -736,6 +745,9 @@ public final class TerminalSession implements AutoCloseable {
         } finally {
             buffer.unlock();
         }
+        // Outside the lock: a listener runs arbitrary code and the buffer lock must stay short.
+        String started = pendingCommand;
+        if (started != null) listeners.forEach(l -> l.commandStarted(started));
     }
 
     /**

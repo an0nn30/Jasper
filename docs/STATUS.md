@@ -31,15 +31,45 @@ sits in his lap.
 
 *Animation and routing.* `BuddyAnimator` gains a `WORKING` mode that returns
 before the tuck and sleep deadlines, so a working buddy never falls asleep —
-pinned by ninety seconds of ticks. `CommandNotifier` formats the notice and picks
-the channel; `NativeNotifier` is the second implementation, passing the command
-line to `osascript` as argv rather than inside an interpolated AppleScript
-string, which a test asserts with a command containing quotes and a newline.
+pinned by ninety seconds of ticks.
+
+*The drawer.* The bubble is now a standing notification drawer. `BuddyDeck` holds
+`BuddyNotice`s keyed by `(source, key)` and knows nothing about panes: the terminal
+is one producer and passes the pane as its key, which is what makes "one card per
+tab/pane/window" true today without the deck learning why. A future sftp transfer
+or SSH session posts per-item notices through the same deck unchanged. `detail` is
+a `Supplier<String>` so a running card ticks without being re-posted, and so a
+transfer can report bytes through the same field — a start timestamp would have
+needed a zero sentinel, the mistake this repository has already made twice.
+
+Nothing auto-hides. The drawer is bounded at 50 with the oldest falling off, every
+card has a dismiss ×, the expanded list has **Clear all** and scrolls rather than
+capping, and nothing is persisted — it starts empty each run. Closing a pane
+*orphans* its card rather than removing it: the action goes, the outcome stays, so
+a pane closed after a successful build still says the build succeeded.
+
+`BuddyDeckLayout` and `BubbleMotion` are pure, so the peek offsets, the scroll
+clamp, the hit tests and the bounce curve are all tested headlessly.
+`BuddyDeckPanel` takes input through package-private handlers the way
+`TerminalView` does. Its backing cards are shape only — every assertion passed
+while the cards behind read straight through the translucent top card, and only
+rendering it showed that; the test now pins the property rather than the pixels.
+
+`TerminalSession.Listener.commandStarted` is new. Nothing previously reached the
+app at the C mark, so `CommandNotifier.passedThreshold` had no production caller
+at all and the typing animation could never have run.
+
+Notification widened from the tab to the pane: only the pane you were typing in is
+quiet. `CommandNotifier.Channel` was deleted rather than given a second
+implementation — a hidden buddy no longer changes where a notice goes, so it had
+one real implementation left. `NativeNotifier` still passes the command line to
+`osascript` as argv rather than inside an interpolated AppleScript string, which a
+test asserts with a command containing quotes and a newline.
 
 *Setting.* `notifications.long_command_seconds`, default 10, live, 0 disables.
 **It needs shell integration**: the duration comes from the OSC 133 marks, so a
-shell without them produces no notifications at all, which the configuration
-guide states plainly rather than guessing a duration.
+shell without them produces no notifications and no cards at all, which the
+configuration guide states plainly rather than guessing a duration.
 
 Fresh `./gradlew check --rerun-tasks`: jasper-app 554 tests,
 553 passed and one fish skip;

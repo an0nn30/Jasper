@@ -122,28 +122,29 @@ arrow keys. Changes apply live, including to an open palette.
 
 ### Finished-command notifications
 
-`notifications.long_command_seconds` sets how long a command must run before finishing it is worth
-telling you about. The default is 10 seconds; `0` turns notifications off entirely.
+`notifications.long_command_seconds` sets how long a command must run before it is worth remembering.
+The default is 10 seconds; `0` turns the feature off entirely.
 
 **This needs [shell integration](#shell-integration).** The duration is measured between the
 command-start and command-end marks the integration scripts emit, so a shell that does not emit them
-produces no notifications at all — Jasper cannot know how long anything took. There is no fallback
-guess.
+produces no notifications and no cards at all — Jasper cannot know how long anything took. There is
+no fallback guess.
 
-You are told only when the command finished somewhere you were not looking:
+Past the threshold the desk buddy sits down and types on a laptop, and the command grows a **card**
+beside him. The card appears whatever you are looking at: it is status, not an interruption. It shows
+the command, how long it has been running, and when the command ends a check or a cross with the
+final time.
 
-- another tab of the window you are using, or
-- anywhere at all when Jasper is in the background.
+Cards never disappear on their own — the drawer is a record of what has been going on, not a message
+that flashes past. They stack newest-on-top, with a count once there are more than three. Clicking
+the stack opens it as a list; clicking an entry takes you to the pane it ran in; the × on a card
+dismisses that one, and **Clear all** empties the drawer. At most 50 are kept, the oldest falling
+off, and the drawer starts empty each time Jasper starts. A card whose pane you have closed stays
+readable but dims and no longer responds — there is nowhere left for it to take you.
 
-Deliberately quiet: the tab you are currently looking at, and a command in a *different* Jasper
-window while another Jasper window has focus — you are still looking at Jasper, and that window's
-tab strip already shows it.
-
-The desk buddy delivers it. While a command is past the threshold he sits down and types on a
-laptop; when it ends he shows a bubble with the command, how long it took and a check or a cross.
-Clicking the bubble focuses the pane it ran in. If the buddy is hidden or `buddy.enabled = false`,
-the notice goes to a macOS notification instead, so turning him off does not silently turn the
-feature off. On Windows and Linux the buddy is the only channel.
+A **system notification** is sent as well, unless the command finished in the pane you were actually
+typing in. That includes a command finishing in a visible but unfocused split pane, which is easy to
+miss. System notifications are macOS-only; elsewhere the drawer is the only channel.
 
 ### Shell history
 

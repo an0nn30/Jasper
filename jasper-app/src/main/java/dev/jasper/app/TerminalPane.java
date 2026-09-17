@@ -40,8 +40,20 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     }
 
     CommandFinished onCommandFinished = (command, exitStatus, duration) -> {};
+
+    /** A command began. Delivered on the EDT. */
+    Consumer<String> onCommandStarted = command -> {};
+
+    /** This pane is gone: anything holding it as a key should let go. Fired once, on the EDT. */
+    Runnable onClosed = () -> {};
     private final TerminalSession.Listener listener = new TerminalSession.Listener() {
         @Override public void screenChanged() { queueUpdate(); }
+
+        @Override public void commandStarted(String command) {
+            // commandStarted arrives on the reader thread; everything downstream is Swing.
+            Consumer<String> started = onCommandStarted;
+            javax.swing.SwingUtilities.invokeLater(() -> started.accept(command));
+        }
         @Override public void titleChanged(String title) { queueUpdate(); }
         @Override public void workingDirectoryChanged(Path directory) { queueUpdate(); }
 
@@ -176,12 +188,15 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        Runnable closedHook = onClosed;
+        onClosed = () -> {};
+        closedHook.run();
         if (findBar != null) findBar.dispose();
         if (view != null) {
             view.setShortcutHandler(null); view.setContextMenuHandler(null); view.setOnCloseRequest(() -> {});
         }
         if (session != null) { session.removeListener(listener); session.close(); }
-        onChanged = () -> {}; onFocused = () -> {}; onClose = () -> {};
+        onChanged = () -> {}; onFocused = () -> {}; onClose = () -> {}; onCommandStarted = command -> {};
         allowLaunchFocus = () -> false;
         onReady = terminal -> {}; onFailure = message -> {};
         onCommandExecuted = entry -> {};

@@ -64,13 +64,22 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private boolean historyEnabled = true;
     /** Set by the application so a finished command can reach the notifier; null in tests. */
     CommandFinishedSink onCommandFinished;
+    /** Set by the application; null in tests. */
+    CommandStartedSink onCommandStarted;
+    /** Set by the application: a pane is gone, so anything keyed on it should be released. */
+    java.util.function.Consumer<Object> onPaneClosed = pane -> {};
     /** Whether any Jasper window has focus; the application knows, a single window does not. */
     java.util.function.BooleanSupplier anyWindowActive = () -> true;
 
-    /** What the application wants to know about a finished command. */
+    /** What the application wants to know about a finished command. {@code pane} is the notice's key. */
     interface CommandFinishedSink {
         void accept(String command, java.util.OptionalInt exitStatus, java.time.Duration duration,
-                    CommandNotice.Origin origin, Runnable focus);
+                    CommandNotice.Origin origin, Object pane, Runnable focus);
+    }
+
+    /** What the application wants to know about a command that has just begun. */
+    interface CommandStartedSink {
+        void accept(String command, Object pane, java.util.function.LongSupplier elapsedNanos, Runnable focus);
     }
     private ShellHistoryIndex shellHistory;
     private CommandRegistry.Subscription historyRegistration;
@@ -362,10 +371,21 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private void configurePane(TerminalTab tab, TerminalPane pane) {
         pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
         pane.onCommandExecuted = entry -> { if (shellHistory != null) shellHistory.record(entry); };
+        pane.onCommandStarted = command -> {
+            if (onCommandStarted == null) return;
+            // Stamped here rather than taken from the session's clock: the session's duration stays
+            // authoritative for the finished card, and this only has to make a ticking card read right.
+            long startedAt = System.nanoTime();
+            onCommandStarted.accept(command, pane, () -> System.nanoTime() - startedAt,
+                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); });
+        };
+        pane.onClosed = () -> onPaneClosed.accept(pane);
         pane.onCommandFinished = (command, exitStatus, duration) -> {
             if (onCommandFinished == null) return;
             onCommandFinished.accept(command, exitStatus, duration,
-                new CommandNotice.Origin(anyWindowActive.getAsBoolean(), isActiveAndOpen(), tab == currentTab()),
+                new CommandNotice.Origin(anyWindowActive.getAsBoolean(), isActiveAndOpen(),
+                    tab == currentTab(), pane.view() != null && pane.view().isFocusOwner()),
+                pane,
                 () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); });
         };
         pane.applyTheme(themes.current().palette());
@@ -620,5 +640,6 @@ final class WindowContent extends JPanel implements AutoCloseable {
         confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
+        onCommandStarted = null; onPaneClosed = pane -> {};
     }
 }

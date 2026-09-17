@@ -8,8 +8,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
-/** The fallback channel: a macOS notification, used when the buddy is hidden or turned off. */
-final class NativeNotifier implements CommandNotifier.Channel, AutoCloseable {
+/** A macOS system notification, for a command that finished somewhere you were not looking. */
+final class NativeNotifier implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(NativeNotifier.class.getName());
 
     /**
@@ -44,7 +44,8 @@ final class NativeNotifier implements CommandNotifier.Channel, AutoCloseable {
         return List.copyOf(arguments);
     }
 
-    @Override public void deliver(String title, String detail, boolean succeeded, Runnable onActivate) {
+    /** Shows a system notification. Silent on anything that is not macOS, which the docs state. */
+    void send(String title, String detail) {
         if (!supported) return;
         try {
             worker.execute(() -> run(command(title, detail)));
