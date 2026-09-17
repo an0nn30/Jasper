@@ -15,9 +15,9 @@ final class BuddyDeckLayout {
     /** Beyond this the nearest bubble carries a count; a taller column would cover the screen. */
     static final int MAX_IN_COLUMN = 3;
     /** The band between his head and the nearest bubble, where the thought tail sits. */
-    static final int TAIL_HEIGHT = 16;
-    static final int TAIL_BIG = 7;
-    static final int TAIL_SMALL = 4;
+    static final int TAIL_HEIGHT = 22;
+    static final int TAIL_BIG = 11;
+    static final int TAIL_SMALL = 7;
     static final int DISMISS_SIZE = 14;
     static final int DISMISS_INSET = 6;
     static final int CLEAR_ROW_HEIGHT = 26;
@@ -53,9 +53,11 @@ final class BuddyDeckLayout {
         int band = below ? 0 : columnHeight - TAIL_HEIGHT;
         int bigY = below ? band + TAIL_HEIGHT - TAIL_BIG - 2 : band + 2;
         int smallY = below ? band + 2 : band + TAIL_HEIGHT - TAIL_SMALL - 2;
+        // Both sit on his centre line, with the small one trailing a little: the column is centred on
+        // him, so a tail that wanders sideways stops pointing at the head it is supposed to come from.
         return new Rectangle[] {
             new Rectangle(centre - TAIL_BIG / 2, bigY, TAIL_BIG, TAIL_BIG),
-            new Rectangle(centre - TAIL_SMALL / 2 + TAIL_BIG, smallY, TAIL_SMALL, TAIL_SMALL)
+            new Rectangle(centre - TAIL_SMALL / 2 + TAIL_BIG / 2, smallY, TAIL_SMALL, TAIL_SMALL)
         };
     }
 
