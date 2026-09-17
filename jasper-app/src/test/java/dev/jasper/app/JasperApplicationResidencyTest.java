@@ -63,13 +63,34 @@ class JasperApplicationResidencyTest {
     }
 
     @Test void warmingUpBuildsTheFontSetAndRefreshesHistoryWithoutAWindow() throws Exception {
-        JasperApplication application = application(() -> { });
-        // The point of warm-up is that it pays the first window's costs and creates nothing:
-        // it must be safe to call, repeatedly, with no configuration and no window.
-        edt(application::warmUp);
-        edt(application::warmUp);
-        edt(() -> { });
-        edt(application::quit);
+        ShellHistoryIndex shellHistory = new ShellHistoryIndex(java.util.List.of());
+        AtomicInteger refreshes = new AtomicInteger();
+        JasperApplication[] held = new JasperApplication[1];
+        try {
+            edt(() -> {
+                held[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(),
+                    null, () -> { }, shellHistory);
+                shellHistory.onChanged(refreshes::incrementAndGet);
+                // onChanged also starts the index's own once-a-second background poll (it exists so a
+                // window need not be open for history to stay current). Stopping it here means the
+                // only refresh this test can observe is the one warmUp() explicitly triggers below --
+                // otherwise the poll alone would satisfy the wait even with warmUp() gutted.
+                shellHistory.pollTimer().stop();
+            });
+            // The point of warm-up is that it pays the first window's costs and creates nothing. The
+            // history half is verified for real here: refresh() hands off to a worker thread and
+            // delivers back to the EDT, so completion is polled for, not assumed from the call
+            // returning. Calling warmUp() twice also exercises refresh()'s own coalescing (a second
+            // call while one is in flight queues rather than double-dispatching) without a window.
+            // (The font-set half has no equivalent external signal without a production test seam,
+            // which this round does not add; a thrown exception here would still fail the test, but
+            // deleting the FontSet construction itself would not.)
+            edt(held[0]::warmUp);
+            edt(held[0]::warmUp);
+            DesktopTestSupport.until(() -> refreshes.get() >= 1);
+        } finally {
+            edt(() -> { if (held[0] != null) held[0].quit(); });
+        }
     }
 
     @Test void theLoginItemFollowsTheSettingWhileResidencyDoesNot(@org.junit.jupiter.api.io.TempDir
@@ -103,11 +124,14 @@ class JasperApplicationResidencyTest {
         }
     }
 
-    @Test void openOrRaiseIsInertOnceTheApplicationHasQuit() throws Exception {
+    @Test void openOrRaiseDoesNotThrowOnceTheApplicationHasQuit() throws Exception {
         JasperApplication application = application(() -> { });
         edt(() -> application.residency(true));
         edt(application::quit);
-        // A request arriving during shutdown must not resurrect a window.
+        // Only that a late request is harmless: with no windows open this reaches newWindow, which
+        // has its own quitting guard. The branch that openOrRaise's own guard protects -- raising an
+        // existing window during shutdown -- needs a live window and cannot be covered headlessly.
+        // It is on the manual checklist instead.
         edt(() -> application.openOrRaise(DesktopTestSupport.HOME));
         edt(() -> { });
     }
