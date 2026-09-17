@@ -139,7 +139,7 @@ final class JasperApplication {
             notifications.started(pane, command, elapsed, focus);
         window.content().onCommandFinished = (command, exitStatus, duration, origin, pane, focus) ->
             notifications.finished(pane, command, exitStatus, duration, origin, focus);
-        window.content().onPaneClosed = pane -> notifications.closed(pane, java.time.Duration.ZERO);
+        window.content().onPaneClosed = notifications::closed;
         windows.add(window); window.show();
         if (first) shellHistory.refresh();
         if (first && configuration == null && snippets != null) snippets.reload();

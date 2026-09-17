@@ -108,4 +108,17 @@ class BuddyDeckTest {
         assertThatIllegalArgumentException().isThrownBy(() ->
             new BuddyNotice("terminal", "a", "  ", BuddyNotice.State.DONE, () -> "d", () -> { }));
     }
+
+    /** The two-argument form is for a running notice only; this one must not rewrite what it said. */
+    @Test void orphaningWithoutAReplacementKeepsWhatTheNoticeSaid() {
+        deck.post(new BuddyNotice("terminal", "a", "./gradlew build", BuddyNotice.State.DONE,
+            () -> "Finished in 1m 12s", () -> { }));
+
+        deck.orphan("terminal", "a");
+
+        BuddyNotice orphan = deck.notices().getFirst();
+        assertThat(orphan.detail().get()).isEqualTo("Finished in 1m 12s");
+        assertThat(orphan.state()).isEqualTo(BuddyNotice.State.DONE);
+        assertThat(orphan.orphaned()).isTrue();
+    }
 }

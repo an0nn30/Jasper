@@ -45,6 +45,8 @@ final class CommandNotifier {
     private static final class InFlight {
         Runnable cancel = () -> {};
         boolean passed;
+        /** How long it has been going, so a pane closed mid-command can freeze the real figure. */
+        LongSupplier elapsed = () -> 0L;
     }
 
     CommandNotifier(Supplier<Duration> threshold, BuddyDeck deck, Runnable onDeckChanged,
@@ -68,6 +70,7 @@ final class CommandNotifier {
         cancel(key);
         if (wait.isZero()) return;
         InFlight flight = new InFlight();
+        flight.elapsed = elapsedNanos;
         inFlight.put(key, flight);
         String title = title(command);
         flight.cancel = schedule.apply(wait, () -> {
@@ -101,11 +104,15 @@ final class CommandNotifier {
      * The pane is gone. Its card stays — the drawer is what you look at to remember — but stops
      * ticking and stops responding, because there is no longer anywhere for a click to go.
      */
-    void closed(Object key, Duration ran) {
+    void closed(Object key) {
         InFlight flight = inFlight.get(key);
-        boolean hadCard = flight != null && flight.passed;
+        boolean stillRunning = flight != null && flight.passed;
+        Duration ran = flight == null ? Duration.ZERO : Duration.ofNanos(flight.elapsed.getAsLong());
         cancel(key);
-        deck.orphan(SOURCE, key, hadCard ? "Stopped after " + humanize(ran) : "Stopped");
+        // Only a running card is rewritten. One that already finished keeps what it said - a pane
+        // closed after a successful build must still say the build succeeded.
+        if (stillRunning) deck.orphan(SOURCE, key, "Stopped after " + humanize(ran));
+        else deck.orphan(SOURCE, key);
         onDeckChanged.run();
     }
 

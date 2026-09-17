@@ -33,9 +33,21 @@ final class BuddyDeck {
     void clear() { notices.clear(); }
 
     /**
-     * Its origin went away. The notice keeps its place and its outcome, stops updating — a running
-     * card would otherwise tick forever against a process that no longer exists — and stops
+     * Its origin went away. The notice keeps its place, its outcome and what it said, and stops
      * responding, because there is nowhere left to go.
+     */
+    void orphan(String source, Object key) {
+        notices.replaceAll(notice -> notice.sameAs(source, key)
+            ? new BuddyNotice(notice.source(), notice.key(), notice.title(), notice.state(),
+                notice.detail(), null)
+            : notice);
+    }
+
+    /**
+     * As {@link #orphan(String, Object)}, and freezes what it says. Only for a notice that was still
+     * running: it would otherwise tick forever against a process that no longer exists. A notice that
+     * had already finished keeps its own words — rewriting them would lose what happened, which is
+     * the very thing orphaning is shaped to preserve.
      */
     void orphan(String source, Object key, String finalDetail) {
         Objects.requireNonNull(finalDetail, "finalDetail");

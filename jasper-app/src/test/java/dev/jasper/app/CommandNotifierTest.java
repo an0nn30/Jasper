@@ -165,7 +165,7 @@ class CommandNotifierTest {
         notifier.started("pane", "sleep 600", () -> Duration.ofSeconds(72).toNanos(), () -> {});
         passThreshold();
 
-        notifier.closed("pane", Duration.ofSeconds(72));
+        notifier.closed("pane");
 
         assertThat(deck.size()).isEqualTo(1);
         assertThat(deck.notices().getFirst().orphaned()).isTrue();
@@ -177,7 +177,7 @@ class CommandNotifierTest {
         CommandNotifier notifier = notifier(10);
         notifier.started("pane", "ls", () -> 0L, () -> {});
 
-        notifier.closed("pane", Duration.ofSeconds(1));
+        notifier.closed("pane");
 
         assertThat(deck.notices()).isEmpty();
         assertThat(scheduled).isEmpty();
@@ -209,5 +209,37 @@ class CommandNotifierTest {
         assertThat(CommandNotifier.humanize(Duration.ofSeconds(72))).isEqualTo("1m 12s");
         assertThat(CommandNotifier.humanize(Duration.ofSeconds(120))).isEqualTo("2m");
         assertThat(CommandNotifier.humanize(Duration.ofSeconds(7500))).isEqualTo("2h 5m");
+    }
+
+    /**
+     * The spec's whole reason for orphaning being a lost action rather than a fourth state: closing
+     * the pane afterwards must not rewrite what happened.
+     */
+    @Test void closingThePaneAfterTheCommandFinishedKeepsWhatItSaid() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "./gradlew build", () -> 0L, () -> {});
+        passThreshold();
+        notifier.finished("pane", "./gradlew build", OptionalInt.of(0), Duration.ofSeconds(72),
+            HIDDEN_TAB, () -> {});
+
+        notifier.closed("pane");
+
+        BuddyNotice card = deck.notices().getFirst();
+        assertThat(card.state()).isEqualTo(BuddyNotice.State.DONE);
+        assertThat(card.detail().get()).isEqualTo("Finished in 1m 12s");
+        assertThat(card.orphaned()).as("there is nowhere left to click to").isTrue();
+    }
+
+    /** A running card is frozen at however long it had actually been going, not at zero. */
+    @Test void closingThePaneMidCommandFreezesTheRealElapsedTime() {
+        CommandNotifier notifier = notifier(10);
+        long[] elapsed = {Duration.ofSeconds(11).toNanos()};
+        notifier.started("pane", "sleep 600", () -> elapsed[0], () -> {});
+        passThreshold();
+        elapsed[0] = Duration.ofSeconds(154).toNanos();
+
+        notifier.closed("pane");
+
+        assertThat(deck.notices().getFirst().detail().get()).isEqualTo("Stopped after 2m 34s");
     }
 }
