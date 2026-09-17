@@ -2,7 +2,7 @@
 
 **Status:** Designed. Development branch: `claude/command-notifications` (continuing), from `612a7d6`.
 
-**Revises:** the [finished-command notifications design](2026-09-16-jasper-finished-command-notifications-design.md). That design's bubble was a transient message on completion. This replaces it with a persistent per-session card, and moves completion notices to the OS.
+**Revises:** the [finished-command notifications design](2026-09-16-jasper-finished-command-notifications-design.md). That design's bubble was a transient message on completion. This replaces it with a standing drawer of cards that never auto-hide, and moves completion notices to the OS.
 
 ## Purpose
 
@@ -14,11 +14,15 @@ The bubble shipped as a five-second message shown *after* a command finished, on
 
 ## Confirmed decisions
 
-- **A card per session, created on demand.** A session — one pane — gets a card when its first command passes `notifications.long_command_seconds`. The card then persists, its content updating through later commands, until the pane or tab closes. An idle pane has no card, so four quiet panes are not four cards beside the buddy.
+- **A drawer, not a message.** Nothing auto-hides. The deck is a standing list of what is going on, kept so you can look back at it.
+- **The deck does not know what a pane is.** A notice carries an identity supplied by whatever produced it. The terminal is one producer and uses the pane as the identity, which gives one card per tab/pane/window today. A future sftp transfer or SSH session is another producer with its own identities, and needs no change to the deck.
+- **A card is created on demand** — for the terminal, when a pane's first command passes `notifications.long_command_seconds`. An idle pane has no card, so four quiet panes are not four cards beside the buddy.
+- **Bounded at 50, newest kept.** Oldest fall off silently. Individual cards can be dismissed, and the expanded list has a clear-all.
+- **Cleared on restart.** The drawer covers this run; shell history is the long-term record.
 - **Cards stack.** The newest is fully drawn; older ones peek out a few pixels behind it like a deck, with a count when there are more than three. Clicking anywhere expands the deck into a vertical list.
-- **Clicking an entry focuses that pane** — raise the window, select the tab, focus the pane.
+- **Clicking an entry runs its action.** For a terminal notice that means raise the window, select the tab, focus the pane; a later producer supplies its own. The deck only knows there is a `Runnable`.
 - **Completion goes to the OS when the pane is not focused.** Only the focused pane is quiet: a command finishing in a *visible but unfocused* split pane still notifies. This is a deliberate widening of the previous rule.
-- **The card shows the result and keeps it.** A finished command leaves its card in place showing the outcome, rather than auto-hiding, because the card is the session's status, not a transient message.
+- **The card shows the result and keeps it**, including after its pane closes: the point is to remember. A card whose origin is gone still reads, but no longer clicks.
 - **System font, pill shape, bounce in, grow on hover.**
 
 ## Appearance
@@ -37,30 +41,51 @@ Scaling is about the card's own centre-left anchor so it grows away from the bud
 
 ## The deck
 
-`BuddyBubbleDeck` owns the cards and all of the geometry. One window holds the whole deck, replacing the current one-window-per-bubble arrangement.
+`BuddyBubbleDeck` owns the notices and all of the geometry. One window holds the whole deck, replacing the current one-window-per-bubble arrangement.
+
+The deck deals in notices, not terminals. It never mentions a pane, a tab or a command:
 
 ```java
-/** One session's card. Identity is the pane; content changes as commands come and go. */
-record BubbleCard(Object sessionId, String title, String detail, State state, Runnable focus) {
-    enum State { RUNNING, SUCCEEDED, FAILED }
+/**
+ * One thing worth remembering. {@code key} is whatever produced it — a terminal pane today, an
+ * sftp transfer or an SSH session later — and is what makes a later update replace this notice
+ * rather than stack on top of it. Two producers can never collide because {@code source} is part
+ * of the key.
+ */
+record BuddyNotice(String source, Object key, String title, String detail, State state,
+                   long at, Runnable activate) {
+    /** Deliberately not "running/succeeded/failed": a transfer is in progress, not running. */
+    enum State { ACTIVE, DONE, FAILED }
+
+    /** Its origin is gone — the pane closed. Nothing to click, but still worth reading. */
+    boolean orphaned() { return activate == null; }
 }
 ```
 
-- `upsert(card)` adds a card or replaces the one with the same `sessionId`, and moves it to the top of the stack.
-- `remove(sessionId)` drops a card when its pane closes.
-- `cards()` is newest first.
+- `post(notice)` adds a notice, or replaces the one with the same `source` and `key`, and moves it to the top.
+- `dismiss(source, key)` removes one; `clear()` empties the drawer.
+- `orphan(source, key)` clears a notice's action when its origin goes away. Orphaning is deliberately *not* a fourth `State`: a pane that closes after its build succeeded must still read "Finished in 1m 12s". The outcome and the reachability are two facts, so they are two fields — a null `activate` is the whole of it, and `orphaned()` derives rather than duplicates.
+- `notices()` is newest first, capped at `MAX_NOTICES = 50`.
 
-Collapsed, the top card is drawn in full and each card behind it is offset 4px down and inset 6px, up to three visible; beyond that the deck draws a count. Expanded, the cards are laid out vertically with 6px between them, and the whole list is clipped to the screen's usable height.
+The terminal producer is the only caller today. It passes `source = "terminal"` and the pane as the key, which is what makes "one card per tab/pane/window" fall out without the deck knowing why.
 
-**Closing the expanded list** is on pointer exit, matching the bubble's existing dismiss. The user did not pick a close mechanism, and a list with no way back would be a trap; this is the least surprising choice and is one line to change.
+Collapsed, the top card is drawn in full and each card behind it is offset 4px down and inset 6px, up to three visible; beyond that the deck draws a count. Expanded, the cards are laid out vertically with 6px between them.
+
+**Dismissing.** Each card grows a small × in its top-right corner on hover, which removes that one notice. The expanded list ends with a **Clear all** row. Both are drawn by the deck and hit-tested by the deck; neither is a Swing component, matching how the bubble already works.
+
+**Scrolling.** Fifty cards do not fit any screen, so the expanded list scrolls on the wheel: one offset, clamped to the content height, reset on collapse. Capping the list and silently hiding the rest would make the drawer lie about what it holds.
+
+**Closing the expanded list** is on pointer exit, matching the bubble's existing dismiss. The user did not pick a close mechanism, and a list with no way back would be a trap. The × and **Clear all** targets sit inside the list's bounds, so reaching for one never grazes outside and collapses the thing you were aiming at.
 
 ## What a card says
 
 | State | Title | Detail | Glyph |
 |---|---|---|---|
-| `RUNNING` | the command | `Running · 1m 12s`, ticking | none |
-| `SUCCEEDED` | the command | `Finished in 1m 12s` | check |
+| `ACTIVE` | the command | `Running · 1m 12s`, ticking | none |
+| `DONE` | the command | `Finished in 1m 12s` | check |
 | `FAILED` | the command | `Exited 2 · 1m 12s` | cross |
+
+An orphaned card keeps all three and simply draws dimmer. An orphaned `ACTIVE` card — the pane closed mid-command — stops ticking and reads `Stopped after 1m 12s`, because nothing will ever finish it.
 
 The running elapsed time updates from the buddy window's repaint timer, which already runs while the buddy is visible. The title collapses newlines to `↵` and truncates, as it does today.
 
@@ -68,9 +93,9 @@ The running elapsed time updates from the buddy window's repaint timer, which al
 
 `CommandNotifier` changes shape: it no longer decides *whether* to show a bubble, only whether to notify the OS.
 
-- **`passedThreshold(sessionId, command, focus)`** — upserts a `RUNNING` card and starts the buddy typing. This happens whatever has focus: the card is status, not an interruption.
-- **`finished(sessionId, command, exitStatus, ran, origin, focus)`** — upserts a `SUCCEEDED` or `FAILED` card, stops the typing when it was the last running command, and sends a **system notification** when `origin` says the pane was not focused.
-- **`closed(sessionId)`** — removes the card and releases any running count.
+- **`passedThreshold(sessionId, command, focus)`** — posts an `ACTIVE` notice and starts the buddy typing. This happens whatever has focus: the card is status, not an interruption.
+- **`finished(sessionId, command, exitStatus, ran, origin, focus)`** — posts a `DONE` or `FAILED` notice over the same key, stops the typing when it was the last running command, and sends a **system notification** when `origin` says the pane was not focused.
+- **`closed(sessionId)`** — orphans the notice rather than removing it, and releases any running count. The drawer keeps what happened; it just cannot take you there any more.
 
 `CommandNotice.Origin` gains `ownPaneFocused`, and `shouldNotify` becomes: notify unless the command's own pane had keyboard focus in an active window. A command shorter than the threshold still notifies nobody and gets no card.
 
@@ -78,23 +103,25 @@ The buddy being hidden or disabled no longer changes the *channel* — a hidden 
 
 ## Errors and edge cases
 
-- A pane that closes while its command runs has its card removed and its running count released, so the buddy stops typing.
+- A pane that closes while its command runs has its notice orphaned and its running count released, so the buddy stops typing. An orphaned card reads the same but does nothing when clicked.
+- The fifty-first notice pushes the oldest out silently. With one card per pane that bound is unreachable today; it becomes real once a producer posts per-item notices, which is exactly the case this design is meant not to corner.
 - A session whose command finishes while the deck is expanded updates in place; the list does not jump or reorder, because reordering under the pointer would misfire a click.
-- More cards than fit the screen height: the expanded list is capped and the oldest are dropped from view, never the newest.
+- More cards than fit the screen height: the list scrolls, and the scroll offset is clamped so it can neither run past the last card nor above the first.
+- Dismissing the last card leaves an empty deck, which draws nothing at all rather than an empty frame.
 - Scaling never makes a card exceed its window bounds; the window is sized for the largest scale so a growing card is not clipped.
 - With no shell integration nothing reaches the notifier, so there are no cards at all — unchanged, and still stated in the documentation.
 
 ## Testing
 
 - Fonts: the resolved family is the system font on macOS and a real family elsewhere; `"SF Pro"` is asserted **not** to be used, since it silently resolves to Dialog.
-- Deck: `upsert` replaces by `sessionId` and promotes to the top; `remove` drops one; `cards()` is newest first; the visible count caps at three plus a remainder.
-- Geometry: collapsed offsets, expanded list positions, and that the expanded height is clipped rather than overflowing.
+- Deck: `post` replaces by source and key and promotes to the top; two sources with the same key never collide; `dismiss` and `clear` remove; `orphan` keeps the card but drops its action; `notices()` is newest first and caps at fifty, dropping the oldest.
+- Geometry: collapsed offsets, expanded list positions, the scroll offset clamping at both ends, and that a dismiss × hit-tests to the card it is drawn on rather than the one behind it.
 - Animation: the in-curve starts below 1, exceeds 1 once, and settles at exactly 1; hover grows and returns; every animation is driven by ticks, so a test advances time rather than sleeping.
-- Routing: a threshold pass creates a `RUNNING` card with no notification; a finish updates the same card and notifies only when the pane was unfocused; a close removes the card and stops the typing.
+- Routing: a threshold pass creates an `ACTIVE` notice with no notification; a finish replaces the same notice and notifies only when the pane was unfocused; a close orphans rather than removes, and stops the typing.
 - `shouldNotify`: every combination of the origin booleans including the new pane one.
 
 User-run afterwards: several long commands across tabs and splits on the real desktop, watching the deck stack, expand, and the cards update.
 
 ## Out of scope
 
-Dismissing a single finished card; a keyboard route into the deck; sound; grouping by tab rather than pane; notification history beyond the live cards.
+A keyboard route into the deck; sound; grouping by tab rather than pane; persisting the drawer across restarts; and the future producers themselves — sftp and SSH are the reason the deck is source-keyed, but nothing here implements them.
