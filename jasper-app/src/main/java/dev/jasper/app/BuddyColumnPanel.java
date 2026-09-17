@@ -32,6 +32,7 @@ final class BuddyColumnPanel extends JComponent {
     private int hovered = -1;
     private int leaving = -1;
     private long hoverChangedAt;
+    private boolean lastFrameMoving = true;
 
     BuddyColumnPanel(BuddyDeck deck, Runnable onLayoutChanged, Runnable onOpenDrawer) {
         this.deck = Objects.requireNonNull(deck, "deck");
@@ -97,6 +98,22 @@ final class BuddyColumnPanel extends JComponent {
     boolean needsAnimationFrames() { return animating() || deck.column().stream().anyMatch(BuddyCard::shimmers); }
 
     boolean needsDetailUpdates() { return deck.column().stream().anyMatch(BuddyNotice::live); }
+
+    /** Settled shimmer changes only the subtext, not the full translucent shadow surface. */
+    void repaintFrame() {
+        boolean moving = animating();
+        if (moving || lastFrameMoving) repaint();
+        else {
+            List<BuddyNotice> column = deck.column();
+            for (int i = 0; i < BuddyDeckLayout.visibleInColumn(column.size()); i++) {
+                if (!column.get(i).live()) continue;
+                Rectangle bounds = cardBounds(i);
+                repaint(bounds.x + BuddyCard.PAD_X, bounds.y + 28,
+                    bounds.width - 2 * BuddyCard.PAD_X, 18);
+            }
+        }
+        lastFrameMoving = moving;
+    }
 
     int hovered() { return hovered; }
 

@@ -29,6 +29,9 @@ final class BuddyDeck {
      * the arrival animation came to have no production caller at all.
      */
     private int generation;
+    private List<BuddyNotice> columnSnapshot, noticeSnapshot;
+
+    private void changed() { columnSnapshot = null; noticeSnapshot = null; }
 
     /** Adds a notice, or replaces the one with the same source and key and promotes it to the top. */
     void post(BuddyNotice notice) {
@@ -38,6 +41,7 @@ final class BuddyDeck {
         seen.remove(new Id(notice.source(), notice.key()));
         notices.addFirst(notice);
         generation++;
+        changed();
         while (notices.size() > MAX_NOTICES) seen.remove(idOf(notices.removeLast()));
     }
 
@@ -47,6 +51,7 @@ final class BuddyDeck {
             BuddyNotice notice = notices.get(i);
             if (!notice.sameAs(source, key)) continue;
             if (notice.title().equals(title)) return false;
+            changed();
             notices.set(i, new BuddyNotice(notice.source(), notice.key(), notice.kind(), title,
                 notice.state(), notice.detail(), notice.activate()));
             return true;
@@ -56,17 +61,20 @@ final class BuddyDeck {
 
     /** Removes one notice; true when there was one to remove. */
     boolean dismiss(String source, Object key) {
+        changed();
         seen.remove(new Id(source, key));
         return notices.removeIf(notice -> notice.sameAs(source, key));
     }
 
     void clear() {
+        changed();
         notices.clear();
         seen.clear();
     }
 
     /** You looked at it. Only matters once it stops being live. */
     void acknowledge(String source, Object key) {
+        changed();
         if (notices.stream().anyMatch(notice -> notice.sameAs(source, key))) seen.add(new Id(source, key));
     }
 
@@ -74,7 +82,9 @@ final class BuddyDeck {
 
     /** What belongs above his head: still happening, or not yet seen. Newest first. */
     List<BuddyNotice> column() {
-        return notices.stream().filter(notice -> notice.live() || !seen.contains(idOf(notice))).toList();
+        if (columnSnapshot == null)
+            columnSnapshot = notices.stream().filter(notice -> notice.live() || !seen.contains(idOf(notice))).toList();
+        return columnSnapshot;
     }
 
     private static Id idOf(BuddyNotice notice) { return new Id(notice.source(), notice.key()); }
@@ -84,6 +94,7 @@ final class BuddyDeck {
      * responding, because there is nowhere left to go.
      */
     void orphan(String source, Object key) {
+        changed();
         notices.replaceAll(notice -> notice.sameAs(source, key)
             ? new BuddyNotice(notice.source(), notice.key(), notice.kind(), notice.title(),
                 notice.state(), notice.detail(), null)
@@ -98,6 +109,7 @@ final class BuddyDeck {
      */
     void orphan(String source, Object key, String finalDetail) {
         Objects.requireNonNull(finalDetail, "finalDetail");
+        changed();
         notices.replaceAll(notice -> notice.sameAs(source, key)
             ? new BuddyNotice(notice.source(), notice.key(), notice.kind(), notice.title(),
                 notice.state(), () -> finalDetail, null)
@@ -105,7 +117,10 @@ final class BuddyDeck {
     }
 
     /** Newest first. A copy: the caller may be painting while a producer posts. */
-    List<BuddyNotice> notices() { return List.copyOf(notices); }
+    List<BuddyNotice> notices() {
+        if (noticeSnapshot == null) noticeSnapshot = List.copyOf(notices);
+        return noticeSnapshot;
+    }
 
     /** Changes when, and only when, something is posted. */
     int generation() { return generation; }

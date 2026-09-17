@@ -1,5 +1,36 @@
 # Jasper — Status and Handoff
 
+**Buddy drag performance and presentation coordination (2026-09-17):** The user
+reported dropped frames and tearing while dragging. Pointer events previously
+moved the buddy immediately, rebuilt/revalidated the notification column, queried
+monitor geometry, and resized/showed its native window while an independent column
+timer also moved/repainted it. Dragging now consumes the latest pointer position
+on one coalescing 16ms EDT clock, moving buddy and column in the same callback. The
+column's independent timer is suspended during dragging and resumes afterward;
+release flushes the last position, and hide/dispose cancel pending moves. A paused
+pointer still advances spring/shimmer frames. Geometry-only moves retain notice
+motion and use the monitor snapshot captured at drag start; native size/location/
+visibility setters run only when changed.
+
+Static translucent capsule material (fill, outline and clipped outer shadow) is
+cached in bounded 2x premultiplied images. Immutable deck snapshots are cached
+until mutation, and settled column shimmer invalidates only the subtext region.
+The actual 2x three-card headless benchmark improved from median **0.983ms / p95
+1.251ms / p99 1.454ms** to **0.731ms / 0.896ms / 0.981ms**. Before/after RGBA renders
+differed in only 12 pixels, by at most one channel value. This measures Java2D
+paint CPU cost, not native dragging FPS or WindowServer presentation. Separate
+native windows still cannot promise atomic/vsynced presentation; desktop tearing
+acceptance remains user-run, with no unverified claim that it is eliminated.
+
+`./gradlew check`: **1,004 tests, 1,002 passed, two existing skips, no failures/errors**
+(app 682/681/1; terminal 322/321/1). New drag-clock tests cover pointer bursts,
+paused-pointer animation, final-position flushing and cancellation. Existing buddy
+geometry, material, title/state, hit-testing and motion regressions pass. Source
+hygiene and diff checks pass. Reproduce CPU measurements with
+`:jasper-app:buddyPerformanceMeasurement` (headless; no native window or shell).
+No GUI, commit or push.
+
+
 **Buddy shimmer and fluid screen placement (2026-09-17):** The additional
 14:35:58 recording was extracted into all 482 original frames with ffmpeg, with
 ffprobe timestamps. On the same notification worktree, RUNNING subtext now has a

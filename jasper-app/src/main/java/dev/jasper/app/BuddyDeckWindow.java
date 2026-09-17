@@ -115,9 +115,10 @@ final class BuddyDeckWindow {
         if (disposed || anchor == null) return;
         Dimension size = panel.getPreferredSize();
         if (!shows(false, anchor, deck.isEmpty(), size)) { frames.stop(); window.setVisible(false); return; }
-        window.setSize(size);
-        window.setLocation(BuddyBubblePlacement.beside(anchor, size, screenFor(anchor)));
-        window.setVisible(true);
+        if (!size.equals(window.getSize())) window.setSize(size);
+        Point next = BuddyBubblePlacement.beside(anchor, size, screenFor(anchor));
+        if (!next.equals(window.getLocation())) window.setLocation(next);
+        if (!window.isVisible()) window.setVisible(true);
         panel.repaint();
         if (panel.needsDetailUpdates() && !frames.isRunning()) {
             frames.setDelay(panel.needsAnimationFrames() ? 16 : 1000);

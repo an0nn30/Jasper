@@ -116,3 +116,28 @@ Tests cover highlight direction and glyph-only changes, completed-task stability
 midpoint/edge placement, interrupted flips, velocity continuity, monitor bounds,
 initial placement, direction-order interpolation, and pointer targets. Native
 macOS compositing and pointer dragging remain user-run acceptance under AGENTS.md.
+
+
+## Drag performance follow-up (2026-09-17)
+
+High-rate pointer events no longer rebuild the column or compete with its animation
+timer. `BuddyDragFrames` holds only the newest pointer position, presents buddy and
+column from a shared 16ms callback while dragging, keeps advancing animations while
+the pointer pauses, and flushes the final position on release. The column resumes
+its ordinary clock afterward. Monitor geometry is sampled at drag start, not per
+pointer frame. Unchanged native size/location/visibility writes are skipped.
+
+The unchanged rounded material and shadow are cached as bounded 2x premultiplied
+images. Title/detail/shimmer remain live; light/dark materials have distinct cache
+keys. Deck list snapshots invalidate on every relevant mutation. Settled shimmer
+requests only its text rectangle, with a full final frame after movement settles.
+
+Run `./gradlew :jasper-app:buddyPerformanceMeasurement` for the headless actual-paint
+benchmark (three running capsules at 2x, 200 warm-up and 600 measured frames). On the
+development Mac the median/p95/p99 fell from 0.983/1.251/1.454ms to
+0.731/0.896/0.981ms. RGBA before/after images differed by at most one channel value
+in 12 pixels. These timings exclude native window movement, desktop composition,
+and refresh synchronization. Coordinating requests reduces conflicting native
+updates, but separate JWindows do not provide an atomic compositor transaction;
+native tearing must be checked on the user's display. No rendering-backend or
+system-wide graphics settings were changed.

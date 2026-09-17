@@ -31,6 +31,8 @@ final class BuddyCard {
     private static final Color DARK_FILL = new Color(37, 37, 37, 222);
     private static final Color LIGHT_FILL = new Color(248, 248, 248, 230);
     private static final BufferedImage SHADOW = shadow();
+    private record Material(int width, int height, boolean dark) { }
+    private static final java.util.Map<Material, BufferedImage> MATERIALS = new java.util.LinkedHashMap<>();
 
     private BuddyCard() { }
 
@@ -74,26 +76,9 @@ final class BuddyCard {
             c.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             c.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             c.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
-            RoundRectangle2D body = new RoundRectangle2D.Float(0, 0, bounds.width, bounds.height,
-                bounds.height, bounds.height);
-            Graphics2D shadow = (Graphics2D) c.create();
-            try {
-                // An outer shadow must not darken the translucent material from underneath.
-                java.awt.geom.Area outside = new java.awt.geom.Area(new Rectangle(-SHADOW_MARGIN,
-                    -SHADOW_MARGIN, bounds.width + 2 * SHADOW_MARGIN, bounds.height + 2 * SHADOW_MARGIN));
-                outside.subtract(new java.awt.geom.Area(body));
-                shadow.clip(outside);
-                shadow.setComposite(AlphaComposite.SrcOver.derive(alpha * (dark ? 0.025f : 0.105f)));
-                shadow.drawImage(SHADOW, -SHADOW_MARGIN, -SHADOW_MARGIN,
-                    bounds.width + 2 * SHADOW_MARGIN, bounds.height + 2 * SHADOW_MARGIN, null);
-            } finally { shadow.dispose(); }
             c.setComposite(AlphaComposite.SrcOver.derive(alpha));
-            c.setColor(dark ? DARK_FILL : LIGHT_FILL);
-            c.fill(body);
-            c.setColor(new Color(255, 255, 255, dark ? 35 : 215));
-            c.setStroke(new BasicStroke(0.75f));
-            c.draw(new RoundRectangle2D.Float(0.375f, 0.375f, bounds.width - 0.75f, bounds.height - 0.75f,
-                bounds.height - 0.75f, bounds.height - 0.75f));
+            c.drawImage(material(bounds.width, bounds.height, dark), -SHADOW_MARGIN, -SHADOW_MARGIN,
+                bounds.width + 2 * SHADOW_MARGIN, bounds.height + 2 * SHADOW_MARGIN, null);
 
             int right = bounds.width - PAD_X;
             if (dismissable) {
@@ -130,6 +115,38 @@ final class BuddyCard {
                 if (shimmers(notice)) paintShimmer(text, detail, right, hover, dark, now);
             } finally { text.dispose(); }
         } finally { c.dispose(); }
+    }
+
+    /** Rasterize the unchanged material once, rather than clipping its shadow on every 60 Hz frame. */
+    private static synchronized BufferedImage material(int width, int height, boolean dark) {
+        Material key = new Material(width, height, dark);
+        BufferedImage cached = MATERIALS.get(key);
+        if (cached != null) return cached;
+        BufferedImage image = new BufferedImage((width + 2 * SHADOW_MARGIN) * 2,
+            (height + 2 * SHADOW_MARGIN) * 2, BufferedImage.TYPE_INT_ARGB_PRE);
+        Graphics2D c = image.createGraphics();
+        try {
+            c.scale(2, 2); c.translate(SHADOW_MARGIN, SHADOW_MARGIN);
+            c.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            c.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+            RoundRectangle2D body = new RoundRectangle2D.Float(0, 0, width, height, height, height);
+            Graphics2D shadow = (Graphics2D) c.create();
+            try {
+                java.awt.geom.Area outside = new java.awt.geom.Area(new Rectangle(-SHADOW_MARGIN,
+                    -SHADOW_MARGIN, width + 2 * SHADOW_MARGIN, height + 2 * SHADOW_MARGIN));
+                outside.subtract(new java.awt.geom.Area(body)); shadow.clip(outside);
+                shadow.setComposite(AlphaComposite.SrcOver.derive(dark ? .025f : .105f));
+                shadow.drawImage(SHADOW, -SHADOW_MARGIN, -SHADOW_MARGIN,
+                    width + 2 * SHADOW_MARGIN, height + 2 * SHADOW_MARGIN, null);
+            } finally { shadow.dispose(); }
+            c.setColor(dark ? DARK_FILL : LIGHT_FILL); c.fill(body);
+            c.setColor(new Color(255, 255, 255, dark ? 35 : 215)); c.setStroke(new BasicStroke(.75f));
+            c.draw(new RoundRectangle2D.Float(.375f, .375f, width - .75f, height - .75f, height - .75f, height - .75f));
+        } finally { c.dispose(); }
+        // Normal surfaces need two entries. Bound unusual preview/test sizes as well.
+        if (MATERIALS.size() >= 4) MATERIALS.clear();
+        MATERIALS.put(key, image);
+        return image;
     }
 
     /** A soft moving highlight confined to the detail glyphs; no card glow or opacity pulsing. */

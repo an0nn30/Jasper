@@ -24,7 +24,8 @@ final class BuddyColumnWindow {
     private final Timer frames = new Timer(16, event -> tick());
     private Rectangle anchor;
     private final BuddyColumnPlacement placement = new BuddyColumnPlacement();
-    private boolean disposed;
+    private boolean disposed, dragging;
+    private List<Rectangle> screens = List.of();
 
     BuddyColumnWindow(BuddyDeck deck, Runnable onOpenDrawer) {
         this.deck = Objects.requireNonNull(deck, "deck");
@@ -48,10 +49,10 @@ final class BuddyColumnWindow {
     }
 
     private void tick() {
-        if (disposed || !window.isVisible()) { frames.stop(); return; }
+        if (disposed || dragging || !window.isVisible()) { frames.stop(); return; }
         Point next = placement.at(System.nanoTime());
         if (!next.equals(window.getLocation())) window.setLocation(next);
-        panel.repaint();
+        panel.repaintFrame();
         if (!moving() && !panel.needsDetailUpdates()) frames.stop();
         else frames.setDelay(moving() ? 16 : 1000);
     }
@@ -60,7 +61,7 @@ final class BuddyColumnWindow {
 
     /** Called whenever the panel starts something moving; harmless when it is already running. */
     private void animate() {
-        if (disposed || !window.isVisible() || (!moving() && !panel.needsDetailUpdates())) return;
+        if (disposed || dragging || !window.isVisible() || (!moving() && !panel.needsDetailUpdates())) return;
         int delay = moving() ? 16 : 1000;
         boolean speedUp = delay < frames.getDelay();
         frames.setDelay(delay);
@@ -81,14 +82,33 @@ final class BuddyColumnWindow {
     void showBeside(Rectangle anchorOnScreen) {
         if (disposed) return;
         anchor = new Rectangle(anchorOnScreen);
+        refreshScreens();
         panel.refresh();
     }
+
+    void beginDrag() {
+        if (disposed) return;
+        dragging = true;
+        frames.stop();
+        refreshScreens();
+    }
+
+    /** Geometry only: no notice rebuild, revalidation or monitor queries on pointer frames. */
+    void moveBeside(Rectangle anchorOnScreen) {
+        if (disposed) return;
+        anchor = new Rectangle(anchorOnScreen);
+        layout();
+        if (window.isVisible()) panel.repaintFrame();
+    }
+
+    void endDrag() { dragging = false; animate(); }
 
     void refresh() { panel.refresh(); }
 
     void hide() {
         if (disposed) return;
         frames.stop();
+        dragging = false;
         window.setVisible(false);
     }
 
@@ -112,9 +132,10 @@ final class BuddyColumnWindow {
         boolean below = placement.update(anchor, size, screen, now, snap);
         panel.setBelow(below, snap);
         if (size.width <= 0 || size.height <= 0) { window.setVisible(false); return; }
-        window.setSize(size);
-        window.setLocation(placement.at(now));
-        window.setVisible(true);
+        if (!size.equals(window.getSize())) window.setSize(size);
+        Point next = placement.at(now);
+        if (!next.equals(window.getLocation())) window.setLocation(next);
+        if (!window.isVisible()) window.setVisible(true);
         animate();
     }
 
@@ -127,10 +148,13 @@ final class BuddyColumnWindow {
             Math.max(screen.y, Math.min(y, screen.y + screen.height - size.height)));
     }
 
-    private static Rectangle screenFor(Rectangle anchor) {
-        if (GraphicsEnvironment.isHeadless()) return new Rectangle(0, 0, 1280, 800);
-        List<Rectangle> screens = BuddyWindow.usableScreens();
-        if (screens.isEmpty()) return new Rectangle(0, 0, 1280, 800);
+    private void refreshScreens() {
+        screens = GraphicsEnvironment.isHeadless() ? List.of() : BuddyWindow.usableScreens();
+        if (screens.isEmpty()) screens = List.of(new Rectangle(0, 0, 1280, 800));
+    }
+
+    private Rectangle screenFor(Rectangle anchor) {
+        if (screens.isEmpty()) refreshScreens();
         for (Rectangle screen : screens) {
             if (screen.contains((int) anchor.getCenterX(), (int) anchor.getCenterY())) return screen;
         }

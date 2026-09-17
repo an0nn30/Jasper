@@ -29,6 +29,10 @@ public final class BuddyPerformanceMeasurement {
                 } finally { g.dispose(); }
                 if (frame >= 0) samples[frame] = System.nanoTime() - start;
             }
+            if (args.length > 0) {
+                try { javax.imageio.ImageIO.write(image, "png", new java.io.File(args[0])); }
+                catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+            }
             Arrays.sort(samples);
             System.out.printf("3 running capsules at 2x: median %.3f ms, p95 %.3f ms, p99 %.3f ms%n",
                 samples[300]/1e6, samples[570]/1e6, samples[594]/1e6);
