@@ -44,7 +44,8 @@ There is no second executable. Startup resolves which role this process plays:
 
 - **Launcher** (default). Before any AWT or Swing initialization, attempt the handoff. If a resident process accepts, exit 0. Doing this ahead of toolkit init is what makes the handoff near-instant, and on macOS it avoids a second Dock icon settling in before the process goes away.
 - **Resident** (`--background`, the form written into the login item). Full startup, warm-up pass, bind the socket, open no window.
-- **App** (no daemon answered, or `--config` was given). Today's path exactly. It additionally binds the socket, and if `background.enabled` is on it stays resident when its last window closes.
+- **App** (no daemon answered). Today's path exactly. It additionally binds the socket, and if `background.enabled` is on it stays resident when its last window closes.
+- **Standalone** (`--config <path>`). Today's path and nothing else: no handoff, no bind, never resident, and the login item untouched. See below.
 
 `AppArguments` gains `--background`; `AppArguments.USAGE` becomes
 `Usage: jasper [--config <path>] [--background] [--help]`. Passing it twice is rejected like a duplicate `--help`.
@@ -86,7 +87,11 @@ A stale resident process **exits only if it has no windows open.** If the user s
 
 **Stale sockets.** After a crash the socket file remains. Binding is therefore: take a `FileLock` on `<AppDirs.root>/daemon.lock`; try to connect to any existing socket; if the connect succeeds, this process is not the owner; if it fails, unlink and bind. The lock makes check-unlink-bind atomic, so two simultaneous cold launches cannot both conclude they are the owner.
 
-**`--config` never hands off.** A launch pointed at a different configuration file runs standalone, because the resident process is holding a different configuration entirely.
+**A `--config` launch is fully standalone.** It does not hand off, does not bind the endpoint, is never resident, and does not touch the login item.
+
+Refusing the handoff is the obvious half: the resident process is holding a different configuration entirely. Refusing to *bind* is the half that is easy to miss and matters just as much. The endpoint's path comes from the real `AppDirs`, not from the override — so a `jasper --config other.toml` whose override happened to set `background.enabled = true` would claim the shared endpoint, and the next plain `jasper` would hand off to it and be given a window built from `other.toml`. That is precisely the invariant refusing the handoff exists to protect, so both sides have to refuse or neither does.
+
+The login item follows the same rule, for a different reason: it points at the installed application with no `--config`, so registering autostart from an override's setting would arm the *default* configuration's Jasper — something the user never asked for.
 
 ## Lifecycle
 
