@@ -25,7 +25,7 @@ class BuddyDeckPanelTest {
     }
 
     private void post(String key, String title) {
-        deck.post(new BuddyNotice("terminal", key, title, BuddyNotice.State.DONE,
+        deck.post(new BuddyNotice("terminal", key, BuddyNotice.Kind.TASK, title, BuddyNotice.State.DONE,
             () -> "Finished in 1m 12s", () -> activated.add(title)));
         panel.arrived();
     }
@@ -202,7 +202,7 @@ class BuddyDeckPanelTest {
 
     @Test void aRunningCardTicksWithoutTheDeckBeingRePosted() {
         long[] elapsed = {0};
-        deck.post(new BuddyNotice("terminal", "a", "sleep 600", BuddyNotice.State.ACTIVE,
+        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "sleep 600", BuddyNotice.State.RUNNING,
             () -> "Running · " + elapsed[0] + "s", () -> { }));
         panel.arrived();
         layout();
@@ -226,7 +226,7 @@ class BuddyDeckPanelTest {
 
     /** A producer's supplier is arbitrary code; a broken one must not take the drawer down. */
     @Test void aDetailSupplierThatThrowsDoesNotStopTheDrawerPainting() {
-        deck.post(new BuddyNotice("terminal", "a", "broken", BuddyNotice.State.ACTIVE,
+        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "broken", BuddyNotice.State.RUNNING,
             () -> { throw new IllegalStateException("boom"); }, () -> { }));
         panel.arrived();
         layout();

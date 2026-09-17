@@ -40,7 +40,7 @@ class CommandNotifierTest {
 
         assertThat(deck.notices()).singleElement().satisfies(notice -> {
             assertThat(notice.title()).isEqualTo("./gradlew build");
-            assertThat(notice.state()).isEqualTo(BuddyNotice.State.ACTIVE);
+            assertThat(notice.state()).isEqualTo(BuddyNotice.State.RUNNING);
         });
         assertThat(os).isEmpty();
         assertThat(working).containsExactly(true);

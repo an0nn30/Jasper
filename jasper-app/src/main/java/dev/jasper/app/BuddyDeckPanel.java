@@ -310,7 +310,7 @@ final class BuddyDeckPanel extends JComponent {
                     card.height - PAD_Y - small.getHeight() + small.getAscent());
                 right = card.width - PAD_X - small.stringWidth(badge) - GLYPH_GAP;
             }
-            if (notice.state() != BuddyNotice.State.ACTIVE) {
+            if (notice.wantsAttention()) {
                 paintGlyph(c, notice.state() == BuddyNotice.State.DONE,
                     right - GLYPH_SIZE, (card.height - GLYPH_SIZE) / 2);
                 right -= GLYPH_SIZE + GLYPH_GAP;

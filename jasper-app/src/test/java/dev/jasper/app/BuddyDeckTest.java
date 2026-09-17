@@ -8,8 +8,13 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 class BuddyDeckTest {
     private final BuddyDeck deck = new BuddyDeck();
 
+    private static BuddyNotice running(String source, Object key, String title) {
+        return new BuddyNotice(source, key, BuddyNotice.Kind.TASK, title,
+            BuddyNotice.State.RUNNING, () -> "running", () -> { });
+    }
+
     private static BuddyNotice notice(String source, Object key, String title) {
-        return new BuddyNotice(source, key, title, BuddyNotice.State.DONE, () -> "done", () -> { });
+        return new BuddyNotice(source, key, BuddyNotice.Kind.TASK, title, BuddyNotice.State.DONE, () -> "done", () -> { });
     }
 
     @Test void noticesComeBackNewestFirst() {
@@ -57,7 +62,7 @@ class BuddyDeckTest {
      * still say the build succeeded. Orphaning is a lost action, not a lost outcome.
      */
     @Test void orphaningKeepsTheOutcomeAndOnlyTakesAwayTheAction() {
-        deck.post(new BuddyNotice("terminal", "a", "./gradlew build", BuddyNotice.State.DONE,
+        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "./gradlew build", BuddyNotice.State.DONE,
             () -> "Finished in 1m 12s", () -> { }));
 
         deck.orphan("terminal", "a", "Finished in 1m 12s");
@@ -71,7 +76,7 @@ class BuddyDeckTest {
     }
 
     @Test void orphaningFreezesARunningNoticeSoItStopsTicking() {
-        deck.post(new BuddyNotice("terminal", "a", "sleep 600", BuddyNotice.State.ACTIVE,
+        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "sleep 600", BuddyNotice.State.RUNNING,
             () -> "Running · " + System.nanoTime(), () -> { }));
 
         deck.orphan("terminal", "a", "Stopped after 1m 12s");
@@ -106,12 +111,12 @@ class BuddyDeckTest {
 
     @Test void aNoticeNeedsAnIdentityAndSomethingToSay() {
         assertThatIllegalArgumentException().isThrownBy(() ->
-            new BuddyNotice("terminal", "a", "  ", BuddyNotice.State.DONE, () -> "d", () -> { }));
+            new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "  ", BuddyNotice.State.DONE, () -> "d", () -> { }));
     }
 
     /** The two-argument form is for a running notice only; this one must not rewrite what it said. */
     @Test void orphaningWithoutAReplacementKeepsWhatTheNoticeSaid() {
-        deck.post(new BuddyNotice("terminal", "a", "./gradlew build", BuddyNotice.State.DONE,
+        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "./gradlew build", BuddyNotice.State.DONE,
             () -> "Finished in 1m 12s", () -> { }));
 
         deck.orphan("terminal", "a");
@@ -120,5 +125,79 @@ class BuddyDeckTest {
         assertThat(orphan.detail().get()).isEqualTo("Finished in 1m 12s");
         assertThat(orphan.state()).isEqualTo(BuddyNotice.State.DONE);
         assertThat(orphan.orphaned()).isTrue();
+    }
+
+    /** The column's whole rule: still happening, or you have not looked at it yet. */
+    @Test void theColumnHoldsWhatIsLiveOrUnseen() {
+        deck.post(running("terminal", "a", "a build"));
+        deck.post(notice("terminal", "b", "a finished thing"));
+
+        assertThat(deck.column()).extracting(BuddyNotice::title)
+            .containsExactly("a finished thing", "a build");
+    }
+
+    @Test void lookingAtAFinishedNoticeTakesItOutOfTheColumnButNotTheDrawer() {
+        deck.post(notice("terminal", "b", "a finished thing"));
+
+        deck.acknowledge("terminal", "b");
+
+        assertThat(deck.column()).isEmpty();
+        assertThat(deck.notices()).extracting(BuddyNotice::title).containsExactly("a finished thing");
+        assertThat(deck.acknowledged("terminal", "b")).isTrue();
+    }
+
+    /** It is live, so looking at it changes nothing until it stops being live. */
+    @Test void lookingAtSomethingStillRunningLeavesItInTheColumn() {
+        deck.post(running("terminal", "a", "a build"));
+
+        deck.acknowledge("terminal", "a");
+
+        assertThat(deck.column()).extracting(BuddyNotice::title).containsExactly("a build");
+    }
+
+    /** Or a flapping tunnel would go quiet after the first drop. */
+    @Test void aNewStateOverAnAcknowledgedKeyAsksForAttentionAgain() {
+        deck.post(running("terminal", "a", "a build"));
+        deck.acknowledge("terminal", "a");
+
+        deck.post(notice("terminal", "a", "a build"));
+
+        assertThat(deck.acknowledged("terminal", "a")).isFalse();
+        assertThat(deck.column()).extracting(BuddyNotice::title).containsExactly("a build");
+    }
+
+    @Test void acknowledgingSomethingThatIsNotThereIsHarmless() {
+        deck.acknowledge("terminal", "missing");
+
+        assertThat(deck.acknowledged("terminal", "missing")).isFalse();
+    }
+
+    @Test void dismissingForgetsTheAcknowledgementToo() {
+        deck.post(notice("terminal", "a", "one"));
+        deck.acknowledge("terminal", "a");
+
+        deck.dismiss("terminal", "a");
+        deck.post(notice("terminal", "a", "one again"));
+
+        assertThat(deck.column()).extracting(BuddyNotice::title).containsExactly("one again");
+    }
+
+    @Test void clearingForgetsEveryAcknowledgement() {
+        deck.post(notice("terminal", "a", "one"));
+        deck.acknowledge("terminal", "a");
+
+        deck.clear();
+        deck.post(notice("terminal", "a", "one again"));
+
+        assertThat(deck.column()).hasSize(1);
+    }
+
+    /** The oldest falling off must not leave its acknowledgement behind to leak forever. */
+    @Test void aNoticePushedOutByTheBoundTakesItsAcknowledgementWithIt() {
+        deck.post(notice("terminal", "first", "first"));
+        deck.acknowledge("terminal", "first");
+        for (int i = 0; i < BuddyDeck.MAX_NOTICES; i++) deck.post(notice("terminal", "k" + i, "n" + i));
+
+        assertThat(deck.acknowledged("terminal", "first")).isFalse();
     }
 }

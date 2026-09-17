@@ -78,7 +78,7 @@ final class CommandNotifier {
             flight.passed = true;
             flight.cancel = () -> {};
             if (running++ == 0) onWorkingChanged.accept(true);
-            deck.post(new BuddyNotice(SOURCE, key, title, BuddyNotice.State.ACTIVE,
+            deck.post(new BuddyNotice(SOURCE, key, BuddyNotice.Kind.TASK, title, BuddyNotice.State.RUNNING,
                 () -> "Running · " + humanize(Duration.ofNanos(elapsedNanos.getAsLong())), activate));
             onDeckChanged.run();
         });
@@ -94,7 +94,7 @@ final class CommandNotifier {
         String detail = succeeded ? "Finished in " + humanize(ran)
             : "Exited " + exitStatus.getAsInt() + " · " + humanize(ran);
         String title = title(command);
-        deck.post(new BuddyNotice(SOURCE, key, title,
+        deck.post(new BuddyNotice(SOURCE, key, BuddyNotice.Kind.TASK, title,
             succeeded ? BuddyNotice.State.DONE : BuddyNotice.State.FAILED, () -> detail, activate));
         onDeckChanged.run();
         if (CommandNotice.shouldNotify(origin, ran, wait)) operatingSystem.accept(title, detail);
