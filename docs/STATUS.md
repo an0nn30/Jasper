@@ -1,5 +1,31 @@
 # Jasper — Status and Handoff
 
+**Buddy shimmer and fluid screen placement (2026-09-17):** The additional
+14:35:58 recording was extracted into all 482 original frames with ffmpeg, with
+ffprobe timestamps. On the same notification worktree, RUNNING subtext now has a
+soft left-to-right glyph highlight, shared by column and drawer, with steady
+completed/waiting/orphaned text. Running surfaces request 16ms frames; timers stop
+when hidden/disposed and return to a one-second cadence for other live details.
+
+Dragging follows the buddy directly until its anchor-relative placement changes.
+The column switches sides around the screen midpoint with an eight-point dead
+band and an approximately reference-fitted damped spring (8.6/s decay, 8 rad/s,
+800ms settle). Reversals preserve position and velocity; internal stack direction
+also interpolates. Every intermediate window position is clamped to the usable
+monitor, including offset/negative-origin screens. Initial showing snaps placement
+without altering the separate capsule arrival animation.
+
+`./gradlew check`: **1,002 tests, 1,000 passed, two existing skips, no failures or
+errors** (app 680/679/1; terminal 322/321/1). Eight new tests cover highlight
+movement, steady completed text, repaint state, continuous/reversed placement,
+midpoint hysteresis and screen bounds. Actual headless light/dark drag/shimmer
+previews are in `jasper-app/build/reports/buddy-motion/{dark,light}.mp4`, generated
+by `:jasper-app:buddyMotionPreview` plus ffmpeg. Native desktop acceptance remains
+user-run under AGENTS.md. No GUI, commit or push. The shimmer's band/timing is
+visual tuning, not a claimed exact measurement from the subtle reference shader.
+[Measurements and reproduction](design/buddy-notification-reference.md#running-subtext-and-dragging-follow-up-2026-09-17).
+
+
 **iTerm-style tabs and title correction (2026-09-17):** Continuing on
 `claude/command-notifications` in `.claude/worktrees/practical-shamir-1252c5`.
 The user's three screenshots supersede the fixed 160-point tabs, duplicate

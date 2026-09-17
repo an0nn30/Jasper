@@ -128,6 +128,8 @@ class BuddyColumnPanelTest {
         layout();
 
         assertThat(panel.below()).isTrue();
+        assertThat(inBubble(0)).as("the flip starts at its current painted position").isEqualTo(newestAbove);
+        now += BubbleSpring.SETTLE_NANOS;
         assertThat(inBubble(0)).as("the newest moved to the other end").isNotEqualTo(newestAbove);
         assertThat(panel.handleClick(inBubble(0))).isFalse();
         assertThat(activated).containsExactly("newer");
@@ -168,6 +170,7 @@ class BuddyColumnPanelTest {
         now = BubbleMotion.IN_NANOS + 1;
         assertThat(panel.animating()).isFalse();
         assertThat(panel.needsDetailUpdates()).as("elapsed time must still tick after settling").isTrue();
+        assertThat(panel.needsAnimationFrames()).as("running subtext keeps shimmering").isTrue();
     }
 
     @Test void hoveringAsksForFramesAndStopsWhenTheGrowthIsDone() {

@@ -24,7 +24,7 @@ final class BuddyDeckWindow {
     private final JWindow window = new JWindow();
     private final BuddyDeck deck;
     private final BuddyDeckPanel panel;
-    /** Animates hover affordances, then ticks live detail text once per second. */
+    /** Animates hover and running-text shimmer; other live detail ticks once per second. */
     private final Timer frames = new Timer(16, event -> tick());
     private Rectangle anchor;
     private boolean disposed;
@@ -63,14 +63,14 @@ final class BuddyDeckWindow {
     private void tick() {
         if (disposed || !window.isVisible()) { frames.stop(); return; }
         panel.repaint();
-        if (!panel.animating() && !panel.needsDetailUpdates()) frames.stop();
-        else frames.setDelay(panel.animating() ? 16 : 1000);
+        if (!panel.needsAnimationFrames() && !panel.needsDetailUpdates()) frames.stop();
+        else frames.setDelay(panel.needsAnimationFrames() ? 16 : 1000);
     }
 
     private void onPanelChanged() {
         layout();
-        if (!disposed && window.isVisible() && (panel.animating() || panel.needsDetailUpdates())) {
-            int delay = panel.animating() ? 16 : 1000;
+        if (!disposed && window.isVisible() && (panel.needsAnimationFrames() || panel.needsDetailUpdates())) {
+            int delay = panel.needsAnimationFrames() ? 16 : 1000;
             boolean speedUp = delay < frames.getDelay();
             frames.setDelay(delay);
             if (!frames.isRunning() || speedUp) frames.restart();
@@ -120,7 +120,7 @@ final class BuddyDeckWindow {
         window.setVisible(true);
         panel.repaint();
         if (panel.needsDetailUpdates() && !frames.isRunning()) {
-            frames.setDelay(1000);
+            frames.setDelay(panel.needsAnimationFrames() ? 16 : 1000);
             frames.start();
         }
     }

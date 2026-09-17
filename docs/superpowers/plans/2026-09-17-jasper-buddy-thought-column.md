@@ -1,5 +1,12 @@
 # Buddy thought column Implementation Plan
 
+> Additional user-requested reference correction (2026-09-17): running subtext now
+> shimmers left to right, and dragging animates the screen-constrained above/below
+> placement through a retargetable spring. This supersedes immediate placement
+> flips and a one-second-only settled RUNNING repaint cadence. See the additional
+> recording analysis in `docs/design/buddy-notification-reference.md`.
+
+
 **Status amendment (2026-09-17):** The original implementation is complete. A user-requested visual
 correction replaces its tail, overlapping cards, scale bounce and hover enlargement with the
 [recording-measured capsule](../../design/buddy-notification-reference.md). This bounded follow-up

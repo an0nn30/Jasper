@@ -79,3 +79,40 @@ stack movement, unchanged identity updates, moving hit regions, theme colors,
 actual material alpha, rounded corners, outer shadows and dismissal propagation.
 Native desktop acceptance remains user-run: check movement and transparency over
 a textured desktop, theme changes with a visible capsule, and successive notices.
+
+
+## Running subtext and dragging follow-up (2026-09-17)
+
+The additional `Screen Recording 2026-09-17 at 14.35.58.mov` is 1032 × 2870,
+9.693 seconds, with 482 encoded frames and variable frame timestamps. All frames
+were extracted with ffmpeg `-fps_mode passthrough`; timestamps and detected capsule/
+sprite bounds are in `/tmp/buddy-motion-reference/` on the development machine.
+
+Ordinary dragging keeps the capsule attached without lag. The capsule changes
+sides around the screen midpoint: the upward pass flips near 2.15s, and the return
+pass near 5.61s. It travels continuously through the buddy with a small overshoot.
+A fit to the return pass gives approximately 8.6/s decay and 8.0 rad/s frequency
+(about 9.8 physical-pixel RMS, limited by the moving/animated sprite used as the
+anchor). The implementation uses that damped spring with an 800ms settle bound,
+preserves position and velocity on retarget, and interpolates the stack's internal
+order too. An eight-point midpoint dead band prevents repeated direction changes.
+Every intermediate window position is constrained to the selected usable screen,
+including monitors with negative origins. Showing a hidden column settles its
+placement immediately; its independent capsule-arrival animation remains intact.
+
+Running TASK subtext now has a soft glyph-only highlight moving left to right.
+The visual tuning is a 48-point-wide band, a 1.65s sweep and a 2.4s cycle; those
+shader parameters are an approximation, not uniquely measurable from the recording.
+Dark mode brightens the text, light mode increases its dark contrast. Titles,
+backgrounds and completed/waiting/orphaned notices remain steady. Both the live
+column and the drawer use the same painter and request 16ms frames while a visible
+running task shimmers; other live details keep the one-second cadence. Hiding or
+disposing a surface stops its timer.
+
+`./gradlew :jasper-app:buddyMotionPreview` renders actual components, placement and
+sprite without native windows, using a scripted upward/downward drag in both
+themes. Frames and encoded previews are in `jasper-app/build/reports/buddy-motion/`.
+Tests cover highlight direction and glyph-only changes, completed-task stability,
+midpoint/edge placement, interrupted flips, velocity continuity, monitor bounds,
+initial placement, direction-order interpolation, and pointer targets. Native
+macOS compositing and pointer dragging remain user-run acceptance under AGENTS.md.

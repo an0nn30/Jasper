@@ -57,6 +57,15 @@ final class BuddyCard {
     /** Hover reveals an open affordance without scaling the capsule or moving its text. */
     static void paint(Graphics2D g2, JComponent owner, BuddyNotice notice, Rectangle bounds,
                       float hover, float opacity, boolean dismissable, int count) {
+        paint(g2, owner, notice, bounds, hover, opacity, dismissable, count, System.nanoTime());
+    }
+
+    static boolean shimmers(BuddyNotice notice) {
+        return notice.state() == BuddyNotice.State.RUNNING && !notice.orphaned();
+    }
+
+    static void paint(Graphics2D g2, JComponent owner, BuddyNotice notice, Rectangle bounds,
+                      float hover, float opacity, boolean dismissable, int count, long now) {
         Graphics2D c = (Graphics2D) g2.create();
         try {
             boolean dark = FlatLaf.isLafDark();
@@ -116,9 +125,30 @@ final class BuddyCard {
                 paintText(text, notice.title(), right, 25, hover);
                 text.setFont(detailFont());
                 text.setColor(detailColor());
-                paintText(text, detailOf(notice), right, 41, hover);
+                String detail = detailOf(notice);
+                paintText(text, detail, right, 41, hover);
+                if (shimmers(notice)) paintShimmer(text, detail, right, hover, dark, now);
             } finally { text.dispose(); }
         } finally { c.dispose(); }
+    }
+
+    /** A soft moving highlight confined to the detail glyphs; no card glow or opacity pulsing. */
+    private static void paintShimmer(Graphics2D g, String detail, int right, float hover, boolean dark, long now) {
+        String text = hover > 0 ? detail : fit(g.getFontMetrics(), detail, right - PAD_X);
+        if (text.isEmpty()) return;
+        int width = Math.min(right - PAD_X, g.getFontMetrics().stringWidth(text));
+        if (width <= 0) return;
+        // Sweep over the text, then leave a short quiet interval before the next pass.
+        double phase = Math.floorMod(now, 2_400_000_000L) / 1_000_000_000d;
+        float half = 24f;
+        float center = PAD_X - half + (width + 2 * half) * (float) (phase / 1.65);
+        if (center - half > PAD_X + width) return;
+        Color clear = new Color(dark ? 255 : 0, dark ? 255 : 0, dark ? 255 : 0, 0);
+        Color peak = new Color(dark ? 255 : 0, dark ? 255 : 0, dark ? 255 : 0, dark ? 150 : 105);
+        g.setPaint(new java.awt.LinearGradientPaint(center - half, 0, center + half, 0,
+            new float[]{0, .25f, .5f, .75f, 1}, new Color[]{clear, new Color(peak.getRed(), peak.getGreen(), peak.getBlue(), peak.getAlpha()/3),
+                peak, new Color(peak.getRed(), peak.getGreen(), peak.getBlue(), peak.getAlpha()/3), clear}));
+        g.drawString(text, PAD_X, 41);
     }
 
     private static void paintText(Graphics2D g, String value, int right, int baseline, float hover) {

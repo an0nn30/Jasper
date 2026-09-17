@@ -66,6 +66,8 @@ final class BuddyDeckPanel extends JComponent {
 
     int hovered() { return hovered; }
 
+    boolean needsAnimationFrames() { return animating() || deck.notices().stream().anyMatch(BuddyCard::shimmers); }
+
     boolean needsDetailUpdates() { return deck.notices().stream().anyMatch(BuddyNotice::live); }
 
     int cardHeight() { return BuddyCard.height(this); }
@@ -196,7 +198,7 @@ final class BuddyDeckPanel extends JComponent {
             for (int index = 0; index < notices.size(); index++) {
                 Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, height, scroll);
                 if (card.y + card.height < 0 || card.y > getHeight()) continue;
-                BuddyCard.paint(g2, this, notices.get(index), card, hoverAmount(index), 1f, true, 0);
+                BuddyCard.paint(g2, this, notices.get(index), card, hoverAmount(index), 1f, true, 0, clock.getAsLong());
             }
             Rectangle clear = BuddyDeckLayout.clearRow(notices.size(), BuddyCard.WIDTH, height, scroll);
             if (clear == null) return;

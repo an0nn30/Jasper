@@ -28,6 +28,7 @@ final class BuddyColumnPanel extends JComponent {
     private LongSupplier clock = System::nanoTime;
     private List<Motion> motions = List.of();
     private boolean below;
+    private final BubbleSpring direction = new BubbleSpring(0);
     private int hovered = -1;
     private int leaving = -1;
     private long hoverChangedAt;
@@ -41,7 +42,10 @@ final class BuddyColumnPanel extends JComponent {
 
     void setClock(LongSupplier clock) { this.clock = Objects.requireNonNull(clock, "clock"); }
 
-    void setBelow(boolean below) {
+    void setBelow(boolean below) { setBelow(below, false); }
+
+    void setBelow(boolean below, boolean snap) {
+        direction.target(below ? 1 : 0, clock.getAsLong(), snap);
         if (this.below == below) return;
         this.below = below;
         hovered = -1;
@@ -86,9 +90,11 @@ final class BuddyColumnPanel extends JComponent {
 
     boolean animating() {
         long now = clock.getAsLong();
-        return motions.stream().anyMatch(m -> m.active(now))
+        return direction.moving(now) || motions.stream().anyMatch(m -> m.active(now))
             || (hovered >= 0 || leaving >= 0) && now - hoverChangedAt < BubbleMotion.HOVER_NANOS;
     }
+
+    boolean needsAnimationFrames() { return animating() || deck.column().stream().anyMatch(BuddyCard::shimmers); }
 
     boolean needsDetailUpdates() { return deck.column().stream().anyMatch(BuddyNotice::live); }
 
@@ -104,11 +110,14 @@ final class BuddyColumnPanel extends JComponent {
     /** Actual painted rectangle, used for input too while a capsule is moving. */
     Rectangle cardBounds(int index) {
         List<BuddyNotice> column = deck.column();
-        Rectangle card = BuddyDeckLayout.column(index, column.size(), BuddyCard.WIDTH, BuddyCard.HEIGHT, below);
+        Rectangle card = BuddyDeckLayout.column(index, column.size(), BuddyCard.WIDTH, BuddyCard.HEIGHT, false);
         Motion motion = motionFor(column.get(index));
         float target = index * (BuddyCard.HEIGHT + BuddyDeckLayout.COLUMN_GAP);
         float offset = motion == null ? 0 : motion.at(clock.getAsLong()) - target;
-        card.translate(MARGIN, MARGIN + (below ? 0 : ARRIVAL_ROOM) + Math.round(below ? offset : -offset));
+        double blend = direction.at(clock.getAsLong());
+        int belowY = BuddyDeckLayout.column(index, column.size(), BuddyCard.WIDTH, BuddyCard.HEIGHT, true).y;
+        double top = card.y + ARRIVAL_ROOM;
+        card.setLocation(MARGIN, MARGIN + (int) Math.round(top + (belowY - top) * blend + (2 * blend - 1) * offset));
         return card;
     }
 
@@ -167,12 +176,12 @@ final class BuddyColumnPanel extends JComponent {
                 Rectangle bounds = cardBounds(index);
                 Motion motion = motionFor(column.get(index));
                 float offset = motion == null ? 0 : motion.at(clock.getAsLong()) - motion.to;
-                float signed = below ? offset : -offset;
+                float signed = (float) ((2 * direction.at(clock.getAsLong()) - 1) * offset);
                 Graphics2D card = (Graphics2D) g2.create();
                 try {
                     // Keep subpixel motion when the recording advances by half a logical pixel.
                     card.translate(0, signed - Math.round(signed));
-                    BuddyCard.paint(card, this, column.get(index), bounds, hoverAmount(index), 1f, false, count);
+                    BuddyCard.paint(card, this, column.get(index), bounds, hoverAmount(index), 1f, false, count, clock.getAsLong());
                 } finally { card.dispose(); }
             }
         } finally { g2.dispose(); }

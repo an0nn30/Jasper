@@ -1,5 +1,12 @@
 # Buddy thought column — design
 
+> Additional user-requested reference correction (2026-09-17): running subtext now
+> shimmers left to right, and dragging animates the screen-constrained above/below
+> placement through a retargetable spring. This supersedes immediate placement
+> flips and a one-second-only settled RUNNING repaint cadence. See the additional
+> recording analysis in `docs/design/buddy-notification-reference.md`.
+
+
 **Status:** Implemented. Development branch: `claude/command-notifications` (continuing), from `9e8d61a`.
 
 **Visual amendment (2026-09-17):** The user supplied light/dark reference recordings and requested

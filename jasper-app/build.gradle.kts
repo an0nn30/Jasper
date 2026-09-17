@@ -55,6 +55,8 @@ for ((taskName, entryPoint) in listOf(
     "commandPalettePreview" to "CommandPalettePreview",
     "buddyNotificationPreview" to "BuddyNotificationPreview",
     "titleBarPreview" to "TitleBarPreview",
+    "buddyMotionPreview" to "BuddyMotionPreview",
+    "buddyPerformanceMeasurement" to "BuddyPerformanceMeasurement",
     "commandSearchMeasurement" to "CommandSearchMeasurement",
     "shellHistorySearchMeasurement" to "ShellHistorySearchMeasurement",
 )) {
