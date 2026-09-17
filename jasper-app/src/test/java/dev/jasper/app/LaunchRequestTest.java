@@ -21,13 +21,14 @@ class LaunchRequestTest {
         var valid = new LaunchRequest("t", Path.of("/x.jar"), 1L).encode();
         for (String line : new String[]{
                 "", "\n", "garbage\n",
-                "jasper\t1\tt\n",                                   // too few fields
-                "jasper\t1\tt\tAA==\tAA==\t1\textra\n",             // too many fields
-                "notjasper\t1\tt\tAA==\tAA==\t1\n",                 // wrong magic
-                "jasper\t2\tt\tAA==\tAA==\t1\n",                    // a future protocol
-                "jasper\tx\tt\tAA==\tAA==\t1\n",                    // unparseable protocol
-                "jasper\t1\tt\tAA==\tAA==\tx\n",                    // unparseable timestamp
-                "jasper\t1\tt\t!not base64!\tAA==\t1\n"}) {         // undecodable path
+                "jasper\t1\tt\n",                                  // too few fields
+                "jasper\t1\tt\tL3guamFy\t1\textra\n",              // too many fields
+                "notjasper\t1\tt\tL3guamFy\t1\n",                  // wrong magic
+                "jasper\t2\tt\tL3guamFy\t1\n",                     // a future protocol
+                "jasper\tx\tt\tL3guamFy\t1\n",                     // unparseable protocol
+                "jasper\t1\tt\tL3guamFy\tx\n",                     // unparseable timestamp
+                "jasper\t1\tt\t!not base64!\t1\n",                 // undecodable base64
+                "jasper\t1\tt\tAA==\t1\n"}) {                      // decodes to an illegal path
             assertThat(LaunchRequest.decode(line)).as(line.strip()).isNull();
         }
         assertThat(LaunchRequest.decode(valid)).isNotNull();
