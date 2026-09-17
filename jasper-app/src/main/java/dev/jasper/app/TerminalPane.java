@@ -38,7 +38,8 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         @Override public void titleChanged(String title) { queueUpdate(); }
         @Override public void workingDirectoryChanged(Path directory) { queueUpdate(); }
 
-        @Override public void commandExecuted(String command, java.util.OptionalInt exitStatus, java.util.Optional<Path> workingDirectory) {
+        @Override public void commandExecuted(String command, java.util.OptionalInt exitStatus,
+                java.util.Optional<Path> workingDirectory, java.time.Duration duration) {
             try {
                 onCommandExecuted.accept(new ShellHistoryEntry(command, java.time.Instant.now().getEpochSecond(),
                     java.util.Set.of(shellLabel), workingDirectory.orElse(null),
