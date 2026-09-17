@@ -23,6 +23,26 @@ record AppDirs(Path root, Path configFile, Path logs) {
         return root.resolve("shell-integration");
     }
 
+    /**
+     * The handoff endpoint's own directory. It is a subdirectory rather than {@link #root()}
+     * because binding sets its parent to owner-only, and the root also holds the user's config.
+     */
+    Path daemonDir() {
+        return root.resolve("daemon");
+    }
+
+    Path daemonSocket() {
+        return daemonDir().resolve("socket");
+    }
+
+    Path daemonToken() {
+        return daemonDir().resolve("token");
+    }
+
+    Path daemonLock() {
+        return daemonDir().resolve("lock");
+    }
+
     static AppDirs resolve(String osName, Map<String, String> env, Path home) {
         String os = osName.toLowerCase(Locale.ROOT);
         Path base;

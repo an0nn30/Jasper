@@ -29,4 +29,17 @@ class AppArgumentsTest {
                 .isThrownBy(() -> AppArguments.parse(args, cwd)).withMessageContaining("Usage:");
         }
     }
+
+    @Test void backgroundIsOffByDefaultAndParsesOnceAlongsideOtherOptions() {
+        assertThat(AppArguments.parse(new String[0], cwd).background()).isFalse();
+        assertThat(AppArguments.parse(new String[]{"--background"}, cwd))
+            .isEqualTo(new AppArguments(null, false, true));
+        assertThat(AppArguments.parse(new String[]{"--config", "c.toml", "--background"}, cwd))
+            .isEqualTo(new AppArguments(cwd.resolve("c.toml"), false, true));
+        for (String[] args : new String[][]{{"--background", "--background"}, {"--background", "--wat"}}) {
+            assertThatIllegalArgumentException().as(java.util.Arrays.toString(args))
+                .isThrownBy(() -> AppArguments.parse(args, cwd)).withMessageContaining("Usage:");
+        }
+        assertThat(AppArguments.USAGE).contains("--background");
+    }
 }

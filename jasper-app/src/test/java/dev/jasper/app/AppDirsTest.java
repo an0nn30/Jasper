@@ -56,4 +56,16 @@ class AppDirsTest {
         assertThat(dirs.buddyState())
             .isEqualTo(Path.of("/Users/example/.config/jasper/buddy.toml"));
     }
+
+    @Test void daemonFilesShareOwnTheirOwnSubdirectoryOfTheRoot() {
+        AppDirs dirs = AppDirs.resolve("Mac OS X", Map.of(), Path.of("/Users/example"));
+        Path daemon = Path.of("/Users/example/.config/jasper/daemon");
+        // Its own directory, not the root: the root also holds config.toml and the endpoint
+        // needs its parent to be owner-only.
+        assertThat(dirs.daemonDir()).isEqualTo(daemon);
+        assertThat(dirs.daemonSocket()).isEqualTo(daemon.resolve("socket"));
+        assertThat(dirs.daemonToken()).isEqualTo(daemon.resolve("token"));
+        assertThat(dirs.daemonLock()).isEqualTo(daemon.resolve("lock"));
+        assertThat(daemon).doesNotExist();
+    }
 }
