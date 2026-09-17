@@ -40,19 +40,23 @@ final class HandoffSocket implements AutoCloseable {
     /** macOS caps sun_path at 104 bytes; a long home directory can reach it. */
     private static final int MAX_SOCKET_PATH_BYTES = 100;
     private static final long HANDOFF_TIMEOUT_MILLIS = 2_000;
+    /** A peer that connects and sends nothing must not hold the endpoint open indefinitely. */
+    private static final long READ_TIMEOUT_MILLIS = 2_000;
 
     private final ServerSocketChannel channel;
     private final Path socketPath;
     private final Path tokenPath;
+    private final Path lockPath;
     private final String token;
     private final Function<LaunchRequest, LaunchRequest.Response> handler;
     private volatile boolean closed;
 
-    private HandoffSocket(ServerSocketChannel channel, Path socketPath, Path tokenPath, String token,
-                          Function<LaunchRequest, LaunchRequest.Response> handler) {
+    private HandoffSocket(ServerSocketChannel channel, Path socketPath, Path tokenPath, Path lockPath,
+                          String token, Function<LaunchRequest, LaunchRequest.Response> handler) {
         this.channel = channel;
         this.socketPath = socketPath;
         this.tokenPath = tokenPath;
+        this.lockPath = lockPath;
         this.token = token;
         this.handler = handler;
     }
@@ -82,7 +86,7 @@ final class HandoffSocket implements AutoCloseable {
                 opened = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
                 opened.bind(UnixDomainSocketAddress.of(socketPath));
                 String token = writeToken(tokenPath);
-                var endpoint = new HandoffSocket(opened, socketPath, tokenPath, token, handler);
+                var endpoint = new HandoffSocket(opened, socketPath, tokenPath, lockPath, token, handler);
                 Thread.ofPlatform().name("jasper-handoff-accept").start(endpoint::acceptLoop);
                 return endpoint;
             }
@@ -107,13 +111,14 @@ final class HandoffSocket implements AutoCloseable {
     static boolean handOff(Path socketPath, Path tokenPath, Path codeSource, long modified) {
         String token = readToken(tokenPath);
         if (token == null) return false;
-        var request = new LaunchRequest(token, codeSource, modified);
+        // codeSource() is nullable; an unresolvable source compares equal to itself and to nothing else.
+        var request = new LaunchRequest(token, codeSource == null ? Path.of("") : codeSource, modified);
         var answer = new CompletableFuture<LaunchRequest.Response>();
         // A wedged owner must not hang the launch, so the exchange is bounded from outside it.
         Thread worker = Thread.ofPlatform().daemon().name("jasper-handoff").start(() -> {
             try (SocketChannel client = SocketChannel.open(UnixDomainSocketAddress.of(socketPath))) {
                 write(client, request.encode());
-                answer.complete(LaunchRequest.Response.of(readLine(client)));
+                answer.complete(LaunchRequest.Response.of(readLine(client, READ_TIMEOUT_MILLIS)));
             } catch (IOException | RuntimeException failure) {
                 answer.complete(LaunchRequest.Response.PROTOCOL);
             }
@@ -154,8 +159,17 @@ final class HandoffSocket implements AutoCloseable {
         if (closed) return;
         closed = true;
         try { channel.close(); } catch (IOException ignored) { }
-        try { Files.deleteIfExists(socketPath); } catch (IOException ignored) { }
-        try { Files.deleteIfExists(tokenPath); } catch (IOException ignored) { }
+        // Under the same lock bind uses: if anything answers on our path now, a successor owns it
+        // and these files are its, not ours.
+        try (FileChannel lockChannel = FileChannel.open(lockPath, StandardOpenOption.CREATE,
+                StandardOpenOption.READ, StandardOpenOption.WRITE);
+             FileLock ignored = lockChannel.lock()) {
+            if (owned(socketPath)) return;
+            Files.deleteIfExists(socketPath);
+            Files.deleteIfExists(tokenPath);
+        } catch (IOException | RuntimeException unavailable) {
+            // Including OverlappingFileLockException: leave the files rather than risk a successor's.
+        }
     }
 
     private void acceptLoop() {
@@ -172,7 +186,7 @@ final class HandoffSocket implements AutoCloseable {
     }
 
     private void serve(SocketChannel client) throws IOException {
-        LaunchRequest request = LaunchRequest.decode(readLine(client));
+        LaunchRequest request = LaunchRequest.decode(readLine(client, READ_TIMEOUT_MILLIS));
         LaunchRequest.Response response;
         if (request == null) response = LaunchRequest.Response.PROTOCOL;
         else if (!MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8),
@@ -220,15 +234,24 @@ final class HandoffSocket implements AutoCloseable {
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(permissions));
     }
 
-    private static String readLine(SocketChannel channel) throws IOException {
+    /** Bounded read of one line. A peer that connects and says nothing must not hold the endpoint. */
+    private static String readLine(SocketChannel channel, long timeoutMillis) throws IOException {
+        channel.configureBlocking(false);
         ByteBuffer buffer = ByteBuffer.allocate(MAX_LINE_BYTES);
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
         int scanned = 0;
         while (buffer.hasRemaining()) {
-            if (channel.read(buffer) < 0) break;
+            int read = channel.read(buffer);
+            if (read < 0) break;
             for (; scanned < buffer.position(); scanned++) {
                 if (buffer.get(scanned) == '\n') {
                     return new String(buffer.array(), 0, scanned, StandardCharsets.UTF_8);
                 }
+            }
+            if (read == 0) {
+                if (System.nanoTime() >= deadline) break;
+                try { Thread.sleep(5); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); break; }
             }
         }
         return new String(buffer.array(), 0, buffer.position(), StandardCharsets.UTF_8);

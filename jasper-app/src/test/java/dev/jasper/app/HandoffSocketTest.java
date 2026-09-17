@@ -64,7 +64,25 @@ class HandoffSocketTest {
     }
 
     @Test void handingOffToNothingFailsQuietly() {
+        // The missing-token case: no socket, no token, nothing was ever bound here. Contrast with
+        // aTokenWhoseOwnerWasKilledFailsAtTheConnectRatherThanTheToken below, the dead-listener case.
         assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isFalse();
+    }
+
+    @Test void aTokenWhoseOwnerWasKilledFailsAtTheConnectRatherThanTheToken() throws Exception {
+        // The post-SIGKILL state: the token and the socket file both survived, nothing is listening.
+        Files.createFile(socket());
+        Files.writeString(token(), "left-over-token\n");
+        assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isFalse();
+    }
+
+    @Test void anUnresolvableCodeSourceHandsOffInsteadOfCrashingTheLauncher() throws Exception {
+        List<LaunchRequest> seen = new CopyOnWriteArrayList<>();
+        try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {
+            assertThat(HandoffSocket.handOff(socket(), token(), null, 0L)).isTrue();
+            assertThat(seen).singleElement()
+                .extracting(LaunchRequest::codeSource).isEqualTo(Path.of(""));
+        }
     }
 
     @Test void aTokenThatCannotBeWrittenDeclinesAndLeavesNoSocketBehind() {
@@ -118,6 +136,8 @@ class HandoffSocketTest {
         assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isTrue();
         endpoint.close();
         endpoint.close(); // Idempotent.
+        // Re-create the token, so the refusal comes from the dead listener rather than a missing file.
+        Files.writeString(token(), "left-over-token\n");
         assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isFalse();
         try (ServerSocketChannel proof = ServerSocketChannel.open(StandardProtocolFamily.UNIX)) {
             proof.bind(UnixDomainSocketAddress.of(socket()));  // The path was released.
