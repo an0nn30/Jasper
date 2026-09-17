@@ -10,24 +10,6 @@ class BuddyDeckLayoutTest {
     private static final int CARD = 58;
     private static final int PITCH = CARD + BuddyDeckLayout.ROW_GAP;
 
-    @Test void theNewestCardIsDrawnInFullAndTheOnesBehindItPeek() {
-        assertThat(BuddyDeckLayout.collapsed(0, WIDTH, CARD)).isEqualTo(new Rectangle(0, 0, WIDTH, CARD));
-        assertThat(BuddyDeckLayout.collapsed(1, WIDTH, CARD)).isEqualTo(new Rectangle(6, 4, WIDTH - 12, CARD));
-        assertThat(BuddyDeckLayout.collapsed(2, WIDTH, CARD)).isEqualTo(new Rectangle(12, 8, WIDTH - 24, CARD));
-    }
-
-    /** Past the third the deck draws a count instead, so a deeper card never insets further. */
-    @Test void theStackStopsGettingDeeperAfterThreeCards() {
-        assertThat(BuddyDeckLayout.collapsed(7, WIDTH, CARD)).isEqualTo(BuddyDeckLayout.collapsed(2, WIDTH, CARD));
-    }
-
-    @Test void theCollapsedHeightIsTheTopCardPlusWhatPeeksBelowIt() {
-        assertThat(BuddyDeckLayout.collapsedHeight(0, CARD)).isZero();
-        assertThat(BuddyDeckLayout.collapsedHeight(1, CARD)).isEqualTo(CARD);
-        assertThat(BuddyDeckLayout.collapsedHeight(2, CARD)).isEqualTo(CARD + 4);
-        assertThat(BuddyDeckLayout.collapsedHeight(9, CARD)).isEqualTo(CARD + 8);
-    }
-
     @Test void theExpandedListRunsDownTheWindowAtAConstantPitch() {
         assertThat(BuddyDeckLayout.expanded(0, WIDTH, CARD, 0)).isEqualTo(new Rectangle(0, 0, WIDTH, CARD));
         assertThat(BuddyDeckLayout.expanded(2, WIDTH, CARD, 0)).isEqualTo(new Rectangle(0, 2 * PITCH, WIDTH, CARD));
@@ -84,5 +66,88 @@ class BuddyDeckLayoutTest {
         assertThat(target.width).isEqualTo(BuddyDeckLayout.DISMISS_SIZE);
         assertThat(target.x + target.width).isEqualTo(card.x + card.width - BuddyDeckLayout.DISMISS_INSET);
         assertThat(target.y).isEqualTo(card.y + BuddyDeckLayout.DISMISS_INSET);
+    }
+
+    @Test void atMostThreeBubblesAreDrawnAndTheRestBecomeACount() {
+        assertThat(BuddyDeckLayout.visibleInColumn(0)).isZero();
+        assertThat(BuddyDeckLayout.visibleInColumn(2)).isEqualTo(2);
+        assertThat(BuddyDeckLayout.visibleInColumn(9)).isEqualTo(BuddyDeckLayout.MAX_IN_COLUMN);
+    }
+
+    @Test void theColumnIsItsBubblesPlusTheTail() {
+        assertThat(BuddyDeckLayout.columnHeight(0, CARD)).isZero();
+        assertThat(BuddyDeckLayout.columnHeight(1, CARD)).isEqualTo(CARD + BuddyDeckLayout.TAIL_HEIGHT);
+        assertThat(BuddyDeckLayout.columnHeight(3, CARD)).isEqualTo(
+            3 * CARD + 2 * BuddyDeckLayout.COLUMN_GAP + BuddyDeckLayout.TAIL_HEIGHT);
+        assertThat(BuddyDeckLayout.columnHeight(20, CARD))
+            .as("past the cap the column stops growing").isEqualTo(BuddyDeckLayout.columnHeight(3, CARD));
+    }
+
+    /** Above him, the newest sits at the bottom of the column: nearest his head. */
+    @Test void aboveHimTheNewestIsLowestAndOlderOnesRiseAwayFromHim() {
+        Rectangle newest = BuddyDeckLayout.column(0, 3, WIDTH, CARD, false);
+        Rectangle middle = BuddyDeckLayout.column(1, 3, WIDTH, CARD, false);
+        Rectangle oldest = BuddyDeckLayout.column(2, 3, WIDTH, CARD, false);
+
+        assertThat(newest.y).isGreaterThan(middle.y);
+        assertThat(middle.y).isGreaterThan(oldest.y);
+        assertThat(oldest.y).isZero();
+        assertThat(newest.y + newest.height)
+            .isEqualTo(BuddyDeckLayout.columnHeight(3, CARD) - BuddyDeckLayout.TAIL_HEIGHT);
+        assertThat(newest.x).isZero();
+        assertThat(newest.width).isEqualTo(WIDTH);
+    }
+
+    /** Flipped below him the order inverts, so the newest is still the one nearest his head. */
+    @Test void belowHimTheNewestIsHighestSoItStaysNearestHisHead() {
+        Rectangle newest = BuddyDeckLayout.column(0, 3, WIDTH, CARD, true);
+        Rectangle oldest = BuddyDeckLayout.column(2, 3, WIDTH, CARD, true);
+
+        assertThat(newest.y).isLessThan(oldest.y);
+        assertThat(newest.y).isEqualTo(BuddyDeckLayout.TAIL_HEIGHT);
+    }
+
+    @Test void everyBubbleSitsInsideTheColumn() {
+        for (boolean below : new boolean[] {false, true}) {
+            int height = BuddyDeckLayout.columnHeight(3, CARD);
+            for (int index = 0; index < 3; index++) {
+                Rectangle card = BuddyDeckLayout.column(index, 3, WIDTH, CARD, below);
+                assertThat(card.y).as("below=%s index=%d", below, index).isNotNegative();
+                assertThat(card.y + card.height).isLessThanOrEqualTo(height);
+            }
+        }
+    }
+
+    /** Without the tail it is a floating list, not a thought. */
+    @Test void theTailRunsFromHisHeadTowardsTheNearestBubble() {
+        int height = BuddyDeckLayout.columnHeight(2, CARD);
+        Rectangle[] above = BuddyDeckLayout.tail(WIDTH, height, false);
+
+        assertThat(above).hasSize(2);
+        assertThat(above[0].width).isGreaterThan(above[1].width);
+        assertThat(above[1].y).as("the small one is nearest him, at the bottom").isGreaterThan(above[0].y);
+        for (Rectangle circle : above) {
+            assertThat(circle.y).isGreaterThanOrEqualTo(height - BuddyDeckLayout.TAIL_HEIGHT);
+            assertThat(circle.y + circle.height).isLessThanOrEqualTo(height);
+            assertThat(circle.x).isGreaterThan(0);
+        }
+    }
+
+    @Test void flippedBelowHimTheTailIsAtTheTopAndStillPointsAtHim() {
+        int height = BuddyDeckLayout.columnHeight(2, CARD);
+        Rectangle[] below = BuddyDeckLayout.tail(WIDTH, height, true);
+
+        assertThat(below[1].y).as("the small one is nearest him, at the top").isLessThan(below[0].y);
+        for (Rectangle circle : below) {
+            assertThat(circle.y).isNotNegative();
+            assertThat(circle.y + circle.height).isLessThanOrEqualTo(BuddyDeckLayout.TAIL_HEIGHT);
+        }
+    }
+
+    @Test void aPointInAColumnBubbleNamesIt() {
+        assertThat(BuddyDeckLayout.columnAt(
+            BuddyDeckLayout.column(1, 3, WIDTH, CARD, false).y + 4, 3, CARD, false)).isEqualTo(1);
+        assertThat(BuddyDeckLayout.columnAt(
+            BuddyDeckLayout.columnHeight(3, CARD) - 2, 3, CARD, false)).as("in the tail").isEqualTo(-1);
     }
 }

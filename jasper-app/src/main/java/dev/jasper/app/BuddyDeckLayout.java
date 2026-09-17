@@ -10,27 +10,63 @@ import java.awt.Rectangle;
  * deck, and uniform rows make the hit test arithmetic rather than a search.
  */
 final class BuddyDeckLayout {
-    static final int PEEK_Y = 4;
-    static final int PEEK_INSET = 6;
-    /** How many cards are drawn in the collapsed stack; beyond this the deck draws a count. */
-    static final int MAX_PEEKED = 3;
     static final int ROW_GAP = 6;
+    static final int COLUMN_GAP = 6;
+    /** Beyond this the nearest bubble carries a count; a taller column would cover the screen. */
+    static final int MAX_IN_COLUMN = 3;
+    /** The band between his head and the nearest bubble, where the thought tail sits. */
+    static final int TAIL_HEIGHT = 16;
+    static final int TAIL_BIG = 7;
+    static final int TAIL_SMALL = 4;
     static final int DISMISS_SIZE = 14;
     static final int DISMISS_INSET = 6;
     static final int CLEAR_ROW_HEIGHT = 26;
 
     private BuddyDeckLayout() { }
 
-    /** Card {@code index} counting from the newest, in the collapsed stack. */
-    static Rectangle collapsed(int index, int width, int cardHeight) {
-        int depth = Math.min(Math.max(index, 0), MAX_PEEKED - 1);
-        return new Rectangle(PEEK_INSET * depth, PEEK_Y * depth, width - 2 * PEEK_INSET * depth, cardHeight);
+    static int visibleInColumn(int count) { return Math.min(Math.max(count, 0), MAX_IN_COLUMN); }
+
+    /** The bubbles, the gaps between them, and the band the tail lives in. */
+    static int columnHeight(int count, int cardHeight) {
+        int visible = visibleInColumn(count);
+        if (visible == 0) return 0;
+        return visible * cardHeight + (visible - 1) * COLUMN_GAP + TAIL_HEIGHT;
     }
 
-    /** The top card plus the sliver of each card peeking below it. */
-    static int collapsedHeight(int count, int cardHeight) {
-        if (count <= 0) return 0;
-        return cardHeight + PEEK_Y * Math.min(count - 1, MAX_PEEKED - 1);
+    /**
+     * Bubble {@code index} counting from the newest. The newest is always the one nearest his head:
+     * lowest when the column is above him, highest when it has been flipped below.
+     */
+    static Rectangle column(int index, int count, int width, int cardHeight, boolean below) {
+        int visible = visibleInColumn(count);
+        int pitch = cardHeight + COLUMN_GAP;
+        int y = below ? TAIL_HEIGHT + index * pitch : (visible - 1 - index) * pitch;
+        return new Rectangle(0, y, width, cardHeight);
+    }
+
+    /**
+     * Two circles tapering from his head towards the nearest bubble, largest first. Without them the
+     * column is a floating list rather than something he is thinking.
+     */
+    static Rectangle[] tail(int width, int columnHeight, boolean below) {
+        int centre = width / 2;
+        int band = below ? 0 : columnHeight - TAIL_HEIGHT;
+        int bigY = below ? band + TAIL_HEIGHT - TAIL_BIG - 2 : band + 2;
+        int smallY = below ? band + 2 : band + TAIL_HEIGHT - TAIL_SMALL - 2;
+        return new Rectangle[] {
+            new Rectangle(centre - TAIL_BIG / 2, bigY, TAIL_BIG, TAIL_BIG),
+            new Rectangle(centre - TAIL_SMALL / 2 + TAIL_BIG, smallY, TAIL_SMALL, TAIL_SMALL)
+        };
+    }
+
+    /** The bubble at {@code y} in the column, or -1 in a gap or the tail band. */
+    static int columnAt(int y, int count, int cardHeight, boolean below) {
+        int visible = visibleInColumn(count);
+        for (int index = 0; index < visible; index++) {
+            Rectangle card = column(index, count, 1, cardHeight, below);
+            if (y >= card.y && y < card.y + card.height) return index;
+        }
+        return -1;
     }
 
     /** Row {@code index} in the expanded list, already shifted by the scroll offset. */
