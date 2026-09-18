@@ -12,8 +12,10 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
                       FontConfig font, Appearance variant, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
                       boolean historyEnabled, int maxResults, List<String> trivialCommands,
-                      boolean backgroundEnabled) {
+                      int longCommandSeconds, boolean backgroundEnabled) {
     ConfigSnapshot {
+        if (longCommandSeconds < 0 || longCommandSeconds > 3600)
+            throw new IllegalArgumentException("Long-command seconds must be 0\u20133600.");
         if (maxResults < PaletteContext.MIN_MAX_RESULTS || maxResults > PaletteContext.MAX_MAX_RESULTS)
             throw new IllegalArgumentException("Max results must be 1\u201320.");
         if (tabHeight < 28 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 28–72.");
@@ -38,13 +40,16 @@ record ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean 
         }
     }
 
-    /** Residency is opt-in, so every constructor that predates it means "not resident". */
+    /**
+     * Every constructor that predates long-command notifications and background residency: the
+     * default notification threshold, and never resident, because residency is opt-in.
+     */
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, Appearance variant, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
                    boolean historyEnabled, int maxResults, List<String> trivialCommands) {
         this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal,
-            buddyEnabled, historyEnabled, maxResults, trivialCommands, false);
+            buddyEnabled, historyEnabled, maxResults, trivialCommands, 10, false);
     }
 
     ConfigSnapshot(int tabHeight, WindowContent.ToolbarMode toolbar, boolean statusBar,

@@ -42,7 +42,8 @@ class ShellIntegrationEndToEndTest {
         try (TerminalSession session = TerminalSession.start(settings.command(), settings.environment(),
                 home, 80, 24, 1000)) {
             session.addListener(new TerminalSession.Listener() {
-                @Override public void commandExecuted(String command, OptionalInt status, Optional<Path> directory) {
+                @Override public void commandExecuted(String command, OptionalInt status,
+                        Optional<Path> directory, java.time.Duration duration) {
                     commands.add(command);
                     statuses.add(status);
                 }

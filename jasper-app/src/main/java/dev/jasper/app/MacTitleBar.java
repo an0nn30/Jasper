@@ -14,7 +14,7 @@ import javax.swing.*;
 final class MacTitleBar extends JPanel implements AutoCloseable {
     private final JRootPane root;
     private final WindowContent content;
-    private final JLabel title = new JLabel("Jasper", SwingConstants.RIGHT);
+    private final JLabel title = new JLabel("Jasper", SwingConstants.CENTER);
     private final PropertyChangeListener boundsChanged;
     private JFrame frame;
     private WindowDecorations decorations;
@@ -47,9 +47,10 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
         root.setContentPane(surface);
         content.onTitle = value -> {
             String displayTitle = Main.windowTitle(value);
-            if (!"Jasper".equals(displayTitle)) displayTitle += " \u2014 Jasper";
             nativeTitle.accept(displayTitle);
-            if (!displayTitle.equals(bar.title.getText())) { bar.title.setText(displayTitle); bar.revalidate(); }
+            if (!displayTitle.equals(bar.title.getText())) bar.title.setText(displayTitle);
+            bar.title.setVisible(content.tabStrip().getTabCount() <= 1);
+            bar.revalidate(); bar.repaint();
         };
         content.onThemeChanged = theme -> bar.applyTheme(theme.chrome());
         content.onTabHeightChanged = bar::refreshHeight;
@@ -97,7 +98,7 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
         Object bounds = root.getClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS);
         // Published native bounds are already in root-pane coordinates; do not scale again.
         int controlsEnd = bounds instanceof Rectangle rectangle ? Math.max(0, rectangle.x + rectangle.width) : 0;
-        return Math.max(UIScale.scale(98), Math.max(nativeLeft, controlsEnd) + UIScale.scale(8));
+        return Math.max(UIScale.scale(120), Math.max(nativeLeft, controlsEnd) + UIScale.scale(8));
     }
 
     private int titleHeight() { return UIScale.scale(content.tabHeight()); }
@@ -117,12 +118,11 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
         refreshNativeGeometry();
         int left = Math.min(safeInset(), getWidth());
         int available = Math.max(0, getWidth() - left - nativeRight);
-        int gap = Math.min(available, UIScale.scale(14));
-        int titleWidth = Math.min(UIScale.scale(260), title.getPreferredSize().width);
-        titleWidth = Math.min(titleWidth, Math.max(0, available - content.windowTabs().getMinimumSize().width - gap * 2));
-        int tabsWidth = Math.max(0, available - titleWidth - gap * 2);
-        content.windowTabs().setBounds(left, 0, tabsWidth, getHeight());
-        title.setBounds(left + tabsWidth + gap, 0, titleWidth, getHeight());
+        content.windowTabs().setBounds(left, 0, available, getHeight());
+        // A lone session uses the ordinary centered window title. Reserve the same space
+        // at both ends so native controls cannot shift the title away from the window center.
+        int inset = Math.max(left, nativeRight);
+        title.setBounds(inset, 0, Math.max(0, getWidth() - 2 * inset), getHeight());
     }
 
     private void applyTheme(BuiltinTheme theme) {
@@ -136,7 +136,7 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
 
     private void refreshColors() {
         setBackground(UIManager.getColor("Jasper.titleBackground"));
-        title.setFont(UIManager.getFont("Label.font").deriveFont(Font.BOLD, UIScale.scale(12f)));
+        title.setFont(SystemFonts.system(Font.PLAIN, UIScale.scale(13f)));
         title.setForeground(UIManager.getColor(active ? "Jasper.titleForeground" : "Jasper.titleInactiveForeground"));
         repaint();
     }

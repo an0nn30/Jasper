@@ -1,7 +1,6 @@
 # Jasper — Status and Handoff
 
-**Background residency (2026-09-17):** On `claude/background-daemon` (from main `1f1afeb`;
-`main` has since advanced to `b56d098` and was not merged into this branch), Jasper gains an
+**Background residency (2026-09-17):** On `claude/background-daemon` (from main `1f1afeb`, with `main` `b56d098` since merged in), Jasper gains an
 opt-in `[background] enabled` setting (default `false`) that keeps the process running with no
 windows after the last one closes, so the next launch reveals a window from an already-warm JVM
 instead of paying a full cold start — JVM, AWT toolkit, FlatLaf, font resolution, theme,
@@ -132,6 +131,285 @@ launched at any point during this work:
   headlessly.
 
 No GUI, merge or push.
+
+**Buddy drag performance and presentation coordination (2026-09-17):** The user
+reported dropped frames and tearing while dragging. Pointer events previously
+moved the buddy immediately, rebuilt/revalidated the notification column, queried
+monitor geometry, and resized/showed its native window while an independent column
+timer also moved/repainted it. Dragging now consumes the latest pointer position
+on one coalescing 16ms EDT clock, moving buddy and column in the same callback. The
+column's independent timer is suspended during dragging and resumes afterward;
+release flushes the last position, and hide/dispose cancel pending moves. A paused
+pointer still advances spring/shimmer frames. Geometry-only moves retain notice
+motion and use the monitor snapshot captured at drag start; native size/location/
+visibility setters run only when changed.
+
+Static translucent capsule material (fill, outline and clipped outer shadow) is
+cached in bounded 2x premultiplied images. Immutable deck snapshots are cached
+until mutation, and settled column shimmer invalidates only the subtext region.
+The actual 2x three-card headless benchmark improved from median **0.983ms / p95
+1.251ms / p99 1.454ms** to **0.731ms / 0.896ms / 0.981ms**. Before/after RGBA renders
+differed in only 12 pixels, by at most one channel value. This measures Java2D
+paint CPU cost, not native dragging FPS or WindowServer presentation. Separate
+native windows still cannot promise atomic/vsynced presentation; desktop tearing
+acceptance remains user-run, with no unverified claim that it is eliminated.
+
+`./gradlew check`: **1,004 tests, 1,002 passed, two existing skips, no failures/errors**
+(app 682/681/1; terminal 322/321/1). New drag-clock tests cover pointer bursts,
+paused-pointer animation, final-position flushing and cancellation. Existing buddy
+geometry, material, title/state, hit-testing and motion regressions pass. Source
+hygiene and diff checks pass. Reproduce CPU measurements with
+`:jasper-app:buddyPerformanceMeasurement` (headless; no native window or shell).
+No GUI, commit or push.
+
+
+**Buddy shimmer and fluid screen placement (2026-09-17):** The additional
+14:35:58 recording was extracted into all 482 original frames with ffmpeg, with
+ffprobe timestamps. On the same notification worktree, RUNNING subtext now has a
+soft left-to-right glyph highlight, shared by column and drawer, with steady
+completed/waiting/orphaned text. Running surfaces request 16ms frames; timers stop
+when hidden/disposed and return to a one-second cadence for other live details.
+
+Dragging follows the buddy directly until its anchor-relative placement changes.
+The column switches sides around the screen midpoint with an eight-point dead
+band and an approximately reference-fitted damped spring (8.6/s decay, 8 rad/s,
+800ms settle). Reversals preserve position and velocity; internal stack direction
+also interpolates. Every intermediate window position is clamped to the usable
+monitor, including offset/negative-origin screens. Initial showing snaps placement
+without altering the separate capsule arrival animation.
+
+`./gradlew check`: **1,002 tests, 1,000 passed, two existing skips, no failures or
+errors** (app 680/679/1; terminal 322/321/1). Eight new tests cover highlight
+movement, steady completed text, repaint state, continuous/reversed placement,
+midpoint hysteresis and screen bounds. Actual headless light/dark drag/shimmer
+previews are in `jasper-app/build/reports/buddy-motion/{dark,light}.mp4`, generated
+by `:jasper-app:buddyMotionPreview` plus ffmpeg. Native desktop acceptance remains
+user-run under AGENTS.md. No GUI, commit or push. The shimmer's band/timing is
+visual tuning, not a claimed exact measurement from the subtle reference shader.
+[Measurements and reproduction](design/buddy-notification-reference.md#running-subtext-and-dragging-follow-up-2026-09-17).
+
+
+**iTerm-style tabs and title correction (2026-09-17):** Continuing on
+`claude/command-notifications` in `.claude/worktrees/practical-shamir-1252c5`.
+The user's three screenshots supersede the fixed 160-point tabs, duplicate
+right-hand window title and sliding underline. A single session now hides the
+strip and uses a centered window title; multiple tabs stretch across the macOS
+title bar with centered system-font text, thin dividers, hover close buttons,
+actual shortcut labels and a fixed right-edge add button. The 38-point default,
+native stoplights/gestures, tab ordering and overflow navigation remain.
+
+Automatic tab/native titles now combine the OSC title (or directory) with the
+foreground job: `~ (-zsh)`, `~ (sleep)`, `Reviewing files (tmux)`. A small Unix PTY
+metadata query reads the foreground process group, then Java process metadata,
+every 500ms off the EDT. It needs no shell integration or helper subprocess and
+stops polling on exit/disposal. Unsupported process metadata falls back to the
+configured program. Manual names remain overrides. Buddy titles remain the
+program's text without the job suffix, with the captured command as fallback;
+finished-notification ordering and the matched bubble motion remain unchanged.
+The existing system-font resolver is shared as `SystemFonts`.
+
+The title wrapper was also present in iTerm: tmux's default `set-titles-string`
+added the session/window number and quoted pane title. With explicit user
+permission, `~/.tmux.conf` now forwards custom pane titles and shortens its default
+hostname/user@hostname:path shell title to `~` or the directory basename. The
+running server received only this option; no plugin/config reload. Original
+saved as `~/.tmux.conf.jasper-backup-20260917-145844`. The running shell evaluates
+to `~`, while custom task titles stay intact.
+
+Validation: `./gradlew check` passes **994 tests: 992 passed, two existing skips,
+zero failures/errors** (app 672/671/1, terminal 322/321/1). Real PTY tests cover
+foreground job changes, background jobs, login shells, real tmux forwarding,
+OSC 0/1/2, manual naming and completed-notice snapshots. Headless title-bar
+renders cover single/multiple/narrow layouts in both themes; source hygiene and
+diff checks pass. One pre-existing dangling Javadoc warning remains in
+`LaunchSettingsTest`. Native desktop acceptance remains user-run under AGENTS.md;
+no GUI, commit or push. [Reference and reproduction](design/iterm-title-bar-reference.md).
+
+
+
+**Program titles in tabs and buddy notices (2026-09-17):** Continuing in
+`.claude/worktrees/practical-shamir-1252c5` on `claude/command-notifications`.
+The user requested using the title set by the command/application for the tab
+and bubble. OSC 0/1/2 reception and automatic tab/window titles already existed;
+the missing connection was from title events to notices, and tabs had no command
+fallback when no OSC title was supplied. The running local tmux server was also
+observed with `set-titles off`, which prevents its pane titles reaching Jasper.
+Optional session-scoped forwarding settings are now documented; the user's tmux
+configuration is unchanged.
+
+`TerminalPane` keeps ordered EDT snapshots of title/start/end events. Reading
+`session.title()` later would race with a subsequent prompt title, so a real PTY
+test holds Swing until the full title/finish/prompt burst has been parsed and
+checks the completed notice still names the command's last task. Automatic tabs,
+the native window and live bubbles use the program title, then running-command
+fallback; idle automatic tabs still fall back to the directory. Manual tab names
+remain explicit overrides. Finished notices/native notifications retain the last
+title from that execution.
+
+A title update changes a notice in place, preserving order, acknowledgement and
+arrival state, and cannot resurrect a dismissed notice. Full titles are retained;
+renderers fit them to available width, with code-point-safe binary truncation for
+the capsule instead of repeatedly shortening a potentially long title one
+character at a time. No terminal-module API or shell script changes were needed.
+
+Validation: eight new tests cover OSC 0/1/2 through the actual PTY/parser/tab/window/
+bubble path, command fallback and title clearing, preserved manual names,
+completion ordering, per-pane identity, pre-threshold titles, dismissal and long
+Unicode titles. `./gradlew check`: app 674 (673 passed, one fish skip), terminal
+320 (319 passed, one existing font skip): **994 total, 992 passed, two skipped,
+zero failures/errors**. Source hygiene and diff checks pass. Native GUI remains
+user-run. [Title behavior and tmux settings](configuration.md#automatic-tab-and-notification-titles).
+
+**Buddy notification reference correction (2026-09-17):** On
+`claude/command-notifications` in `.claude/worktrees/practical-shamir-1252c5`, the
+user supplied light/dark recordings and asked to replace the notification styling
+and animation. ffmpeg extracted every original frame and ffprobe supplied its
+variable-rate timestamp. The replacement uses 330 × 56 logical-pixel capsules,
+13-point macOS system text, measured light/dark fills, partial transparency and a
+cached soft outer shadow. Thought-tail dots, card overlap and scale/hover growth
+are removed. The capsule descends 32 logical pixels with a fitted 600ms spring;
+the actual headless render tracks the recorded arrival with 0.95 physical-pixel
+RMS error and a maximum two-pixel difference.
+
+Motion is keyed by notice identity: status updates stay in place and interrupted
+stack moves preserve the current position. Live detail text ticks once a second
+after motion settles; theme changes repaint visible capsules. Drawer dismissal
+now refreshes the column, and input ignores transparent rounded corners. Existing
+notice routing, three-visible limit and drawer history remain. The reference's
+stop-task control has no corresponding Jasper cancellation API; existing open
+and dismiss actions are retained rather than adding a misleading button.
+
+`./gradlew check` passes: app 666 tests (665 passed, one fish skip), terminal 320
+(319 passed, one existing font skip): **986 total, 984 passed, two skipped, zero
+failures/errors**. `:jasper-app:buddyNotificationPreview` renders actual components
+without a window or shell. Light/dark frames, the visual comparison and a
+reference-left/Jasper-right motion MP4 are in
+`jasper-app/build/reports/buddy-notifications/`. Source hygiene and diff checks
+pass. Native desktop acceptance remains user-run, especially transparency over
+a textured background: a flat video does not uniquely identify source alpha or
+native blur. [Measurements, evidence limits and reproduction](design/buddy-notification-reference.md).
+The thought-column spec and plan banners record this user-requested deviation.
+
+**Finished-command notifications (2026-09-16):** On
+`claude/command-notifications` (from main `1f1afeb`), a command that ran past a
+threshold and finished in a tab you were not looking at now tells you, through
+the desk buddy — who also gains the status bubble that was built and deferred.
+
+*Duration.* `commandExecuted` carried no elapsed time, so `TerminalSession` now
+stamps a monotonic clock at the command-start mark and subtracts at the end; the
+clock is injectable so tests drive it without sleeping. The first cut used
+`commandStartedAt == 0` as a "never started" sentinel — the same mistake as
+history ranking treating timestamp 0 as "older than everything" — and the test
+clock, which legitimately starts at zero, caught it. No sentinel is needed.
+
+*The rule.* `CommandNotice.shouldNotify` is pure over three booleans the app
+already tracks, so all eight combinations are tested without a window. It
+notifies for another tab of the focused window, and for anything while Jasper is
+in the background. Deliberately quiet: the tab you are looking at, and a command
+in a different Jasper window while another Jasper window has focus.
+
+*Sprites.* Three frames appended — `TYPE_A`, `TYPE_B`, `TYPE_REST` — so existing
+column indices are untouched; the strip is 840x48. The plan said to check the
+`.ase` master had not been hand-edited, because `generate.py` warns that
+rerunning it destroys hand edits. It had four commits rather than the expected
+one, so the check earned its place: `generate.py` changed in all four and
+rerunning it reproduces the committed PNG byte for byte. The script has always
+been the source of truth and the README now says so. The first laptop was drawn
+large and centred and read as a buddy behind a monitor, with shell, belly and
+glasses all hidden; rendering at 8x showed it at once, and it is now compact and
+sits in his lap.
+
+*Animation and routing.* `BuddyAnimator` gains a `WORKING` mode that returns
+before the tuck and sleep deadlines, so a working buddy never falls asleep —
+pinned by ninety seconds of ticks.
+
+*Two surfaces.* Live notices rise in a **thought column above his head**;
+everything that happened lives in a **drawer** he opens on a single click.
+Position is a claim about lifetime, and a permanent stack of finished cards
+beside him was a record pretending to be a status display.
+
+`BuddyDeck` holds `BuddyNotice`s keyed by `(source, key)` and knows nothing
+about panes: the terminal is one producer and passes the pane as its key,
+which is what makes "one card per tab/pane/window" true today without the
+deck learning why. `Kind` splits **task** (begins and ends) from
+**connection** (up until it is not), because a tunnel never completes and a
+model built only around completion could not express one; `State.fits(Kind)`
+makes an impossible notice unconstructible. `detail` is a `Supplier<String>`
+so a running card ticks without being re-posted and a future transfer can
+report bytes through the same field.
+
+A bubble appears the moment its pane stops being watched — `focusLost` covers
+another pane, another tab, another window and Jasper itself going to the
+background — with `long_command_seconds` as the fallback for a command
+running in the pane you are still watching.
+
+The surfaces run their own repaint timers. They previously had none: the
+buddy's timer repaints only his sprite canvas, so the column painted a
+single frame per event at elapsed zero — scale 0.6, and opacity 0 because it
+rode the same spring curve — and the bubble was invisible until an unrelated
+repaint happened. Opacity now fades over the first 40% of the arrival rather
+than riding the spring, and the timers stop as soon as `animating()` goes
+false, so a settled column costs nothing. Bubbles overlap by six pixels so
+the column reads as a stack, and the ones above a new arrival spring up over
+its place and overshoot once before settling.
+
+Column membership is `live() || !acknowledged`. Acknowledgement is deck
+state, not notice state, because it is a fact about the reader. Focusing a
+pane acknowledges it; a command finishing in the focused pane is
+acknowledged on the spot and never appears; closing a pane acknowledges as
+well as orphans, since its pane can never be focused again. `live()`
+excludes orphans — a pane closed mid-command is left `RUNNING` but nothing
+is still happening, and without that it sat above his head all session.
+
+`BuddyCard` paints one card for both surfaces. `BuddyDeckLayout` and
+`BubbleMotion` stay pure, so the column offsets, the flip, the scroll clamp,
+the hit tests and the bounce curve are all tested headlessly. Rendering the
+column under the sprite is what showed the tail was invisible at 7px on a
+dark desktop and trailed off his centre line; no assertion would have.
+
+`NEEDS_INPUT` is defined and rendered but set by nothing yet: OSC 133 `A`
+means "at a prompt, ready for input", so for the shell it is the same event
+as a finished command. Catching a blocked **sub-process** (`sudo`, `[y/N]`)
+needs the pty's foreground process group and is its own work. Connection
+producers, and grouping healthy connections into one "2 tunnels up" bubble,
+are deliberately deferred until something posts one rather than shipping
+untested machinery for a caller that does not exist.
+
+`TerminalSession.Listener.commandStarted` is new. Nothing previously reached
+the app at the C mark, so `CommandNotifier.passedThreshold` had no
+production caller at all and the typing animation could never have run.
+
+Notification widened from the tab to the pane: only the pane you were typing
+in is quiet. `CommandNotifier.Channel` was deleted rather than given a second
+implementation. `NativeNotifier` passes the command line to `osascript` as
+argv rather than inside an interpolated AppleScript string, which a test
+asserts with a command containing quotes and a newline.
+
+*tmux.* The scripts wrap every OSC in tmux's passthrough sequence when `$TMUX`
+is set, and turn on `allow-passthrough` for their own pane. Measured against tmux
+3.5a: without the wrapper **none** of the marks reach the outer terminal, so the
+whole feature was silently dead in a pane while history — which is read from the
+shell's history file, not the marks — kept working and hid it. With the wrapper
+all four marks, the OSC 1341 command payload and OSC 7 arrive. The option is set
+pane-scoped so a user's global tmux configuration is untouched.
+
+*Setting.* `notifications.long_command_seconds`, default 10, live, 0 disables.
+**It needs shell integration**: the duration comes from the OSC 133 marks, so a
+shell without them produces no notifications and no cards at all, which the
+configuration guide states plainly rather than guessing a duration.
+
+Fresh `./gradlew check --rerun-tasks`: jasper-app 554 tests,
+553 passed and one fish skip;
+jasper-terminal 318 tests,
+317 passed and one existing
+font skip. Total 872 tests, 870 passed, 2 skipped,
+zero failures/errors. [Configuration
+guide](configuration.md#finished-command-notifications), [design
+spec](superpowers/specs/2026-09-16-jasper-finished-command-notifications-design.md),
+[plan](superpowers/plans/2026-09-16-jasper-command-notifications.md). Still
+user-run: a long command in a background tab on the real desktop, watching the
+typing animation and the bubble, and the same with the buddy disabled. No GUI,
+merge or push.
 
 **History ranking, freshness and tmux (2026-09-16):** On
 `claude/history-scope-ranking` (from main `18fd513`), three confirmed defects in

@@ -53,6 +53,10 @@ tasks.register<JavaExec>("mockUiPreview") {
 // runtime, but check never runs them and they never create a native window.
 for ((taskName, entryPoint) in listOf(
     "commandPalettePreview" to "CommandPalettePreview",
+    "buddyNotificationPreview" to "BuddyNotificationPreview",
+    "titleBarPreview" to "TitleBarPreview",
+    "buddyMotionPreview" to "BuddyMotionPreview",
+    "buddyPerformanceMeasurement" to "BuddyPerformanceMeasurement",
     "commandSearchMeasurement" to "CommandSearchMeasurement",
     "shellHistorySearchMeasurement" to "ShellHistorySearchMeasurement",
 )) {

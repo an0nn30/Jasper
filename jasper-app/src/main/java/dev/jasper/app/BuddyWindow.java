@@ -36,8 +36,16 @@ final class BuddyWindow {
     private final Path stateFile;
     private final Runnable raiseTerminal;
     private final Runnable toggle;
+    private final java.beans.PropertyChangeListener appearanceListener = event -> {
+        if ("lookAndFeel".equals(event.getPropertyName())) SwingUtilities.invokeLater(() -> {
+            if (!this.disposed) refreshDeck();
+        });
+    };
     private final Timer timer = new Timer(1, event -> tick());
     private BuddyBubble bubble;
+    private BuddyDeckWindow drawer;
+    private BuddyColumnWindow column;
+    private final BuddyDragFrames dragFrames = new BuddyDragFrames(this::presentDrag);
     private Point pressScreen;
     private Point pressOrigin;
     private boolean dragged;
@@ -91,23 +99,39 @@ final class BuddyWindow {
                 Point now = event.getLocationOnScreen();
                 int dx = now.x - pressScreen.x, dy = now.y - pressScreen.y;
                 if (!dragged && Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+                if (!dragged && column != null) column.beginDrag();
                 dragged = true;
-                window.setLocation(pressOrigin.x + dx, pressOrigin.y + dy);
+                dragFrames.offer(new Point(pressOrigin.x + dx, pressOrigin.y + dy));
             }
             @Override public void mouseReleased(MouseEvent event) {
-                if (event.isPopupTrigger()) { popup(); pressScreen = null; return; }
+                if (event.isPopupTrigger()) { endDrag(); popup(); pressScreen = null; return; }
                 if (pressScreen == null) return;
                 pressScreen = null;
-                if (dragged) save(window.getLocation());
+                if (dragged) { endDrag(); save(window.getLocation()); }
             }
             @Override public void mouseClicked(MouseEvent event) {
                 // A macOS control-click is the popup trigger yet reports the left button; it must not raise.
-                if (SwingUtilities.isLeftMouseButton(event) && !event.isControlDown()
-                        && event.getClickCount() == 2 && !dragged) raiseTerminal.run();
+                if (!SwingUtilities.isLeftMouseButton(event) || event.isControlDown() || dragged) return;
+                if (event.getClickCount() == 2) raiseTerminal.run();
+                else if (event.getClickCount() == 1) openDrawer();
             }
         };
         canvas.addMouseListener(mouse);
         canvas.addMouseMotionListener(mouse);
+        javax.swing.UIManager.addPropertyChangeListener(appearanceListener);
+    }
+
+    private void presentDrag(Point location) {
+        if (disposed || !window.isVisible()) return;
+        if (!location.equals(window.getLocation())) window.setLocation(location);
+        Rectangle bounds = new Rectangle(location, window.getSize());
+        if (column != null) column.moveBeside(bounds);
+        if (drawer != null && drawer.isShowing()) drawer.showBeside(bounds);
+    }
+
+    private void endDrag() {
+        dragFrames.finish();
+        if (column != null) column.endDrag();
     }
 
     /** Null when headless or the toolkit lacks always-on-top or per-pixel translucency; logs once. */
@@ -128,11 +152,44 @@ final class BuddyWindow {
         return new BuddyWindow(sprite, stateFile, raiseTerminal, toggle);
     }
 
+    /** The application owns the contents; the buddy only gives the two surfaces somewhere to sit. */
+    void attachDeck(BuddyDeck deck) {
+        if (disposed || drawer != null) return;
+        drawer = new BuddyDeckWindow(deck, () -> column.refresh());
+        column = new BuddyColumnWindow(deck, this::openDrawer);
+        refreshDeck();
+    }
+
+    /** A notice was posted, dismissed or cleared: re-place both surfaces around him. */
+    void refreshDeck() {
+        if (column == null) return;
+        if (window.isVisible()) {
+            column.showBeside(window.getBounds());
+            if (drawer.isShowing()) drawer.showBeside(window.getBounds());
+        } else {
+            column.hide();
+            drawer.hide();
+        }
+    }
+
+    /** Single click: double-click already raises the terminal and right-click opens his menu. */
+    private void openDrawer() {
+        if (drawer == null || !window.isVisible()) return;
+        drawer.showBeside(window.getBounds());
+    }
+
+    /** A long command is in flight: he sits down with the laptop until it finishes. */
+    void setWorking(boolean working) {
+        animator.setWorking(working);
+        window.repaint();
+    }
+
     void show() {
         if (disposed || window.isVisible()) return;
         animator.shown(System.nanoTime());
         window.setVisible(true);
         paintAndSchedule();
+        refreshDeck();
     }
 
     /** The user came back to a Jasper window: wave, waking him out of his shell first if need be. */
@@ -152,7 +209,11 @@ final class BuddyWindow {
     void hide() {
         if (disposed) return;
         timer.stop();
+        dragFrames.cancel();
+        pressScreen = null;
         if (bubble != null) bubble.hide();
+        if (drawer != null) drawer.hide();
+        if (column != null) column.hide();
         animator.hidden();
         window.setVisible(false);
     }
@@ -160,8 +221,13 @@ final class BuddyWindow {
     void dispose() {
         if (disposed) return;
         disposed = true;
+        javax.swing.UIManager.removePropertyChangeListener(appearanceListener);
         timer.stop();
+        dragFrames.cancel();
+        pressScreen = null;
         if (bubble != null) bubble.dispose();
+        if (drawer != null) drawer.dispose();
+        if (column != null) column.dispose();
         window.dispose();
     }
 

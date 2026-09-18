@@ -38,6 +38,12 @@ final class ConfigTemplate {
             # View > Show Jasper and a right-click on Jasper toggle him for this session only.
             # enabled = true
 
+            [notifications]
+            # Live. Notify when a command that ran at least this long finishes in a tab you are not
+            # looking at. Needs shell integration: the duration comes from its command marks.
+            # Zero disables notifications. Range 0-3600.
+            # long_command_seconds = 10
+
             [background]
             # Keep Jasper running with no windows after the last one closes, so the next launch is
             # instant, and start it in the background at login. Quit still exits completely.

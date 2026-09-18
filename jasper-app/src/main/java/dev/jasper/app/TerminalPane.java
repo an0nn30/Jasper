@@ -20,6 +20,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     private final AtomicBoolean updateQueued = new AtomicBoolean();
     private volatile String shellLabel;
     private TerminalSession session;
+    /** EDT snapshots preserve the order of titles, command starts and command ends from the reader. */
+    private String reportedTitle = "";
+    private String runningCommand = "";
+    private String foregroundJob = "";
+    private boolean jobQueryPending;
+    private final Timer jobTimer = new Timer(500, event -> refreshJob());
     private TerminalView view;
     private FindBar findBar;
     private boolean closed;
@@ -33,12 +39,60 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     Consumer<String> onFailure = message -> {};
     Consumer<TerminalView> onReady = terminal -> {};
     Consumer<ShellHistoryEntry> onCommandExecuted = entry -> {};
+
+    /** A command finished: its text, exit status and how long it ran. Delivered on the EDT. */
+    interface CommandFinished {
+        void accept(String command, java.util.OptionalInt exitStatus, java.time.Duration duration);
+    }
+
+    CommandFinished onCommandFinished = (command, exitStatus, duration) -> {};
+
+    /** A command began. Delivered on the EDT. */
+    Consumer<String> onCommandStarted = command -> {};
+    /** Effective program title, including the command fallback; delivered on the EDT. */
+    Consumer<String> onTitleChanged = title -> {};
+
+    /** This pane is gone: anything holding it as a key should let go. Fired once, on the EDT. */
+    Runnable onClosed = () -> {};
+
+    /**
+     * This pane took keyboard focus. Separate from {@link #onFocused}, which the tab owns to track
+     * its active pane; this one is for whoever cares that the user is now looking here.
+     */
+    Runnable onPaneFocused = () -> {};
+
+    /**
+     * This pane stopped being watched — another pane, another tab, another window, or Jasper itself
+     * going to the background. Swing reports all four as a focus loss, the last as a temporary one.
+     */
+    Runnable onPaneBlurred = () -> {};
     private final TerminalSession.Listener listener = new TerminalSession.Listener() {
         @Override public void screenChanged() { queueUpdate(); }
-        @Override public void titleChanged(String title) { queueUpdate(); }
+
+        @Override public void commandStarted(String command) {
+            // commandStarted arrives on the reader thread; everything downstream is Swing.
+            SwingUtilities.invokeLater(() -> {
+                if (closed) return;
+                runningCommand = command;
+                onCommandStarted.accept(command);
+                onTitleChanged.accept(title());
+                onChanged.run();
+            });
+        }
+        @Override public void titleChanged(String title) {
+            // Do not read session.title() later: another OSC (including the next prompt's title)
+            // may already have overwritten it by the time this event reaches Swing.
+            SwingUtilities.invokeLater(() -> {
+                if (closed) return;
+                reportedTitle = title == null ? "" : title;
+                onTitleChanged.accept(title());
+                onChanged.run();
+            });
+        }
         @Override public void workingDirectoryChanged(Path directory) { queueUpdate(); }
 
-        @Override public void commandExecuted(String command, java.util.OptionalInt exitStatus, java.util.Optional<Path> workingDirectory) {
+        @Override public void commandExecuted(String command, java.util.OptionalInt exitStatus,
+                java.util.Optional<Path> workingDirectory, java.time.Duration duration) {
             try {
                 onCommandExecuted.accept(new ShellHistoryEntry(command, java.time.Instant.now().getEpochSecond(),
                     java.util.Set.of(shellLabel), workingDirectory.orElse(null),
@@ -46,6 +100,13 @@ final class TerminalPane extends JPanel implements AutoCloseable {
             } catch (RuntimeException failure) {
                 LOG.log(System.Logger.Level.WARNING, "History listener failed for a captured command", failure);
             }
+            // commandExecuted arrives on the reader thread; everything downstream is Swing.
+            SwingUtilities.invokeLater(() -> {
+                if (closed) return;
+                onCommandFinished.accept(command, exitStatus, duration);
+                runningCommand = "";
+                onChanged.run();
+            });
         }
     };
 
@@ -59,6 +120,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         setBackground(UIManager.getColor("Panel.background"));
         setActive(false);
     }
+
+    /**
+     * Whether the user is watching this pane right now. The focus owner only exists inside the
+     * active window, so this is false whenever Jasper itself is in the background.
+     */
+    boolean watched() { return view != null && view.isFocusOwner(); }
 
     @Override public Dimension getMinimumSize() {
         Dimension layout = super.getMinimumSize();
@@ -88,10 +155,13 @@ final class TerminalPane extends JPanel implements AutoCloseable {
                 @Override public void componentResized(ComponentEvent event) { queueUpdate(); }
             });
             session.addListener(listener);
+            reportedTitle = session.title();
+            refreshJob(); jobTimer.start();
             // Always defer: the process may already have exited before launch delivery.
             // Read the policy on the EDT after onReady has applied the latest configuration.
             created.exitFuture().whenComplete((code, error) -> SwingUtilities.invokeLater(() -> {
                 if (closed || session != created) return;
+                jobTimer.stop();
                 if (onExit == ShellExitBehavior.CLOSE
                     || (onExit == ShellExitBehavior.CLOSE_ON_SUCCESS && error == null && Integer.valueOf(0).equals(code))) {
                     onClose.run();
@@ -107,6 +177,20 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         });
     }
 
+    private void refreshJob() {
+        if (jobQueryPending || !running()) return;
+        jobQueryPending = true;
+        TerminalSession current = session;
+        Thread.ofVirtual().name("jasper-foreground-job").start(() -> {
+            String job = current.foregroundJob().orElse("");
+            SwingUtilities.invokeLater(() -> {
+                jobQueryPending = false;
+                if (closed || current != session || !running()) return;
+                if (!job.equals(foregroundJob)) { foregroundJob = job; onChanged.run(); }
+            });
+        });
+    }
+
     private static TerminalOptions applicationOptions() {
         TerminalOptions defaults = TerminalOptions.defaults();
         return new TerminalOptions(defaults.fontFamily(), DEFAULT_FONT_SIZE, defaults.fallbackFonts(), defaults.ligatures(),
@@ -116,7 +200,9 @@ final class TerminalPane extends JPanel implements AutoCloseable {
 
     private void trackFocus(Component component) {
         component.addFocusListener(new FocusAdapter() {
-            @Override public void focusGained(FocusEvent event) { onFocused.run(); }
+            @Override public void focusGained(FocusEvent event) { onFocused.run(); onPaneFocused.run(); }
+
+            @Override public void focusLost(FocusEvent event) { onPaneBlurred.run(); }
         });
         if (component instanceof Container container) {
             for (Component child : container.getComponents()) trackFocus(child);
@@ -137,7 +223,12 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     boolean running() { return !closed && session != null && !session.exitFuture().isDone(); }
     boolean shellIntegrationDetected() { return session != null && session.shellIntegrationDetected(); }
     Path directory() { return session == null ? launchDirectory : session.workingDirectory().orElse(launchDirectory); }
-    String title() { return session == null ? "" : session.title(); }
+    String title() {
+        return TerminalTitle.singleLine(!reportedTitle.isBlank() ? reportedTitle : runningCommand.strip());
+    }
+    String tabTitle() {
+        return TerminalTitle.tab(reportedTitle, directory(), foregroundJob.isBlank() ? shellLabel : foregroundJob);
+    }
     String shellLabel() { return shellLabel; }
     void focusTerminal() { if (view != null) view.requestFocusInWindow(); }
     void setActive(boolean selected) {
@@ -165,12 +256,19 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        jobTimer.stop();
+        Runnable closedHook = onClosed;
+        onClosed = () -> {};
+        closedHook.run();
         if (findBar != null) findBar.dispose();
         if (view != null) {
             view.setShortcutHandler(null); view.setContextMenuHandler(null); view.setOnCloseRequest(() -> {});
         }
         if (session != null) { session.removeListener(listener); session.close(); }
-        onChanged = () -> {}; onFocused = () -> {}; onClose = () -> {};
+        onChanged = () -> {}; onFocused = () -> {}; onClose = () -> {}; onCommandStarted = command -> {};
+        onPaneFocused = () -> {}; onPaneBlurred = () -> {};
+        onTitleChanged = title -> {};
+        onCommandFinished = (command, exitStatus, duration) -> {};
         allowLaunchFocus = () -> false;
         onReady = terminal -> {}; onFailure = message -> {};
         onCommandExecuted = entry -> {};

@@ -44,7 +44,21 @@ final class JasperApplication {
     private final BuddyVisibility buddyVisibility = new BuddyVisibility();
     private final Path buddyStateFile;
     private BuddyWindow buddy;
+    private final NativeNotifier nativeNotifier = new NativeNotifier();
+    /** The drawer outlives the buddy's window: hiding him must not throw away what you kept. */
+    private final BuddyDeck deck = new BuddyDeck();
+    private final CommandNotifier notifications = new CommandNotifier(
+        () -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
+        deck,
+        () -> { if (buddy != null) buddy.refreshDeck(); },
+        nativeNotifier::send,
+        working -> { if (buddy != null) buddy.setWorking(working); },
+        JasperApplication::afterDelay);
     private boolean buddyUnavailable;
+
+    private int configuredLongCommandSeconds() {
+        return configuration == null ? 10 : configuration.snapshot().longCommandSeconds();
+    }
     private AWTEventListener keyWatch;
     private long lastPokeNanos;
     private TerminalWindow lastActive;
@@ -114,6 +128,15 @@ final class JasperApplication {
         }
     }
 
+    /** Swing's timer, as a plain function: schedule a task, get back the way to cancel it. */
+    private static Runnable afterDelay(java.time.Duration delay, Runnable task) {
+        javax.swing.Timer timer = new javax.swing.Timer(
+            (int) Math.max(1, Math.min(Integer.MAX_VALUE, delay.toMillis())), event -> task.run());
+        timer.setRepeats(false);
+        timer.start();
+        return timer::stop;
+    }
+
     TerminalWindow newWindow(Path directory) {
         if (quitting) return null;
         boolean first = windows.isEmpty();
@@ -121,6 +144,15 @@ final class JasperApplication {
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(startSession(path, settings)), shellIntegrationDir);
         TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history, shellHistory, snippets);
+        window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
+        window.content().onCommandStarted = (command, pane, elapsed, focus, watched) ->
+            notifications.started(pane, command, elapsed, focus, watched);
+        window.content().onCommandFinished = (command, exitStatus, duration, origin, pane, focus) ->
+            notifications.finished(pane, command, exitStatus, duration, origin, focus);
+        window.content().onPaneTitleChanged = notifications::titleChanged;
+        window.content().onPaneClosed = notifications::closed;
+        window.content().onPaneFocused = notifications::looked;
+        window.content().onPaneBlurred = notifications::hidden;
         windows.add(window); window.show();
         if (first) shellHistory.refresh();
         if (first && configuration == null && snippets != null) snippets.reload();
@@ -287,7 +319,7 @@ final class JasperApplication {
                         buddy = BuddyWindow.create(buddyStateFile, this::raiseTerminal, this::toggleBuddy);
                         if (buddy == null) buddyUnavailable = true; else installKeyWatch();
                     }
-                    if (buddy != null) buddy.show();
+                    if (buddy != null) { buddy.show(); buddy.attachDeck(deck); }
                 } else if (buddy != null) buddy.hide();
             } catch (RuntimeException failure) {
                 buddyUnavailable = true;

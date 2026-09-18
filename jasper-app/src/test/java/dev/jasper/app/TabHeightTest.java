@@ -48,6 +48,8 @@ class TabHeightTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>())); var root = new JRootPane();
             MacTitleBar.install(root, owner, false, title -> {}); root.setSize(958, 958);
+            assertThat(owner.windowTabs().isVisible()).isFalse();
+            owner.newTab(HOME);
             for (int height : new int[]{28, 72, 38}) {
                 owner.setTabHeight(height); MockUiTest.layoutTree(root);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(height);

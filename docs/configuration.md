@@ -79,6 +79,7 @@ variant = "dark"
 | `window.columns` | `150` | Integer 5–500 | New windows |
 | `window.lines` | `45` | Integer 2–200 | New windows |
 | `buddy.enabled` | `true` | Boolean | Live |
+| `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
 | `background.enabled` | `false` | Boolean | Next start (residency); live (login item) |
 | `palette.scopes.history.enabled` | `true` | Boolean | Live |
 | `palette.scopes.history.trivial_commands` | see below | Array of single words | Live |
@@ -168,6 +169,92 @@ acted on.
 best `max_results` matches and History the most recent or best-matching `max_results` commands, with no
 scrolling. Cmd/Ctrl+1–5 always act on the first five rows, so a larger cap only adds rows you reach with the
 arrow keys. Changes apply live, including to an open palette.
+
+### Finished-command notifications
+
+`notifications.long_command_seconds` sets how long a command must run before it is worth remembering.
+The default is 10 seconds; `0` turns the feature off entirely.
+
+**This needs [shell integration](#shell-integration).** The duration is measured between the
+command-start and command-end marks the integration scripts emit, so a shell that does not emit them
+produces no notifications and no cards at all — Jasper cannot know how long anything took. There is
+no fallback guess.
+
+A running command shows a **capsule above the buddy's head**, and he sits down and types while it runs. The bubble appears **the moment you look away** —
+switching tab, switching window, or sending Jasper to the background — because out of sight is the
+whole reason it exists. If you stay in the pane and watch, it appears once the command passes
+`long_command_seconds` instead. It shows the app-supplied terminal title (or the command when no title is supplied),
+how long it has been running, and when the command ends a check or a cross with the final time.
+
+**Looking at it clears it.** Focusing the pane a bubble came from takes it out of the column, so the
+column empties as you work rather than needing to be tidied. A command that finishes in the pane you
+were already typing in never produces a bubble at all — you watched it happen. When nothing is
+running and nothing is unseen there is nothing above his head, which is the resting state.
+
+At most three bubbles are shown, newest nearest his head, with a count on the newest when there are
+more. A new capsule slides down into place with a small spring settle; existing capsules move
+smoothly to make room. Its size stays fixed, and status changes update the text in place. The
+translucent material and text follow the light or dark app theme. The column flips below him when he is too near the top of the screen, and the order inverts so
+the newest is still the one closest to him.
+
+**Single-clicking him opens the drawer**: everything from this run, newest first, whether or not you
+have seen it, with the × on a card to dismiss one and **Clear all** to empty it. At most 50 are kept,
+the oldest falling off, and the drawer starts empty each time Jasper starts. A card whose pane you
+have closed stays readable but dims and no longer responds — there is nowhere left for it to take
+you. Double-clicking him still raises the terminal and right-clicking still opens his menu.
+
+A **system notification** is sent as well, unless the command finished in the pane you were actually
+typing in. That includes a command finishing in a visible but unfocused split pane, which is easy to
+miss. System notifications are macOS-only; elsewhere the drawer is the only channel.
+
+### Automatic tab and notification titles
+
+With one session, Jasper hides the tab strip and centers its title in the macOS
+window title bar. With multiple sessions, equal-width tabs fill that bar after
+the native controls; the add button stays at its right edge. Tab titles are
+centered, close buttons appear on hover, and shortcut labels reflect the actual
+key bindings. Narrow windows scroll overflowing tabs, and keyboard selection
+reveals the selected tab. Tab height remains configurable (38 points by default).
+
+Applications can set the terminal title with OSC 0, 1 or 2. An automatic tab and
+the native window show that text plus the foreground job in parentheses, like
+`Editing README.md (vim)` or `Reviewing files (tmux)`. Without an application title,
+they show the working-directory name plus the job, such as `~ (-zsh)`. On Unix,
+Jasper reads the PTY's foreground process group every 500ms off the EDT, so job
+names work without shell integration or title escape sequences. Where process
+metadata is unavailable it falls back to the configured shell/program name.
+Working-directory changes still use OSC 7. Manual tab names override the whole
+automatic title; clearing the rename restores it.
+
+Buddy bubbles use the program-supplied title without the tab's job suffix; shell
+integration provides the current command as their fallback. Running subtext shimmers from left to right. Dragging the buddy smoothly moves
+the bubbles between above/below positions while keeping them on screen. Live title changes
+update a bubble in place, without moving it to the front or replaying its arrival.
+Once the command finishes, its bubble and native notification keep its last title;
+later prompt titles do not rewrite the result. Title reception works without shell
+integration, but buddy notifications still need command-start/end marks.
+
+Inside tmux, the multiplexer must forward titles to its outer terminal. If tmux's
+`set-titles` option is off, Jasper cannot see titles applications set inside its
+panes. These settings forward the active pane title without the default tmux
+session/window wrapper:
+
+```tmux
+set -g set-titles on
+set -g set-titles-string '#{pane_title}'
+```
+
+For a compact shell title while retaining custom application titles, use this
+format instead. It replaces tmux's hostname-only default and the conventional
+`user@hostname:path` shell title with `~` or the directory basename:
+
+```tmux
+set -g set-titles-string '#{?#{||:#{==:#{pane_title},#{host}},#{m:*@#{host}:*,#{pane_title}}},#{?#{==:#{pane_current_path},#{HOME}},~,#{b:pane_current_path}},#{pane_title}}'
+```
+
+Jasper does not modify tmux configuration automatically. The outer Jasper tab
+represents the attached tmux client and follows its active pane, rather than
+exposing each tmux pane as a separate Jasper tab.
 
 ### Shell history
 

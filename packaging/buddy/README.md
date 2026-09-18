@@ -5,7 +5,9 @@ Pixel-art Jasper for the floating desk buddy: 42 × 48 art pixels per frame, dra
 
 - `jasper-buddy.ase` — editable master for [LibreSprite](https://libresprite.github.io). One RGBA layer, seventeen frames.
 - `../../jasper-app/src/main/resources/dev/jasper/app/buddy/jasper-buddy.png` — runtime strip, 714 × 48, frames left to right.
-- `generate.py` — bootstrap that drew the first version of both files (Python 3 + Pillow). Do not rerun it after hand edits.
+- `generate.py` — **the source of truth** for both files (Python 3 + Pillow). Every frame so far has
+  been drawn here, never by hand: rerunning it reproduces the committed PNG byte for byte. Change the
+  art here and rerun, rather than editing the `.ase` and stranding the script.
 
 ## Frames (column order is fixed by `BuddyFrame` in the app)
 
@@ -28,8 +30,12 @@ Pixel-art Jasper for the floating desk buddy: 42 × 48 art pixels per frame, dra
 | 14 | `SPARKLE_A` | Spawn overlay: stars only, no body (painted on top of another frame) |
 | 15 | `SPARKLE_B` | Spawn overlay, stars in different places |
 | 16 | `SPARKLE_C` | Spawn overlay, stars in different places again |
+| 17 | `TYPE_A` | Sitting with a laptop in his lap, left hand raised off the keys |
+| 18 | `TYPE_B` | As A, right hand raised instead |
+| 19 | `TYPE_REST` | As A with both hands down, the beat between bursts |
 
-Frames 0–13 are poses. Frames 14–16 are overlays: transparent except for the stars, cycled on top of
+Frames 17–19 are the working animation, cycled while a command has been running past the
+notification threshold. Frames 0–13 are poses. Frames 14–16 are overlays: transparent except for the stars, cycled on top of
 the body while he fades in at spawn, so they never replace a pose.
 
 ## Palette (from `../icons/jasper.svg`)
@@ -37,6 +43,9 @@ the body while he fades in at spawn, so they never replace a pose.
 | Role | Hex |
 |---|---|
 | Outline, pupils, glasses | `#332f27` |
+| Laptop screen | `#1e222a` |
+| Laptop prompt text | `#7fd9a8` |
+| Laptop key deck | `#5a626e` |
 | Skin | `#a7ae70` |
 | Skin highlight | `#c9ce93` |
 | Shell rim | `#d8c49c` |

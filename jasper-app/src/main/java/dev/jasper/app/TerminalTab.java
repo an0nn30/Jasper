@@ -54,7 +54,7 @@ final class TerminalTab extends JPanel implements AutoCloseable {
     SplitTree tree() { return tree; }
     String title() {
         TerminalPane pane = focusedPane();
-        return state.title(pane == null ? null : pane.title(), pane == null ? null : pane.directory());
+        return state.title(pane == null ? null : pane.tabTitle(), pane == null ? null : pane.directory());
     }
     void rename(String name) { state.rename(name); onChanged.run(); }
 

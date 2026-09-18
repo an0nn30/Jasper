@@ -526,4 +526,68 @@ class BuddyAnimatorTest {
         assertThat(asleep.frame()).isEqualTo(BuddyFrame.IDLE);
         assertThat(asleep.nextDueNanos()).isPresent();
     }
+
+    @Test void workingCyclesTheTypingFramesAndNeverFallsAsleep() {
+        var animator = new BuddyAnimator(new Random(7));
+        animator.shown(0L);
+        spawned(animator, 0L);
+
+        animator.setWorking(true);
+        // Well past both the sit and sleep deadlines: a resting buddy would be asleep by now.
+        List<Event> events = runUntil(animator, 90 * SECOND);
+
+        assertThat(events).extracting(Event::frame)
+            .contains(BuddyFrame.TYPE_A, BuddyFrame.TYPE_B)
+            .doesNotContain(BuddyFrame.SLEEP_A, BuddyFrame.SLEEP_B, BuddyFrame.SLEEP_C,
+                BuddyFrame.TUCK, BuddyFrame.SIT);
+    }
+
+    @Test void clearingWorkingReturnsHimToTheRestingProgression() {
+        var animator = new BuddyAnimator(new Random(7));
+        animator.shown(0L);
+        spawned(animator, 0L);
+        animator.setWorking(true);
+        runUntil(animator, 10 * SECOND);
+
+        animator.setWorking(false);
+        List<Event> after = runUntil(animator, 14 * SECOND);
+
+        assertThat(after).extracting(Event::frame)
+            .doesNotContain(BuddyFrame.TYPE_A, BuddyFrame.TYPE_B, BuddyFrame.TYPE_REST);
+        assertThat(animator.frame()).isIn(BuddyFrame.IDLE, BuddyFrame.BLINK, BuddyFrame.WINK);
+    }
+
+    /** A two-second spawn is short; cutting it off to type would look broken. */
+    @Test void workingWaitsForTheSpawnToFinish() {
+        var animator = new BuddyAnimator(new Random(7));
+        animator.shown(0L);
+        animator.setWorking(true);
+
+        // Mid-spawn the wave owns the stage, however long the command has been running.
+        for (int step = 1; step < BuddyAnimator.SPAWN_STEPS; step++) {
+            animator.tick(step * BuddyAnimator.STEP_NANOS);
+            assertThat(animator.frame()).as("step %d", step)
+                .isNotIn(BuddyFrame.TYPE_A, BuddyFrame.TYPE_B, BuddyFrame.TYPE_REST);
+        }
+
+        animator.tick(BuddyAnimator.SPAWN_STEPS * BuddyAnimator.STEP_NANOS);
+
+        assertThat(animator.frame()).as("and he picks it up the moment the spawn ends")
+            .isIn(BuddyFrame.TYPE_A, BuddyFrame.TYPE_B, BuddyFrame.TYPE_REST);
+    }
+
+    @Test void settingWorkingTwiceChangesNothing() {
+        var animator = new BuddyAnimator(new Random(7));
+        animator.shown(0L);
+        spawned(animator, 0L);
+        animator.setWorking(true);
+        runUntil(animator, 5 * SECOND);
+        BuddyFrame before = animator.frame();
+        long due = animator.nextDueNanos().orElseThrow();
+
+        animator.setWorking(true);
+
+        assertThat(animator.frame()).isEqualTo(before);
+        assertThat(animator.nextDueNanos()).hasValue(due);
+    }
 }

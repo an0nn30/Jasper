@@ -26,8 +26,8 @@ class MacTitleBarTest {
                 assertThat(root.getClientProperty("apple.awt.windowTitleVisible")).isEqualTo(false);
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
                 owner.currentTab().rename("build logs"); owner.update();
-                assertThat(metadata.get()).isEqualTo("build logs — Jasper");
-                assertThat(label(bar).getText()).isEqualTo("build logs — Jasper");
+                assertThat(metadata.get()).isEqualTo("build logs");
+                assertThat(label(bar).getText()).isEqualTo("build logs");
                 assertThat(bar.getMouseListeners()).isEmpty();
                 assertThat(label(bar).getMouseListeners()).isEmpty();
                 assertThat(label(bar).getToolTipText()).isNull();
@@ -64,9 +64,15 @@ class MacTitleBarTest {
                 assertThat(tabs).as("the real tabs are in the native header").isNotNull();
                 assertThat(WindowTabsTest.named(owner, "windowTabs")).isNull();
                 bar.setSize(959, 38); bar.doLayout();
-                assertThat(tabs.getX()).isEqualTo(98);
-                assertThat(label(bar).getHorizontalAlignment()).isEqualTo(SwingConstants.RIGHT);
-                assertThat(label(bar).getX()).isGreaterThanOrEqualTo(tabs.getX() + tabs.getWidth());
+                assertThat(tabs.getX()).isEqualTo(120);
+                assertThat(label(bar).getHorizontalAlignment()).isEqualTo(SwingConstants.CENTER);
+                assertThat(tabs.isVisible()).isFalse();
+                assertThat(label(bar).isVisible()).isTrue();
+                assertThat(label(bar).getX() * 2 + label(bar).getWidth()).isEqualTo(bar.getWidth());
+                owner.newTab(HOME); bar.doLayout();
+                assertThat(tabs.isVisible()).isTrue();
+                assertThat(label(bar).isVisible()).isFalse();
+                assertThat(tabs.getWidth()).isEqualTo(959 - 120);
                 root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(12, 6, 110, 34));
                 assertThat(minimumChanges.get()).isPositive();
                 bar.doLayout();
@@ -80,7 +86,7 @@ class MacTitleBarTest {
                 assertThat(tabs.getWidth()).isZero();
                 root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle());
                 bar.setSize(959, 38); bar.doLayout();
-                assertThat(tabs.getX()).isEqualTo(98);
+                assertThat(tabs.getX()).isEqualTo(120);
             }
         });
     }

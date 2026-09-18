@@ -23,6 +23,7 @@ class ShellIntegrationSessionTest {
     private TerminalSession session;
     private CopyOnWriteArrayList<String> captured;
     private CopyOnWriteArrayList<OptionalInt> statuses;
+    private CopyOnWriteArrayList<java.time.Duration> durations;
 
     @BeforeEach
     void start() throws Exception {
@@ -39,10 +40,13 @@ class ShellIntegrationSessionTest {
     private void listenForCommands() {
         captured = new CopyOnWriteArrayList<>();
         statuses = new CopyOnWriteArrayList<>();
+        durations = new CopyOnWriteArrayList<>();
         session.addListener(new TerminalSession.Listener() {
-            @Override public void commandExecuted(String command, OptionalInt exitStatus, Optional<Path> workingDirectory) {
+            @Override public void commandExecuted(String command, OptionalInt exitStatus,
+                    Optional<Path> workingDirectory, java.time.Duration duration) {
                 captured.add(command);
                 statuses.add(exitStatus);
+                durations.add(duration);
             }
         });
     }
@@ -308,5 +312,83 @@ class ShellIntegrationSessionTest {
 
         Await.until(() -> captured.size() == 1, "one captured command");
         assertThat(captured).containsExactly("typed");
+    }
+
+    /** The notification threshold needs to know how long a command took, which only the marks can say. */
+    @Test void aCommandReportsHowLongItRan() throws Exception {
+        var clock = new java.util.concurrent.atomic.AtomicLong(0);
+        FakeConnector timedConnector = new FakeConnector();
+        var reported = new CopyOnWriteArrayList<java.time.Duration>();
+        var started = new CopyOnWriteArrayList<String>();
+        try (var timed = new TerminalSession(timedConnector, 20, 4, 100, clock::get)) {
+            timed.addListener(new TerminalSession.Listener() {
+                @Override public void commandStarted(String command) { started.add(command); }
+
+                @Override public void commandExecuted(String command, OptionalInt exitStatus,
+                        Optional<Path> directory, java.time.Duration duration) {
+                    reported.add(duration);
+                }
+            });
+            timed.startReading();
+            timedConnector.feed("\033]133;A\007$ \033]133;B\007sleep 5\033]133;C\007");
+            // The start mark, not the screen text: the text is written before the C mark is parsed,
+            // so awaiting it could advance the clock before the start was stamped and report zero.
+            Await.until(() -> !started.isEmpty(), "command start marked");
+
+            clock.set(java.time.Duration.ofSeconds(12).toNanos());
+            timedConnector.feed("\033]133;D;0\007");
+
+            Await.until(() -> !reported.isEmpty(), "command reported");
+            assertThat(reported.getFirst()).isEqualTo(java.time.Duration.ofSeconds(12));
+        }
+    }
+
+    /** A prompt mark flushing a stale command never saw a C, so it cannot claim a duration. */
+    @Test void aCommandFlushedWithoutAStartMarkReportsNoDuration() throws Exception {
+        listenForCommands();
+        connector.feed("\033]133;A\007$ \033]133;B\007pwd\033]133;C\007/tmp\r\n\033]133;A\007$ ");
+
+        Await.until(() -> captured.size() == 1, "captured at the next prompt");
+        assertThat(durations.getFirst()).isNotNull().isGreaterThanOrEqualTo(java.time.Duration.ZERO);
+    }
+
+    /**
+     * The app needs the start, not only the end: without it there is nothing to hang a running card
+     * on and nothing to start the buddy typing.
+     */
+    @Test void theCommandStartMarkIsReportedBeforeTheCommandFinishes() throws Exception {
+        var started = new CopyOnWriteArrayList<String>();
+        listenForCommands();
+        session.addListener(new TerminalSession.Listener() {
+            @Override public void commandStarted(String command) { started.add(command); }
+        });
+
+        connector.feed("\033]133;A\007$ \033]133;B\007./gradlew build\r\n\033]133;C\007");
+        Await.until(() -> started.size() == 1, "one started command");
+
+        assertThat(started).containsExactly("./gradlew build");
+        assertThat(captured).as("nothing has finished yet").isEmpty();
+
+        connector.feed("out\r\n\033]133;D;0\007");
+        Await.until(() -> captured.size() == 1, "one finished command");
+
+        assertThat(captured).containsExactly("./gradlew build");
+        assertThat(started).as("one start per command").hasSize(1);
+    }
+
+    @Test void aCycleWithNothingTypedReportsNoStart() throws Exception {
+        var started = new CopyOnWriteArrayList<String>();
+        listenForCommands();
+        session.addListener(new TerminalSession.Listener() {
+            @Override public void commandStarted(String command) { started.add(command); }
+        });
+
+        // An empty cycle, then a real one: the second is the deterministic signal that the first
+        // was processed and reported nothing.
+        connector.feed("\033]133;A\007$ \033]133;B\007\033]133;C\007\033]133;D;0\007");
+        connector.feed("\033]133;A\007$ \033]133;B\007ls\r\n\033]133;C\007\033]133;D;0\007");
+        Await.until(() -> started.size() == 1, "the real command started");
+
+        assertThat(started).containsExactly("ls");
     }
 }

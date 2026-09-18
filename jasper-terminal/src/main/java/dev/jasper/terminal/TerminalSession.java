@@ -28,18 +28,21 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
 
 /** A program running in a pseudo-terminal, emulated by JediTerm on a dedicated reader thread. */
@@ -72,12 +75,28 @@ public final class TerminalSession implements AutoCloseable {
         default void alternateBufferChanged(boolean alternate) {
         }
 
-        /** The shell ran a command it marked with OSC 133 B/C (and D when it sends one). Reader thread. */
-        default void commandExecuted(String command, OptionalInt exitStatus, Optional<Path> workingDirectory) {
+        /**
+         * The shell marked the start of a command it is about to run (OSC 133 C). Reader thread, and
+         * fired outside the buffer lock. Exactly one start per {@link #commandExecuted}, except when
+         * the pane is closed mid-command — then there is a start and no finish, which is precisely
+         * the case a running notice exists to show.
+         */
+        default void commandStarted(String command) {
+        }
+
+        /**
+         * The shell ran a command it marked with OSC 133 B/C (and D when it sends one). Reader thread.
+         * {@code duration} is measured from the command-start mark. A cycle that never saw one has no
+         * command to report either, so it fires no callback at all rather than one with a zero duration.
+         */
+        default void commandExecuted(String command, OptionalInt exitStatus, Optional<Path> workingDirectory,
+                                     Duration duration) {
         }
     }
 
+    private final LongSupplier clock;
     private final TtyConnector connector;
+    private final PtyConnector pty;
     private final TerminalTextBuffer buffer;
     private final JediTerminal terminal;
     private final SessionDisplay display;
@@ -98,6 +117,11 @@ public final class TerminalSession implements AutoCloseable {
     private int commandStartColumn;
     private String pendingCommand;
     private String pendingCommandText;
+    /**
+     * nanoTime at the command-start mark. Only meaningful while {@code pendingCommand} is set, which
+     * is the same moment it is written — a zero here is a real reading, not a "never started" flag.
+     */
+    private long commandStartedAt;
 
     /** Starts {@code command} in a new pseudo-terminal and begins emulating its output. */
     public static TerminalSession start(List<String> command, Map<String, String> environment, Path workingDirectory,
@@ -114,13 +138,20 @@ public final class TerminalSession implements AutoCloseable {
             .setInitialRows(rows)
             .setUnixOpenTtyToPreserveOutputAfterTermination(true)
             .start();
-        TerminalSession session = new TerminalSession(new PtyConnector(process), columns, rows, scrollback);
+        TerminalSession session = new TerminalSession(new PtyConnector(process, command), columns, rows, scrollback);
         session.startReading();
         return session;
     }
 
     TerminalSession(TtyConnector connector, int columns, int rows, int scrollback) {
+        this(connector, columns, rows, scrollback, System::nanoTime);
+    }
+
+    /** {@code clock} supplies monotonic nanoseconds; tests drive it instead of sleeping. */
+    TerminalSession(TtyConnector connector, int columns, int rows, int scrollback, LongSupplier clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
         this.connector = new ShellIntegrationConnector(connector);
+        this.pty = connector instanceof PtyConnector value ? value : null;
         this.columns = columns;
         this.rows = rows;
         StyleState styleState = new StyleState();
@@ -272,6 +303,11 @@ public final class TerminalSession implements AutoCloseable {
 
     public int rows() {
         return rows;
+    }
+
+    /** Current foreground job's executable name, when the OS exposes it. Query off the EDT. */
+    public Optional<String> foregroundJob() {
+        return pty == null ? Optional.empty() : pty.foregroundJob();
     }
 
     public String title() {
@@ -712,9 +748,13 @@ public final class TerminalSession implements AutoCloseable {
             }
             commandStartRow = -1;
             pendingCommand = text.isEmpty() ? null : text;
+            commandStartedAt = clock.getAsLong();
         } finally {
             buffer.unlock();
         }
+        // Outside the lock: a listener runs arbitrary code and the buffer lock must stay short.
+        String started = pendingCommand;
+        if (started != null) listeners.forEach(l -> l.commandStarted(started));
     }
 
     /**
@@ -738,11 +778,15 @@ public final class TerminalSession implements AutoCloseable {
 
     private void flushPendingCommand(OptionalInt exitStatus) {
         String command = pendingCommand;
+        long startedAt = commandStartedAt;
         pendingCommand = null;
         pendingCommandText = null;
         if (command == null) return;
+        // Only captureCommand sets pendingCommand, and it stamps the clock in the same breath, so a
+        // non-null command always has a real start. nanoTime is monotonic, so this cannot go negative.
+        Duration ran = Duration.ofNanos(clock.getAsLong() - startedAt);
         Optional<Path> directory = workingDirectory();
-        listeners.forEach(l -> l.commandExecuted(command, exitStatus, directory));
+        listeners.forEach(l -> l.commandExecuted(command, exitStatus, directory, ran));
     }
 
     private static OptionalInt exitStatus(List<String> args) {

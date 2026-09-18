@@ -1,5 +1,8 @@
 # Compact configurable tabs and motion
 
+> Superseded presentation, 2026-09-17: the user's iTerm screenshots replace fixed-width slots and the active underline with equal-width tabs that fill the native title bar. Width arrival/departure motion remains 180ms, with the add button fixed at the right. The strip is hidden for one tab, including an immediate transition when closing down to one; selection no longer animates an underline. See [the reference](../../design/iterm-title-bar-reference.md).
+
+
 The user's follow-up authorizes shortening the title/tab row, configurable height, quick eased new-tab appearance and active underline movement, and Cmd/Ctrl tab shortcuts. This supersedes the mock's 54px fixed height. Continue in the clean codex/mock-ui worktree; do not merge yet.
 
 Default row height is 38 logical pixels. A View → Tab height… numeric control offers 28–72px, applies to the current window immediately after acceptance, and can restore 38. Cancellation preserves the old value. This is a session-only appearance control like toolbar visibility; persistence remains Plan 4 unless user steering changes scope. Both WindowTabs and MacTitleBar use this same value, including native JBR title height/minimum geometry. Theme changes preserve it. Other chrome dimensions remain unchanged. New windows initially use 38. Validation rejects out-of-range input. Real native controls and hit testing are retained.

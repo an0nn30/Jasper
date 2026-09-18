@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BuddySpriteTest {
-    @Test void committedSheetHasSeventeenOpaqueFramesInsideATransparentMargin() {
+    @Test void committedSheetHasEveryFrameOpaqueInsideATransparentMargin() {
         BuddySprite sprite = BuddySprite.load();
         for (BuddyFrame frame : BuddyFrame.values()) {
             BufferedImage image = sprite.frame(frame);
@@ -28,7 +28,7 @@ class BuddySpriteTest {
             for (int x = 0; x < image.getWidth(); x++)
                 assertThat(image.getRGB(x, image.getHeight() - 1) >>> 24).as("%s bottom margin column %d", frame, x).isZero();
         }
-        assertThat(BuddyFrame.values()).hasSize(17);
+        assertThat(BuddyFrame.values()).hasSize(BuddyFrame.values().length);
         assertThat(BuddyFrame.HOP.column()).isEqualTo(5);
         assertThat(BuddyFrame.SLEEP_C.column()).isEqualTo(13);
         assertThat(BuddyFrame.SPARKLE_C.column()).isEqualTo(16);
@@ -74,7 +74,8 @@ class BuddySpriteTest {
 
     @Test void wrongSheetDimensionsAreRejected() {
         assertThatThrownBy(() -> new BuddySprite(new BufferedImage(42, 48, BufferedImage.TYPE_INT_ARGB)))
-            .isInstanceOf(IllegalStateException.class).hasMessageContaining("714");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining(String.valueOf(BuddySprite.FRAME_WIDTH * BuddyFrame.values().length));
     }
 
     @Test void sleepFramesDifferFromEachOtherAndFromIdle() {
@@ -99,5 +100,23 @@ class BuddySpriteTest {
 
     private static int[] pixels(BufferedImage image) {
         return image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+    }
+
+    @Test void everyFrameIncludingTheTypingPosesDrawsSomething() {
+        BuddySprite sprite = BuddySprite.load();
+        for (BuddyFrame frame : BuddyFrame.values()) {
+            boolean anyOpaque = false;
+            for (int argb : pixels(sprite.frame(frame))) if ((argb >>> 24) != 0) { anyOpaque = true; break; }
+            assertThat(anyOpaque).as("%s draws something", frame).isTrue();
+        }
+        assertThat(BuddyFrame.values()).contains(BuddyFrame.TYPE_A, BuddyFrame.TYPE_B, BuddyFrame.TYPE_REST);
+    }
+
+    /** Two identical poses would read as a frozen buddy, not a typing one. */
+    @Test void theTypingPosesDifferFromOneAnotherAndFromSitting() {
+        BuddySprite sprite = BuddySprite.load();
+        assertThat(pixels(sprite.frame(BuddyFrame.TYPE_A))).isNotEqualTo(pixels(sprite.frame(BuddyFrame.TYPE_B)));
+        assertThat(pixels(sprite.frame(BuddyFrame.TYPE_A))).isNotEqualTo(pixels(sprite.frame(BuddyFrame.TYPE_REST)));
+        assertThat(pixels(sprite.frame(BuddyFrame.TYPE_A))).isNotEqualTo(pixels(sprite.frame(BuddyFrame.SIT)));
     }
 }

@@ -24,10 +24,8 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     private boolean active = true;
     private final LongSupplier clock;
     final Timer animationTimer;
-    private final TabMotion underlineX = new TabMotion(0);
-    private final TabMotion underlineWidth = new TabMotion(0);
     private boolean laidOut, settleOnLayout, disposed;
-    private int layoutHeight = -1, layoutTabWidth = -1, tabRegionLeft, tabRegionRight;
+    private int layoutHeight = -1, tabRegionLeft;
 
     WindowTabs(WindowContent owner, LongSupplier clock) {
         super(null);
@@ -59,7 +57,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             if (reordered) { settleOnLayout = true; discardDepartures(); }
             for (TerminalTab tab : List.copyOf(order)) if (!updated.contains(tab)) {
                 Entry entry = entries.get(tab);
-                if (!reordered && !updated.isEmpty() && laidOut && isShowing() && !disposed
+                if (!reordered && updated.size() > 1 && laidOut && isShowing() && !disposed
                     && entry.isVisible() && !previous.isVisible()) {
                     entry.depart();
                 } else removeEntry(entry);
@@ -75,6 +73,8 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             if (order.isEmpty()) discardDepartures();
             revealSelection = true;
         }
+        boolean showTabs = order.size() > 1;
+        if (isVisible() != showTabs) { settleMotion(); setVisible(showTabs); }
         if (selected != owner.currentTab()) { selected = owner.currentTab(); revealSelection = true; }
         setBackground(UIManager.getColor("Jasper.titleBackground"));
         for (TerminalTab tab : order) entries.get(tab).refresh();
@@ -94,21 +94,18 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         long now = clock.getAsLong();
         for (Entry entry : List.copyOf(visualOrder))
             if (entry.departing && !entry.width.moving(now)) removeEntry(entry);
-        boolean settle = !laidOut || settleOnLayout || disposed || order.isEmpty();
+        boolean settle = !laidOut || settleOnLayout || disposed || order.size() < 2;
         boolean widthChanged = layoutWidth != getWidth();
-        if (widthChanged) { layoutWidth = getWidth(); revealSelection = true; }
+        if (widthChanged) { layoutWidth = getWidth(); revealSelection = true; settle = true; }
         if (layoutHeight != getHeight()) { layoutHeight = getHeight(); settle = true; }
         int oldFirstVisible = firstVisible;
-        int width = getWidth(), tabWidth = UIScale.scale(160), plusWidth = Math.min(width, UIScale.scale(32));
-        boolean overflow = order.size() * tabWidth + plusWidth > width;
+        int width = getWidth(), minimumTabWidth = UIScale.scale(140);
+        int plusWidth = Math.min(width, UIScale.scale(24));
+        boolean overflow = order.size() * minimumTabWidth + plusWidth > width;
         int navigation = overflow ? Math.min(UIScale.scale(24), Math.max(0, (width - plusWidth) / 3)) : 0;
         int space = Math.max(0, width - plusWidth - 2 * navigation);
-        int slotWidth = Math.min(tabWidth, space);
-        // The active window title can change this allocation without moving any tab.
-        // Preserve motion until the navigation inset, tab slot or visible origin changes.
-        if (navigation != tabRegionLeft || (widthChanged && slotWidth != layoutTabWidth)) settle = true;
-        layoutTabWidth = slotWidth;
-        int count = Math.min(order.size(), Math.max(1, space / tabWidth));
+        if (navigation != tabRegionLeft) settle = true;
+        int count = Math.min(order.size(), Math.max(1, space / minimumTabWidth));
         firstVisible = Math.max(0, Math.min(firstVisible, order.size() - count));
         int selectedIndex = order.indexOf(selected);
         if (revealSelection && selectedIndex >= 0) {
@@ -116,55 +113,39 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             if (selectedIndex >= firstVisible + count) firstVisible = selectedIndex - count + 1;
             revealSelection = false;
         }
-        if (firstVisible != oldFirstVisible) settle = true;
-        if (overflow && entries.values().stream().anyMatch(entry -> entry.entering)) settle = true;
-        if (visualOrder.stream().anyMatch(entry -> entry.departing)
-            && visualOrder.size() * tabWidth + plusWidth > width) settle = true;
+        if (firstVisible != oldFirstVisible || overflow) settle = true;
         if (settle) discardDepartures();
-        int x = navigation, targetX = navigation, targetSpace = space;
-        int selectedX = 0, selectedWidth = 0;
         tabRegionLeft = navigation;
+        double tabWidth = count == 0 ? 0 : (double) space / count;
+        double total = 0;
         for (Entry entry : visualOrder) {
-            if (entry.departing) {
-                int shownWidth = Math.min(space, Math.max(0, (int) Math.round(entry.width.value(now))));
-                entry.setBounds(x, 0, shownWidth, getHeight()); entry.doLayout();
-                x += shownWidth; space -= shownWidth;
-                continue;
-            }
-            int i = order.indexOf(entry.tab);
-            boolean visible = i >= firstVisible && i < firstVisible + count;
+            int index = order.indexOf(entry.tab);
+            boolean visible = entry.departing || (index >= firstVisible && index < firstVisible + count);
             entry.setVisible(visible);
-            if (visible) {
-                int actualWidth = Math.min(tabWidth, targetSpace);
-                if (entry.entering) {
-                    entry.width = new TabMotion(Math.min(UIScale.scale(64), actualWidth));
-                    entry.entering = false;
-                }
-                entry.width.target(actualWidth, now, settle);
-                int shownWidth = Math.min(space, Math.max(0, (int) Math.round(entry.width.value(now))));
-                entry.setBounds(x, 0, shownWidth, getHeight());
-                entry.doLayout();
-                if (order.get(i) == selected) { selectedX = targetX; selectedWidth = actualWidth; }
-                x += shownWidth; targetX += actualWidth; space -= shownWidth; targetSpace -= actualWidth;
-            } else {
-                // Offscreen arrivals need no reveal; retaining one would suppress later visible motion.
-                entry.entering = false;
-                entry.width.target(tabWidth, now, true);
+            if (!entry.departing) {
+                if (entry.entering) { entry.width = new TabMotion(0); entry.entering = false; }
+                entry.width.target(tabWidth, now, settle || !visible);
             }
+            if (visible) total += Math.max(0, entry.width.value(now));
         }
-        tabRegionRight = x;
-        int inset = UIScale.scale(14);
-        underlineX.target(selectedX + inset, now, settle);
-        underlineWidth.target(Math.max(0, selectedWidth - 2 * inset), now, settle);
+        // Normalize the spring widths so tabs always fill the bar, including interrupted
+        // arrivals/departures. The add button never moves when titles or tab counts change.
+        double accumulated = 0;
+        int x = navigation;
+        for (Entry entry : visualOrder) if (entry.isVisible()) {
+            accumulated += Math.max(0, entry.width.value(now));
+            int right = navigation + (total == 0 ? 0 : (int) Math.round(space * accumulated / total));
+            entry.setBounds(x, 0, Math.max(0, right - x), getHeight());
+            entry.doLayout(); x = right;
+        }
         laidOut = true; settleOnLayout = false;
-        plus.setBounds(x, 0, plusWidth, getHeight());
+        plus.setBounds(width - plusWidth, 0, plusWidth, getHeight());
         previous.setVisible(overflow); next.setVisible(overflow);
         previous.setBounds(0, 0, navigation, getHeight());
-        next.setBounds(x + plusWidth, 0, navigation, getHeight());
+        next.setBounds(width - plusWidth - navigation, 0, navigation, getHeight());
         previous.setEnabled(firstVisible > 0);
         next.setEnabled(firstVisible + count < order.size());
-        boolean moving = underlineX.moving(now) || underlineWidth.moving(now)
-            || entries.values().stream().anyMatch(entry -> entry.width.moving(now));
+        boolean moving = entries.values().stream().anyMatch(entry -> entry.width.moving(now));
         if (moving && isShowing() && !disposed) animationTimer.start();
         else animationTimer.stop();
     }
@@ -183,7 +164,6 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     private void settleMotion() {
         animationTimer.stop();
         discardDepartures();
-        underlineX.settle(); underlineWidth.settle();
         entries.values().forEach(entry -> { entry.entering = false; entry.width.settle(); });
         settleOnLayout = true;
     }
@@ -191,18 +171,6 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     @Override public void addNotify() { super.addNotify(); settleMotion(); }
     @Override public void removeNotify() { settleMotion(); super.removeNotify(); }
     @Override public void close() { disposed = true; settleMotion(); }
-
-    @Override protected void paintChildren(Graphics graphics) {
-        super.paintChildren(graphics);
-        Graphics g = graphics.create();
-        try {
-            g.clipRect(tabRegionLeft, 0, Math.max(0, tabRegionRight - tabRegionLeft), getHeight());
-            g.setColor(UIManager.getColor("Jasper.tabUnderline"));
-            long now = clock.getAsLong();
-            g.fillRect((int) Math.round(underlineX.value(now)), getHeight() - UIScale.scale(1),
-                (int) Math.round(underlineWidth.value(now)), UIScale.scale(1));
-        } finally { g.dispose(); }
-    }
 
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -228,13 +196,15 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     }
 
     private void style(JButton button) {
-        button.setFont(UIManager.getFont("Label.font").deriveFont(UIScale.scale(12f)));
+        button.setFont(SystemFonts.system(Font.PLAIN, UIScale.scale(13f)));
         button.setForeground(foreground());
     }
 
     private final class Entry extends JPanel {
         private final TerminalTab tab;
         private final JButton select, close;
+        private final JLabel shortcut = new JLabel("", SwingConstants.RIGHT);
+        private boolean hovered;
         private Point origin;
         private boolean entering = laidOut && !disposed;
         private boolean departing, wasSelected;
@@ -244,13 +214,17 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             super(null);
             this.tab = tab;
             setOpaque(false);
-            select = button("select:" + tab.title(), tab.title(), "terminal-2");
-            select.setHorizontalAlignment(SwingConstants.LEFT);
-            select.setIconTextGap(UIScale.scale(8));
+            select = button("select:" + tab.title(), tab.title(), null);
+            select.setHorizontalAlignment(SwingConstants.CENTER);
             select.addActionListener(event -> { if (!departing) owner.selectTab(tab); });
             close = button("close:" + tab.title(), "Close tab", "x");
             close.addActionListener(event -> { if (!departing) owner.closeTab(tab); });
             MouseAdapter gestures = new MouseAdapter() {
+                @Override public void mouseEntered(MouseEvent event) { hovered = true; close.setVisible(!departing); }
+                @Override public void mouseExited(MouseEvent event) {
+                    Point point = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), Entry.this);
+                    hovered = contains(point); close.setVisible(hovered && !departing);
+                }
                 @Override public void mousePressed(MouseEvent event) {
                     origin = null;
                     if (departing) return;
@@ -275,18 +249,28 @@ final class WindowTabs extends JPanel implements AutoCloseable {
                 }
             };
             addMouseListener(gestures); select.addMouseListener(gestures);
+            shortcut.addMouseListener(gestures);
+            close.addMouseListener(new MouseAdapter() {
+                @Override public void mouseEntered(MouseEvent event) { hovered = true; close.setVisible(!departing); }
+                @Override public void mouseExited(MouseEvent event) {
+                    hovered = contains(SwingUtilities.convertPoint(close, event.getPoint(), Entry.this));
+                    close.setVisible(hovered && !departing);
+                }
+            });
             close.addMouseListener(new MouseAdapter() {
                 @Override public void mousePressed(MouseEvent event) {
                     if (!departing && SwingUtilities.isMiddleMouseButton(event)) owner.closeTab(tab);
                 }
             });
-            add(select); add(close);
+            shortcut.putClientProperty("html.disable", true);
+            close.setVisible(false);
+            add(select); add(close); add(shortcut);
         }
 
         void depart() {
             departing = true; entering = false; wasSelected = tab == selected; origin = null;
             width.target(0, clock.getAsLong(), false);
-            select.setEnabled(false); close.setEnabled(false);
+            select.setEnabled(false); close.setEnabled(false); close.setVisible(false);
         }
 
         void refresh() {
@@ -297,15 +281,21 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             }
             select.setSelected(tab == selected);
             style(select); style(close);
-            select.setFont(select.getFont().deriveFont(java.util.Map.of(java.awt.font.TextAttribute.WEIGHT,
-                java.awt.font.TextAttribute.WEIGHT_SEMIBOLD)));
+            shortcut.setFont(select.getFont());
+            shortcut.setForeground(foreground());
+            shortcut.setText(owner.tabShortcut(order.indexOf(tab)));
+            shortcut.setName("shortcut:" + text);
             if (tab == selected && active) select.setForeground(UIManager.getColor("Jasper.tabSelectedForeground"));
         }
 
         @Override public void doLayout() {
-            int inset = UIScale.scale(14), closeWidth = Math.min(UIScale.scale(16), getWidth());
-            close.setBounds(Math.max(0, getWidth() - UIScale.scale(10) - closeWidth), 0, closeWidth, getHeight());
-            select.setBounds(Math.min(inset, getWidth()), 0, Math.max(0, getWidth() - inset * 2 - closeWidth), getHeight());
+            int edge = UIScale.scale(8), closeWidth = Math.min(UIScale.scale(16), getWidth());
+            int hintWidth = Math.min(shortcut.getPreferredSize().width, Math.max(0, getWidth() / 3));
+            // Symmetric margins keep text centered even when shortcut strings differ.
+            int inset = Math.min(getWidth() / 2, Math.max(edge + closeWidth, edge + hintWidth) + UIScale.scale(8));
+            close.setBounds(Math.min(edge, Math.max(0, getWidth() - closeWidth)), 0, closeWidth, getHeight());
+            shortcut.setBounds(Math.max(0, getWidth() - edge - hintWidth), 0, hintWidth, getHeight());
+            select.setBounds(inset, 0, Math.max(0, getWidth() - 2 * inset), getHeight());
         }
 
         @Override protected void paintComponent(Graphics graphics) {
@@ -314,6 +304,11 @@ final class WindowTabs extends JPanel implements AutoCloseable {
                 graphics.fillRect(0, 0, getWidth(), getHeight());
             }
             super.paintComponent(graphics);
+            graphics.setColor(UIManager.getColor("Jasper.titleSeparator"));
+            int line = UIScale.scale(1);
+            graphics.fillRect(Math.max(0, getWidth() - line), 0, line, getHeight());
+            if (tab != selected && !(departing && wasSelected))
+                graphics.fillRect(0, getHeight() - line, getWidth(), line);
         }
     }
 }

@@ -6,8 +6,18 @@ if status is-interactive
     and not set -q JASPER_INTEGRATION_LOADED
     set -gx JASPER_INTEGRATION_LOADED 1
 
-    function __jasper_osc
-        command printf '\033]%s\007' $argv[1]
+    # tmux forwards almost no escape out of a pane: measured on 3.5a, not one OSC 133 mark reaches the
+    # terminal, so integration is silently dead there. Its passthrough wrapper is the way out, and needs
+    # allow-passthrough on - set pane-scoped, leaving a global tmux configuration exactly as written.
+    if set -q TMUX
+        command tmux set-option -p allow-passthrough on 2>/dev/null
+        function __jasper_osc
+            command printf '\033Ptmux;\033\033]%s\007\033\\' $argv[1]
+        end
+    else
+        function __jasper_osc
+            command printf '\033]%s\007' $argv[1]
+        end
     end
 
     function __jasper_encode

@@ -335,4 +335,13 @@ class ConfigLoaderTest {
         assertThat(old.snapshot().historyEnabled()).as("the old key no longer applies").isTrue();
         assertThat(old.diagnostics()).isNotEmpty();
     }
+
+    @Test void longCommandSecondsParsesItsRangeAndDefaultsToTen() {
+        assertThat(parse("").snapshot().longCommandSeconds()).isEqualTo(10);
+        assertThat(parse("[notifications]\nlong_command_seconds=0\n").snapshot().longCommandSeconds()).isZero();
+        assertThat(parse("[notifications]\nlong_command_seconds=3600\n").snapshot().longCommandSeconds()).isEqualTo(3600);
+        var high = parse("[notifications]\nlong_command_seconds=3601\n");
+        assertThat(high.snapshot().longCommandSeconds()).as("out of range keeps the default").isEqualTo(10);
+        assertThat(high.diagnostics()).isNotEmpty();
+    }
 }
