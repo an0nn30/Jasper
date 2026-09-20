@@ -1,5 +1,20 @@
 # Jasper — Status and Handoff
 
+**Terminal architecture refactor (2026-09-20):** The user approved staged
+responsibility extraction, a packaged public API with fluent configuration and
+reusable terminal actions, and developer onboarding/maintenance documentation.
+Public API reorganization and migration of affected app callers are authorized;
+the broader app refactor and plugin SDK remain later work. The
+[written refactor specification](superpowers/specs/2026-09-20-jasper-terminal-refactor-design.md)
+is proposed for review; implementation and implementation planning have not
+started. It amends the Phase 1 structural-redesign restriction for this scope
+while preserving terminal behavior and the remaining architecture constraints.
+Fresh terminal-only `./gradlew :jasper-terminal:test --rerun-tasks`: 322 tests,
+321 passed, one skipped, zero failures/errors. No fresh full-app or native
+acceptance is implied. Next: review the written spec, then write the detailed
+implementation plan. Existing working edits and the untracked assessment are
+preserved.
+
 **Background residency (2026-09-17):** On `claude/background-daemon` (from main `1f1afeb`, with `main` `b56d098` since merged in), Jasper gains an
 opt-in `[background] enabled` setting (default `false`) that keeps the process running with no
 windows after the last one closes, so the next launch reveals a window from an already-warm JVM
