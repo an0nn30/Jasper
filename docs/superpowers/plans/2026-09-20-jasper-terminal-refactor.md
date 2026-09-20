@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–2 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–3 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -397,7 +397,7 @@ builder reuse. Existing canonical validation tests continue to protect bounds.
 - `PtyConnector(PtyChild)` remains the hidden JediTerm adapter.
 - `PtySessionFactory.finish(TtyConnector, Supplier<TerminalSession>)` is package-private until the vendor adapter moves; its final equivalent uses `PtyChild` plus `Supplier<TerminalSession>`.
 
-- [ ] **Step 1: Add the startup-cleanup regression.**
+- [x] **Step 1: Add the startup-cleanup regression.**
 
 ```java
 @Test void constructionFailureClosesTheAlreadyCreatedConnector() {
@@ -434,7 +434,7 @@ this failure assertion at the engine's package-private connector construction
 seam, and exercise the final factory's child cleanup with a controlled child.
 Do not make PtyChild subclassable solely to retain a fixture.
 
-- [ ] **Step 2: Extract process ownership without changing shutdown behavior.**
+- [x] **Step 2: Extract process ownership without changing shutdown behavior.**
 
 Move `PtyConnector`'s `process`, `reader`, `input`, `closing`, and close timing
 constant to `PtyChild`. Move its I/O, connection, wait, close and closeStreams bodies unchanged;
@@ -467,7 +467,7 @@ Preserve the old `getName()` text if it is consumed by an existing assertion;
 it is diagnostic only. Imports are the existing connector's vendor/JDK imports.
 No extra worker or polling process is introduced.
 
-- [ ] **Step 3: Centralize environment normalization and failure cleanup.**
+- [x] **Step 3: Centralize environment normalization and failure cleanup.**
 
 Move the `PtyProcessBuilder` chain from `TerminalSession.start` into `PtyChild`'s
 factory. Keep `setUnixOpenTtyToPreserveOutputAfterTermination(true)`.
@@ -504,7 +504,7 @@ constructor for emulator tests; no public vendor constructor is introduced.
 Add a pure environment test asserting forced values and unchanged source map,
 and a suppressed-cleanup-error test. No real PTY is needed for these tests.
 
-- [ ] **Step 4: Run process/session tests and full check; document and commit.**
+- [x] **Step 4: Run process/session tests and full check; document and commit.**
 
 `./gradlew :jasper-terminal:test --tests '*Pty*' --tests '*TerminalSessionTest'`.
 Then `./gradlew check`, recording any unchanged baseline failures separately.

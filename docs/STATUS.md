@@ -15,7 +15,7 @@ failed in app tests: 728 tests, 724 passed, three failures, one skipped. All thr
 failures are in TerminalTitleIntegrationTest; one expects `~ (sh)` but observes
 `~ (bash)`, and two time out. This reproduces previously recorded failures before
 production changes; their root cause is not yet established. Task 1 completed baseline diagnosis and explicit-executable fixture corrections; full check now passes 1,048/1,050 with two environment skips. The plan proposes a Jasper-owned row capture refinement,
-subject to plan review and measured allocation/capture-time checks. Execution is native, with a final independent review. Task 2 adds defensively copied fluent options, explicit launch inputs, and typed search requests. Its tests are grouped in FluentOptionsTest rather than separate files. Task 3 extracts process creation and cleanup. Existing working edits and the untracked assessment are preserved.
+subject to plan review and measured allocation/capture-time checks. Execution is native, with a final independent review. Task 2 adds defensively copied fluent options, explicit launch inputs, and typed search requests. Its tests are grouped in FluentOptionsTest rather than separate files. Task 3 extracts process creation, foreground metadata, and failure cleanup; focused PTY/session tests and full check pass. Task 4 establishes the vendor-free row/input boundary with an allocation gate. Existing working edits and the untracked assessment are preserved.
 
 **Background residency (2026-09-17):** On `claude/background-daemon` (from main `1f1afeb`, with `main` `b56d098` since merged in), Jasper gains an
 opt-in `[background] enabled` setting (default `false`) that keeps the process running with no

@@ -18,8 +18,6 @@ import com.jediterm.terminal.model.TerminalTextBuffer;
 import com.jediterm.terminal.model.TextBufferChangesListener;
 import com.jediterm.terminal.model.hyperlinks.LinkResult;
 import com.jediterm.terminal.model.hyperlinks.LinkResultItem;
-import com.pty4j.PtyProcess;
-import com.pty4j.PtyProcessBuilder;
 
 import java.io.IOException;
 import java.net.URI;
@@ -31,7 +29,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -126,21 +123,13 @@ public final class TerminalSession implements AutoCloseable {
     /** Starts {@code command} in a new pseudo-terminal and begins emulating its output. */
     public static TerminalSession start(List<String> command, Map<String, String> environment, Path workingDirectory,
                                         int columns, int rows, int scrollback) throws IOException {
-        GridSize initial = new GridSize(columns, rows);
-        columns = initial.columns(); rows = initial.rows();
-        Map<String, String> env = new HashMap<>(environment);
-        env.put("TERM", "xterm-256color");
-        env.put("COLORTERM", "truecolor");
-        PtyProcess process = new PtyProcessBuilder(command.toArray(String[]::new))
-            .setEnvironment(env)
-            .setDirectory(workingDirectory.toString())
-            .setInitialColumns(columns)
-            .setInitialRows(rows)
-            .setUnixOpenTtyToPreserveOutputAfterTermination(true)
-            .start();
-        TerminalSession session = new TerminalSession(new PtyConnector(process, command), columns, rows, scrollback);
-        session.startReading();
-        return session;
+        return start(new SessionLaunchOptions(command, environment, workingDirectory,
+            new GridSize(columns, rows), scrollback));
+    }
+
+    /** Starts a validated launch description and owns cleanup if session construction fails. */
+    public static TerminalSession start(SessionLaunchOptions options) throws IOException {
+        return PtySessionFactory.start(Objects.requireNonNull(options, "options"));
     }
 
     TerminalSession(TtyConnector connector, int columns, int rows, int scrollback) {
