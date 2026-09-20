@@ -8,3 +8,15 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.14.0")
     testRuntimeOnly("org.slf4j:slf4j-nop:2.0.13")
 }
+
+// Deliberately outside check: comparisons report timings, never assert wall-clock thresholds.
+tasks.register<JavaExec>("refactorMeasurement") {
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.jasper.terminal.TerminalRefactorMeasurement")
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(25))
+        vendor.set(JvmVendorSpec.JETBRAINS)
+    })
+    systemProperty("java.awt.headless", "true")
+}

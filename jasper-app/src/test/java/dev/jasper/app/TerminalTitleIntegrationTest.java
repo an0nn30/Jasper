@@ -31,7 +31,10 @@ class TerminalTitleIntegrationTest {
     private record Fixture(WindowContent content, BuddyDeck deck, List<String> nativeTitles) { }
 
     private Fixture open(String script) throws Exception {
-        return open(List.of("/bin/sh", "-c", script), "sh");
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+            java.nio.file.Files.isExecutable(java.nio.file.Path.of("/bin/bash")), "Bash fixture unavailable");
+        // ProcessHandle reports the real executable; /bin/sh may resolve to bash or dash.
+        return open(List.of("/bin/bash", "--noprofile", "--norc", "-c", script), "bash");
     }
 
     private Fixture open(List<String> program, String label) throws Exception {
@@ -104,23 +107,23 @@ class TerminalTitleIntegrationTest {
         edt(() -> f.content.currentPane().session().write("start\n"));
         until(() -> !f.deck.isEmpty());
         edt(() -> {
-            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("~ (sh)");
+            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("~ (bash)");
             assertThat(f.deck.notices().getFirst().title()).isEqualTo("worker");
             f.content.currentPane().session().write("Reviewing files\n");
         });
         until(() -> f.deck.notices().getFirst().title().equals("Reviewing files"));
         edt(() -> {
-            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Reviewing files (sh)");
-            assertThat(f.nativeTitles.getLast()).isEqualTo("Reviewing files (sh)");
+            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Reviewing files (bash)");
+            assertThat(f.nativeTitles.getLast()).isEqualTo("Reviewing files (bash)");
             f.content.currentPane().session().write("Writing tests\n");
         });
         until(() -> f.deck.notices().getFirst().title().equals("Writing tests"));
         edt(() -> {
-            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Writing tests (sh)");
+            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Writing tests (bash)");
             f.content.currentPane().session().write("\n");
         });
         until(() -> f.deck.notices().getFirst().title().equals("worker"));
-        edt(() -> assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("~ (sh)"));
+        edt(() -> assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("~ (bash)"));
     }
 
     @Test void aBurstEndingWithAPromptTitleCannotOverwriteTheCompletedNotice() throws Exception {
@@ -140,18 +143,18 @@ class TerminalTitleIntegrationTest {
             try { assertThat(parsed.await(5, TimeUnit.SECONDS)).isTrue(); }
             catch (InterruptedException failure) { throw new AssertionError(failure); }
         });
-        until(() -> f.content.tabStrip().getTitleAt(0).equals("Prompt directory (sh)"));
+        until(() -> f.content.tabStrip().getTitleAt(0).equals("Prompt directory (bash)"));
         edt(() -> {
             assertThat(f.deck.notices().getFirst().title()).isEqualTo("Task complete");
             assertThat(f.deck.notices().getFirst().state()).isEqualTo(BuddyNotice.State.DONE);
-            assertThat(f.nativeTitles.getLast()).isEqualTo("Prompt directory (sh)");
+            assertThat(f.nativeTitles.getLast()).isEqualTo("Prompt directory (bash)");
         });
     }
 
     @Test void programTitlesWorkWithoutShellIntegrationAndManualTabNamesStillWin() throws Exception {
         Fixture f = open("while read title; do printf '\\033]1;%s\\007' \"$title\"; done");
         edt(() -> f.content.currentPane().session().write("Editor document\n"));
-        until(() -> f.content.tabStrip().getTitleAt(0).equals("Editor document (sh)"));
+        until(() -> f.content.tabStrip().getTitleAt(0).equals("Editor document (bash)"));
         edt(() -> {
             f.content.currentTab().rename("Pinned name");
             f.content.currentPane().session().write("Another document\n");
@@ -161,7 +164,7 @@ class TerminalTitleIntegrationTest {
             assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Pinned name");
             assertThat(f.deck.notices()).isEmpty();
             f.content.currentTab().rename("");
-            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Another document (sh)");
+            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Another document (bash)");
         });
     }
 }

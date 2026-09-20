@@ -7,18 +7,15 @@ Public API reorganization and migration of affected app callers are authorized;
 the broader app refactor and plugin SDK remain later work. The
 [written refactor specification](superpowers/specs/2026-09-20-jasper-terminal-refactor-design.md)
 was approved by the user. The [12-task implementation plan](superpowers/plans/2026-09-20-jasper-terminal-refactor.md)
-is awaiting review; implementation has not started. It amends the Phase 1 structural-redesign restriction for this scope
+is authorized for native execution on `codex/terminal-refactor-native` in the isolated `terminal-refactor-4830` worktree. It amends the Phase 1 structural-redesign restriction for this scope
 while preserving terminal behavior and the remaining architecture constraints.
 Fresh terminal-only `./gradlew :jasper-terminal:test --rerun-tasks`: 322 tests,
 321 passed, one skipped, zero failures/errors. During planning, `./gradlew check`
 failed in app tests: 728 tests, 724 passed, three failures, one skipped. All three
 failures are in TerminalTitleIntegrationTest; one expects `~ (sh)` but observes
 `~ (bash)`, and two time out. This reproduces previously recorded failures before
-production changes; their root cause is not yet established. Task 1 isolates
-baseline diagnosis. The plan proposes a Jasper-owned row capture refinement,
-subject to plan review and measured allocation/capture-time checks. Next: review
-the plan before implementation, using the established per-task implementer/reviewer
-workflow. Existing working edits and the untracked assessment are preserved.
+production changes; their root cause is not yet established. Task 1 completed baseline diagnosis and explicit-executable fixture corrections; full check now passes 1,048/1,050 with two environment skips. The plan proposes a Jasper-owned row capture refinement,
+subject to plan review and measured allocation/capture-time checks. Execution is native, with a final independent review. Task 2 (fluent values) follows. Existing working edits and the untracked assessment are preserved.
 
 **Background residency (2026-09-17):** On `claude/background-daemon` (from main `1f1afeb`, with `main` `b56d098` since merged in), Jasper gains an
 opt-in `[background] enabled` setting (default `false`) that keeps the process running with no

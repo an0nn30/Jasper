@@ -90,14 +90,15 @@ class TerminalTabTest {
     }
 
     @Test void titleOverrideSurvivesRealOscTitleChangeAndBlankRestoresIt() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.Files.isExecutable(java.nio.file.Path.of("/bin/bash")), "Bash fixture unavailable");
         Queue<Runnable> pending = new ArrayDeque<>();
         ShellLauncher launcher = new ShellLauncher(pending::add, path -> {
             try {
-                return TerminalSession.start(List.of("/bin/sh", "-c",
+                return TerminalSession.start(List.of("/bin/bash", "--noprofile", "--norc", "-c",
                     "read answer; printf '\\033]2;new-shell-title\\007'; read answer"),
                     System.getenv(), path, 80, 24, 100);
             } catch (Exception e) { throw new RuntimeException(e); }
-        }, "sh");
+        }, "bash");
         WindowContent[] owner = new WindowContent[1];
         edt(() -> owner[0] = content(launcher)); pending.remove().run();
         edt(() -> { owner[0].currentTab().rename("manual"); owner[0].currentPane().session().write("go\n"); });
@@ -105,7 +106,7 @@ class TerminalTabTest {
         edt(() -> {
             assertThat(owner[0].currentTab().title()).isEqualTo("manual");
             owner[0].currentTab().rename("");
-            assertThat(owner[0].currentTab().title()).isEqualTo("new-shell-title (sh)");
+            assertThat(owner[0].currentTab().title()).isEqualTo("new-shell-title (bash)");
             owner[0].close();
         });
     }

@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Proposed implementation plan for user review; execution has not started. The written spec was approved in conversation on 2026-09-20. The intended execution method is the repository's per-task implementer/reviewer workflow, followed by whole-branch review. Do not execute before plan review.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -168,7 +168,7 @@ are adapted at the facade; the engine does not import the session package.
 runtime, XML totals, failure classification, and benchmark fixture definition
 used by all subsequent task reviews.
 
-- [ ] **Step 1: Create the isolated execution worktree and reproduce the full check.**
+- [x] **Step 1: Create the isolated execution worktree and reproduce the full check.**
 
 ```bash
 git status --short
@@ -192,7 +192,7 @@ for module in ('jasper-terminal', 'jasper-app'):
     print(module, totals)
 ```
 
-- [ ] **Step 2: Diagnose the three known app failures before changing expectations.**
+- [x] **Step 2: Diagnose the three known app failures before changing expectations.**
 
 Use `superpowers:systematic-debugging`. Run:
 
@@ -208,7 +208,7 @@ rename assertions. Record a confirmed cause or clearly state it remains open.
 Any correction is a separate reviewed regression/fix commit and plan amendment.
 Do not begin structural changes with unexplained new failures.
 
-- [ ] **Step 3: Record headless comparison fixtures without adding flaky timing assertions.**
+- [x] **Step 3: Record headless comparison fixtures without adding flaky timing assertions.**
 
 Use the existing rendering tests' `BufferedImage`/`FontSet` setup and the same
 in-memory connector. Fixture A: 150 columns × 45 rows, default library font and
@@ -221,7 +221,7 @@ thread allocation bytes when the runtime supports them, and JFR allocation/
 monitor evidence. C must retain the existing zero-line-copy/no-repaint assertion.
 These are acceptance measurements, not timing pass/fail unit tests.
 
-- [ ] **Step 4: Commit the baseline report.**
+- [x] **Step 4: Commit the baseline report.**
 
 The report contains environment, commit, commands, XML totals, known failures,
 fixture parameters and limitations. No GUI/benchmark task is launched. The
