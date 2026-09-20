@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-20
 
-**Status:** Proposed written specification. The user approved the architectural direction and public API migration; review of this written specification is pending. Implementation has not started.
+**Status:** Approved by the user on 2026-09-20. The [implementation plan](../plans/2026-09-20-jasper-terminal-refactor.md) is awaiting review. Implementation has not started.
 
 **Scope:** `jasper-terminal`, its documentation and tests, and migration of affected repository callers.
 
@@ -389,8 +389,8 @@ fresh full-app, native GUI, or performance result. The implementation baseline
 must rerun the full suite and classify any existing failures on its chosen base.
 
 The design approval was given in conversation on 2026-09-20 after the package,
-ownership, patterns, documentation, and migration proposal. Written-spec review
-is the next step. Following approval of this file, use `superpowers:writing-plans`
+ownership, patterns, documentation, and migration proposal. The user approved
+this written specification on 2026-09-20. Use `superpowers:writing-plans`
 to define exact signatures, bridge members, files, task code, and checks; the
 user then reviews that plan and selects execution. No implementation is included
 in this documentation change.
