@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–2 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -242,7 +242,7 @@ native throughput/RSS checklist remains explicitly pending user execution.
 - `SearchQuery(String text, boolean regex, boolean caseSensitive)`.
 - GridSize becomes public, retaining its existing minimum clamping and `fit` semantics.
 
-- [ ] **Step 1: Add defensive-copy and canonical-validation tests before builders.**
+- [x] **Step 1: Add defensive-copy and canonical-validation tests before builders.**
 
 ```java
 @Test void aBuilderRoundTripPreservesEveryOptionAndDoesNotMutateItsSource() {
@@ -279,7 +279,7 @@ Use standard JUnit/AssertJ imports plus the named JDK collection/path classes.
 Run `./gradlew :jasper-terminal:test --tests '*OptionsTest'`; expected RED:
 missing builder/type, not an unrelated failure.
 
-- [ ] **Step 2: Generate the complete TerminalOptions builder from its record components.**
+- [x] **Step 2: Generate the complete TerminalOptions builder from its record components.**
 
 The following edit script inserts a complete nested builder; run it only during
 execution. It avoids hand-maintained duplication of the twelve component names.
@@ -321,7 +321,7 @@ Replace generated setter descriptions with the component's units/ranges and live
 versus new-session semantics before commit; the source record's existing
 canonical validation remains the only value validator.
 
-- [ ] **Step 3: Implement the new launch and query values.**
+- [x] **Step 3: Implement the new launch and query values.**
 
 ```java
 public record SessionLaunchOptions(List<String> command, Map<String, String> environment,
@@ -378,7 +378,7 @@ public record SearchQuery(String text, boolean regex, boolean caseSensitive) {
 }
 ```
 
-- [ ] **Step 4: Run value tests and full terminal tests; document and commit.**
+- [x] **Step 4: Run value tests and full terminal tests; document and commit.**
 
 `./gradlew :jasper-terminal:test`. Add tests for fallback-list mutation and launch
 builder reuse. Existing canonical validation tests continue to protect bounds.
