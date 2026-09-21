@@ -58,6 +58,7 @@ final class WindowCommands implements AutoCloseable {
                 "Toolbar: " + label, () -> owner.setToolbarMode(mode));
         }
         add(registry, "view.status_bar", "Status Bar", "Hide Status Bar", () -> owner.setStatusVisible(!owner.status().isVisible()));
+        add(registry, "view.rail", "Rail", "Hide Rail", () -> owner.setRailVisible(!owner.railVisible()), List.of("panels", "sidebar"));
         add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
             List.of("jasper", "mascot", "turtle", "desk buddy"));
         for (var appearance : Appearance.values()) {
@@ -93,6 +94,8 @@ final class WindowCommands implements AutoCloseable {
             owner.currentTab() != null && owner.currentTab().tree().zoomed() ? "Restore Pane" : "Zoom Pane");
         view("view.status_bar").putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
         view("view.status_bar").putValue(Action.SELECTED_KEY, owner.status().isVisible());
+        view("view.rail").putValue(Command.TITLE, owner.railVisible() ? "Hide Rail" : "Show Rail");
+        view("view.rail").putValue(Action.SELECTED_KEY, owner.railVisible());
         boolean buddy = owner.buddyEnabled.getAsBoolean();
         view("view.buddy").putValue(Command.TITLE, buddy ? "Hide Jasper" : "Show Jasper");
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);

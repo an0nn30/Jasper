@@ -31,6 +31,7 @@ final class WindowChrome {
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
     private final JCheckBoxMenuItem buddyVisible = new JCheckBoxMenuItem("Show Jasper", false);
+    private final JCheckBoxMenuItem railVisible = new JCheckBoxMenuItem("Rail", true);
     private final Component toolbarGlue = Box.createHorizontalGlue();
     private final java.util.EnumMap<MenuTarget.Slot, JMenu> standardMenus = new java.util.EnumMap<>(MenuTarget.Slot.class);
     private final List<Component> contributedToolbar = new ArrayList<>();
@@ -64,9 +65,10 @@ final class WindowChrome {
             item.setActionCommand(mode.name());
             toolbarModes.add(item); modes.add(item);
         }
-        view.addSeparator(); view.add(modes); view.add(statusVisible); view.add(buddyVisible);
+        view.addSeparator(); view.add(modes); view.add(statusVisible); view.add(railVisible); view.add(buddyVisible);
         statusVisible.setAction(owner.windowCommands().view("view.status_bar"));
         buddyVisible.setAction(owner.windowCommands().view("view.buddy"));
+        railVisible.setAction(owner.windowCommands().view("view.rail"));
         JMenu appearance = new JMenu("Appearance");
         ButtonGroup themes = new ButtonGroup();
         for (Appearance theme : new Appearance[]{Appearance.LIGHT, Appearance.DARK}) {

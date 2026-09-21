@@ -4,6 +4,10 @@ import dev.jasper.app.commands.Command;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.contributions.PanelEntry;
+import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.contributions.PanelSite;
+import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.lifecycle.Subscription;
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
@@ -13,6 +17,10 @@ import java.util.Map;
 import java.util.Optional;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 
 /**
  * This window's Swing side of the application-wide contributions model: one {@link Action} per
@@ -26,12 +34,32 @@ final class WindowContributions implements AutoCloseable {
     private final Map<String, Subscription> commands = new LinkedHashMap<>();
     private Subscription listening;
 
-    WindowContributions(WindowContent owner, Contributions model) {
+    private static final class PanelInstance {
+        final PanelEntry entry;
+        PanelRegion region;
+        boolean visible;
+        int size;
+        PanelSite site;
+        JComponent component;
+        PanelInstance(PanelEntry entry) { this.entry = entry; }
+    }
+
+    private final UiState state;
+    private final Map<String, PanelInstance> panels = new LinkedHashMap<>();
+    private Subscription panelRequests;
+
+    WindowContributions(WindowContent owner, Contributions model, UiState state) {
         this.owner = owner;
         this.model = model;
+        this.state = state;
         syncActions();
         owner.chrome().connect(this);
         renderStatus();
+        owner.rail().onToggle = this::togglePanel;
+        owner.rail().onMove = this::movePanel;
+        panelRequests = model.onPanelRequest(this::requested);
+        syncPanels();
+        renderRail();
         listening = model.onChanged(this::changed);
     }
 
@@ -61,6 +89,113 @@ final class WindowContributions implements AutoCloseable {
 
     private void renderStatus() { owner.status().setContributed(model.status(), this::action); }
 
+    private void requested(Contributions.PanelRequest request) {
+        if (!request.windowId().equals(owner.id())) return;
+        switch (request.op()) {
+            case SHOW -> showPanel(request.panelId());
+            case HIDE -> hidePanel(request.panelId());
+            case TOGGLE -> togglePanel(request.panelId());
+        }
+    }
+
+    private void togglePanel(String id) {
+        PanelInstance panel = panels.get(id);
+        if (panel == null) return;
+        if (panel.visible) hidePanel(id); else showPanel(id);
+    }
+
+    /** Adds instances for new panels, restoring their saved place, and discards instances of removed panels. */
+    private void syncPanels() {
+        Map<String, PanelEntry> current = new LinkedHashMap<>();
+        for (PanelEntry entry : model.panels()) current.put(entry.id(), entry);
+        for (String id : List.copyOf(panels.keySet())) {
+            if (current.containsKey(id)) continue;
+            PanelInstance gone = panels.remove(id);
+            if (gone.visible) owner.regions().hide(gone.region);
+            if (gone.site != null) gone.site.notifyClosed();
+        }
+        for (PanelEntry entry : current.values()) {
+            if (panels.containsKey(entry.id())) continue;
+            var panel = new PanelInstance(entry);
+            var saved = state.panel(entry.id());
+            panel.region = saved.map(value -> PanelRegion.valueOf(value.region())).orElse(entry.defaultRegion());
+            panel.size = saved.map(UiState.Panel::size).orElse(owner.regions().size(panel.region));
+            panels.put(entry.id(), panel);
+            if (saved.map(UiState.Panel::visible).orElse(false)) showPanel(entry.id());
+        }
+    }
+
+    void showPanel(String id) {
+        PanelInstance panel = panels.get(id);
+        if (panel == null || panel.visible) return;
+        for (PanelInstance other : panels.values())
+            if (other != panel && other.visible && other.region == panel.region) hidePanel(other.entry.id());
+        if (panel.component == null) {
+            panel.site = new PanelSite(owner.id(), () -> showPanel(id), () -> hidePanel(id), () -> panel.visible);
+            JComponent built = null;
+            try { built = panel.entry.factory().apply(panel.site); }
+            catch (RuntimeException failure) { /* The contributor's adapter has logged it; the window only needs a placeholder. */ }
+            panel.component = built != null ? built : new JLabel("This panel could not be loaded.", SwingConstants.CENTER);
+        }
+        owner.regions().show(panel.region, panel.component, panel.size);
+        panel.visible = true;
+        persist(panel);
+        renderRail();
+        panel.site.notifyVisibility(true);
+    }
+
+    void hidePanel(String id) {
+        PanelInstance panel = panels.get(id);
+        if (panel == null || !panel.visible) return;
+        panel.size = owner.regions().size(panel.region);
+        owner.regions().hide(panel.region);
+        panel.visible = false;
+        persist(panel);
+        renderRail();
+        panel.site.notifyVisibility(false);
+        if (owner.currentTab() != null) owner.currentTab().focusTerminal();
+    }
+
+    void movePanel(String id, PanelRegion region) {
+        PanelInstance panel = panels.get(id);
+        if (panel == null || panel.region == region) return;
+        if (panel.visible) {
+            // A move is not a change of visibility, so the instance hears nothing; only the region changes.
+            for (PanelInstance other : panels.values())
+                if (other != panel && other.visible && other.region == region) hidePanel(other.entry.id());
+            owner.regions().hide(panel.region);
+            panel.region = region;
+            panel.size = owner.regions().size(region);
+            owner.regions().show(region, panel.component, panel.size);
+        } else {
+            panel.region = region;
+            panel.size = owner.regions().size(region);
+        }
+        persist(panel);
+        renderRail();
+    }
+
+    private void persist(PanelInstance panel) {
+        state.putPanel(panel.entry.id(), new UiState.Panel(panel.region.name(), panel.visible, Math.clamp(panel.size, 80, 4000)));
+        state.save();
+    }
+
+    private void renderRail() {
+        List<WindowRail.PanelButton> buttons = new ArrayList<>();
+        for (PanelInstance panel : panels.values())
+            buttons.add(new WindowRail.PanelButton(panel.entry.id(), panel.entry.title(), panel.entry.icon(), panel.region, panel.visible));
+        List<Action> railActions = new ArrayList<>();
+        for (String id : model.railActions()) if (actions.get(id) != null) railActions.add(actions.get(id));
+        owner.rail().render(buttons, railActions);
+        owner.syncRailVisibility();
+    }
+
+    /** Panel content that is not showing is outside the window's component tree and must be updated by hand. */
+    void refreshTheme() {
+        for (PanelInstance panel : panels.values())
+            if (panel.component != null && !panel.visible) SwingUtilities.updateComponentTreeUI(panel.component);
+    }
+
     private void changed(Contributions.Kind kind) {
         switch (kind) {
             case ACTIONS -> {
@@ -69,7 +204,10 @@ final class WindowContributions implements AutoCloseable {
                 owner.chrome().renderContributedToolbar();
                 owner.chrome().renderContributedMenus();
                 renderStatus();
+                renderRail();
             }
+            case PANELS -> { syncPanels(); renderRail(); }
+            case RAIL -> renderRail();
             case TOOLBAR -> owner.chrome().renderContributedToolbar();
             case MENUS -> owner.chrome().renderContributedMenus();
             case STATUS -> renderStatus();
@@ -116,6 +254,17 @@ final class WindowContributions implements AutoCloseable {
         commands.values().forEach(Subscription::close);
         commands.clear();
         actions.values().forEach(action -> action.setEnabled(false));
+        if (panelRequests != null) { panelRequests.close(); panelRequests = null; }
+        for (PanelInstance panel : panels.values()) {
+            if (panel.visible) { panel.size = owner.regions().size(panel.region); state.putPanel(panel.entry.id(),
+                new UiState.Panel(panel.region.name(), true, Math.clamp(panel.size, 80, 4000))); }
+            if (panel.site != null) panel.site.notifyClosed();
+        }
+        state.save();
+        panels.clear();
+        owner.rail().onToggle = id -> { }; owner.rail().onMove = (id, region) -> { };
+        owner.rail().render(List.of(), List.of());
+        owner.syncRailVisibility();
         actions.clear();
         owner.chrome().connect(null);
         owner.status().setContributed(List.of(), id -> null);

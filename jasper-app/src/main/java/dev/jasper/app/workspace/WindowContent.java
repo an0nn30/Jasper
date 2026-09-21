@@ -12,6 +12,7 @@ import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.history.CommandHistory;
 import dev.jasper.app.history.ShellHistoryIndex;
 import dev.jasper.app.launch.ShellLauncher;
@@ -63,6 +64,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final UUID id = UUID.randomUUID();
     private KeyBindings baseBindings;
     private WindowContributions contributed;
+    private final WorkspaceRegions regions;
+    private final WindowRail rail;
+    private UiState uiState = UiState.inMemory();
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
     private final ThemeController themes;
@@ -179,7 +183,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         windowTabs = new WindowTabs(this, animationClock);
         var north = new JPanel(new BorderLayout());
         north.add(windowTabs, BorderLayout.NORTH); north.add(chrome.toolbar(), BorderLayout.CENTER);
-        add(north, BorderLayout.NORTH); add(tabs); add(chrome.status(), BorderLayout.SOUTH);
+        regions = new WorkspaceRegions(tabs);
+        rail = new WindowRail(action(ActionId.OPEN_SETTINGS));
+        rail.setVisible(false);
+        var body = new JPanel(new BorderLayout());
+        body.add(rail, BorderLayout.WEST); body.add(regions, BorderLayout.CENTER);
+        add(north, BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {
                 if (commandPalette != null) commandPalette.dismiss();
@@ -363,14 +372,35 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Stable identity of this window for extensions; never a Swing object. */
     public UUID id() { return id; }
 
+    /** Connects with layout state that lives only as long as this window. */
+    public void connectContributions(Contributions model) { connectContributions(model, UiState.inMemory()); }
+
     /**
-     * Connects this window to the application-wide contributions model, once. Contributed actions
-     * become palette commands and shortcuts here; their toolbar, menu and status placements follow.
+     * Connects this window to the application-wide contributions model, once, remembering panel
+     * placement and rail visibility in {@code state}.
      */
-    public void connectContributions(Contributions model) {
+    public void connectContributions(Contributions model, UiState state) {
         if (closed || contributed != null) return;
-        contributed = new WindowContributions(this, Objects.requireNonNull(model));
+        uiState = Objects.requireNonNull(state);
+        contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         rebind();
+    }
+
+    WorkspaceRegions regions() { return regions; }
+    WindowRail rail() { return rail; }
+    boolean railVisible() { return uiState.railVisible(); }
+
+    void setRailVisible(boolean value) {
+        uiState.setRailVisible(value);
+        uiState.save();
+        syncRailVisibility();
+        updateActions();
+    }
+
+    /** The rail shows only when it has something besides Settings and the user has not hidden it. */
+    void syncRailVisibility() {
+        boolean wanted = !rail.empty() && uiState.railVisible();
+        if (rail.isVisible() != wanted) { rail.setVisible(wanted); revalidate(); repaint(); }
     }
     boolean updatingActions() { return workspaceActions.updating(); }
     Action action(ActionId id) { return workspaceActions.action(id); }
@@ -526,6 +556,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         try {
             if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
             if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
+            rail.refreshTheme();
+            if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
                 tab.setBackground(theme.palette().background());
                 for (TerminalPane pane : tab.panes()) {
