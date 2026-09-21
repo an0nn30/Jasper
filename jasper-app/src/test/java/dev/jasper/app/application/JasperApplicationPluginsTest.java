@@ -13,6 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
+import dev.jasper.app.contributions.MenuEntry;
+import dev.jasper.app.contributions.MenuTarget;
+import dev.jasper.app.restart.RestartMode;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static dev.jasper.app.workspace.DesktopTestSupport.launcher;
@@ -120,5 +125,76 @@ class JasperApplicationPluginsTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(dirs.uiState()).as("saved again at shutdown, keeping what was loaded").exists()
             .content().contains("rail_visible = false");
+    }
+
+    @Test void theManagerIsAContributedActionInTheFileMenu() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, null, false, dirs);
+            assertThat(application[0].contributions().action("plugins.manage")).get()
+                .satisfies(action -> assertThat(action.title()).isEqualTo("Manage Plugins…"));
+            assertThat(application[0].contributions().menus()).anySatisfy(section -> {
+                assertThat(section.target()).isEqualTo(MenuTarget.standard(MenuTarget.Slot.FILE));
+                assertThat(section.entries()).containsExactly(new MenuEntry.Item("plugins.manage"));
+            });
+            assertThat(application[0].bindingProblems()).isEmpty();
+        });
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test void restartQuitsThenStartsTheReplacementAfterProcessCleanup() throws Exception {
+        List<String> order = new CopyOnWriteArrayList<>();
+        var terminated = new CountDownLatch(1);
+        edt(() -> {
+            var application = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null,
+                () -> { order.add("terminate"); terminated.countDown(); });
+            application.restartPlanner = mode -> Optional.of(List.of("jasper", mode.name()));
+            application.spawner = command -> order.add("spawn " + command);
+            application.residency(true);
+            application.onShutdown(() -> order.add("endpoint released"));
+            assertThat(application.restart(RestartMode.SAME)).isTrue();
+            assertThat(application.restart(RestartMode.NORMAL)).as("already on its way out").isTrue();
+        });
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(order).containsExactly("endpoint released", "spawn [jasper, SAME]", "terminate");
+    }
+
+    @Test void aReplacementForAnEndpointOwnerWhoseCleanupHangsCanNeverHandOff() throws Exception {
+        List<String> spawned = new CopyOnWriteArrayList<>();
+        var terminated = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try {
+            edt(() -> {
+                var application = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+                application.restartPlanner = mode -> Optional.of(List.of("jasper"));
+                application.spawner = command -> spawned.add(String.join(" ", command));
+                application.residency(true);
+                application.onShutdown(() -> { try { release.await(); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); } });
+                application.restart(RestartMode.SAME);
+            });
+            assertThat(terminated.await(10, TimeUnit.SECONDS)).as("the shutdown grace bounds the wait").isTrue();
+            assertThat(spawned).containsExactly("jasper --standalone");
+        } finally { release.countDown(); }
+    }
+
+    @Test void anUnknownCommandLineLeavesJasperRunning() throws Exception {
+        List<String> spawned = new CopyOnWriteArrayList<>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].restartPlanner = mode -> Optional.empty();
+            application[0].spawner = command -> spawned.add(String.join(" ", command));
+            assertThat(application[0].restart(RestartMode.SAME)).isFalse();
+        });
+        edt(() -> { });
+        assertThat(terminated.getCount()).as("still running").isEqualTo(1);
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(spawned).as("an ordinary quit starts nothing").isEmpty();
     }
 }

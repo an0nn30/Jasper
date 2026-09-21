@@ -20,6 +20,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
+import dev.jasper.app.restart.ResidentControl;
 
 /** Resolves desktop-free launch roles, then assembles the application's resource owners. */
 public final class ApplicationBootstrap {
@@ -114,6 +115,10 @@ public final class ApplicationBootstrap {
             var snippets = acquired.own(new SnippetStore(dirs.snippets(), new ConfigEditor()::open));
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
                 () -> System.exit(0), shellHistory, snippets, integrationDir);
+            Path source = HandoffSocket.codeSource();
+            application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
+                () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
+                replacementHandsOff(options), standaloneNotice(options));
             application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
             acquired.transfer();
             return application;
@@ -230,6 +235,20 @@ public final class ApplicationBootstrap {
      *  handed a window built from that configuration or plugin set. */
     static boolean residentRole(AppArguments options, boolean enabled) {
         return enabled && !options.standaloneLaunch();
+    }
+
+    /**
+     * Whether leaving safe mode yields a plain launch. A replacement that keeps {@code --config},
+     * {@code --plugin-dir} or {@code --standalone} is standalone anyway: it never hands off, so there is no
+     * resident to ask, and a resident with another configuration must not be retired on its account.
+     */
+    static boolean replacementHandsOff(AppArguments options) {
+        return options.configOverride() == null && options.pluginDir() == null && !options.standalone();
+    }
+
+    /** A launch that is standalone only because of {@code --standalone} is a "Launch anyway" replacement. */
+    static boolean standaloneNotice(AppArguments options) {
+        return options.standalone() && options.configOverride() == null && options.pluginDir() == null && !options.safeMode();
     }
 
     /** True when a request comes from a different build than this one. A resident process must not

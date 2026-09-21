@@ -42,6 +42,17 @@ import java.util.concurrent.*;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
+import dev.jasper.app.contributions.MenuEntry;
+import dev.jasper.app.contributions.MenuTarget;
+import dev.jasper.app.pluginmanager.PluginManager;
+import dev.jasper.app.restart.ResidentControl;
+import dev.jasper.app.restart.RestartCommand;
+import dev.jasper.app.restart.RestartFlow;
+import dev.jasper.app.restart.RestartMode;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 /** Application-level window and shell ownership; closing a window never exits sibling windows. */
 public final class JasperApplication {
@@ -72,6 +83,20 @@ public final class JasperApplication {
     private PluginRuntime plugins;
     private UiState uiState = UiState.inMemory();
     private AuxiliaryWindows auxiliary;
+    private NativeShells shells;
+    private PluginManager pluginManager;
+    private ResidentControl residentControl = ResidentControl.NONE;
+    private boolean replacementHandsOff;
+    private boolean standaloneNotice;
+    /** Test seams. Production plans from this process's own command line and starts a real process. */
+    Function<RestartMode, Optional<List<String>>> restartPlanner = RestartCommand::current;
+    Consumer<List<String>> spawner = command -> {
+        try { RestartCommand.spawn(command); }
+        catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+    };
+    private volatile List<String> relaunch;
+    private volatile boolean endpointOwner;
+    private volatile List<CompletableFuture<?>> processCleanups;
     private final dev.jasper.app.contributions.Contributions contributions = new dev.jasper.app.contributions.Contributions();
     private ActivityNotifier activityNotifier;
     private dev.jasper.app.lifecycle.Subscription pluginTheme;
@@ -122,7 +147,8 @@ public final class JasperApplication {
                       Runnable terminate, ShellHistoryIndex shellHistory, SnippetStore snippets, Path shellIntegrationDir) {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
-        this.shutdown = new ApplicationShutdown(terminate);
+        // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.
+        this.shutdown = new ApplicationShutdown(() -> { relaunchIfRequested(); terminate.run(); });
         this.shellHistory = shellHistory;
         this.snippets = snippets;
         this.shellIntegrationDir = shellIntegrationDir;
@@ -274,12 +300,17 @@ public final class JasperApplication {
         if (plugins != null || quitting || stopped) return;
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
         uiState = UiState.load(dirs.uiState());
-        auxiliary = new AuxiliaryWindows(uiState, new NativeShells(themes, uiState, this::nativeWindow,
-            () -> newWindow(Path.of(System.getProperty("user.home"))), this::quit)::create);
+        shells = new NativeShells(themes, uiState, this::nativeWindow,
+            () -> newWindow(Path.of(System.getProperty("user.home"))), this::quit);
+        auxiliary = new AuxiliaryWindows(uiState, shells::create);
         auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock(), dirs.pluginData()), activityNotifier,
             (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions, auxiliary);
+        // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
+        contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
+            Optional.empty(), invocation -> managePlugins());
+        contributions.addMenuSection(MenuTarget.standard(MenuTarget.Slot.FILE)).set(List.of(new MenuEntry.Item("plugins.manage")));
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome() == BuiltinTheme.DARK);
         boolean[] replayed = new boolean[1];
         // subscribe replays the current theme at once; plugins read the look on demand, so only later changes are events.
@@ -392,6 +423,65 @@ public final class JasperApplication {
         else shutdownActions.add(java.util.Objects.requireNonNull(action));
     }
 
+    /**
+     * Quits through the normal quit path and starts a replacement process once process cleanup, which
+     * releases the handoff endpoint, has finished. EDT.
+     *
+     * @param mode which launch flags the replacement keeps
+     * @return false, and nothing happens, when this process's command line cannot be determined
+     */
+    public boolean restart(RestartMode mode) {
+        if (quitting || stopped) return true;
+        Optional<List<String>> planned = restartPlanner.apply(mode);
+        if (planned.isEmpty()) return false;
+        relaunch = planned.get();
+        endpointOwner = resident;
+        quit();
+        return true;
+    }
+
+    /** Exit thread. A replacement that could hand off must not start while this process may still answer the endpoint. */
+    private void relaunchIfRequested() {
+        List<String> command = relaunch;
+        if (command == null) return;
+        List<CompletableFuture<?>> cleanups = processCleanups;
+        boolean released = cleanups != null && cleanups.stream().allMatch(done -> done.isDone() && !done.isCompletedExceptionally());
+        if (endpointOwner && !released) {
+            LOG.log(System.Logger.Level.WARNING, "Process cleanup did not finish; the replacement starts standalone so it cannot hand off to this process");
+            command = RestartCommand.standalone(command);
+        }
+        try { spawner.accept(command); }
+        catch (RuntimeException failure) { LOG.log(System.Logger.Level.ERROR, "Could not start the replacement process", failure); }
+    }
+
+    /**
+     * Tells the Plugins manager about the resident process. EDT, before the manager is first opened.
+     *
+     * @param control probes and retires the process that holds the handoff endpoint
+     * @param replacementHandsOff whether leaving safe mode produces a plain launch, which a resident would swallow
+     * @param standaloneNotice whether this process is a {@code --standalone} replacement that should say when a resident still runs
+     */
+    public void residentControl(ResidentControl control, boolean replacementHandsOff, boolean standaloneNotice) {
+        this.residentControl = java.util.Objects.requireNonNull(control);
+        this.replacementHandsOff = replacementHandsOff;
+        this.standaloneNotice = standaloneNotice;
+    }
+
+    dev.jasper.app.contributions.Contributions contributions() { return contributions; }
+
+    private void managePlugins() {
+        if (plugins == null || quitting || stopped) return;
+        if (pluginManager == null) {
+            java.util.concurrent.Executor worker = work -> Thread.ofPlatform().daemon().name("jasper-restart").start(work);
+            // Only a plain replacement can be swallowed by a resident; any other is standalone and needs no conversation.
+            var flow = new RestartFlow(replacementHandsOff ? residentControl : ResidentControl.NONE, this::restart, worker,
+                SwingUtilities::invokeLater, Duration.ofSeconds(30), Duration.ofMillis(250));
+            pluginManager = new PluginManager(plugins, auxiliary, new PluginManager.Hooks(
+                surface -> shells.chooseFile(surface, "Install Plugin", ".zip"), flow, this::quit, residentControl, standaloneNotice, worker));
+        }
+        pluginManager.open();
+    }
+
     public void quit() {
         quitting = true;
         for (TerminalWindow window : List.copyOf(windows)) window.close();
@@ -433,8 +523,11 @@ public final class JasperApplication {
         // Cross-process locks and socket probes must not hold up Swing or the exit deadline.
         List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());
         pending.addAll(pluginWork);
-        for (Runnable action : java.util.List.copyOf(shutdownActions)) pending.add(processCleanup(action));
+        List<CompletableFuture<?>> cleanups = new ArrayList<>();
+        for (Runnable action : java.util.List.copyOf(shutdownActions)) cleanups.add(processCleanup(action));
         shutdownActions.clear();
+        pending.addAll(cleanups);
+        processCleanups = List.copyOf(cleanups);
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
         pending.add(history.closedFuture());
         shutdown.await(pending);
