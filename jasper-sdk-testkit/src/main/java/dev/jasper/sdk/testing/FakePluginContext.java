@@ -98,6 +98,7 @@ public final class FakePluginContext implements PluginContext {
         return new Events() {
             @Override public <T> Subscription subscribe(Topic<T> topic, Consumer<? super T> handler) {
                 requireOpen();
+                if (dev.jasper.sdk.terminal.TerminalEvents.owns(topic)) terminals.require(dev.jasper.sdk.Capabilities.TERMINAL_OBSERVE);
                 Subscription subscription = host.subscribe(info.id(), topic, handler);
                 synchronized (owned) { owned.add(subscription); }
                 return subscription;

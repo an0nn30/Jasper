@@ -40,6 +40,8 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import dev.jasper.sdk.Capabilities;
+import dev.jasper.sdk.terminal.TerminalEvents;
 
 /** One plugin's view of the host. Closed after a failed start and after stop: nothing can be contributed through it. */
 final class HostedContext implements PluginContext {
@@ -55,6 +57,7 @@ final class HostedContext implements PluginContext {
     private final HostedUi ui;
     final CapabilityGate gate;
     final HostedTerminals terminals;
+    private boolean observing;
     Plugin plugin;
 
     HostedContext(PluginHost host, HostedPlugin hosted, PluginSettings settings) {
@@ -140,6 +143,10 @@ final class HostedContext implements PluginContext {
             @Override public <T> Subscription subscribe(Topic<T> topic, Consumer<? super T> handler) {
                 requireOpen();
                 requireUi("subscribe");
+                if (TerminalEvents.owns(topic)) {
+                    gate.require(Capabilities.TERMINAL_OBSERVE);
+                    if (!observing) { observing = true; gate.audit(Capabilities.TERMINAL_OBSERVE, "subscribed to terminal events"); }
+                }
                 Subscription subscription = host.bus.subscribe(id, topic, handler);
                 synchronized (owned) { owned.add(subscription); }
                 return subscription;

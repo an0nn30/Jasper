@@ -33,6 +33,7 @@ final class PluginHost {
     record Outcome(PluginStatus.State state, String reason) { }
 
     final Environment environment;
+    private final dev.jasper.app.lifecycle.Subscription terminalBridge;
     final Containment containment;
     final EventBus bus;
     final ActivityHub activities;
@@ -45,6 +46,7 @@ final class PluginHost {
         this.containment = new Containment(environment.onUi());
         this.bus = new EventBus(environment.ui(), containment);
         this.activities = new ActivityHub(bus);
+        this.terminalBridge = TerminalBridge.connect(environment.terminals(), bus);
     }
 
     private void requireUi() {
@@ -101,6 +103,7 @@ final class PluginHost {
     /** Reverse start order. The returned futures complete when each plugin's background work has drained. */
     List<CompletableFuture<?>> stop() {
         requireUi();
+        terminalBridge.close();
         List<CompletableFuture<?>> pending = new ArrayList<>();
         List<HostedContext> order = new ArrayList<>(contexts.values());
         for (int i = order.size() - 1; i >= 0; i--) {

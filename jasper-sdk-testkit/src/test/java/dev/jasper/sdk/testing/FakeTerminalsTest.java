@@ -49,4 +49,34 @@ class FakeTerminalsTest {
             assertThat(host.openRequests()).isEmpty();
         }
     }
+
+    @Test void terminalTopicsNeedObserveAndTheDriversPublishThem() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "build"), pane = host.addTerminalPane(tab, info("make"));
+            var heard = new java.util.ArrayList<Object>();
+            host.start(new PluginInfo("dev.x.blind", "Blind", "1.0.0", Set.of()), Set.of(), Set.of(), plugin ->
+                assertThatThrownBy(() -> plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.BELL, heard::add))
+                    .isInstanceOf(MissingCapabilityException.class));
+            host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OBSERVE)), Set.of(), Set.of(), plugin -> {
+                plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.COMMAND_FINISHED, heard::add);
+                plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.TITLE_CHANGED, heard::add);
+                plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.SESSION_STATE_CHANGED, heard::add);
+                plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.ACTIVE_PANE_CHANGED, heard::add);
+            });
+            assertThat(host.failures()).isEmpty();
+            host.flush();
+            heard.clear();
+            host.activateTerminalWindow(window);
+            host.titleChanged(pane, "make test");
+            host.commandFinished(pane, "make test", OptionalInt.of(2), java.time.Duration.ofSeconds(3));
+            host.sessionExited(pane, OptionalInt.of(0));
+            assertThat(heard).as("delivered by flush, like every event").isEmpty();
+            host.flush();
+            assertThat(heard).containsExactly(new dev.jasper.sdk.terminal.TerminalEvents.ActivePaneChanged(Optional.of(pane)),
+                new dev.jasper.sdk.terminal.TerminalEvents.TitleChanged(pane, "make test"),
+                new dev.jasper.sdk.terminal.TerminalEvents.CommandFinished(pane, "make test", OptionalInt.of(2), java.time.Duration.ofSeconds(3),
+                    Optional.of(Path.of("/src")), Optional.empty()),
+                new dev.jasper.sdk.terminal.TerminalEvents.SessionStateChanged(pane, SessionState.EXITED, OptionalInt.of(0)));
+        }
+    }
 }

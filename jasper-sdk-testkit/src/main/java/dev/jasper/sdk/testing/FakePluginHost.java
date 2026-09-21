@@ -32,6 +32,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import dev.jasper.sdk.terminal.TerminalEvents;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * A single-threaded plugin runtime for tests. It follows the same rules as the application: queued
@@ -595,4 +599,82 @@ public final class FakePluginHost implements AutoCloseable {
      * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} or {@code front|<window id>}
      */
     public List<String> openRequests() { return List.copyOf(workspace.openRequests); }
+
+    private static dev.jasper.sdk.terminal.PaneInfo with(dev.jasper.sdk.terminal.PaneInfo info, String title, Optional<Path> directory,
+            dev.jasper.sdk.terminal.SessionState state, OptionalInt exitStatus) {
+        return new dev.jasper.sdk.terminal.PaneInfo(title, directory, info.remoteDirectory(), info.columns(), info.rows(), info.shellIntegration(),
+            info.kind(), info.providerPluginId(), state, exitStatus);
+    }
+
+    /**
+     * Publishes that a command began in an open pane.
+     *
+     * @param paneId the pane
+     * @param command the command line
+     */
+    public void commandStarted(UUID paneId, String command) {
+        workspace.pane(paneId).ifPresent(pane -> publishApp(TerminalEvents.COMMAND_STARTED, new TerminalEvents.CommandStarted(paneId, command)));
+    }
+
+    /**
+     * Publishes that a command finished in an open pane, in the directories the pane reports.
+     *
+     * @param paneId the pane
+     * @param command the command line
+     * @param exitStatus its exit status, when known
+     * @param duration how long it ran
+     */
+    public void commandFinished(UUID paneId, String command, OptionalInt exitStatus, Duration duration) {
+        workspace.pane(paneId).ifPresent(pane -> publishApp(TerminalEvents.COMMAND_FINISHED, new TerminalEvents.CommandFinished(paneId, command,
+            exitStatus, duration, pane.info.workingDirectory(), pane.info.remoteDirectory())));
+    }
+
+    /**
+     * Changes an open pane's title and publishes it.
+     *
+     * @param paneId the pane
+     * @param title the new title
+     */
+    public void titleChanged(UUID paneId, String title) {
+        workspace.pane(paneId).ifPresent(pane -> {
+            pane.info = with(pane.info, title, pane.info.workingDirectory(), pane.info.state(), pane.info.exitStatus());
+            publishApp(TerminalEvents.TITLE_CHANGED, new TerminalEvents.TitleChanged(paneId, title));
+        });
+    }
+
+    /**
+     * Changes an open pane's local working directory and publishes it.
+     *
+     * @param paneId the pane
+     * @param directory the new directory, or null for unknown
+     */
+    public void cwdChanged(UUID paneId, Path directory) {
+        workspace.pane(paneId).ifPresent(pane -> {
+            pane.info = with(pane.info, pane.info.title(), Optional.ofNullable(directory), pane.info.state(), pane.info.exitStatus());
+            publishApp(TerminalEvents.CWD_CHANGED, new TerminalEvents.CwdChanged(paneId, Optional.ofNullable(directory), Optional.empty()));
+        });
+    }
+
+    /**
+     * Ends an open pane's session and publishes it; the pane stays open.
+     *
+     * @param paneId the pane
+     * @param exitStatus the exit status, when known
+     */
+    public void sessionExited(UUID paneId, OptionalInt exitStatus) {
+        workspace.pane(paneId).ifPresent(pane -> {
+            pane.info = with(pane.info, pane.info.title(), pane.info.workingDirectory(), dev.jasper.sdk.terminal.SessionState.EXITED, exitStatus);
+            publishApp(TerminalEvents.SESSION_STATE_CHANGED, new TerminalEvents.SessionStateChanged(paneId,
+                dev.jasper.sdk.terminal.SessionState.EXITED, exitStatus));
+        });
+    }
+
+    /**
+     * Publishes that an open pane rang the bell.
+     *
+     * @param paneId the pane
+     */
+    public void bell(UUID paneId) {
+        workspace.pane(paneId).ifPresent(pane -> publishApp(TerminalEvents.BELL, new TerminalEvents.PaneEvent(pane.tab.id, paneId)));
+    }
 }
