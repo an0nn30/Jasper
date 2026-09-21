@@ -2,9 +2,13 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
+import dev.jasper.app.contributions.StatusEntry;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.terminal.config.Palette;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
 import javax.swing.*;
 
 /** Bounded status segments: long shell/path metadata never displaces dimensions/defaults. */
@@ -12,6 +16,8 @@ final class WindowStatusBar extends JPanel {
     private final Segment left = new Segment(new JLabel());
     private final JButton configButton = new JButton("Built-in defaults");
     private final Segment right = new Segment(configButton);
+    private final Box leftItems = Box.createHorizontalBox();
+    private final Box rightItems = Box.createHorizontalBox();
     Runnable onConfigurationDetails = () -> {};
     private String configText = "Built-in defaults";
     private String configColor = "Jasper.configSuccessForeground";
@@ -27,7 +33,7 @@ final class WindowStatusBar extends JPanel {
         configButton.setContentAreaFilled(false); configButton.setOpaque(false);
         configButton.setEnabled(false); configButton.putClientProperty("html.disable", true);
         configButton.addActionListener(event -> onConfigurationDetails.run());
-        add(left); add(right); refreshTheme();
+        add(left); add(leftItems); add(rightItems); add(right); refreshTheme();
         getAccessibleContext().setAccessibleName("Terminal status");
     }
 
@@ -69,6 +75,39 @@ final class WindowStatusBar extends JPanel {
             : spoken + "  |  " + directory + "  |  " + dimensions + "  |  " + configText);
         revalidate(); repaint();
     }
+    /** Replaces the contributed items. An item with a live action is a button; any other is inert text. */
+    void setContributed(List<StatusEntry> entries, Function<String, Action> actions) {
+        leftItems.removeAll();
+        rightItems.removeAll();
+        for (StatusEntry entry : entries) {
+            if (!entry.visible()) continue;
+            var item = new JButton(entry.text(), entry.icon());
+            item.setBorder(BorderFactory.createEmptyBorder()); item.setContentAreaFilled(false); item.setOpaque(false);
+            item.setFocusable(false); item.putClientProperty("html.disable", true);
+            item.setIconTextGap(UIScale.scale(5));
+            item.setToolTipText(entry.tooltip());
+            item.getAccessibleContext().setAccessibleName(entry.text().isEmpty() && entry.tooltip() != null ? entry.tooltip() : entry.text());
+            Action action = entry.actionId() == null ? null : actions.apply(entry.actionId());
+            if (action != null) {
+                item.setEnabled(action.isEnabled());
+                item.addActionListener(event -> action.actionPerformed(event));
+            } else {
+                item.setRolloverEnabled(false);
+            }
+            Box row = entry.left() ? leftItems : rightItems;
+            if (row.getComponentCount() > 0) row.add(Box.createHorizontalStrut(UIScale.scale(14)));
+            row.add(item);
+        }
+        refreshTheme();
+        revalidate(); repaint();
+    }
+
+    List<JButton> contributedItems(boolean leftSide) {
+        List<JButton> items = new ArrayList<>();
+        for (Component child : (leftSide ? leftItems : rightItems).getComponents()) if (child instanceof JButton button) items.add(button);
+        return items;
+    }
+
     JButton configButton() { return configButton; }
     String getText() { return text; }
     void applyPalette(Palette next) { palette = java.util.Objects.requireNonNull(next); refreshTheme(); }
@@ -76,6 +115,11 @@ final class WindowStatusBar extends JPanel {
     void refreshTheme() {
         setBackground(palette.background());
         left.refreshTheme(); right.refreshTheme();
+        for (Box row : new Box[]{leftItems, rightItems})
+            for (Component child : row.getComponents()) if (child instanceof JButton item) {
+                item.setForeground(muted());
+                item.setFont(UIManager.getFont("Label.font").deriveFont(UIScale.scale(10f)));
+            }
         configButton.setForeground(UIManager.getColor(configColor));
     }
 
@@ -116,10 +160,24 @@ final class WindowStatusBar extends JPanel {
     @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(30)); }
     @Override public void doLayout() {
         int edge = Math.min(UIScale.scale(14), getWidth() / 2), leftInset = Math.min(getWidth(), UIScale.scale(26));
+        int gap = UIScale.scale(14);
         int available = Math.max(0, getWidth() - edge * 2);
         int rightWidth = Math.min(available, right.getPreferredSize().width);
         right.setBounds(Math.max(edge, getWidth() - edge - rightWidth), 0, rightWidth, getHeight());
-        left.setBounds(leftInset, 0, Math.max(0, right.getX() - leftInset - edge), getHeight());
+        int remaining = Math.max(0, right.getX() - leftInset - edge);
+        int rightItemsWidth = rightItems.getComponentCount() == 0 ? 0 : Math.min(rightItems.getPreferredSize().width, remaining / 3);
+        int rightItemsSpace = rightItemsWidth == 0 ? 0 : rightItemsWidth + gap;
+        // An empty row collapses at the origin: no child may ever extend past the bar, however narrow it is.
+        if (rightItemsWidth == 0) rightItems.setBounds(0, 0, 0, 0);
+        else rightItems.setBounds(right.getX() - rightItemsSpace, 0, rightItemsWidth, getHeight());
+        remaining -= rightItemsSpace;
+        int leftItemsWidth = leftItems.getComponentCount() == 0 ? 0 : Math.min(leftItems.getPreferredSize().width, remaining / 4);
+        int leftItemsSpace = leftItemsWidth == 0 ? 0 : leftItemsWidth + gap;
+        int leftWidth = Math.max(0, Math.min(left.getPreferredSize().width, remaining - leftItemsSpace));
+        if (leftItemsWidth == 0) leftWidth = Math.max(0, remaining);
+        left.setBounds(leftInset, 0, leftWidth, getHeight());
+        if (leftItemsWidth == 0) leftItems.setBounds(0, 0, 0, 0);
+        else leftItems.setBounds(Math.min(leftInset + leftWidth + gap, Math.max(0, getWidth() - leftItemsWidth)), 0, leftItemsWidth, getHeight());
     }
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);

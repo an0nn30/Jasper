@@ -31,6 +31,7 @@ final class WindowContributions implements AutoCloseable {
         this.model = model;
         syncActions();
         owner.chrome().connect(this);
+        renderStatus();
         listening = model.onChanged(this::changed);
     }
 
@@ -58,17 +59,20 @@ final class WindowContributions implements AutoCloseable {
         model.action(id).ifPresent(entry -> entry.invoke(new Contributions.Invocation(owner.id(), pane)));
     }
 
+    private void renderStatus() { owner.status().setContributed(model.status(), this::action); }
+
     private void changed(Contributions.Kind kind) {
         switch (kind) {
             case ACTIONS -> {
                 if (syncActions()) owner.rebind();
-                // Titles label toolbar buttons and a vanished action removes its placements.
+                // Titles label toolbar buttons, and a vanished or disabled action changes every placement of it.
                 owner.chrome().renderContributedToolbar();
                 owner.chrome().renderContributedMenus();
+                renderStatus();
             }
             case TOOLBAR -> owner.chrome().renderContributedToolbar();
             case MENUS -> owner.chrome().renderContributedMenus();
-            case STATUS -> { }
+            case STATUS -> renderStatus();
         }
     }
 
@@ -114,5 +118,6 @@ final class WindowContributions implements AutoCloseable {
         actions.values().forEach(action -> action.setEnabled(false));
         actions.clear();
         owner.chrome().connect(null);
+        owner.status().setContributed(List.of(), id -> null);
     }
 }
