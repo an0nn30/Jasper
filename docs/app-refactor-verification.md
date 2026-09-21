@@ -44,6 +44,17 @@ Moved immutable notice identity/options into the new JDK-only Buddy module. Valu
 tests failed on missing APIs before implementation. `./gradlew check` passed:
 app 741 tests (one skip), Buddy 7, terminal 355 (one skip); no failures/errors.
 
+### Task 9 — Buddy facade and presentation
+
+Facade EDT/lifecycle tests failed on missing API, then passed. Full check passes
+with 1,105 tests and two expected skips. Existing model, animation, geometry and
+paint assertions moved with their owners; application tests use a separate test
+fixture artifact. Native construction rollback is explicit; no GUI was opened.
+
+Task 9: Ruling: Use a separate java-test-fixtures artifact exposing controlled companion snapshots to app tests instead of adding producer-only callbacks to production. The existing notifier tests assert replacement, acknowledgement and history as well as emissions. Cost if wrong: an extra test artifact dependency; no fixture is shipped in either production jar.
+Task 9: Ruling: The existing native-window tests exercise pure geometry predicates; there is no headless native acquisition seam. Preserve those and animation/drag cancellation tests, add exhaustive EDT/headless facade tests, and inspect native timer/listener disposal without inventing a second window implementation. Native lifecycle acceptance remains user-run. Cost if wrong: a platform-specific cleanup defect may escape headless checks.
+Task 9: Ruling: Move Buddy preview tasks to the Buddy module and replace app theme installers with explicit font/dark values. Cost if wrong: developer preview commands change module; documentation will name the new commands. Production appearance still comes from the application.
+
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.

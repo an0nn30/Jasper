@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.view.BuddyTestSupport;
+import dev.jasper.buddy.notice.BuddyNoticeId;
 import dev.jasper.buddy.notice.BuddyNotice;
 
 import java.time.Duration;
@@ -10,18 +12,18 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.extension.ExtendWith(EdtTestExtension.class)
 class CommandNotifierTest {
     private record Sent(String title, String detail) {}
 
-    private final BuddyDeck deck = new BuddyDeck();
+    private final BuddyTestSupport deck = new BuddyTestSupport();
     private final List<Sent> os = new ArrayList<>();
     private final List<Boolean> working = new ArrayList<>();
     private final List<Runnable> scheduled = new ArrayList<>();
-    private int refreshes;
 
     /** Nothing fires by itself: a test runs the scheduled task when it wants the threshold to pass. */
     private CommandNotifier notifier(int seconds) {
-        return new CommandNotifier(() -> Duration.ofSeconds(seconds), deck, () -> refreshes++,
+        return new CommandNotifier(() -> Duration.ofSeconds(seconds), deck.companion(),
             (title, detail) -> os.add(new Sent(title, detail)), working::add,
             (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); });
     }
@@ -389,13 +391,13 @@ class CommandNotifierTest {
         CommandNotifier notifier = notifier(10);
         notifier.started("a", "worker a", () -> 0L, () -> {}, UNWATCHED);
         notifier.started("b", "worker b", () -> 0L, () -> {}, UNWATCHED);
-        deck.acknowledge(CommandNotifier.SOURCE, "a");
+        deck.acknowledge(new BuddyNoticeId(CommandNotifier.SOURCE, "a"));
         int generation = deck.generation();
         notifier.titleChanged("a", "Reviewing database migration");
         assertThat(deck.notices()).extracting(BuddyNotice::title)
             .containsExactly("worker b", "Reviewing database migration");
         assertThat(deck.generation()).isEqualTo(generation);
-        assertThat(deck.acknowledged(CommandNotifier.SOURCE, "a")).isTrue();
+        assertThat(deck.acknowledged(new BuddyNoticeId(CommandNotifier.SOURCE, "a"))).isTrue();
         assertThat(working).containsExactly(true);
     }
 
@@ -421,7 +423,7 @@ class CommandNotifierTest {
     @Test void changingATitleDoesNotResurrectADismissedRunningNotice() {
         CommandNotifier notifier = notifier(10);
         notifier.started("a", "worker", () -> 0L, () -> {}, UNWATCHED);
-        deck.dismiss(CommandNotifier.SOURCE, "a");
+        deck.dismiss(new BuddyNoticeId(CommandNotifier.SOURCE, "a"));
         notifier.titleChanged("a", "Still working");
         assertThat(deck.notices()).isEmpty();
     }

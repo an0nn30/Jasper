@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.view.BuddyCompanion;
+import dev.jasper.buddy.config.BuddyOptions;
+import dev.jasper.buddy.config.BuddyPosition;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.rendering.FontSet;
 import dev.jasper.terminal.session.SessionLaunchOptions;
@@ -47,17 +50,10 @@ final class JasperApplication {
     private final Path shellIntegrationDir;
     private final BuddyVisibility buddyVisibility = new BuddyVisibility();
     private final Path buddyStateFile;
-    private BuddyWindow buddy;
+    private final BuddyCompanion buddy;
+    private final dev.jasper.app.lifecycle.Subscription buddyAppearance;
     private final NativeNotifier nativeNotifier = new NativeNotifier();
-    /** The drawer outlives the buddy's window: hiding him must not throw away what you kept. */
-    private final BuddyDeck deck = new BuddyDeck();
-    private final CommandNotifier notifications = new CommandNotifier(
-        () -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
-        deck,
-        () -> { if (buddy != null) buddy.refreshDeck(); },
-        nativeNotifier::send,
-        working -> { if (buddy != null) buddy.setWorking(working); },
-        JasperApplication::afterDelay);
+    private final CommandNotifier notifications;
     private boolean buddyUnavailable;
 
     private int configuredLongCommandSeconds() {
@@ -113,6 +109,10 @@ final class JasperApplication {
         this.shellHistory = shellHistory;
         this.snippets = snippets;
         this.shellIntegrationDir = shellIntegrationDir;
+        buddy = new BuddyCompanion(buddyOptions());
+        buddyAppearance = themes.subscribe((theme, changed) -> buddy.applyOptions(buddyOptions()));
+        notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
+            buddy, nativeNotifier::send, buddy::setWorking, JasperApplication::afterDelay);
         configuration = service == null ? null : new ConfigurationController(themes, service);
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddyVisibility.configure(snapshot.buddyEnabled()); syncBuddy();
@@ -327,23 +327,33 @@ final class JasperApplication {
         if (target != null) target.toFront();
     }
 
+    private BuddyOptions buddyOptions() {
+        var builder = BuddyOptions.builder(SystemFonts.system(java.awt.Font.PLAIN, 13f))
+            .dark(themes.current().chrome() == BuiltinTheme.DARK)
+            .activateHost(this::raiseTerminal).toggleRequested(this::toggleBuddy);
+        if (buddyStateFile != null) {
+            try { BuddyStateFile.read(buddyStateFile).ifPresent(p -> builder.initialPosition(new BuddyPosition(p.x, p.y))); }
+            catch (java.io.IOException failure) { LOG.log(System.Logger.Level.WARNING, "Ignoring unreadable buddy state " + buddyStateFile, failure); }
+            builder.positionChanged(p -> {
+                try { BuddyStateFile.write(buddyStateFile, new java.awt.Point(p.x(), p.y())); }
+                catch (java.io.IOException failure) { LOG.log(System.Logger.Level.WARNING, "Could not save buddy position to " + buddyStateFile, failure); }
+            });
+        }
+        return builder.build();
+    }
+
     private void syncBuddy() {
         if (quitting || stopped) return;
         if (!buddyUnavailable) {
             try {
                 if (buddyVisibility.shown()) {
-                    if (buddy == null) {
-                        buddy = BuddyWindow.create(buddyStateFile, this::raiseTerminal, this::toggleBuddy);
-                        if (buddy == null) buddyUnavailable = true; else installKeyWatch();
-                    }
-                    if (buddy != null) { buddy.show(); buddy.attachDeck(deck); }
+                    if (!buddy.show()) buddyUnavailable = true; else installKeyWatch();
                 } else if (buddy != null) buddy.hide();
             } catch (RuntimeException failure) {
                 buddyUnavailable = true;
                 if (buddy != null) {
-                    try { buddy.dispose(); } catch (RuntimeException ignored) { }
+                    try { buddy.close(); } catch (RuntimeException ignored) { }
                 }
-                buddy = null;
                 removeKeyWatch();
                 LOG.log(System.Logger.Level.WARNING, "Desk buddy disabled for this session", failure);
             }
@@ -377,7 +387,8 @@ final class JasperApplication {
         quitting = true;
         launches.close();
         removeKeyWatch();
-        if (buddy != null) buddy.dispose();
+        buddyAppearance.close();
+        buddy.close();
         history.close();
         shellHistory.close();
         if (snippets != null) snippets.close();

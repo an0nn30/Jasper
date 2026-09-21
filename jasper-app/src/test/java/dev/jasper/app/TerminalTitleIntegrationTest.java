@@ -1,5 +1,6 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.view.BuddyTestSupport;
 import dev.jasper.buddy.notice.BuddyNotice;
 
 import dev.jasper.terminal.config.GridSize;
@@ -34,7 +35,7 @@ class TerminalTitleIntegrationTest {
         return "\\033]1341;jasper;cmd;" + encoded + "\\007\\033]133;C\\007";
     }
 
-    private record Fixture(WindowContent content, BuddyDeck deck, List<String> nativeTitles) { }
+    private record Fixture(WindowContent content, BuddyTestSupport deck, List<String> nativeTitles) { }
 
     private Fixture open(String script) throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(
@@ -52,8 +53,8 @@ class TerminalTitleIntegrationTest {
         Fixture[] fixture = new Fixture[1];
         edt(() -> {
             WindowContent window = content(launcher);
-            BuddyDeck deck = new BuddyDeck();
-            CommandNotifier notifier = new CommandNotifier(() -> Duration.ofNanos(1), deck, () -> {},
+            BuddyTestSupport deck = new BuddyTestSupport();
+            CommandNotifier notifier = new CommandNotifier(() -> Duration.ofNanos(1), deck.companion(),
                 (title, detail) -> {}, working -> {}, (delay, run) -> () -> {});
             window.activity(event -> {
             switch (event) {

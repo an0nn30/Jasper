@@ -1,5 +1,6 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.view.BuddyCompanion;
 import dev.jasper.buddy.notice.BuddyNoticeId;
 import dev.jasper.buddy.notice.BuddyNotice;
 
@@ -32,8 +33,7 @@ final class CommandNotifier {
     static final String SOURCE = "terminal";
 
     private final Supplier<Duration> threshold;
-    private final BuddyDeck deck;
-    private final Runnable onDeckChanged;
+    private final BuddyCompanion deck;
     private final BiConsumer<String, String> operatingSystem;
     private final Consumer<Boolean> onWorkingChanged;
     private final BiFunction<Duration, Runnable, Runnable> schedule;
@@ -52,12 +52,11 @@ final class CommandNotifier {
         Runnable activate = () -> {};
     }
 
-    CommandNotifier(Supplier<Duration> threshold, BuddyDeck deck, Runnable onDeckChanged,
+    CommandNotifier(Supplier<Duration> threshold, BuddyCompanion deck,
                     BiConsumer<String, String> operatingSystem, Consumer<Boolean> onWorkingChanged,
                     BiFunction<Duration, Runnable, Runnable> schedule) {
         this.threshold = Objects.requireNonNull(threshold, "threshold");
         this.deck = Objects.requireNonNull(deck, "deck");
-        this.onDeckChanged = Objects.requireNonNull(onDeckChanged, "onDeckChanged");
         this.operatingSystem = Objects.requireNonNull(operatingSystem, "operatingSystem");
         this.onWorkingChanged = Objects.requireNonNull(onWorkingChanged, "onWorkingChanged");
         this.schedule = Objects.requireNonNull(schedule, "schedule");
@@ -98,7 +97,6 @@ final class CommandNotifier {
         flight.cancel = () -> {};
         if (running++ == 0) onWorkingChanged.accept(true);
         deck.post(new BuddyNotice(new BuddyNoticeId(SOURCE, key), BuddyNotice.Kind.TASK, flight.title, BuddyNotice.State.RUNNING, flight.detail, flight.activate));
-        onDeckChanged.run();
     }
 
     /** Refresh wording without promoting the card, clearing acknowledgement, or replaying arrival. */
@@ -108,7 +106,7 @@ final class CommandNotifier {
         String updated = TerminalTitle.singleLine(programTitle);
         if (updated.isBlank() || updated.equals(flight.title)) return;
         flight.title = updated;
-        if (flight.passed && deck.updateTitle(SOURCE, key, updated)) onDeckChanged.run();
+        if (flight.passed) deck.updateTitle(new BuddyNoticeId(SOURCE, key), updated);
     }
 
     /** A command ended. Its card becomes the outcome, and the OS hears about it if you were elsewhere. */
@@ -124,15 +122,13 @@ final class CommandNotifier {
             : "Exited " + exitStatus.getAsInt() + " · " + humanize(ran);
         deck.post(new BuddyNotice(new BuddyNoticeId(SOURCE, key), BuddyNotice.Kind.TASK, title, succeeded ? BuddyNotice.State.DONE : BuddyNotice.State.FAILED, () -> detail, activate));
         // You were looking straight at it, so it is already seen and never reaches the column.
-        if (origin.ownPaneFocused()) deck.acknowledge(SOURCE, key);
-        onDeckChanged.run();
+        if (origin.ownPaneFocused()) deck.acknowledge(new BuddyNoticeId(SOURCE, key));
         if (CommandNotice.shouldNotify(origin, ran, wait)) operatingSystem.accept(title, detail);
     }
 
     /** That pane took focus: whatever it posted has now been seen. */
     void looked(Object key) {
-        deck.acknowledge(SOURCE, key);
-        onDeckChanged.run();
+        deck.acknowledge(new BuddyNoticeId(SOURCE, key));
     }
 
     /**
@@ -146,11 +142,10 @@ final class CommandNotifier {
         cancel(key);
         // Only a running card is rewritten. One that already finished keeps what it said - a pane
         // closed after a successful build must still say the build succeeded.
-        if (stillRunning) deck.orphan(SOURCE, key, "Stopped after " + humanize(ran));
-        else deck.orphan(SOURCE, key);
+        if (stillRunning) deck.orphan(new BuddyNoticeId(SOURCE, key) , "Stopped after " + humanize(ran));
+        else deck.orphan(new BuddyNoticeId(SOURCE, key));
         // Its pane is gone, so it can never be looked at and would sit in the column all session.
-        deck.acknowledge(SOURCE, key);
-        onDeckChanged.run();
+        deck.acknowledge(new BuddyNoticeId(SOURCE, key));
     }
 
     /** Drops any in-flight command for this key, releasing the typing animation if it had claimed it. */
