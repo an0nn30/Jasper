@@ -4,37 +4,79 @@ import dev.jasper.app.commands.ActionId;
 import javax.swing.KeyStroke;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
-import java.util.EnumMap;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
 
-/** Parses and indexes application keybindings independently of the Swing action layer. */
+/**
+ * Parses and indexes application keybindings by action id, independently of the Swing action layer.
+ * Built-in ids come from {@link ActionId}; namespaced (dotted) ids belong to contributed actions.
+ * A user's binding for a dotted id is validated when the configuration loads but bound only once
+ * {@link #withExtensions} learns that the action exists.
+ */
 public final class KeyBindings {
-    private static final Map<String, Integer> NAMED_KEYS = namedKeys();
-
-    private final Map<ActionId, KeyStroke> strokesByAction;
-    private final Map<KeyStroke, ActionId> actionsByStroke;
-
-    private KeyBindings(Map<ActionId, KeyStroke> strokesByAction) {
-        this.strokesByAction = Map.copyOf(strokesByAction);
-        Map<KeyStroke, ActionId> reverse = new HashMap<>();
-        for (Map.Entry<ActionId, KeyStroke> entry : strokesByAction.entrySet()) {
-            reverse.put(entry.getValue(), entry.getKey());
+    /** A contributed action and the shortcut its contributor would like, if any. */
+    public record Extension(String id, Optional<String> defaultBinding) {
+        public Extension {
+            if (!extensionId(id)) throw new IllegalArgumentException("not a contributed action id: '" + id + "'");
+            Objects.requireNonNull(defaultBinding, "defaultBinding");
         }
-        actionsByStroke = Map.copyOf(reverse);
+    }
+
+    /** Something {@link #withExtensions} could not honor. */
+    public record Problem(Kind kind, String actionId, String message) {
+        public enum Kind {
+            /** The user bound an id that no registered action has: a configuration warning. */
+            UNKNOWN_ACTION,
+            /** A contributor's default lost to an existing binding or was invalid: logged, not a warning. */
+            DEFAULT_DROPPED
+        }
+    }
+
+    /** Effective bindings and what was dropped on the way. */
+    public record Resolved(KeyBindings bindings, List<Problem> problems) {
+        public Resolved { problems = List.copyOf(problems); }
+    }
+
+    private static final Map<String, Integer> NAMED_KEYS = namedKeys();
+    private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]*(\\.[a-z0-9_-]+)+");
+
+    private final boolean macOs;
+    private final Map<String, KeyStroke> strokesById;
+    private final Map<KeyStroke, String> idsByStroke;
+    private final Map<String, Optional<KeyStroke>> extensionOverrides;
+
+    private KeyBindings(boolean macOs, Map<String, KeyStroke> strokesById, Map<String, Optional<KeyStroke>> extensionOverrides) {
+        this.macOs = macOs;
+        this.strokesById = Collections.unmodifiableMap(new LinkedHashMap<>(strokesById));
+        Map<KeyStroke, String> reverse = new HashMap<>();
+        for (Map.Entry<String, KeyStroke> entry : strokesById.entrySet()) reverse.put(entry.getValue(), entry.getKey());
+        idsByStroke = Map.copyOf(reverse);
+        this.extensionOverrides = Collections.unmodifiableMap(new LinkedHashMap<>(extensionOverrides));
+    }
+
+    /** Whether the id is well formed and namespaced with at least one dot, which no built-in id is. */
+    public static boolean extensionId(String id) {
+        return id != null && id.length() <= 128 && ID.matcher(id).matches();
     }
 
     public static KeyBindings defaults(boolean macOs) {
-        EnumMap<ActionId, KeyStroke> strokes = new EnumMap<>(ActionId.class);
+        Map<String, KeyStroke> strokes = new LinkedHashMap<>();
         for (ActionId action : ActionId.values()) {
             String binding = effectiveDefaultBinding(action, macOs);
             KeyStroke stroke = parse(binding, macOs).orElseThrow();
-            putWithoutCollision(strokes, action, stroke, binding);
+            putWithoutCollision(strokes, action.id(), stroke, binding);
         }
-        return new KeyBindings(strokes);
+        return new KeyBindings(macOs, strokes, Map.of());
     }
 
     /** Text that round-trips the effective default, including non-macOS compatibility modifiers. */
@@ -49,41 +91,100 @@ public final class KeyBindings {
         if (overrides == null) {
             throw new IllegalArgumentException("keybinding overrides must not be null");
         }
-        KeyBindings defaults = defaults(macOs);
-        EnumMap<ActionId, KeyStroke> result = new EnumMap<>(defaults.strokesByAction);
-        Map<ActionId, String> resolved = new LinkedHashMap<>();
+        Map<String, KeyStroke> result = new LinkedHashMap<>(defaults(macOs).strokesById);
+        Map<String, String> builtIn = new LinkedHashMap<>();
+        Map<String, String> extensions = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : overrides.entrySet()) {
-            String actionName = entry.getKey();
-            ActionId action = actionForId(actionName);
-            resolved.put(action, entry.getValue());
+            String id = entry.getKey();
+            if (ActionId.forId(id).isPresent()) builtIn.put(id, entry.getValue());
+            else if (extensionId(id)) extensions.put(id, entry.getValue());
+            else throw new IllegalArgumentException("unknown action name: '" + id + "'");
         }
-
-        for (ActionId action : resolved.keySet()) {
-            result.remove(action);
+        builtIn.keySet().forEach(result::remove);
+        for (Map.Entry<String, String> entry : builtIn.entrySet()) {
+            parseFor(entry.getKey(), entry.getValue(), macOs)
+                .ifPresent(stroke -> putWithoutCollision(result, entry.getKey(), stroke, entry.getValue()));
         }
-        for (Map.Entry<ActionId, String> entry : resolved.entrySet()) {
-            ActionId action = entry.getKey();
-            String binding = entry.getValue();
-            Optional<KeyStroke> parsed;
-            try {
-                parsed = parse(binding, macOs);
-            } catch (IllegalArgumentException exception) {
-                throw new IllegalArgumentException(
-                    "invalid keybinding for action '" + action.id() + "': '" + binding + "' ("
-                        + exception.getMessage() + ")",
-                    exception);
-            }
-            parsed.ifPresent(stroke -> putWithoutCollision(result, action, stroke, binding));
+        // A contributed action's shortcut must not collide with anything the user or the defaults claim,
+        // but it is not bound here: the action may not exist in this launch.
+        Map<String, KeyStroke> claimed = new LinkedHashMap<>(result);
+        Map<String, Optional<KeyStroke>> extensionOverrides = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : extensions.entrySet()) {
+            Optional<KeyStroke> parsed = parseFor(entry.getKey(), entry.getValue(), macOs);
+            parsed.ifPresent(stroke -> putWithoutCollision(claimed, entry.getKey(), stroke, entry.getValue()));
+            extensionOverrides.put(entry.getKey(), parsed);
         }
-        return new KeyBindings(result);
+        return new KeyBindings(macOs, result, extensionOverrides);
     }
 
+    /**
+     * Adds contributed actions in registration order. The user's binding for an action wins; otherwise
+     * its default applies unless the shortcut is already taken or invalid. Always call this on the
+     * result of {@link #withOverrides} or {@link #defaults}, never on an already extended instance.
+     */
+    public Resolved withExtensions(List<Extension> extensions) {
+        Map<String, KeyStroke> strokes = new LinkedHashMap<>();
+        strokesById.forEach((id, stroke) -> { if (!extensionId(id)) strokes.put(id, stroke); });
+        List<Problem> problems = new ArrayList<>();
+        Set<String> registered = new LinkedHashSet<>();
+        for (Extension extension : extensions) registered.add(extension.id());
+        for (Map.Entry<String, Optional<KeyStroke>> override : extensionOverrides.entrySet()) {
+            if (!registered.contains(override.getKey())) {
+                problems.add(new Problem(Problem.Kind.UNKNOWN_ACTION, override.getKey(), "Unknown action; ignored."));
+                continue;
+            }
+            override.getValue().ifPresent(stroke -> strokes.put(override.getKey(), stroke));
+        }
+        for (Extension extension : extensions) {
+            if (extensionOverrides.containsKey(extension.id()) || extension.defaultBinding().isEmpty()) continue;
+            String binding = extension.defaultBinding().get();
+            Optional<KeyStroke> parsed;
+            try { parsed = parse(binding, macOs); }
+            catch (IllegalArgumentException invalid) {
+                problems.add(new Problem(Problem.Kind.DEFAULT_DROPPED, extension.id(),
+                    "Default shortcut '" + binding + "' is not valid; the action is unbound."));
+                continue;
+            }
+            if (parsed.isEmpty()) continue;
+            String holder = null;
+            for (Map.Entry<String, KeyStroke> existing : strokes.entrySet())
+                if (existing.getValue().equals(parsed.get())) holder = existing.getKey();
+            if (holder != null) {
+                problems.add(new Problem(Problem.Kind.DEFAULT_DROPPED, extension.id(), "Default shortcut '" + binding
+                    + "' is already used by '" + holder + "'; bind the action under [keybindings] to give it one."));
+                continue;
+            }
+            strokes.put(extension.id(), parsed.get());
+        }
+        return new Resolved(new KeyBindings(macOs, strokes, extensionOverrides), problems);
+    }
+
+    public Optional<String> idFor(KeyStroke stroke) {
+        return Optional.ofNullable(idsByStroke.get(stroke));
+    }
+
+    public Optional<KeyStroke> strokeFor(String id) {
+        return Optional.ofNullable(strokesById.get(id));
+    }
+
+    /** Every bound id with its shortcut, built-ins first, in a stable order. */
+    public Map<String, KeyStroke> strokes() { return strokesById; }
+
     public Optional<ActionId> actionFor(KeyStroke stroke) {
-        return Optional.ofNullable(actionsByStroke.get(stroke));
+        return idFor(stroke).flatMap(ActionId::forId);
     }
 
     public Optional<KeyStroke> strokeFor(ActionId action) {
-        return Optional.ofNullable(strokesByAction.get(action));
+        return strokeFor(action.id());
+    }
+
+    private static Optional<KeyStroke> parseFor(String id, String binding, boolean macOs) {
+        try {
+            return parse(binding, macOs);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException(
+                "invalid keybinding for action '" + id + "': '" + binding + "' (" + exception.getMessage() + ")", exception);
+        }
     }
 
     static Optional<KeyStroke> parse(String binding, boolean macOs) {
@@ -128,28 +229,14 @@ public final class KeyBindings {
         return Optional.of(KeyStroke.getKeyStroke(keyCode, modifiers));
     }
 
-    private static ActionId actionForId(String id) {
-        if (id != null) {
-            for (ActionId action : ActionId.values()) {
-                if (action.id().equals(id)) {
-                    return action;
-                }
-            }
-        }
-        throw new IllegalArgumentException("unknown action name: '" + id + "'");
-    }
-
-    private static void putWithoutCollision(
-        Map<ActionId, KeyStroke> strokes, ActionId action, KeyStroke stroke, String binding
-    ) {
-        for (Map.Entry<ActionId, KeyStroke> existing : strokes.entrySet()) {
+    private static void putWithoutCollision(Map<String, KeyStroke> strokes, String id, KeyStroke stroke, String binding) {
+        for (Map.Entry<String, KeyStroke> existing : strokes.entrySet()) {
             if (existing.getValue().equals(stroke)) {
                 throw new IllegalArgumentException(
-                    "keybinding collision for '" + binding + "': actions '" + existing.getKey().id()
-                        + "' and '" + action.id() + "'");
+                    "keybinding collision for '" + binding + "': actions '" + existing.getKey() + "' and '" + id + "'");
             }
         }
-        strokes.put(action, stroke);
+        strokes.put(id, stroke);
     }
 
     private static int keyCode(String token) {

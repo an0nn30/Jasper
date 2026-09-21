@@ -327,7 +327,7 @@ public final class ConfigLoader {
         boolean invalid = false;
         for (String action : table.keySet()) {
             List<String> path = List.of("keybindings", action);
-            if (!knownAction(action)) {
+            if (!knownAction(action) && !KeyBindings.extensionId(action)) {
                 warning(path, "Unknown action; ignored.");
                 continue;
             }
@@ -340,6 +340,9 @@ public final class ConfigLoader {
                 KeyBindings.parse(binding, macOs);
                 overrides.put(action, binding);
             } catch (IllegalArgumentException ignored) {
+                // The action may belong to a plugin that is not even installed: a bad shortcut for it
+                // must not cost the user every other binding, so only this entry is ignored.
+                if (!knownAction(action)) { warning(path, "Use a valid shortcut or none; ignored."); continue; }
                 valueError(path, "Use a valid shortcut or none; using all default keybindings.");
                 invalid = true;
             }

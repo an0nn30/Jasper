@@ -1,6 +1,6 @@
 package dev.jasper.app.commands;
 
-/** The complete Phase 1 application action catalog. */
+/** The built-in application action catalog; plugins contribute further actions by namespaced id. */
 public enum ActionId {
     NEW_TAB("new_tab", "New Tab", "cmd+t"),
     CLOSE_TAB("close_tab", "Close Tab", "cmd+w"),
@@ -55,6 +55,12 @@ public enum ActionId {
 
     public String id() {
         return id;
+    }
+
+    /** The built-in action with this configuration id, if any; contributed actions are not in this catalog. */
+    public static java.util.Optional<ActionId> forId(String id) {
+        for (ActionId action : values()) if (action.id.equals(id)) return java.util.Optional.of(action);
+        return java.util.Optional.empty();
     }
 
     public String label() {
