@@ -19,6 +19,8 @@ Use `--config <path>` to select a different file. Relative paths resolve from th
 ./gradlew :jasper-app:run --args='--help'
 ```
 
+`--safe-mode` starts without user-installed plugins, `--plugin-dir <path>` additionally loads one development plugin directory, and `--standalone` changes nothing else. All three, like `--config`, make the launch standalone: it never hands off to a resident Jasper and never becomes resident.
+
 The first command launches the desktop and a shell. `--help` prints usage without opening a window or reading configuration. Missing, duplicate and unknown arguments fail before desktop startup.
 
 ## Supported settings
@@ -391,6 +393,22 @@ To check whether integration is active in a given pane, look at the status bar: 
 Columns and lines specify the desired first terminal grid of a new window. Jasper derives the initial pixel area from the saved font metrics and adds 4px pane padding on each side (8px total per dimension); Swing adds chrome and window decorations. The packed window respects its minimum constraints and is capped to the current display's usable area. If the display is smaller than those constraints, its usable area is the cap. Thus a large requested grid may not fit exactly, and native minimums may enlarge a small request.
 
 A window captures its grid defaults once. Later reloads do not resize or repack it, and a delayed shell does not repack it when ready. New tabs and splits in that window use its captured launch grid and then resize to the available layout. A newly opened window uses the latest saved grid. Changing live typography can change how many cells fit in the existing window.
+
+### Plugins
+
+Each plugin reads its own table, keyed by its quoted id. Jasper does not validate the
+contents; a plugin reports problems with its settings through the same diagnostics as the
+rest of the file. A table for a plugin that is not installed is ignored without a warning.
+Values may be strings, integers, floats, booleans, arrays of strings and nested tables.
+
+```toml
+[plugins."dev.jasper.sample"]
+demo_activity = true      # show a short demonstration activity on Buddy at startup
+demo_step_millis = 300    # 0 to 5000
+```
+
+Installed plugins live in `plugins/<id>/` beside `config.toml`; their enabled state and
+consented capabilities are in `plugins.toml`, and their private data under `plugin-data/<id>/`.
 
 ## Shortcuts
 

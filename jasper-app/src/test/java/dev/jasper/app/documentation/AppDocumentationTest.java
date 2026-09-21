@@ -18,12 +18,14 @@ class AppDocumentationTest {
         "docs/command-palette.md", "docs/diagnostics.md", "docs/packaging.md", "docs/benchmarks.md",
         "docs/rebranding.md", "docs/terminal-readiness.md", "docs/terminal-refactor-verification.md",
         "docs/app-refactor-verification.md", "docs/documentation-audit.md",
-        "packaging/icons/README.md", "packaging/buddy/README.md")
+        "packaging/icons/README.md", "packaging/buddy/README.md",
+        "jasper-sdk/README.md", "docs/sdk-architecture.md", "docs/plugin-authoring.md")
         .stream().map(ROOT::resolve).toList();
 
     @Test void guideLinksResolveAndExamplesMatchCompiledSource() throws Exception {
         String source = Files.readString(ROOT.resolve("jasper-app/src/test/java/dev/jasper/app/documentation/AppExamplesTest.java"));
         source += "\n" + Files.readString(ROOT.resolve("jasper-buddy/src/test/java/dev/jasper/buddy/documentation/BuddyExamplesTest.java"));
+        source += "\n" + Files.readString(ROOT.resolve("plugins/sample/src/main/java/dev/jasper/sample/SamplePlugin.java"));
         var guides = new java.util.ArrayList<>(GUIDES);
         // Dated records retain old code examples, but their local links must still resolve.
         for (String directory : List.of("docs/superpowers", "docs/design", "docs/benchmarks")) {
@@ -59,7 +61,7 @@ class AppDocumentationTest {
     }
 
     @Test void everyProductionPackageHasAnOwnershipContract() throws Exception {
-        for (String module : List.of("app", "buddy")) {
+        for (String module : List.of("app", "buddy", "sdk")) {
         Path source = ROOT.resolve("jasper-" + module + "/src/main/java/dev/jasper/" + module);
         try (var files = Files.walk(source)) {
             for (Path directory : files.filter(Files::isDirectory).toList()) {

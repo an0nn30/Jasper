@@ -16,9 +16,9 @@ Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferr
 
 ## Architecture rules (from the spec and the plans' Global Constraints)
 
-- Modules: `jasper-terminal` (`dev.jasper.terminal`), `jasper-app` (`dev.jasper.app`) and JDK-only `jasper-buddy` (`dev.jasper.buddy`). Both libraries are independent of the application and each other. The [approved app/Buddy amendment](docs/superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md) defines the supported Buddy facade/values; app production code never imports Buddy internals. `verifyApplicationArchitecture` checks both full package DAGs and vendor-free Buddy signatures.
+- Modules: `jasper-terminal` (`dev.jasper.terminal`), `jasper-app` (`dev.jasper.app`) and JDK-only `jasper-buddy` (`dev.jasper.buddy`). Both libraries are independent of the application and each other. The [approved app/Buddy amendment](docs/superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md) defines the supported Buddy facade/values; app production code never imports Buddy internals. `verifyApplicationArchitecture` checks both full package DAGs and vendor-free Buddy signatures. `jasper-sdk` (`dev.jasper.sdk`, JDK-only) is the plugin API and `jasper-sdk-testkit` its fake and contract suite; in-repo plugins live under `plugins/` and compile against the SDK only. SDK types appear in the app only inside `dev.jasper.app.plugins`. `verifySdkArchitecture` and `verifyPluginArchitecture` enforce this.
 - JediTerm (`org.jetbrains.jediterm:jediterm-core:3.76`, from `https://packages.jetbrains.team/maven/p/ij/intellij-dependencies`, not Maven Central) is an `implementation` dependency of `jasper-terminal` only. **No public method in `jasper-terminal` takes or returns a JediTerm type.** Do not add `jediterm-ui` or `jediterm-pty`.
-- No interface without two real implementations. No plugin API in phase 1. No abstraction over "emulator backends".
+- No interface without two real implementations (SDK interfaces are implemented by the app and by the testkit). The plugin API is the SDK; the user lifted "no plugin API in phase 1" on 2026-09-21 ([design](docs/superpowers/specs/2026-09-21-jasper-plugin-sdk-design.md)). No abstraction over "emulator backends".
 - Child processes get `TERM=xterm-256color` and `COLORTERM=truecolor`.
 - Rows: **absolute row** = `discardedLines + historyLines + screenRow` (screen row 0 = top of the live screen; negative buffer rows are scrollback). Selections, prompt marks, search matches and the scrolled-back viewport use absolute rows.
 - Threading: JediTerm runs on the session's reader thread; the view runs on the Event Dispatch Thread. Every read of buffer state takes `TerminalTextBuffer`'s lock (it is re-entrant); keep work under the lock small and bounded (the regex search deliberately runs outside it).
@@ -40,7 +40,7 @@ Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferr
 ```
 python3 - <<'PY'
 import pathlib, sys
-for name in sys.argv[1:] or [str(p) for p in pathlib.Path("jasper-terminal/src").rglob("*.java")]:
+for name in sys.argv[1:] or [str(p) for root in ("jasper-terminal/src", "jasper-app/src", "jasper-buddy/src", "jasper-sdk/src", "jasper-sdk-testkit/src", "plugins") for p in pathlib.Path(root).rglob("*.java")]:
     text = pathlib.Path(name).read_text(encoding="utf-8")
     bad = sum(1 for c in text if 0xD800 <= ord(c) <= 0xDFFF or 0xE000 <= ord(c) <= 0xF8FF or (ord(c) < 0x20 and c not in "\n\t\r") or ord(c) == 0x7f)
     if bad: print(name, "bad chars:", bad)
@@ -55,6 +55,7 @@ Plans are written with `superpowers:writing-plans` (complete code in every step,
 
 Use the [documentation index](docs/README.md) for all three modules, including
 [Buddy architecture](docs/buddy-architecture.md) and [Buddy maintenance](docs/buddy-maintenance.md).
+Plugin work starts with [SDK architecture](docs/sdk-architecture.md), [plugin authoring](docs/plugin-authoring.md) and the [SDK README](jasper-sdk/README.md).
 Start with [app onboarding](jasper-app/README.md), [Buddy embedding](jasper-buddy/README.md),
 [architecture](docs/app-architecture.md) and [maintenance recipes](docs/app-maintenance.md).
 App public visibility is for internal feature collaboration, not a plugin ABI. Package-info

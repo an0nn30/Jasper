@@ -7,7 +7,7 @@ import org.gradle.jvm.toolchain.JvmVendorSpec
 val app = project(":jasper-app")
 val buddy = project(":jasper-buddy")
 val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitecture") {
-    dependsOn(":jasper-app:classes", ":jasper-buddy:jar", ":jasper-terminal:jar")
+    dependsOn(":jasper-app:classes", ":jasper-buddy:jar", ":jasper-terminal:jar", ":jasper-sdk:jar")
     doLast {
         val launcher = app.extensions.getByType<JavaToolchainService>().launcherFor {
             languageVersion = JavaLanguageVersion.of(25)
@@ -54,6 +54,10 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                 if (!from.startsWith(prefix)) return@forEach
                 if (module == buddy) check(to.startsWith(prefix) || jdk(to)) { "Buddy depends on non-JDK type: $line" }
                 if (module == app && to.startsWith("dev.jasper.buddy.")) check(topLevel(to) in supported) { "Unsupported Buddy API: $line" }
+                if (module == app && to.startsWith("dev.jasper.sdk."))
+                    check(packageOf(from) == "dev.jasper.app.plugins" || packageOf(from).startsWith("dev.jasper.app.plugins.")) {
+                        "SDK types are confined to dev.jasper.app.plugins: $line"
+                    }
                 if (to.startsWith(prefix) && packageOf(from) != packageOf(to))
                     graph.getOrPut(packageOf(from)) { linkedSetOf() }.add(packageOf(to))
             }

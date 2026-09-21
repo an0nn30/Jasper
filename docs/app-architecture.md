@@ -1,8 +1,8 @@
 # Application and Buddy architecture
 
 The app is the composition root for two independent libraries. The refactor preserves
-user-visible terminal behavior and establishes clear owners for future features. It
-introduces no plugin loader, stable plugin ABI or third-party permission model.
+user-visible terminal behavior and establishes clear owners for future features.
+Plugins are hosted by `dev.jasper.app.plugins` against the separate `jasper-sdk`; see [SDK architecture](sdk-architecture.md).
 
 ```mermaid
 flowchart TD
@@ -34,9 +34,9 @@ and lazy windows. Typed workspace events and JDK callbacks report upward without
 back-references. PaletteScope has three real providers; no speculative interface or
 emulator-backend abstraction was introduced.
 
-App Java-public classes enable feature collaboration; they are not a supported external
-SDK. Later plugins may adapt these boundaries after lifecycle, versioning, permissions
-and loading policy are designed. Do not infer SDK guarantees from Java visibility.
+App Java-public classes enable feature collaboration; they are not the plugin API. The
+supported API is `jasper-sdk`, and only `dev.jasper.app.plugins` may reference it. Do not
+infer SDK guarantees from Java visibility.
 
 ## Startup, lifetime and shutdown
 
@@ -68,6 +68,11 @@ sequenceDiagram
 failures onto the original error. Pre-EDT and EDT composition use separate scopes.
 A successful resident handoff creates no window. Endpoint bind failure cannot silently
 leave a background process. Logging cleanup and final process waiting do not block Swing.
+
+Plugins start once, before the first window. Shutdown arms an exit deadline first, closes
+application-owned state, then stops plugins in reverse order; their drained background work
+joins the bounded wait. A blocked EDT callback cannot be abandoned, so the deadline, not the
+bounded wait, ends the process in that case.
 
 A pane owns its admitted session. The launch coordinator stops admission and closes
 late arrivals; it does not force-close a session before its pane has completed cleanup.
@@ -139,10 +144,11 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `launch` | Immutable launch capture and shell integration extraction; ShellLauncher starts off EDT and delivers on EDT. Receiving pane owns the session. |
 | `history` | Pure parsing/snapshots plus EDT indexes backed by workers. Application owns indexes and command-history flush at shutdown. |
 | `snippets` | Immutable snippet values, bounded persistence and EDT store over workers. Application closes the store; caller closes subscriptions. |
-| `notifications` | EDT terminal notice production, active producer identities, attention and visibility policy. Application closes notifier before companion. |
+| `notifications` | EDT terminal and activity notice production, active producer identities, attention and visibility policy. Application closes notifiers before companion. |
 | `residency` | Bounded interprocess protocol and endpoint workers. Bootstrap transfers endpoint close to application shutdown and process-hook backup. |
 | `platform` | OS adapters, icons, fonts, title-bar paint and logging. Callers own registrations and native handles; Swing operations run on EDT and logging has its own worker. |
 | `persistence` | Bounded TOML reads and atomic writes; synchronous helpers own short-lived file handles. Caller chooses thread and lifecycle. |
+| `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
 | `benchmark` | Explicit opt-in native benchmark orchestration and reports. Benchmarks own and close fixtures; never part of headless check. |
 

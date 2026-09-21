@@ -9,7 +9,39 @@ and worktree were removed. Those merge operations did not push to origin.
 The three modules are `jasper-app` (product composition), `jasper-terminal`
 (terminal library) and `jasper-buddy` (JDK-only companion library). Start at the
 [documentation index](README.md) for each module's onboarding, architecture and
-maintenance guides. No plugin SDK has been implemented.
+maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented on
+`claude/plugin-sdk-plan-1`; plans 2–4 are not.
+
+### Plugin SDK plan 1 — 2026-09-21
+
+Branch `claude/plugin-sdk-plan-1` (not merged, not pushed) implements
+[plan 1](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-1-core-runtime.md) of the
+[plugin SDK design](superpowers/specs/2026-09-21-jasper-plugin-sdk-design.md): the JDK-only
+`jasper-sdk`, `jasper-sdk-testkit` with a contract suite that both the fake and the
+application pass, the `dev.jasper.app.plugins` runtime, standalone `--safe-mode`,
+`--plugin-dir` and `--standalone` launches, an EDT-independent exit deadline, the activity
+bridge to Buddy and a bundled sample plugin. Start at [SDK architecture](sdk-architecture.md).
+
+Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist`
+passed with **1,207 tests: 1,205 passed, two expected environment skips, no failures or
+errors** (app 667, Buddy 163, terminal 355, SDK 8, testkit 11, sample plugin 3). Each new
+architecture guard was shown to fail on a deliberate violation before being restored.
+
+Deviations from the spec, all recorded in the plan: `PluginContext` carries only plan-1
+accessors; the cleanup worker and `MissingCapabilityException` wait for plan 4; the runtime
+is one package; activities reach Buddy without a threshold and do not drive its working
+animation; the per-consumer service overload is `publishPerConsumer` (two `publish` overloads
+are ambiguous for functional service interfaces). Deviations from the plan text: two tests
+were corrected (`PluginTablesTest` expects the loader's quoted diagnostic keys;
+`ConfigurationReportTest` builds `ConfigService` off the EDT, as production must), one racing
+assertion in `PluginHostTest` now waits on a latch, and `installDist` also carries bundled
+plugins in `lib/plugins`, which the plan had omitted.
+
+Open items: the sample plugin ships in the application image and should leave it when the
+Vault plugin arrives. Until plan 3's Plugins manager, a user plugin can only be consented by
+editing `plugins.toml`. Native acceptance is pending and user-run; the checklist is at the end
+of the plan. Native packaging (`packageApp`/`verifyPackage`) was changed to bundle and verify
+plugins but was not run.
 
 The approved [terminal amendment](superpowers/specs/2026-09-20-jasper-terminal-refactor-design.md)
 and [app/Buddy amendment](superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md)

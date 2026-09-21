@@ -1,8 +1,8 @@
 # Jasper documentation
 
-Use these guides for the code currently in the repository. Jasper has three Gradle
-modules; the application composes two independent libraries. Public Java visibility
-inside the app does not constitute a plugin API.
+Use these guides for the code currently in the repository. Jasper's application composes
+two independent libraries and hosts plugins written against `jasper-sdk`. Public Java
+visibility inside the app does not constitute a plugin API; the SDK does.
 
 ## Contributor routes
 
@@ -11,6 +11,7 @@ inside the app does not constitute a plugin API.
 | `jasper-terminal` | [Onboarding and embedding](../jasper-terminal/README.md) | [Owners, API and threading](terminal-architecture.md) | [Keys, protocols, options and lifecycle](terminal-maintenance.md) |
 | `jasper-app` | [Onboarding](../jasper-app/README.md) | [Composition and feature ownership](app-architecture.md) | [Commands, scopes, settings, providers and platform hooks](app-maintenance.md) |
 | `jasper-buddy` | [Embedding](../jasper-buddy/README.md) | [Facade, model and presentation](buddy-architecture.md) | [Notices, options, animation and assets](buddy-maintenance.md) |
+| `jasper-sdk` and plugins | [SDK packages](../jasper-sdk/README.md) | [Loading, threading and lifetimes](sdk-architecture.md) | [Writing and testing a plugin](plugin-authoring.md) |
 
 The [current handoff](STATUS.md) records integration and pending acceptance. The
 [documentation audit](documentation-audit.md) records source checks and corrected drift.
