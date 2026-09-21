@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–9 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–10 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -1301,7 +1301,7 @@ left/right Option-as-Meta, Unicode pairs, post-exit key handling and wheel fract
 - Bell methods: `void attach(long)`, `void detach()`, `void modeChanged()`, `void signal(long)`, `boolean visual()`; `setSound(Runnable)` for injected live test callback.
 - Timer tick/publication methods remain package-private for owner tests, never supported API.
 
-- [ ] **Step 1: Move the deterministic old-token regression to the scheduler owner.**
+- [x] **Step 1: Move the deterministic old-token regression to the scheduler owner.**
 
 Retain the real component regression
 `anOldFramePublicationCannotClaimTheReattachedViewsToken`. Replace its reflection
@@ -1345,7 +1345,7 @@ new token, and a subsequent current notification can still schedule a frame.
 It deliberately does not assert that an obsolete callback cannot set the shared
 dirty bit; the original algorithm allows that harmless bit without scheduling.
 
-- [ ] **Step 2: Move scheduling fields and bodies with one attachment authority.**
+- [x] **Step 2: Move scheduling fields and bodies with one attachment authority.**
 
 Move `FRAME_MILLIS=8`, `BLINK_MILLIS=530`, dirty/pendingFrame/renderingActive,
 attachmentGeneration, frameTimer/blinkTimer, blinkOn, `markDirty`, `publishDirty`,
@@ -1378,7 +1378,7 @@ existing token handling. Retain validation inside the queued EDT runnable.
 Use `volatile` for generation/token/active as in the existing code. Do not add a
 behavioral race fix as part of moving this already-regressed algorithm.
 
-- [ ] **Step 3: Move bell coalescing and expiry as one owner.**
+- [x] **Step 3: Move bell coalescing and expiry as one owner.**
 
 Move visualBell, pendingBell, bellTimer, bellSound and the old ring/clear methods.
 Bell stores the attachment generation passed by RenderScheduler; it does not
@@ -1426,7 +1426,7 @@ then reconcile absolute rows. The view keeps one observed row epoch and one
 `forgetAbsoluteRows` orchestration path (selection.clear, search.clear,
 viewport.follow, repaint, find-result notification).
 
-- [ ] **Step 4: Run lifecycle, bell, live-option and painting suites; document/commit.**
+- [x] **Step 4: Run lifecycle, bell, live-option and painting suites; document/commit.**
 
 `./gradlew :jasper-terminal:test --tests '*Lifecycle*' --tests '*Bell*' --tests '*LiveOptions*' --tests '*Painting*'`.
 Recheck hidden output, focused/unfocused cursor, pending-wrap cursor, exit,

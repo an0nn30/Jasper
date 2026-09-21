@@ -229,9 +229,7 @@ class TerminalBellTest {
 
     private Timer timer() {
         try {
-            var field = TerminalView.class.getDeclaredField("bellTimer");
-            field.setAccessible(true);
-            return (Timer) field.get(view);
+            return (Timer) SessionInspection.field(SessionInspection.field(view, "bells"), "bellTimer");
         } catch (ReflectiveOperationException failure) {
             throw new AssertionError(failure);
         }

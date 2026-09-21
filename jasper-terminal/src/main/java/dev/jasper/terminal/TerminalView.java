@@ -51,9 +51,6 @@ import java.util.regex.PatternSyntaxException;
  */
 public final class TerminalView extends JComponent {
     private static final System.Logger LOG = System.getLogger(TerminalView.class.getName());
-    private static final int FRAME_MILLIS = 8;
-    private static final int BLINK_MILLIS = 530;
-    private static final int BELL_MILLIS = 150;
     private static final float DEFAULT_FONT_SIZE = 14f;
     private static final float MIN_FONT_SIZE = 6f;
     private static final float MAX_FONT_SIZE = 72f;
@@ -61,6 +58,8 @@ public final class TerminalView extends JComponent {
     private final TerminalSession session;
     private final TerminalAccess access;
     private final SearchController search;
+    private final RenderScheduler rendering;
+    private final BellController bells;
     private TerminalOptions options;
     private FontSet fonts;
     private Palette palette;
@@ -69,19 +68,7 @@ public final class TerminalView extends JComponent {
     private final Viewport viewport = new Viewport();
     private Color matchColor;
     private Color currentMatchColor;
-    private final AtomicBoolean dirty = new AtomicBoolean(true);
-    private volatile AtomicBoolean pendingFrame = new AtomicBoolean();
-    private volatile boolean renderingActive;
-    private final Timer frameTimer;
-    private final Timer blinkTimer;
-    private final Timer bellTimer;
     private TerminalSessionListener listener;
-    private volatile long attachmentGeneration;
-    /** A fresh coalescing token on attachment or mode change also invalidates queued deliveries. */
-    private volatile AtomicBoolean pendingBell;
-    private boolean visualBell;
-    private Runnable bellSound = Toolkit.getDefaultToolkit()::beep;
-    private boolean blinkOn = true;
     private final SelectionController selection;
     private final KeyboardController keyboard;
     private final MouseController mouseInput;
@@ -122,18 +109,9 @@ public final class TerminalView extends JComponent {
         Color yellow = palette.ansi().get(3);
         this.matchColor = CellStyle.blend(yellow, palette.background(), 0.7f);
         this.currentMatchColor = CellStyle.blend(yellow, palette.background(), 0.35f);
-        this.frameTimer = new Timer(FRAME_MILLIS, e -> frameTimerFinished());
-        this.frameTimer.setRepeats(false);
-        this.blinkTimer = new Timer(BLINK_MILLIS, e -> {
-            reconcileBlink();
-            if (((Timer) e.getSource()).isRunning()) {
-                blinkOn = !blinkOn;
-                repaint();
-            }
-        });
-
-        this.bellTimer = new Timer(BELL_MILLIS, e -> clearVisualBell());
-        this.bellTimer.setRepeats(false);
+        this.rendering = new RenderScheduler(this::reconcileAbsoluteRows, this::repaint, search::cancelPending,
+            () -> isFocusOwner() && !exited && access.blinkingCursorInView(viewport.topRow(), this.options.cursorBlink()));
+        this.bells = new BellController(() -> this.options.bell(), this::repaint, Toolkit.getDefaultToolkit()::beep);
 
         setOpaque(true);
         setFocusable(true);
@@ -195,29 +173,25 @@ public final class TerminalView extends JComponent {
         });
         session.exitFuture().thenAccept(code -> {
             exited = true;
-            markDirty(attachmentGeneration);
+            rendering.markDirty(rendering.generation());
         });
     }
 
     @Override
     public void addNotify() {
         super.addNotify();
-        pendingBell = new AtomicBoolean();
-        listener = listenerFor(++attachmentGeneration);
+        long generation = rendering.attach();
+        bells.attach(generation);
+        listener = listenerFor(generation);
         session.addListener(listener);
         reconcileAbsoluteRows();
-        refreshRendering();
+        rendering.showing(isShowing());
     }
 
     @Override
     public void removeNotify() {
-        ++attachmentGeneration;
-        renderingActive = false;
-        pendingFrame = new AtomicBoolean();
-        pendingBell = null;
-        clearVisualBell();
-        frameTimer.stop();
-        blinkTimer.stop();
+        rendering.detach();
+        bells.detach();
         if (listener != null) {
             session.removeListener(listener);
             listener = null;
@@ -308,8 +282,7 @@ public final class TerminalView extends JComponent {
             keyboard.setEncoder(new KeyEncoder(next.optionAsMeta(), macOs));
         }
         if (options.bell() != next.bell()) {
-            pendingBell = listener == null ? null : new AtomicBoolean();
-            clearVisualBell();
+            bells.modeChanged();
         }
         options = next;
         fontSize = next.fontSize();
@@ -427,10 +400,10 @@ public final class TerminalView extends JComponent {
         boolean blinks = CursorRequest.effectiveBlink(snapshot.cursorShape(), options.cursorBlink());
         boolean focused = isFocusOwner();
         reconcileBlink();
-        boolean on = exited || !blinks || !focused || blinkOn;
+        boolean on = exited || !blinks || !focused || rendering.blinkOn();
         painter.paint((Graphics2D) g, snapshot, new TerminalPainter.CursorLook(style, on, focused),
             highlights(snapshot), getWidth(), getHeight());
-        if (visualBell) {
+        if (bells.visual()) {
             Color foreground = palette.foreground();
             g.setColor(new Color(foreground.getRed(), foreground.getGreen(), foreground.getBlue(),
                 Math.round(255 * .15f)));
@@ -459,7 +432,7 @@ public final class TerminalView extends JComponent {
         if (widthChanged) {
             forgetAbsoluteRows(); // JediTerm reflows soft-wrapped lines, moving them to other absolute rows
         }
-        markDirty(attachmentGeneration);
+        rendering.markDirty(rendering.generation());
     }
 
     /**
@@ -496,64 +469,16 @@ public final class TerminalView extends JComponent {
     }
 
     void setBellSound(Runnable sound) {
-        bellSound = Objects.requireNonNull(sound, "sound");
+        bells.setSound(sound);
     }
 
     private TerminalSessionListener listenerFor(long generation) {
         return new TerminalSessionListener() {
-            @Override
-            public void screenChanged() {
-                markDirty(generation);
-            }
-
-            @Override
-            public void scrollbackReset() {
-                SwingUtilities.invokeLater(() -> {
-                    if (generation == attachmentGeneration) reconcileAbsoluteRows();
-                });
-            }
-
-            @Override
-            public void alternateBufferChanged(boolean alternate) {
-                SwingUtilities.invokeLater(() -> {
-                    if (generation == attachmentGeneration) reconcileAbsoluteRows();
-                });
-            }
-
-            @Override
-            public void bell() {
-                AtomicBoolean pending = pendingBell;
-                if (generation != attachmentGeneration || pending == null || !pending.compareAndSet(false, true)) {
-                    return;
-                }
-                SwingUtilities.invokeLater(() -> {
-                    pending.set(false);
-                    if (generation == attachmentGeneration && pending == pendingBell) {
-                        ringBell();
-                    }
-                });
-            }
+            @Override public void screenChanged() { rendering.markDirty(generation); }
+            @Override public void scrollbackReset() { reconcileRowsLater(generation); }
+            @Override public void alternateBufferChanged(boolean alternate) { reconcileRowsLater(generation); }
+            @Override public void bell() { bells.signal(generation); }
         };
-    }
-
-    private void ringBell() {
-        switch (options.bell()) {
-            case VISUAL -> {
-                visualBell = true;
-                bellTimer.restart();
-                repaint();
-            }
-            case SOUND -> bellSound.run();
-            case NONE -> { }
-        }
-    }
-
-    private void clearVisualBell() {
-        bellTimer.stop();
-        if (visualBell) {
-            visualBell = false;
-            repaint();
-        }
     }
 
     void setLinkOpener(Consumer<String> opener) {
@@ -640,62 +565,6 @@ public final class TerminalView extends JComponent {
         repaint();
     }
 
-    private void restartBlink() {
-        blinkOn = true;
-        reconcileBlink();
-        if (blinkTimer.isRunning()) blinkTimer.restart();
-        repaint();
-    }
-
-    /** Reader-thread calls retain one dirty bit and at most one queued EDT delivery per attachment. */
-    private void markDirty(long generation) {
-        // Capture before validation: an old callback must never claim a newer attachment's token.
-        AtomicBoolean pending = pendingFrame;
-        if (generation != attachmentGeneration) return;
-        publishDirty(generation, pending);
-    }
-
-    /** An already validated reader request may resume here after its attachment has been replaced. */
-    private void publishDirty(long generation, AtomicBoolean pending) {
-        dirty.set(true);
-        if (!renderingActive || !pending.compareAndSet(false, true)) return;
-        SwingUtilities.invokeLater(() -> {
-            if (generation == attachmentGeneration && pending == pendingFrame && renderingActive) {
-                frameTimer.start();
-            }
-        });
-    }
-
-    private void frameTimerFinished() {
-        frameTimer.stop();
-        pendingFrame.set(false);
-        if (!renderingActive) return;
-        if (dirty.getAndSet(false)) {
-            reconcileAbsoluteRows();
-            reconcileBlink();
-            repaint();
-        }
-    }
-
-    /** Hidden tabs keep session/application metadata flowing, but schedule no view frames or cursor ticks. */
-    private void refreshRendering() {
-        renderingActive = listener != null && isShowing();
-        if (renderingActive) {
-            markDirty(attachmentGeneration);
-        } else {
-            search.cancelPending();
-            pendingFrame = new AtomicBoolean();
-            frameTimer.stop();
-        }
-        reconcileBlink();
-    }
-
-    private void reconcileBlink() {
-        boolean eligible = renderingActive && isFocusOwner() && !exited
-            && access.blinkingCursorInView(viewport.topRow(), options.cursorBlink());
-        if (eligible) blinkTimer.start(); else blinkTimer.stop();
-    }
-
     /** Finds matches synchronously; callers on the EDT should prefer findAsync for long histories. */
     public FindResult find(SearchQuery query) { return search.find(query); }
     /** Searches on the bounded worker and delivers only the latest result on the EDT. */
@@ -725,4 +594,13 @@ public final class TerminalView extends JComponent {
             case NEXT_PROMPT -> scrollToNextPrompt();
         }
     }
+
+    private void reconcileRowsLater(long generation) {
+        SwingUtilities.invokeLater(() -> {
+            if (generation == rendering.generation()) reconcileAbsoluteRows();
+        });
+    }
+    private void restartBlink() { rendering.restartBlink(); }
+    private void reconcileBlink() { rendering.reconcileBlink(); }
+    private void refreshRendering() { rendering.showing(isShowing()); }
 }

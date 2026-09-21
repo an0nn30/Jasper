@@ -220,9 +220,7 @@ class TerminalLiveOptionsTest {
 
     private void tickBlink() {
         try {
-            var field = TerminalView.class.getDeclaredField("blinkTimer");
-            field.setAccessible(true);
-            var timer = (javax.swing.Timer) field.get(view);
+            var timer = (javax.swing.Timer) SessionInspection.field(SessionInspection.field(view, "rendering"), "blinkTimer");
             for (var listener : timer.getActionListeners()) {
                 listener.actionPerformed(new java.awt.event.ActionEvent(timer, 0, ""));
             }

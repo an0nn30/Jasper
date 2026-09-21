@@ -136,8 +136,11 @@ class ConfiguredTerminalBehaviorTest {
     private javax.swing.Timer timer() { return (javax.swing.Timer) field("bellTimer"); }
     private Object field(String name) {
         try {
-            var field = TerminalView.class.getDeclaredField(name);
-            field.setAccessible(true); return field.get(view);
+            var ownerField = TerminalView.class.getDeclaredField("bells");
+            ownerField.setAccessible(true);
+            var owner = ownerField.get(view);
+            var field = owner.getClass().getDeclaredField(name);
+            field.setAccessible(true); return field.get(owner);
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
     private void call(String name, Class<?>[] parameters, Object... args) {

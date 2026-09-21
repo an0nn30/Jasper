@@ -177,21 +177,15 @@ class TerminalRenderingLifecycleTest {
 
     @Test void anOldFramePublicationCannotClaimTheReattachedViewsToken() throws Exception {
         onEdt(() -> tick("frameTimer"));
-        var generationField = TerminalView.class.getDeclaredField("attachmentGeneration");
-        generationField.setAccessible(true);
-        long oldGeneration = generationField.getLong(view);
-        var tokenField = TerminalView.class.getDeclaredField("pendingFrame");
-        tokenField.setAccessible(true);
-        var oldToken = (java.util.concurrent.atomic.AtomicBoolean) tokenField.get(view);
+        var rendering = (RenderScheduler) SessionInspection.field(view, "rendering");
+        long oldGeneration = rendering.generation();
+        var oldToken = rendering.pendingToken();
 
         // Resume the publication half of an already validated reader request after the new initial frame.
         // The review established the precise volatile-read interleaving; no thread suspension is needed here.
         onEdt(() -> { view.removeNotify(); view.addNotify(); });
         onEdt(() -> { tick("frameTimer"); repaints.set(0); });
-        var publish = TerminalView.class.getDeclaredMethod("publishDirty", long.class,
-            java.util.concurrent.atomic.AtomicBoolean.class);
-        publish.setAccessible(true);
-        publish.invoke(view, oldGeneration, oldToken);
+        rendering.publishDirty(oldGeneration, oldToken);
         onEdt(() -> assertThat(repaints).hasValue(0));
 
         connector.feed("current output");
@@ -239,9 +233,7 @@ class TerminalRenderingLifecycleTest {
 
     private Timer timer(String name) {
         try {
-            var field = TerminalView.class.getDeclaredField(name);
-            field.setAccessible(true);
-            return (Timer) field.get(view);
+            return (Timer) SessionInspection.field(SessionInspection.field(view, "rendering"), name);
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
