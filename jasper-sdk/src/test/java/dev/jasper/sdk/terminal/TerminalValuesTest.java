@@ -24,6 +24,7 @@ class TerminalValuesTest {
         assertThatNullPointerException().isThrownBy(() -> new PaneInfo(null, Optional.empty(), Optional.empty(), 80, 24, false,
             SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty()));
         assertThatIllegalArgumentException().isThrownBy(() -> new RemoteDirectory(" ", "/srv"));
+        assertThat(new RemoteDirectory("", "/srv").host()).as("the program named no host").isEmpty();
     }
 
     @Test void openRequestsAreLocalAndTakeAnAbsoluteDirectory() {

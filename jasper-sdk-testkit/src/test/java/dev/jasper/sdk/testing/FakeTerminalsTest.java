@@ -60,6 +60,7 @@ class FakeTerminalsTest {
             host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OBSERVE)), Set.of(), Set.of(), plugin -> {
                 plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.COMMAND_FINISHED, heard::add);
                 plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.TITLE_CHANGED, heard::add);
+                plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.CWD_CHANGED, heard::add);
                 plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.SESSION_STATE_CHANGED, heard::add);
                 plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.ACTIVE_PANE_CHANGED, heard::add);
             });
@@ -70,13 +71,15 @@ class FakeTerminalsTest {
             host.titleChanged(pane, "make test");
             host.commandFinished(pane, "make test", OptionalInt.of(2), java.time.Duration.ofSeconds(3));
             host.sessionExited(pane, OptionalInt.of(0));
+            host.remoteCwdChanged(pane, "build-host", "/srv/app");
             assertThat(heard).as("delivered by flush, like every event").isEmpty();
             host.flush();
             assertThat(heard).containsExactly(new dev.jasper.sdk.terminal.TerminalEvents.ActivePaneChanged(Optional.of(pane)),
                 new dev.jasper.sdk.terminal.TerminalEvents.TitleChanged(pane, "make test"),
                 new dev.jasper.sdk.terminal.TerminalEvents.CommandFinished(pane, "make test", OptionalInt.of(2), java.time.Duration.ofSeconds(3),
                     Optional.of(Path.of("/src")), Optional.empty()),
-                new dev.jasper.sdk.terminal.TerminalEvents.SessionStateChanged(pane, SessionState.EXITED, OptionalInt.of(0)));
+                new dev.jasper.sdk.terminal.TerminalEvents.SessionStateChanged(pane, SessionState.EXITED, OptionalInt.of(0)),
+                new dev.jasper.sdk.terminal.TerminalEvents.CwdChanged(pane, Optional.empty(), Optional.of(new dev.jasper.sdk.terminal.RemoteDirectory("build-host", "/srv/app"))));
         }
     }
 }

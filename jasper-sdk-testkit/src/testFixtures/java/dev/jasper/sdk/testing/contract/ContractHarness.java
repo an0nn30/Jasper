@@ -99,6 +99,9 @@ public interface ContractHarness extends AutoCloseable {
     /** A provided session's state: {@code CONNECTING|<status>}, {@code RUNNING|}, {@code EXITED|<how it ended>}, or {@code CLOSED|} for a pane that is gone. */
     String sessionState(java.util.UUID paneId);
 
+    /** UI thread: what the pane's shell reports as its working directory; an empty host is a local report. */
+    void reportDirectory(java.util.UUID paneId, String hostOrEmpty, String path);
+
     /** UI thread: the user pressed Cancel. A pane that never showed a session closes; otherwise it returns to the disconnected state. */
     void cancelSession(java.util.UUID paneId);
 

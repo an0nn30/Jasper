@@ -652,7 +652,9 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public void cwdChanged(UUID paneId, Path directory) {
         workspace.pane(paneId).ifPresent(pane -> {
-            pane.info = with(pane.info, pane.info.title(), Optional.ofNullable(directory), pane.info.state(), pane.info.exitStatus());
+            // A local report replaces a remote one: at most one of the two directories is present.
+            pane.info = new dev.jasper.sdk.terminal.PaneInfo(pane.info.title(), Optional.ofNullable(directory), Optional.empty(), pane.info.columns(),
+                pane.info.rows(), pane.info.shellIntegration(), pane.info.kind(), pane.info.providerPluginId(), pane.info.state(), pane.info.exitStatus());
             publishApp(TerminalEvents.CWD_CHANGED, new TerminalEvents.CwdChanged(paneId, Optional.ofNullable(directory), Optional.empty()));
         });
     }
@@ -727,4 +729,20 @@ public final class FakePluginHost implements AutoCloseable {
      * @return their ids
      */
     public List<UUID> terminalPanes() { return workspace.everyOpenPane().stream().map(pane -> pane.id).toList(); }
+
+    /**
+     * Reports a working directory that is not on this machine: the pane's local directory becomes empty.
+     *
+     * @param paneId the pane
+     * @param host the reported host; empty when the program named none
+     * @param path the reported path
+     */
+    public void remoteCwdChanged(UUID paneId, String host, String path) {
+        workspace.pane(paneId).ifPresent(pane -> {
+            var remote = Optional.of(new dev.jasper.sdk.terminal.RemoteDirectory(host, path));
+            pane.info = new dev.jasper.sdk.terminal.PaneInfo(pane.info.title(), Optional.empty(), remote, pane.info.columns(), pane.info.rows(),
+                pane.info.shellIntegration(), pane.info.kind(), pane.info.providerPluginId(), pane.info.state(), pane.info.exitStatus());
+            publishApp(TerminalEvents.CWD_CHANGED, new TerminalEvents.CwdChanged(paneId, Optional.empty(), remote));
+        });
+    }
 }

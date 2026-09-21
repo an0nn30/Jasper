@@ -44,6 +44,9 @@ class FakeContractTest extends PluginContractTest {
             @Override public void selectInPane(java.util.UUID paneId, String text) { host.setSelection(paneId, text); }
             @Override public List<String> sentToPane(java.util.UUID paneId) { return host.sent(paneId); }
             @Override public String sessionState(java.util.UUID paneId) { return host.sessionState(paneId); }
+            @Override public void reportDirectory(java.util.UUID paneId, String hostOrEmpty, String path) {
+                if (hostOrEmpty.isEmpty()) host.cwdChanged(paneId, java.nio.file.Path.of(path)); else host.remoteCwdChanged(paneId, hostOrEmpty, path);
+            }
             @Override public void cancelSession(java.util.UUID paneId) { host.cancelSession(paneId); }
             @Override public void reconnectSession(java.util.UUID paneId) { host.reconnectSession(paneId); }
             @Override public void typeIntoSession(java.util.UUID paneId, String text) { host.typeIntoSession(paneId, text); }

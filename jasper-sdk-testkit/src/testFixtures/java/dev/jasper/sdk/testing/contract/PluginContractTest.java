@@ -58,6 +58,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import dev.jasper.sdk.terminal.RemoteDirectory;
 
 import static dev.jasper.sdk.activity.ActivityEvent.State.FAILED;
 import static dev.jasper.sdk.activity.ActivityEvent.State.PROGRESS;
@@ -796,5 +797,40 @@ public abstract class PluginContractTest {
         pendings.get(0).attach(late.connection(""));
         h.flush();
         assertThat(late.closes).as("after the plugin stopped, too").hasValue(1);
+    }
+
+    @Test void aRemoteDirectoryIsNeverALocalOneInQueriesOrEvents() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "zsh", Path.of("/src"));
+        var alpha = new AtomicReference<PluginContext>();
+        List<Object> heard = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            context.events().subscribe(TerminalEvents.CWD_CHANGED, heard::add);
+            context.events().subscribe(TerminalEvents.COMMAND_FINISHED, heard::add);
+        });
+        h.flush();
+        heard.clear();
+        var remote = Optional.of(new RemoteDirectory("build-host", "/srv/app"));
+        h.reportDirectory(only, "build-host", "/srv/app");
+        h.finishCommand(only, "make", 0);
+        h.ui(() -> {
+            var info = alpha.get().terminals().pane(only).orElseThrow().info();
+            assertThat(info.workingDirectory()).as("the user ran ssh by hand; this is not a local path").isEmpty();
+            assertThat(info.remoteDirectory()).isEqualTo(remote);
+        });
+        h.reportDirectory(only, "", "/tmp");
+        h.flush();
+        h.ui(() -> {
+            var info = alpha.get().terminals().pane(only).orElseThrow().info();
+            assertThat(info.workingDirectory()).contains(Path.of("/tmp"));
+            assertThat(info.remoteDirectory()).isEmpty();
+        });
+        assertThat(heard).hasSize(3);
+        assertThat(heard.get(0)).isEqualTo(new TerminalEvents.CwdChanged(only, Optional.empty(), remote));
+        assertThat(heard.get(1)).isInstanceOfSatisfying(TerminalEvents.CommandFinished.class, finished -> {
+            assertThat(finished.workingDirectory()).isEmpty();
+            assertThat(finished.remoteDirectory()).isEqualTo(remote);
+        });
+        assertThat(heard.get(2)).isEqualTo(new TerminalEvents.CwdChanged(only, Optional.of(Path.of("/tmp")), Optional.empty()));
     }
 }
