@@ -23,11 +23,16 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import javax.swing.SwingUtilities;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /**
  * The application's single entry to plugins: discover, resolve, load and start them once at launch,
  * forward configuration and theme changes, show their activities on Buddy, and stop them at shutdown.
- * Install, enable, disable and update take effect at the next start. EDT only, except {@link #executing}.
+ * Install, enable, disable and update take effect at the next start. EDT only, except {@link #executing}
+ * and {@link #maintain}.
  */
 public final class PluginRuntime {
     /**
@@ -92,6 +97,33 @@ public final class PluginRuntime {
         public Snapshot { rows = List.copyOf(rows); }
     }
 
+    /**
+     * A plugin zip that was unpacked and validated but not installed: what the consent dialog shows.
+     *
+     * @param staged the staging directory; pass the inspection back to {@link #install} or {@link #discard}
+     * @param id the plugin id
+     * @param name its display name
+     * @param version its version
+     * @param description the descriptor's description, possibly empty
+     * @param vendor the descriptor's vendor, possibly empty
+     * @param capabilities what it declares, sorted
+     * @param update whether a plugin with this id is already installed or staged
+     */
+    public record Inspection(Path staged, String id, String name, String version, String description, String vendor,
+                             List<String> capabilities, boolean update) {
+        /** Copies the capabilities. */
+        public Inspection { capabilities = List.copyOf(capabilities); }
+    }
+
+    /**
+     * The result of a manager operation.
+     *
+     * @param ok whether it succeeded
+     * @param message why not, written for the user; empty on success
+     * @param snapshot the plugins afterwards, or null when the operation failed
+     */
+    public record Outcome(boolean ok, String message, Snapshot snapshot) { }
+
     private static final System.Logger LOG = System.getLogger(PluginRuntime.class.getName());
     private static final Duration DRAIN_GRACE = Duration.ofMillis(1500);
     private static final Duration LOCK_WAIT = Duration.ofSeconds(2);
@@ -107,6 +139,9 @@ public final class PluginRuntime {
     private volatile Map<String, Map<String, Object>> tables = Map.of();
     private volatile PluginHost host;
     private Subscription bridge;
+    private volatile PluginCatalog.Launch launch;
+    private PluginAdmin admin;
+    private ExecutorService adminWorker;
 
     /**
      * Creates an idle runtime.
@@ -200,6 +235,9 @@ public final class PluginRuntime {
                 candidate.descriptor().exports(), unit.loader(), unit::instantiate));
             statuses.add(PluginStatus.of(candidate, outcome.state(), outcome.reason()));
         }
+        launch = new PluginCatalog.Launch(candidates, statuses, PluginCatalog.versions(resolution.load()), options.safeMode());
+        admin = new PluginAdmin(options, Version.parse(JasperSdk.VERSION), () -> launch, created.containment::failures, LOCK_WAIT);
+        adminWorker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-plugin-admin").factory());
         problems.forEach(problem -> LOG.log(System.Logger.Level.WARNING, "Plugin discovery: " + problem));
         statusLines().forEach(line -> LOG.log(System.Logger.Level.INFO, "Plugin " + line));
         LOG.log(System.Logger.Level.INFO, "Plugins started in " + (System.nanoTime() - began) / 1_000_000 + " ms");
@@ -258,6 +296,7 @@ public final class PluginRuntime {
     public List<CompletableFuture<?>> stop() {
         PluginHost current = host;
         if (current == null) return List.of();
+        if (adminWorker != null) adminWorker.shutdown();
         List<CompletableFuture<?>> pending = new ArrayList<>(current.stop());
         List<PluginClassLoader> closing = List.copyOf(loaders);
         loaders.clear();
@@ -269,6 +308,108 @@ public final class PluginRuntime {
         }));
         return pending;
     }
+
+    /** Runs one manager operation on the worker and answers on the EDT. A late answer after stop is dropped by the caller's window. */
+    private void manage(Callable<Snapshot> work, Consumer<Outcome> done) {
+        Objects.requireNonNull(done, "done");
+        if (adminWorker == null || adminWorker.isShutdown()) { done.accept(new Outcome(false, "Plugins are not running", null)); return; }
+        adminWorker.execute(() -> {
+            Outcome outcome;
+            try { outcome = new Outcome(true, "", work.call()); }
+            catch (Exception failure) {
+                LOG.log(System.Logger.Level.WARNING, "A plugin manager operation failed", failure);
+                outcome = new Outcome(false, failure.getMessage() == null ? failure.toString() : failure.getMessage(), null);
+            }
+            Outcome result = outcome;
+            SwingUtilities.invokeLater(() -> done.accept(result));
+        });
+    }
+
+    /**
+     * Lists every plugin from a fresh look at the disk and the saved state.
+     *
+     * @param done receives the outcome on the EDT
+     */
+    public void snapshot(Consumer<Outcome> done) { manage(() -> admin.snapshot(), done); }
+
+    /**
+     * Enables or disables a reviewed plugin from the next launch on.
+     *
+     * @param id the plugin
+     * @param enabled the new saved state
+     * @param done receives the outcome on the EDT
+     */
+    public void setEnabled(String id, boolean enabled, Consumer<Outcome> done) { manage(() -> admin.setEnabled(id, enabled), done); }
+
+    /**
+     * Records the user's consent to exactly the capabilities they reviewed, which also enables the plugin.
+     *
+     * @param id the plugin
+     * @param reviewed the capabilities the user was shown
+     * @param done receives the outcome on the EDT
+     */
+    public void consent(String id, List<String> reviewed, Consumer<Outcome> done) {
+        List<String> shown = List.copyOf(reviewed);
+        manage(() -> admin.consent(id, shown), done);
+    }
+
+    /**
+     * Marks an installed plugin for removal at the next launch, or withdraws the mark.
+     *
+     * @param id the plugin
+     * @param remove whether to remove it
+     * @param done receives the outcome on the EDT
+     */
+    public void remove(String id, boolean remove, Consumer<Outcome> done) { manage(() -> admin.remove(id, remove), done); }
+
+    /**
+     * Unpacks and validates a plugin zip without installing it.
+     *
+     * @param zip the file the user chose
+     * @param done receives, on the EDT, the inspection or else a message for the user
+     */
+    public void inspect(Path zip, java.util.function.BiConsumer<Inspection, String> done) {
+        Objects.requireNonNull(done, "done");
+        if (adminWorker == null || adminWorker.isShutdown()) { done.accept(null, "Plugins are not running"); return; }
+        adminWorker.execute(() -> {
+            Inspection inspection = null;
+            String message = null;
+            try { inspection = admin.inspect(zip); }
+            catch (PluginInstaller.InstallFailure | RuntimeException failure) {
+                message = failure.getMessage() == null ? failure.toString() : failure.getMessage();
+            }
+            Inspection found = inspection;
+            String problem = message;
+            SwingUtilities.invokeLater(() -> done.accept(found, problem));
+        });
+    }
+
+    /**
+     * Installs an inspected plugin at the next launch and records consent to the capabilities the user was shown.
+     *
+     * @param inspection what {@link #inspect} returned
+     * @param done receives the outcome on the EDT
+     */
+    public void install(Inspection inspection, Consumer<Outcome> done) {
+        manage(() -> admin.install(inspection.staged(), inspection.capabilities()), done);
+    }
+
+    /**
+     * Forgets an inspected plugin the user declined.
+     *
+     * @param inspection what {@link #inspect} returned
+     */
+    public void discard(Inspection inspection) {
+        if (adminWorker != null && !adminWorker.isShutdown()) adminWorker.execute(() -> admin.discard(inspection.staged()));
+    }
+
+    /**
+     * Drops an install that waits for the next launch.
+     *
+     * @param id the plugin
+     * @param done receives the outcome on the EDT
+     */
+    public void discardInstall(String id, Consumer<Outcome> done) { manage(() -> admin.discardInstall(id), done); }
 
     private void forward(ActivityEvent event) {
         String detail = event.fraction().isPresent()

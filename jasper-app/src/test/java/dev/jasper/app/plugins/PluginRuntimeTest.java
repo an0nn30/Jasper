@@ -14,6 +14,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import java.time.Duration;
+import java.util.Set;
+import javax.swing.SwingUtilities;
 import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -133,5 +136,42 @@ class PluginRuntimeTest {
         assertThat(PluginRuntime.bundledDirectory(jar)).isEqualTo(root.resolve("plugins"));
         assertThat(PluginRuntime.bundledDirectory(root)).as("classes directory during development").isNull();
         assertThat(PluginRuntime.bundledDirectory(null)).isNull();
+    }
+
+    @Test void managementRunsOffTheEdtAnswersOnItAndNoticesAChange() throws Exception {
+        Path user = root.resolve("user");
+        probe(user, "dev.example.probe");
+        new PluginStateStore(root.resolve("plugins.toml"), root.resolve("plugins.lock"), Duration.ofSeconds(2))
+            .transact(PluginStateStore.consenting("dev.example.probe", Set.of()));
+        PluginRuntime runtime = runtime(null, user, null, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+
+        var first = new CompletableFuture<PluginRuntime.Outcome>();
+        var answeredOnEdt = new AtomicReference<Boolean>();
+        onEdt(() -> runtime.snapshot(outcome -> { answeredOnEdt.set(SwingUtilities.isEventDispatchThread()); first.complete(outcome); }));
+        PluginRuntime.Outcome listed = first.get(5, TimeUnit.SECONDS);
+        assertThat(answeredOnEdt.get()).isTrue();
+        assertThat(listed.ok()).isTrue();
+        assertThat(listed.snapshot().restartNeeded()).isFalse();
+        assertThat(listed.snapshot().rows()).singleElement().satisfies(row -> {
+            assertThat(row.state()).isEqualTo("ACTIVE");
+            assertThat(row.errors()).isZero();
+        });
+
+        var second = new CompletableFuture<PluginRuntime.Outcome>();
+        onEdt(() -> runtime.setEnabled("dev.example.probe", false, second::complete));
+        assertThat(second.get(5, TimeUnit.SECONDS).snapshot().restartNeeded()).isTrue();
+
+        var third = new CompletableFuture<PluginRuntime.Outcome>();
+        onEdt(() -> runtime.setEnabled("dev.example.absent", false, third::complete));
+        PluginRuntime.Outcome failed = third.get(5, TimeUnit.SECONDS);
+        assertThat(failed.ok()).isFalse();
+        assertThat(failed.message()).contains("dev.example.absent");
+        assertThat(failed.snapshot()).isNull();
+
+        var pending = new AtomicReference<List<CompletableFuture<?>>>();
+        onEdt(() -> pending.set(runtime.stop()));
+        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
     }
 }
