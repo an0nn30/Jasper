@@ -25,6 +25,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import dev.jasper.app.terminals.TerminalRegistry;
+import java.util.UUID;
 
 /** The application's runtime must pass the same contract as the testkit fake, on the real EDT. */
 class AppContractTest extends PluginContractTest {
@@ -164,6 +165,20 @@ class AppContractTest extends PluginContractTest {
                 return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
                     .map(dev.jasper.app.windows.AuxiliarySurface::requestClose).orElse(false));
             }
+            @Override public UUID addTerminalWindow() { return onEdtValue(terminalFixture::addWindow); }
+            @Override public UUID addTerminalTab(UUID windowId, String title) { return onEdtValue(() -> terminalFixture.addTab(windowId, title)); }
+            @Override public UUID addTerminalPane(UUID tabId, String title, java.nio.file.Path directory) {
+                return onEdtValue(() -> terminalFixture.addPane(tabId, title, directory));
+            }
+            @Override public void activateTerminalWindow(UUID windowId) { onEdt(() -> terminalFixture.activateWindow(windowId)); }
+            @Override public void focusTerminalPane(UUID paneId) { onEdt(() -> terminalFixture.focusPane(paneId)); }
+            @Override public void closeTerminalPane(UUID paneId) { onEdt(() -> terminalFixture.closePane(paneId)); }
+            @Override public void selectInPane(UUID paneId, String text) { onEdt(() -> terminalFixture.select(paneId, text)); }
+            @Override public List<String> sentToPane(UUID paneId) { return onEdtValue(() -> terminalFixture.sent(paneId)); }
+            @Override public List<String> openRequests() {
+                return onEdtValue(() -> terminalFixture.opened().stream().filter(line -> !line.startsWith("front|")).toList());
+            }
+            @Override public void finishCommand(UUID paneId, String command, int exitStatus) { onEdt(() -> terminalFixture.finishCommand(paneId, command, exitStatus)); }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) {
                 dark.set(variant == dev.jasper.sdk.Variant.DARK);
                 host.bus.publish(EventBus.APP, dev.jasper.sdk.events.AppEvents.THEME_CHANGED, new dev.jasper.sdk.events.AppEvents.ThemeChanged(variant));

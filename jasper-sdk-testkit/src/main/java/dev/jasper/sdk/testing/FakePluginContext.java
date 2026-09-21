@@ -92,7 +92,7 @@ public final class FakePluginContext implements PluginContext {
     }
 
     /** The scripted windows, tabs and panes. */
-    public dev.jasper.sdk.terminal.Terminals terminals() { return terminals; }
+    @Override public dev.jasper.sdk.terminal.Terminals terminals() { return terminals; }
 
     @Override public Events events() {
         return new Events() {

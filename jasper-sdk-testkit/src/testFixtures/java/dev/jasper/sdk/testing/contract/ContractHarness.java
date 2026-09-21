@@ -66,6 +66,36 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: closes the first open window with this id as the user would; false when vetoed or absent. */
     boolean requestClose(String windowId);
 
+    /** UI thread: adds a terminal window, which announces itself on the terminal topics. */
+    java.util.UUID addTerminalWindow();
+
+    /** UI thread: adds and selects a tab in an open window. */
+    java.util.UUID addTerminalTab(java.util.UUID windowId, String title);
+
+    /** UI thread: adds a running local pane, 80 by 24, with shell integration; a tab's first pane is its focused pane. */
+    java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory);
+
+    /** UI thread: the user turned to this window. */
+    void activateTerminalWindow(java.util.UUID windowId);
+
+    /** UI thread: the user focused this pane. */
+    void focusTerminalPane(java.util.UUID paneId);
+
+    /** UI thread: closes a pane; the last pane takes its tab with it, and the last tab its window. */
+    void closeTerminalPane(java.util.UUID paneId);
+
+    /** UI thread: sets the text selected in a pane. */
+    void selectInPane(java.util.UUID paneId, String text);
+
+    /** What plugins sent to a pane, in order: {@code write:<the bytes as UTF-8 text>} or {@code paste:<text>}. */
+    List<String> sentToPane(java.util.UUID paneId);
+
+    /** What plugins asked to open: {@code tab|<window id>|<directory or ->} or {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->}. */
+    List<String> openRequests();
+
+    /** UI thread: publishes that a command finished in a pane after 1.5 seconds, in the pane's directory. */
+    void finishCommand(java.util.UUID paneId, String command, int exitStatus);
+
     /** Changes the look and announces it. */
     void setVariant(Variant variant);
 

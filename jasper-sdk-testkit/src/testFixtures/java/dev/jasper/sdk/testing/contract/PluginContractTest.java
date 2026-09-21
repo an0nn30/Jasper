@@ -41,6 +41,14 @@ import javax.swing.JLabel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import dev.jasper.sdk.Capabilities;
+import dev.jasper.sdk.MissingCapabilityException;
+import dev.jasper.sdk.terminal.Direction;
+import dev.jasper.sdk.terminal.OpenRequest;
+import dev.jasper.sdk.terminal.PaneHandle;
+import dev.jasper.sdk.terminal.SessionState;
+import dev.jasper.sdk.terminal.TerminalEvents;
+import java.nio.file.Path;
 
 import static dev.jasper.sdk.activity.ActivityEvent.State.FAILED;
 import static dev.jasper.sdk.activity.ActivityEvent.State.PROGRESS;
@@ -477,5 +485,147 @@ public abstract class PluginContractTest {
         assertThat(h.windows()).containsExactly("test.alpha.other|Other|true");
         h.stopAll();
         assertThat(h.windows()).isEmpty();
+    }
+
+    private static PluginInfo info(String id, String... capabilities) { return new PluginInfo(id, id, "1.0.0", Set.of(capabilities)); }
+
+    @Test void terminalsAreFoundThroughTheContextAndHandlesAreEqualById() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build");
+        UUID left = h.addTerminalPane(tab, "make", Path.of("/src")), right = h.addTerminalPane(tab, "top", Path.of("/"));
+        h.activateTerminalWindow(window);
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            assertThat(terminals.windows()).extracting(handle -> handle.id()).containsExactly(window);
+            assertThat(terminals.activeWindow()).contains(terminals.windows().get(0));
+            var tabHandle = terminals.windows().get(0).activeTab().orElseThrow();
+            assertThat(tabHandle.title()).isEqualTo("build");
+            assertThat(tabHandle.panes()).extracting(PaneHandle::id).containsExactly(left, right);
+            PaneHandle pane = terminals.activePane().orElseThrow();
+            assertThat(pane).isEqualTo(terminals.pane(left).orElseThrow());
+            assertThat(pane.tab()).isEqualTo(tabHandle);
+            assertThat(pane.tab().window().isActive()).isTrue();
+            assertThat(pane.info().title()).isEqualTo("make");
+            assertThat(pane.info().workingDirectory()).contains(Path.of("/src"));
+            assertThat(pane.info().state()).isEqualTo(SessionState.RUNNING);
+            terminals.pane(right).orElseThrow().focus();
+            assertThat(terminals.activePane().map(PaneHandle::id)).contains(right);
+        });
+        h.closeTerminalPane(right);
+        h.ui(() -> assertThat(alpha.get().terminals().activePane().map(PaneHandle::id)).contains(left));
+    }
+
+    @Test void gatedTerminalCallsNameTheMissingCapability() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
+        var bare = new AtomicReference<PluginContext>();
+        h.start(info("test.bare"), Set.of(), Set.of(), context -> {
+            bare.set(context);
+            assertThatThrownBy(() -> context.events().subscribe(TerminalEvents.COMMAND_FINISHED, event -> { }))
+                .isInstanceOfSatisfying(MissingCapabilityException.class, failure -> {
+                    assertThat(failure.pluginId()).isEqualTo("test.bare");
+                    assertThat(failure.capability()).isEqualTo(Capabilities.TERMINAL_OBSERVE);
+                });
+        });
+        assertThat(h.active("test.bare")).isTrue();
+        h.ui(() -> {
+            PaneHandle pane = bare.get().terminals().pane(only).orElseThrow();
+            assertThat(pane.isOpen()).as("structure needs no capability").isTrue();
+            assertThatThrownBy(pane::info).isInstanceOf(MissingCapabilityException.class);
+            assertThatThrownBy(() -> pane.tab().title()).isInstanceOf(MissingCapabilityException.class);
+            assertThatThrownBy(pane::selection).isInstanceOf(MissingCapabilityException.class);
+            assertThatThrownBy(() -> pane.sendText("x")).isInstanceOf(MissingCapabilityException.class);
+            assertThatThrownBy(() -> bare.get().terminals().split(pane, Direction.RIGHT, OpenRequest.local())).isInstanceOf(MissingCapabilityException.class);
+        });
+        assertThat(h.sentToPane(only)).isEmpty();
+        assertThat(h.openRequests()).isEmpty();
+    }
+
+    @Test void injectionArrivesInOrderFromAnyThreadAndAClosedPaneIgnoresIt() throws Exception {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build");
+        UUID only = h.addTerminalPane(tab, "make", Path.of("/src")), other = h.addTerminalPane(tab, "top", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_INJECT, Capabilities.TERMINAL_SELECTION), Set.of(), Set.of(), alpha::set);
+        var pane = new AtomicReference<PaneHandle>();
+        h.ui(() -> {
+            pane.set(alpha.get().terminals().pane(only).orElseThrow());
+            pane.get().sendText("ls\n");
+            pane.get().paste("pasted");
+        });
+        Thread worker = new Thread(() -> { pane.get().sendText("one"); pane.get().sendBytes("two".getBytes(java.nio.charset.StandardCharsets.UTF_8)); });
+        worker.start();
+        worker.join();
+        h.flush();
+        assertThat(h.sentToPane(only)).containsExactly("write:ls\n", "paste:pasted", "write:one", "write:two");
+        h.selectInPane(only, "selected");
+        h.ui(() -> assertThat(pane.get().selection()).contains("selected"));
+        h.closeTerminalPane(only);
+        h.ui(() -> {
+            assertThat(pane.get().isOpen()).isFalse();
+            assertThatCode(() -> pane.get().sendText("late")).doesNotThrowAnyException();
+            assertThat(pane.get().selection()).isEmpty();
+        });
+        h.flush();
+        assertThat(h.sentToPane(other)).isEmpty();
+    }
+
+    @Test void terminalEventsNameIdsAndFollowTheActivePane() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build");
+        UUID left = h.addTerminalPane(tab, "make", Path.of("/src")), right = h.addTerminalPane(tab, "top", Path.of("/"));
+        List<Object> heard = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            context.events().subscribe(TerminalEvents.ACTIVE_PANE_CHANGED, heard::add);
+            context.events().subscribe(TerminalEvents.COMMAND_FINISHED, heard::add);
+            context.events().subscribe(TerminalEvents.PANE_CLOSED, heard::add);
+        });
+        h.flush();
+        heard.clear();
+        h.activateTerminalWindow(window);
+        h.focusTerminalPane(right);
+        h.finishCommand(left, "make test", 2);
+        h.closeTerminalPane(right);
+        h.flush();
+        assertThat(heard).hasSize(5);
+        assertThat(heard.get(0)).isEqualTo(new TerminalEvents.ActivePaneChanged(Optional.of(left)));
+        assertThat(heard.get(1)).isEqualTo(new TerminalEvents.ActivePaneChanged(Optional.of(right)));
+        assertThat(heard.get(2)).isInstanceOfSatisfying(TerminalEvents.CommandFinished.class, finished -> {
+            assertThat(finished.paneId()).isEqualTo(left);
+            assertThat(finished.command()).isEqualTo("make test");
+            assertThat(finished.exitStatus()).hasValue(2);
+            assertThat(finished.workingDirectory()).contains(Path.of("/src"));
+        });
+        assertThat(heard.subList(3, 5)).containsExactlyInAnyOrder(new TerminalEvents.PaneEvent(tab, right),
+            new TerminalEvents.ActivePaneChanged(Optional.of(left)));
+    }
+
+    @Test void openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            PaneHandle opened = terminals.openTab(terminals.window(window).orElseThrow(), OpenRequest.localIn(Path.of("/tmp"))).orElseThrow();
+            assertThat(opened.isOpen()).isTrue();
+            assertThat(opened.tab().id()).isNotEqualTo(tab);
+            PaneHandle split = terminals.split(terminals.pane(only).orElseThrow(), Direction.DOWN, OpenRequest.local()).orElseThrow();
+            assertThat(split.tab().id()).isEqualTo(tab);
+        });
+        assertThat(h.openRequests()).containsExactly("tab|" + window + "|/tmp", "split|" + only + "|DOWN|-");
+    }
+
+    @Test void actionContextsCarryHandlesOfTheInvokingPlugin() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
+        List<String> seen = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha", Capabilities.TERMINAL_INJECT), Set.of(), Set.of(), context ->
+            context.actions().register(ActionSpec.of("test.alpha.type", "Type"), invoked -> {
+                PaneHandle pane = invoked.pane().orElseThrow();
+                seen.add(invoked.window().isOpen() + " " + pane.isOpen() + " " + pane.tab().id().equals(tab));
+                pane.sendText("typed");
+                try { pane.info(); } catch (MissingCapabilityException expected) { seen.add(expected.capability()); }
+            }));
+        assertThat(h.invoke("test.alpha.type", window, only)).isTrue();
+        h.flush();
+        assertThat(seen).containsExactly("true true true", Capabilities.TERMINAL_OBSERVE);
+        assertThat(h.sentToPane(only)).containsExactly("write:typed");
     }
 }

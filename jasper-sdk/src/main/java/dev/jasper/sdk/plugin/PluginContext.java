@@ -14,6 +14,7 @@ import dev.jasper.sdk.ui.Toolbar;
 import dev.jasper.sdk.ui.Windows;
 import java.nio.file.Path;
 import java.util.concurrent.Executor;
+import dev.jasper.sdk.terminal.Terminals;
 
 /**
  * Everything the application offers one plugin. Each plugin has its own context, so every
@@ -134,4 +135,11 @@ public interface PluginContext {
      * @return the windows service
      */
     Windows windows();
+
+    /**
+     * The terminal windows, tabs and panes. Finding them needs no capability; what a handle may do does.
+     *
+     * @return the terminals service
+     */
+    Terminals terminals();
 }

@@ -42,6 +42,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.terminal.TerminalEvents;
+import dev.jasper.sdk.terminal.Terminals;
 
 /** One plugin's view of the host. Closed after a failed start and after stop: nothing can be contributed through it. */
 final class HostedContext implements PluginContext {
@@ -129,6 +130,7 @@ final class HostedContext implements PluginContext {
     @Override public Panels panels() { return ui.panels(); }
     @Override public Rail rail() { return ui.rail(); }
     @Override public Windows windows() { return ui.windows(); }
+    @Override public Terminals terminals() { return terminals; }
 
     @Override public Executor background() {
         return task -> {

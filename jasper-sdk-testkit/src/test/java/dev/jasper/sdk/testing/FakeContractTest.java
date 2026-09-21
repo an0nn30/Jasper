@@ -32,6 +32,21 @@ class FakeContractTest extends PluginContractTest {
             @Override public List<String> rail() { return host.rail(); }
             @Override public List<String> windows() { return host.windows(); }
             @Override public boolean requestClose(String windowId) { return host.requestClose(windowId); }
+            @Override public java.util.UUID addTerminalWindow() { return host.addTerminalWindow(); }
+            @Override public java.util.UUID addTerminalTab(java.util.UUID windowId, String title) { return host.addTerminalTab(windowId, title); }
+            @Override public java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory) {
+                return host.addTerminalPane(tabId, new dev.jasper.sdk.terminal.PaneInfo(title, java.util.Optional.ofNullable(directory), java.util.Optional.empty(), 80, 24,
+                    true, dev.jasper.sdk.terminal.SessionKind.LOCAL, java.util.Optional.empty(), dev.jasper.sdk.terminal.SessionState.RUNNING, java.util.OptionalInt.empty()));
+            }
+            @Override public void activateTerminalWindow(java.util.UUID windowId) { host.activateTerminalWindow(windowId); }
+            @Override public void focusTerminalPane(java.util.UUID paneId) { host.focusTerminalPane(paneId); }
+            @Override public void closeTerminalPane(java.util.UUID paneId) { host.closeTerminalPane(paneId); }
+            @Override public void selectInPane(java.util.UUID paneId, String text) { host.setSelection(paneId, text); }
+            @Override public List<String> sentToPane(java.util.UUID paneId) { return host.sent(paneId); }
+            @Override public List<String> openRequests() { return host.openRequests().stream().filter(line -> !line.startsWith("front|")).toList(); }
+            @Override public void finishCommand(java.util.UUID paneId, String command, int exitStatus) {
+                host.commandFinished(paneId, command, java.util.OptionalInt.of(exitStatus), java.time.Duration.ofMillis(1500));
+            }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) { host.setVariant(variant); }
             @Override public void stopAll() { host.stopAll(); }
             @Override public void close() { host.close(); }
