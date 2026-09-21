@@ -1,6 +1,6 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.Palette;
+import dev.jasper.terminal.config.Palette;
 
 /** The two modern variants: each pairs a FlatLaf chrome with its terminal palette. */
 enum BuiltinTheme {

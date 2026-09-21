@@ -1,6 +1,6 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.FontSet;
+import dev.jasper.terminal.rendering.FontSet;
 import java.awt.Dimension;
 import java.awt.Rectangle;
 

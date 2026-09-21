@@ -1,7 +1,11 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.TerminalSession;
-import dev.jasper.terminal.TerminalView;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.search.SearchQuery;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+
+import dev.jasper.terminal.session.TerminalSession;
+import dev.jasper.terminal.view.TerminalView;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -55,8 +59,8 @@ class ShellExitBehaviorTest {
             assertThat(empty).hasValue(closes ? 1 : 0);
             if (!closes) {
                 assertThat(pane.running()).isFalse();
-                assertThat(view.find("READY", false, true).count()).isEqualTo(1);
-                assertThat(view.find("[process exited with code " + code + "]", false, true).count()).isEqualTo(1);
+                assertThat(view.find(new SearchQuery("READY", false, true)).count()).isEqualTo(1);
+                assertThat(view.find(new SearchQuery("[process exited with code " + code + "]", false, true)).count()).isEqualTo(1);
             }
             pane.onClose.run(); // A repeated close request cannot empty the owner twice.
         });
@@ -112,7 +116,7 @@ class ShellExitBehaviorTest {
         until(() -> owner.tabStrip().getTabCount() == 1);
         edt(() -> {
             assertThat(owner.currentPane()).isSameAs(retained);
-            assertThat(retainedView.find("[process exited with code 0]", false, true).count()).isEqualTo(1);
+            assertThat(retainedView.find(new SearchQuery("[process exited with code 0]", false, true)).count()).isEqualTo(1);
             assertThat(empty).hasValue(0);
         });
     }
@@ -217,9 +221,8 @@ class ShellExitBehaviorTest {
             ShellLauncher launcher = new ShellLauncher(pending::add, path -> {
                 if (launchFailure) throw new IllegalStateException("controlled launch failure");
                 try {
-                    var session = TerminalSession.start(List.of("/bin/sh", "-c", earlyExit
-                        ? "printf 'READY\\n'; exit 0" : "stty -echo; printf 'READY\\n'; read code; exit \"$code\""),
-                        System.getenv(), path, 80, 24, 100);
+                    var session = TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/sh", "-c", earlyExit
+                        ? "printf 'READY\\n'; exit 0" : "stty -echo; printf 'READY\\n'; read code; exit \"$code\"")).environment(System.getenv()).workingDirectory(path).grid(new GridSize(80, 24)).scrollback(100).build());
                     sessions.add(session);
                     if (earlyExit) assertThat(session.exitFuture().get(5, TimeUnit.SECONDS)).isZero();
                     return session;

@@ -2,7 +2,7 @@ package dev.jasper.app;
 
 import java.awt.Color;
 import java.util.*;
-import dev.jasper.terminal.TerminalSession;
+import dev.jasper.terminal.session.TerminalSession;
 import java.util.ArrayDeque;
 import javax.swing.*;
 import org.junit.jupiter.api.AfterEach;

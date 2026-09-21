@@ -1,6 +1,10 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.TerminalSession;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.rendering.FontSet;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+
+import dev.jasper.terminal.session.TerminalSession;
 import java.awt.AWTEvent;
 import java.awt.Component;
 import java.awt.Desktop;
@@ -210,7 +214,7 @@ final class JasperApplication {
         ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
         FontConfig font = snapshot.font();
         try {
-            new dev.jasper.terminal.FontSet(font.family(), font.size(), font.fallback(),
+            new dev.jasper.terminal.rendering.FontSet(font.family(), font.size(), font.fallback(),
                 font.ligatures(), font.lineHeight());
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "Font warm-up failed; the first window will pay for it", failure);
@@ -232,8 +236,7 @@ final class JasperApplication {
 
     private static TerminalSession startSession(Path directory, LaunchSettings settings) {
         try {
-            return TerminalSession.start(settings.command(), settings.environment(), directory,
-                settings.columns(), settings.lines(), settings.scrollback());
+            return TerminalSession.start(SessionLaunchOptions.builder().command(settings.command()).environment(settings.environment()).workingDirectory(directory).grid(new GridSize(settings.columns(), settings.lines())).scrollback(settings.scrollback()).build());
         } catch (IOException failure) {
             LOG.log(System.Logger.Level.ERROR, "Shell launch failed", failure);
             throw new UncheckedIOException(failure);

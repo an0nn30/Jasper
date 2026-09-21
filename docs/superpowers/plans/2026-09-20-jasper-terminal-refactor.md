@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Execution status:** Tasks 1–11 complete on `codex/terminal-refactor-native`; Task 12 in progress. Native execution and one final independent review were selected by the user. Recorded deviations and measurement evidence are in [STATUS](../../STATUS.md) and [verification](../../terminal-refactor-verification.md). Task 11 migrates the actual WindowContent action catalog and uses Java 25 multi-release jdeps with batched javap.
+
 **Goal:** Make the terminal library independently understandable and maintainable through cohesive packages, explicit ownership, fluent immutable options, reusable actions, and tested developer documentation.
 
 **Architecture:** Preserve JediTerm and the existing algorithms while extracting concrete session and view collaborators. Introduce a deliberate supported API and an explicitly internal session/view bridge; no plugin loader or emulator abstraction. Complete one runnable refactor deliverable through independently reviewed checkpoints.

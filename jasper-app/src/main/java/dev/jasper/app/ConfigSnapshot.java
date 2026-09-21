@@ -1,7 +1,7 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.Palette;
-import dev.jasper.terminal.TerminalOptions;
+import dev.jasper.terminal.config.Palette;
+import dev.jasper.terminal.config.TerminalOptions;
 
 import java.util.List;
 import java.util.Map;

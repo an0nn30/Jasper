@@ -1,6 +1,8 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.TerminalView;
+import dev.jasper.terminal.view.TerminalAction;
+
+import dev.jasper.terminal.view.TerminalView;
 import java.awt.*;
 import java.awt.event.*;
 import java.nio.file.Path;
@@ -494,11 +496,11 @@ final class WindowContent extends JPanel implements AutoCloseable {
             case FIND -> pane.findBar().open();
             case FIND_NEXT -> pane.findBar().next();
             case FIND_PREVIOUS -> pane.findBar().previous();
-            case PREVIOUS_PROMPT -> view.scrollToPreviousPrompt();
-            case NEXT_PROMPT -> view.scrollToNextPrompt();
-            case COPY -> view.copySelection();
-            case PASTE -> view.pasteClipboard();
-            case CLEAR_SCROLLBACK -> view.clearScrollback();
+            case PREVIOUS_PROMPT -> view.execute(TerminalAction.PREVIOUS_PROMPT);
+            case NEXT_PROMPT -> view.execute(TerminalAction.NEXT_PROMPT);
+            case COPY -> view.execute(TerminalAction.COPY_SELECTION);
+            case PASTE -> view.execute(TerminalAction.PASTE_CLIPBOARD);
+            case CLEAR_SCROLLBACK -> view.execute(TerminalAction.CLEAR_SCROLLBACK);
             case FONT_BIGGER -> view.setFontSize(view.fontSize() + 1);
             case FONT_SMALLER -> view.setFontSize(view.fontSize() - 1);
             case FONT_RESET -> view.setFontSize(configuredFontSize);

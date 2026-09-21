@@ -1,7 +1,12 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.TerminalSession;
-import dev.jasper.terminal.TerminalSessionListener;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.config.TerminalOptions;
+import dev.jasper.terminal.search.SearchQuery;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+
+import dev.jasper.terminal.session.TerminalSession;
+import dev.jasper.terminal.session.TerminalSessionListener;
 import javax.swing.*;
 import java.awt.Dimension;
 import java.awt.GraphicsEnvironment;
@@ -175,7 +180,7 @@ final class BenchmarkRun implements AutoCloseable {
         env.put("arch", System.getProperty("os.arch")); env.put("pid", ProcessHandle.current().pid());
         env.put("heapAndGcSource", "JDK management beans; cumulative GC milliseconds / allocation bytes; no forced GC");
         env.put("residentSource", BenchmarkMetrics.residentSource()); env.put("forcedGc", false);
-        env.put("fontFamily", dev.jasper.terminal.TerminalOptions.defaults().fontFamily()); env.put("fontSize", 16);
+        env.put("fontFamily", dev.jasper.terminal.config.TerminalOptions.defaults().fontFamily()); env.put("fontSize", 16);
         env.put("layout", "single visible tab; alternating right/down splits of focused pane; window 1100x850 logical pixels");
         return env;
     }
@@ -242,8 +247,7 @@ final class BenchmarkRun implements AutoCloseable {
         try {
             if (closing.get()) throw new IllegalStateException("Benchmark closing");
             child = new Child(Files.createTempDirectory(directory, "child-")); children.add(child);
-            TerminalSession session = TerminalSession.start(BenchmarkFixture.command(data, child.control, options.timeoutSeconds()),
-                BenchmarkFixture.environment(), directory, 120, 36, scrollback);
+            TerminalSession session = TerminalSession.start(SessionLaunchOptions.builder().command(BenchmarkFixture.command(data, child.control, options.timeoutSeconds())).environment(BenchmarkFixture.environment()).workingDirectory(directory).grid(new GridSize(120, 36)).scrollback(scrollback).build());
             Child captured = child;
             session.addListener(new TerminalSessionListener() {
                 @Override public void titleChanged(String title) {
@@ -266,7 +270,7 @@ final class BenchmarkRun implements AutoCloseable {
             AtomicInteger completed = new AtomicInteger();
             int count = edt(() -> {
                 var panes = window.content().currentTab().panes();
-                for (TerminalPane pane : panes) pane.view().findAsync("jasper", false, true, ignored -> completed.incrementAndGet());
+                for (TerminalPane pane : panes) pane.view().findAsync(new SearchQuery("jasper", false, true), ignored -> completed.incrementAndGet());
                 return panes.size();
             });
             await(() -> completed.get() == count, "search callbacks");

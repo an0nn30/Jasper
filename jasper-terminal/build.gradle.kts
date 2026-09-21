@@ -13,7 +13,7 @@ dependencies {
 tasks.register<JavaExec>("refactorMeasurement") {
     dependsOn(tasks.testClasses)
     classpath = sourceSets.test.get().runtimeClasspath
-    mainClass.set("dev.jasper.terminal.TerminalRefactorMeasurement")
+    mainClass.set("dev.jasper.terminal.view.TerminalRefactorMeasurement")
     javaLauncher.set(javaToolchains.launcherFor {
         languageVersion.set(JavaLanguageVersion.of(25))
         vendor.set(JvmVendorSpec.JETBRAINS)

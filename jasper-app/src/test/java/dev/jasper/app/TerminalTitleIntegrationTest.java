@@ -1,7 +1,10 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.TerminalSession;
-import dev.jasper.terminal.TerminalSessionListener;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+
+import dev.jasper.terminal.session.TerminalSession;
+import dev.jasper.terminal.session.TerminalSessionListener;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -41,7 +44,7 @@ class TerminalTitleIntegrationTest {
     private Fixture open(List<String> program, String label) throws Exception {
         Queue<Runnable> pending = new ArrayDeque<>();
         ShellLauncher launcher = new ShellLauncher(pending::add, path -> {
-            try { return TerminalSession.start(program, System.getenv(), path, 80, 24, 100); }
+            try { return TerminalSession.start(SessionLaunchOptions.builder().command(program).environment(System.getenv()).workingDirectory(path).grid(new GridSize(80, 24)).scrollback(100).build()); }
             catch (Exception failure) { throw new RuntimeException(failure); }
         }, label);
         Fixture[] fixture = new Fixture[1];

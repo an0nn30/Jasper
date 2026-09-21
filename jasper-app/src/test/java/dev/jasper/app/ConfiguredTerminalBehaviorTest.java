@@ -1,8 +1,13 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.TerminalSession;
-import dev.jasper.terminal.TerminalSessionListener;
-import dev.jasper.terminal.TerminalView;
+import dev.jasper.terminal.config.BellMode;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.search.SearchQuery;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+
+import dev.jasper.terminal.session.TerminalSession;
+import dev.jasper.terminal.session.TerminalSessionListener;
+import dev.jasper.terminal.view.TerminalView;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -36,7 +41,7 @@ class ConfiguredTerminalBehaviorTest {
             controller = new ConfigurationController(themes, service);
             var launcher = new ShellLauncher(pending::add, path -> {
                 try {
-                    return TerminalSession.start(List.of("/bin/sh", "-c", """
+                    return TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/sh", "-c", """
                         stty -echo
                         printf 'READY\n'
                         while IFS= read -r command; do
@@ -46,7 +51,7 @@ class ConfiguredTerminalBehaviorTest {
                                 *) : ;;
                             esac
                         done
-                        """), System.getenv(), path, 80, 24, 100);
+                        """)).environment(System.getenv()).workingDirectory(path).grid(new GridSize(80, 24)).scrollback(100).build());
                 } catch (Exception failure) { throw new CompletionException(failure); }
             }, "controlled-sh");
             owner = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {}, themes);
@@ -68,7 +73,7 @@ class ConfiguredTerminalBehaviorTest {
             host.add(root);
             host.addNotify();
         });
-        until(() -> view.find("READY", false, true).count() == 1);
+        until(() -> view.find(new SearchQuery("READY", false, true)).count() == 1);
     }
 
     @AfterEach void close() throws Exception {
@@ -110,7 +115,7 @@ class ConfiguredTerminalBehaviorTest {
             assertThat(sounds).hasValue(1);
         });
         reload("[terminal]\nbell='sound'\n");
-        edt(() -> assertThat(view.options().bell()).isEqualTo(dev.jasper.terminal.BellMode.VISUAL));
+        edt(() -> assertThat(view.options().bell()).isEqualTo(dev.jasper.terminal.config.BellMode.VISUAL));
     }
 
     private void reload(String text) throws Exception {

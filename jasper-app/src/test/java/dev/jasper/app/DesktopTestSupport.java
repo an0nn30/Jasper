@@ -1,6 +1,9 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.TerminalSession;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+
+import dev.jasper.terminal.session.TerminalSession;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
@@ -12,8 +15,7 @@ final class DesktopTestSupport {
     static final Path HOME = Path.of(System.getProperty("user.home"));
     static TerminalSession shell(Path directory) {
         try {
-            return TerminalSession.start(List.of("/bin/sh", "-c", "printf 'alpha alpha\\n'; read answer"),
-                System.getenv(), directory, 80, 24, 100);
+            return TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/sh", "-c", "printf 'alpha alpha\\n'; read answer")).environment(System.getenv()).workingDirectory(directory).grid(new GridSize(80, 24)).scrollback(100).build());
         } catch (Exception e) { throw new CompletionException(e); }
     }
     static void edt(Runnable task) throws Exception { SwingUtilities.invokeAndWait(task); }

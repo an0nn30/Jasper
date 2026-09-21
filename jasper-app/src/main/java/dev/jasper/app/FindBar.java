@@ -1,7 +1,9 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.FindResult;
-import dev.jasper.terminal.TerminalView;
+import dev.jasper.terminal.search.SearchQuery;
+
+import dev.jasper.terminal.search.FindResult;
+import dev.jasper.terminal.view.TerminalView;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.HierarchyEvent;
@@ -108,7 +110,7 @@ final class FindBar extends JPanel {
         if (disposed || !isShowing()) return;
         searching = true; dirty = false;
         long request = generation;
-        view.findAsync(query.getText(), regex.isSelected(), caseSensitive.isSelected(), found -> {
+        view.findAsync(new SearchQuery(query.getText(), regex.isSelected(), caseSensitive.isSelected()), found -> {
             if (disposed || !isShowing() || request != generation) return;
             searching = false;
             FindResult navigated = found;

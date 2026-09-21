@@ -1,5 +1,9 @@
 package dev.jasper.app;
 
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+import dev.jasper.terminal.session.TerminalSession;
+
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.nio.file.Path;
@@ -102,10 +106,9 @@ class ShellHistoryIntegrationTest {
         environment.put("JASPER_GO", go.toString());
         var launcher = new ShellLauncher(pending::add, path -> {
             try {
-                return dev.jasper.terminal.TerminalSession.start(List.of("/bin/sh", "-c",
+                return dev.jasper.terminal.session.TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/sh", "-c",
                     "while [ ! -e \"$JASPER_GO\" ]; do sleep 0.05; done; "
-                        + "printf '\\033]133;A\\007$ \\033]133;B\\007ls -la\\n\\033]133;C\\007out\\n\\033]133;D;3\\007'"),
-                    environment, directory, 80, 24, 100);
+                        + "printf '\\033]133;A\\007$ \\033]133;B\\007ls -la\\n\\033]133;C\\007out\\n\\033]133;D;3\\007'")).environment(environment).workingDirectory(directory).grid(new GridSize(80, 24)).scrollback(100).build());
             } catch (java.io.IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
         }, "sh");
         var index = new ShellHistoryIndex(List.of());

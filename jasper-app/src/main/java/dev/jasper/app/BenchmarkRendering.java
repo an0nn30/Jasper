@@ -1,6 +1,6 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.TerminalView;
+import dev.jasper.terminal.view.TerminalView;
 import javax.swing.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;

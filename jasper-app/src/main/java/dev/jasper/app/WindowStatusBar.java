@@ -1,7 +1,7 @@
 package dev.jasper.app;
 
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.terminal.Palette;
+import dev.jasper.terminal.config.Palette;
 import java.awt.*;
 import javax.swing.*;
 

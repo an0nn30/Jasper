@@ -1,9 +1,9 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.BellMode;
-import dev.jasper.terminal.CursorStyle;
-import dev.jasper.terminal.OptionAsMeta;
-import dev.jasper.terminal.Palette;
+import dev.jasper.terminal.config.BellMode;
+import dev.jasper.terminal.config.CursorStyle;
+import dev.jasper.terminal.config.OptionAsMeta;
+import dev.jasper.terminal.config.Palette;
 import org.junit.jupiter.api.Test;
 import org.tomlj.Toml;
 

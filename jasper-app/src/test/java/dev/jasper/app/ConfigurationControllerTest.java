@@ -1,5 +1,11 @@
 package dev.jasper.app;
 
+import dev.jasper.terminal.config.BellMode;
+import dev.jasper.terminal.config.CursorStyle;
+import dev.jasper.terminal.config.OptionAsMeta;
+import dev.jasper.terminal.rendering.FontSet;
+import dev.jasper.terminal.view.TerminalView;
+
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -278,12 +284,12 @@ class ConfigurationControllerTest {
                 assertThat(options.fallbackFonts()).containsExactly("Dialog");
                 assertThat(options.ligatures()).isFalse();
                 assertThat(options.lineHeight()).isEqualTo(1.5f);
-                assertThat(options.optionAsMeta()).isEqualTo(dev.jasper.terminal.OptionAsMeta.NONE);
-                assertThat(options.cursorStyle()).isEqualTo(dev.jasper.terminal.CursorStyle.BEAM);
+                assertThat(options.optionAsMeta()).isEqualTo(dev.jasper.terminal.config.OptionAsMeta.NONE);
+                assertThat(options.cursorStyle()).isEqualTo(dev.jasper.terminal.config.CursorStyle.BEAM);
                 assertThat(options.cursorBlink()).isFalse();
                 assertThat(options.copyOnSelect()).isTrue();
-                assertThat(options.bell()).isEqualTo(dev.jasper.terminal.BellMode.NONE);
-                var fonts = new dev.jasper.terminal.FontSet("Monospaced", 18, List.of("Dialog"), false, 1.5f);
+                assertThat(options.bell()).isEqualTo(dev.jasper.terminal.config.BellMode.NONE);
+                var fonts = new dev.jasper.terminal.rendering.FontSet("Monospaced", 18, List.of("Dialog"), false, 1.5f);
                 assertThat(pane.view().getMinimumSize()).isEqualTo(
                     new java.awt.Dimension(5 * fonts.cellWidth(), 2 * fonts.cellHeight()));
             }
@@ -541,7 +547,7 @@ class ConfigurationControllerTest {
             """.formatted(size);
     }
 
-    private static void selectWord(dev.jasper.terminal.TerminalView view) {
+    private static void selectWord(dev.jasper.terminal.view.TerminalView view) {
         for (int id : new int[] {java.awt.event.MouseEvent.MOUSE_PRESSED, java.awt.event.MouseEvent.MOUSE_RELEASED}) {
             var event = new java.awt.event.MouseEvent(view, id, 0, 0, 1, 1, 1, 1, 2, false, java.awt.event.MouseEvent.BUTTON1);
             call(view, "handleMouse", new Class<?>[] {java.awt.event.MouseEvent.class}, event);
@@ -562,9 +568,9 @@ class ConfigurationControllerTest {
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
-    private static void terminalKey(dev.jasper.terminal.TerminalView view, java.awt.event.KeyEvent event) {
+    private static void terminalKey(dev.jasper.terminal.view.TerminalView view, java.awt.event.KeyEvent event) {
         try {
-            var method = dev.jasper.terminal.TerminalView.class.getDeclaredMethod("handleKey", java.awt.event.KeyEvent.class);
+            var method = dev.jasper.terminal.view.TerminalView.class.getDeclaredMethod("handleKey", java.awt.event.KeyEvent.class);
             method.setAccessible(true); method.invoke(view, event);
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
@@ -593,5 +599,4 @@ class ConfigurationControllerTest {
                 .isEqualTo(KeyStroke.getKeyStroke("ctrl shift T"));
         });
     }
-
 }

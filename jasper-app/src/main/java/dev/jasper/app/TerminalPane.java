@@ -1,6 +1,11 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.*;
+import dev.jasper.terminal.config.Palette;
+import dev.jasper.terminal.config.TerminalOptions;
+import dev.jasper.terminal.session.TerminalSession;
+import dev.jasper.terminal.session.TerminalSessionListener;
+import dev.jasper.terminal.view.TerminalView;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.nio.file.Path;
@@ -192,10 +197,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
     }
 
     private static TerminalOptions applicationOptions() {
-        TerminalOptions defaults = TerminalOptions.defaults();
-        return new TerminalOptions(defaults.fontFamily(), DEFAULT_FONT_SIZE, defaults.fallbackFonts(), defaults.ligatures(),
-            defaults.palette(), defaults.cursorStyle(), defaults.cursorBlink(), defaults.optionAsMeta(),
-            defaults.scrollback(), defaults.copyOnSelect());
+        return TerminalOptions.defaults().toBuilder().fontSize(DEFAULT_FONT_SIZE).build();
     }
 
     private void trackFocus(Component component) {
@@ -247,7 +249,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
         setActive(active);
     }
 
-    void applyTheme(dev.jasper.terminal.Palette palette) {
+    void applyTheme(dev.jasper.terminal.config.Palette palette) {
         setBackground(palette.background());
         if (view != null) view.setPalette(palette);
         setActive(active);

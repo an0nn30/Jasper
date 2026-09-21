@@ -1,6 +1,5 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.Palette;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

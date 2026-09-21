@@ -1,7 +1,10 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.TerminalSession;
-import dev.jasper.terminal.TerminalSessionListener;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+
+import dev.jasper.terminal.session.TerminalSession;
+import dev.jasper.terminal.session.TerminalSessionListener;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,8 +43,7 @@ class ShellIntegrationEndToEndTest {
         var commands = new CopyOnWriteArrayList<String>();
         var statuses = new CopyOnWriteArrayList<OptionalInt>();
         LaunchSettings settings = LaunchSettings.resolve(snapshotFor(zsh), "Mac OS X", inherited(), 80, 24, scripts);
-        try (TerminalSession session = TerminalSession.start(settings.command(), settings.environment(),
-                home, 80, 24, 1000)) {
+        try (TerminalSession session = TerminalSession.start(SessionLaunchOptions.builder().command(settings.command()).environment(settings.environment()).workingDirectory(home).grid(new GridSize(80, 24)).scrollback(1000).build())) {
             session.addListener(new TerminalSessionListener() {
                 @Override public void commandExecuted(String command, OptionalInt status,
                         Optional<Path> directory, java.time.Duration duration) {

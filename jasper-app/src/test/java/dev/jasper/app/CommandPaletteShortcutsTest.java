@@ -1,5 +1,9 @@
 package dev.jasper.app;
 
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+import dev.jasper.terminal.session.TerminalSession;
+
 import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
@@ -228,9 +232,8 @@ class CommandPaletteShortcutsTest {
                 edt(() -> {
                     var launcher = new ShellLauncher(pending::add, path -> {
                         try {
-                            return dev.jasper.terminal.TerminalSession.start(java.util.List.of("/bin/sh", "-c",
-                                "stty -echo -icanon min 1 time 0; : > \"$JASPER_READY\"; dd bs=1 count=1 of=\"$JASPER_RECEIVED\" 2>/dev/null"),
-                                environment, directory, 80, 24, 100);
+                            return dev.jasper.terminal.session.TerminalSession.start(SessionLaunchOptions.builder().command(java.util.List.of("/bin/sh", "-c",
+                                "stty -echo -icanon min 1 time 0; : > \"$JASPER_READY\"; dd bs=1 count=1 of=\"$JASPER_RECEIVED\" 2>/dev/null")).environment(environment).workingDirectory(directory).grid(new GridSize(80, 24)).scrollback(100).build());
                         } catch (java.io.IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
                     }, "controlled input fixture");
                     owner[0] = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {},
@@ -243,7 +246,7 @@ class CommandPaletteShortcutsTest {
                     var content = owner[0]; var view = content.currentPane().view();
                     var router = PaletteKeyRouterTest.router(content, mac, SwingUtilities.getRootPane(content));
                     java.util.function.Consumer<KeyEvent> send = event -> {
-                        if (!router.dispatch(event)) dev.jasper.terminal.TerminalKeyTestSupport.handleKey(view, event);
+                        if (!router.dispatch(event)) dev.jasper.terminal.view.TerminalKeyTestSupport.handleKey(view, event);
                     };
                     var calls = new java.util.concurrent.atomic.AtomicInteger();
                     content.commands().register(PaletteKeyRouterTest.command("byte.fixture", calls::incrementAndGet));

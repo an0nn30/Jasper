@@ -1,6 +1,6 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.Palette;
+import dev.jasper.terminal.config.Palette;
 
 import java.util.Objects;
 

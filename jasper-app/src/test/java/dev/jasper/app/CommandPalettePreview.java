@@ -1,8 +1,7 @@
 package dev.jasper.app;
 
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.terminal.TerminalSession;
-import java.awt.Component;
+import dev.jasper.terminal.session.TerminalSession;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ComponentEvent;

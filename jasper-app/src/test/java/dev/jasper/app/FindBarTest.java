@@ -1,6 +1,11 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.*;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.config.TerminalOptions;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+import dev.jasper.terminal.session.TerminalSession;
+import dev.jasper.terminal.view.TerminalView;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -45,9 +50,8 @@ class FindBarTest {
     }
 
     private void navigationDuringSearch(String key, int presses, int expected) throws Exception {
-        try (TerminalSession session = TerminalSession.start(java.util.List.of("/bin/sh", "-c",
-            "printf 'alpha alpha alpha\\n\\033]2;ready\\007'; read answer"),
-            System.getenv(), HOME, 80, 24, 100)) {
+        try (TerminalSession session = TerminalSession.start(SessionLaunchOptions.builder().command(java.util.List.of("/bin/sh", "-c",
+            "printf 'alpha alpha alpha\\n\\033]2;ready\\007'; read answer")).environment(System.getenv()).workingDirectory(HOME).grid(new GridSize(80, 24)).scrollback(100).build())) {
             until(() -> session.title().equals("ready"));
             FindBar[] bar = new FindBar[1];
             try {
@@ -103,9 +107,8 @@ class FindBarTest {
     }
 
     private void navigationAcrossReparent(boolean navigateAfterAttach, int expected) throws Exception {
-        try (TerminalSession session = TerminalSession.start(java.util.List.of("/bin/sh", "-c",
-            "printf 'alpha alpha\\n\\033]2;ready\\007'; read answer"),
-            System.getenv(), HOME, 80, 24, 100)) {
+        try (TerminalSession session = TerminalSession.start(SessionLaunchOptions.builder().command(java.util.List.of("/bin/sh", "-c",
+            "printf 'alpha alpha\\n\\033]2;ready\\007'; read answer")).environment(System.getenv()).workingDirectory(HOME).grid(new GridSize(80, 24)).scrollback(100).build())) {
             until(() -> session.title().equals("ready"));
             FindBar[] bar = new FindBar[1];
             TerminalView[] view = new TerminalView[1];

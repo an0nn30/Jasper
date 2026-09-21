@@ -1,6 +1,9 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.TerminalSession;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+
+import dev.jasper.terminal.session.TerminalSession;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.nio.file.*;
@@ -52,8 +55,7 @@ public final class MockUiPreview {
                                 .append("\\033[35m>\\033[0m ");
                             script = script.replace("; read answer", "; printf '" + sample + "'; read answer");
                         }
-                        TerminalSession session = TerminalSession.start(List.of("/bin/sh", "-c", script),
-                            System.getenv(), HOME, 80, 24, 100);
+                        TerminalSession session = TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/sh", "-c", script)).environment(System.getenv()).workingDirectory(HOME).grid(new GridSize(80, 24)).scrollback(100).build());
                         sessions.add(session); return session;
                     } catch (Exception failure) { throw new CompletionException(failure); }
                 }, "bash");

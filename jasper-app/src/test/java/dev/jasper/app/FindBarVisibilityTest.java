@@ -1,9 +1,12 @@
 package dev.jasper.app;
 
-import dev.jasper.terminal.FindResult;
-import dev.jasper.terminal.TerminalOptions;
-import dev.jasper.terminal.TerminalSession;
-import dev.jasper.terminal.TerminalView;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+
+import dev.jasper.terminal.search.FindResult;
+import dev.jasper.terminal.config.TerminalOptions;
+import dev.jasper.terminal.session.TerminalSession;
+import dev.jasper.terminal.view.TerminalView;
 import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.util.List;
@@ -29,9 +32,8 @@ class FindBarVisibilityTest {
     private JTabbedPane tabs;
 
     @BeforeEach void setUp() throws Exception {
-        session = TerminalSession.start(List.of("/bin/sh", "-c",
-            "printf 'alpha alpha alpha\\n\\033]2;ready\\007'; read answer"),
-            System.getenv(), HOME, 80, 24, 100);
+        session = TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/sh", "-c",
+            "printf 'alpha alpha alpha\\n\\033]2;ready\\007'; read answer")).environment(System.getenv()).workingDirectory(HOME).grid(new GridSize(80, 24)).scrollback(100).build());
         until(() -> session.title().equals("ready"));
         edt(() -> {
             view = new TerminalView(session, TerminalOptions.defaults());

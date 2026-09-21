@@ -1,11 +1,14 @@
 package dev.jasper.app;
 
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.session.SessionLaunchOptions;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import dev.jasper.terminal.TerminalSession;
+import dev.jasper.terminal.session.TerminalSession;
 import static org.assertj.core.api.Assertions.*;
 import static dev.jasper.app.DesktopTestSupport.*;
 
@@ -94,9 +97,8 @@ class TerminalTabTest {
         Queue<Runnable> pending = new ArrayDeque<>();
         ShellLauncher launcher = new ShellLauncher(pending::add, path -> {
             try {
-                return TerminalSession.start(List.of("/bin/bash", "--noprofile", "--norc", "-c",
-                    "read answer; printf '\\033]2;new-shell-title\\007'; read answer"),
-                    System.getenv(), path, 80, 24, 100);
+                return TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/bash", "--noprofile", "--norc", "-c",
+                    "read answer; printf '\\033]2;new-shell-title\\007'; read answer")).environment(System.getenv()).workingDirectory(path).grid(new GridSize(80, 24)).scrollback(100).build());
             } catch (Exception e) { throw new RuntimeException(e); }
         }, "bash");
         WindowContent[] owner = new WindowContent[1];
@@ -170,9 +172,8 @@ class TerminalTabTest {
         Queue<Runnable> pending = new ArrayDeque<>();
         ShellLauncher launcher = new ShellLauncher(pending::add, path -> {
             try {
-                return TerminalSession.start(List.of("/bin/sh", "-c",
-                    "read answer; printf '\\033]7;file://localhost" + directory + "\\007\\033]2;" + title + "\\007'; read answer"),
-                    System.getenv(), path, 80, 24, 100);
+                return TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/sh", "-c",
+                    "read answer; printf '\\033]7;file://localhost" + directory + "\\007\\033]2;" + title + "\\007'; read answer")).environment(System.getenv()).workingDirectory(path).grid(new GridSize(80, 24)).scrollback(100).build());
             } catch (Exception e) { throw new RuntimeException(e); }
         }, "sh");
         WindowContent[] owner = new WindowContent[1];
