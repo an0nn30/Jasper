@@ -13,13 +13,13 @@ maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merg
 local `main`, as is plan 2 (actions and chrome placements). Plan 3a (rail, panels and plugin
 windows) is merged too; the spec's plan 3 was split into 3a and 3b. Plan 3b (Plugins manager,
 install and restart) is merged too. The spec's plan 4 is split into 4a (terminal API: observe,
-inject, open) and 4b (plugin-provided sessions); 4a is implemented on `claude/plugin-sdk-plan-4`,
-and 4b is not started.
+inject, open) and 4b (plugin-provided sessions); 4a is merged too, and 4b is planned on
+`claude/plugin-sdk-plan-4b`. Working-directory provenance moved from 4b to a small plan 4c.
 
 ### Plugin SDK plan 4a — 2026-09-21
 
-Implemented on `claude/plugin-sdk-plan-4` (worktree `.worktrees/plugin-sdk-plan-4`), not yet merged
-or pushed. The work implements
+Merged into local `main` by fast-forward on 2026-09-21 at `2eee9c7` (not pushed); the merged
+result passed the same verification. The work implements
 [plan 4a](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-4a-terminal-api.md): plugins find the
 active window, tab and pane through `context.terminals()`, read pane metadata, follow sixteen
 `TerminalEvents` topics, type and paste into a pane, read the selection, and open local tabs and
