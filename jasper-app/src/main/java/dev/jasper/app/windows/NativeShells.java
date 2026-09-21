@@ -29,6 +29,11 @@ import javax.swing.JPanel;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
+import java.awt.FileDialog;
+import java.awt.Frame;
+import java.nio.file.Path;
+import java.util.Locale;
+import java.util.Optional;
 
 /**
  * The native boundary for auxiliary windows: frame or dialog, application icon, the unified macOS title
@@ -80,7 +85,7 @@ public final class NativeShells {
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
-            @Override public void windowActivated(WindowEvent event) { if (bar != null) bar.setActive(true); }
+            @Override public void windowActivated(WindowEvent event) { if (bar != null) bar.setActive(true); surface.notifyActivated(); }
             @Override public void windowDeactivated(WindowEvent event) { if (bar != null) bar.setActive(false); }
         });
         if (bar != null) bar.attach(frame);
@@ -120,6 +125,26 @@ public final class NativeShells {
         natives.put(surface, dialog);
         return new AuxiliarySurface.Shell(() -> { dialog.pack(); dialog.setLocationRelativeTo(owner); dialog.setVisible(true); },
             dialog::toFront, () -> { theme.close(); natives.remove(surface); dialog.dispose(); }, dialog::setTitle, dialog::getBounds);
+    }
+
+    /**
+     * Asks for one existing file with the platform's own dialog, over a surface's window.
+     *
+     * @param owner the surface whose window the dialog belongs to
+     * @param title the dialog title
+     * @param suffix the file name suffix to offer, for example {@code .zip}
+     * @return the chosen file, or empty when the user cancelled
+     */
+    public Optional<Path> chooseFile(AuxiliarySurface owner, String title, String suffix) {
+        Frame parent = natives.get(owner) instanceof Frame frame ? frame : null;
+        var dialog = new FileDialog(parent, title, FileDialog.LOAD);
+        String wanted = suffix.toLowerCase(Locale.ROOT);
+        // macOS and Linux honor the filter; Windows honors the pattern.
+        dialog.setFilenameFilter((directory, name) -> name.toLowerCase(Locale.ROOT).endsWith(wanted));
+        dialog.setFile("*" + suffix);
+        dialog.setVisible(true);
+        String file = dialog.getFile();
+        return file == null ? Optional.empty() : Optional.of(Path.of(dialog.getDirectory(), file));
     }
 
     /** A minimal menu bar: macOS otherwise shows only the application menu while this window has focus. */

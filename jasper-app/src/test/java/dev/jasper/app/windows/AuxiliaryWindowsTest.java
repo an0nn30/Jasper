@@ -96,4 +96,20 @@ class AuxiliaryWindowsTest {
         second.close();
         assertThat(events).containsExactly("empty");
     }
+
+    @Test void activationReachesListenersUntilTheyUnsubscribeOrTheWindowCloses() {
+        AuxiliarySurface manager = windows.window("dev.x.manager", "Manager", new Dimension(640, 480), true);
+        List<String> events = new ArrayList<>();
+        var first = manager.onActivated(() -> events.add("first"));
+        manager.onActivated(() -> { throw new IllegalStateException("listener failure"); });
+        manager.onActivated(() -> events.add("third"));
+        manager.notifyActivated();
+        assertThat(events).as("a failing listener does not stop the others").containsExactly("first", "third");
+        first.close();
+        manager.notifyActivated();
+        assertThat(events).containsExactly("first", "third", "third");
+        manager.close();
+        manager.notifyActivated();
+        assertThat(events).hasSize(3);
+    }
 }

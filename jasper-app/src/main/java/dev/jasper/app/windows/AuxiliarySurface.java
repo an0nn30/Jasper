@@ -37,6 +37,7 @@ public final class AuxiliarySurface {
     private final JPanel holder = new JPanel(new BorderLayout());
     private final List<BooleanSupplier> guards = new ArrayList<>();
     private final List<Runnable> closedListeners = new ArrayList<>();
+    private final List<Runnable> activatedListeners = new ArrayList<>();
     private String title;
     private Shell shell;
     private boolean shown;
@@ -116,6 +117,7 @@ public final class AuxiliarySurface {
             catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A window closed listener failed", failure); }
         }
         closedListeners.clear();
+        activatedListeners.clear();
     }
 
     public Subscription onClosing(BooleanSupplier guard) {
@@ -126,5 +128,19 @@ public final class AuxiliarySurface {
     public Subscription onClosed(Runnable listener) {
         closedListeners.add(java.util.Objects.requireNonNull(listener));
         return new Subscription(() -> closedListeners.remove(listener));
+    }
+
+    /** The native window gained focus. Called by the shell; does nothing once closed. */
+    public void notifyActivated() {
+        if (closed) return;
+        for (Runnable listener : List.copyOf(activatedListeners)) {
+            try { listener.run(); }
+            catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A window activation listener failed", failure); }
+        }
+    }
+
+    public Subscription onActivated(Runnable listener) {
+        activatedListeners.add(java.util.Objects.requireNonNull(listener));
+        return new Subscription(() -> activatedListeners.remove(listener));
     }
 }
