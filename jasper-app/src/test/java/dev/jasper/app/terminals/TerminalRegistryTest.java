@@ -32,7 +32,7 @@ class TerminalRegistryTest {
         final TabEntry entry;
         Tab(Window window) { entry = new TabEntry(id, window.id, () -> List.copyOf(panes), () -> Optional.ofNullable(focused), () -> "tab", () -> { }); }
         PaneEntry pane() {
-            var snapshot = new PaneSnapshot("sh", Optional.empty(), 80, 24, false, PaneSnapshot.State.RUNNING, OptionalInt.empty(), Optional.empty());
+            var snapshot = new PaneSnapshot("sh", Optional.empty(), 80, 24, false, PaneSnapshot.State.RUNNING, OptionalInt.empty(), Optional.empty(), Optional.empty());
             var created = new PaneEntry(UUID.randomUUID(), id, () -> snapshot, () -> CompletableFuture.completedFuture(Optional.empty()),
                 bytes -> { }, text -> { }, Optional::empty, () -> { }, (axis, directory) -> Optional.empty());
             panes.add(created);

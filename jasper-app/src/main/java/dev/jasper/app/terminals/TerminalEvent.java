@@ -20,10 +20,10 @@ public sealed interface TerminalEvent {
     /** Derived by the registry; windows never publish it. */
     record ActivePaneChanged(Optional<UUID> paneId) implements TerminalEvent { }
     record TitleChanged(UUID paneId, String title) implements TerminalEvent { }
-    record DirectoryChanged(UUID paneId, Optional<Path> directory) implements TerminalEvent { }
+    record DirectoryChanged(UUID paneId, Optional<Path> directory, Optional<RemoteLocation> remote) implements TerminalEvent { }
     record CommandStarted(UUID paneId, String command) implements TerminalEvent { }
     record CommandFinished(UUID paneId, String command, OptionalInt exitStatus, Duration duration,
-                           Optional<Path> directory) implements TerminalEvent { }
+                           Optional<Path> directory, Optional<RemoteLocation> remote) implements TerminalEvent { }
     /** A provided session started connecting, first or again. */
     record SessionConnecting(UUID paneId) implements TerminalEvent { }
     record SessionStarted(UUID paneId) implements TerminalEvent { }

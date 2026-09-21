@@ -35,7 +35,8 @@ class TerminalBridgeTest {
         fixture.activateWindow(window);
         fixture.registry.publish(new TerminalEvent.SessionStarted(pane));
         fixture.registry.publish(new TerminalEvent.TitleChanged(pane, "make test"));
-        fixture.registry.publish(new TerminalEvent.DirectoryChanged(pane, Optional.of(Path.of("/src/app"))));
+        fixture.registry.publish(new TerminalEvent.DirectoryChanged(pane, Optional.of(Path.of("/src/app")), Optional.empty()));
+        fixture.reportDirectory(pane, "build-host", "/srv/app");
         fixture.registry.publish(new TerminalEvent.CommandStarted(pane, "make test"));
         fixture.finishCommand(pane, "make test", 2);
         fixture.registry.publish(new TerminalEvent.Bell(tab, pane));
@@ -49,8 +50,9 @@ class TerminalBridgeTest {
             new TerminalEvents.SessionStateChanged(pane, SessionState.RUNNING, OptionalInt.empty()),
             new TerminalEvents.TitleChanged(pane, "make test"),
             new TerminalEvents.CwdChanged(pane, Optional.of(Path.of("/src/app")), Optional.empty()),
+            new TerminalEvents.CwdChanged(pane, Optional.empty(), Optional.of(new dev.jasper.sdk.terminal.RemoteDirectory("build-host", "/srv/app"))),
             new TerminalEvents.CommandStarted(pane, "make test"),
-            new TerminalEvents.CommandFinished(pane, "make test", OptionalInt.of(2), Duration.ofMillis(1500), Optional.of(Path.of("/src")), Optional.empty()),
+            new TerminalEvents.CommandFinished(pane, "make test", OptionalInt.of(2), Duration.ofMillis(1500), Optional.empty(), Optional.of(new dev.jasper.sdk.terminal.RemoteDirectory("build-host", "/srv/app"))),
             new TerminalEvents.PaneEvent(tab, pane),
             new TerminalEvents.SessionStateChanged(pane, SessionState.EXITED, OptionalInt.of(0)),
             new TerminalEvents.PaneEvent(tab, pane));

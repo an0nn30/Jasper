@@ -25,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import dev.jasper.app.terminals.OpenSpec;
+import dev.jasper.sdk.terminal.RemoteDirectory;
 
 /**
  * One plugin's view of the terminal registry. Handles hold ids and the last values they saw, never an entry:
@@ -58,7 +59,8 @@ final class HostedTerminals implements Terminals {
         SessionState state = switch (snapshot.state()) {
             case STARTING -> SessionState.CONNECTING; case RUNNING -> SessionState.RUNNING; case EXITED -> SessionState.EXITED;
         };
-        return new PaneInfo(snapshot.title(), snapshot.workingDirectory(), Optional.empty(), snapshot.columns(), snapshot.rows(),
+        return new PaneInfo(snapshot.title(), snapshot.workingDirectory(),
+            snapshot.remoteDirectory().map(location -> new RemoteDirectory(location.host(), location.path())), snapshot.columns(), snapshot.rows(),
             snapshot.shellIntegration(), snapshot.providerId().isPresent() ? SessionKind.PLUGIN : SessionKind.LOCAL, snapshot.providerId(), state,
             snapshot.exitStatus());
     }

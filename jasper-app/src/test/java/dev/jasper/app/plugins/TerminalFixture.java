@@ -25,7 +25,7 @@ import dev.jasper.terminal.session.AttachedConnection;
 
 /** A scripted workspace behind a real {@link TerminalRegistry}: what windows do, without windows. EDT only. */
 final class TerminalFixture {
-    private static final class Pane { UUID id = UUID.randomUUID(); Tab tab; String title; Path directory; String selection; List<String> sent = new ArrayList<>();
+    private static final class Pane { UUID id = UUID.randomUUID(); Tab tab; String title; Path directory; String selection; List<String> sent = new ArrayList<>(); dev.jasper.app.terminals.RemoteLocation remote;
         SessionRequest request; SessionAttempt attempt; AttachedConnection connection; boolean everAttached; String status = ""; String state = ""; }
     private static final class Tab { UUID id = UUID.randomUUID(); Window window; String title; List<Pane> panes = new ArrayList<>(); Pane focused; }
     private static final class Window { UUID id = UUID.randomUUID(); List<Tab> tabs = new ArrayList<>(); Tab selected; Subscription registration; }
@@ -40,9 +40,9 @@ final class TerminalFixture {
 
     private PaneEntry entry(Pane pane) {
         return new PaneEntry(pane.id, pane.tab.id,
-            () -> new PaneSnapshot(pane.title, Optional.ofNullable(pane.directory), 80, 24, true,
+            () -> new PaneSnapshot(pane.title, pane.remote == null ? Optional.ofNullable(pane.directory) : Optional.empty(), 80, 24, true,
                 pane.state.equals("CONNECTING") ? PaneSnapshot.State.STARTING : pane.state.equals("EXITED") ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING,
-                OptionalInt.empty(), Optional.ofNullable(pane.request).map(SessionRequest::providerId)),
+                OptionalInt.empty(), Optional.ofNullable(pane.request).map(SessionRequest::providerId), Optional.ofNullable(pane.remote)),
             () -> CompletableFuture.completedFuture(Optional.of("vim")),
             bytes -> pane.sent.add("write:" + new String(bytes, StandardCharsets.UTF_8)), text -> pane.sent.add("paste:" + text),
             () -> Optional.ofNullable(pane.selection), () -> focusPane(pane.id),
@@ -148,7 +148,8 @@ final class TerminalFixture {
 
     void finishCommand(UUID paneId, String command, int exitStatus) {
         registry.publish(new TerminalEvent.CommandFinished(paneId, command, OptionalInt.of(exitStatus), Duration.ofMillis(1500),
-            Optional.ofNullable(panes.get(paneId)).map(pane -> pane.directory)));
+            Optional.ofNullable(panes.get(paneId)).filter(pane -> pane.remote == null).map(pane -> pane.directory),
+            Optional.ofNullable(panes.get(paneId)).map(pane -> pane.remote)));
     }
 
     private UUID addSessionPane(UUID tabId, SessionRequest request) {
@@ -216,5 +217,14 @@ final class TerminalFixture {
             var stream = pane.connection.output();
             return new String(stream.readNBytes(stream.available()), StandardCharsets.UTF_8);
         } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+    }
+
+    /** What the pane's shell reports: a local directory when {@code hostOrEmpty} is empty, a remote one otherwise. */
+    void reportDirectory(UUID paneId, String hostOrEmpty, String path) {
+        Pane pane = panes.get(paneId);
+        if (hostOrEmpty.isEmpty()) { pane.remote = null; pane.directory = Path.of(path); }
+        else { pane.remote = new dev.jasper.app.terminals.RemoteLocation(hostOrEmpty, path); }
+        registry.publish(new TerminalEvent.DirectoryChanged(paneId, hostOrEmpty.isEmpty() ? Optional.of(Path.of(path)) : Optional.empty(),
+            Optional.ofNullable(pane.remote)));
     }
 }

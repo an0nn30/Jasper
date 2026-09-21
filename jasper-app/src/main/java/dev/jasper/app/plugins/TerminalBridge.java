@@ -7,6 +7,7 @@ import dev.jasper.sdk.terminal.SessionState;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import java.util.Optional;
 import java.util.OptionalInt;
+import dev.jasper.sdk.terminal.RemoteDirectory;
 
 /**
  * Republishes the registry's facts as SDK topics. Publishing only enqueues, so plugin handlers run later on
@@ -14,6 +15,10 @@ import java.util.OptionalInt;
  */
 final class TerminalBridge {
     private TerminalBridge() { }
+
+    private static Optional<RemoteDirectory> remote(Optional<dev.jasper.app.terminals.RemoteLocation> location) {
+        return location.map(where -> new RemoteDirectory(where.host(), where.path()));
+    }
 
     static Subscription connect(TerminalRegistry registry, EventBus bus) {
         return registry.onEvent(event -> {
@@ -30,10 +35,10 @@ final class TerminalBridge {
                 case TerminalEvent.ActivePaneChanged fact -> bus.publish(EventBus.APP, TerminalEvents.ACTIVE_PANE_CHANGED, new TerminalEvents.ActivePaneChanged(fact.paneId()));
                 case TerminalEvent.TitleChanged fact -> bus.publish(EventBus.APP, TerminalEvents.TITLE_CHANGED, new TerminalEvents.TitleChanged(fact.paneId(), fact.title()));
                 case TerminalEvent.DirectoryChanged fact -> bus.publish(EventBus.APP, TerminalEvents.CWD_CHANGED,
-                    new TerminalEvents.CwdChanged(fact.paneId(), fact.directory(), Optional.empty()));
+                    new TerminalEvents.CwdChanged(fact.paneId(), fact.directory(), remote(fact.remote())));
                 case TerminalEvent.CommandStarted fact -> bus.publish(EventBus.APP, TerminalEvents.COMMAND_STARTED, new TerminalEvents.CommandStarted(fact.paneId(), fact.command()));
                 case TerminalEvent.CommandFinished fact -> bus.publish(EventBus.APP, TerminalEvents.COMMAND_FINISHED,
-                    new TerminalEvents.CommandFinished(fact.paneId(), fact.command(), fact.exitStatus(), fact.duration(), fact.directory(), Optional.empty()));
+                    new TerminalEvents.CommandFinished(fact.paneId(), fact.command(), fact.exitStatus(), fact.duration(), fact.directory(), remote(fact.remote())));
                 case TerminalEvent.SessionConnecting fact -> bus.publish(EventBus.APP, TerminalEvents.SESSION_STATE_CHANGED,
                     new TerminalEvents.SessionStateChanged(fact.paneId(), SessionState.CONNECTING, OptionalInt.empty()));
                 case TerminalEvent.SessionStarted fact -> bus.publish(EventBus.APP, TerminalEvents.SESSION_STATE_CHANGED,

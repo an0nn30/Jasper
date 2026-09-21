@@ -479,14 +479,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             report(new TerminalEvent.PaneFocused(tab.id(), pane.id()));
         };
         pane.onPaneBlurred = () -> emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.BLURRED));
-        pane.onCommandFinished = (command, exitStatus, duration, workingDirectory) -> {
+        pane.onCommandFinished = (command, exitStatus, duration, workingDirectory, remote) -> {
             emit(new WorkspaceActivity.Finished(pane.id(), command, exitStatus, duration,
                 new WorkspaceActivity.Origin(anyWindowActive.getAsBoolean(), isActiveAndOpen(),
                     tab == currentTab(), pane.view() != null && pane.view().isFocusOwner()),
                 () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); }));
-            report(new TerminalEvent.CommandFinished(pane.id(), command, exitStatus, duration, workingDirectory));
+            report(new TerminalEvent.CommandFinished(pane.id(), command, exitStatus, duration, workingDirectory, remote));
         };
-        pane.onDirectoryChanged = directory -> report(new TerminalEvent.DirectoryChanged(pane.id(), directory));
+        pane.onDirectoryChanged = (directory, remote) -> report(new TerminalEvent.DirectoryChanged(pane.id(), directory, remote));
         pane.onBell = () -> report(new TerminalEvent.Bell(tab.id(), pane.id()));
         pane.onStarted = () -> report(new TerminalEvent.SessionStarted(pane.id()));
         pane.onExited = status -> report(new TerminalEvent.SessionExited(pane.id(), status));
@@ -575,7 +575,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         TerminalPane pane = currentPane();
         String size = pane == null || pane.session() == null ? "Starting terminal" :
             pane.session().columns() + " \u00d7 " + pane.session().rows();
-        chrome.status().setMetadata(pane == null ? "" : pane.shellLabel(), pane == null ? "" : pane.directory().toString(),
+        chrome.status().setMetadata(pane == null ? "" : pane.shellLabel(), pane == null ? "" : pane.locationLabel(),
             pane == null ? "" : size, pane != null && pane.running(), pane != null && pane.shellIntegrationDetected());
         onTitle.accept(currentTab() == null ? "Jasper" : currentTab().title());
         updateActions(); windowTabs.refresh(); onMinimumSizeChanged.run();

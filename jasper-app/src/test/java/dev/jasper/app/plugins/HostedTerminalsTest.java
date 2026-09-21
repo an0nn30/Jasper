@@ -67,6 +67,12 @@ class HostedTerminalsTest {
         assertThat(terminals.activePane().map(PaneHandle::id)).contains(right);
         handle.toFront();
         assertThat(fixture.opened()).containsExactly("front|" + window);
+        fixture.reportDirectory(left, "build-host", "/srv/app");
+        assertThat(pane.info().workingDirectory()).isEmpty();
+        assertThat(pane.info().remoteDirectory()).contains(new dev.jasper.sdk.terminal.RemoteDirectory("build-host", "/srv/app"));
+        fixture.reportDirectory(left, "", "/tmp");
+        assertThat(pane.info().workingDirectory()).contains(Path.of("/tmp"));
+        assertThat(pane.info().remoteDirectory()).isEmpty();
     }
 
     @Test void aClosedPaneKeepsItsLastValuesAndIgnoresCommands() {
