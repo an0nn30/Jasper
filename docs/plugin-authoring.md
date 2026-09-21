@@ -227,7 +227,11 @@ private static void installTerminalDemo(PluginContext context) {
   `foregroundJob()` completes on a worker thread.
 - **`sendText` adds nothing.** End a command with `"\n"` if you mean to run it; leaving it out lets
   the user look first. `paste` behaves like the user's own paste, bracketed when the program asked.
-- **Working directories are hints.** They are whatever the shell last reported and may not exist.
+- **Working directories are hints, and come in two kinds.** `PaneInfo.workingDirectory` is a
+  directory on this machine; `PaneInfo.remoteDirectory` is host plus path text from a shell on
+  another machine, for example after the user ran `ssh`, or in a provided session. At most one is
+  present. Both are whatever the shell last reported, unauthenticated: never open a remote path as
+  a local file, and expect a local one not to exist.
 - To run a command in a new tab, open one with `OpenRequest.local()` or `localIn(directory)` and
   `sendText` to the pane you get back; the tab runs the user's configured shell.
 
@@ -286,7 +290,7 @@ private static void connectEcho(PendingSession pending, long stepMillis) {
 - **The remote pty** should be requested with `TerminalConnection.TERM` and the attempt's
   `columns()` and `rows()`; the pane resizes it through `resize` once it has been laid out.
 - A remote shell with Jasper's shell integration produces the same command events as a local one.
-  Working directories it reports are not exposed yet: a remote path must never look local.
+  The directory it reports appears as the pane's `remoteDirectory`, never as a local one.
 - `PipedInputStream` fails once the thread that wrote last has ended. The sample uses a queue.
 
 ## Rules that matter
@@ -329,7 +333,8 @@ try (var host = new FakePluginHost()) {
 `focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
 `titleChanged`, `cwdChanged`, `sessionExited` and `bell` publish terminal events, delivered by
-`flush()`. Give the `PluginInfo` you start with the capabilities your `plugin.toml` declares.
+`flush()`. `host.remoteCwdChanged(paneId, host, path)` reports a remote directory. Give the
+`PluginInfo` you start with the capabilities your `plugin.toml` declares.
 A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`, `sessionOutput`,
 `cancelSession` and `reconnectSession`; `flush()` notices exits. The fake runs cancellation handlers
 and closes inline where Jasper uses its cleanup thread.

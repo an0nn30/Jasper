@@ -189,8 +189,26 @@ attached output runs through the same `ShellIntegrationConnector` chain as a PTY
 
 An attached session differs from a PTY session in four ways: it writes no exit line into the
 buffer; `exitFuture()` completes exceptionally when the status is unknown or the transport failed;
-`foregroundJob()` is empty; and it never reports a local working directory, because the path a
-remote shell reports is a path on another machine.
+`foregroundJob()` is empty; and everything it reports as a working directory is remote.
+
+## Working-directory provenance
+
+An OSC 7 report is `file://host/path`. `internal.shell.DirectoryProvenance` classifies it: **local**
+only when the session is a local process and the host is empty, `localhost`, or exactly one of the
+names in `SessionLaunchOptions.localHostNames`, compared without regard to case; **remote**
+otherwise, and always for an attached session. There is no partial or first-label matching, and
+with no known names only hostless and `localhost` reports are local: ambiguity resolves away from
+treating a path as local, because consumers start shells and open files there.
+
+`ShellCommandTracker` keeps one of the two and clears the other. `TerminalSession.workingDirectory()`,
+`workingDirectoryChanged` and the directory of `commandExecuted` carry local directories only and
+are empty while the program reports a remote one, which also happens when the user runs `ssh` by
+hand in a local pane; `remoteDirectory()` and `remoteDirectoryChanged` carry the remote one as host
+plus path text.
+
+This is a best-effort classification, not a guarantee. The report is unauthenticated text from
+whatever runs in the pane: a remote machine that reports this machine's name, `localhost` or no host
+at all is indistinguishable from local. A local working directory stays a hint that may not exist.
 
 ## Threads and failures
 

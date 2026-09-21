@@ -14,7 +14,55 @@ local `main`, as is plan 2 (actions and chrome placements). Plan 3a (rail, panel
 windows) is merged too; the spec's plan 3 was split into 3a and 3b. Plan 3b (Plugins manager,
 install and restart) is merged too. The spec's plan 4 is split into 4a (terminal API: observe,
 inject, open) and 4b (plugin-provided sessions); 4a and 4b are merged too. Working-directory provenance moved from 4b to a small plan 4c, which is
-planned on `claude/plugin-sdk-plan-4c`.
+implemented on `claude/plugin-sdk-plan-4c`. With it the plugin SDK plans are complete; the Vault
+and SSH plugin specs come next.
+
+### Plugin SDK plan 4c — 2026-09-21
+
+Implemented on `claude/plugin-sdk-plan-4c` (not merged, not pushed). The work implements
+[plan 4c](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-4c-directory-provenance.md): a
+directory reported under another host name is no longer treated as a local path.
+`internal.shell.DirectoryProvenance` classifies every OSC 7 report; `ShellCommandTracker` keeps one
+of local and remote and clears the other; `jasper-terminal` gained `session.RemoteDirectory` (the
+only addition to the app-facing allowlist), `TerminalSession.remoteDirectory()`,
+`TerminalSessionListener.remoteDirectoryChanged` and `SessionLaunchOptions.localHostNames`. The app
+resolves the machine's names once, off the EDT, in `launch.LocalHostNames`, carries the remote
+directory through `terminals.RemoteLocation`, `PaneSnapshot` and `TerminalEvent`, and shows
+`host:path` in the status bar. SDK `PaneInfo.remoteDirectory`, `CWD_CHANGED` and `COMMAND_FINISHED`
+now carry it; the SDK is 0.5.1; the testkit gained `remoteCwdChanged`. See
+[terminal architecture](terminal-architecture.md#working-directory-provenance).
+
+Scope decisions, as recorded at the top of the plan:
+
+1. A report with no host, or with `localhost`, is local in a local session even when the machine's
+   names could not be resolved; the spec's "unresolved names mean remote" applies to reports that
+   name a host.
+2. The local names are what `hostname` prints plus the `HOSTNAME` and `COMPUTERNAME` variables,
+   which is what the bundled integration scripts report. `InetAddress.getLocalHost()` is not used.
+3. `commandExecuted` keeps its signature; the app reads `session.remoteDirectory()` inside the
+   callback on the reader thread.
+4. An attached session now reports remote directories; plan 4b's suppression wrapper is gone.
+5. The status bar shows `host:path` for a remote directory; tab titles keep falling back to the
+   local directory.
+6. SDK `RemoteDirectory` accepts an empty host (the program named none); the sample's range
+   `>=0.5, <0.6` is unchanged.
+7. A stronger locality signal, such as a per-session token from Jasper's own integration, stays
+   deferred, as in the spec.
+
+This changes local sessions: a local pane in which the user runs `ssh` by hand reports no local
+directory while the remote shell reports its own, so New Tab and Split start where the local shell
+was. The classification is best effort: OSC 7 is unauthenticated text.
+
+Deviation from the plan text: Task 0's separate baseline `check` was skipped, because the branch
+starts at the main commit verified minutes earlier. No code deviations.
+
+Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks`
+passed with **1,415 tests: 1,413 passed, two expected environment skips, no failures or
+errors** (app 810, Buddy 163, terminal 377, SDK 18, testkit 38, sample plugin 9). The contract
+suite is 30 cases, run against both the testkit and the application. Native acceptance (the five
+steps at the end of the plan) is pending and is the user's: step 5 matters most, because a machine
+whose `hostname` differs from what its shell reports would see local directories classified as
+remote.
 
 ### Plugin SDK plan 4b — 2026-09-21
 

@@ -111,6 +111,12 @@ declares. `TerminalBridge` republishes registry events as `TerminalEvents` topic
 bus, and subscribing to a `jasper.terminal.*` topic needs `terminal.observe`. Payloads carry ids,
 not handles: a handle is bound to one plugin's gate, a payload is shared by all subscribers.
 
+`PaneInfo.workingDirectory` is the local directory and `PaneInfo.remoteDirectory` the remote one;
+at most one is present, and `CWD_CHANGED` and `COMMAND_FINISHED` carry both. The application
+resolves the machine's names once, off the EDT, in `launch.LocalHostNames` (the `hostname` program
+and the `HOSTNAME` and `COMPUTERNAME` variables, which is what the bundled shell integration
+reports) and passes them at launch.
+
 ## Provided sessions
 
 `OpenRequest.session` needs `session.provide`. `HostedSessions` turns the `SessionSpec` into the
@@ -170,5 +176,5 @@ disagree, the implementation is wrong, not the contract.
 
 ## Not yet implemented
 
-Working-directory provenance (classifying OSC 7 reports by host and exposing `RemoteDirectory`)
-and explicit commands in `LocalSpec` (plan 4c).
+Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
+per-session token from Jasper's own shell integration.

@@ -28,7 +28,7 @@ All package names below begin with `dev.jasper.terminal`.
 
 | Package | Supported types | Role |
 | --- | --- | --- |
-| `session` | [TerminalSession](src/main/java/dev/jasper/terminal/session/TerminalSession.java), [SessionLaunchOptions](src/main/java/dev/jasper/terminal/session/SessionLaunchOptions.java), [TerminalSessionListener](src/main/java/dev/jasper/terminal/session/TerminalSessionListener.java), [AttachedConnection](src/main/java/dev/jasper/terminal/session/AttachedConnection.java) | Launch or attach (`TerminalSession.attach` runs a connection instead of a child process; `inputDropped` reports rejected input), input, metadata, lifecycle and events |
+| `session` | [TerminalSession](src/main/java/dev/jasper/terminal/session/TerminalSession.java), [SessionLaunchOptions](src/main/java/dev/jasper/terminal/session/SessionLaunchOptions.java), [TerminalSessionListener](src/main/java/dev/jasper/terminal/session/TerminalSessionListener.java), [AttachedConnection](src/main/java/dev/jasper/terminal/session/AttachedConnection.java), [RemoteDirectory](src/main/java/dev/jasper/terminal/session/RemoteDirectory.java) | Launch or attach (`TerminalSession.attach` runs a connection instead of a child process; `inputDropped` reports rejected input), input, metadata, lifecycle and events |
 | `view` | [TerminalView](src/main/java/dev/jasper/terminal/view/TerminalView.java), [TerminalAction](src/main/java/dev/jasper/terminal/view/TerminalAction.java) | Swing component and reusable operations |
 | `config` | [TerminalOptions](src/main/java/dev/jasper/terminal/config/TerminalOptions.java), [Palette](src/main/java/dev/jasper/terminal/config/Palette.java), [CursorStyle](src/main/java/dev/jasper/terminal/config/CursorStyle.java), [BellMode](src/main/java/dev/jasper/terminal/config/BellMode.java), [OptionAsMeta](src/main/java/dev/jasper/terminal/config/OptionAsMeta.java), [GridSize](src/main/java/dev/jasper/terminal/config/GridSize.java) | Immutable settings and geometry |
 | `search` | [SearchQuery](src/main/java/dev/jasper/terminal/search/SearchQuery.java), [FindResult](src/main/java/dev/jasper/terminal/search/FindResult.java) | Typed search request and outcome |
@@ -46,7 +46,8 @@ suite. Imports are in that source. Builders do no I/O and copy collections.
 Launch command, environment and working directory must be explicit. Supply an
 actual executable instead of the illustrative `example-shell`; environment is
 not inherited implicitly. The process factory forces `TERM=xterm-256color` and
-`COLORTERM=truecolor` in its copied environment.
+`COLORTERM=truecolor` in its copied environment. Pass `localHostNames` so a directory
+reported under another host is not taken for a local path.
 
 <!-- example:configuration -->
 ```java

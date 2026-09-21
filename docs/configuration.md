@@ -361,6 +361,8 @@ on_exit = "close_on_success"
 
 `terminal.shell_integration` controls whether Jasper's own zsh, bash and fish scripts load in new panes. Each script marks every prompt cycle with OSC 7 (the working directory, whenever it changed) and OSC 133 A/B/C/D (prompt start, prompt end, command start, command end with the exit status), and sends the exact command line just before C on Jasper's own channel. Jasper prefers that exact text over reading it back off the screen. These marks drive prompt jumping, the status bar's directory, and shell history's live capture of command text, working directory and exit status — see [Shell history](command-palette.md#shell-history).
 
+The working directory Jasper uses for "new tab in the same directory", command history and the status bar is local only when the shell reports it under this machine's own name (what `hostname` prints), `localhost` or no host. After `ssh` inside a pane, the status bar shows `host:path` and new tabs start where the local shell was.
+
 - `"auto"` (the default) loads the script automatically, after your own shell startup files, with no dotfile edits.
 - `"manual"` only exports `JASPER_SHELL_INTEGRATION=<dir>` so you can `source` the script yourself: zsh `source "$JASPER_SHELL_INTEGRATION/jasper.zsh"`, bash `source "$JASPER_SHELL_INTEGRATION/jasper.bash"`, fish `source "$JASPER_SHELL_INTEGRATION/jasper.fish"`.
 - `"off"` exports nothing and injects nothing.

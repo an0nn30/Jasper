@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Record every deviation from this text here and in `docs/STATUS.md`.
+**Status:** Implemented on `claude/plugin-sdk-plan-4c`; native acceptance pending. Deviation: Task 0's separate baseline `check` was skipped, because the branch starts at the main commit verified minutes earlier. No code deviations. Final verification: 1,415 tests, two expected skips, no failures (see `docs/STATUS.md`).
 
 **Goal:** Stop treating a directory reported under another host name as a local path. A local pane in which the user runs `ssh` by hand no longer mislabels the remote directory as local, and a provided session (an SSH pane) exposes the directory its remote shell reports as host plus path.
 
