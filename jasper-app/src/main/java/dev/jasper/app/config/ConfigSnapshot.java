@@ -103,8 +103,10 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     }
 
     public static Builder builder() { return new Builder(defaults()); }
-    Builder toBuilder() { return new Builder(this); }
-    static final class Builder {
+    /** Copies every canonical field; subsequent changes retain unrelated saved settings. */
+    public Builder toBuilder() { return new Builder(this); }
+    /** Caller-confined fluent construction; build delegates to canonical validation. */
+    public static final class Builder {
         private int tabHeight;
         private ToolbarMode toolbar;
         private boolean statusBar;
@@ -137,22 +139,22 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             longCommandSeconds = source.longCommandSeconds();
             backgroundEnabled = source.backgroundEnabled();
         }
-        Builder tabHeight(int value) { tabHeight = value; return this; }
-        Builder toolbar(ToolbarMode value) { toolbar = value; return this; }
-        Builder statusBar(boolean value) { statusBar = value; return this; }
-        Builder font(FontConfig value) { font = value; return this; }
-        Builder variant(Appearance value) { variant = value; return this; }
-        Builder keybindings(Map<String, String> value) { keybindings = Map.copyOf(value); return this; }
-        Builder columns(int value) { columns = value; return this; }
-        Builder lines(int value) { lines = value; return this; }
-        Builder terminal(TerminalConfig value) { terminal = value; return this; }
-        Builder buddyEnabled(boolean value) { buddyEnabled = value; return this; }
-        Builder historyEnabled(boolean value) { historyEnabled = value; return this; }
-        Builder maxResults(int value) { maxResults = value; return this; }
-        Builder trivialCommands(List<String> value) { trivialCommands = List.copyOf(value); return this; }
-        Builder longCommandSeconds(int value) { longCommandSeconds = value; return this; }
-        Builder backgroundEnabled(boolean value) { backgroundEnabled = value; return this; }
-        ConfigSnapshot build() {
+        public Builder tabHeight(int value) { tabHeight = value; return this; }
+        public Builder toolbar(ToolbarMode value) { toolbar = value; return this; }
+        public Builder statusBar(boolean value) { statusBar = value; return this; }
+        public Builder font(FontConfig value) { font = value; return this; }
+        public Builder variant(Appearance value) { variant = value; return this; }
+        public Builder keybindings(Map<String, String> value) { keybindings = Map.copyOf(value); return this; }
+        public Builder columns(int value) { columns = value; return this; }
+        public Builder lines(int value) { lines = value; return this; }
+        public Builder terminal(TerminalConfig value) { terminal = value; return this; }
+        public Builder buddyEnabled(boolean value) { buddyEnabled = value; return this; }
+        public Builder historyEnabled(boolean value) { historyEnabled = value; return this; }
+        public Builder maxResults(int value) { maxResults = value; return this; }
+        public Builder trivialCommands(List<String> value) { trivialCommands = List.copyOf(value); return this; }
+        public Builder longCommandSeconds(int value) { longCommandSeconds = value; return this; }
+        public Builder backgroundEnabled(boolean value) { backgroundEnabled = value; return this; }
+        public ConfigSnapshot build() {
             return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, historyEnabled, maxResults, trivialCommands, longCommandSeconds, backgroundEnabled);
         }
     }

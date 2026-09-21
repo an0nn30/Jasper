@@ -77,6 +77,23 @@ the terminal library before main. No desktop launcher was run.
 
 Task 11: Ruling: Place integration tests with the workspace they drive and keep package-local test access fixtures beside private owners; share pure worker/config/layout fixtures under testsupport. This avoids exposing palette widgets, bootstrap hooks or native session test seams in production. Public configuration/value factories are cross-feature contracts, while ConfigurationController stays package-private. Cost if wrong: more small test support files to navigate; no test artifact enters production. FlatLaf defaults retain their resource path but name the relocated public SplitDividerBorder; icon loads use absolute resource paths. Both regressions were observed RED and pass after correction.
 
+### Task 12 — Guides, executable recipes and clean verification
+
+Guide/package tests were RED while files were absent. The fluent setting example
+first failed on inaccessible builder methods, then all seven app recipes and the
+Buddy embedding example passed. Strict Javadoc found malformed brace comments and
+a relocated link; corrected without disabling doclint. A clean full run caught
+an old terminal guide link, also corrected. Javadoc missing-tag warnings remain
+nonfatal (existing app APIs plus supported Buddy members with prose contracts).
+
+Fresh `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture check
+:jasper-app:installDist --rerun-tasks` passed with **1,124 tests: app 606 (one skip),
+Buddy 163, terminal 355 (one skip), zero failures/errors**. All 23 tasks executed.
+The three-module production source-character scan and `git diff --check` pass.
+No GUI, native performance run, merge or push.
+
+Task 12: Ruling: Expose ConfigSnapshot.Builder/toBuilder across app feature packages because the compiled setting recipe revealed inaccessible fluent methods; canonical validation remains unchanged. Update packaged benchmark scripts as well as Gradle entry points, detecting old versus new jar class names to preserve baseline images. Cost if wrong: public app collaboration surface grows and script entry selection could fail; copied examples and a fake-runtime old/new-image test cover both without opening a GUI. Windows script execution remains manual.
+
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.

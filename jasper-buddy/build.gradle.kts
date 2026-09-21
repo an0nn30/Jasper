@@ -19,3 +19,18 @@ tasks.test {
     dependsOn(tasks.jar)
     systemProperty("jasper.buddyJar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
 }
+
+// Keep API/package contracts in the ordinary headless verification path.
+tasks.withType<Javadoc>().configureEach {
+    isFailOnError = true
+    (options as StandardJavadocDocletOptions).apply {
+        encoding = "UTF-8"
+        addBooleanOption("Xdoclint:all", true)
+    }
+}
+tasks.named("check") { dependsOn(tasks.named("javadoc")) }
+tasks.javadoc {
+    dependsOn(tasks.classes)
+    exclude("dev/jasper/buddy/internal/**")
+    classpath += sourceSets.main.get().output
+}

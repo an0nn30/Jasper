@@ -10,7 +10,7 @@ import java.util.Objects;
 
 /**
  * The per-platform autostart entry. Resolution is pure, like {@link AppDirs} and
- * {@link LaunchSettings}, so both platforms' output is asserted on any host; {@link #apply} is the
+ * {@link dev.jasper.app.launch.LaunchSettings}, so both platforms' output is asserted on any host; {@link #apply} is the
  * only part that touches the system.
  */
 public final class LoginItem {

@@ -5,6 +5,7 @@ import java.util.Objects;
 import javax.swing.Action;
 import javax.swing.Icon;
 
+/** Immutable stable command identity and metadata around a live Swing action. Registry access and action dispatch are EDT-confined. */
 public record Command(String id, Action action, List<String> keywords) {
     public static final String TITLE = "jasper.command.title";
     public static final String ICON = "jasper.command.icon";

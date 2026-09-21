@@ -77,7 +77,7 @@ are package-private in `internal.emulation`; native ownership lives in
 
 The builders produce immutable validated options. `TerminalAction` is a closed
 command enum reused by standalone shortcuts and the app's existing
-[WindowContent catalog](../jasper-app/src/main/java/dev/jasper/app/WindowContent.java).
+[WindowContent catalog](../jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java).
 Parameterized paste/search/resize use typed methods. No command objects are
 allocated for every keystroke. Vendor/native adapters and the filtered connector
 decorator isolate integration. `TerminalSessionListener` is the observer contract.

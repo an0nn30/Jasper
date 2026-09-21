@@ -120,6 +120,15 @@ Working-directory inheritance and prompt navigation use OSC 7 and OSC 133 emitte
 ## Layout
 
 - `jasper-terminal/`: sessions, emulator integration, terminal rendering/input, selection, search and shell integration.
-- `jasper-app/`: window/pane ownership, app models, actions, tabs/splits, find and desktop chrome.
+- `jasper-app/`: packaged application composition, workspace, palette, providers and platform integration.
+- `jasper-buddy/`: independent JDK-only companion facade, notice model, animation and presentation.
 - `docs/STATUS.md`: completed work, open items and deferred findings.
 - `docs/superpowers/specs/` and `docs/superpowers/plans/`: specifications and implementation plans.
+
+## Contributor architecture guides
+
+Start with the [app onboarding](jasper-app/README.md), [terminal onboarding](jasper-terminal/README.md),
+or [Buddy embedding guide](jasper-buddy/README.md). The [app architecture](docs/app-architecture.md)
+and [maintenance recipes](docs/app-maintenance.md) explain feature ownership, lifecycle and
+where to add commands, settings, providers and notices. [STATUS](docs/STATUS.md) records
+verified checkpoints and remaining manual acceptance.

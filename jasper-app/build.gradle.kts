@@ -22,6 +22,7 @@ application {
 }
 
 tasks.test {
+    systemProperty("jasper.repoRoot", rootProject.projectDir.absolutePath)
     dependsOn(tasks.jar, ":jasper-buddy:jar", ":jasper-terminal:jar")
     systemProperty("jasper.appJar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
     systemProperty("jasper.buddyJar", project(":jasper-buddy").layout.buildDirectory.file("libs/jasper-buddy.jar").get().asFile.absolutePath)
@@ -81,3 +82,13 @@ for ((taskName, entryPoint) in listOf(
 }
 
 apply(from = rootProject.file("gradle/packaging.gradle"))
+
+// Keep API/package contracts in the ordinary headless verification path.
+tasks.withType<Javadoc>().configureEach {
+    isFailOnError = true
+    (options as StandardJavadocDocletOptions).apply {
+        encoding = "UTF-8"
+        addBooleanOption("Xdoclint:all", true)
+    }
+}
+tasks.named("check") { dependsOn(tasks.named("javadoc")) }

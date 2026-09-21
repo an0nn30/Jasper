@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 
+/** Writes reproducible benchmark artifacts after the run has released native fixtures; called by the benchmark runner, never the UI. */
 final class BenchmarkReport {
     private BenchmarkReport() {}
     static Map<String, Object> summary(List<Double> input) {

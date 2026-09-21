@@ -17,7 +17,7 @@ production vendor constructor just to simplify a test.
    owner rather than duplicating selection/search/viewport state in the view.
 3. Add real behavior and off-EDT rejection coverage in
    [TerminalActionTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/TerminalActionTest.java).
-4. Add an app catalog adapter in [WindowContent](../jasper-app/src/main/java/dev/jasper/app/WindowContent.java)
+4. Add an app catalog adapter in [WindowContent](../jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java)
    only if the action needs a menu/key binding. Reuse the existing registry.
 5. Run `./gradlew :jasper-terminal:test --tests '*TerminalActionTest'` and app
    `WindowCommandsTest` if the catalog changed, then full check.
@@ -59,9 +59,9 @@ reach the child.
 3. Apply it in `TerminalView.applyOptions` and its specific controller. Test an
    already-running session in [TerminalLiveOptionsTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/TerminalLiveOptionsTest.java),
    including retention of unrelated appearance and no process restart.
-4. Separately update app [TerminalConfig](../jasper-app/src/main/java/dev/jasper/app/TerminalConfig.java),
-   [ConfigLoader](../jasper-app/src/main/java/dev/jasper/app/ConfigLoader.java),
-   [ConfigSnapshot](../jasper-app/src/main/java/dev/jasper/app/ConfigSnapshot.java), configuration
+4. Separately update app [TerminalConfig](../jasper-app/src/main/java/dev/jasper/app/config/TerminalConfig.java),
+   [ConfigLoader](../jasper-app/src/main/java/dev/jasper/app/config/ConfigLoader.java),
+   [ConfigSnapshot](../jasper-app/src/main/java/dev/jasper/app/config/ConfigSnapshot.java), configuration
    template and [configuration guide](configuration.md). Add parser/default/error
    tests and an unrelated-reload retention test in `ConfigurationControllerTest`.
 5. Run option/live-option tests, affected app config tests, then full check.
@@ -163,7 +163,7 @@ Do not let a plugin borrow a controller's in-flight gesture state.
 
 1. Reproduce the OS/executable case in
    [TerminalSessionTest](../jasper-terminal/src/test/java/dev/jasper/terminal/internal/emulation/TerminalSessionTest.java)
-   and [TerminalTitleIntegrationTest](../jasper-app/src/test/java/dev/jasper/app/TerminalTitleIntegrationTest.java)
+   and [TerminalTitleIntegrationTest](../jasper-app/src/test/java/dev/jasper/app/workspace/TerminalTitleIntegrationTest.java)
    as appropriate. Use explicit executable fixtures; `/bin/sh` may resolve to
    Bash on the test runtime.
 2. Change [ForegroundJobResolver](../jasper-terminal/src/main/java/dev/jasper/terminal/internal/process/ForegroundJobResolver.java).

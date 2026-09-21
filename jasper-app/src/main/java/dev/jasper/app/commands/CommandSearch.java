@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+/** Pure bounded ranking over prepared command metadata and recency. Performs no I/O and retains no UI owner or mutable global state. */
 public final class CommandSearch {
     private static final Pattern SPACE = Pattern.compile("\\s+");
     private static final Pattern WORD = Pattern.compile("[^\\p{L}\\p{N}]+");

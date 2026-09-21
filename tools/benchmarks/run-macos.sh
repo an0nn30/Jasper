@@ -13,6 +13,11 @@ shift 4
 case "$image" in /*) ;; *) echo 'Use an absolute package path' >&2; exit 2;; esac
 case "$output" in /*) ;; *) echo 'Use an absolute output path' >&2; exit 2;; esac
 case "$mode" in throughput) entry=Bench;; memory) entry=MemoryBench;; *) echo 'Expected throughput or memory' >&2; exit 2;; esac
+# Preserved baseline images retain the flat launcher; new images use the benchmark package.
+entry_package=dev.jasper.app
+if unzip -Z1 "$image/Contents/app/jasper-app.jar" | grep -Fxq "dev/jasper/app/benchmark/$entry.class"; then
+    entry_package=dev.jasper.app.benchmark
+fi
 exec "$image/Contents/runtime/Contents/Home/bin/java" --enable-native-access=ALL-UNNAMED \
     -Dapple.awt.application.name='Jasper benchmark' -cp "$image/Contents/app/*" \
-    "dev.jasper.app.$entry" --revision "$revision" --output "$output" "$@"
+    "$entry_package.$entry" --revision "$revision" --output "$output" "$@"

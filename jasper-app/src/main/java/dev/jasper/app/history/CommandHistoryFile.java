@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Set;
 import org.tomlj.Toml;
 
+/** Bounded command-history file codec. Callers select the I/O thread; each operation owns and closes its own file handles. */
 final class CommandHistoryFile {
     private CommandHistoryFile() {}
 

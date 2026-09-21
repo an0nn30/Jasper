@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** One saved command. Placeholders are {@code {{identifier}}}; a backslash before {@code {{} makes it literal. */
+/** One saved command. Placeholders are {@code {{identifier}}}; a backslash before the opening double brace makes it literal. */
 public record Snippet(String name, String command, List<String> keywords) {
     public static final int MAX_NAME = 128;
     static final int MAX_COMMAND = 16 * 1024;
@@ -42,7 +42,7 @@ public record Snippet(String name, String command, List<String> keywords) {
         return List.copyOf(names);
     }
 
-    /** The command with every placeholder replaced (missing values become empty) and {@code \{{} unescaped. */
+    /** The command with every placeholder replaced (missing values become empty) and escaped opening braces restored. */
     public String fill(Map<String, String> values) {
         Matcher matcher = PLACEHOLDER.matcher(command);
         var out = new StringBuilder();

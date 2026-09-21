@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.swing.SwingUtilities;
 
+/** EDT registry of real Swing actions with a cached search index. Registration handles and registry close remove property listeners exactly once. */
 public final class CommandRegistry implements AutoCloseable {
     private record Registered(Command command, PropertyChangeListener listener) {}
 

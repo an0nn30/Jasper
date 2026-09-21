@@ -12,8 +12,15 @@ import java.util.function.Supplier;
  * <p>{@code detail} is a supplier rather than a string so a running notice can tick without the deck
  * being re-posted every second, and so a future transfer can report bytes through the same field.
  *
- * <p>Identity is {@link #id}, never {@code equals}: the record holds two lambdas, so its
+ * <p>Identity is {@link #id()}, never {@code equals}: the record holds two lambdas, so its
  * generated {@code equals} compares them by reference and means nothing useful.
+ * <p>Construction is resource-free. Detail and activation run on EDT and must not block.
+ * @param id nonnull source-qualified identity with stable equality
+ * @param kind nonnull task or connection kind
+ * @param title nonblank display title
+ * @param state nonnull state compatible with kind
+ * @param detail nonnull nonblocking detail supplier; presentation tolerates a failed supplier
+ * @param activate activation request, or null when its origin is gone
  */
 public record BuddyNotice(BuddyNoticeId id, Kind kind, String title, State state,
                    Supplier<String> detail, Runnable activate) {
@@ -26,6 +33,7 @@ public record BuddyNotice(BuddyNoticeId id, Kind kind, String title, State state
         CONNECTION
     }
 
+    /** Task and connection lifecycle states; kind compatibility is validated at construction. */
     public enum State {
         RUNNING, NEEDS_INPUT, DONE, FAILED, UP, DEGRADED, DOWN;
 
@@ -37,6 +45,7 @@ public record BuddyNotice(BuddyNoticeId id, Kind kind, String title, State state
         }
     }
 
+    /** Rejects null required inputs, blank titles and kind/state mismatches before acquiring anything. */
     public BuddyNotice {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(kind, "kind");
@@ -65,5 +74,6 @@ public record BuddyNotice(BuddyNoticeId id, Kind kind, String title, State state
      */
     public boolean orphaned() { return activate == null; }
 
+    /** Compares only stable notice identity; callback identity never participates. */
     public boolean sameAs(BuddyNoticeId otherId) { return id.equals(otherId); }
 }

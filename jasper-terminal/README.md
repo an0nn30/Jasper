@@ -64,7 +64,7 @@ SessionLaunchOptions launch = SessionLaunchOptions.builder()
 Start the session off the Event Dispatch Thread (EDT), then create and attach the
 view on the EDT. This example transfers the session to its caller. If the pane
 closes while launch is in flight, the owner must close that unneeded session
-instead of attaching it. Jasper's [ShellLauncher](../jasper-app/src/main/java/dev/jasper/app/ShellLauncher.java)
+instead of attaching it. Jasper's [ShellLauncher](../jasper-app/src/main/java/dev/jasper/app/launch/ShellLauncher.java)
 already handles this application concern. This method is compiled, but never
 invoked by the headless example test.
 

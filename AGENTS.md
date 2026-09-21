@@ -50,3 +50,12 @@ PY
 ## Workflow used so far
 
 Plans are written with `superpowers:writing-plans` (complete code in every step, TDD, one commit per task) and executed with `superpowers:subagent-driven-development` (per-task implementer + reviewer, fix rounds, a final whole-branch review). Keep that shape for plans 3 and 4: one plan per runnable deliverable, and record any deviation from plan text in the plan's status banner and in `docs/STATUS.md`.
+
+## App and Buddy contributor entry points
+
+Start with [app onboarding](jasper-app/README.md), [Buddy embedding](jasper-buddy/README.md),
+[architecture](docs/app-architecture.md) and [maintenance recipes](docs/app-maintenance.md).
+App public visibility is for internal feature collaboration, not a plugin ABI. Package-info
+files name allowed outgoing dependencies and lifetime owners. The app/Buddy refactor uses
+the user-approved native inline workflow with one independent final review. Pure test
+fixtures live in testsupport; owner-package test access bridges stay out of production jars.

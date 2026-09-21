@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.*;
 
 /** Native benchmark orchestration. Never reached from production Main or headless check. */
 @SuppressWarnings("try") // Cleanup intentionally preserves failures, including interrupted bounded waits.
+/** Owns one opt-in native benchmark run, its controlled child and workspace fixtures; closes acquired resources even when measurement fails. */
 final class BenchmarkRun implements AutoCloseable {
     private final BenchmarkOptions options;
     private final Path directory;

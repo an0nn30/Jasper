@@ -23,13 +23,13 @@ ditto jasper-app/build/packaging/image/Jasper.app /absolute/benchmark-baselines/
 ./tools/benchmarks/run-macos.sh /absolute/benchmark-baselines/pre-hardening/Jasper.app memory REVISION /absolute/results/memory-1.json
 ```
 
-Equivalent direct invocation, using only the preserved runtime and JARs:
+Equivalent direct invocation for a newly built image, using only its preserved runtime and JARs:
 
 ```sh
 /absolute/benchmark-baselines/pre-hardening/Jasper.app/Contents/runtime/Contents/Home/bin/java \
   --enable-native-access=ALL-UNNAMED -Dapple.awt.application.name='Jasper benchmark' \
   -cp '/absolute/benchmark-baselines/pre-hardening/Jasper.app/Contents/app/*' \
-  dev.jasper.app.MemoryBench --revision REVISION --output /absolute/results/memory-1.json
+  dev.jasper.app.benchmark.MemoryBench --revision REVISION --output /absolute/results/memory-1.json
 ```
 
 Windows PowerShell (build natively on Windows first, then copy the entire `Jasper` image):
@@ -39,9 +39,13 @@ Windows PowerShell (build natively on Windows first, then copy the entire `Jaspe
 Copy-Item -Recurse 'jasper-app\build\packaging\image\Jasper' 'C:\benchmark-baselines\pre-hardening\Jasper'
 .\tools\benchmarks\run-windows.ps1 -Image 'C:\benchmark-baselines\pre-hardening\Jasper' -Mode memory -Revision REVISION -Output 'C:\results\memory-1.json'
 & 'C:\benchmark-baselines\pre-hardening\Jasper\runtime\bin\java.exe' '--enable-native-access=ALL-UNNAMED' `
-  '-cp' 'C:\benchmark-baselines\pre-hardening\Jasper\app\*' 'dev.jasper.app.Bench' `
+  '-cp' 'C:\benchmark-baselines\pre-hardening\Jasper\app\*' 'dev.jasper.app.benchmark.Bench' `
   '--revision' 'REVISION' '--output' 'C:\results\throughput-1.json'
 ```
+
+The scripts detect both the original flat benchmark entry points in older preserved images
+and the new `dev.jasper.app.benchmark` package. For a direct invocation of an older image,
+use its original `dev.jasper.app.Bench` or `dev.jasper.app.MemoryBench` class name.
 
 Arguments are separate strings throughout the parent and Java child launches; paths may contain spaces or shell metacharacters. There is no `cmd /c type`. The Java child uses the same `java.home` and absolute classpath as its parent and an allowlisted process environment. `TERM=xterm-256color`, `COLORTERM=truecolor`, and `LANG=en_US.UTF-8` are explicit.
 

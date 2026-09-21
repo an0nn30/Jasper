@@ -19,6 +19,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 
+/** EDT command-recency owner with asynchronous persistence. The application closes it and waits for its flush future during shutdown. */
 public final class CommandHistory implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(CommandHistory.class.getName());
 
