@@ -23,9 +23,11 @@ class CommandNotifierTest {
 
     /** Nothing fires by itself: a test runs the scheduled task when it wants the threshold to pass. */
     private CommandNotifier notifier(int seconds) {
-        return new CommandNotifier(() -> Duration.ofSeconds(seconds), deck.companion(),
+        var notifier = new CommandNotifier(() -> Duration.ofSeconds(seconds), deck.companion(),
             (title, detail) -> os.add(new Sent(title, detail)), working::add,
             (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); });
+        for (String key : List.of("pane", "a", "b")) notifier.opened(key);
+        return notifier;
     }
 
     private void passThreshold() {
@@ -436,4 +438,30 @@ class CommandNotifierTest {
         assertThat(deck.notices().getFirst().title()).isEqualTo(title);
     }
 
+
+    @Test void savedCallbacksAndLateEventsCannotResurrectClosedProducers() {
+        for (int scenario = 0; scenario < 4; scenario++) {
+            var notifier = notifier(10);
+            String key = "late-" + scenario;
+            notifier.opened(key);
+            Runnable saved = () -> {};
+            if (scenario != 0) {
+                notifier.started(key, "build", () -> 20_000_000_000L, () -> {}, WATCHED);
+                saved = scheduled.getLast();
+            }
+            if (scenario == 2) {
+                saved.run();
+                notifier.finished(key, "build", OptionalInt.of(0), Duration.ofSeconds(20), HIDDEN_TAB, () -> {});
+            }
+            if (scenario == 3) notifier.close(); else notifier.closed(key);
+            int generation = deck.generation(), sent = os.size(), changes = working.size();
+            saved.run();
+            notifier.started(key, "late", () -> 20_000_000_000L, () -> {}, UNWATCHED);
+            notifier.finished(key, "late", OptionalInt.of(0), Duration.ofSeconds(20), HIDDEN_TAB, () -> {});
+            notifier.hidden(key); notifier.looked(key); notifier.titleChanged(key, "late");
+            assertThat(deck.generation()).isEqualTo(generation);
+            assertThat(os).hasSize(sent); assertThat(working).hasSize(changes);
+            notifier.close(); notifier.close();
+        }
+    }
 }

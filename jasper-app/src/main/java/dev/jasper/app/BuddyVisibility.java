@@ -25,6 +25,8 @@ final class BuddyVisibility {
 
     void remove(Object key) { windows.remove(key); }
 
+    void clear() { windows.clear(); }
+
     boolean shown() {
         if (!enabled()) return false;
         for (WindowState state : windows.values()) if (state.showing() && !state.iconified()) return true;

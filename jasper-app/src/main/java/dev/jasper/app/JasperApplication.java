@@ -1,20 +1,13 @@
 package dev.jasper.app;
 
-import dev.jasper.buddy.view.BuddyCompanion;
-import dev.jasper.buddy.config.BuddyOptions;
-import dev.jasper.buddy.config.BuddyPosition;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.rendering.FontSet;
 import dev.jasper.terminal.session.SessionLaunchOptions;
 
 import dev.jasper.terminal.session.TerminalSession;
-import java.awt.AWTEvent;
 import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.GraphicsEnvironment;
-import java.awt.Toolkit;
-import java.awt.event.AWTEventListener;
-import java.awt.event.KeyEvent;
 import java.io.UncheckedIOException;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -27,8 +20,6 @@ import javax.swing.SwingUtilities;
 /** Application-level window and shell ownership; closing a window never exits sibling windows. */
 final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
-    /** At most one buddy poke per second, however fast the user types. */
-    private static final long POKE_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(1);
     private final ThemeController themes = new ThemeController();
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
@@ -48,19 +39,14 @@ final class JasperApplication {
     private final ShellHistoryIndex shellHistory;
     private final SnippetStore snippets;
     private final Path shellIntegrationDir;
-    private final BuddyVisibility buddyVisibility = new BuddyVisibility();
-    private final Path buddyStateFile;
-    private final BuddyCompanion buddy;
+    private final BuddyIntegration buddy;
     private final dev.jasper.app.lifecycle.Subscription buddyAppearance;
     private final NativeNotifier nativeNotifier = new NativeNotifier();
     private final CommandNotifier notifications;
-    private boolean buddyUnavailable;
 
     private int configuredLongCommandSeconds() {
         return configuration == null ? 10 : configuration.snapshot().longCommandSeconds();
     }
-    private AWTEventListener keyWatch;
-    private long lastPokeNanos;
     private TerminalWindow lastActive;
 
     JasperApplication() { this(null); }
@@ -104,18 +90,18 @@ final class JasperApplication {
                       Runnable terminate, ShellHistoryIndex shellHistory, SnippetStore snippets, Path shellIntegrationDir) {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
-        this.buddyStateFile = buddyStateFile;
         this.shutdown = new ApplicationShutdown(terminate);
         this.shellHistory = shellHistory;
         this.snippets = snippets;
         this.shellIntegrationDir = shellIntegrationDir;
-        buddy = new BuddyCompanion(buddyOptions());
-        buddyAppearance = themes.subscribe((theme, changed) -> buddy.applyOptions(buddyOptions()));
+        buddy = new BuddyIntegration(buddyStateFile, SystemFonts.system(java.awt.Font.PLAIN, 13f),
+            themes.current().chrome() == BuiltinTheme.DARK, this::raiseTerminal, this::toggleBuddy, this::owns);
+        buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome() == BuiltinTheme.DARK));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
-            buddy, nativeNotifier::send, buddy::setWorking, JasperApplication::afterDelay);
+            buddy.companion(), nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
         configuration = service == null ? null : new ConfigurationController(themes, service);
         if (configuration != null) configuration.onSnapshot(snapshot -> {
-            buddyVisibility.configure(snapshot.buddyEnabled()); syncBuddy();
+            buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             if (snippets != null) snippets.reload();
             loginItems.accept(snapshot.backgroundEnabled());
         });
@@ -167,7 +153,7 @@ final class JasperApplication {
                 case WorkspaceActivity.TitleChanged value -> notifications.titleChanged(value.id(), value.title());
                 case WorkspaceActivity.PaneState value -> {
                     switch (value.state()) {
-                        case OPENED -> { }
+                        case OPENED -> notifications.opened(value.id());
                         case CLOSED -> notifications.closed(value.id());
                         case FOCUSED -> notifications.looked(value.id());
                         case BLURRED -> notifications.hidden(value.id());
@@ -266,19 +252,19 @@ final class JasperApplication {
 
     void windowClosed(TerminalWindow window) {
         windows.remove(window);
-        buddyVisibility.remove(window);
+        buddy.removeWindow(window);
         if (lastActive == window) lastActive = null;
         // Residency keeps the warm process: the command history, the shell-history index, the
         // snippets and the configuration watcher are precisely what makes the next window fast,
         // and shutdown would close all of them. Quit still terminates.
         if (windows.isEmpty() && !resident) requestShutdown();
-        else syncBuddy();
+        else updateBuddyActions();
     }
 
     void windowStateChanged(TerminalWindow window, boolean showing, boolean iconified) {
         if (!windows.contains(window)) return;
-        buddyVisibility.window(window, showing, iconified);
-        syncBuddy();
+        buddy.window(window, showing, iconified);
+        updateBuddyActions();
     }
 
     /** Coming back to a Jasper window is attention: the buddy wakes and waves. */
@@ -288,38 +274,14 @@ final class JasperApplication {
         if (buddy != null && !quitting && !stopped) buddy.greet();
     }
 
-    /**
-     * One toolkit listener for the whole app, installed with the buddy: typing in a Jasper window keeps
-     * him awake without a wave. Key events from the buddy's own bubble or any other window are ignored.
-     */
-    private void installKeyWatch() {
-        if (keyWatch != null) return;
-        lastPokeNanos = System.nanoTime() - POKE_INTERVAL_NANOS;
-        keyWatch = event -> {
-            if (event.getID() != KeyEvent.KEY_PRESSED || quitting || stopped || buddy == null) return;
-            if (!(event.getSource() instanceof Component source) || !owns(source)) return;
-            long now = System.nanoTime();
-            if (now - lastPokeNanos < POKE_INTERVAL_NANOS) return;
-            lastPokeNanos = now;
-            buddy.poke();
-        };
-        Toolkit.getDefaultToolkit().addAWTEventListener(keyWatch, AWTEvent.KEY_EVENT_MASK);
-    }
-
-    private void removeKeyWatch() {
-        if (keyWatch == null) return;
-        Toolkit.getDefaultToolkit().removeAWTEventListener(keyWatch);
-        keyWatch = null;
-    }
-
     private boolean owns(Component component) {
         for (TerminalWindow window : windows) if (window.owns(component)) return true;
         return false;
     }
 
-    void toggleBuddy() { buddyVisibility.toggle(); syncBuddy(); }
+    void toggleBuddy() { buddy.toggle(); updateBuddyActions(); }
 
-    boolean buddyEnabled() { return buddyVisibility.enabled(); }
+    boolean buddyEnabled() { return buddy.enabled(); }
 
     private void raiseTerminal() {
         TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive
@@ -327,37 +289,7 @@ final class JasperApplication {
         if (target != null) target.toFront();
     }
 
-    private BuddyOptions buddyOptions() {
-        var builder = BuddyOptions.builder(SystemFonts.system(java.awt.Font.PLAIN, 13f))
-            .dark(themes.current().chrome() == BuiltinTheme.DARK)
-            .activateHost(this::raiseTerminal).toggleRequested(this::toggleBuddy);
-        if (buddyStateFile != null) {
-            try { BuddyStateFile.read(buddyStateFile).ifPresent(p -> builder.initialPosition(new BuddyPosition(p.x, p.y))); }
-            catch (java.io.IOException failure) { LOG.log(System.Logger.Level.WARNING, "Ignoring unreadable buddy state " + buddyStateFile, failure); }
-            builder.positionChanged(p -> {
-                try { BuddyStateFile.write(buddyStateFile, new java.awt.Point(p.x(), p.y())); }
-                catch (java.io.IOException failure) { LOG.log(System.Logger.Level.WARNING, "Could not save buddy position to " + buddyStateFile, failure); }
-            });
-        }
-        return builder.build();
-    }
-
-    private void syncBuddy() {
-        if (quitting || stopped) return;
-        if (!buddyUnavailable) {
-            try {
-                if (buddyVisibility.shown()) {
-                    if (!buddy.show()) buddyUnavailable = true; else installKeyWatch();
-                } else if (buddy != null) buddy.hide();
-            } catch (RuntimeException failure) {
-                buddyUnavailable = true;
-                if (buddy != null) {
-                    try { buddy.close(); } catch (RuntimeException ignored) { }
-                }
-                removeKeyWatch();
-                LOG.log(System.Logger.Level.WARNING, "Desk buddy disabled for this session", failure);
-            }
-        }
+    private void updateBuddyActions() {
         for (TerminalWindow window : List.copyOf(windows)) window.content().updateActions();
     }
 
@@ -386,7 +318,7 @@ final class JasperApplication {
         stopped = true;
         quitting = true;
         launches.close();
-        removeKeyWatch();
+        notifications.close();
         buddyAppearance.close();
         buddy.close();
         history.close();

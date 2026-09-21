@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Approved for native execution; Tasks 1–9 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Tasks 1–10 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -741,10 +741,10 @@ BuddyDeck construction is pure/no resources; null validation precedes all presen
 
 **Interfaces:** `BuddyIntegration(Path stateFile,Font font,boolean dark,Runnable activateHost,Runnable toggleRequested)`; `BuddyCompanion companion()`, `void configured(boolean)`, `void toggle()`, `boolean enabled()`, `void window(Object,boolean showing,boolean iconified)`, `void removeWindow(Object)`, `void appearance(Font,boolean)`, `void activity()`, `void greet()`, `void close()`. Application composes CommandNotifier with companion and OS notification callback. CommandNotifier adds `opened(Object key)` and `close()`; all producer events reject inactive keys.
 
-- [ ] Add notifier tests that call `opened`, start a long command, save its scheduled Runnable, close the producer, then execute the saved Runnable and deliver a finished event. Assert no new post, no working state and no OS notification. Repeat for close before start, close after completion and notifier-wide shutdown. A test must invoke saved work after close, not only verify the cancellation callback was called.
-- [ ] Add BuddyIntegration tests using a package-private constructor that accepts `BuddyCompanion`, `BuddyVisibility`, `Consumer<BuddyPosition>` and `BooleanSupplier show` for headless control. Assert unavailable show called once despite repeated state events; hiding preserves the companion model; position writes occur only on drag-end callback; appearance changes retain initial position without applying it again; close removes the global key listener once.
-- [ ] Run focused tests for RED. Move JasperApplication's Buddy fields, lazy availability, syncBuddy, toggle, greet, key watch and poke throttling into BuddyIntegration. Keep exactly one companion model from construction even before first show. Resolve the system font in the app and pass it with resolved dark mode. Read BuddyStateFile before first show; retain its strict format and synchronous drag-end write behavior. Native exception handling still disables the presentation and logs the existing message.
-- [ ] Reject events after producer closure without retaining an unbounded tombstone set:
+- [x] Add notifier tests that call `opened`, start a long command, save its scheduled Runnable, close the producer, then execute the saved Runnable and deliver a finished event. Assert no new post, no working state and no OS notification. Repeat for close before start, close after completion and notifier-wide shutdown. A test must invoke saved work after close, not only verify the cancellation callback was called.
+- [x] Add BuddyIntegration tests using a package-private constructor that accepts `BuddyCompanion`, `BuddyVisibility`, `Consumer<BuddyPosition>` and `BooleanSupplier show` for headless control. Assert unavailable show called once despite repeated state events; hiding preserves the companion model; position writes occur only on drag-end callback; appearance changes retain initial position without applying it again; close removes the global key listener once.
+- [x] Run focused tests for RED. Move JasperApplication's Buddy fields, lazy availability, syncBuddy, toggle, greet, key watch and poke throttling into BuddyIntegration. Keep exactly one companion model from construction even before first show. Resolve the system font in the app and pass it with resolved dark mode. Read BuddyStateFile before first show; retain its strict format and synchronous drag-end write behavior. Native exception handling still disables the presentation and logs the existing message.
+- [x] Reject events after producer closure without retaining an unbounded tombstone set:
 
 ```java
 private final java.util.Set<Object> activeProducers = new java.util.HashSet<>();
@@ -756,8 +756,8 @@ private boolean accepts(Object key) { return !disposed && activeProducers.contai
 ```
 
 Translate workspace OPENED into `opened` before any started event; registration replays existing panes and later panes emit their own OPENED. Put `if (!accepts(key)) return;` at the beginning of started/finished/titleChanged/looked/hidden paths and inside delayed callbacks. In closed, remove the key **before** cancellation/orphaning; retain the existing final duration/outcome rules. In notifier close, mark disposed, cancel every in-flight timer, clear active producers and replace/release retained callback closures. App closes notifier before companion. No post-shutdown callback can reactivate the companion.
-- [ ] Replace notification use of `TerminalTitle.singleLine` with its existing two-replacement pure body inside CommandNotifier; do not create a common module. Application translates workspace events and registers producer identities; workspace never imports CommandNotice/Buddy.
-- [ ] Run `./gradlew check`; commit `refactor: isolate Buddy application integration` with trailer.
+- [x] Replace notification use of `TerminalTitle.singleLine` with its existing two-replacement pure body inside CommandNotifier; do not create a common module. Application translates workspace events and registers producer identities; workspace never imports CommandNotice/Buddy.
+- [x] Run `./gradlew check`; commit `refactor: isolate Buddy application integration` with trailer.
 
 ## Task 11: Apply final packages and enforce architecture from bytecode
 

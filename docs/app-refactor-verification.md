@@ -55,6 +55,15 @@ Task 9: Ruling: Use a separate java-test-fixtures artifact exposing controlled c
 Task 9: Ruling: The existing native-window tests exercise pure geometry predicates; there is no headless native acquisition seam. Preserve those and animation/drag cancellation tests, add exhaustive EDT/headless facade tests, and inspect native timer/listener disposal without inventing a second window implementation. Native lifecycle acceptance remains user-run. Cost if wrong: a platform-specific cleanup defect may escape headless checks.
 Task 9: Ruling: Move Buddy preview tasks to the Buddy module and replace app theme installers with explicit font/dark values. Cost if wrong: developer preview commands change module; documentation will name the new commands. Production appearance still comes from the application.
 
+### Task 10 — Application Buddy policy
+
+Missing owner/lifecycle APIs were RED, then focused tests and full `check` passed:
+app 594, Buddy 160, terminal 355; 1,109 total, two expected skips, no failures/errors.
+Saved callbacks are explicitly invoked after producer closure and notifier shutdown.
+Availability, hide-preserves-model, listener removal and strict position writes pass.
+
+Task 10: Ruling: Add an ownership predicate and a JDK activity-registration callback to BuddyIntegration rather than coupling it to TerminalWindow. The plan’s four-argument test seam omitted appearance and key-listener ownership inputs; the actual seam takes BuddyOptions, companion, visibility, show, ownership and registration. Cost if wrong: extra constructor inputs; production filtering and headless exactly-once removal use the same path. Position persistence is tested through the real options factory and drag callback, without adding public inspection methods.
+
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.

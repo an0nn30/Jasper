@@ -28,15 +28,20 @@ import java.util.function.Supplier;
  *
  * <p>EDT only.
  */
-final class CommandNotifier {
+final class CommandNotifier implements AutoCloseable {
+    private final java.util.Set<Object> activeProducers = new java.util.HashSet<>();
+    private boolean disposed;
+
+    void opened(Object key) { if (!disposed) activeProducers.add(Objects.requireNonNull(key)); }
+    private boolean accepts(Object key) { return !disposed && activeProducers.contains(key); }
     /** Every notice this class posts is the terminal's; a transfer or an SSH session brings its own. */
     static final String SOURCE = "terminal";
 
-    private final Supplier<Duration> threshold;
-    private final BuddyCompanion deck;
-    private final BiConsumer<String, String> operatingSystem;
-    private final Consumer<Boolean> onWorkingChanged;
-    private final BiFunction<Duration, Runnable, Runnable> schedule;
+    private Supplier<Duration> threshold;
+    private BuddyCompanion deck;
+    private BiConsumer<String, String> operatingSystem;
+    private Consumer<Boolean> onWorkingChanged;
+    private BiFunction<Duration, Runnable, Runnable> schedule;
     private final Map<Object, InFlight> inFlight = new HashMap<>();
     /** Commands that have been running past the threshold. */
     private int running;
@@ -68,6 +73,7 @@ final class CommandNotifier {
      * being re-posted every second.
      */
     void started(Object key, String command, LongSupplier elapsedNanos, Runnable activate, boolean watched) {
+        if (!accepts(key)) return;
         Duration wait = threshold.get();
         cancel(key);
         if (wait.isZero()) return;
@@ -85,12 +91,14 @@ final class CommandNotifier {
 
     /** The pane stopped being watched: anything running in it is now worth showing. */
     void hidden(Object key) {
+        if (!accepts(key)) return;
         InFlight flight = inFlight.get(key);
         if (flight != null && !flight.passed) promote(key, flight);
     }
 
     /** Turns an in-flight command into a bubble, once. */
     private void promote(Object key, InFlight flight) {
+        if (!accepts(key)) return;
         if (inFlight.get(key) != flight || flight.passed) return;
         flight.passed = true;
         flight.cancel.run();
@@ -101,9 +109,10 @@ final class CommandNotifier {
 
     /** Refresh wording without promoting the card, clearing acknowledgement, or replaying arrival. */
     void titleChanged(Object key, String programTitle) {
+        if (!accepts(key)) return;
         InFlight flight = inFlight.get(key);
         if (flight == null) return; // Prompt titles cannot rename completed history.
-        String updated = TerminalTitle.singleLine(programTitle);
+        String updated = singleLine(programTitle);
         if (updated.isBlank() || updated.equals(flight.title)) return;
         flight.title = updated;
         if (flight.passed) deck.updateTitle(new BuddyNoticeId(SOURCE, key), updated);
@@ -112,6 +121,7 @@ final class CommandNotifier {
     /** A command ended. Its card becomes the outcome, and the OS hears about it if you were elsewhere. */
     void finished(Object key, String command, OptionalInt exitStatus, Duration ran,
                   CommandNotice.Origin origin, Runnable activate) {
+        if (!accepts(key)) return;
         InFlight flight = inFlight.get(key);
         String title = flight == null ? title(command) : flight.title;
         cancel(key);
@@ -128,6 +138,7 @@ final class CommandNotifier {
 
     /** That pane took focus: whatever it posted has now been seen. */
     void looked(Object key) {
+        if (!accepts(key)) return;
         deck.acknowledge(new BuddyNoticeId(SOURCE, key));
     }
 
@@ -136,6 +147,7 @@ final class CommandNotifier {
      * ticking and stops responding, because there is no longer anywhere for a click to go.
      */
     void closed(Object key) {
+        if (disposed || !activeProducers.remove(key)) return;
         InFlight flight = inFlight.get(key);
         boolean stillRunning = flight != null && flight.passed;
         Duration ran = flight == null ? Duration.ZERO : Duration.ofNanos(flight.elapsed.getAsLong());
@@ -153,12 +165,27 @@ final class CommandNotifier {
         InFlight flight = inFlight.remove(key);
         if (flight == null) return;
         flight.cancel.run();
+        flight.cancel = () -> {}; flight.activate = () -> {}; flight.detail = () -> ""; flight.elapsed = () -> 0L;
         if (flight.passed && running > 0 && --running == 0) onWorkingChanged.accept(false);
     }
 
     /** Keep the full content; the tab and capsule renderers fit it to their own available width. */
     static String title(String command) {
-        return TerminalTitle.singleLine(command.strip());
+        return singleLine(command.strip());
+    }
+
+    private static String singleLine(String title) {
+        return title.replace("\r", "").replace("\n", " ↵ ");
+    }
+
+    @Override public void close() {
+        if (disposed) return;
+        disposed = true;
+        for (Object key : java.util.List.copyOf(inFlight.keySet())) cancel(key);
+        activeProducers.clear();
+        threshold = () -> Duration.ZERO; deck = null;
+        operatingSystem = (title, detail) -> {}; onWorkingChanged = value -> {};
+        schedule = (delay, action) -> () -> {};
     }
 
     /** "45s", "1m 12s", "2m", "2h 5m" — the way a person would say it, not ISO-8601. */

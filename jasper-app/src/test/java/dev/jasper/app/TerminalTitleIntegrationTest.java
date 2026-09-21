@@ -66,7 +66,7 @@ class TerminalTitleIntegrationTest {
                 case WorkspaceActivity.TitleChanged value -> notifier.titleChanged(value.id(), value.title());
                 case WorkspaceActivity.PaneState value -> {
                     switch (value.state()) {
-                        case OPENED -> { }
+                        case OPENED -> notifier.opened(value.id());
                         case CLOSED -> notifier.closed(value.id());
                         case FOCUSED -> notifier.looked(value.id());
                         case BLURRED -> notifier.hidden(value.id());

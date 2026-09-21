@@ -4,11 +4,10 @@
 `codex/app-architecture-design`, based on merged main `c7b796b`.
 [Spec](superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md) and
 [plan](superpowers/plans/2026-09-20-jasper-app-buddy-refactor.md) are the authorities.
-Tasks 1–9 are committed: settings/builders/subscriptions, theme and platform
+Tasks 1–10 are committed: settings/builders/subscriptions, theme and platform
 boundaries, workspace owners/activity, palette controller with stale-result guards,
 launch/shutdown coordination, startup rollback, and the extracted Buddy library/facade. Latest full check:
-1,105 tests across three modules, zero failures/errors, two expected skips. Next: Buddy
-app integration, final packages/checks and onboarding.
+1,109 tests across three modules, zero failures/errors, two expected skips. Buddy application policy and producer closure are isolated. Next: final packages/checks and onboarding.
 Execution rulings and exact checks are in the
 [verification report](app-refactor-verification.md). No GUI, merge or push.
 The terminal refactor is merged; older notes below describe its earlier handoff.
