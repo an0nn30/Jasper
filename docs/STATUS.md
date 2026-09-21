@@ -13,13 +13,13 @@ maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merg
 local `main`, as is plan 2 (actions and chrome placements). Plan 3a (rail, panels and plugin
 windows) is merged too; the spec's plan 3 was split into 3a and 3b. Plan 3b (Plugins manager,
 install and restart) is merged too. The spec's plan 4 is split into 4a (terminal API: observe,
-inject, open) and 4b (plugin-provided sessions); 4a is merged too, and 4b is implemented on
-`claude/plugin-sdk-plan-4b`. Working-directory provenance moved from 4b to a small plan 4c, which is not started.
+inject, open) and 4b (plugin-provided sessions); 4a and 4b are merged too. Working-directory provenance moved from 4b to a small plan 4c, which is
+planned on `claude/plugin-sdk-plan-4c`.
 
 ### Plugin SDK plan 4b — 2026-09-21
 
-Implemented on `claude/plugin-sdk-plan-4b` (worktree `.worktrees/plugin-sdk-plan-4b`), not yet
-merged or pushed. The work implements
+Merged into local `main` by fast-forward on 2026-09-21 at `5f21a0e` (not pushed); the merged
+result passed the same verification. The work implements
 [plan 4b](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-4b-plugin-sessions.md): a plugin opens
 a pane whose session it provides. `jasper-terminal` gained `TerminalSession.attach(AttachedConnection,
 GridSize, scrollback)`, the only addition to the app-facing allowlist, over a JDK-only
