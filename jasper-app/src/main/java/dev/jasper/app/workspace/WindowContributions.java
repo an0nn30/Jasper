@@ -30,6 +30,7 @@ final class WindowContributions implements AutoCloseable {
         this.owner = owner;
         this.model = model;
         syncActions();
+        owner.chrome().connect(this);
         listening = model.onChanged(this::changed);
     }
 
@@ -58,8 +59,17 @@ final class WindowContributions implements AutoCloseable {
     }
 
     private void changed(Contributions.Kind kind) {
-        if (kind != Contributions.Kind.ACTIONS) return;
-        if (syncActions()) owner.rebind();
+        switch (kind) {
+            case ACTIONS -> {
+                if (syncActions()) owner.rebind();
+                // Titles label toolbar buttons and a vanished action removes its placements.
+                owner.chrome().renderContributedToolbar();
+                owner.chrome().renderContributedMenus();
+            }
+            case TOOLBAR -> owner.chrome().renderContributedToolbar();
+            case MENUS -> owner.chrome().renderContributedMenus();
+            case STATUS -> { }
+        }
     }
 
     /** Returns whether the set of actions changed, which is when shortcuts must be recomputed. */
@@ -103,5 +113,6 @@ final class WindowContributions implements AutoCloseable {
         commands.clear();
         actions.values().forEach(action -> action.setEnabled(false));
         actions.clear();
+        owner.chrome().connect(null);
     }
 }

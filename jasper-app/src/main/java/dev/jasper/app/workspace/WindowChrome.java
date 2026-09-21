@@ -1,6 +1,11 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.commands.Command;
+import dev.jasper.app.contributions.MenuEntry;
+import dev.jasper.app.contributions.MenuSection;
+import dev.jasper.app.contributions.MenuTarget;
+import dev.jasper.app.contributions.ToolbarEntry;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.config.ToolbarMode;
@@ -8,6 +13,10 @@ import dev.jasper.app.config.ToolbarMode;
 import java.awt.*;
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import javax.swing.*;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
@@ -22,6 +31,12 @@ final class WindowChrome {
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
     private final JCheckBoxMenuItem buddyVisible = new JCheckBoxMenuItem("Show Jasper", false);
+    private final Component toolbarGlue = Box.createHorizontalGlue();
+    private final java.util.EnumMap<MenuTarget.Slot, JMenu> standardMenus = new java.util.EnumMap<>(MenuTarget.Slot.class);
+    private final List<Component> contributedToolbar = new ArrayList<>();
+    private final Map<JMenu, List<Component>> contributedSections = new LinkedHashMap<>();
+    private final List<JMenu> contributedMenus = new ArrayList<>();
+    private WindowContributions contributions;
 
     WindowChrome(WindowContent owner) {
         this.owner = owner;
@@ -40,6 +55,9 @@ final class WindowChrome {
             ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4,
             ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6, ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9);
         menuBar.add(file); menuBar.add(edit); menuBar.add(view); menuBar.add(pane); menuBar.add(tab);
+        standardMenus.put(MenuTarget.Slot.FILE, file); standardMenus.put(MenuTarget.Slot.EDIT, edit);
+        standardMenus.put(MenuTarget.Slot.VIEW, view); standardMenus.put(MenuTarget.Slot.PANE, pane);
+        standardMenus.put(MenuTarget.Slot.TAB, tab);
         JMenu modes = new JMenu("Toolbar");
         for (ToolbarMode mode : ToolbarMode.values()) {
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));
@@ -80,8 +98,113 @@ final class WindowChrome {
         toolbar.add(Box.createHorizontalStrut(UIScale.scale(4)));
         addButton(ActionId.ZOOM_PANE, "maximize"); addButton(ActionId.FIND, "search");
         toolbar.add(new ToolbarSeparator());
-        toolbar.add(Box.createHorizontalGlue());
+        toolbar.add(toolbarGlue);
         addButton(ActionId.OPEN_SETTINGS, "settings"); addButton(ActionId.RELOAD_CONFIG, "refresh");
+    }
+
+    void connect(WindowContributions source) {
+        contributions = source;
+        renderContributedToolbar();
+        renderContributedMenus();
+    }
+
+    private ReferenceButton contributedButton(Action action, String label, Icon icon) {
+        ReferenceButton button = new ReferenceButton(action, null);
+        button.setText(owner.toolbarMode() == ToolbarMode.ICONS ? null : label);
+        button.putClientProperty("label", label);
+        button.setIcon(icon != null ? icon : AppIcons.icon("command"));
+        button.setFocusable(false);
+        button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
+        button.setIconTextGap(UIScale.scale(8));
+        button.getAccessibleContext().setAccessibleName(label);
+        button.setToolTipText(label);
+        button.setFont(button.chromeFont());
+        return button;
+    }
+
+    /** Rebuilds the plugin section, which sits between the built-in group and the right-aligned group. */
+    void renderContributedToolbar() {
+        contributedToolbar.forEach(toolbar::remove);
+        contributedToolbar.clear();
+        if (contributions != null) {
+            for (ToolbarEntry entry : contributions.model().toolbar()) {
+                switch (entry) {
+                    case ToolbarEntry.Button placed -> {
+                        Action action = contributions.action(placed.actionId());
+                        if (action != null) contributedToolbar.add(contributedButton(action,
+                            (String) action.getValue(Action.NAME), (Icon) action.getValue(Command.ICON)));
+                    }
+                    case ToolbarEntry.Dropdown dropdown -> {
+                        List<Action> live = new ArrayList<>();
+                        for (String id : dropdown.actionIds()) if (contributions.action(id) != null) live.add(contributions.action(id));
+                        if (live.isEmpty()) break;
+                        ReferenceButton button = contributedButton(null, dropdown.title(), dropdown.icon());
+                        button.chevron = true;
+                        button.addActionListener(event -> {
+                            owner.updateActions();
+                            JPopupMenu popup = new JPopupMenu();
+                            live.forEach(popup::add);
+                            popup.show(button, 0, button.getHeight());
+                        });
+                        contributedToolbar.add(button);
+                    }
+                }
+            }
+            int index = toolbar.getComponentIndex(toolbarGlue);
+            for (Component control : contributedToolbar) toolbar.add(control, index++);
+        }
+        toolbar.revalidate(); toolbar.repaint();
+    }
+
+    private List<Component> build(List<MenuEntry> entries) {
+        List<Component> built = new ArrayList<>();
+        for (MenuEntry entry : entries) {
+            switch (entry) {
+                case MenuEntry.Item item -> {
+                    Action action = contributions.action(item.actionId());
+                    if (action != null) built.add(new JMenuItem(action));
+                }
+                case MenuEntry.Separator separator -> built.add(new JPopupMenu.Separator());
+                case MenuEntry.Submenu submenu -> {
+                    List<Component> children = build(submenu.entries());
+                    if (children.stream().noneMatch(child -> child instanceof JMenuItem)) break;
+                    JMenu menu = new JMenu(submenu.title());
+                    children.forEach(menu::add);
+                    built.add(menu);
+                }
+            }
+        }
+        // A section reduced to separators by vanished actions renders as nothing.
+        return built.stream().anyMatch(child -> child instanceof JMenuItem) ? built : List.of();
+    }
+
+    void renderContributedMenus() {
+        contributedSections.forEach((menu, added) -> added.forEach(menu::remove));
+        contributedSections.clear();
+        contributedMenus.forEach(menuBar::remove);
+        contributedMenus.clear();
+        if (contributions != null) {
+            for (MenuSection section : contributions.model().menus()) {
+                List<Component> built = build(section.entries());
+                if (built.isEmpty()) continue;
+                switch (section.target().type()) {
+                    case STANDARD -> {
+                        JMenu menu = standardMenus.get(MenuTarget.Slot.valueOf(section.target().key()));
+                        List<Component> added = contributedSections.computeIfAbsent(menu, key -> new ArrayList<>());
+                        var separator = new JPopupMenu.Separator();
+                        menu.add(separator); added.add(separator);
+                        for (Component child : built) { menu.add(child); added.add(child); }
+                    }
+                    case TOP_LEVEL -> {
+                        JMenu menu = observe(new JMenu(section.target().title()));
+                        built.forEach(menu::add);
+                        menuBar.add(menu); contributedMenus.add(menu);
+                    }
+                    case CONTEXT -> { }
+                }
+            }
+        }
+        menuBar.revalidate(); menuBar.repaint();
     }
 
     void editTabHeight() {
@@ -105,6 +228,11 @@ final class WindowChrome {
     private JMenu menu(String label, ActionId... ids) {
         JMenu menu = new JMenu(label);
         for (ActionId id : ids) menu.add(owner.action(id));
+        observe(menu);
+        return menu;
+    }
+
+    private JMenu observe(JMenu menu) {
         menu.addMenuListener(new MenuListener() {
             @Override public void menuSelected(MenuEvent event) { owner.updateActions(); }
             @Override public void menuDeselected(MenuEvent event) {}
@@ -134,6 +262,7 @@ final class WindowChrome {
     private static final class ReferenceButton extends JButton {
         private final ActionId id;
         private boolean compact;
+        private boolean chevron;
         ReferenceButton(Action action, ActionId id) { super(action); this.id = id; }
         private boolean labels() { return getText() != null && !compact; }
         private String hint() {
@@ -163,8 +292,8 @@ final class WindowChrome {
             int width = UIScale.scale(32);
             if (labels()) width += UIScale.scale(5) + fm.stringWidth(getText());
             if (!hint().isEmpty()) width += UIScale.scale(8) + getFontMetrics(chromeFont().deriveFont(UIScale.scale(10f))).stringWidth(hint());
-            if (id == ActionId.SPLIT_RIGHT && labels()) width += UIScale.scale(16);
-            int trim = labels() ? switch (id) { case NEW_TAB -> 6; case NEW_WINDOW -> 3; case FIND -> 4; default -> 0; } : 0;
+            if ((id == ActionId.SPLIT_RIGHT || chevron) && labels()) width += UIScale.scale(16);
+            int trim = labels() && id != null ? switch (id) { case NEW_TAB -> 6; case NEW_WINDOW -> 3; case FIND -> 4; default -> 0; } : 0;
             int measuredWidth = width - UIScale.scale(trim);
             if (id == ActionId.NEW_TAB && labels()) measuredWidth = Math.max(UIScale.scale(104), measuredWidth);
             return new Dimension(measuredWidth, UIScale.scale(30));
@@ -196,7 +325,7 @@ final class WindowChrome {
                     g.setFont(chromeFont().deriveFont(UIScale.scale(10f))); g.setColor(UIManager.getColor("Jasper.mutedForeground"));
                     g.drawString(hint(), x + UIScale.scale(8), baseline);
                 }
-                if (id == ActionId.SPLIT_RIGHT) {
+                if (id == ActionId.SPLIT_RIGHT || chevron) {
                     x += UIScale.scale(8); int y = getHeight() / 2;
                     g.setStroke(new BasicStroke(UIScale.scale(1f)));
                     g.drawLine(x, y - 2, x + 3, y + 1); g.drawLine(x + 3, y + 1, x + 6, y - 2);
@@ -262,6 +391,15 @@ final class WindowChrome {
         JPopupMenu menu = new JPopupMenu();
         for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.SPLIT_RIGHT,
             ActionId.SPLIT_DOWN, ActionId.ZOOM_PANE, ActionId.CLOSE_PANE}) menu.add(owner.action(id));
+        if (contributions != null) {
+            for (MenuSection section : contributions.model().menus()) {
+                if (section.target().type() != MenuTarget.Type.CONTEXT) continue;
+                List<Component> built = build(section.entries());
+                if (built.isEmpty()) continue;
+                menu.addSeparator();
+                built.forEach(menu::add);
+            }
+        }
         return menu;
     }
 
