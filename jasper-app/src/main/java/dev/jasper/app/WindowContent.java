@@ -141,7 +141,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         this.snippets = snippets;
         syncHistoryScope();
         if (snippets != null) snippetsRegistration = scopes.register(new SnippetsScope(snippets, message -> onError.accept(message)));
-        paletteKeys = new PaletteKeyRouter(commandPalette, () -> this.bindings, macOs,
+        paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
             source -> !closed && active && bindingRoot != null && source != null
                 && SwingUtilities.isDescendingFrom(this, bindingRoot)
                 && SwingUtilities.isDescendingFrom(source, bindingRoot));

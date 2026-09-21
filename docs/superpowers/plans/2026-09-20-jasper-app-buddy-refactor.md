@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Approved for native execution; Tasks 1–4 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Tasks 1–5 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -386,9 +386,9 @@ boolean updatingActions() { return workspaceActions.updating(); }
 
 **Files:** Create `A/PaletteController.java`; modify `A/{WindowCommandPalette,PaletteTarget,PaletteContext,CommandPalette}.java`; update `AT/WindowCommandPaletteTest.java`, `AT/PaletteScopesTest.java`; create `AT/PaletteControllerTest.java`.
 
-**Interfaces:** `PaletteController(ScopeRegistry,String defaultScopeId,boolean macOs,CommandPalette,Runnable layout,Runnable dismissed,Function<String,String> shortcut,BooleanSupplier batching)`; `boolean open(String,PaletteTarget,BooleanSupplier originValid)`; `void dismiss()`, `close()`, `refresh()`, `refreshIfChanged()`, `setMaxResults(int)`, `setTrivialCommands(List<String>)`, `enterPressed(int)`, `escape()`, `executeNumber(int)`, `moveSelection(int)`, `openPicker()`; `boolean isOpen()`, `pickerOpen()`, `stepOpen()`, `tabPressed(boolean)`; `String activeScopeId()`. Retain presentation methods on CommandPalette. WindowCommandPalette creates `PaletteTarget` from its captured pane using the exact removed `PaletteTarget.of` body.
+**Interfaces:** `PaletteController(ScopeRegistry,boolean macOs,Runnable layout,Runnable dismissed,Function<String,String> shortcut,BooleanSupplier batching,Runnable updateActions,Consumer<String> reportError,Consumer<String> reopen)`; `boolean open(String,PaletteTarget,BooleanSupplier originValid)`; `void dismiss()`, `close()`, `refresh()`, `refreshIfChanged()`, `setMaxResults(int)`, `setTrivialCommands(List<String>)`, `enterPressed(int)`, `escape()`, `executeNumber(int)`, `moveSelection(int)`, `openPicker()`; `boolean isOpen()`, `pickerOpen()`, `stepOpen()`, `tabPressed(boolean)`; `String activeScopeId()`. Retain presentation methods on CommandPalette. WindowCommandPalette creates `PaletteTarget` from its captured pane using the exact removed `PaletteTarget.of` body.
 
-- [ ] In the existing step tests, capture the `Consumer<PaletteStep.Result>` passed to the fake scope's completion. Add three cases that actually invoke completion after: dismiss/reopen, removal/replacement of scope, origin pane closure. Assert a replacement query, selection and error label remain unchanged, and no target paste/run occurs. Queue the delivery explicitly with `SwingUtilities.invokeLater` and drain the EDT before asserting; do not merely close a never-completed step.
+- [x] In the existing step tests, capture the `Consumer<PaletteStep.Result>` passed to the fake scope's completion. Add three cases that actually invoke completion after: dismiss/reopen, removal/replacement of scope, origin pane closure. Assert a replacement query, selection and error label remain unchanged, and no target paste/run occurs. Queue the delivery explicitly with `SwingUtilities.invokeLater` and drain the EDT before asserting; do not merely close a never-completed step.
 Use this concrete queued case in PaletteScopesTest, reusing its existing owner/install/FakeScope fixtures:
 
 ```java
@@ -422,9 +422,9 @@ Use this concrete queued case in PaletteScopesTest, reusing its existing owner/i
 }
 ```
 
-- [ ] Run `./gradlew :jasper-app:test --tests '*WindowCommandPaletteTest' --tests '*PaletteScopesTest'`; preserve the baseline tests even if existing stale protection passes. Add a same-step-object reuse case; the old identity-only guard is insufficient to distinguish two opening generations.
-- [ ] Move these complete state-machine methods from WindowCommandPalette into PaletteController: `activate`, settings setters/getters, picker/step state accessors, `enterPressed`, `executeNumber`, `moveSelection`, `escape`, `tabPressed`, `showStep`, `closeStep`, `completeStep`, `queryChanged`, `changed`, `refreshIfChanged`, `refresh`, `rebuild`, `pickerResults`, `matchesScope` and scope matching helpers. Move their corresponding state/listener fields. Replace owner accesses with the constructor callbacks; preserve search/ranking/selection semantics.
-- [ ] Add a monotonically increasing generation; increment on open, dismiss, close, scope replacement, step cancellation and invalidated origin. Complete through this guard before mutating `completing` or card state:
+- [x] Run `./gradlew :jasper-app:test --tests '*WindowCommandPaletteTest' --tests '*PaletteScopesTest'`; preserve the baseline tests even if existing stale protection passes. Add a same-step-object reuse case; the old identity-only guard is insufficient to distinguish two opening generations.
+- [x] Move these complete state-machine methods from WindowCommandPalette into PaletteController: `activate`, settings setters/getters, picker/step state accessors, `enterPressed`, `executeNumber`, `moveSelection`, `escape`, `tabPressed`, `showStep`, `closeStep`, `completeStep`, `queryChanged`, `changed`, `refreshIfChanged`, `refresh`, `rebuild`, `pickerResults`, `matchesScope` and scope matching helpers. Move their corresponding state/listener fields. Replace owner accesses with the constructor callbacks; preserve search/ranking/selection semantics.
+- [x] Add a monotonically increasing generation; increment on open, dismiss, close, scope replacement, step cancellation and invalidated origin. Complete through this guard before mutating `completing` or card state:
 
 ```java
 long submittedGeneration = generation;
@@ -444,8 +444,8 @@ current.complete().accept(palette.stepValues(), result -> {
 
 `acceptStepResult(PaletteStep.Result)` is the original completeStep callback body from its error branch through reopening/selecting, excluding the old `completing=false` and identity guard. Its reopen goes through a new generation using the captured target only while originValid is true. Capture synchronous completion errors under the same generation guard before displaying them.
 
-- [ ] Leave root/layer installation, Overlay, positioning, swallowed pointer release, captured pane/tab and prior focus in WindowCommandPalette. Its `dismissed` callback performs the original focus restoration and clears pane/tab references. Controller clears target/context closures on dismiss/close. Preserve palette key routing and IME composition behavior.
-- [ ] Run full app tests; verify PaletteController and PaletteTarget reference no workspace/history/snippets/application classes. Commit `refactor: isolate palette interaction state` with trailer.
+- [x] Leave root/layer installation, Overlay, positioning, swallowed pointer release, captured pane/tab and prior focus in WindowCommandPalette. Its `dismissed` callback performs the original focus restoration and clears pane/tab references. Controller clears target/context closures on dismiss/close. Preserve palette key routing and IME composition behavior.
+- [x] Run full app tests; verify PaletteController and PaletteTarget reference no workspace/history/snippets/application classes. Commit `refactor: isolate palette interaction state` with trailer.
 
 ## Task 6: Own session launch admission and bounded shutdown
 

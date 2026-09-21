@@ -23,6 +23,8 @@ class PaletteScopesTest {
         PaletteStep.Result stepResult = PaletteStep.Result.done();
         final List<Map<String, String>> completed = new ArrayList<>();
         boolean deferCompletion;
+        boolean reuseStep;
+        PaletteStep cachedStep;
         java.util.function.Consumer<PaletteStep.Result> pending;
         @Override public String id() { return "test.fake"; }
         @Override public String label() { return "Fake"; }
@@ -34,7 +36,8 @@ class PaletteScopesTest {
         }
         @Override public PaletteStep step(PaletteRow row, PaletteVerb verb, PaletteContext context) {
             if (!verb.id().equals("three")) return null;
-            return new PaletteStep("Fill " + row.title(),
+            if (reuseStep && cachedStep != null) return cachedStep;
+            return cachedStep = new PaletteStep("Fill " + row.title(),
                 List.of(new PaletteStep.Field("first", "First", "pre"), new PaletteStep.Field("second", "Second", "")),
                 (values, done) -> {
                     completed.add(values);
@@ -356,5 +359,48 @@ class PaletteScopesTest {
                 assertThat(palette.isOpen()).isFalse();
             }
         });
+    }
+
+    @Test void queuedCompletionCannotAffectAnotherOpeningEvenWhenScopeReusesItsStep() throws Exception {
+        for (int transition = 0; transition < 3; transition++) {
+            final int mode = transition;
+            var ref = new java.util.concurrent.atomic.AtomicReference<WindowContent>();
+            var fake = new FakeScope(); fake.deferCompletion = true; fake.reuseStep = true;
+            var delivered = new java.util.concurrent.atomic.AtomicBoolean();
+            try {
+                edt(() -> {
+                    var content = owner(true); ref.set(content); install(content);
+                    var registration = content.scopes().register(fake);
+                    var palette = content.commandPalette();
+                    palette.open(fake.id()); palette.enterPressed(2); palette.enterPressed(0);
+                    assertThat(fake.pending).isNotNull();
+                    var oldCompletion = fake.pending;
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        delivered.set(true);
+                        oldCompletion.accept(PaletteStep.Result.reopen(PaletteScope.COMMANDS_ID, "new_tab"));
+                    });
+                    if (mode == 0) palette.dismiss();
+                    else if (mode == 1) { registration.close(); content.scopes().register(fake); }
+                    else {
+                        var oldTab = content.currentTab();
+                        content.newTab(DesktopTestSupport.HOME); content.closeTab(oldTab);
+                    }
+                    palette.open(fake.id()); palette.component().queryField().setText("beta");
+                    palette.enterPressed(2); palette.enterPressed(0);
+                    assertThat(fake.completed).hasSize(2);
+                });
+                edt(() -> {
+                    assertThat(delivered).isTrue();
+                    var palette = ref.get().commandPalette();
+                    assertThat(palette.isOpen()).as("transition %s", mode).isTrue();
+                    assertThat(palette.stepOpen()).isTrue();
+                    assertThat(palette.activeScopeId()).isEqualTo("test.fake");
+                    assertThat(palette.component().queryField().getText()).isEqualTo("beta");
+                    palette.enterPressed(0);
+                    assertThat(fake.completed).hasSize(2);
+                    assertThat(fake.executed).isEmpty();
+                });
+            } finally { edt(() -> { if (ref.get() != null) ref.get().close(); }); }
+        }
     }
 }

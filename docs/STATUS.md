@@ -7,7 +7,7 @@ is drafted and self-reviewed on `codex/app-architecture-design`, based on merged
 main `c7b796b`. It has 12 runnable checkpoints covering concrete app owners,
 package boundaries, Buddy extraction, regression checks and onboarding. Native
 execution remains the selected method. Native implementation is approved and underway. Baseline checks passed: 1,083 tests,
-zero failures/errors, two expected skips. Tasks 1–4 are committed: workspace action/configuration owners and typed activity plus independent settings/subscriptions/builders, theme value subscriptions, and platform/window ownership separation. Initial settings still apply before window packing; configuration registration now belongs to the application. Two explicit dependency details
+zero failures/errors, two expected skips. Tasks 1–5 are committed: palette controller/generation protection, workspace action/configuration owners and typed activity plus independent settings/subscriptions/builders, theme value subscriptions, and platform/window ownership separation. Initial settings still apply before window packing; configuration registration now belongs to the application. Two explicit dependency details
 are recorded for review: platform title-bar callbacks and Buddy dark-mode input.
 The terminal refactor is merged into the main checkout; older execution notes
 below record its pre-integration handoff.

@@ -26,6 +26,10 @@ Task 3: Ruling: Keep pre-pack initial snapshot application in TerminalWindow, th
 
 Task 4: Ruling: Reuse the pane’s existing immutable UUID as opaque activity identity instead of allocating a second Object — it cannot retain UI and already identifies that producer. Wire pane lifetime at creation, before shell readiness, to cover early close. Existing config integration tests already exercise unchanged overrides, changed fonts and captured next-session settings; retain those instead of duplicating them. Replace the proposed record-shape test with observable OPENED/CLOSED and unsubscribe tests.
 
+5. Queued reused-step completion regression failed before the generation guard; all three invalidation paths now pass. Full app suite: 736 tests, one expected skip. Logger-capture test follows the new controller owner.
+
+Task 5: Ruling: PaletteController creates its card and accepts explicit action-refresh/error/reopen callbacks; the plan’s injected card could not wire its final callbacks without a construction cycle. PaletteKeyRouter now consumes the controller plus an open callback, removing another reverse workspace dependency. Keep integration tests beside the workspace instead of duplicating fixtures in a controller-only test. Cost if wrong: keyboard/focus or failure-reporting regressions; existing integration suites cover these paths.
+
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.

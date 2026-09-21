@@ -76,7 +76,7 @@ class PaletteKeyRouterTest {
         edt(() -> {
             try (var owner = owner(true)) {
                 var root = install(owner); KeyBindings[] keys = {KeyBindings.defaults(true)};
-                var router = new PaletteKeyRouter(owner.commandPalette(), () -> keys[0], true,
+                var router = new PaletteKeyRouter(owner.commandPalette().controller(), owner.commandPalette()::open, () -> keys[0], true,
                     source -> SwingUtilities.isDescendingFrom(source, root));
                 keys[0] = KeyBindings.withOverrides(true, Map.of("command_palette", "alt+p"));
                 assertThat(router.dispatch(press(owner, KeyEvent.VK_K, primary(true)))).isFalse();
@@ -174,7 +174,7 @@ class PaletteKeyRouterTest {
     }
 
     static PaletteKeyRouter router(WindowContent owner, boolean mac, JRootPane root) {
-        return new PaletteKeyRouter(owner.commandPalette(), () -> KeyBindings.defaults(mac), mac,
+        return new PaletteKeyRouter(owner.commandPalette().controller(), owner.commandPalette()::open, () -> KeyBindings.defaults(mac), mac,
             source -> SwingUtilities.isDescendingFrom(source, root));
     }
     static Command command(String id, Runnable run) {

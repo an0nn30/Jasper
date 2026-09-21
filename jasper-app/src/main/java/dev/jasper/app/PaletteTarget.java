@@ -19,13 +19,4 @@ record PaletteTarget(Consumer<String> paste, Runnable sendReturn, Supplier<Optio
         return new PaletteTarget(text -> {}, () -> {}, Optional::empty, () -> "", () -> false);
     }
 
-    /** Paste goes through the view (bracketed paste, newline normalization); the return is a raw carriage return. */
-    static PaletteTarget of(TerminalPane pane) {
-        return new PaletteTarget(
-            text -> { if (pane.view() != null) pane.view().paste(text); },
-            () -> { if (pane.session() != null) pane.session().write("\r"); },
-            () -> pane.session() == null ? Optional.empty() : pane.session().workingDirectory(),
-            pane::shellLabel,
-            pane::running);
-    }
 }

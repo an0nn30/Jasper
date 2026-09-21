@@ -190,7 +190,7 @@ class WindowCommandPaletteTest {
 
     @Test void failedActionReportsAndDoesNotRecord() throws Exception {
         DesktopTestSupport.edt(() -> {
-            var logger = java.util.logging.Logger.getLogger(WindowCommandPalette.class.getName());
+            var logger = java.util.logging.Logger.getLogger(PaletteController.class.getName());
             boolean parents = logger.getUseParentHandlers(); logger.setUseParentHandlers(false);
             var records = new ArrayList<java.util.logging.LogRecord>();
             var handler = new java.util.logging.Handler() {

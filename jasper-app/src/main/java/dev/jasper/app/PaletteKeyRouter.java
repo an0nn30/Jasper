@@ -13,7 +13,8 @@ import javax.swing.text.JTextComponent;
 
 /** Owns palette key sequences, including their tails after execution changes focus. */
 final class PaletteKeyRouter implements AutoCloseable {
-    private final WindowCommandPalette palette;
+    private final PaletteController palette;
+    private final java.util.function.Consumer<String> open;
     private final Supplier<KeyBindings> bindings;
     private final boolean macOs;
     private final Predicate<Component> belongsToOwner;
@@ -21,9 +22,9 @@ final class PaletteKeyRouter implements AutoCloseable {
     private boolean closed;
     private boolean swallowTyped;
 
-    PaletteKeyRouter(WindowCommandPalette palette, Supplier<KeyBindings> bindings, boolean macOs,
+    PaletteKeyRouter(PaletteController palette, java.util.function.Consumer<String> open, Supplier<KeyBindings> bindings, boolean macOs,
                      Predicate<Component> belongsToOwner) {
-        this.palette = palette; this.bindings = bindings; this.macOs = macOs; this.belongsToOwner = belongsToOwner;
+        this.palette = palette; this.open = open; this.bindings = bindings; this.macOs = macOs; this.belongsToOwner = belongsToOwner;
     }
 
     boolean dispatch(KeyEvent event) {
@@ -63,7 +64,7 @@ final class PaletteKeyRouter implements AutoCloseable {
             // An unregistered scope's shortcut is inert: it does not hold the physical key,
             // so it cannot swallow a later, differently-modified press of the same key.
             if (palette.hasScope(scope)) claim.accept(code);
-            palette.open(scope);
+            open.accept(scope);
             return true;
         }
         if (!palette.isOpen()) return false;
