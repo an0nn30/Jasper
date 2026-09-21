@@ -9,7 +9,8 @@ plugin writer's view.
 | --- | --- | --- |
 | `jasper-sdk` | Interfaces and values plugins compile against | JDK |
 | `jasper-sdk-testkit` | `FakePluginHost` and the abstract `PluginContractTest` | JDK, SDK |
-| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `notifications`, `persistence` |
+| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `contributions`, `notifications`, `persistence`, `platform` |
+| `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections and status entries | `lifecycle` |
 | `plugins/sample` | Bundled end-to-end fixture and documentation example | SDK (`compileOnly`) |
 
 `verifySdkArchitecture`, `verifyPluginArchitecture` and `verifyApplicationArchitecture`
@@ -51,6 +52,21 @@ Every outcome is a `PluginStatus` line in the log.
 - **State.** `PluginStateStore` changes `plugins.toml` only inside a `FileLock` transaction
   and never at shutdown, because standalone launches mean several processes may edit it.
 
+## Chrome contributions
+
+A plugin's `actions()`, `toolbar()`, `menus()` and `statusBar()` calls reach `HostedUi`, which
+enforces namespaces, ownership of placed actions, the UI thread and containment, and writes the
+single application-wide `Contributions` model. Each `WindowContent` connects to that model once:
+`WindowContributions` turns every contributed action into a Swing `Action` registered in the
+window's `CommandRegistry`, and `WindowChrome` and `WindowStatusBar` rebuild only their plugin
+sections when the model changes. Workspace code never sees an SDK type.
+
+`KeyBindings` is keyed by action id. A user's binding for a namespaced id is validated when the
+configuration loads and bound when `withExtensions` learns the action exists. Precedence is the
+user's configuration, built-in defaults, then plugin defaults in load order. The application
+reports a user binding for an unknown action as a configuration warning and logs a dropped
+plugin default.
+
 ## Shutdown
 
 `JasperApplication.shutdown` arms `ApplicationShutdown`'s exit deadline, closes
@@ -67,6 +83,6 @@ disagree, the implementation is wrong, not the contract.
 
 ## Not yet implemented
 
-Actions, toolbar, menus and status items (plan 2); the rail, panels, plugin windows and the
-Plugins manager with install, consent and restart (plan 3); terminal handles, injection,
-plugin-provided sessions, capability gating and the cleanup worker (plan 4).
+The rail, panels, plugin windows and the Plugins manager with install, consent and restart
+(plan 3); handle queries, injection, plugin-provided sessions, capability gating and the
+cleanup worker (plan 4).

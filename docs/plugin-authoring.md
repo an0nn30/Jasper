@@ -1,8 +1,8 @@
 # Writing a Jasper plugin
 
-This guide covers what the SDK offers today (0.1): lifecycle, configuration, events,
-activities and services. Panels, toolbar and menu items, status items, windows and terminal
-access arrive in later SDK versions. The contract is in the
+This guide covers what the SDK offers today (0.2): lifecycle, configuration, events,
+activities, services, actions and their placements in the toolbar, menus and status bar.
+Panels, plugin windows and terminal access arrive in later SDK versions. The contract is in the
 [design](superpowers/specs/2026-09-21-jasper-plugin-sdk-design.md); the runtime is described
 in the [SDK architecture](sdk-architecture.md).
 
@@ -15,7 +15,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.1, <0.2"
+sdk = ">=0.2, <0.3"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide
 exports = []                       # packages other plugins may use
 
@@ -43,6 +43,7 @@ classes in `dev.jasper.*` platform packages or in a package a dependency exports
         delay = 300;
     }
     long stepMillis = delay;
+    if (context.config().bool("demo_ui").orElse(false)) installUi(context, stepMillis);
     if (context.config().bool("demo_activity").orElse(false))
         context.background().execute(() -> demo(context, stepMillis));
 }
@@ -52,6 +53,56 @@ classes in `dev.jasper.*` platform packages or in a package a dependency exports
 `start` throws, everything the context handed out is rolled back and the context is closed.
 `stop` must not block: a blocked event thread cannot be abandoned, and the application's exit
 deadline will end the process.
+
+## Actions and where they appear
+
+Anything clickable is an action. Register it once and it is a command in every window's
+palette, may have a shortcut, and can be placed in the toolbar, the menu bar, the terminal's
+right-click menu and the status bar. Jasper draws all of it, so contributed chrome looks like
+built-in chrome; a plugin supplies titles, icons and handlers, never components.
+
+<!-- example:pluginui -->
+```java
+private static void installUi(PluginContext context, long stepMillis) {
+    PluginAction[] demo = new PluginAction[1];
+    demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
+            .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg"))
+            .withKeywords(List.of("sample", "demo", "activity"))
+            .withDefaultBinding("cmd+alt+j"),
+        invoked -> {
+            demo[0].setEnabled(false);
+            context.background().execute(() -> demo(context, stepMillis));
+        });
+    context.toolbar().add(ToolbarItem.action(DEMO));
+    context.menus().create("dev.jasper.sample.menu", "Sample").add(DEMO);
+    context.menus().standard(StandardMenu.VIEW).add(DEMO);
+    context.menus().terminalContext().add(DEMO);
+
+    StatusItem status = context.statusBar().add(new StatusItemSpec("dev.jasper.sample.status", Side.RIGHT, 100));
+    status.setText("Sample: idle");
+    status.setTooltip("Run the sample activity");
+    status.setAction(DEMO);
+    // Handlers run on the UI thread, which is where status items and actions may be changed.
+    context.events().subscribe(Activities.TOPIC, event -> {
+        if (!event.sourcePluginId().equals(context.plugin().id())) return;
+        status.setText(event.terminal() ? "Sample: ready" : "Sample: " + Math.round(event.fraction().orElse(0) * 100) + "%");
+        if (event.terminal()) demo[0].setEnabled(true);
+    });
+}
+```
+
+- **Ids** of actions, top-level menus and status items start with your plugin id and a dot.
+- **Shortcuts.** `withDefaultBinding` uses the `[keybindings]` syntax. The user's configuration
+  wins, then Jasper's own shortcuts, then plugin defaults in load order; a default that loses is
+  dropped and logged. Users rebind an action under `[keybindings]` with its quoted id.
+- **Placements** may name only actions your plugin registered. Closing an action removes it from
+  everywhere it was placed.
+- **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
+- **Status items** are global: one handle updates the item in every window.
+- **Icons.** `context.appearance().icon("path/in/your/jar.svg")` returns a 16 by 16 icon that
+  follows the theme. Use monochrome artwork.
+- **Threads.** Register and mutate on the event thread. Event handlers already run there, so
+  updating a status item from a handler, as the sample does, needs no marshaling.
 
 ## Rules that matter
 
@@ -83,6 +134,9 @@ try (var host = new FakePluginHost()) {
     assertThat(host.activityLog()).isNotEmpty();
 }
 ```
+
+`host.actions()`, `host.toolbar()`, `host.menu("VIEW")`, `host.status()` and
+`host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.
 
 ## Running a plugin in Jasper
 

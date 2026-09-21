@@ -47,4 +47,34 @@ class SamplePluginTest {
             assertThat(host.reports()).containsExactly("dev.jasper.sample: demo_step_millis: Use 0 to 5000; using 300.");
         }
     }
+
+    @Test void contributesNothingToTheChromeByDefault() {
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            assertThat(host.actions()).isEmpty();
+            assertThat(host.toolbar()).isEmpty();
+            assertThat(host.status()).isEmpty();
+        }
+    }
+
+    @Test void theDemoUiPlacesOneActionEverywhereAndItsStatusFollowsTheActivity() {
+        try (var host = new FakePluginHost()) {
+            host.setConfig("dev.jasper.sample", Map.of("demo_ui", true, "demo_step_millis", 0L));
+            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            assertThat(host.failures()).isEmpty();
+            assertThat(host.actions()).containsExactly("dev.jasper.sample.demo|Run Sample Activity|true");
+            assertThat(host.toolbar()).containsExactly("button:dev.jasper.sample.demo");
+            assertThat(host.menu("top:dev.jasper.sample.menu")).containsExactly("item:dev.jasper.sample.demo");
+            assertThat(host.menu("VIEW")).containsExactly("item:dev.jasper.sample.demo");
+            assertThat(host.menu("context")).containsExactly("item:dev.jasper.sample.demo");
+            assertThat(host.status()).containsExactly("dev.jasper.sample.status|RIGHT|Sample: idle|Run the sample activity|dev.jasper.sample.demo");
+
+            assertThat(host.invoke("dev.jasper.sample.demo", java.util.UUID.randomUUID(), null)).isTrue();
+            assertThat(host.actions()).as("no second run while one is going").containsExactly("dev.jasper.sample.demo|Run Sample Activity|false");
+            assertThat(host.runBackground()).isEqualTo(1);
+            host.flush();
+            assertThat(host.status()).singleElement().asString().contains("|Sample: ready|");
+            assertThat(host.actions()).containsExactly("dev.jasper.sample.demo|Run Sample Activity|true");
+        }
+    }
 }

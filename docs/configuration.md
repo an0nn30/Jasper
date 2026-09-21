@@ -405,6 +405,7 @@ Values may be strings, integers, floats, booleans, arrays of strings and nested 
 [plugins."dev.jasper.sample"]
 demo_activity = true      # show a short demonstration activity on Buddy at startup
 demo_step_millis = 300    # 0 to 5000
+demo_ui = true            # add the sample's action to the toolbar, menus and status bar
 ```
 
 Installed plugins live in `plugins/<id>/` beside `config.toml`; their enabled state and
@@ -439,6 +440,17 @@ reload_config = "ctrl+F12"
 `{` and `}` are aliases for Shift+[ and Shift+]. Named function keys F1–F24 are accepted. To remove an accelerator while keeping the menu/toolbar action, set it to `"none"`. Reload removes the previous shortcut immediately; terminal views use the new map without being recreated. Copy/paste in find text fields retain native text editing.
 
 Each shortcut must be unique. Invalid or colliding shortcut overrides restore the whole default binding map and produce an error; unknown action names produce warnings and are ignored. For example, outside macOS `split_down = "cmd+shift+d"` collides with split right; use `"alt+cmd+shift+d"` or the literal Ctrl+Alt+Shift+D above.
+
+Plugin actions are bound by their quoted id, for example:
+
+```toml
+[keybindings]
+"dev.jasper.sample.demo" = "cmd+alt+j"   # or "none"
+```
+
+A plugin may suggest a default shortcut; yours always wins, and Jasper's built-in shortcuts win
+over a plugin's suggestion. A binding for an action that no installed plugin provides is
+reported as a configuration warning.
 
 ## Command palette shortcuts
 

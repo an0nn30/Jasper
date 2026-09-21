@@ -10,7 +10,40 @@ The three modules are `jasper-app` (product composition), `jasper-terminal`
 (terminal library) and `jasper-buddy` (JDK-only companion library). Start at the
 [documentation index](README.md) for each module's onboarding, architecture and
 maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merged into
-local `main`; plans 2–4 are not.
+local `main`; plan 2 (actions and chrome placements) is implemented on
+`claude/plugin-sdk-plan-2`; plans 3–4 are not.
+
+### Plugin SDK plan 2 — 2026-09-21
+
+Branch `claude/plugin-sdk-plan-2` (not merged, not pushed) implements
+[plan 2](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-2-actions-chrome.md): plugin
+actions that are palette commands with rebindable shortcuts, and their placements in the
+toolbar, menu bar, terminal context menu and status bar, all drawn by the application.
+`KeyBindings` is keyed by action id; the new app-native `dev.jasper.app.contributions` model
+keeps SDK types confined to `dev.jasper.app.plugins`; the SDK is 0.2.0. See
+[SDK architecture](sdk-architecture.md#chrome-contributions).
+
+Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist`
+passed with **1,246 tests: 1,244 passed, two expected environment skips, no failures or
+errors** (app 695, Buddy 163, terminal 355, SDK 10, testkit 18, sample plugin 5). The
+contract suite grew from 9 to 14 cases and passes for the testkit fake and for the application.
+
+Scope decisions, recorded in the plan: window and pane handles carry identity only until plan
+4; the sample plugin's UI is off unless `demo_ui = true`; status items are global; a plugin's
+dropped default shortcut is logged rather than shown as a configuration warning. Deviations
+from the plan text: an invalid shortcut for a namespaced (plugin) action id is a per-entry
+warning instead of an error that resets every keybinding, because the plugin may not even be
+installed (a pre-existing loader test exposed this); empty contributed status rows collapse at
+the origin and rows are clamped inside the bar, because the first layout broke the status
+bar's bounded-layout contract at very narrow widths; and `:jasper-app:test` now takes only
+`plugins/sample/src` as an input, fixing a plan-1 wiring bug in which the whole `plugins/`
+tree, including the sample's build outputs, was declared and Gradle rejected builds that ran
+both projects' tasks.
+
+Known limit: keybinding diagnostics are evaluated when plugins start and at each configuration
+reload; an action registered later is rebound in windows at once but not re-evaluated for
+diagnostics until the next reload. Native acceptance is pending and user-run; the checklist is
+at the end of the plan.
 
 ### Plugin SDK plan 1 — 2026-09-21
 

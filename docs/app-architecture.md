@@ -140,6 +140,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `palette` | EDT scope/query/step state, keyboard routing and Swing card. Controller owns scope listeners and invalidates asynchronous completions on close. |
 | `palette.builtin` | EDT adapters for commands, shell history and snippets. Providers own I/O; scope subscriptions are disposed by the palette. |
 | `config` | Immutable values and pure parsing; ConfigService owns background watch/reload work and marshals delivery to EDT. Application closes the service. |
+| `contributions` | EDT model of what extensions contribute to the chrome, in app-native types. Application owns the single instance; the plugin runtime writes it and every window renders it. |
 | `appearance` | EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles. |
 | `launch` | Immutable launch capture and shell integration extraction; ShellLauncher starts off EDT and delivers on EDT. Receiving pane owns the session. |
 | `history` | Pure parsing/snapshots plus EDT indexes backed by workers. Application owns indexes and command-history flush at shutdown. |

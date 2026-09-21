@@ -28,7 +28,13 @@ class BundledSamplePluginTest {
             runtime.set(new PluginRuntime(new PluginRuntime.Options(staged, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock"), root.resolve("plugin-data")),
                 new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> { }, contributions));
-            runtime.get().start(Map.of("dev.jasper.sample", Map.<String, Object>of("demo_activity", true, "demo_step_millis", 0L)), true);
+            runtime.get().start(Map.of("dev.jasper.sample", Map.<String, Object>of("demo_activity", true, "demo_ui", true, "demo_step_millis", 0L)), true);
+        });
+        onEdt(() -> {
+            assertThat(contributions.action("dev.jasper.sample.demo")).get()
+                .satisfies(action -> assertThat(action.icon()).as("an SVG from the plugin's own jar").isNotNull());
+            assertThat(contributions.toolbar()).hasSize(1);
+            assertThat(contributions.status()).singleElement().satisfies(item -> assertThat(item.text()).startsWith("Sample:"));
         });
         assertThat(runtime.get().statusLines()).singleElement().asString()
             .contains("dev.jasper.sample", "0.1.0", "BUNDLED", "ACTIVE");
