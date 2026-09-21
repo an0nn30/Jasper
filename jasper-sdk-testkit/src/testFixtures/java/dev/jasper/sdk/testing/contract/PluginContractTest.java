@@ -12,13 +12,20 @@ import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.services.ServiceUnavailableException;
 import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.Anchor;
+import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.PanelHost;
+import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
+import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
+import dev.jasper.sdk.ui.WindowSpec;
+import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +36,8 @@ import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.swing.ImageIcon;
+import javax.swing.JLabel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -391,5 +400,82 @@ public abstract class PluginContractTest {
         h.stopAll();
         assertThat(h.actions()).isEmpty();
         assertThat(h.menu("TAB")).isEmpty();
+    }
+
+    @Test void panelsAreNamespacedLazyPerWindowAndContained() {
+        List<PanelHost> hosts = Collections.synchronizedList(new ArrayList<>());
+        var registration = new AtomicReference<Subscription>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            registration.set(context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", new ImageIcon(), Anchor.RIGHT),
+                host -> { hosts.add(host); return new JLabel("hosts"); }));
+            context.panels().register(new PanelSpec("test.alpha.broken", "Broken", new ImageIcon(), Anchor.BOTTOM),
+                host -> { throw new IllegalStateException("factory failure"); });
+            assertThatIllegalArgumentException().isThrownBy(() -> context.panels().register(
+                new PanelSpec("test.alpha.hosts", "Twice", new ImageIcon(), Anchor.LEFT), host -> new JLabel()));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.panels().register(
+                new PanelSpec("test.beta.panel", "Foreign", new ImageIcon(), Anchor.LEFT), host -> new JLabel()));
+        });
+        assertThat(h.panels()).containsExactly("test.alpha.hosts|Hosts|RIGHT", "test.alpha.broken|Broken|BOTTOM");
+        assertThat(hosts).as("no instance until a window shows the panel").isEmpty();
+        UUID window = UUID.randomUUID();
+        h.ui(() -> {
+            assertThat(h.openPanel("test.alpha.hosts", window)).isInstanceOf(JLabel.class);
+            assertThat(h.openPanel("test.alpha.broken", window)).as("a throwing factory is contained").isNull();
+            assertThat(h.openPanel("test.alpha.absent", window)).isNull();
+        });
+        assertThat(hosts).singleElement().satisfies(host -> assertThat(host.window().id()).isEqualTo(window));
+        h.ui(() -> registration.get().close());
+        assertThat(h.panels()).containsExactly("test.alpha.broken|Broken|BOTTOM");
+        h.stopAll();
+        assertThat(h.panels()).isEmpty();
+    }
+
+    @Test void railButtonsNameThePluginsOwnActions() {
+        var open = new AtomicReference<PluginAction>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            open.set(context.actions().register(ActionSpec.of("test.alpha.open", "Open"), invoked -> { }));
+            context.rail().add("test.alpha.open");
+            assertThatIllegalArgumentException().isThrownBy(() -> context.rail().add("new_tab"));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.rail().add("test.alpha.absent"));
+        });
+        assertThat(h.rail()).containsExactly("test.alpha.open");
+        h.ui(() -> open.get().close());
+        assertThat(h.rail()).isEmpty();
+    }
+
+    @Test void windowsAreSingletonsGuardedOwnedAndClosedWithTheirPlugin() {
+        List<String> events = Collections.synchronizedList(new ArrayList<>());
+        var manager = new AtomicReference<PluginWindow>();
+        var veto = new AtomicReference<Subscription>();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            PluginWindow window = context.windows().create(new WindowSpec("test.alpha.manager", "Manager", new Dimension(640, 480), true));
+            manager.set(window);
+            assertThat(context.windows().create(new WindowSpec("test.alpha.manager", "Manager", new Dimension(640, 480), true))).isSameAs(window);
+            assertThatIllegalArgumentException().isThrownBy(() ->
+                context.windows().create(new WindowSpec("test.beta.window", "Foreign", new Dimension(10, 10), false)));
+            veto.set(window.onClosing(() -> false));
+            window.onClosing(() -> { throw new IllegalStateException("guard failure"); });
+            window.onClosed(() -> events.add("closed"));
+            window.show();
+            context.windows().dialog(new DialogSpec("Unlock", window, true));
+        });
+        assertThat(h.windows()).containsExactly("test.alpha.manager|Manager|true", "dialog|Unlock|false");
+        h.ui(() -> {
+            assertThat(h.requestClose("test.alpha.manager")).isFalse();
+            veto.get().close();
+            assertThat(h.requestClose("test.alpha.manager")).as("a throwing guard cannot trap the window open").isTrue();
+            assertThat(h.requestClose("test.alpha.absent")).isFalse();
+        });
+        assertThat(events).containsExactly("closed");
+        assertThat(h.windows()).as("the dialog went with its owner").isEmpty();
+        h.ui(() -> {
+            assertThatIllegalArgumentException().isThrownBy(() -> alpha.get().windows().dialog(new DialogSpec("Late", manager.get(), true)));
+            alpha.get().windows().create(new WindowSpec("test.alpha.other", "Other", new Dimension(10, 10), false)).show();
+        });
+        assertThat(h.windows()).containsExactly("test.alpha.other|Other|true");
+        h.stopAll();
+        assertThat(h.windows()).isEmpty();
     }
 }

@@ -7,8 +7,11 @@ import dev.jasper.sdk.services.Services;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.Menus;
+import dev.jasper.sdk.ui.Panels;
+import dev.jasper.sdk.ui.Rail;
 import dev.jasper.sdk.ui.StatusBar;
 import dev.jasper.sdk.ui.Toolbar;
+import dev.jasper.sdk.ui.Windows;
 import java.nio.file.Path;
 import java.util.concurrent.Executor;
 
@@ -110,4 +113,25 @@ public interface PluginContext {
      * @return the appearance service
      */
     Appearance appearance();
+
+    /**
+     * Side and bottom panels.
+     *
+     * @return the panels service
+     */
+    Panels panels();
+
+    /**
+     * Rail action buttons.
+     *
+     * @return the rail service
+     */
+    Rail rail();
+
+    /**
+     * Application-built windows and dialogs.
+     *
+     * @return the windows service
+     */
+    Windows windows();
 }

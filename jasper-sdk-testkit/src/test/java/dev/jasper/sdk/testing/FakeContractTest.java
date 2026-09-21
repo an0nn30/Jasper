@@ -27,6 +27,11 @@ class FakeContractTest extends PluginContractTest {
             @Override public List<String> toolbar() { return host.toolbar(); }
             @Override public List<String> menu(String target) { return host.menu(target); }
             @Override public List<String> status() { return host.status(); }
+            @Override public List<String> panels() { return host.panels(); }
+            @Override public javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId) { return host.openPanel(panelId, windowId); }
+            @Override public List<String> rail() { return host.rail(); }
+            @Override public List<String> windows() { return host.windows(); }
+            @Override public boolean requestClose(String windowId) { return host.requestClose(windowId); }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) { host.setVariant(variant); }
             @Override public void stopAll() { host.stopAll(); }
             @Override public void close() { host.close(); }

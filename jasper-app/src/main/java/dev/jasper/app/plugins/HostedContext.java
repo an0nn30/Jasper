@@ -18,8 +18,11 @@ import dev.jasper.sdk.services.Services;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.Menus;
+import dev.jasper.sdk.ui.Panels;
+import dev.jasper.sdk.ui.Rail;
 import dev.jasper.sdk.ui.StatusBar;
 import dev.jasper.sdk.ui.Toolbar;
+import dev.jasper.sdk.ui.Windows;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -115,6 +118,9 @@ final class HostedContext implements PluginContext {
     @Override public Menus menus() { return ui.menus(); }
     @Override public StatusBar statusBar() { return ui.statusBar(); }
     @Override public Appearance appearance() { return ui.appearance(); }
+    @Override public Panels panels() { return ui.panels(); }
+    @Override public Rail rail() { return ui.rail(); }
+    @Override public Windows windows() { return ui.windows(); }
 
     @Override public Executor background() {
         return task -> {

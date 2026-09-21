@@ -50,9 +50,14 @@ class AppContractTest extends PluginContractTest {
 
     static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark) {
+        return host(data, tables, drainGrace, contributions, dark, onEdtValue(AppContractTest::headlessWindows));
+    }
+
+    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
+                           Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary) {
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()),
-            (key, message) -> { }, drainGrace, contributions, dark::get, headlessWindows())));
+            (key, message) -> { }, drainGrace, contributions, dark::get, auxiliary)));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
@@ -70,7 +75,8 @@ class AppContractTest extends PluginContractTest {
         catch (IOException failure) { throw new UncheckedIOException(failure); }
         Contributions contributions = onEdtValue(Contributions::new);
         var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
-        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark);
+        AuxiliaryWindows auxiliary = onEdtValue(AppContractTest::headlessWindows);
+        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark, auxiliary);
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
         return new ContractHarness() {
@@ -133,6 +139,27 @@ class AppContractTest extends PluginContractTest {
                 return onEdtValue(() -> contributions.status().stream().filter(dev.jasper.app.contributions.StatusEntry::visible)
                     .map(item -> item.id() + "|" + (item.left() ? "LEFT" : "RIGHT") + "|" + item.text() + "|"
                         + (item.tooltip() == null ? "" : item.tooltip()) + "|" + (item.actionId() == null ? "" : item.actionId())).toList());
+            }
+            @Override public List<String> panels() {
+                return onEdtValue(() -> contributions.panels().stream()
+                    .map(panel -> panel.id() + "|" + panel.title() + "|" + panel.defaultRegion()).toList());
+            }
+            @Override public javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId) {
+                return onEdtValue(() -> contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
+                    .map(panel -> panel.factory().apply(new dev.jasper.app.contributions.PanelSite(windowId, () -> { }, () -> { }, () -> true)))
+                    .orElse(null));
+            }
+            @Override public List<String> rail() {
+                return onEdtValue(() -> contributions.railActions().stream().filter(id -> contributions.action(id).isPresent()).toList());
+            }
+            @Override public List<String> windows() {
+                return onEdtValue(() -> auxiliary.open().stream()
+                    .map(surface -> (surface.kind() == dev.jasper.app.windows.AuxiliarySurface.Kind.DIALOG ? "dialog" : surface.id())
+                        + "|" + surface.title() + "|" + surface.shown()).toList());
+            }
+            @Override public boolean requestClose(String windowId) {
+                return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
+                    .map(dev.jasper.app.windows.AuxiliarySurface::requestClose).orElse(false));
             }
             @Override public void setVariant(dev.jasper.sdk.Variant variant) {
                 dark.set(variant == dev.jasper.sdk.Variant.DARK);

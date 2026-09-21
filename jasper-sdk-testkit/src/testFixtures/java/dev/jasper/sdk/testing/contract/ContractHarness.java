@@ -51,6 +51,21 @@ public interface ContractHarness extends AutoCloseable {
     /** Visible status items as {@code id|side|text|tooltip|actionId}, ascending priority. */
     List<String> status();
 
+    /** Registered panels as {@code id|title|LEFT|RIGHT|BOTTOM} (the default anchor), registration order. */
+    List<String> panels();
+
+    /** UI thread: invokes the panel's factory as a window showing it would; null when there is no such panel or the factory failed. */
+    javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId);
+
+    /** Rail buttons as action ids in placement order; buttons of closed actions omitted. */
+    List<String> rail();
+
+    /** Open plugin windows and dialogs as {@code id|title|shown} in creation order; a dialog's id is {@code dialog}. */
+    List<String> windows();
+
+    /** UI thread: closes the first open window with this id as the user would; false when vetoed or absent. */
+    boolean requestClose(String windowId);
+
     /** Changes the look and announces it. */
     void setVariant(Variant variant);
 

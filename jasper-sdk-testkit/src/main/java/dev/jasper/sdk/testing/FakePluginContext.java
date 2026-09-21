@@ -146,13 +146,13 @@ public final class FakePluginContext implements PluginContext {
     @Override public StatusBar statusBar() { return ui.statusBar(); }
 
     /** Side panels. */
-    public Panels panels() { return ui.panels(); }
+    @Override public Panels panels() { return ui.panels(); }
 
     /** Rail buttons. */
-    public Rail rail() { return ui.rail(); }
+    @Override public Rail rail() { return ui.rail(); }
 
     /** Plugin windows and dialogs. */
-    public Windows windows() { return ui.windows(); }
+    @Override public Windows windows() { return ui.windows(); }
 
     /** The host's variant, change notifications, and icons checked against the plugin's own class loader. */
     @Override public Appearance appearance() {
