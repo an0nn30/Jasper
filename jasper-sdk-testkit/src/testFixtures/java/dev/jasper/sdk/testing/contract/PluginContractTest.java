@@ -49,6 +49,15 @@ import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.SessionState;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import java.nio.file.Path;
+import dev.jasper.sdk.terminal.ExitPolicy;
+import dev.jasper.sdk.terminal.PendingSession;
+import dev.jasper.sdk.terminal.SessionKind;
+import dev.jasper.sdk.terminal.SessionSpec;
+import dev.jasper.sdk.terminal.TerminalConnection;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static dev.jasper.sdk.activity.ActivityEvent.State.FAILED;
 import static dev.jasper.sdk.activity.ActivityEvent.State.PROGRESS;
@@ -627,5 +636,165 @@ public abstract class PluginContractTest {
         h.flush();
         assertThat(seen).containsExactly("true true true", Capabilities.TERMINAL_OBSERVE);
         assertThat(h.sentToPane(only)).containsExactly("write:typed");
+    }
+
+    /** A connection the test can watch: what was typed, how often it was closed, and when it exits. */
+    private static final class Probe {
+        final ByteArrayOutputStream typed = new ByteArrayOutputStream();
+        final AtomicInteger closes = new AtomicInteger();
+        final CompletableFuture<Integer> exited = new CompletableFuture<>();
+        TerminalConnection connection(String output) {
+            return new TerminalConnection(new ByteArrayInputStream(output.getBytes(java.nio.charset.StandardCharsets.UTF_8)), typed,
+                (columns, rows) -> { }, exited, closes::incrementAndGet);
+        }
+    }
+
+    private PaneHandle openSession(AtomicReference<PluginContext> context, UUID window, SessionSpec spec) {
+        var pane = new AtomicReference<PaneHandle>();
+        h.ui(() -> pane.set(context.get().terminals().openTab(context.get().terminals().window(window).orElseThrow(), OpenRequest.session(spec)).orElseThrow()));
+        return pane.get();
+    }
+
+    @Test void aProvidedSessionAppearsFirstThenAttachesAndCarriesBytesBothWays() {
+        UUID window = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.SESSION_PROVIDE, Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        List<PendingSession> pendings = Collections.synchronizedList(new ArrayList<>());
+        PaneHandle pane = openSession(alpha, window, SessionSpec.of("build-host", pendings::add));
+        assertThat(pendings).as("the connector ran, on the event thread, before openTab returned").hasSize(1);
+        assertThat(h.sessionState(pane.id())).isEqualTo("CONNECTING|");
+        assertThat(pendings.get(0).pane()).isEqualTo(pane);
+        assertThat(pendings.get(0).columns()).isPositive();
+        h.ui(() -> {
+            assertThat(pane.info().kind()).isEqualTo(SessionKind.PLUGIN);
+            assertThat(pane.info().providerPluginId()).contains("test.alpha");
+            assertThat(pane.info().state()).isEqualTo(SessionState.CONNECTING);
+        });
+        pendings.get(0).status("Authenticating");
+        h.flush();
+        assertThat(h.sessionState(pane.id())).isEqualTo("CONNECTING|Authenticating");
+        var probe = new Probe();
+        pendings.get(0).attach(probe.connection("welcome"));
+        h.flush();
+        assertThat(h.sessionState(pane.id())).isEqualTo("RUNNING|");
+        h.typeIntoSession(pane.id(), "uptime\r");
+        assertThat(probe.typed.toString(java.nio.charset.StandardCharsets.UTF_8)).isEqualTo("uptime\r");
+        assertThat(h.sessionOutput(pane.id())).isEqualTo("welcome");
+        probe.exited.complete(3);
+        h.flush();
+        assertThat(h.sessionState(pane.id())).isEqualTo("EXITED|exit 3");
+        assertThat(probe.closes).hasValue(1);
+    }
+
+    @Test void ownershipTransfersAtAttachAndEveryConnectionIsClosedExactlyOnce() {
+        UUID window = h.addTerminalWindow(), keep = h.addTerminalTab(window, "local");
+        h.addTerminalPane(keep, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.SESSION_PROVIDE), Set.of(), Set.of(), alpha::set);
+        List<PendingSession> pendings = Collections.synchronizedList(new ArrayList<>());
+        PaneHandle pane = openSession(alpha, window, SessionSpec.of("build-host", pendings::add));
+        var first = new Probe(); var second = new Probe(); var late = new Probe();
+        pendings.get(0).attach(first.connection(""));
+        pendings.get(0).attach(second.connection(""));
+        pendings.get(0).fail("ignored after attach");
+        h.flush();
+        assertThat(h.sessionState(pane.id())).isEqualTo("RUNNING|");
+        assertThat(second.closes).as("offered to an attempt that already attached").hasValue(1);
+        assertThat(first.closes).hasValue(0);
+        h.closeTerminalPane(pane.id());
+        h.flush();
+        assertThat(first.closes).as("the pane closed").hasValue(1);
+        pendings.get(0).attach(late.connection(""));
+        h.flush();
+        assertThat(late.closes).hasValue(1);
+        assertThat(h.sessionState(pane.id())).isEqualTo("CLOSED|");
+    }
+
+    @Test void failureCancellationAndReconnectFollowTheAttemptRules() {
+        UUID window = h.addTerminalWindow(), keep = h.addTerminalTab(window, "local");
+        h.addTerminalPane(keep, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.SESSION_PROVIDE), Set.of(), Set.of(), alpha::set);
+        List<PendingSession> pendings = Collections.synchronizedList(new ArrayList<>());
+        List<String> seen = Collections.synchronizedList(new ArrayList<>());
+        PaneHandle pane = openSession(alpha, window, new SessionSpec("build-host", Optional.empty(), ExitPolicy.KEEP_OPEN, pendings::add));
+        pendings.get(0).fail("Connection refused");
+        h.flush();
+        assertThat(h.sessionState(pane.id())).isEqualTo("EXITED|Connection refused");
+        h.reconnectSession(pane.id());
+        assertThat(pendings).as("the same connector, a fresh attempt").hasSize(2);
+        var stale = new Probe();
+        pendings.get(0).attach(stale.connection(""));
+        h.flush();
+        assertThat(stale.closes).as("a finished attempt cannot attach into a later one").hasValue(1);
+        assertThat(h.sessionState(pane.id())).isEqualTo("CONNECTING|");
+
+        var live = new Probe();
+        pendings.get(1).attach(live.connection(""));
+        h.flush();
+        live.exited.complete(0);
+        h.flush();
+        assertThat(h.sessionState(pane.id())).isEqualTo("EXITED|exit 0");
+        assertThat(live.closes).as("closed before a reconnect is possible").hasValue(1);
+        h.reconnectSession(pane.id());
+        assertThat(pendings).hasSize(3);
+        pendings.get(2).onCancelled(() -> seen.add("aborted"));
+        var withdrawn = pendings.get(2).onCancelled(() -> seen.add("withdrawn"));
+        withdrawn.close();
+        h.cancelSession(pane.id());
+        h.flush();
+        assertThat(pendings.get(2).isCancelled()).isTrue();
+        assertThat(h.sessionState(pane.id())).as("a cancelled reconnect returns to the disconnected pane").isEqualTo("EXITED|Connection cancelled");
+        pendings.get(2).onCancelled(() -> seen.add("late"));
+        h.flush();
+        assertThat(seen).containsExactly("aborted", "late");
+    }
+
+    @Test void cancellingAnAttemptThatNeverShowedAnythingClosesThePane() {
+        UUID window = h.addTerminalWindow(), keep = h.addTerminalTab(window, "local");
+        h.addTerminalPane(keep, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.SESSION_PROVIDE), Set.of(), Set.of(), alpha::set);
+        List<PendingSession> pendings = Collections.synchronizedList(new ArrayList<>());
+        PaneHandle pane = openSession(alpha, window, SessionSpec.of("build-host", pendings::add));
+        h.cancelSession(pane.id());
+        h.flush();
+        assertThat(pendings.get(0).isCancelled()).isTrue();
+        assertThat(h.sessionState(pane.id())).isEqualTo("CLOSED|");
+        h.ui(() -> assertThat(pane.isOpen()).isFalse());
+    }
+
+    @Test void providingSessionsNeedsTheCapabilityAndAThrowingConnectorFailsTheAttempt() {
+        UUID window = h.addTerminalWindow(), keep = h.addTerminalTab(window, "local");
+        h.addTerminalPane(keep, "zsh", Path.of("/"));
+        var bare = new AtomicReference<PluginContext>();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.bare", Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), bare::set);
+        h.start(info("test.alpha", Capabilities.SESSION_PROVIDE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> assertThatThrownBy(() -> bare.get().terminals().openTab(bare.get().terminals().window(window).orElseThrow(),
+            OpenRequest.session(SessionSpec.of("x", pending -> { })))).isInstanceOfSatisfying(MissingCapabilityException.class,
+                failure -> assertThat(failure.capability()).isEqualTo(Capabilities.SESSION_PROVIDE)));
+        assertThat(h.openRequests()).isEmpty();
+        PaneHandle pane = openSession(alpha, window, SessionSpec.of("x", pending -> { throw new IllegalStateException("no such host"); }));
+        h.flush();
+        assertThat(h.sessionState(pane.id())).isEqualTo("EXITED|no such host");
+        assertThat(h.active("test.alpha")).as("a failing connector is contained").isTrue();
+    }
+
+    @Test void stoppingAPluginCancelsWhatItIsStillConnecting() {
+        UUID window = h.addTerminalWindow();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.SESSION_PROVIDE), Set.of(), Set.of(), alpha::set);
+        List<PendingSession> pendings = Collections.synchronizedList(new ArrayList<>());
+        List<String> seen = Collections.synchronizedList(new ArrayList<>());
+        openSession(alpha, window, SessionSpec.of("build-host", pending -> { pendings.add(pending); pending.onCancelled(() -> seen.add("aborted")); }));
+        h.stopAll();
+        h.flush();
+        assertThat(pendings.get(0).isCancelled()).isTrue();
+        assertThat(seen).containsExactly("aborted");
+        var late = new Probe();
+        pendings.get(0).attach(late.connection(""));
+        h.flush();
+        assertThat(late.closes).as("after the plugin stopped, too").hasValue(1);
     }
 }

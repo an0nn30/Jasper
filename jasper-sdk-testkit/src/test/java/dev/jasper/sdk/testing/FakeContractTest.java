@@ -43,6 +43,11 @@ class FakeContractTest extends PluginContractTest {
             @Override public void closeTerminalPane(java.util.UUID paneId) { host.closeTerminalPane(paneId); }
             @Override public void selectInPane(java.util.UUID paneId, String text) { host.setSelection(paneId, text); }
             @Override public List<String> sentToPane(java.util.UUID paneId) { return host.sent(paneId); }
+            @Override public String sessionState(java.util.UUID paneId) { return host.sessionState(paneId); }
+            @Override public void cancelSession(java.util.UUID paneId) { host.cancelSession(paneId); }
+            @Override public void reconnectSession(java.util.UUID paneId) { host.reconnectSession(paneId); }
+            @Override public void typeIntoSession(java.util.UUID paneId, String text) { host.typeIntoSession(paneId, text); }
+            @Override public String sessionOutput(java.util.UUID paneId) { return host.sessionOutput(paneId); }
             @Override public List<String> openRequests() { return host.openRequests().stream().filter(line -> !line.startsWith("front|")).toList(); }
             @Override public void finishCommand(java.util.UUID paneId, String command, int exitStatus) {
                 host.commandFinished(paneId, command, java.util.OptionalInt.of(exitStatus), java.time.Duration.ofMillis(1500));

@@ -92,6 +92,9 @@ class AppContractTest extends PluginContractTest {
             @Override public void ui(Runnable action) { onEdt(action); }
             @Override public void flush() {
                 do { onEdt(() -> { }); } while (host.bus.pending() > 0);
+                // Closes and cancellation handlers run on the cleanup thread; an exit is noticed on the EDT after that thread completed a future.
+                host.cleanup.drained().join();
+                do { onEdt(() -> { }); } while (host.bus.pending() > 0);
             }
             @Override public <T> void publishApp(Topic<T> topic, T payload) { host.bus.publish(EventBus.APP, topic, payload); }
             @Override public List<ActivityEvent> activityLog() { return List.copyOf(log); }
@@ -175,6 +178,11 @@ class AppContractTest extends PluginContractTest {
             @Override public void closeTerminalPane(UUID paneId) { onEdt(() -> terminalFixture.closePane(paneId)); }
             @Override public void selectInPane(UUID paneId, String text) { onEdt(() -> terminalFixture.select(paneId, text)); }
             @Override public List<String> sentToPane(UUID paneId) { return onEdtValue(() -> terminalFixture.sent(paneId)); }
+            @Override public String sessionState(UUID paneId) { return onEdtValue(() -> terminalFixture.sessionState(paneId)); }
+            @Override public void cancelSession(UUID paneId) { onEdt(() -> terminalFixture.cancelSession(paneId)); }
+            @Override public void reconnectSession(UUID paneId) { onEdt(() -> terminalFixture.reconnectSession(paneId)); }
+            @Override public void typeIntoSession(UUID paneId, String text) { onEdt(() -> terminalFixture.typeIntoSession(paneId, text)); }
+            @Override public String sessionOutput(UUID paneId) { return onEdtValue(() -> terminalFixture.sessionOutput(paneId)); }
             @Override public List<String> openRequests() {
                 return onEdtValue(() -> terminalFixture.opened().stream().filter(line -> !line.startsWith("front|")).toList());
             }

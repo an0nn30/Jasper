@@ -96,6 +96,21 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: publishes that a command finished in a pane after 1.5 seconds, in the pane's directory. */
     void finishCommand(java.util.UUID paneId, String command, int exitStatus);
 
+    /** A provided session's state: {@code CONNECTING|<status>}, {@code RUNNING|}, {@code EXITED|<how it ended>}, or {@code CLOSED|} for a pane that is gone. */
+    String sessionState(java.util.UUID paneId);
+
+    /** UI thread: the user pressed Cancel. A pane that never showed a session closes; otherwise it returns to the disconnected state. */
+    void cancelSession(java.util.UUID paneId);
+
+    /** UI thread: the user pressed Reconnect or Retry on a session that ended. */
+    void reconnectSession(java.util.UUID paneId);
+
+    /** UI thread: writes to the attached connection's input and flushes. */
+    void typeIntoSession(java.util.UUID paneId, String text);
+
+    /** UI thread: what the attached connection's output has available, without blocking. */
+    String sessionOutput(java.util.UUID paneId);
+
     /** Changes the look and announces it. */
     void setVariant(Variant variant);
 
