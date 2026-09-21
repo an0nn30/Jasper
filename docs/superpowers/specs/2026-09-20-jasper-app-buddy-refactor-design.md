@@ -1,7 +1,7 @@
 # Jasper application and Buddy architecture
 
 **Date:** 2026-09-20  
-**Status:** Architecture direction approved in conversation. Written specification awaiting user review; no implementation plan or production changes yet.  
+**Status:** Written specification approved by the user’s “continue”. Implementation plan awaiting review; no production changes yet.
 **Baseline:** `c7b796b` on `main`, after the terminal refactor merge.  
 **Scope:** Reorganize `jasper-app`, extract `jasper-buddy`, migrate repository callers/resources/build wiring, and provide executable developer documentation.
 
@@ -259,7 +259,7 @@ JWindow, executor or live mutable collection.
   supplier and nullable activation for orphaned notices. Identity is its ID, not
   generated record equality over callbacks. Detail/activation execute on EDT and
   must be fast, nonblocking and independent of live terminal-buffer reads.
-- `BuddyOptions` supplies resolved primary font, optional initial position,
+- `BuddyOptions` supplies resolved primary font, explicit dark/light mode, optional initial position,
   position-change consumer, activate-host callback and toggle-request callback.
   It has a builder/toBuilder, defensive value handling and documented inert
   callback defaults. The primary font is explicit and nonnull, not OS-discovered
@@ -452,3 +452,13 @@ are explicit. API input validation and lifecycle behavior have defined outcomes.
 No speculative SDK/runtime dependency or new feature is included. This document
 has no implementation placeholders; the next artifact is a task-by-task plan
 after written-spec approval.
+
+## Planning clarifications (2026-09-20)
+
+Implementation planning found two concrete dependencies that need explicit conversion
+at existing boundaries. MacTitleBar currently takes WindowContent and calls Main;
+it will receive Swing components, geometry suppliers and lifecycle callbacks, while
+window-title normalization stays in workspace. BuddyCard currently calls
+FlatLaf.isLafDark(); BuddyOptions therefore carries a dark boolean supplied by the
+app along with the resolved font. Both preserve existing behavior and implement
+the approved dependency direction. They are included in the plan for review.
