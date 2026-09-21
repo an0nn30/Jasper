@@ -11,13 +11,13 @@ The three modules are `jasper-app` (product composition), `jasper-terminal`
 [documentation index](README.md) for each module's onboarding, architecture and
 maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merged into
 local `main`, as is plan 2 (actions and chrome placements). Plan 3a (rail, panels and plugin
-windows) is implemented on `claude/plugin-sdk-plan-3a`; the spec's plan 3 was split into 3a and
-3b. Plans 3b and 4 are not started.
+windows) is merged too; the spec's plan 3 was split into 3a and 3b. Plan 3b (Plugins manager,
+install and restart) is planned on `claude/plugin-sdk-plan-3b`; plan 4 is not started.
 
 ### Plugin SDK plan 3a — 2026-09-21
 
-Implemented on `claude/plugin-sdk-plan-3a` (worktree `.worktrees/plugin-sdk-plan-3a`), not yet
-merged or pushed. The work implements
+Merged into local `main` by fast-forward on 2026-09-21 at `88fe4a0` (not pushed); the merged
+result passed the same verification. The work implements
 [plan 3a](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-3a-rail-panels-windows.md):
 plugin panels in left, right and bottom regions toggled from a single left rail, rail action
 buttons, and application-built plugin windows and dialogs, with panel placement, rail
