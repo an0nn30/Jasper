@@ -118,8 +118,8 @@ to empty.
 - Bundled plugins: `<app image>/plugins/`. User plugins: `<AppDirs.root>/plugins/`.
   When the same id appears in both, the higher version wins and a diagnostic is
   logged.
-- `<AppDirs.root>/plugins.toml` (app-owned state, written with the existing
-  bounded atomic persistence) records per plugin id: the enabled flag, the exact
+- `<AppDirs.root>/plugins.toml` (app-owned state, changed only through the locked
+  transactions of section 10) records per plugin id: the enabled flag, the exact
   capability set the user consented to, and pending removals.
 - A newly found user plugin, or an update whose capability set is not a subset of
   the consented set, is `NEEDS_CONSENT` and is not loaded. Bundled plugins and
@@ -178,11 +178,27 @@ public interface Plugin {
   callback) is applied to windows that already exist.
 - `start` must be quick; slow work goes to `context.background()`. The runtime
   times each `start` and logs slow ones.
-- If `start` throws, every registration the plugin made is rolled back, the plugin
-  is `FAILED`, its hard dependents are `SKIPPED`, and the app continues.
+- If `start` throws, the plugin is `FAILED`, its hard dependents are `SKIPPED`, and
+  the app continues. Rollback covers everything the context handed out, not only
+  registrations: the runtime performs the teardown of shutdown step 3 below
+  (without calling `stop()`), discards service publications, closes attached
+  connections (their panes show "disconnected: plugin failed to start"), and shuts
+  the plugin's executor down with interruption. Panes the plugin opened with
+  `OpenRequest.local` stay; they are ordinary user shells. Resources a plugin
+  created outside the SDK (its own threads, sockets) are its own to release before
+  it throws, and the authoring guide says so.
+- **Context invalidation.** A context is `STARTING`, `ACTIVE`, `STOPPING` or
+  `CLOSED`. After a failed `start`, and after a normal stop, it is `CLOSED`: every
+  contributing call (`register`, `add`, `subscribe`, `publish`, `begin`, `openTab`,
+  `split`, `windows().create`, `dialog`) throws `IllegalStateException`,
+  `background()` rejects new tasks, and handles already issued are inert. `log`
+  keeps working. Delayed plugin work therefore cannot recreate contributions after
+  a rollback.
 - Shutdown, in this order:
-  1. The app writes its own persistent state (panel and window state,
-     `plugins.toml`) so that nothing app-owned depends on plugins behaving.
+  1. The app writes its own persistent state (panel and window state) so that
+     nothing app-owned depends on plugins behaving. `plugins.toml` is never
+     rewritten at shutdown; it changes only inside a locked Plugins manager
+     transaction (section 10).
   2. The app **arms an independent process-exit deadline** on a non-EDT platform
      thread, before any plugin code runs. Today `ApplicationShutdown.await` only
      bounds asynchronous futures and is itself started from the EDT, so it cannot
@@ -192,10 +208,19 @@ public interface Plugin {
   3. On the EDT, in reverse dependency order: `stop()`, then the runtime closes
      every `Subscription` the plugin still holds in reverse registration order,
      closes its windows and dialogs, cancels its pending session attempts, fails
-     its open activities, and stops admitting tasks to its executor.
+     its open activities, and stops admitting tasks to its executor. Tasks the
+     executor already accepted keep running and are interrupted when the wait in
+     step 4 elapses.
   4. Asynchronous remainders join the existing bounded wait: the termination of
-     each plugin executor, and the `exited` future of each attached connection
-     whose `close` has been invoked (section 6).
+     each plugin executor, outstanding work on the app-owned **cleanup worker**,
+     and the `exited` future of each attached connection whose `close` has been
+     invoked (section 6).
+- The **cleanup worker** is an app-owned executor that runs session cancellation
+  handlers and the `close` of rejected or app-closed connections. It is independent
+  of every plugin executor and keeps accepting work throughout shutdown until the
+  process exits, so cleanup scheduled late, for example an `onCancelled` handler
+  that a still-running connector registers after its plugin's executor stopped
+  admitting tasks, is never rejected. Each task is contained and attributed.
 - `stop()` must return promptly and must not block on I/O; work that needs time
   belongs on `background()` before or during `stop()` and is bounded by step 4.
   **A blocked EDT callback cannot be abandoned:** while `stop()` or a handler
@@ -281,8 +306,10 @@ Plugin code is called under two distinct contracts.
   action handler, every event handler, the session `connector`, and per-consumer
   service factories. Registries throw `IllegalStateException` off the EDT, like
   `CommandRegistry.requireEdt()`.
-- **Plugin `background()` executor:** `PendingSession.onCancelled` handlers, which
-  usually abort blocking network work.
+- **App-owned cleanup worker:** `PendingSession.onCancelled` handlers, which
+  usually abort blocking network work. They do not run on the plugin's
+  `background()` executor, because that stops admitting tasks during shutdown while
+  a connector may still be running.
 - **Callable from any thread:** `log`, `background`, `dataDirectory`, `config`
   getters, `events().publish`, `activities()` handles, `services().require/find`
   (a cache lookup that runs no provider code), `Subscription.close`,
@@ -293,7 +320,7 @@ Plugin code is called under two distinct contracts.
 **Transport operations** (the members of a `TerminalConnection`, section 6) are
 plugin code that necessarily runs on terminal threads: `output.read` on the
 session's reader thread, `input.write`/`flush` and `resize` on the session's
-app-owned writer thread, and `close` on an app worker. None ever runs on the EDT or
+app-owned writer thread, and `close` on the cleanup worker. None ever runs on the EDT or
 under the buffer lock. Transport code must not touch Swing or call EDT-only SDK
 methods.
 
@@ -339,8 +366,9 @@ These are the targeted changes to current code, each exposed in app-native types
    indistinguishable. This one is a behavior change to local sessions, not only an
    additive entry point.
 8. **`application/ApplicationShutdown`** arms its deadline before plugin shutdown
-   begins (section 3), and **`bootstrap`** treats `--safe-mode` and `--plugin-dir`
-   as standalone launches (section 10).
+   begins (section 3); **`bootstrap`** treats `--safe-mode`, `--plugin-dir` and the
+   new `--standalone` as standalone launches; and **`residency`** gains the retire
+   request (section 10).
 
 ## 5. UI surface
 
@@ -570,13 +598,14 @@ public record TerminalConnection(
   transition is atomic and the first one wins. A pane has at most one live attempt.
 - **Cancellation** happens when the user presses Cancel, the pane, tab or window
   closes, the providing plugin stops, or the app shuts down. `onCancelled` handlers
-  run at most once, on the plugin's `background()` executor; a handler registered
-  after cancellation is scheduled immediately. `isCancelled()` supports polling.
+  run at most once, on the app-owned cleanup worker (section 3); a handler
+  registered after cancellation is scheduled there immediately, including during
+  shutdown and after the plugin's context is `CLOSED`. `isCancelled()` supports polling.
 - **Ownership transfers at the call to `attach`, whatever the outcome.** The app
   guarantees that `close` is invoked exactly once for every connection passed to
   `attach`. If the attempt is no longer `PENDING` (cancelled, already completed,
   pane gone, app shutting down), the connection is **rejected**: the app never
-  reads it and invokes its `close` at once on an app worker. This is the guarantee
+  reads it and invokes its `close` at once on the cleanup worker. This is the guarantee
   `SessionLaunchCoordinator.track` already gives late-acquired local sessions, so a
   connect that finishes after the user cancelled cannot leak a live connection.
   Anything the plugin must release with the session (the SSH client session behind
@@ -636,17 +665,31 @@ terminal layer, not the plugin, owns outbound queuing for attached sessions:
   command events, and Buddy notices and other plugins work on SSH panes unchanged.
   No JediTerm type appears in any signature.
 - **Working-directory provenance.** The terminal layer keeps the OSC 7 host instead
-  of discarding it and classifies each report. It is *local* when the session is a
-  local PTY and the host is empty, `localhost`, or equals the machine's host name
-  (case-insensitive, compared on the first DNS label). Everything else, and every
-  report on an attached session, is *remote*. The existing local `Path` surface
+  of discarding it and classifies each report. It is *local* only when the session
+  is a local PTY and the host is empty, `localhost`, or an **exact**,
+  case-insensitive match for one of the machine's known local names. The app
+  resolves those once, off the EDT (the OS host name, which is what Jasper's own
+  shell integration reports through `$HOST`, `$HOSTNAME` or `hostname`), and
+  passes them in `SessionLaunchOptions`. There is no partial or first-label
+  matching: `workstation.home.example` and `workstation.office.example` are
+  different machines, and a bare `workstation` is local only if that is exactly the
+  local name. Anything else, anything unparseable, every report when the local
+  names could not be resolved, and every report on an attached session is
+  *remote*: ambiguity resolves away from treating a path as local. The existing local `Path` surface
   (`TerminalSession.workingDirectory()`, `workingDirectoryChanged`, and the
   directory on `commandExecuted`) carries local directories only and becomes empty
   while the shell reports a remote one; a remote report is exposed separately as
-  host plus path string. Consequently command history, "new tab/split in the same
-  directory" and launch capture never receive a remote path, including when the
-  user runs `ssh` by hand inside a local pane, which today mislabels the remote
-  directory as local. In the SDK, `PaneInfo.workingDirectory` is the local value,
+  host plus path string. Command history, "new tab/split in the same directory" and
+  launch capture consume only the local value, so they no longer receive a
+  directory reported under a different host name, including when the user runs
+  `ssh` by hand inside a local pane, which today mislabels the remote directory as
+  local. **This is a best-effort classification, not a guarantee:** OSC 7 is
+  unauthenticated text from whatever is running in the pane, and a remote machine
+  that reports the same host name as the local one (`raspberrypi`,
+  `localhost.localdomain`) or no host at all is indistinguishable from local.
+  Consumers must keep treating a local working directory as a hint and tolerate a
+  path that does not exist. A stronger signal, such as a per-session token emitted
+  only by Jasper's locally injected shell integration, is deferred. In the SDK, `PaneInfo.workingDirectory` is the local value,
   `PaneInfo.remoteDirectory` the remote one, and `CWD_CHANGED` and
   `COMMAND_FINISHED` carry both.
 - The plugin requests `TerminalConnection.TERM` on the remote pty.
@@ -817,8 +860,8 @@ required test scenario (section 11).
 1. **Cancellation while the Vault is unlocking.** The SSH connector is awaiting
    `ensureUnlocked` when the pane closes (a window-modal unlock prompt makes the
    pane's own Cancel unreachable, so this arrives through tab or window close, or
-   quit). The attempt becomes `CANCELLED`; SSH's `onCancelled` handler runs on its
-   `background()` executor and cancels the future it is waiting on. Requirement
+   quit). The attempt becomes `CANCELLED`; SSH's `onCancelled` handler runs on the
+   cleanup worker and cancels the future it is waiting on. Requirement
    carried into the Vault spec: cancelling a future returned by `VaultApi`
    withdraws that request, and the prompt is dismissed when no other requester is
    waiting. No connection exists yet, so nothing else needs disposal.
@@ -885,21 +928,64 @@ before creating the application, which would reopen the very process that holds
 the problematic plugin. Both flags therefore follow the existing `--config`
 precedent and are **always standalone**: the launch never hands off, never binds or
 claims the shared endpoint, and cannot be resident (combined with `--background`
-it logs a warning and exits, as `--config` does). A resident process, if one is
-running, is left alone and keeps its plugins; the standalone process exists to
-reach the Plugins manager. Because two processes may then hold `plugins.toml`, the
-manager re-reads the file before each atomic write and changes only the entries it
-is editing.
+it logs a warning and exits, as `--config` does). A new public flag,
+`--standalone`, gives the same launch semantics with the normal plugin set. A
+resident process, if one is running, is not disturbed by a standalone launch and
+keeps the plugin set it started with.
 
-**Restart now** goes through the normal quit path, including the running-session
-confirmation. The old process performs its orderly shutdown and releases the
-handoff endpoint off the EDT *before* the replacement is spawned, so the new
-process cannot hand off to the one that is exiting. The replacement is started
-from the current process's own command line (`ProcessHandle.info()`), preserving
-the launch options (`--config`, `--plugin-dir`) except `--background`, and except
-`--safe-mode` when the button is used from a safe-mode process, where it reads
-"Restart normally". If the command line cannot be determined, the button degrades
-to Quit with a message asking the user to reopen Jasper.
+### `plugins.toml` transactions
+
+More than one Jasper process can therefore edit `plugins.toml`. Re-reading before
+an atomic write would not prevent lost updates (`TomlStateFile.writeAtomically`
+prevents partial files, not interleaved read–modify–write), so every change is a
+**locked transaction**: take an exclusive `FileLock` on
+`<AppDirs.root>/plugins.lock`, read the file, apply the single edit, write
+atomically, release. The transaction runs off the EDT with a bounded wait for the
+lock, as the endpoint lock already must; if the lock cannot be taken the operation
+fails visibly and nothing is written. No process writes `plugins.toml` outside
+such a transaction, in particular not at shutdown, so a recovery process's disable
+decision cannot be overwritten by another process exiting with stale state.
+Pending removals are carried out at launch inside the same lock; a directory that
+cannot be deleted stays pending and is retried at the next launch, and a plugin
+marked for removal is never loaded. Panel and window state files remain
+last-writer-wins across processes, like the existing Buddy and snippet state.
+
+When the manager opens or regains focus it re-reads `plugins.toml` and compares it
+with the set the process started with, so a resident whose plugin set was changed
+by another process shows the "Restart to apply" banner too.
+
+### Restart now
+
+Restart goes through the normal quit path, including the running-session
+confirmation. The replacement is started from the current process's own command
+line (`ProcessHandle.info()`), preserving `--config`, `--plugin-dir` and
+`--standalone` and dropping `--background`. If the command line cannot be
+determined, the button degrades to Quit with a message asking the user to reopen
+Jasper.
+
+- **From the process that owns the endpoint:** it performs its orderly shutdown and
+  releases the endpoint off the EDT *before* the replacement is spawned, so the new
+  process cannot hand off to the one that is exiting.
+- **From a standalone process with `--config`, `--plugin-dir` or `--standalone`:**
+  the replacement keeps the flag, so it is standalone again and never hands off.
+- **From a safe-mode process ("Restart normally"):** the replacement drops
+  `--safe-mode`, so a plain relaunch would hand off to a resident that still has
+  the problematic plugin loaded, and the safe-mode process has no endpoint whose
+  release could prevent that. The button therefore first probes the endpoint:
+  1. No live resident: relaunch normally.
+  2. A live resident: tell the user that another Jasper process is running with the
+     previous plugin set and must quit for the change to apply, then send it a
+     **retire** request, a new authenticated handoff request kind that runs the
+     resident's normal quit path including its running-session confirmation. Wait,
+     bounded and cancelable, for the endpoint lock to be released, then relaunch
+     normally.
+  3. The resident does not exit (it is wedged, its user declined, the wait elapsed,
+     or the user chose "Launch anyway"): relaunch with `--standalone`, which can
+     never hand off, and show in the replacement's Plugins manager that another
+     process still runs the previous plugin set until it is quit.
+
+  In no branch is a handoff-capable replacement started while the old resident
+  holds the endpoint.
 
 ## 11. Testing
 
@@ -926,13 +1012,24 @@ to Quit with a message asking the user to reopen Jasper.
   status, exceptional exit, drain before disconnect, `close` unblocking reads and
   invoked exactly once, shell-integration events; a stalled `input` never blocks
   the caller of `write` or `resize`, ordering and resize coalescing hold, and an
-  overflowing write is rejected whole. Working-directory provenance: local, remote
-  and hand-run `ssh` inside a local pane, across `workingDirectory`, command events
-  and history.
-- **Lifecycle scenarios:** the five failure walkthroughs in section 8, plus the
-  exit deadline firing while a plugin's `stop()` blocks the EDT (driven through an
-  injected terminate action, as `ApplicationShutdown` is tested today), and
-  standalone behavior of `--safe-mode` and `--plugin-dir` against a bound endpoint.
+  overflowing write is rejected whole. Working-directory provenance across
+  `workingDirectory`, command events and history: exact local name, `localhost`,
+  empty host, same first label under a different domain (remote), unresolved local
+  names (remote), and hand-run `ssh` inside a local pane.
+- **Lifecycle scenarios:** the five failure walkthroughs in section 8; the exit
+  deadline firing while a plugin's `stop()` blocks the EDT (driven through an
+  injected terminate action, as `ApplicationShutdown` is tested today); an
+  `onCancelled` handler registered after the plugin executor stopped admitting
+  tasks still runs; a `start` that submits background work, creates a window and
+  begins a session attempt before throwing leaves nothing behind, and its delayed
+  work cannot contribute through the `CLOSED` context.
+- **Residency and persistence scenarios:** `--safe-mode`, `--plugin-dir` and
+  `--standalone` never hand off to or bind a live endpoint; "Restart normally" with
+  a live resident sends retire and relaunches normally once the endpoint is
+  released, and relaunches `--standalone` when the resident does not exit, never a
+  handoff-capable launch while the resident lives; two processes editing different
+  `plugins.toml` entries concurrently both survive; a process exiting with a stale
+  view does not overwrite a newer disable; lock acquisition failure writes nothing.
 - **`plugins/sample`:** a panel, an action, a toolbar item, a menu, a status item,
   an activity, an injection action and a loopback echo session. An integration test
   loads it from a real jar; its sources are the compiled examples in the authoring
@@ -978,8 +1075,9 @@ behavior.
    resolution, classloaders, consent state, lifecycle, containment);
    `verifySdkArchitecture` and `verifyPluginArchitecture`; the testkit and contract
    suite; `plugins/sample`; the Activity → Buddy bridge; the shutdown order with the
-   exit deadline armed before plugin shutdown; `--safe-mode` and `--plugin-dir` as
-   standalone launches. Context accessors for later plans throw
+   exit deadline armed before plugin shutdown, the cleanup worker and context
+   invalidation; locked `plugins.toml` transactions; `--safe-mode`, `--plugin-dir`
+   and `--standalone` as standalone launches. Context accessors for later plans throw
    `UnsupportedOperationException` until their plan lands. User-directory plugins
    that need consent are reported in the log only until plan 3. *Demo: the bundled
    sample loads from a real jar and its demo activity appears on Buddy.*
@@ -990,8 +1088,8 @@ behavior.
 3. **Rail, panels, windows and the Plugins manager.** Rail and three regions in
    `WindowContent`; `Panels`, `Rail`; `PluginWindow` and `PluginDialog`; panel and
    window state persistence; the Plugins manager with install, consent,
-   enable/disable, the restart banner and Restart now (endpoint released before
-   the replacement starts). *Demo: the sample panel toggles from the
+   enable/disable, the restart banner and Restart now, including the retire request
+   and the "Restart normally" recovery path. *Demo: the sample panel toggles from the
    rail and moves between regions; a plugin installed from a zip goes through
    consent.*
 4. **Terminal API and plugin sessions.** Handles and `Terminals`; capability gating
@@ -1058,3 +1156,24 @@ checked against the code at the baseline and accepted:
 
 The review's broader recommendation, failure walkthroughs, is section 8's new
 subsection and a required test group in section 11.
+
+**2026-09-21, second external review of `9d26e2d`.** Five findings, each checked and
+accepted:
+
+1. *"Restart normally" could hand off to the broken resident.* Confirmed: a
+   safe-mode process owns no endpoint. Section 10 now probes for a resident, sends a
+   retire request, and falls back to a `--standalone` relaunch; no handoff-capable
+   replacement starts while the old resident lives.
+2. *Re-reading before an atomic write does not prevent lost updates.* Confirmed: no
+   state file has a cross-process lock today. `plugins.toml` changes are now locked
+   read–modify–write transactions and the file is never rewritten at shutdown.
+3. *Late cancellation callbacks conflicted with executor shutdown.* Cancellation
+   handlers and connection disposal moved to an app-owned cleanup worker that stays
+   available through shutdown.
+4. *Failed startup lacked complete cleanup.* Rollback now covers windows, attempts,
+   connections, activities and the executor, and the context becomes `CLOSED` so
+   delayed work cannot contribute.
+5. *First-label host matching misclassified machines.* Matching is now exact against
+   resolved local names (Jasper's integration reports `$HOST`/`$HOSTNAME`), ambiguity
+   resolves to remote, and the "never" promise is restated as best-effort.
+   `RemoteDirectory` is kept on the reviewer's recommendation.
