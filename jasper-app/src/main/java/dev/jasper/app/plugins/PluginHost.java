@@ -33,6 +33,8 @@ final class PluginHost {
     record Outcome(PluginStatus.State state, String reason) { }
 
     final Environment environment;
+    /** Runs cancellation handlers and connection closes off the EDT; outlives every plugin's own executor. */
+    final CleanupWorker cleanup = new CleanupWorker();
     private final dev.jasper.app.lifecycle.Subscription terminalBridge;
     final Containment containment;
     final EventBus bus;
@@ -115,6 +117,7 @@ final class PluginHost {
             context.teardown(false, "Plugin stopped");
             pending.add(context.drain(environment.drainGrace()));
         }
+        pending.add(cleanup.drained());
         return pending;
     }
 

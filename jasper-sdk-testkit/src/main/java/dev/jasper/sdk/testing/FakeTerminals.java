@@ -169,6 +169,7 @@ final class FakeTerminals implements Terminals {
     private OpenRequest.Local local(OpenRequest request) {
         return switch (Objects.requireNonNull(request, "request")) {
             case OpenRequest.Local local -> { require(Capabilities.TERMINAL_OPEN); yield local; }
+            case OpenRequest.Session session -> throw new UnsupportedOperationException("provided sessions arrive with the next commit");
         };
     }
 }

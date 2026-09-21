@@ -19,10 +19,14 @@ import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import dev.jasper.app.terminals.OpenSpec;
+import dev.jasper.app.terminals.SessionAttempt;
+import dev.jasper.app.terminals.SessionRequest;
+import dev.jasper.terminal.session.AttachedConnection;
 
 /** A scripted workspace behind a real {@link TerminalRegistry}: what windows do, without windows. EDT only. */
 final class TerminalFixture {
-    private static final class Pane { UUID id = UUID.randomUUID(); Tab tab; String title; Path directory; String selection; List<String> sent = new ArrayList<>(); }
+    private static final class Pane { UUID id = UUID.randomUUID(); Tab tab; String title; Path directory; String selection; List<String> sent = new ArrayList<>();
+        SessionRequest request; SessionAttempt attempt; AttachedConnection connection; boolean everAttached; String status = ""; String state = ""; }
     private static final class Tab { UUID id = UUID.randomUUID(); Window window; String title; List<Pane> panes = new ArrayList<>(); Pane focused; }
     private static final class Window { UUID id = UUID.randomUUID(); List<Tab> tabs = new ArrayList<>(); Tab selected; Subscription registration; }
 
@@ -36,14 +40,23 @@ final class TerminalFixture {
 
     private PaneEntry entry(Pane pane) {
         return new PaneEntry(pane.id, pane.tab.id,
-            () -> new PaneSnapshot(pane.title, Optional.ofNullable(pane.directory), 80, 24, true, PaneSnapshot.State.RUNNING, OptionalInt.empty(), Optional.empty()),
+            () -> new PaneSnapshot(pane.title, Optional.ofNullable(pane.directory), 80, 24, true,
+                pane.state.equals("CONNECTING") ? PaneSnapshot.State.STARTING : pane.state.equals("EXITED") ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING,
+                OptionalInt.empty(), Optional.ofNullable(pane.request).map(SessionRequest::providerId)),
             () -> CompletableFuture.completedFuture(Optional.of("vim")),
             bytes -> pane.sent.add("write:" + new String(bytes, StandardCharsets.UTF_8)), text -> pane.sent.add("paste:" + text),
             () -> Optional.ofNullable(pane.selection), () -> focusPane(pane.id),
             (axis, spec) -> {
-                Optional<Path> directory = spec instanceof OpenSpec.Local local ? local.directory() : Optional.<Path>empty();
-                opened.add("split|" + pane.id + "|" + axis + "|" + directory.map(Path::toString).orElse("-"));
-                UUID created = addPane(pane.tab.id, "split", directory.orElse(pane.directory));
+                UUID created = switch (spec) {
+                    case OpenSpec.Local local -> {
+                        opened.add("split|" + pane.id + "|" + axis + "|" + local.directory().map(Path::toString).orElse("-"));
+                        yield addPane(pane.tab.id, "split", local.directory().orElse(pane.directory));
+                    }
+                    case OpenSpec.Session session -> {
+                        opened.add("session-split|" + pane.id + "|" + axis + "|" + session.request().title());
+                        yield addSessionPane(pane.tab.id, session.request());
+                    }
+                };
                 focusPane(created);
                 return Optional.of(entry(panes.get(created)));
             });
@@ -59,11 +72,15 @@ final class TerminalFixture {
         windows.put(window.id, window);
         window.registration = registry.addWindow(new WindowEntry(window.id, () -> window.tabs.stream().map(this::entry).toList(),
             () -> Optional.ofNullable(window.selected).map(this::entry), () -> registry.activeWindow().map(WindowEntry::id).equals(Optional.of(window.id)),
-            () -> opened.add("front|" + window.id), spec -> {
-                Optional<Path> directory = spec instanceof OpenSpec.Local local ? local.directory() : Optional.<Path>empty();
-                opened.add("tab|" + window.id + "|" + directory.map(Path::toString).orElse("-"));
-                UUID tab = addTab(window.id, "opened");
-                return Optional.of(entry(panes.get(addPane(tab, "opened", directory.orElse(null)))));
+            () -> opened.add("front|" + window.id), spec -> switch (spec) {
+                case OpenSpec.Local local -> {
+                    opened.add("tab|" + window.id + "|" + local.directory().map(Path::toString).orElse("-"));
+                    yield Optional.of(entry(panes.get(addPane(addTab(window.id, "opened"), "opened", local.directory().orElse(null)))));
+                }
+                case OpenSpec.Session session -> {
+                    opened.add("session-tab|" + window.id + "|" + session.request().title());
+                    yield Optional.of(entry(panes.get(addSessionPane(addTab(window.id, session.request().title()), session.request()))));
+                }
             }));
         return window.id;
     }
@@ -107,6 +124,8 @@ final class TerminalFixture {
         Pane pane = panes.remove(paneId);
         if (pane == null) return;
         closedPanes.put(paneId, pane);
+        if (pane.attempt != null) pane.attempt.cancel();
+        if (pane.connection != null) { pane.connection.close().run(); pane.connection = null; }
         Tab tab = pane.tab; Window window = tab.window;
         registry.atomically(() -> {
             tab.panes.remove(pane);
@@ -130,5 +149,72 @@ final class TerminalFixture {
     void finishCommand(UUID paneId, String command, int exitStatus) {
         registry.publish(new TerminalEvent.CommandFinished(paneId, command, OptionalInt.of(exitStatus), Duration.ofMillis(1500),
             Optional.ofNullable(panes.get(paneId)).map(pane -> pane.directory)));
+    }
+
+    private UUID addSessionPane(UUID tabId, SessionRequest request) {
+        UUID id = addPane(tabId, request.title(), null);
+        panes.get(id).request = request;
+        connect(panes.get(id));
+        return id;
+    }
+
+    /** What a pane does for a provided session, without a pane: the attempt, the attach, the exit and the close. */
+    private void connect(Pane pane) {
+        // Attempts are driven from any thread; the registry belongs to the EDT. Inline when already there, so EDT tests stay synchronous.
+        var attempt = new SessionAttempt(pane.id, 80, 24, pane.request.cleanup(),
+            task -> { if (javax.swing.SwingUtilities.isEventDispatchThread()) task.run(); else javax.swing.SwingUtilities.invokeLater(task); });
+        pane.attempt = attempt;
+        pane.state = "CONNECTING"; pane.status = "";
+        attempt.onStatus = text -> { if (pane.attempt == attempt) pane.status = text; };
+        attempt.onAttached = connection -> {
+            if (pane.attempt != attempt || !panes.containsKey(pane.id)) { connection.close().run(); return; }
+            pane.connection = connection; pane.everAttached = true; pane.state = "RUNNING"; pane.status = "";
+            registry.publish(new TerminalEvent.SessionStarted(pane.id));
+            connection.exited().whenComplete((status, error) -> javax.swing.SwingUtilities.invokeLater(() -> {
+                if (pane.connection != connection) return;
+                connection.close().run();
+                pane.connection = null; pane.state = "EXITED";
+                pane.status = error == null ? "exit " + status : String.valueOf(error.getMessage());
+                registry.publish(new TerminalEvent.SessionExited(pane.id, error == null ? OptionalInt.of(status) : OptionalInt.empty()));
+                if (pane.request.closeOnExit()) closePane(pane.id);
+            }));
+        };
+        attempt.onFailed = message -> { if (pane.attempt == attempt) { pane.state = "EXITED"; pane.status = message; } };
+        registry.publish(new TerminalEvent.SessionConnecting(pane.id));
+        pane.request.connector().accept(attempt);
+    }
+
+    String sessionState(UUID paneId) {
+        Pane pane = panes.get(paneId);
+        return pane == null ? "CLOSED|" : pane.state + "|" + pane.status;
+    }
+
+    void cancelSession(UUID paneId) {
+        Pane pane = panes.get(paneId);
+        if (pane == null || pane.attempt == null) return;
+        pane.attempt.cancel();
+        // As in a real pane: with nothing ever shown there is nothing to return to.
+        if (!pane.everAttached) closePane(paneId); else { pane.state = "EXITED"; pane.status = "Connection cancelled"; }
+    }
+
+    void reconnectSession(UUID paneId) {
+        Pane pane = panes.get(paneId);
+        if (pane != null && pane.request != null && pane.state.equals("EXITED")) connect(pane);
+    }
+
+    void typeIntoSession(UUID paneId, String text) {
+        Pane pane = panes.get(paneId);
+        if (pane == null || pane.connection == null) return;
+        try { pane.connection.input().write(text.getBytes(StandardCharsets.UTF_8)); pane.connection.input().flush(); }
+        catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+    }
+
+    String sessionOutput(UUID paneId) {
+        Pane pane = panes.get(paneId);
+        if (pane == null || pane.connection == null) return "";
+        try {
+            var stream = pane.connection.output();
+            return new String(stream.readNBytes(stream.available()), StandardCharsets.UTF_8);
+        } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
     }
 }

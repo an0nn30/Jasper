@@ -66,8 +66,11 @@ final class HostedContext implements PluginContext {
         this.id = hosted.info().id();
         this.executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("jasper-plugin-" + id + "-", 0).factory());
         this.gate = new CapabilityGate(id, hosted.info().capabilities());
+        HostedTerminals[] self = new HostedTerminals[1];
+        var sessions = new HostedSessions(id, host.containment, host.cleanup, paneId -> self[0].detachedPaneHandle(paneId));
         this.terminals = new HostedTerminals(id, gate, host.environment.terminals(), host.environment.ui(), host.environment.onUi(),
-            () -> state != State.CLOSED);
+            () -> state != State.CLOSED, sessions);
+        self[0] = terminals;
         this.ui = new HostedUi(id, host.environment.contributions(), host.containment, host.environment.ui(),
             host.environment.onUi(), () -> state != State.CLOSED, hosted.loader(),
             () -> host.environment.dark().getAsBoolean() ? Variant.DARK : Variant.LIGHT,
@@ -88,6 +91,7 @@ final class HostedContext implements PluginContext {
     void teardown(boolean interrupt, String reason) {
         state = State.CLOSED;
         ui.closeAll();
+        terminals.closeAll();
         List<Subscription> copy;
         synchronized (owned) { copy = new ArrayList<>(owned); owned.clear(); }
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();

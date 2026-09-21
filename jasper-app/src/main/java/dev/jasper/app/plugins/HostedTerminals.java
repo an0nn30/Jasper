@@ -41,10 +41,12 @@ final class HostedTerminals implements Terminals {
     private final Consumer<Runnable> ui;
     private final BooleanSupplier onUi;
     private final BooleanSupplier open;
+    private final HostedSessions sessions;
 
     HostedTerminals(String pluginId, CapabilityGate gate, TerminalRegistry registry, Consumer<Runnable> ui, BooleanSupplier onUi,
-                    BooleanSupplier open) {
+                    BooleanSupplier open, HostedSessions sessions) {
         this.pluginId = pluginId; this.gate = gate; this.registry = registry; this.ui = ui; this.onUi = onUi; this.open = open;
+        this.sessions = sessions;
     }
 
     private void requireUi(String what) {
@@ -192,30 +194,41 @@ final class HostedTerminals implements Terminals {
 
     @Override public Optional<PaneHandle> openTab(WindowHandle window, OpenRequest request) {
         Objects.requireNonNull(window, "window");
-        OpenRequest.Local local = local(request);
+        OpenSpec spec = spec(request);
         requireUi("openTab");
         Optional<WindowEntry> target = registry.window(window.id());
         if (target.isEmpty()) return Optional.empty();
-        gate.audit(Capabilities.TERMINAL_OPEN, "opened a tab in window " + window.id());
-        return target.get().openTab().apply(new OpenSpec.Local(local.spec().workingDirectory())).map(Pane::new);
+        gate.audit(capability(request), "opened a tab in window " + window.id());
+        return target.get().openTab().apply(spec).map(Pane::new);
     }
 
     @Override public Optional<PaneHandle> split(PaneHandle target, Direction direction, OpenRequest request) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(direction, "direction");
-        OpenRequest.Local local = local(request);
+        OpenSpec spec = spec(request);
         requireUi("split");
         Optional<PaneEntry> entry = registry.pane(target.id());
         if (entry.isEmpty()) return Optional.empty();
-        gate.audit(Capabilities.TERMINAL_OPEN, "split pane " + target.id());
-        return entry.get().split().apply(direction == Direction.RIGHT ? SplitAxis.RIGHT : SplitAxis.DOWN, new OpenSpec.Local(local.spec().workingDirectory()))
+        gate.audit(capability(request), "split pane " + target.id());
+        return entry.get().split().apply(direction == Direction.RIGHT ? SplitAxis.RIGHT : SplitAxis.DOWN, spec)
             .map(Pane::new);
     }
 
     /** Every request kind names its capability here, before anything else happens. */
-    private OpenRequest.Local local(OpenRequest request) {
+    private OpenSpec spec(OpenRequest request) {
         return switch (Objects.requireNonNull(request, "request")) {
-            case OpenRequest.Local local -> { gate.require(Capabilities.TERMINAL_OPEN); yield local; }
+            case OpenRequest.Local local -> { gate.require(Capabilities.TERMINAL_OPEN); yield new OpenSpec.Local(local.spec().workingDirectory()); }
+            case OpenRequest.Session session -> { gate.require(Capabilities.SESSION_PROVIDE); yield new OpenSpec.Session(sessions.request(session.spec())); }
         };
     }
+
+    private static String capability(OpenRequest request) {
+        return request instanceof OpenRequest.Session ? Capabilities.SESSION_PROVIDE : Capabilities.TERMINAL_OPEN;
+    }
+
+    /** A handle that finds its tab lazily, for callers that are not on the UI thread. */
+    PaneHandle detachedPaneHandle(UUID id) { return new Pane(id, NOWHERE); }
+
+    /** The plugin is stopping. */
+    void closeAll() { sessions.cancelAll(); }
 }

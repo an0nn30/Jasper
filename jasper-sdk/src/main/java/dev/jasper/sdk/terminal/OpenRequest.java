@@ -4,8 +4,8 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 
-/** What to run in a new tab or split. Plugin-provided sessions join this family in a later SDK version. */
-public sealed interface OpenRequest permits OpenRequest.Local {
+/** What to run in a new tab or split. */
+public sealed interface OpenRequest permits OpenRequest.Local, OpenRequest.Session {
     /**
      * A local shell. Needs {@code terminal.open}.
      *
@@ -38,4 +38,22 @@ public sealed interface OpenRequest permits OpenRequest.Local {
      * @return the request
      */
     static OpenRequest local(LocalSpec spec) { return new Local(spec); }
+
+    /**
+     * A session the plugin provides. Needs {@code session.provide}.
+     *
+     * @param spec how to connect it
+     */
+    record Session(SessionSpec spec) implements OpenRequest {
+        /** Rejects null. */
+        public Session { Objects.requireNonNull(spec, "spec"); }
+    }
+
+    /**
+     * A session the plugin provides.
+     *
+     * @param spec how to connect it
+     * @return the request
+     */
+    static OpenRequest session(SessionSpec spec) { return new Session(spec); }
 }

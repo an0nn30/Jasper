@@ -39,7 +39,8 @@ class HostedUiTest {
             () -> new java.awt.Rectangle(0, 0, 10, 10)));
     private final TerminalFixture terminalFixture = new TerminalFixture();
     private final HostedTerminals terminals = new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", java.util.Set.of()),
-        terminalFixture.registry, Runnable::run, () -> true, () -> true);
+        terminalFixture.registry, Runnable::run, () -> true, () -> true,
+        new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null));
     private final HostedUi ui = new HostedUi("dev.x.tool", model, containment, Runnable::run, () -> true, open::get,
         HostedUiTest.class.getClassLoader(), () -> variant,
         handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary, terminals);

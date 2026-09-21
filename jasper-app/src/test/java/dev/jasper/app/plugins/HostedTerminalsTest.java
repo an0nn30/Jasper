@@ -32,7 +32,7 @@ class HostedTerminalsTest {
 
     private HostedTerminals terminals(String... capabilities) {
         return new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", Set.of(capabilities)), fixture.registry, posted::add,
-            onUi::get, open::get);
+            onUi::get, open::get, new HostedSessions("dev.x.tool", new Containment(() -> true), Runnable::run, id -> null));
     }
 
     @Test void queriesMirrorTheRegistryAndHandlesAreEqualById() {
