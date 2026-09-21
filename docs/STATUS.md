@@ -12,7 +12,46 @@ The three modules are `jasper-app` (product composition), `jasper-terminal`
 maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merged into
 local `main`, as is plan 2 (actions and chrome placements). Plan 3a (rail, panels and plugin
 windows) is merged too; the spec's plan 3 was split into 3a and 3b. Plan 3b (Plugins manager,
-install and restart) is planned on `claude/plugin-sdk-plan-3b`; plan 4 is not started.
+install and restart) is implemented on `claude/plugin-sdk-plan-3b`; plan 4 is not started.
+
+### Plugin SDK plan 3b — 2026-09-21
+
+Implemented on `claude/plugin-sdk-plan-3b` (worktree `.worktrees/plugin-sdk-plan-3b`), not yet
+merged or pushed. The work implements
+[plan 3b](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-3b-manager-install-restart.md):
+the application-owned Plugins manager (File → Manage Plugins…, action `plugins.manage`) that lists
+every plugin with state, reason, capabilities, requirements and error count; enables and disables
+plugins; reviews capabilities and records consent; installs a plugin from a zip and removes one;
+and restarts Jasper to apply the change, including safe mode's Restart Normally, which retires a
+resident process first. New packages: `dev.jasper.app.pluginmanager` and the leaf
+`dev.jasper.app.restart`; new runtime classes `PluginMaintenance`, `PluginInstaller`,
+`PluginCatalog` and `PluginAdmin`; `PluginRuntime` gained the public records `Row`, `Snapshot`,
+`Inspection` and `Outcome`. The SDK is unchanged at 0.3.0. See
+[SDK architecture](sdk-architecture.md#plugins-manager-install-and-restart).
+
+Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks`
+passed with **1,326 tests: 1,324 passed, two expected environment skips, no failures or
+errors** (app 768, Buddy 163, terminal 355, SDK 12, testkit 22, sample plugin 6).
+`RestartCommandTest.theRunningJvmReportsItsOwnCommandLine` passes on the development Mac under
+JBR 25: `ProcessHandle.info()` reports the process's own command and arguments, so Restart Now
+can replay them. Native acceptance (the eleven-step checklist at the end of the plan) is pending:
+agents do not launch the GUI, and no test spawns a Jasper process.
+
+Scope decisions, recorded in the plan: the quit path has no running-session confirmation today,
+so restart and retire call `quit()` as it is; installs are always staged in
+`plugins/.pending/<id>/` and applied, like removals, by launch maintenance inside the state lock;
+that maintenance runs on the main thread in the bootstrap, before the desktop starts; the manager
+is app UI over `PluginRuntime`'s public records, and `PluginRuntime` stays the only public
+top-level type of its package; `retire` is handoff protocol 1 with a sixth field, so an ordinary
+open request is byte-identical and the stale-build upgrade path is untouched; waiting for the
+resident means waiting until nothing answers on the socket, 30 seconds, cancelable; a replacement
+spawned while process cleanup has not finished gets `--standalone`; a zip whose plugin needs
+another SDK is rejected at install; an entry in `plugins.toml` means "reviewed", so an unreviewed
+plugin offers only Review and Remove; zips hold jars at the root or in one folder, within fixed
+limits; the manager does not open by itself in safe mode; `plugins.manage` is contributed by the
+application before plugins start and has no default shortcut; and the sample plugin is unchanged.
+
+Deviations from the plan text: Task 0's separate baseline `check` was not run: the branch started from the merged `main` that had just passed the full verification, with documentation-only changes on top. The new `LaunchRequestTest` case is `@DisabledOnOs(WINDOWS)`, as Task 5 allowed, because it asserts the exact encoding of a Unix path. In `docs/plugin-authoring.md` the obsolete passage that told users to consent by hand in `plugins.toml` was replaced by a pointer to File → Manage Plugins…, rather than kept above the new section. No production or test code differs from the plan text.
 
 ### Plugin SDK plan 3a — 2026-09-21
 

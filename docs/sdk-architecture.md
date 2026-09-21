@@ -12,6 +12,8 @@ plugin writer's view.
 | `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `contributions`, `notifications`, `persistence`, `platform`, `windows` |
 | `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `lifecycle` |
 | `dev.jasper.app.windows` | Application-built auxiliary windows: headless `AuxiliarySurface`, native `NativeShells` | `appearance`, `lifecycle`, `persistence`, `platform` |
+| `dev.jasper.app.pluginmanager` | The Plugins manager window: passive Swing view, consent view and controller over app-native rows | `plugins`, `restart`, `windows` |
+| `dev.jasper.app.restart` | Restart planning from the process's own command line, `ResidentControl`, and the Restart normally conversation | none |
 | `plugins/sample` | Bundled end-to-end fixture and documentation example | SDK (`compileOnly`) |
 
 `verifySdkArchitecture`, `verifyPluginArchitecture` and `verifyApplicationArchitecture`
@@ -90,6 +92,33 @@ visibility and auxiliary window bounds. It is application state, not configurati
 read, atomic write, defaults when unreadable. The process stays alive while a plugin window
 is open.
 
+## Plugins manager, install and restart
+
+Nothing is loaded or unloaded in a running process. The manager edits `plugins.toml` through
+`PluginStateStore.transact` (exclusive lock on `plugins.lock`, read, one edit, atomic write) on a
+worker thread, and stages installs: `PluginInstaller` unpacks only jars from a zip, under size
+limits and with names that cannot leave the staging directory, validates the descriptor with
+`PluginDiscovery`, and on consent moves the result to `plugins/.pending/<id>/` inside the same
+transaction that records the consent. `PluginMaintenance` runs once per launch, on the main thread
+before the desktop starts: inside the lock it deletes plugins marked `remove` and moves pending
+installs into place, renaming the old directory away first so nothing is ever half replaced.
+What cannot be done stays pending. An entry in `plugins.toml` means the user reviewed the plugin.
+
+`PluginCatalog` is pure: it resolves the disk as it would be after maintenance and compares the
+result with what this process selected at launch. The difference is the "Restart to apply"
+banner, and because the comparison starts from the files it also notices changes made by another
+Jasper process. `PluginRuntime` exposes the result as `Row` and `Snapshot` records; the manager
+package never sees a runtime type.
+
+Restart now replays the process's own command line (`ProcessHandle.info()`) without `--background`.
+The replacement is spawned from the exit thread, after process cleanup has released the handoff
+endpoint; if that cleanup did not finish, the replacement gets `--standalone`. Restart normally,
+from safe mode, drops `--safe-mode`, and therefore first asks `ResidentControl` whether a resident
+process holds the endpoint: if so it sends the authenticated `retire` request (protocol 1 with a
+sixth field, so an ordinary open request is unchanged), waits up to 30 seconds for the socket to go
+quiet, and otherwise offers only a `--standalone` launch. A handoff-capable replacement is never
+started while the old resident holds the endpoint.
+
 ## Shutdown
 
 `JasperApplication.shutdown` arms `ApplicationShutdown`'s exit deadline, closes
@@ -106,5 +135,5 @@ disagree, the implementation is wrong, not the contract.
 
 ## Not yet implemented
 
-The Plugins manager with install, consent and restart (plan 3b); handle queries, injection, plugin-provided sessions, capability gating and the
-cleanup worker (plan 4).
+Handle queries, injection, plugin-provided sessions, capability gating and the cleanup worker
+(plan 4).

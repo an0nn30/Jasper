@@ -215,15 +215,26 @@ jasper --plugin-dir /path/to/build/plugin-directory
 
 `--plugin-dir` loads one plugin directory with consent pre-granted. Like `--safe-mode`
 (no user plugins) and `--standalone`, it never hands off to or becomes a resident process.
-Installed plugins live in `~/.config/jasper/plugins/<id>/` and stay inert until reviewed;
-the Plugins manager that performs the review arrives with SDK plan 3. Until then a user
-plugin can be consented by hand in `~/.config/jasper/plugins.toml`:
+Installed plugins live in `~/.config/jasper/plugins/<id>/` and stay inert until the user reviews
+them in File → Manage Plugins…, which records the consent in `~/.config/jasper/plugins.toml`.
 
-```toml
-version = 1
+## Distributing a plugin
 
-[plugins."dev.example.tool"]
-enabled = true
-consented = []
-remove = false
+Zip your plugin's jars, either at the root of the zip or inside one folder; everything else in the
+zip is ignored. Users install it from File → Manage Plugins… → Install from Zip…. Jasper unpacks
+the jars into a staging folder, checks the descriptor exactly as it does at launch (one
+`plugin.toml`, a valid id, an `sdk` range that includes this Jasper), and shows a consent dialog
+with your name, version, vendor and capabilities. The plugin is installed and loaded at the next
+restart; an update never replaces jars that a running Jasper has open.
+
+```bash
+cd plugins/sample/build/libs && zip sample.zip *.jar
 ```
+
+- Declare only the capabilities you use: the list is what the user is asked to allow, and a later
+  version that adds one is held back until the user reviews it again.
+- Consent is not a sandbox, and the dialog says so. Your plugin runs with everything Jasper can reach.
+- Users disable, review and remove plugins in the same window. Removal deletes `plugins/<id>/` at the
+  next launch; your `plugin-data/<id>/` directory is left alone.
+- `jasper --safe-mode` starts without installed plugins, so a plugin that breaks startup can be
+  disabled or removed; the manager then offers Restart Normally.

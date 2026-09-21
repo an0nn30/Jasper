@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Record every deviation from this text here and in `docs/STATUS.md`.
+**Status:** Implemented on `claude/plugin-sdk-plan-3b`; native acceptance pending. Deviations from this text: (1) Task 0's separate baseline `check` was not run: the branch started from the merged `main` that had just passed the full verification, with documentation-only changes on top. (2) The new `LaunchRequestTest` case is `@DisabledOnOs(WINDOWS)`, as Task 5 allowed, because it asserts the exact encoding of a Unix path. (3) In `docs/plugin-authoring.md` the obsolete passage that told users to consent by hand in `plugins.toml` was replaced by a pointer to File → Manage Plugins…, rather than kept above the new section. No production or test code differs from the plan text.
 
 **Goal:** Give the user an application-owned Plugins manager that lists every plugin with its state, enables and disables plugins, reviews capabilities and records consent, installs a plugin from a zip and removes one, and restarts Jasper to apply the change, including the safe-mode "Restart normally" path that retires a resident process first.
 

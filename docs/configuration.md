@@ -19,7 +19,7 @@ Use `--config <path>` to select a different file. Relative paths resolve from th
 ./gradlew :jasper-app:run --args='--help'
 ```
 
-`--safe-mode` starts without user-installed plugins, `--plugin-dir <path>` additionally loads one development plugin directory, and `--standalone` changes nothing else. All three, like `--config`, make the launch standalone: it never hands off to a resident Jasper and never becomes resident.
+`--safe-mode` starts without user-installed plugins, `--plugin-dir <path>` additionally loads one development plugin directory, and `--standalone` changes nothing else. All three, like `--config`, make the launch standalone: it never hands off to a resident Jasper and never becomes resident. In safe mode, File → Manage Plugins… shows that safe mode is on and offers Restart Normally. If another Jasper is resident, it is asked to quit first, because a plain launch would otherwise be handed to it.
 
 The first command launches the desktop and a shell. `--help` prints usage without opening a window or reading configuration. Missing, duplicate and unknown arguments fail before desktop startup.
 
@@ -411,7 +411,8 @@ demo_ui = true            # add the sample's action to the toolbar, menus and st
 Installed plugins live in `plugins/<id>/` beside `config.toml`; their enabled state and
 consented capabilities are in `plugins.toml`, and their private data under `plugin-data/<id>/`.
 `ui-state.toml` beside `config.toml` remembers panel placement, rail visibility and plugin window
-bounds; it is written by Jasper and is not meant to be edited.
+bounds; it is written by Jasper and is not meant to be edited. Pending plugin installs wait in
+`plugins/.pending/`; Jasper applies them, and removals, when it next starts.
 
 ## Shortcuts
 
@@ -453,7 +454,7 @@ Plugin actions are bound by their quoted id, for example:
 A plugin may suggest a default shortcut; yours always wins, and Jasper's built-in shortcuts win
 over a plugin's suggestion. A binding for an action that no installed plugin provides is
 reported as a configuration warning. Every panel also has a `<panel id>.toggle` action you can
-bind the same way.
+bind the same way. `"plugins.manage"` opens the Plugins manager and has no default shortcut.
 
 ## Command palette shortcuts
 
