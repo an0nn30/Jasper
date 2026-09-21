@@ -11,15 +11,19 @@ import java.util.OptionalInt;
  * Command-start/finish callbacks run after command capture releases the buffer lock.
  */
 public interface TerminalSessionListener {
+    /** Visible buffer contents changed; may be called while holding the buffer lock. */
     public default void screenChanged() {
     }
 
+    /** The reader received a program title; the argument is the new title. */
     public default void titleChanged(String title) {
     }
 
+    /** The reader received BEL; schedule presentation work without blocking. */
     public default void bell() {
     }
 
+    /** The reader decoded an OSC 7 working directory; the argument is the reported local path. */
     public default void workingDirectoryChanged(Path directory) {
     }
 

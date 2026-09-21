@@ -24,6 +24,7 @@ public final class ShellIntegrationFilter {
     private static final char BEL = '\007';
     private static final int MAX_HELD = 4096;
 
+    /** Streaming parser states retained across read-chunk boundaries. */
     private enum State { TEXT, ESCAPE, OSC_NUMBER, OSC_DATA, OSC_DATA_ESCAPE, CSI }
 
     private final StringBuilder held = new StringBuilder();

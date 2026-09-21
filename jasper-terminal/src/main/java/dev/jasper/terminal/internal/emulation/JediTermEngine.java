@@ -302,7 +302,16 @@ public final class JediTermEngine implements AutoCloseable {
         }
     }
 
-    /** Internal concrete callback bundle; constructed before emulator initialization. */
+    /** Internal concrete callback bundle; constructed before emulator initialization.
+     * @param screenChanged fast synchronous dirty notification, may hold the buffer lock
+     * @param titleChanged reader-thread title notification
+     * @param bell reader-thread bell notification
+     * @param scrollbackReset coordinate-reset notification on causing thread
+     * @param alternateBufferChanged buffer-switch notification on causing thread
+     * @param workingDirectoryChanged reader-thread shell directory notification
+     * @param commandStarted reader-thread command-start notification outside the capture lock
+     * @param commandFinished reader-thread completed-command notification outside the capture lock
+     */
     public record Events(Runnable screenChanged, java.util.function.Consumer<String> titleChanged,
         Runnable bell, Runnable scrollbackReset, java.util.function.Consumer<Boolean> alternateBufferChanged,
         java.util.function.Consumer<Path> workingDirectoryChanged, java.util.function.Consumer<String> commandStarted,

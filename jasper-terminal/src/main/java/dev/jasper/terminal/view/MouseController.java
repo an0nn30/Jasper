@@ -43,6 +43,7 @@ final class MouseController {
     private long gestureSequence;
     private double wheelRemainder;
 
+    /** Ownership and modifier state captured on press and retained through release. */
     private static final class Gesture {
         final MouseRouting.Action action;
         final boolean shift, alt, control;

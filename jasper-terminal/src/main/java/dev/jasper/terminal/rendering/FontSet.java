@@ -27,10 +27,12 @@ public final class FontSet {
     private final int cellHeight;
     private final int ascent;
 
+    /** Creates EDT-owned fonts with natural line height; family order controls glyph fallback. */
     public FontSet(String family, float size, List<String> fallbackFamilies, boolean ligatures) {
         this(family, size, fallbackFamilies, ligatures, 1f);
     }
 
+    /** Creates EDT-owned font variants and metrics with a line-height multiplier. Use validated TerminalOptions values. */
     public FontSet(String family, float size, List<String> fallbackFamilies, boolean ligatures, float lineHeight) {
         this.ligatures = ligatures;
         List<String> families = new ArrayList<>();
@@ -51,6 +53,7 @@ public final class FontSet {
         ascent = naturalAscent + (cellHeight - naturalHeight) / 2;
     }
 
+    /** Returns the first family displaying this code point, with requested weight/slant; caches the choice on EDT. */
     public Font fontFor(int codePoint, boolean bold, boolean italic) {
         int index = fontIndexByCodePoint.computeIfAbsent(codePoint, this::firstFontThatCanDisplay);
         return fonts[index][(bold ? 1 : 0) | (italic ? 2 : 0)];
@@ -63,18 +66,22 @@ public final class FontSet {
             : font.createGlyphVector(FRC, text);
     }
 
+    /** Returns the resolved primary family name, which can differ if a requested font is unavailable. */
     public String primaryFamily() {
         return fonts[0][0].getFamily();
     }
 
+    /** Returns the positive width of one cell in logical pixels. */
     public int cellWidth() {
         return cellWidth;
     }
 
+    /** Returns the positive height of one cell in logical pixels, including line-height spacing. */
     public int cellHeight() {
         return cellHeight;
     }
 
+    /** Returns baseline distance from the cell top in logical pixels. */
     public int ascent() {
         return ascent;
     }

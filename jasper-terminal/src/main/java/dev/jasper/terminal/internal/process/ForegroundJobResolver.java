@@ -60,6 +60,7 @@ final class ForegroundJobResolver {
         }
     }
 
+    /** Native foreground process-group result and whether it belongs to the shell. */
     private static final class ForegroundGroup {
         static final Function GET = find();
         private static Function find() {

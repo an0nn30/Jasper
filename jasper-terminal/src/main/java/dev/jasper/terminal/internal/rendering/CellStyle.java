@@ -5,7 +5,13 @@ import dev.jasper.terminal.internal.text.CellAttributes;
 
 import java.awt.Color;
 
-/** A cell's style with colors fully resolved (inverse, dim and hidden already applied). */
+/** A cell's style with colors fully resolved (inverse, dim and hidden already applied).
+ * @param foreground resolved foreground color
+ * @param background resolved background color
+ * @param bold bold font variant
+ * @param italic italic font variant
+ * @param underline underline decoration
+ */
 public record CellStyle(Color foreground, Color background, boolean bold, boolean italic, boolean underline) {
 
     public static CellStyle resolve(CellAttributes style, Palette palette) {

@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-20
 
-**Status:** Approved by the user on 2026-09-20. The [implementation plan](../plans/2026-09-20-jasper-terminal-refactor.md) is awaiting review. Implementation has not started.
+**Status:** Approved by the user on 2026-09-20. The [implementation plan](../plans/2026-09-20-jasper-terminal-refactor.md) is executing natively on the independently created `codex/terminal-refactor-native` branch. Tasks 1–11 are complete; documentation and final review are in progress. The final connector adapter belongs to internal.emulation (vendor confinement), with native ownership in internal.process. Row capture uses the measured compact detached adapter described in the verification report.
 
 **Scope:** `jasper-terminal`, its documentation and tests, and migration of affected repository callers.
 
@@ -88,7 +88,7 @@ dev.jasper.terminal
     FontSet
   internal/
     emulation/  JediTermEngine, SessionDisplay, BufferQueries, vendor adapters
-    process/    process creation, PtyConnector, ForegroundJobResolver
+    process/    PtyChild process ownership, ForegroundJobResolver
     shell/      stream filtering, custom-command decoding, ShellCommandTracker
     text/       absolute-row state, copied-row access, text and selection algorithms
     rendering/ screen snapshots, runs, style resolution, painter

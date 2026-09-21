@@ -88,6 +88,7 @@ final class RunBuilder {
         return styleCache.computeIfAbsent(style, s -> CellStyle.resolve(s, palette));
     }
 
+    /** Reusable scratch storage for one contiguous font/style run; owned by its RunBuilder. */
     private static final class Accumulator {
         private final int startColumn;
         private final CellStyle style;

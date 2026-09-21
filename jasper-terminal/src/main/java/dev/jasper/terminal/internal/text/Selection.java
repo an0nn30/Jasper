@@ -3,6 +3,11 @@ package dev.jasper.terminal.internal.text;
 /**
  * A selection over absolute rows (see {@code TerminalSession}) and columns, both ends inclusive. A stream selection
  * runs like text from its start cell to its end cell; a block selection is a rectangle.
+ * @param anchorRow absolute anchor row
+ * @param anchorColumn anchor cell
+ * @param focusRow absolute focus row
+ * @param focusColumn focus cell
+ * @param block whether the range is rectangular
  */
 public record Selection(long anchorRow, int anchorColumn, long focusRow, int focusColumn, boolean block) {
 

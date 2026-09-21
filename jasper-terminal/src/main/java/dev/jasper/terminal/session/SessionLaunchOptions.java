@@ -7,7 +7,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Immutable process inputs. Builders perform validation but never start a process. */
+/**
+ * Immutable process inputs. Builders validate but perform no I/O.
+ * Command, environment and working directory are explicit; no shell or environment is inferred.
+ * @param command executable followed by literal arguments; copied, no shell parsing
+ * @param environment complete copied child environment; TERM and COLORTERM are forced at launch
+ * @param workingDirectory child directory; existence is checked by process creation
+ * @param grid initial terminal size in cells
+ * @param scrollback history capacity from 0 through 1,000,000 lines
+ */
 public record SessionLaunchOptions(List<String> command, Map<String, String> environment,
         Path workingDirectory, GridSize grid, int scrollback) {
     /** Copies collections and rejects invalid arguments before process creation. */

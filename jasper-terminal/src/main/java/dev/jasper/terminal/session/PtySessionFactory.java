@@ -4,7 +4,6 @@ import dev.jasper.terminal.internal.TerminalAccess;
 import dev.jasper.terminal.internal.process.PtyChild;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.function.Supplier;
 
 /** Owns the handoff from a newly spawned process to a fully wired running session. */

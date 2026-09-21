@@ -8,7 +8,11 @@ import java.util.regex.Pattern;
 /** Finds text row by row; a match does not span a soft wrap. */
 public final class TerminalSearch {
 
-    /** A match on an absolute row; columns inclusive. */
+    /** A match on an absolute row; columns inclusive.
+     * @param row absolute match row
+     * @param startColumn first selected cell, inclusive
+     * @param endColumn last selected cell, inclusive
+     */
     public record Match(long row, int startColumn, int endColumn) {
     }
 

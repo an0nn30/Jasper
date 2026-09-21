@@ -20,50 +20,34 @@ import dev.jasper.terminal.session.TerminalSessionListener;
 
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 import java.awt.AWTEvent;
 import java.awt.Color;
-import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.HeadlessException;
 import java.awt.Toolkit;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.StringSelection;
-import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.event.HierarchyEvent;
-import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.regex.PatternSyntaxException;
 
 /**
  * The Swing component that shows a {@link TerminalSession}: painting, keyboard, mouse, selection, scrollback, search
- * and prompt jumps.
+ * and prompt jumps. Construct and access it on the EDT. Removing it cancels presentation
+ * work but leaves its session open; the embedding application owns session shutdown.
  */
 public final class TerminalView extends JComponent {
     private static final System.Logger LOG = System.getLogger(TerminalView.class.getName());
@@ -100,6 +84,7 @@ public final class TerminalView extends JComponent {
     private Consumer<String> clipboardWriter = DesktopServices::writeClipboard;
     private Consumer<String> linkOpener = DesktopServices::openBrowser;
 
+    /** Constructs an EDT-owned view without taking ownership of session shutdown; options and session must be nonnull. */
     public TerminalView(TerminalSession session, TerminalOptions options) {
         this.session = session;
         this.access = session.internalAccess();
@@ -193,6 +178,7 @@ public final class TerminalView extends JComponent {
         });
     }
 
+    /** Attaches fresh listener/timer generations when Swing realizes this component; EDT only. */
     @Override
     public void addNotify() {
         super.addNotify();
@@ -204,6 +190,7 @@ public final class TerminalView extends JComponent {
         rendering.showing(isShowing());
     }
 
+    /** Invalidates presentation work and unregisters its listener; leaves the session open. EDT only. */
     @Override
     public void removeNotify() {
         rendering.detach();
@@ -216,11 +203,13 @@ public final class TerminalView extends JComponent {
         super.removeNotify();
     }
 
+    /** Returns the emulator minimum grid in current font metrics. */
     @Override
     public Dimension getMinimumSize() {
         return new Dimension(GridSize.MIN_COLUMNS * fonts.cellWidth(), GridSize.MIN_ROWS * fonts.cellHeight());
     }
 
+    /** Returns the current session grid in current font metrics. */
     @Override
     public Dimension getPreferredSize() {
         return new Dimension(session.columns() * fonts.cellWidth(), session.rows() * fonts.cellHeight());
@@ -239,11 +228,13 @@ public final class TerminalView extends JComponent {
     /** Whether this EDT-owned view has a selected cell range; does not read or lock terminal text. */
     public boolean hasSelection() { return selection.hasSelection(); }
 
+    /** Validates selected live cells and extracts text atomically; returns empty if output overwrote the selection. EDT only. */
     public Optional<String> selectedText() {
         reconcileAbsoluteRows();
         return selection.selectedText();
     }
 
+    /** Copies a still-valid nonempty selection to the clipboard. EDT only. */
     public void copySelection() {
         selectedText().filter(text -> !text.isEmpty()).ifPresent(clipboardWriter);
     }
@@ -407,6 +398,7 @@ public final class TerminalView extends JComponent {
         this.onCloseRequest = action;
     }
 
+    /** Captures rows under the buffer lock, then paints detached runs and overlays on EDT. */
     @Override
     protected void paintComponent(Graphics g) {
         reconcileAbsoluteRows();
@@ -433,6 +425,7 @@ public final class TerminalView extends JComponent {
         }
     }
 
+    /** Routes AWT keys through shortcut precedence and terminal encoding on EDT. */
     @Override
     protected void processKeyEvent(KeyEvent e) {
         handleKey(e);
@@ -586,8 +579,11 @@ public final class TerminalView extends JComponent {
     /** Searches on the bounded worker and delivers only the latest result on the EDT. */
     public void findAsync(SearchQuery query, Consumer<FindResult> callback) { search.findAsync(query, callback); }
 
+    /** Selects the next newer match, wrapping around; call on EDT. */
     public FindResult findNext() { return search.next(); }
+    /** Selects the next older match, wrapping around; call on EDT. */
     public FindResult findPrevious() { return search.previous(); }
+    /** Cancels pending publication and clears current highlights on EDT. */
     public void clearFind() { search.clear(); }
     void handleKey(KeyEvent event) { keyboard.handle(event); }
     void handleMouse(MouseEvent event) { mouseInput.handle(event); }

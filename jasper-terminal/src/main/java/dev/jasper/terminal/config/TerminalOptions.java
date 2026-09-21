@@ -3,11 +3,27 @@ package dev.jasper.terminal.config;
 import java.util.List;
 import java.util.Objects;
 
-/** Everything about how a terminal looks and behaves that the app can configure. */
+/**
+ * Immutable terminal settings. Live values apply on the EDT through TerminalView;
+ * scrollback is only a default for new sessions. Collections are defensively copied.
+ * @param fontFamily nonblank primary font family
+ * @param fontSize font points in the inclusive range 6–72
+ * @param fallbackFonts ordered nonblank glyph fallback families
+ * @param ligatures whether font shaping enables ligatures
+ * @param palette default, ANSI and indexed colors
+ * @param cursorStyle default shape, overridden by an explicit program request
+ * @param cursorBlink default blinking, overridden by an explicit program request
+ * @param optionAsMeta which macOS Option keys send Meta
+ * @param scrollback new-session history capacity, 0–1,000,000 lines
+ * @param copyOnSelect whether completing a selection copies it
+ * @param lineHeight cell-height multiplier, 1–3
+ * @param bell visual, sound or disabled bell behavior
+ */
 public record TerminalOptions(String fontFamily, float fontSize, List<String> fallbackFonts, boolean ligatures,
                               Palette palette, CursorStyle cursorStyle, boolean cursorBlink,
                               OptionAsMeta optionAsMeta, int scrollback, boolean copyOnSelect, float lineHeight, BellMode bell) {
 
+    /** Creates settings with unit line height and a visual bell; other arguments match the record components. */
     public TerminalOptions(String fontFamily, float fontSize, List<String> fallbackFonts, boolean ligatures,
                            Palette palette, CursorStyle cursorStyle, boolean cursorBlink,
                            OptionAsMeta optionAsMeta, int scrollback, boolean copyOnSelect) {
@@ -15,6 +31,7 @@ public record TerminalOptions(String fontFamily, float fontSize, List<String> fa
             optionAsMeta, scrollback, copyOnSelect, 1f, BellMode.VISUAL);
     }
 
+    /** Validates all fields and copies fallback families; rejects nulls and out-of-range values. */
     public TerminalOptions {
         requireFontName(fontFamily);
         if (!Float.isFinite(fontSize) || fontSize < 6f || fontSize > 72f) {

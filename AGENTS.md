@@ -1,12 +1,13 @@
 # Instructions for coding agents working on Jasper
 
-Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferred findings and next steps. The design spec (`docs/superpowers/specs/2026-09-10-jasper-phase-1-terminal-design.md`) is the binding authority; plans live in `docs/superpowers/plans/`.
+Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferred findings and next steps. The design spec (`docs/superpowers/specs/2026-09-10-jasper-phase-1-terminal-design.md`) and its approved [terminal refactor amendment](docs/superpowers/specs/2026-09-20-jasper-terminal-refactor-design.md) are the binding authorities; plans live in `docs/superpowers/plans/`.
 
 ## Build and test
 
 - Java 25 on the **JetBrains Runtime** (JBR) 25. The Gradle toolchain requires vendor JetBrains and finds it automatically (on the dev Mac: `~/Library/Java/JavaVirtualMachines/jbrsdk-25.0.4.1-osx-aarch64-b583.48`). Use the wrapper: `./gradlew`, never a system `gradle`.
 - `./gradlew check` runs everything (headless). For exact counts read the XML in `*/build/test-results/test/`.
-- Tests are headless: `TerminalView` is a lightweight component; drive it with its package-private `handleKey` / `handleMouse`; inject the clipboard and link opener (`setClipboard`, `setLinkOpener`). Session tests use `FakeConnector` (`feed`, `finish`, `written`, `lastResize`) and `Await.until(condition, description)`.
+- Terminal onboarding: [module README](jasper-terminal/README.md), [architecture](docs/terminal-architecture.md), [maintenance recipes](docs/terminal-maintenance.md). Supported packages are session, view, config, search and rendering; only the documented allowlist is app-facing. `internalAccess()` and all internal types are unsupported. `verifyTerminalArchitecture` enforces this boundary and an acyclic package graph; `check` includes JavaDoc doclint and compiled documentation examples.
+- Tests are headless: `TerminalView` is a lightweight component; drive it with its package-private `handleKey` / `handleMouse`; inject the clipboard and link opener (`setClipboard`, `setLinkOpener`). View tests live in `dev.jasper.terminal.view`; session fixtures live in test-only `internal.emulation.EmulationFixture` / `FakeConnector`, with `testsupport.Await`. Session tests use `FakeConnector` (`feed`, `finish`, `written`, `lastResize`) and `Await.until(condition, description)`.
 
 ## Never do these without the user
 

@@ -8,6 +8,10 @@ import java.util.function.LongFunction;
  * budget, not a bound on all temporary object bytes. Extreme lines retain a bounded range containing
  * the clicked row, preferring preceding rows, and cannot produce a plain-text URL. A single row wider
  * than the budget selects only its first MAX_CELLS columns and is always considered truncated.
+ * @param firstRow first included absolute row
+ * @param lastRow last included absolute row, inclusive
+ * @param columns maximum readable cells per included row
+ * @param truncated whether bounded traversal omitted part of the logical line
  */
 public record LogicalLine(long firstRow, long lastRow, int columns, boolean truncated) {
     public static final int MAX_ROWS = 4096;

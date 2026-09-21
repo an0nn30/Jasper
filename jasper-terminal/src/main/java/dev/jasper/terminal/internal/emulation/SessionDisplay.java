@@ -86,7 +86,7 @@ final class SessionDisplay implements TerminalDisplay {
 
     @Override
     public TerminalSelection getSelection() {
-        return null; // selection arrives in plan 2
+        return null; // selection belongs to the Swing SelectionController, not the vendor display
     }
 
     @Override

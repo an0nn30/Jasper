@@ -7,6 +7,7 @@ import dev.jasper.terminal.internal.text.MouseInput.Button;
 /** Decides what a mouse event means for the terminal view. */
 final class MouseRouting {
 
+    /** One local routing decision before any gesture mutation. */
     enum Action {
         REPORT, START_SELECTION, SELECT_WORD, SELECT_LINE, EXTEND_SELECTION, END_SELECTION,
         OPEN_LINK, SCROLL_VIEW, SEND_ARROWS, NONE

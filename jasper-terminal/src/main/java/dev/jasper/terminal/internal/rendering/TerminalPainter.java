@@ -17,11 +17,20 @@ import java.util.List;
 /** Draws a {@link ScreenSnapshot}. Event Dispatch Thread only. */
 public final class TerminalPainter {
 
-    /** How the cursor should look this frame; {@code on} is false during the blink-off phase. */
+    /** How the cursor should look this frame; {@code on} is false during the blink-off phase.
+     * @param style effective cursor shape
+     * @param on whether this blink phase paints the cursor
+     * @param focused whether the view has focus
+     */
     public record CursorLook(CursorStyle style, boolean on, boolean focused) {
     }
 
-    /** A background fill over one viewport row, columns inclusive: a selection or a search match. */
+    /** A background fill over one viewport row, columns inclusive: a selection or a search match.
+     * @param row zero-based viewport row
+     * @param startColumn first highlighted cell, inclusive
+     * @param endColumn last highlighted cell, inclusive
+     * @param color highlight background
+     */
     public record Highlight(int row, int startColumn, int endColumn, Color color) {
     }
 

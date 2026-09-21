@@ -20,3 +20,16 @@ tasks.register<JavaExec>("refactorMeasurement") {
     })
     systemProperty("java.awt.headless", "true")
 }
+
+// Keep supported API documentation and examples in the ordinary verification path.
+tasks.withType<Javadoc>().configureEach {
+    isFailOnError = true
+    (options as StandardJavadocDocletOptions).apply {
+        encoding = "UTF-8"
+        addBooleanOption("Xdoclint:all", true)
+    }
+}
+tasks.named("check") { dependsOn(tasks.named("javadoc")) }
+tasks.withType<Test>().configureEach {
+    systemProperty("jasper.repoRoot", rootProject.projectDir.absolutePath)
+}

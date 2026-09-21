@@ -27,6 +27,7 @@ final class JediCellReader {
     /** Borrowed view: every use, including style conversion, requires the buffer lock. */
     TerminalRow live(TerminalLine line) { return new LiveRow(line); }
 
+    /** Borrowed vendor row. Every access requires the caller to hold the buffer lock. */
     private final class LiveRow implements TerminalRow {
         private final TerminalLine line;
         LiveRow(TerminalLine line) { this.line = line; }

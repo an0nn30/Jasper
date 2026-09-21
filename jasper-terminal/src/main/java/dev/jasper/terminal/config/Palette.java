@@ -4,9 +4,17 @@ import java.awt.Color;
 import java.util.List;
 import java.util.Objects;
 
-/** Terminal colors: theme defaults, the 16 ANSI colors, and the xterm 256-color table. */
+/**
+ * Immutable colors: theme defaults, 16 ANSI entries and the derived xterm 256-color table.
+ * @param foreground default text color
+ * @param background default screen color
+ * @param cursor cursor color
+ * @param selection selected-cell background
+ * @param ansi exactly 16 nonnull colors, copied on construction
+ */
 public record Palette(Color foreground, Color background, Color cursor, Color selection, List<Color> ansi) {
 
+    /** Checks nonnull colors and exactly 16 ANSI entries, then copies the list. */
     public Palette {
         Objects.requireNonNull(foreground, "foreground");
         Objects.requireNonNull(background, "background");
@@ -22,6 +30,7 @@ public record Palette(Color foreground, Color background, Color cursor, Color se
         ansi = List.copyOf(ansi);
     }
 
+    /** Returns the standalone dark palette. */
     public static Palette jasperDark() {
         return new Palette(
             new Color(0xabb2bf), new Color(0x292c34), new Color(0xb3bbc7), new Color(0x3e4451),
@@ -32,6 +41,7 @@ public record Palette(Color foreground, Color background, Color cursor, Color se
                 new Color(0x74bff8), new Color(0xd68bee), new Color(0x67c7d3), new Color(0xe6e9ef)));
     }
 
+    /** Returns the standalone light palette. */
     public static Palette jasperLight() {
         return new Palette(
             new Color(0x383a42), new Color(0xfafafa), new Color(0x526fff), new Color(0xd5def5),

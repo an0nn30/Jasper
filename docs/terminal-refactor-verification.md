@@ -76,3 +76,88 @@ Same JBR, fixtures, warmup and batching as baseline:
 
 Capture allocation and time improve over baseline; scratch-array reuse also
 reduces painting allocation. These remain headless samples, not native FPS/RSS.
+
+## Packaged implementation and documentation (Task 12)
+
+Fresh `./gradlew verifyTerminalArchitecture check --rerun-tasks` passes. XML:
+
+| Module | Tests | Passed | Skipped | Failures/errors |
+| --- | ---: | ---: | ---: | ---: |
+| jasper-terminal | 351 | 350 | 1 | 0 |
+| jasper-app | 728 | 727 | 1 | 0 |
+| Total | 1,079 | 1,077 | 2 | 0 |
+
+Expected skips: `FontSetTest.fallsBackWhenPrimaryCannotDisplay` cannot find a code
+point covered by Dialog but absent from JetBrains Mono on this machine;
+`ShellIntegrationScriptTest.fishReWrapsAPromptDefinedAfterTheIntegrationLoaded`
+requires unavailable Fish. Architecture checks pass for the final package DAG,
+JediTerm confinement, generic public signatures, supported app types and no app
+internal bridge calls. Benchmark classes compile without being launched.
+JavaDoc doclint passes (existing/internal missing-tag warnings are nonfatal).
+Guide links, package contracts and embedded examples are build-checked; the
+launch example is compiled but never run as a test. Source hygiene and
+`git diff --check` pass.
+
+The session facade is now 78 lines (formerly 814); the view is 613 (formerly
+1,175), with stateful behavior assigned to concrete owners. These counts include
+comments and imports and are navigation indicators, not correctness metrics.
+
+Final packaged headless comparison, same runtime and fixture as baseline:
+
+| Operation | Median ms | Range ms | Bytes/op |
+| --- | ---: | ---: | ---: |
+| Plain capture | 0.0014 | 0.0007–0.0015 | 4,327 |
+| Plain capture + paint | 1.1477 | 1.1444–1.1620 | 800,240 |
+| Mixed capture | 0.0020 | 0.0020–0.0022 | 3,872 |
+| Mixed capture + paint | 0.5532 | 0.5507–0.5634 | 655,528 |
+
+Capture allocation is roughly 63% lower for plain and 70% lower for mixed than
+the original baseline; capture+paint allocation is roughly 25%/47% lower.
+Mixed capture timing varies from the earlier extraction sample; its final
+2-microsecond median is near the 1.9-microsecond original baseline. Treat these
+microbenchmarks as comparative samples, not deterministic latency guarantees.
+A second fresh JVM gave plain capture 0.0014 ms [0.0008–0.0016], 4,249 bytes;
+plain capture+paint 1.1571 ms [1.1481–1.1709], 800,240 bytes; mixed capture
+0.0021 ms [0.0020–0.0023], 3,872 bytes; mixed capture+paint 0.5595 ms
+[0.5560–0.5697], 657,296 bytes. The mixed capture microstep is about 0.1–0.2 μs
+slower than the original sample while end-to-end paint time and allocation
+improve; no native performance claim follows from these results.
+
+Additional execution rulings:
+
+- Builder coverage is grouped in `FluentOptionsTest` instead of three files.
+  Cost: test names differ from the plan; behavior coverage is unchanged.
+- Full-width row arrays failed the measurement gate. Compact detached and locked
+  live row implementations satisfy the opaque-adapter allowance. Cost if the
+  pinned mutation assumption changes: captured content could become unstable;
+  overwrite/NUL-append regressions and upgrade review are required.
+- Factory cleanup tests use a shared Runnable close gate plus a real-child test.
+  Cost: synthetic failure tests rely on the same production forwarding gate;
+  the native-child regression covers that forwarding.
+- App action dispatch lives in `WindowContent`, not `TerminalPane` as named in
+  the plan. Cost: a different edit location; the existing catalog is preserved.
+- `jdeps` needs `--multi-release 25` for pinned dependencies, and `javap` runs in
+  batches of 100 classes. Cost: violations print a batch with class/method
+  declarations for attribution, rather than a single-class result.
+
+## Remaining user-run desktop acceptance
+
+From this branch's worktree, when ready to inspect native behavior:
+
+```bash
+./gradlew :jasper-app:run
+./gradlew :jasper-app:bench --args='--revision codex/terminal-refactor-native --output /absolute/results/refactor-throughput.json'
+./gradlew :jasper-app:memoryBench --args='--revision codex/terminal-refactor-native --output /absolute/results/refactor-memory.json'
+```
+
+Choose actual writable absolute output paths. These commands open windows; do
+not run benchmarks while a game or VM is active. Follow the
+[benchmark comparison protocol](benchmarks.md) for baseline/final settings and
+[desktop acceptance](superpowers/plans/2026-09-11-jasper-plan-3-manual-check.md)
+for interaction. Check font/Unicode rendering, resize/reflow, clipboard, mouse
+capture, search, prompt navigation, detach/reattach, and close/reopen. Native
+throughput, RSS, visual fidelity, Windows acceptance and the daily-use trial
+remain pending. This execution did not launch the GUI or either native benchmark.
+
+Final independent review and fresh-reader onboarding assessment are recorded
+below after review. No merge or push has been performed.

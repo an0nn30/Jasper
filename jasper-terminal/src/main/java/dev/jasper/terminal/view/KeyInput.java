@@ -2,7 +2,13 @@ package dev.jasper.terminal.view;
 
 import java.awt.event.InputEvent;
 
-/** The parts of a KeyEvent the encoder needs. {@code modifiers} is {@code KeyEvent.getModifiersEx()}. */
+/** The parts of a KeyEvent the encoder needs. {@code modifiers} is {@code KeyEvent.getModifiersEx()}.
+ * @param keyCode AWT virtual key code
+ * @param keyChar AWT character, possibly undefined
+ * @param modifiers AWT extended modifier mask
+ * @param leftAltHeld whether the left Option key is held
+ * @param rightAltHeld whether the right Option key is held
+ */
 record KeyInput(int keyCode, char keyChar, int modifiers, boolean leftAltHeld, boolean rightAltHeld) {
 
     boolean shift() {

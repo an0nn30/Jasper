@@ -10,6 +10,13 @@ Jasper has its own terminal renderer over JediTerm and pty4j, with ligatures, fa
 
 Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). Desktop acceptance remains user-run: [Plan 3](docs/superpowers/plans/2026-09-11-jasper-plan-3-manual-check.md) and [screenshot UI](docs/superpowers/plans/2026-09-11-jasper-mock-ui-manual-check.md). Passing the headless tests is not the Phase 1 daily-use gate.
 
+## Developing Jasper
+
+Start with the [terminal onboarding guide](jasper-terminal/README.md), then
+[architecture](docs/terminal-architecture.md) and [feature recipes](docs/terminal-maintenance.md).
+The terminal has a supported packaged API, fluent options, reusable actions and
+build-checked examples. The application architecture and plugin SDK are separate future work.
+
 ## Requirements
 
 Install the **JetBrains Runtime SDK 25 (JBR SDK)**, including `jpackage`; a JRE or a JDK from another vendor is insufficient. Gradle requires vendor JetBrains and discovers the SDK automatically on the development Mac. If discovery fails, set `JAVA_HOME` to the SDK and add its `bin` directory to `PATH`, or set `org.gradle.java.installations.paths` in Gradle properties. Use the checked-in Gradle wrapper, not a system Gradle installation. The first build downloads Gradle and dependencies.
