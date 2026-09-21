@@ -12,7 +12,9 @@ The three modules are `jasper-app` (product composition), `jasper-terminal`
 maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merged into
 local `main`, as is plan 2 (actions and chrome placements). Plan 3a (rail, panels and plugin
 windows) is merged too; the spec's plan 3 was split into 3a and 3b. Plan 3b (Plugins manager,
-install and restart) is implemented on `claude/plugin-sdk-plan-3b`; plan 4 is not started.
+install and restart) is implemented on `claude/plugin-sdk-plan-3b`, not yet merged. The spec's plan 4 is
+split into 4a (terminal API: observe, inject, open) and 4b (plugin-provided sessions); 4a is planned
+on `claude/plugin-sdk-plan-4`, which branches from the 3b tip.
 
 ### Plugin SDK plan 3b — 2026-09-21
 
