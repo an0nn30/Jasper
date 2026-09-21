@@ -33,7 +33,8 @@ public final class TerminalSession implements AutoCloseable {
             alternate -> listeners.forEach(l -> l.alternateBufferChanged(alternate)),
             directory -> listeners.forEach(l -> l.workingDirectoryChanged(directory)),
             command -> listeners.forEach(l -> l.commandStarted(command)),
-            command -> listeners.forEach(l -> l.commandExecuted(command.command(), command.status(), command.directory(), command.duration())));
+            command -> listeners.forEach(l -> l.commandExecuted(command.command(), command.status(), command.directory(), command.duration())),
+            location -> listeners.forEach(l -> l.remoteDirectoryChanged(new RemoteDirectory(location.host(), location.path()))));
         access = Objects.requireNonNull(create.apply(events), "access");
     }
 
@@ -96,8 +97,19 @@ public final class TerminalSession implements AutoCloseable {
     public void close() { access.close(); }
     void startReading() { access.startReading(); }
 
-    /** The directory the shell last reported with OSC 7, if any. */
+    /**
+     * The directory the shell last reported with OSC 7, if any. Local directories only: empty while the program
+     * reports a directory under another host, and always for an attached session.
+     */
     public Optional<Path> workingDirectory() { return access.workingDirectory(); }
+
+    /**
+     * The working directory the program last reported when it is not a directory of this machine. Exactly one
+     * of this and {@link #workingDirectory()} is present once the program reported anything. A hint, never a fact.
+     */
+    public Optional<RemoteDirectory> remoteDirectory() {
+        return access.remoteDirectory().map(location -> new RemoteDirectory(location.host(), location.path()));
+    }
     /** True once the shell has reported its first prompt (mark A) through Jasper's shell integration. */
     public boolean shellIntegrationDetected() { return access.shellIntegrationDetected(); }
 }

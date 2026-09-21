@@ -323,11 +323,13 @@ public final class JediTermEngine implements AutoCloseable {
      * @param workingDirectoryChanged reader-thread shell directory notification
      * @param commandStarted reader-thread command-start notification outside the capture lock
      * @param commandFinished reader-thread completed-command notification outside the capture lock
+     * @param remoteDirectoryChanged reader-thread notification of a directory that is not local
      */
     public record Events(Runnable screenChanged, java.util.function.Consumer<String> titleChanged,
         Runnable bell, Runnable scrollbackReset, java.util.function.Consumer<Boolean> alternateBufferChanged,
         java.util.function.Consumer<Path> workingDirectoryChanged, java.util.function.Consumer<String> commandStarted,
-        java.util.function.Consumer<CompletedCommand> commandFinished) { }
+        java.util.function.Consumer<CompletedCommand> commandFinished,
+        java.util.function.Consumer<dev.jasper.terminal.internal.shell.RemoteLocation> remoteDirectoryChanged) { }
 
     /** An attached connection instead of a child process. */
     public JediTermEngine(AttachedTransport transport, int columns, int rows, int scrollback, Events events) {

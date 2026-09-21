@@ -64,6 +64,7 @@ class AttachedSessionTest {
         List<String> events = Collections.synchronizedList(new ArrayList<>());
         session.addListener(new TerminalSessionListener() {
             @Override public void workingDirectoryChanged(Path directory) { events.add("cwd " + directory); }
+            @Override public void remoteDirectoryChanged(RemoteDirectory directory) { events.add("remote " + directory.host() + ":" + directory.path()); }
             @Override public void commandStarted(String command) { events.add("started " + command); }
             @Override public void commandExecuted(String command, OptionalInt exitStatus, Optional<Path> workingDirectory, Duration duration) {
                 events.add("finished " + command + " " + exitStatus + " " + workingDirectory);
@@ -71,7 +72,8 @@ class AttachedSessionTest {
         });
         feed("\033]7;file://build-host/srv/app\007\033]133;A\007$ \033]133;B\007make\r\n\033]133;C\007ok\r\n\033]133;D;2\007\033]133;A\007$ ");
         Await.until(() -> events.stream().anyMatch(event -> event.startsWith("finished")), "the command finished");
-        assertThat(events).containsExactly("started make", "finished make OptionalInt[2] Optional.empty");
+        assertThat(events).containsExactly("remote build-host:/srv/app", "started make", "finished make OptionalInt[2] Optional.empty");
+        assertThat(session.remoteDirectory()).contains(new RemoteDirectory("build-host", "/srv/app"));
         assertThat(session.workingDirectory()).as("a remote path must never look local").isEmpty();
         assertThat(session.shellIntegrationDetected()).isTrue();
     }

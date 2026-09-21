@@ -13,7 +13,7 @@ final class PtySessionFactory {
     static TerminalSession start(SessionLaunchOptions options) throws IOException {
         PtyChild child = PtyChild.start(options.command(), options.environment(), options.workingDirectory(), options.grid().columns(), options.grid().rows());
         return finish(child, () -> new TerminalSession(events -> new TerminalAccess(child,
-            options.grid().columns(), options.grid().rows(), options.scrollback(), events)));
+            options.grid().columns(), options.grid().rows(), options.scrollback(), options.localHostNames(), events)));
     }
 
     static TerminalSession finish(PtyChild child, Supplier<TerminalSession> make) {

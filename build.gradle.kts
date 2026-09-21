@@ -82,7 +82,7 @@ val verifyTerminalArchitecture = tasks.register("verifyTerminalArchitecture") {
         val done = mutableSetOf<String>()
         graph.keys.forEach { visit(it, linkedSetOf(), done) }
         val supported = setOf(
-            "session.TerminalSession", "session.SessionLaunchOptions", "session.TerminalSessionListener", "session.AttachedConnection",
+            "session.TerminalSession", "session.SessionLaunchOptions", "session.TerminalSessionListener", "session.AttachedConnection", "session.RemoteDirectory",
             "view.TerminalView", "view.TerminalAction", "config.TerminalOptions", "config.Palette",
             "config.CursorStyle", "config.BellMode", "config.OptionAsMeta", "config.GridSize",
             "search.SearchQuery", "search.FindResult", "rendering.FontSet"

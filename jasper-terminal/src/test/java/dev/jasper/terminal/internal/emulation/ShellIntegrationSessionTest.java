@@ -21,6 +21,7 @@ import java.util.OptionalInt;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import dev.jasper.terminal.session.RemoteDirectory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -389,5 +390,26 @@ class ShellIntegrationSessionTest {
         Await.until(() -> started.size() == 1, "the real command started");
 
         assertThat(started).containsExactly("ls");
+    }
+
+    @Test
+    void aDirectoryReportedUnderAnotherHostIsRemoteUntilALocalOneFollows() throws Exception {
+        var events = new CopyOnWriteArrayList<String>();
+        session.addListener(new TerminalSessionListener() {
+            @Override public void workingDirectoryChanged(Path directory) { events.add("local " + directory); }
+            @Override public void remoteDirectoryChanged(RemoteDirectory directory) {
+                events.add("remote " + directory.host() + ":" + directory.path() + " local=" + session.workingDirectory().isPresent());
+            }
+        });
+        connector.feed("\033]7;file:///Users/me\007");
+        Await.until(() -> session.workingDirectory().isPresent(), "a hostless report is local");
+        connector.feed("\033]7;file://build-host/srv/app\007");
+        Await.until(() -> session.remoteDirectory().isPresent(), "a hosted report is remote");
+        assertThat(session.remoteDirectory()).contains(new RemoteDirectory("build-host", "/srv/app"));
+        assertThat(session.workingDirectory()).as("the user ran ssh by hand; this is not a local path").isEmpty();
+        connector.feed("\033]7;file://localhost/tmp\007");
+        Await.until(() -> session.workingDirectory().isPresent(), "back on this machine");
+        assertThat(session.remoteDirectory()).isEmpty();
+        assertThat(events).containsExactly("local /Users/me", "remote build-host:/srv/app local=false", "local /tmp");
     }
 }

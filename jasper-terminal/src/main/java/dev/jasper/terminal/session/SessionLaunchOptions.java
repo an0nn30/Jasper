@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Immutable process inputs. Builders validate but perform no I/O.
@@ -15,9 +16,10 @@ import java.util.Objects;
  * @param workingDirectory child directory; existence is checked by process creation
  * @param grid initial terminal size in cells
  * @param scrollback history capacity from 0 through 1,000,000 lines
+ * @param localHostNames names this machine is known by, for classifying reported working directories; resolve them off the EDT, empty when unknown
  */
 public record SessionLaunchOptions(List<String> command, Map<String, String> environment,
-        Path workingDirectory, GridSize grid, int scrollback) {
+        Path workingDirectory, GridSize grid, int scrollback, Set<String> localHostNames) {
     /** Copies collections and rejects invalid arguments before process creation. */
     public SessionLaunchOptions {
         command = List.copyOf(command);
@@ -35,13 +37,15 @@ public record SessionLaunchOptions(List<String> command, Map<String, String> env
         });
         if (scrollback < 0 || scrollback > 1_000_000)
             throw new IllegalArgumentException("scrollback must be within 0–1000000");
+        localHostNames = Set.copyOf(localHostNames);
+        if (localHostNames.stream().anyMatch(String::isBlank)) throw new IllegalArgumentException("a local host name must not be blank");
     }
     /** Starts a builder requiring an explicit command, environment, and working directory. */
     public static Builder builder() { return new Builder(); }
     /** Copies this launch description into an independent builder. */
     public Builder toBuilder() {
         return new Builder().command(command).environment(environment)
-            .workingDirectory(workingDirectory).grid(grid).scrollback(scrollback);
+            .workingDirectory(workingDirectory).grid(grid).scrollback(scrollback).localHostNames(localHostNames);
     }
     /** Thread-confined builder with an 80 by 24 grid and 10,000 history lines. */
     public static final class Builder {
@@ -50,6 +54,7 @@ public record SessionLaunchOptions(List<String> command, Map<String, String> env
         private Path workingDirectory;
         private GridSize grid = new GridSize(80, 24);
         private int scrollback = 10_000;
+        private Set<String> localHostNames = Set.of();
         private Builder() { }
         /** Copies the executable and arguments; no shell parsing is performed. */
         public Builder command(List<String> v) { command = List.copyOf(v); return this; }
@@ -61,9 +66,11 @@ public record SessionLaunchOptions(List<String> command, Map<String, String> env
         public Builder grid(GridSize v) { grid = v; return this; }
         /** Sets retained history capacity, from zero through 1,000,000 lines. */
         public Builder scrollback(int v) { scrollback = v; return this; }
+        /** Names this machine is known by; a working directory reported under any other host is not local. */
+        public Builder localHostNames(Set<String> v) { localHostNames = Set.copyOf(v); return this; }
         /** Validates and creates an immutable launch description without process I/O. */
         public SessionLaunchOptions build() {
-            return new SessionLaunchOptions(command, environment, workingDirectory, grid, scrollback);
+            return new SessionLaunchOptions(command, environment, workingDirectory, grid, scrollback, localHostNames);
         }
     }
 }

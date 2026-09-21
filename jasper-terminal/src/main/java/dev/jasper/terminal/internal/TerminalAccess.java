@@ -17,53 +17,44 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
-import dev.jasper.terminal.internal.shell.CompletedCommand;
 import dev.jasper.terminal.internal.transport.AttachedTransport;
+import dev.jasper.terminal.internal.shell.DirectoryProvenance;
+import dev.jasper.terminal.internal.shell.RemoteLocation;
+import java.util.Set;
 
 /** Internal module bridge; not an application or plugin API. No vendor objects escape. */
 public final class TerminalAccess implements AutoCloseable {
     private final JediTermEngine engine;
     private final BufferQueries queries;
     private final ShellCommandTracker shell;
-    private final boolean local;
     /** Unsupported module collaboration API; used only by terminal owners. */
     public TerminalAccess(PtyChild child, int columns, int rows, int scrollback, JediTermEngine.Events events) {
-        this(new JediTermEngine(child, columns, rows, scrollback, events), events, System::nanoTime);
+        this(child, columns, rows, scrollback, Set.of(), events);
+    }
+    /** A local process; {@code localHostNames} are the names under which a reported directory is local. Unsupported module collaboration API. */
+    public TerminalAccess(PtyChild child, int columns, int rows, int scrollback, Set<String> localHostNames, JediTermEngine.Events events) {
+        this(new JediTermEngine(child, columns, rows, scrollback, events), events, System::nanoTime, new DirectoryProvenance(true, localHostNames));
     }
     /** Unsupported module collaboration API; used only by terminal owners. */
-    public TerminalAccess(JediTermEngine engine, JediTermEngine.Events events, LongSupplier clock) { this(engine, events, clock, true); }
-
-    /** An attached connection instead of a child process. Unsupported module collaboration API. */
+    public TerminalAccess(JediTermEngine engine, JediTermEngine.Events events, LongSupplier clock) {
+        this(engine, events, clock, new DirectoryProvenance(true, Set.of()));
+    }
+    /** An attached connection instead of a child process: nothing it reports is local. Unsupported module collaboration API. */
     public TerminalAccess(AttachedTransport transport, int columns, int rows, int scrollback, JediTermEngine.Events events) {
-        this(transport, columns, rows, scrollback, withoutLocalDirectories(events), false);
+        this(new JediTermEngine(transport, columns, rows, scrollback, events), events, System::nanoTime, new DirectoryProvenance(false, Set.of()));
     }
-
-    private TerminalAccess(AttachedTransport transport, int columns, int rows, int scrollback, JediTermEngine.Events remote, boolean local) {
-        this(new JediTermEngine(transport, columns, rows, scrollback, remote), remote, System::nanoTime, local);
-    }
-
-    private TerminalAccess(JediTermEngine engine, JediTermEngine.Events events, LongSupplier clock, boolean local) {
+    private TerminalAccess(JediTermEngine engine, JediTermEngine.Events events, LongSupplier clock, DirectoryProvenance provenance) {
         this.engine = engine;
-        this.local = local;
         queries = engine.queries();
         shell = new ShellCommandTracker(clock, queries::cursor, queries::captureCommand, queries::recordPrompt,
             events.workingDirectoryChanged(), events.commandStarted(), events.commandFinished(),
-            events.screenChanged(), engine::resetCursorShape,
-            new dev.jasper.terminal.internal.shell.DirectoryProvenance(local, java.util.Set.of()), location -> { });
+            events.screenChanged(), engine::resetCursorShape, provenance, events.remoteDirectoryChanged());
         engine.setShellHooks(shell::accept, shell::discardUnusedPayload);
     }
-
-    /**
-     * What an attached program reports as its directory is a path on another machine. Until reports are classified
-     * by host, none of them may reach consumers that treat a directory as local.
-     */
-    private static JediTermEngine.Events withoutLocalDirectories(JediTermEngine.Events events) {
-        return new JediTermEngine.Events(events.screenChanged(), events.titleChanged(), events.bell(), events.scrollbackReset(),
-            events.alternateBufferChanged(), directory -> { }, events.commandStarted(),
-            command -> events.commandFinished().accept(new CompletedCommand(command.command(), command.status(), Optional.empty(), command.duration())));
-    }
     /** Unsupported module collaboration API; used only by terminal owners. */
-    public Optional<Path> workingDirectory() { return local ? shell.workingDirectory() : Optional.empty(); }
+    public Optional<Path> workingDirectory() { return shell.workingDirectory(); }
+    /** The directory last reported when it is not on this machine. Unsupported module collaboration API. */
+    public Optional<RemoteLocation> remoteDirectory() { return shell.remoteDirectory(); }
     /** Unsupported module collaboration API; used only by terminal owners. */
     public boolean shellIntegrationDetected() { return shell.detected(); }
     /** Unsupported module collaboration API; used only by terminal owners. */

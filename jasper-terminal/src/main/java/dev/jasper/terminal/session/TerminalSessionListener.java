@@ -62,4 +62,12 @@ public interface TerminalSessionListener {
      */
     public default void inputDropped() {
     }
+
+    /**
+     * The program reported a working directory that is not a directory of this machine. From this moment
+     * {@link TerminalSession#workingDirectory()} is empty, until a local directory is reported again.
+     * Called on the session's reader thread; never wait for the EDT here.
+     */
+    public default void remoteDirectoryChanged(RemoteDirectory directory) {
+    }
 }
