@@ -53,6 +53,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import dev.jasper.app.terminals.TerminalRegistry;
 
 /** Application-level window and shell ownership; closing a window never exits sibling windows. */
 public final class JasperApplication {
@@ -105,6 +106,10 @@ public final class JasperApplication {
         return configuration == null ? 10 : configuration.snapshot().longCommandSeconds();
     }
     private TerminalWindow lastActive;
+    /** Every terminal window's tabs and panes, for features that must not hold Swing objects. */
+    private final TerminalRegistry terminals = new TerminalRegistry();
+
+    TerminalRegistry terminals() { return terminals; }
 
     public JasperApplication() { this(null); }
 
@@ -200,6 +205,7 @@ public final class JasperApplication {
             launcher, directory, themes, configuration == null ? null : configuration.snapshot(), history, shellHistory, snippets);
         if (configuration != null) configuration.register(window.content());
         window.content().connectContributions(contributions, uiState);
+        window.content().connectTerminals(terminals, window::toFront);
         window.content().onToggleBuddy = this::toggleBuddy;
         window.content().buddyEnabled = this::buddyEnabled;
         window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
@@ -306,8 +312,7 @@ public final class JasperApplication {
         auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock(), dirs.pluginData()), activityNotifier,
-            (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions, auxiliary,
-            new dev.jasper.app.terminals.TerminalRegistry());
+            (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions, auxiliary, terminals);
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
             Optional.empty(), invocation -> managePlugins());
@@ -393,6 +398,7 @@ public final class JasperApplication {
     void windowActivated(TerminalWindow window) {
         if (!windows.contains(window)) return;
         lastActive = window;
+        terminals.windowActivated(window.content().id());
         if (buddy != null && !quitting && !stopped) buddy.greet();
     }
 

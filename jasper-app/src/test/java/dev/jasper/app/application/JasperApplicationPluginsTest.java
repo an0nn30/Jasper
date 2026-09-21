@@ -197,4 +197,34 @@ class JasperApplicationPluginsTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(spawned).as("an ordinary quit starts nothing").isEmpty();
     }
+
+    private static final String TERMINALS_FIXTURE = """
+        package fix.terms;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import java.nio.file.Files;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) throws Exception {
+                Files.writeString(context.dataDirectory().resolve("windows"),
+                    context.terminals().windows().size() + " " + context.terminals().activePane().isPresent());
+            }
+        }
+        """;
+
+    @Test void pluginsSeeTheApplicationsTerminalRegistry() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("terms-plugin");
+        PluginJars.build(dev, "terms.jar", PluginJars.descriptor("dev.example.terms", "1.0.0", "fix.terms.Main"),
+            Map.of("fix.terms.Main", TERMINALS_FIXTURE), List.of());
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, dev, false, dirs);
+            assertThat(application[0].terminals().windows()).isEmpty();
+        });
+        assertThat(dirs.pluginData().resolve("dev.example.terms").resolve("windows")).hasContent("0 false");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
 }
