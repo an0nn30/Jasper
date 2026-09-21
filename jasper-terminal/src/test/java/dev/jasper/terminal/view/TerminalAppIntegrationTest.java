@@ -13,6 +13,8 @@ import dev.jasper.terminal.testsupport.Await;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.swing.SwingUtilities;
 import java.awt.event.FocusEvent;
@@ -227,6 +229,48 @@ class TerminalAppIntegrationTest {
         } finally {
             onEdt(view::removeNotify);
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"history", "alternate", "reflow", "reset"})
+    void rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation(String reset) throws Exception {
+        show("alpha\r\n2\r\n3\r\n4\r\n5", 3, "5");
+        AtomicInteger callbacks = new AtomicInteger();
+        onEdt(view::addNotify);
+        try {
+            onEdt(() -> {
+                view.findAsync(new SearchQuery("alpha", false, false), result -> callbacks.incrementAndGet());
+                try {
+                    var controller = SessionInspection.field(view, "search");
+                    var pending = (java.util.concurrent.Future<?>) SessionInspection.field(controller, "pendingSearch");
+                    // Future completion proves applyFind was enqueued; this EDT event still prevents its delivery.
+                    pending.get(5, java.util.concurrent.TimeUnit.SECONDS);
+                    long epoch = session.internalAccess().absoluteRowEpoch();
+                    switch (reset) {
+                        case "history" -> session.clearScrollback();
+                        case "reflow" -> session.resize(18, 4);
+                        case "alternate" -> connector.feed("\033[?1049h");
+                        case "reset" -> connector.feed("\033c");
+                        default -> throw new AssertionError(reset);
+                    }
+                    Await.until(() -> session.internalAccess().absoluteRowEpoch() != epoch, "row epoch changed");
+                } catch (Exception failure) { throw new AssertionError(failure); }
+            });
+            drainEventQueue();
+            onEdt(() -> {
+                assertThat(callbacks).as("old callback after " + reset).hasValue(0);
+                assertThat(view.findNext()).isEqualTo(new FindResult(0, 0, null));
+            });
+            // Rejection must not disable searches admitted in the new epoch.
+            connector.feed("\033[Hcurrent\033]0;current-ready\007");
+            Await.until(() -> session.title().equals("current-ready"), "new epoch output");
+            var published = new java.util.concurrent.CountDownLatch(1);
+            onEdt(() -> view.findAsync(new SearchQuery("current", false, false), result -> {
+                assertThat(result.count()).isEqualTo(1);
+                published.countDown();
+            }));
+            assertThat(published.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        } finally { onEdt(view::removeNotify); }
     }
 
     @Test

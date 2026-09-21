@@ -1,21 +1,34 @@
 # Jasper — Status and Handoff
 
-**Terminal architecture refactor (2026-09-20):** The user approved staged
-responsibility extraction, a packaged public API with fluent configuration and
-reusable terminal actions, and developer onboarding/maintenance documentation.
-Public API reorganization and migration of affected app callers are authorized;
-the broader app refactor and plugin SDK remain later work. The
-[written refactor specification](superpowers/specs/2026-09-20-jasper-terminal-refactor-design.md)
-was approved by the user. The [12-task implementation plan](superpowers/plans/2026-09-20-jasper-terminal-refactor.md)
-is authorized for native execution on `codex/terminal-refactor-native` in the isolated `terminal-refactor-4830` worktree. It amends the Phase 1 structural-redesign restriction for this scope
-while preserving terminal behavior and the remaining architecture constraints.
-Fresh terminal-only `./gradlew :jasper-terminal:test --rerun-tasks`: 322 tests,
-321 passed, one skipped, zero failures/errors. During planning, `./gradlew check`
-failed in app tests: 728 tests, 724 passed, three failures, one skipped. All three
-failures are in TerminalTitleIntegrationTest; one expects `~ (sh)` but observes
-`~ (bash)`, and two time out. This reproduces previously recorded failures before
-production changes; their root cause is not yet established. Task 1 completed baseline diagnosis and explicit-executable fixture corrections; full check now passes 1,048/1,050 with two environment skips. The plan proposes a Jasper-owned row capture refinement,
-subject to plan review and measured allocation/capture-time checks. Execution is native, with a final independent review. Task 2 adds defensively copied fluent options, explicit launch inputs, and typed search requests. Its tests are grouped in FluentOptionsTest rather than separate files. Task 3 extracts process creation, foreground metadata, and failure cleanup; focused PTY/session tests and full check pass. Task 4 establishes vendor-free text/render/input types. Full-width arrays failed the measurement gate, so TerminalRow uses two production implementations: locked live rows and compact detached rows with deferred style conversion. The pinned JediTerm entry-sharing assumption and improved allocation/capture results are documented in docs/terminal-refactor-verification.md. Task 5 extracts BufferQueries, AbsoluteRowState and ShellCommandTracker; focused suites and full check pass. Eviction storage assertions now inspect the row-state owner. Task 6 separates JediTermEngine, TerminalAccess and the session facade, migrates listener callers, and verifies callback threads and single reader startup. Cleanup tests use the factory’s shared Runnable close gate plus a real native child instead of preserving a vendor constructor seam. Test-only state inspection follows owners; production app code uses the supported API. Task 7 extracts SearchController with immutable published results, bounded admission, and stale-generation rejection; new clear/queue tests and existing lifecycle/highlight tests pass. Task 8 extracts SelectionController and DesktopServices; stale-copy, gesture, and bounded browser-worker regressions pass. Task 9 extracts KeyboardController and MouseController and adds EDT-only TerminalAction dispatch; input, gesture ownership and zero-line-read mouse reporting regressions pass. Task 10 extracts RenderScheduler and BellController with one attachment-generation authority, preserving the existing dirty-bit algorithm and coalescing tokens. Owner and component lifecycle regressions pass. Task 11 completes final packages and all app callers. Architecture checks enforce an acyclic package graph, the supported-type allowlist, vendor-free public signatures and no app internalAccess calls. Existing actions are in WindowContent (a correction to the plan location). jdeps requires --multi-release 25; javap checks are batched. Full check passes. Task 12 adds the module onboarding README, architecture diagrams/ownership contracts, eight maintenance recipes and compiled embedding/lifecycle examples. JavaDoc doclint and documentation links/examples are in check. Fresh verification: 1,079 tests, 1,077 passed, two expected environment skips, zero failures/errors. Final independent review and its fresh-reader onboarding assessment are next. Native GUI/throughput/RSS remain user-run. Existing working edits and the untracked assessment are preserved.
+**Terminal architecture refactor (2026-09-20):** Implemented independently on
+`codex/terminal-refactor-native` in the isolated `terminal-refactor-4830` worktree.
+The terminal now has supported session/view/config/search/rendering packages,
+concrete owners for process, emulator, queries, shell state and view behavior,
+fluent immutable options, and reusable actions. Affected app callers are migrated;
+the broader app redesign and plugin SDK remain separate work.
+
+Start at the [terminal onboarding guide](../jasper-terminal/README.md), then
+[architecture](terminal-architecture.md) and [maintenance recipes](terminal-maintenance.md).
+The [approved refactor spec](superpowers/specs/2026-09-20-jasper-terminal-refactor-design.md)
+amends Phase 1's structural restriction for this scope. The
+[plan](superpowers/plans/2026-09-20-jasper-terminal-refactor.md) is the execution record;
+its historical status/checklist details have a deferred synchronization note.
+Use this handoff and [verification report](terminal-refactor-verification.md) for current state.
+
+Fresh `./gradlew verifyTerminalArchitecture check --rerun-tasks`: **1,083 tests,
+1,081 passed, two expected environment skips, zero failures/errors**. Package DAG,
+app allowlist, vendor-free signatures, documentation links/examples and JavaDoc
+doclint pass (missing-tag warnings remain nonfatal). Independent review found
+one important queued-search/reset race; four deterministic regressions failed
+before the row-epoch publication guard and pass afterward. The fresh-reader
+onboarding review located the key, shell-event and lifecycle owners correctly;
+a narrow live-option reconstruction-site note remains deferred. Full review,
+rulings, measurement evidence and both minor notes are in the verification report.
+
+Desktop visual/clipboard/keyboard acceptance, native throughput/RSS, Windows
+runtime acceptance and the daily-use trial remain user-run. No GUI, native
+benchmark, merge or push was performed. The original checkout's modified
+TerminalTitle.java and untracked assessment/worktrees remain untouched.
 
 **Background residency (2026-09-17):** On `claude/background-daemon` (from main `1f1afeb`, with `main` `b56d098` since merged in), Jasper gains an
 opt-in `[background] enabled` setting (default `false`) that keeps the process running with no

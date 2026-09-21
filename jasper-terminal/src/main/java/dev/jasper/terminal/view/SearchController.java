@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongConsumer;
+import java.util.function.LongSupplier;
 import java.util.regex.PatternSyntaxException;
 import javax.swing.SwingUtilities;
 
@@ -20,6 +21,7 @@ import javax.swing.SwingUtilities;
 final class SearchController {
     private final Function<SearchQuery,List<TerminalSearch.Match>> search;
     private final LongConsumer reveal;
+    private final LongSupplier rowEpoch;
     private final Runnable repaint;
     private static final long SEARCH_IDLE_MILLIS = 1_000;
     private List<TerminalSearch.Match> matches = List.of();
@@ -29,8 +31,10 @@ final class SearchController {
     private ThreadPoolExecutor searchExecutor;
     private Future<?> pendingSearch;
 
-    SearchController(Function<SearchQuery,List<TerminalSearch.Match>> search, LongConsumer reveal, Runnable repaint) {
+    SearchController(Function<SearchQuery,List<TerminalSearch.Match>> search, LongSupplier rowEpoch,
+                     LongConsumer reveal, Runnable repaint) {
         this.search = Objects.requireNonNull(search);
+        this.rowEpoch = Objects.requireNonNull(rowEpoch);
         this.reveal = Objects.requireNonNull(reveal);
         this.repaint = Objects.requireNonNull(repaint);
     }
@@ -59,6 +63,7 @@ final class SearchController {
     public void findAsync(SearchQuery query, Consumer<FindResult> callback) {
         Consumer<FindResult> completion = callback == null ? result -> { } : callback;
         long generation;
+        long requestedEpoch = rowEpoch.getAsLong();
         ThreadPoolExecutor executor;
         synchronized (searchLock) {
             generation = ++searchGeneration;
@@ -67,7 +72,7 @@ final class SearchController {
             }
             executor = searchExecutor();
             executor.getQueue().clear();
-            pendingSearch = executor.submit(() -> calculateFind(generation, query, completion));
+            pendingSearch = executor.submit(() -> calculateFind(generation, requestedEpoch, query, completion));
         }
     }
 
@@ -88,7 +93,7 @@ final class SearchController {
         repaint.run();
     }
 
-    private void calculateFind(long generation, SearchQuery query,
+    private void calculateFind(long generation, long requestedEpoch, SearchQuery query,
                                Consumer<FindResult> callback) {
         List<TerminalSearch.Match> found;
         FindResult result;
@@ -101,16 +106,19 @@ final class SearchController {
         }
         List<TerminalSearch.Match> completedMatches = found;
         FindResult completedResult = result;
-        SwingUtilities.invokeLater(() -> applyFind(generation, completedMatches, completedResult, callback));
+        SwingUtilities.invokeLater(() -> applyFind(generation, requestedEpoch, completedMatches, completedResult, callback));
     }
 
-    private void applyFind(long generation, List<TerminalSearch.Match> found, FindResult result,
+    private void applyFind(long generation, long requestedEpoch, List<TerminalSearch.Match> found, FindResult result,
                            Consumer<FindResult> callback) {
         synchronized (searchLock) {
             if (generation != searchGeneration) {
                 return;
             }
             pendingSearch = null;
+            // Reset notifications are reconciled on EDT, possibly behind this queued completion.
+            // Read the atomic row epoch directly so obsolete coordinates never publish first.
+            if (requestedEpoch != rowEpoch.getAsLong()) return;
         }
         matches = found;
         currentMatch = found.size() - 1;

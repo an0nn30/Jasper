@@ -15,17 +15,16 @@ class SearchControllerTest {
 @Test void clearRejectsACompletionAlreadyQueuedForTheEdt() throws Exception {
     AtomicInteger callbacks = new AtomicInteger();
     AtomicReference<SearchController> reference = new AtomicReference<>();
-    CountDownLatch searched = new CountDownLatch(1);
     SwingUtilities.invokeAndWait(() -> {
         SearchController controller = new SearchController(query -> {
-            searched.countDown();
             return List.of(new TerminalSearch.Match(0,0,0));
-        }, row -> {}, () -> {});
+        }, () -> 0L, row -> {}, () -> {});
         reference.set(controller);
         controller.findAsync(new SearchQuery("a",false,false), result -> callbacks.incrementAndGet());
         try {
-            assertThat(searched.await(5,TimeUnit.SECONDS)).isTrue();
-        } catch (InterruptedException e) { throw new AssertionError(e); }
+            var pending = (java.util.concurrent.Future<?>) SessionInspection.field(controller, "pendingSearch");
+            pending.get(5, TimeUnit.SECONDS); // Completion has posted to EDT, which this event still occupies.
+        } catch (Exception e) { throw new AssertionError(e); }
         controller.clear();
     });
     SwingUtilities.invokeAndWait(() -> {
@@ -53,7 +52,7 @@ class SearchControllerTest {
                         }
                     }
                     return List.of(new TerminalSearch.Match(3, 0, 2));
-                }, row -> {}, () -> {});
+                }, () -> 0L, row -> {}, () -> {});
                 reference.set(controller);
                 controller.findAsync(new SearchQuery("first", false, false), result -> callbacks.add("first"));
             });

@@ -89,7 +89,7 @@ public final class TerminalView extends JComponent {
         this.session = session;
         this.access = session.internalAccess();
         this.selection = new SelectionController(access);
-        this.search = new SearchController(access::search,
+        this.search = new SearchController(access::search, access::absoluteRowEpoch,
             row -> viewport.reveal(row, access.snapshot(viewport.topRow())), this::repaint);
         this.observedAbsoluteRowEpoch = access.absoluteRowEpoch();
         this.options = options;

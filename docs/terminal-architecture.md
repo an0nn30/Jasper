@@ -137,12 +137,14 @@ sequenceDiagram
     Queries-->>Worker: rows
     Worker->>Worker: regex/text matching outside lock
     Worker-->>Search: post result to EDT
-    Search->>Search: reject stale generation
+    Search->>Search: reject stale query generation or changed row epoch
     Search-->>View: immutable matches, reveal current, callback
 ```
 
 Clearing, invalidating or detaching cancels publication. Cancellation can be
 cooperative; a stale worker must never publish merely because it finished.
+An atomic row epoch is also captured at admission and checked before publication,
+because a completed worker can already be queued ahead of the EDT reset notification.
 The worker expires after one idle second. Visible highlights are bounded to the
 viewport rather than rebuilt for every match in history.
 

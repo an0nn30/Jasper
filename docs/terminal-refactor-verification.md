@@ -2,7 +2,7 @@
 
 Execution branch: `codex/terminal-refactor-native`, independently from production
 base `0f82c55` and plan commit `bf038c6`. Native execution was explicitly selected;
-there are no per-task subagents, and one independent final review remains required.
+there are no per-task subagents; the one independent final review and its fix pass are complete.
 
 ## Baseline (2026-09-20)
 
@@ -160,4 +160,71 @@ throughput, RSS, visual fidelity, Windows acceptance and the daily-use trial
 remain pending. This execution did not launch the GUI or either native benchmark.
 
 Final independent review and fresh-reader onboarding assessment are recorded
-below after review. No merge or push has been performed.
+below. No merge or push has been performed.
+
+
+## Final independent review and fix pass
+
+A fresh-context GPT-6 Astra reviewer reviewed `bf038c6..cdc38cb`, including the
+complete spec, plan, ledger rulings and all five Review Focus items. The reviewer
+also checked the pinned JediTerm row-sharing assumption against its local source
+jar and ran 73 focused tests, all passing. The review found one Important issue:
+an async result already queued on EDT could invoke its callback with obsolete
+rows after a history reset, before the separately queued reconciliation event.
+
+The fix captures the atomic absolute-row epoch at admission and rejects a changed
+epoch before storing matches, revealing a row, repainting or invoking the callback.
+The existing query-generation and attachment cancellation rules remain intact.
+`TerminalAppIntegrationTest.rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation`
+waits for the worker future while occupying EDT, proves publication is already
+queued, then changes row state. All four variants (history clear, alternate-screen
+switch, width reflow, RIS) failed with one stale callback before the fix and pass
+afterward. Each also verifies a new-epoch search still publishes. The original
+controller queued-clear regression now waits for actual worker completion rather
+than a pre-return latch.
+
+Fresh final `./gradlew verifyTerminalArchitecture check --rerun-tasks` after the
+fix: **terminal 355 tests (354 passed, one skip), app 728 (727 passed, one skip):
+1,083 total, 1,081 passed, two expected skips, zero failures/errors**. The skipped
+conditions are unchanged from above. Source hygiene and `git diff --check` pass.
+No second reviewer was dispatched; the deterministic RED→GREEN regressions and
+full fresh check verify the single fix pass.
+
+Fresh-reader onboarding findings:
+
+- Key changes route to KeyEncoder / KeyboardController / engine, with the correct
+  unit and component tests identified.
+- Shell marks trace from filter/connector through ordered engine hooks, tracker,
+  locked query capture and facade listeners; command capture releases the lock
+  before notification.
+- Live options cover validation/builders, existing-view application, owning
+  controller, app parser/snapshot/template and retention tests. The minor gap
+  below names two additional reconstruction sites.
+- Session/view disposal and callback threading are correctly distinguished in
+  both the guide and compiled examples.
+
+Deferred minor notes (not part of the runtime fix pass):
+
+1. The live-option recipe does not explicitly list TerminalView.setPalette and
+   setFontSize, which still reconstruct options positionally. When adding a new
+   option, preserve it through those paths too, or change them to toBuilder.
+2. The plan's historical Status paragraph and per-step checkboxes lag the finished
+   implementation. Its current execution banner, STATUS and this report are the
+   authoritative handoff; full historical checklist synchronization is deferred.
+
+Review coverage qualifications: constructor failure, real-child cleanup,
+defensive copying, stale-query supersession, attachment delivery and modifier
+ownership were exercised. Reader-start failure and reporting-mode changes during
+a gesture were inspected in code but do not have separately forced deterministic
+regressions. No additional runtime defect was identified.
+
+Final rulings on the reviewer's explicitly unjudged areas:
+
+- Native visual/input/clipboard/throughput/RSS remain user-run, as the repository
+  requires. Cost if wrong: headless evidence can miss native regressions.
+- Windows runtime remains unverified on this Mac. Cost if wrong: Windows-specific
+  native failures can remain undetected despite portable compilation/tests.
+- Flat-package compatibility stays intentionally removed under the user's API
+  migration approval. Cost: downstream callers outside this repository must migrate.
+- The plugin SDK and JPMS isolation remain excluded by design. Cost: plugins
+  cannot load yet, and package names do not enforce runtime security isolation.
