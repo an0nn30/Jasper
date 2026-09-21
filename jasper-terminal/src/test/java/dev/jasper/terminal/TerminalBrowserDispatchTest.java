@@ -21,7 +21,7 @@ class TerminalBrowserDispatchTest {
         var edtResponsive = new AtomicBoolean();
         var ran = new AtomicInteger();
         List<LogRecord> records = new ArrayList<>();
-        var logger = Logger.getLogger(TerminalView.class.getName());
+        var logger = Logger.getLogger(DesktopServices.class.getName());
         var handler = new Handler() {
             @Override public void publish(LogRecord record) { records.add(record); }
             @Override public void flush() {}
@@ -61,7 +61,7 @@ class TerminalBrowserDispatchTest {
 
     @Test void failingDesktopActionUsesFixedDiagnosticsAndLaterActionsStillRun() throws Exception {
         List<LogRecord> records = new java.util.concurrent.CopyOnWriteArrayList<>();
-        var logger = Logger.getLogger(TerminalView.class.getName());
+        var logger = Logger.getLogger(DesktopServices.class.getName());
         var handler = new Handler() {
             @Override public void publish(LogRecord record) { records.add(record); }
             @Override public void flush() {}
@@ -90,7 +90,7 @@ class TerminalBrowserDispatchTest {
         org.junit.jupiter.api.Assumptions.assumeTrue(java.awt.GraphicsEnvironment.isHeadless());
         var received = new CountDownLatch(1);
         var offEdt = new AtomicBoolean();
-        var logger = Logger.getLogger(TerminalView.class.getName());
+        var logger = Logger.getLogger(DesktopServices.class.getName());
         var handler = new Handler() {
             @Override public void publish(LogRecord record) {
                 offEdt.set(!SwingUtilities.isEventDispatchThread());
@@ -104,11 +104,7 @@ class TerminalBrowserDispatchTest {
         logger.addHandler(handler);
         try {
             SwingUtilities.invokeAndWait(() -> {
-                try {
-                    var method = TerminalView.class.getDeclaredMethod("openInBrowser", String.class);
-                    method.setAccessible(true);
-                    method.invoke(null, "https://example.test");
-                } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+                DesktopServices.openBrowser("https://example.test");
             });
             assertThat(received.await(5, TimeUnit.SECONDS)).isTrue();
             assertThat(offEdt).isTrue();
@@ -119,11 +115,7 @@ class TerminalBrowserDispatchTest {
     }
 
     private static void dispatch(Runnable action) {
-        try {
-            var method = TerminalView.class.getDeclaredMethod("dispatchBrowserAction", Runnable.class);
-            method.setAccessible(true);
-            method.invoke(null, action);
-        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        DesktopServices.dispatchBrowserAction(action);
     }
 
     private static void await(CountDownLatch latch) {

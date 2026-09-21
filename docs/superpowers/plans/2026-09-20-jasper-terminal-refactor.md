@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–7 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–8 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -1080,7 +1080,7 @@ reset during work, and supplementary-character highlight width explicitly.
 - `Selection range()`, `boolean hasSelection()`, `void set(Selection)`, `void clear()`, `Optional<String> selectedText()`, `void validate()`, `void start(long,int,boolean)`, `void word(long,int)`, `void line(long)`, `void extend(long,int)`, `void finish()`.
 - Desktop static methods `readClipboard()`, `writeClipboard(String)`, `openBrowser(String)`; package-private `dispatchBrowserAction(Runnable)` for owner tests.
 
-- [ ] **Step 1: Protect stale selected text using the real buffer.**
+- [x] **Step 1: Protect stale selected text using the real buffer.**
 
 Keep `TerminalViewInteractionTest.selectedLiveOverwriteClearsBeforeCopyEvenWithoutPainting`.
 Add this owner-level test
@@ -1103,7 +1103,7 @@ Execute controller operations on the EDT using the existing `onEdt` fixture
 wrapper, with output feeding/waits outside it. Keep an equivalent actual-view
 copy assertion using injected clipboard callbacks.
 
-- [ ] **Step 2: Move selection state and transitions as one owner.**
+- [x] **Step 2: Move selection state and transitions as one owner.**
 
 Move `selection`, `pendingAnchor`, `wordAnchor`, `selectedLiveCells`, and the old
 `setSelection` body. The controller's basic operations are:
@@ -1143,7 +1143,7 @@ before/after word comparison and anchor direction. Copy-on-select stays in mouse
 orchestration: call `finish()`, then invoke the supplied copy action if enabled.
 No clipboard, viewport, repaint, or Swing component is stored by selection.
 
-- [ ] **Step 3: Move desktop operations with their bounded worker.**
+- [x] **Step 3: Move desktop operations with their bounded worker.**
 
 Move these whole declarations from TerminalView into a final `DesktopServices`
 class: `readSystemClipboard`, `writeSystemClipboard`, `openInBrowser`,
@@ -1157,7 +1157,7 @@ with DesktopServices method references. Retain package-private setters for the
 headless component tests. Replace browser-test reflection on TerminalView with
 direct owner-package calls to `DesktopServices.dispatchBrowserAction`.
 
-- [ ] **Step 4: Run selection, view interaction and desktop worker tests; commit.**
+- [x] **Step 4: Run selection, view interaction and desktop worker tests; commit.**
 
 `./gradlew :jasper-terminal:test --tests '*Selection*' --tests '*Interaction*' --tests '*Browser*'`.
 Verify the existing blocked-worker test still proves EDT responsiveness, queue

@@ -87,11 +87,7 @@ public final class TerminalView extends JComponent {
     private boolean suppressNextTyped;
     private boolean leftAltHeld;
     private boolean rightAltHeld;
-    private Selection selection;
-    /** Where a click-drag started; becomes the selection on the first drag. */
-    private Selection pendingAnchor;
-    private Selection wordAnchor;
-    private List<SelectedCells> selectedLiveCells = List.of();
+    private final SelectionController selection;
     /** Press ownership and report modifiers survive until that button's matching release. */
     private final java.util.EnumMap<MouseInput.Button, Gesture> gestures =
         new java.util.EnumMap<>(MouseInput.Button.class);
@@ -118,13 +114,14 @@ public final class TerminalView extends JComponent {
     private Predicate<KeyEvent> shortcutHandler;
     private Consumer<MouseEvent> contextMenuHandler = event -> { };
     private Consumer<FindResult> findResultListener = result -> { };
-    private Supplier<String> clipboardReader = TerminalView::readSystemClipboard;
-    private Consumer<String> clipboardWriter = TerminalView::writeSystemClipboard;
-    private Consumer<String> linkOpener = TerminalView::openInBrowser;
+    private Supplier<String> clipboardReader = DesktopServices::readClipboard;
+    private Consumer<String> clipboardWriter = DesktopServices::writeClipboard;
+    private Consumer<String> linkOpener = DesktopServices::openBrowser;
 
     public TerminalView(TerminalSession session, TerminalOptions options) {
         this.session = session;
         this.access = session.internalAccess();
+        this.selection = new SelectionController(access);
         this.search = new SearchController(access::search,
             row -> viewport.reveal(row, access.snapshot(viewport.topRow())), this::repaint);
         this.observedAbsoluteRowEpoch = access.absoluteRowEpoch();
@@ -265,14 +262,11 @@ public final class TerminalView extends JComponent {
     }
 
     /** Whether this EDT-owned view has a selected cell range; does not read or lock terminal text. */
-    public boolean hasSelection() { return selection != null; }
+    public boolean hasSelection() { return selection.hasSelection(); }
 
     public Optional<String> selectedText() {
         reconcileAbsoluteRows();
-        if (selection == null) return Optional.empty();
-        Optional<String> text = access.selectedText(selection, selectedLiveCells);
-        if (text.isEmpty()) setSelection(null);
-        return text;
+        return selection.selectedText();
     }
 
     public void copySelection() {
@@ -442,7 +436,7 @@ public final class TerminalView extends JComponent {
     @Override
     protected void paintComponent(Graphics g) {
         reconcileAbsoluteRows();
-        if (selection != null && !access.selectionUnchanged(selectedLiveCells)) setSelection(null);
+        selection.validate();
         ScreenSnapshot snapshot = access.snapshot(viewport.topRow());
         CursorStyle style = CursorRequest.effective(snapshot.cursorShape(), options.cursorStyle());
         boolean blinks = CursorRequest.effectiveBlink(snapshot.cursorShape(), options.cursorBlink());
@@ -507,7 +501,7 @@ public final class TerminalView extends JComponent {
         if (bytes != null) {
             session.write(bytes);
             viewport.follow();
-            setSelection(null);
+            selection.set(null);
             restartBlink();
             e.consume();
         }
@@ -575,39 +569,13 @@ public final class TerminalView extends JComponent {
             return; // Reports need no copied screen content and no repaint.
         }
         switch (action) {
-            case START_SELECTION -> {
-                setSelection(null);
-                wordAnchor = null;
-                pendingAnchor = Selection.at(absoluteRow, column, e.isAltDown());
-            }
-            case SELECT_WORD -> {
-                wordAnchor = access.wordSelection(absoluteRow, column);
-                setSelection(wordAnchor);
-                pendingAnchor = null;
-            }
-            case SELECT_LINE -> {
-                wordAnchor = null;
-                setSelection(access.lineSelection(absoluteRow));
-                pendingAnchor = null;
-            }
-            case EXTEND_SELECTION -> {
-                Selection next = selection == null ? pendingAnchor : selection;
-                if (wordAnchor != null) {
-                    Selection word = access.wordSelection(absoluteRow, column);
-                    boolean before = word.startRow() < wordAnchor.startRow()
-                        || (word.startRow() == wordAnchor.startRow() && word.startColumn() < wordAnchor.startColumn());
-                    next = before
-                        ? new Selection(wordAnchor.endRow(), wordAnchor.endColumn(), word.startRow(), word.startColumn(), false)
-                        : new Selection(wordAnchor.startRow(), wordAnchor.startColumn(), word.endRow(), word.endColumn(), false);
-                } else if (next != null) {
-                    next = next.withFocus(absoluteRow, column);
-                }
-                setSelection(next);
-            }
+            case START_SELECTION -> selection.start(absoluteRow, column, e.isAltDown());
+            case SELECT_WORD -> selection.word(absoluteRow, column);
+            case SELECT_LINE -> selection.line(absoluteRow);
+            case EXTEND_SELECTION -> selection.extend(absoluteRow, column);
             case END_SELECTION -> {
-                pendingAnchor = null;
-                wordAnchor = null;
-                if (options.copyOnSelect() && selection != null) copySelection();
+                selection.finish();
+                if (options.copyOnSelect() && selection.hasSelection()) copySelection();
             }
             case SCROLL_VIEW -> scrollBy(notches * WHEEL_LINES);
             case SEND_ARROWS -> sendArrows(notches);
@@ -619,11 +587,6 @@ public final class TerminalView extends JComponent {
         }
         if (type == Type.RELEASED) gestures.remove(button);
         if (action != MouseRouting.Action.NONE && action != MouseRouting.Action.OPEN_LINK) repaint();
-    }
-
-    private void setSelection(Selection next) {
-        selection = next;
-        selectedLiveCells = next == null ? List.of() : access.selectedLiveCells(next);
     }
 
     /** AWT drag events usually have NOBUTTON; prefer the latest owned button still held. */
@@ -664,9 +627,7 @@ public final class TerminalView extends JComponent {
      */
     private void forgetAbsoluteRows() {
         observedAbsoluteRowEpoch = access.absoluteRowEpoch();
-        setSelection(null);
-        pendingAnchor = null;
-        wordAnchor = null;
+        selection.clear();
         search.clear();
         viewport.follow();
         repaint();
@@ -820,9 +781,10 @@ public final class TerminalView extends JComponent {
             highlights.add(new TerminalPainter.Highlight((int) (match.row() - first), match.startColumn(),
                 match.endColumn(), i == search.currentIndex() ? currentMatchColor : matchColor));
         }
-        if (selection != null) {
+        Selection range = selection.range();
+        if (range != null) {
             for (int row = 0; row < snapshot.height(); row++) {
-                int[] columns = selection.columnsOn(first + row, snapshot.width());
+                int[] columns = range.columnsOn(first + row, snapshot.width());
                 if (columns != null) {
                     highlights.add(new TerminalPainter.Highlight(row, columns[0], columns[1],
                         palette.selection()));
@@ -955,68 +917,6 @@ public final class TerminalView extends JComponent {
             return MouseInput.Button.RIGHT;
         }
         return MouseInput.Button.NONE;
-    }
-
-    private static String readSystemClipboard() {
-        try {
-            return (String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
-        } catch (UnsupportedFlavorException | IOException | IllegalStateException | HeadlessException e) {
-            LOG.log(System.Logger.Level.WARNING, "Clipboard read failed", e);
-            return null;
-        }
-    }
-
-    private static void writeSystemClipboard(String text) {
-        try {
-            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
-        } catch (IllegalStateException | HeadlessException e) {
-            LOG.log(System.Logger.Level.WARNING, "Clipboard write failed", e);
-        }
-    }
-
-    private static void openInBrowser(String uri) {
-        dispatchBrowserAction(() -> {
-            try {
-                if (Desktop.isDesktopSupported()) {
-                    Desktop.getDesktop().browse(new URI(uri));
-                } else {
-                    LOG.log(System.Logger.Level.WARNING, "Browser opening is unsupported");
-                }
-            } catch (IOException | URISyntaxException failure) {
-                // Desktop exceptions can contain the URI. Keep diagnostics fixed and free of terminal content.
-                LOG.log(System.Logger.Level.WARNING, "Browser open failed");
-            }
-        });
-    }
-
-    private static void dispatchBrowserAction(Runnable action) {
-        try {
-            BrowserWorker.EXECUTOR.execute(() -> {
-                try {
-                    action.run();
-                } catch (RuntimeException failure) {
-                    LOG.log(System.Logger.Level.WARNING, "Browser open failed");
-                }
-            });
-        } catch (RejectedExecutionException busy) {
-            LOG.log(System.Logger.Level.WARNING, "Browser request dropped: pending request limit reached");
-        }
-    }
-
-    /** Shared across views, lazily created, and never falls back to running Desktop calls on the EDT. */
-    private static final class BrowserWorker {
-        static final ThreadPoolExecutor EXECUTOR = createExecutor();
-
-        private static ThreadPoolExecutor createExecutor() {
-            var executor = new ThreadPoolExecutor(1, 1, 1_000, TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(8), action -> {
-                    var thread = new Thread(action, "jasper-terminal-browser");
-                    thread.setDaemon(true);
-                    return thread;
-                }, new ThreadPoolExecutor.AbortPolicy());
-            executor.allowCoreThreadTimeOut(true);
-            return executor;
-        }
     }
 
     /** Finds matches synchronously; callers on the EDT should prefer findAsync for long histories. */
