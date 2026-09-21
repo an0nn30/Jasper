@@ -155,14 +155,24 @@ final class JasperApplication {
         window.content().onToggleBuddy = this::toggleBuddy;
         window.content().buddyEnabled = this::buddyEnabled;
         window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
-        window.content().onCommandStarted = (command, pane, elapsed, focus, watched) ->
-            notifications.started(pane, command, elapsed, focus, watched);
-        window.content().onCommandFinished = (command, exitStatus, duration, origin, pane, focus) ->
-            notifications.finished(pane, command, exitStatus, duration, origin, focus);
-        window.content().onPaneTitleChanged = notifications::titleChanged;
-        window.content().onPaneClosed = notifications::closed;
-        window.content().onPaneFocused = notifications::looked;
-        window.content().onPaneBlurred = notifications::hidden;
+        window.content().activity(event -> {
+            switch (event) {
+                case WorkspaceActivity.Started value -> notifications.started(value.id(), value.command(),
+                    value.elapsedNanos(), value.activate(), value.watched());
+                case WorkspaceActivity.Finished value -> notifications.finished(value.id(), value.command(),
+                    value.exitStatus(), value.duration(), new CommandNotice.Origin(value.origin().anyWindowActive(),
+                        value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), value.activate());
+                case WorkspaceActivity.TitleChanged value -> notifications.titleChanged(value.id(), value.title());
+                case WorkspaceActivity.PaneState value -> {
+                    switch (value.state()) {
+                        case OPENED -> { }
+                        case CLOSED -> notifications.closed(value.id());
+                        case FOCUSED -> notifications.looked(value.id());
+                        case BLURRED -> notifications.hidden(value.id());
+                    }
+                }
+            }
+        });
         windows.add(window); window.show();
         if (first) shellHistory.refresh();
         if (first && configuration == null && snippets != null) snippets.reload();

@@ -3,9 +3,7 @@ package dev.jasper.app;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.config.ToolbarMode;
 
-import dev.jasper.terminal.view.TerminalAction;
 
-import dev.jasper.terminal.view.TerminalView;
 import java.awt.*;
 import java.awt.event.*;
 import java.nio.file.Path;
@@ -22,7 +20,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private final Runnable onEmpty;
     private final JTabbedPane tabs = new TerminalDeck();
     private final WindowTabs windowTabs;
-    private final EnumMap<ActionId, Action> actions = new EnumMap<>(ActionId.class);
+    private final WorkspaceActions workspaceActions;
     private final CommandRegistry commands = new CommandRegistry();
     private final WindowCommands windowCommands;
     private final ScopeRegistry scopes = new ScopeRegistry();
@@ -36,11 +34,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private final KeyEventDispatcher paletteDispatcher = this::paletteKeysDispatch;
     private KeyboardFocusManager paletteFocusManager;
     private javax.swing.Timer paletteTailCleanup;
-    private boolean updatingActions;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
     private KeyBindings bindings;
-    private ConfigSnapshot configured;
-    private float configuredFontSize = TerminalPane.DEFAULT_FONT_SIZE;
+    private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
     private final ThemeController themes;
     private final Subscription themeRegistration;
@@ -67,32 +63,27 @@ final class WindowContent extends JPanel implements AutoCloseable {
     Runnable onToggleBuddy = () -> {};
     java.util.function.BooleanSupplier buddyEnabled = () -> false;
     private boolean historyEnabled = true;
-    /** Set by the application so a finished command can reach the notifier; null in tests. */
-    CommandFinishedSink onCommandFinished;
-    /** Set by the application; null in tests. */
-    CommandStartedSink onCommandStarted;
-    /** Title updates identify their originating pane, including inactive tabs and splits. */
-    java.util.function.BiConsumer<Object, String> onPaneTitleChanged = (pane, title) -> {};
-    /** Set by the application: a pane is gone, so anything keyed on it should be released. */
-    java.util.function.Consumer<Object> onPaneClosed = pane -> {};
-    /** Set by the application: this pane took focus, so whatever it posted has been seen. */
-    java.util.function.Consumer<Object> onPaneFocused = pane -> {};
-    /** Set by the application: this pane is no longer being watched. */
-    java.util.function.Consumer<Object> onPaneBlurred = pane -> {};
-    /** Whether any Jasper window has focus; the application knows, a single window does not. */
+    private final java.util.List<Consumer<WorkspaceActivity.Event>> activityListeners = new ArrayList<>();
+    /** Whether any Jasper window has focus; application-supplied, EDT-only. */
     java.util.function.BooleanSupplier anyWindowActive = () -> true;
 
-    /** What the application wants to know about a finished command. {@code pane} is the notice's key. */
-    interface CommandFinishedSink {
-        void accept(String command, java.util.OptionalInt exitStatus, java.time.Duration duration,
-                    CommandNotice.Origin origin, Object pane, Runnable focus);
+    /** Replays existing producers before returning; the listener receives later events until closed. */
+    Subscription activity(Consumer<WorkspaceActivity.Event> listener) {
+        Objects.requireNonNull(listener);
+        if (closed) return new Subscription(() -> {});
+        activityListeners.add(listener);
+        try {
+            for (int i = 0; i < tabs.getTabCount(); i++)
+                for (TerminalPane pane : ((TerminalTab) tabs.getComponentAt(i)).panes())
+                    listener.accept(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
+        } catch (RuntimeException | Error failure) { activityListeners.remove(listener); throw failure; }
+        return new Subscription(() -> activityListeners.remove(listener));
     }
 
-    /** What the application wants to know about a command that has just begun. */
-    interface CommandStartedSink {
-        void accept(String command, Object pane, java.util.function.LongSupplier elapsedNanos,
-                    Runnable focus, boolean watched);
+    private void emit(WorkspaceActivity.Event event) {
+        for (var listener : java.util.List.copyOf(activityListeners)) listener.accept(event);
     }
+
     private ShellHistoryIndex shellHistory;
     private Subscription historyRegistration;
     private SnippetStore snippets;
@@ -140,19 +131,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         this.macOs = macOs;
         this.themes = themes;
         this.launcher = launcher; this.newWindow = newWindow; this.quit = quit; this.onEmpty = onEmpty;
-        for (ActionId id : ActionId.values()) {
-            Action action = new AbstractAction(id.label()) {
-                @Override public void actionPerformed(ActionEvent event) { invoke(id); }
-            };
-            bindings.strokeFor(id).ifPresent(stroke -> {
-                action.putValue(Action.ACCELERATOR_KEY, stroke);
-
-            });
-            actions.put(id, action);
-        }
-        String unavailable = "Configuration is not connected";
-        action(ActionId.OPEN_SETTINGS).putValue(Action.SHORT_DESCRIPTION, unavailable);
-        action(ActionId.RELOAD_CONFIG).putValue(Action.SHORT_DESCRIPTION, unavailable);
+        workspaceActions = new WorkspaceActions(this);
         windowCommands = new WindowCommands(this, commands);
         chrome = new WindowChrome(this);
         commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
@@ -309,46 +288,14 @@ final class WindowContent extends JPanel implements AutoCloseable {
         };
     }
 
-    void applyConfiguration(ConfigSnapshot next, boolean macOs) {
-        if (closed) return;
-        ConfigSnapshot previous = configured;
-        configured = next;
-        if (previous == null || previous.tabHeight() != next.tabHeight()) setTabHeight(next.tabHeight());
-        if (previous == null || previous.toolbar() != next.toolbar()) setToolbarMode(next.toolbar());
-        if (previous == null || previous.statusBar() != next.statusBar()) setStatusVisible(next.statusBar());
-        boolean sizeChanged = previous == null || previous.fontSize() != next.fontSize();
-        boolean optionsChanged = previous == null || !previous.font().equals(next.font())
-            || liveBehaviorChanged(previous.terminal(), next.terminal());
-        boolean dimChanged = previous == null
-            || previous.terminal().dimInactivePanes() != next.terminal().dimInactivePanes();
-        boolean exitChanged = previous == null || previous.terminal().onExit() != next.terminal().onExit();
-        configuredFontSize = next.fontSize();
-        if (optionsChanged || dimChanged || exitChanged) {
-            for (int i = 0; i < tabs.getTabCount(); i++) {
-                for (TerminalPane pane : ((TerminalTab) tabs.getComponentAt(i)).panes()) {
-                    if (optionsChanged && pane.view() != null) {
-                        float size = sizeChanged ? next.fontSize() : pane.view().fontSize();
-                        pane.view().applyOptions(next.viewOptions(size, pane.view().palette()));
-                    }
-                    if (dimChanged) pane.setConfiguredDim(next.terminal().dimInactivePanes());
-                    if (exitChanged) pane.setShellExitBehavior(next.terminal().onExit());
-                }
-            }
-        }
-        if (previous == null || !previous.keybindings().equals(next.keybindings())) setBindings(next.bindings(macOs));
-        if (previous == null || previous.historyEnabled() != next.historyEnabled()) setHistoryEnabled(next.historyEnabled());
-        if (previous == null || previous.maxResults() != next.maxResults()) commandPalette.setMaxResults(next.maxResults());
-        if (previous == null || !previous.trivialCommands().equals(next.trivialCommands()))
-            commandPalette.setTrivialCommands(next.trivialCommands());
-    }
-
-    private static boolean liveBehaviorChanged(TerminalConfig previous, TerminalConfig next) {
-        return previous.optionAsMeta() != next.optionAsMeta()
-            || previous.cursorShape() != next.cursorShape()
-            || previous.cursorBlink() != next.cursorBlink()
-            || previous.copyOnSelect() != next.copyOnSelect()
-            || previous.bell() != next.bell();
-    }
+    void applyConfiguration(ConfigSnapshot next, boolean macOs) { workspaceConfiguration.apply(next, macOs); }
+    float configuredFontSize() { return workspaceConfiguration.configuredFontSize(); }
+    boolean closed() { return closed; }
+    boolean configurationConnected() { return openSettings != null && reloadConfiguration != null; }
+    void openSettings() { openSettings.run(); }
+    void reloadConfiguration() { reloadConfiguration.run(); }
+    void requestNewWindow() { newWindow.accept(directory()); }
+    void requestQuit() { quit.run(); }
 
     CommandRegistry commands() { return commands; }
     ScopeRegistry scopes() { return scopes; }
@@ -377,8 +324,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
     boolean isActiveAndOpen() { return active && !closed; }
-    boolean updatingActions() { return updatingActions; }
-    Action action(ActionId id) { return actions.get(id); }
+    boolean updatingActions() { return workspaceActions.updating(); }
+    Action action(ActionId id) { return workspaceActions.action(id); }
     KeyBindings bindings() { return bindings; }
     JToolBar toolbar() { return chrome.toolbar(); }
     WindowStatusBar status() { return chrome.status(); }
@@ -399,37 +346,39 @@ final class WindowContent extends JPanel implements AutoCloseable {
         tab.onEmpty = () -> closeTab(tab);
         tab.onError = message -> onError.accept(message);
         tab.configure = pane -> configurePane(tab, pane);
+        tab.onPaneCreated = pane -> connectActivity(tab, pane);
+        for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
         tab.setBackground(themes.current().palette().background());
         for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current().palette());
         tabs.addTab(tab.title(), tab);
         tabs.setSelectedComponent(tab); update(); tab.start();
     }
 
+    private void connectActivity(TerminalTab tab, TerminalPane pane) {
+        emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
+        pane.onCommandStarted = command -> {
+            long startedAt = System.nanoTime();
+            emit(new WorkspaceActivity.Started(pane.id(), command, () -> System.nanoTime() - startedAt,
+                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); },
+                pane.watched() && isActiveAndOpen() && tab == currentTab()));
+        };
+        pane.onTitleChanged = title -> emit(new WorkspaceActivity.TitleChanged(pane.id(), title));
+        pane.onClosed = () -> emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.CLOSED));
+        pane.onPaneFocused = () -> emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.FOCUSED));
+        pane.onPaneBlurred = () -> emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.BLURRED));
+        pane.onCommandFinished = (command, exitStatus, duration) -> emit(new WorkspaceActivity.Finished(
+            pane.id(), command, exitStatus, duration,
+            new WorkspaceActivity.Origin(anyWindowActive.getAsBoolean(), isActiveAndOpen(),
+                tab == currentTab(), pane.view() != null && pane.view().isFocusOwner()),
+            () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); }));
+    }
+
     private void configurePane(TerminalTab tab, TerminalPane pane) {
         pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
         pane.onCommandExecuted = entry -> { if (shellHistory != null) shellHistory.record(entry); };
-        pane.onCommandStarted = command -> {
-            if (onCommandStarted == null) return;
-            // Stamped here rather than taken from the session's clock: the session's duration stays
-            // authoritative for the finished card, and this only has to make a ticking card read right.
-            long startedAt = System.nanoTime();
-            onCommandStarted.accept(command, pane, () -> System.nanoTime() - startedAt,
-                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); },
-                pane.watched() && isActiveAndOpen() && tab == currentTab());
-        };
-        pane.onTitleChanged = title -> onPaneTitleChanged.accept(pane, title);
-        pane.onClosed = () -> onPaneClosed.accept(pane);
-        pane.onPaneFocused = () -> onPaneFocused.accept(pane);
-        pane.onPaneBlurred = () -> onPaneBlurred.accept(pane);
-        pane.onCommandFinished = (command, exitStatus, duration) -> {
-            if (onCommandFinished == null) return;
-            onCommandFinished.accept(command, exitStatus, duration,
-                new CommandNotice.Origin(anyWindowActive.getAsBoolean(), isActiveAndOpen(),
-                    tab == currentTab(), pane.view() != null && pane.view().isFocusOwner()),
-                pane,
-                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); });
-        };
         pane.applyTheme(themes.current().palette());
+        ConfigSnapshot configured = workspaceConfiguration.snapshot();
+        float configuredFontSize = workspaceConfiguration.configuredFontSize();
         if (configured == null) {
             pane.view().setFontSize(configuredFontSize);
         } else {
@@ -480,91 +429,8 @@ final class WindowContent extends JPanel implements AutoCloseable {
         return true;
     }
 
-    void invoke(ActionId id) {
-        if (commandPalette != null && commandPalette.isOpen()
-            && id != ActionId.COMMAND_PALETTE && id != ActionId.HISTORY_PALETTE && id != ActionId.SNIPPETS_PALETTE) return;
-        updateActions();
-        if (!action(id).isEnabled()) return;
-        TerminalTab tab = currentTab();
-        TerminalPane pane = currentPane();
-        TerminalView view = pane == null ? null : pane.view();
-        switch (id) {
-            case COMMAND_PALETTE -> commandPalette.open(PaletteScope.COMMANDS_ID);
-            case HISTORY_PALETTE -> commandPalette.open(PaletteScope.HISTORY_ID);
-            case SNIPPETS_PALETTE -> commandPalette.open(PaletteScope.SNIPPETS_ID);
-            case NEW_TAB -> newTab(directory());
-            case NEW_WINDOW -> newWindow.accept(directory());
-            case QUIT -> quit.run();
-            case CLOSE_TAB -> closeTab(tab);
-            case CLOSE_PANE -> tab.closePane(pane);
-            case SPLIT_RIGHT -> tab.split(SplitTree.Axis.RIGHT);
-            case SPLIT_DOWN -> tab.split(SplitTree.Axis.DOWN);
-            case ZOOM_PANE -> tab.toggleZoom();
-            case FOCUS_PANE_LEFT -> tab.navigate(SplitTree.Direction.LEFT);
-            case FOCUS_PANE_RIGHT -> tab.navigate(SplitTree.Direction.RIGHT);
-            case FOCUS_PANE_UP -> tab.navigate(SplitTree.Direction.UP);
-            case FOCUS_PANE_DOWN -> tab.navigate(SplitTree.Direction.DOWN);
-            case NEXT_TAB -> selectRelative(1);
-            case PREVIOUS_TAB -> selectRelative(-1);
-            case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
-                 SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 -> {
-                int index = id.ordinal() - ActionId.SELECT_TAB_1.ordinal();
-                if (index < tabs.getTabCount()) tabs.setSelectedIndex(index);
-            }
-            case RENAME_TAB -> {
-                String name = JOptionPane.showInputDialog(this, "Tab name (leave blank for automatic):", tab.title());
-                if (name != null) tab.rename(name);
-            }
-            case FIND -> pane.findBar().open();
-            case FIND_NEXT -> pane.findBar().next();
-            case FIND_PREVIOUS -> pane.findBar().previous();
-            case PREVIOUS_PROMPT -> view.execute(TerminalAction.PREVIOUS_PROMPT);
-            case NEXT_PROMPT -> view.execute(TerminalAction.NEXT_PROMPT);
-            case COPY -> view.execute(TerminalAction.COPY_SELECTION);
-            case PASTE -> view.execute(TerminalAction.PASTE_CLIPBOARD);
-            case CLEAR_SCROLLBACK -> view.execute(TerminalAction.CLEAR_SCROLLBACK);
-            case FONT_BIGGER -> view.setFontSize(view.fontSize() + 1);
-            case FONT_SMALLER -> view.setFontSize(view.fontSize() - 1);
-            case FONT_RESET -> view.setFontSize(configuredFontSize);
-            case OPEN_SETTINGS -> openSettings.run();
-            case RELOAD_CONFIG -> reloadConfiguration.run();
-        }
-        update();
-    }
-
-    private void selectRelative(int delta) {
-        if (tabs.getTabCount() > 0) tabs.setSelectedIndex(Math.floorMod(tabs.getSelectedIndex() + delta, tabs.getTabCount()));
-    }
-
-    void updateActions() {
-        updatingActions = true;
-        try {
-            TerminalPane pane = currentPane();
-            boolean present = pane != null;
-            boolean ready = present && pane.view() != null;
-            boolean running = present && pane.running();
-            for (ActionId id : ActionId.values()) {
-                boolean enabled = !closed && switch (id) {
-                    case OPEN_SETTINGS -> openSettings != null;
-                    case RELOAD_CONFIG -> reloadConfiguration != null;
-                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT -> true;
-                    case HISTORY_PALETTE -> scopes.find(PaletteScope.HISTORY_ID).isPresent();
-                    case SNIPPETS_PALETTE -> scopes.find(PaletteScope.SNIPPETS_ID).isPresent();
-                    case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
-                    case COPY -> ready && pane.view().hasSelection();
-                    case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
-                         CLEAR_SCROLLBACK, FONT_BIGGER, FONT_SMALLER, FONT_RESET -> ready;
-                    case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
-                         SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
-                        id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < tabs.getTabCount();
-                    default -> present;
-                };
-                action(id).setEnabled(enabled);
-            }
-            if (windowCommands != null && chrome != null) windowCommands.refresh();
-        } finally { updatingActions = false; }
-        if (commandPalette != null) commandPalette.refreshIfChanged();
-    }
+    void invoke(ActionId id) { workspaceActions.invoke(id); }
+    void updateActions() { workspaceActions.update(); }
 
     void update() {
         if (closed) return;
@@ -674,13 +540,14 @@ final class WindowContent extends JPanel implements AutoCloseable {
         themeRegistration.close();
         for (int i = 0; i < tabs.getTabCount(); i++) ((TerminalTab) tabs.getComponentAt(i)).close();
         tabs.removeAll(); removeRootBindings();
-        actions.values().forEach(action -> action.setEnabled(false));
+        workspaceActions.disable();
         windowTabs.refresh();
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
         confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
-        onCommandStarted = null; onPaneClosed = pane -> {}; onPaneFocused = pane -> {}; onPaneBlurred = pane -> {};
+        activityListeners.clear();
+        anyWindowActive = () -> false;
     }
 }

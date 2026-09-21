@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Approved for native execution; Tasks 1–3 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Tasks 1–4 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -354,7 +354,7 @@ public final class WorkspaceActivity {
 
 This is a closed local value family, not a plugin event bus or strategy interface. Remove `CommandStartedSink` and `CommandFinishedSink`. Each pane allocates a private final `Object activityId = new Object()`; callback actions are separate from the ID, so retaining an ID cannot retain a pane. Validate nonnull event fields in compact constructors, including activation for started/finished events.
 
-- [ ] Add identity and no-policy tests:
+- [x] Add identity and no-policy tests:
 
 ```java
 @Test void activityIdentityDoesNotContainThePaneOrFeaturePolicy() {
@@ -368,8 +368,8 @@ This is a closed local value family, not a plugin event bus or strategy interfac
 }
 ```
 
-- [ ] Run `./gradlew :jasper-app:test --tests '*WorkspaceActivityTest'`; expect missing type.
-- [ ] Transplant WindowContent's action-map construction, `invoke`, `updateActions`, and `updatingActions` flag into WorkspaceActions. Keep command registry/window-command registration in WindowContent; actions obtain the current tab/pane through WindowContent's existing accessors. Action callbacks capture the owner, not a tab from construction. WindowContent delegates exactly:
+- [x] Run `./gradlew :jasper-app:test --tests '*WorkspaceActivityTest'`; expect missing type.
+- [x] Transplant WindowContent's action-map construction, `invoke`, `updateActions`, and `updatingActions` flag into WorkspaceActions. Keep command registry/window-command registration in WindowContent; actions obtain the current tab/pane through WindowContent's existing accessors. Action callbacks capture the owner, not a tab from construction. WindowContent delegates exactly:
 
 ```java
 void invoke(ActionId id) { workspaceActions.invoke(id); }
@@ -378,9 +378,9 @@ void updateActions() { workspaceActions.update(); }
 boolean updatingActions() { return workspaceActions.updating(); }
 ```
 
-- [ ] Transplant `configured`, `configuredFontSize`, `applyConfiguration` and `liveBehaviorChanged` into WorkspaceConfiguration. Change direct tab iteration to owner tab access; use narrow existing methods for toolbar/status/bindings/history/palette. Preserve the `previous == null || savedValueChanged` conditions; never replay all defaults indiscriminately. Route new-pane options through `workspaceConfiguration.snapshot()` and saved font size. Use `TerminalOptions.toBuilder()` where rebuilding an existing options value so all unrelated fields survive.
-- [ ] Implement local activity subscription with the same ordered-list/snapshot-iteration/removal idiom as CommandRegistry. On subscription, replay OPENED for each existing pane before returning the registration. Emit OPENED for each later pane before any command event. On pane close emit CLOSED before releasing callbacks; detach listeners on workspace close. Application translates the records into existing notifier calls, including conversion of `WorkspaceActivity.Origin` into `CommandNotice.Origin`. Workspace imports neither notifications nor Buddy.
-- [ ] Extend the existing configuration reload integration tests using their snapshot/pane fixtures: zoom a live pane, reload an identical snapshot, assert zoom preserved; change font default, assert live font updates; change only shell/grid/scrollback, assert no session replacement and next launch sees captured new settings. Retain existing temporary theme/toolbar/status tests. Run the full app tests after each extraction, then commit `refactor: extract workspace behavior owners` with trailer.
+- [x] Transplant `configured`, `configuredFontSize`, `applyConfiguration` and `liveBehaviorChanged` into WorkspaceConfiguration. Change direct tab iteration to owner tab access; use narrow existing methods for toolbar/status/bindings/history/palette. Preserve the `previous == null || savedValueChanged` conditions; never replay all defaults indiscriminately. Route new-pane options through `workspaceConfiguration.snapshot()` and saved font size. Use `TerminalOptions.toBuilder()` where rebuilding an existing options value so all unrelated fields survive.
+- [x] Implement local activity subscription with the same ordered-list/snapshot-iteration/removal idiom as CommandRegistry. On subscription, replay OPENED for each existing pane before returning the registration. Emit OPENED for each later pane before any command event. On pane close emit CLOSED before releasing callbacks; detach listeners on workspace close. Application translates the records into existing notifier calls, including conversion of `WorkspaceActivity.Origin` into `CommandNotice.Origin`. Workspace imports neither notifications nor Buddy.
+- [x] Extend the existing configuration reload integration tests using their snapshot/pane fixtures: zoom a live pane, reload an identical snapshot, assert zoom preserved; change font default, assert live font updates; change only shell/grid/scrollback, assert no session replacement and next launch sees captured new settings. Retain existing temporary theme/toolbar/status tests. Run the full app tests after each extraction, then commit `refactor: extract workspace behavior owners` with trailer.
 
 ## Task 5: Extract palette state from window presentation
 

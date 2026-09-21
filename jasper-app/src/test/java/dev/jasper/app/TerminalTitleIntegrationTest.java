@@ -53,11 +53,24 @@ class TerminalTitleIntegrationTest {
             BuddyDeck deck = new BuddyDeck();
             CommandNotifier notifier = new CommandNotifier(() -> Duration.ofNanos(1), deck, () -> {},
                 (title, detail) -> {}, working -> {}, (delay, run) -> () -> {});
-            window.onCommandStarted = (command, pane, elapsed, focus, watched) ->
-                notifier.started(pane, command, elapsed, focus, false);
-            window.onPaneTitleChanged = notifier::titleChanged;
-            window.onCommandFinished = (command, status, duration, origin, pane, focus) ->
-                notifier.finished(pane, command, status, duration, origin, focus);
+            window.activity(event -> {
+            switch (event) {
+                case WorkspaceActivity.Started value -> notifier.started(value.id(), value.command(),
+                    value.elapsedNanos(), value.activate(), false);
+                case WorkspaceActivity.Finished value -> notifier.finished(value.id(), value.command(),
+                    value.exitStatus(), value.duration(), new CommandNotice.Origin(value.origin().anyWindowActive(),
+                        value.origin().ownWindowActive(), value.origin().ownTabSelected(), value.origin().ownPaneFocused()), value.activate());
+                case WorkspaceActivity.TitleChanged value -> notifier.titleChanged(value.id(), value.title());
+                case WorkspaceActivity.PaneState value -> {
+                    switch (value.state()) {
+                        case OPENED -> { }
+                        case CLOSED -> notifier.closed(value.id());
+                        case FOCUSED -> notifier.looked(value.id());
+                        case BLURRED -> notifier.hidden(value.id());
+                    }
+                }
+            }
+            });
             List<String> titles = new ArrayList<>();
             window.onTitle = titles::add;
             fixture[0] = new Fixture(window, deck, titles);

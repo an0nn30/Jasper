@@ -23,6 +23,7 @@ final class TerminalTab extends JPanel implements AutoCloseable {
     Runnable onChanged = () -> {};
     Runnable onEmpty = () -> {};
     Consumer<String> onError = message -> {};
+    Consumer<TerminalPane> onPaneCreated = pane -> {};
     Consumer<TerminalPane> configure = pane -> {};
 
     TerminalTab(Path directory, ShellLauncher launcher) {
@@ -46,6 +47,7 @@ final class TerminalTab extends JPanel implements AutoCloseable {
             closePane(pane);
         };
         pane.onReady = view -> configure.accept(pane);
+        onPaneCreated.accept(pane);
         return pane;
     }
 
@@ -172,6 +174,6 @@ final class TerminalTab extends JPanel implements AutoCloseable {
         if (closed) return;
         closed = true; ++renderGeneration;
         panes.values().forEach(TerminalPane::close); panes.clear(); splits.clear(); removeAll();
-        onChanged = () -> {}; onEmpty = () -> {}; configure = pane -> {}; onError = message -> {};
+        onChanged = () -> {}; onEmpty = () -> {}; configure = pane -> {}; onPaneCreated = pane -> {}; onError = message -> {};
     }
 }

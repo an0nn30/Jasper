@@ -22,6 +22,10 @@ Existing javac/doclint warnings are nonfatal and will be reviewed with documenta
 
 Task 3: Ruling: Keep pre-pack initial snapshot application in TerminalWindow, then register with ConfigurationController from the application — preserves geometry before pack while removing reverse ownership; wrong ordering would change initial sizing. WindowContent.installTitleBar is the workspace adapter exercised by existing headless title-bar tests. No trivial callback-record-only test; real wiring is covered by those integration tests.
 
+4. Workspace activity tests failed on absent API; new lifecycle tests and full app suite pass (735 tests, one expected skip). Existing config/action coverage passes after owner extraction.
+
+Task 4: Ruling: Reuse the pane’s existing immutable UUID as opaque activity identity instead of allocating a second Object — it cannot retain UI and already identifies that producer. Wire pane lifetime at creation, before shell readiness, to cover early close. Existing config integration tests already exercise unchanged overrides, changed fonts and captured next-session settings; retain those instead of duplicating them. Replace the proposed record-shape test with observable OPENED/CLOSED and unsubscribe tests.
+
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.
