@@ -54,7 +54,6 @@ public final class TerminalView extends JComponent {
     private static final int FRAME_MILLIS = 8;
     private static final int BLINK_MILLIS = 530;
     private static final int BELL_MILLIS = 150;
-    private static final int WHEEL_LINES = 3;
     private static final float DEFAULT_FONT_SIZE = 14f;
     private static final float MIN_FONT_SIZE = 6f;
     private static final float MAX_FONT_SIZE = 72f;
@@ -66,7 +65,6 @@ public final class TerminalView extends JComponent {
     private FontSet fonts;
     private Palette palette;
     private TerminalPainter painter;
-    private KeyEncoder keys;
     private final boolean macOs;
     private final Viewport viewport = new Viewport();
     private Color matchColor;
@@ -84,28 +82,9 @@ public final class TerminalView extends JComponent {
     private boolean visualBell;
     private Runnable bellSound = Toolkit.getDefaultToolkit()::beep;
     private boolean blinkOn = true;
-    private boolean suppressNextTyped;
-    private boolean leftAltHeld;
-    private boolean rightAltHeld;
     private final SelectionController selection;
-    /** Press ownership and report modifiers survive until that button's matching release. */
-    private final java.util.EnumMap<MouseInput.Button, Gesture> gestures =
-        new java.util.EnumMap<>(MouseInput.Button.class);
-    private long gestureSequence;
-    private double wheelRemainder;
-
-    private static final class Gesture {
-        final MouseRouting.Action action;
-        final boolean shift, alt, control;
-        final long sequence;
-        boolean popupShown;
-
-        Gesture(MouseRouting.Action action, boolean shift, boolean alt, boolean control, long sequence) {
-            this.action = action;
-            this.shift = shift; this.alt = alt; this.control = control;
-            this.sequence = sequence;
-        }
-    }
+    private final KeyboardController keyboard;
+    private final MouseController mouseInput;
     private long observedAbsoluteRowEpoch;
     private volatile boolean exited;
     private float fontSize;
@@ -132,7 +111,14 @@ public final class TerminalView extends JComponent {
         this.palette = options.palette();
         this.painter = new TerminalPainter(fonts, palette);
         this.macOs = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac");
-        this.keys = new KeyEncoder(options.optionAsMeta(), macOs);
+        this.keyboard = new KeyboardController(access, new KeyEncoder(options.optionAsMeta(), macOs),
+            this::handleShortcut, () -> exited, () -> onCloseRequest.run(), () -> {
+                viewport.follow(); selection.set(null); restartBlink();
+            });
+        this.mouseInput = new MouseController(access, selection, viewport, macOs,
+            () -> fonts.cellWidth(), () -> fonts.cellHeight(), () -> this.options.copyOnSelect(),
+            this::requestFocusInWindow, this::copySelection, link -> linkOpener.accept(link),
+            event -> contextMenuHandler.accept(event), this::repaint);
         Color yellow = palette.ansi().get(3);
         this.matchColor = CellStyle.blend(yellow, palette.background(), 0.7f);
         this.currentMatchColor = CellStyle.blend(yellow, palette.background(), 0.35f);
@@ -200,10 +186,9 @@ public final class TerminalView extends JComponent {
 
             @Override
             public void focusLost(FocusEvent e) {
-                leftAltHeld = false;
-                rightAltHeld = false;
+                keyboard.focusLost();
                 // A lost command-click release must not swallow a later gesture. Other buttons keep ownership.
-                gestures.entrySet().removeIf(entry -> entry.getValue().action == MouseRouting.Action.OPEN_LINK);
+                mouseInput.focusLost();
                 reconcileBlink();
                 repaint();
             }
@@ -320,7 +305,7 @@ public final class TerminalView extends JComponent {
                 next.lineHeight());
         }
         if (options.optionAsMeta() != next.optionAsMeta()) {
-            keys = new KeyEncoder(next.optionAsMeta(), macOs);
+            keyboard.setEncoder(new KeyEncoder(next.optionAsMeta(), macOs));
         }
         if (options.bell() != next.bell()) {
             pendingBell = listener == null ? null : new AtomicBoolean();
@@ -465,150 +450,6 @@ public final class TerminalView extends JComponent {
         if (!e.isConsumed()) {
             super.processKeyEvent(e);
         }
-    }
-
-    void handleKey(KeyEvent e) {
-        trackAltKeys(e);
-        if (e.getID() == KeyEvent.KEY_PRESSED && handleShortcut(e)) {
-            suppressNextTyped = true;
-            e.consume();
-            return;
-        }
-        if (exited) {
-            if (e.getID() == KeyEvent.KEY_PRESSED && !isModifierOnly(e.getKeyCode())) {
-                onCloseRequest.run();
-            }
-            e.consume();
-            return;
-        }
-        KeyInput input = new KeyInput(e.getKeyCode(), e.getKeyChar(), e.getModifiersEx(), leftAltHeld, rightAltHeld);
-        byte[] bytes = switch (e.getID()) {
-            case KeyEvent.KEY_PRESSED -> {
-                byte[] pressed = keys.pressed(input, session::codeForKey);
-                suppressNextTyped = pressed != null; // re-decided on every press
-                yield pressed;
-            }
-            case KeyEvent.KEY_TYPED -> {
-                if (suppressNextTyped) {
-                    suppressNextTyped = false;
-                    e.consume();
-                    yield null;
-                }
-                yield keys.typed(input);
-            }
-            default -> null;
-        };
-        if (bytes != null) {
-            session.write(bytes);
-            viewport.follow();
-            selection.set(null);
-            restartBlink();
-            e.consume();
-        }
-    }
-
-    void handleMouse(MouseEvent e) {
-        Type type = typeOf(e);
-        if (type == null || (type == Type.MOVED && !access.mouseReporting())) return;
-        if (macOs && type == Type.WHEEL && e.isShiftDown()) return;
-        int notches = type == Type.WHEEL ? notches((MouseWheelEvent) e) : 0;
-        if (type == Type.WHEEL && notches == 0) return;
-
-        MouseGeometry grid = access.mouseGeometry(viewport.topRow());
-        int column = Math.max(0, Math.min(grid.width() - 1, e.getX() / fonts.cellWidth()));
-        int row = Math.max(0, Math.min(grid.height() - 1, e.getY() / fonts.cellHeight()));
-        long absoluteRow = grid.firstRow() + row;
-        MouseInput.Button button = gestureButton(e, type);
-        Gesture gesture = gestures.get(button);
-        MouseRouting.Action action;
-        if (type == Type.PRESSED) {
-            requestFocusInWindow();
-            boolean linkModifier = macOs ? e.isMetaDown() : e.isControlDown();
-            action = MouseRouting.decide(type, button, e.getClickCount(), e.isShiftDown(),
-                linkModifier, access.mouseReporting(), grid.alternateBuffer());
-            // Command-click is deliberately local on macOS, even if the program requests reports.
-            if (button == MouseInput.Button.LEFT && ((macOs && linkModifier)
-                || action == MouseRouting.Action.OPEN_LINK)) {
-                Optional<String> link = access.linkAt(absoluteRow, column);
-                if (link.isPresent()) {
-                    linkOpener.accept(link.get());
-                    action = MouseRouting.Action.OPEN_LINK;
-                } else {
-                    action = MouseRouting.Action.START_SELECTION;
-                }
-            }
-            gesture = new Gesture(action, e.isShiftDown(), e.isAltDown(), e.isControlDown(), ++gestureSequence);
-            if (button != MouseInput.Button.NONE) gestures.put(button, gesture);
-        } else if (type == Type.DRAGGED || type == Type.RELEASED) {
-            action = gesture == null
-                ? (access.mouseReporting() && !e.isShiftDown() ? MouseRouting.Action.REPORT : MouseRouting.Action.NONE)
-                : switch (gesture.action) {
-                case REPORT -> MouseRouting.Action.REPORT;
-                case START_SELECTION, SELECT_WORD, SELECT_LINE -> type == Type.DRAGGED
-                    ? MouseRouting.Action.EXTEND_SELECTION : MouseRouting.Action.END_SELECTION;
-                default -> MouseRouting.Action.NONE;
-            };
-        } else {
-            action = MouseRouting.decide(type, button, e.getClickCount(), e.isShiftDown(), false,
-                access.mouseReporting(), grid.alternateBuffer());
-        }
-
-        if (action == MouseRouting.Action.REPORT) {
-            int screenRow = row - grid.scrollOffset();
-            if (screenRow >= 0) {
-                boolean owned = gesture != null && type != Type.WHEEL && type != Type.MOVED;
-                MouseInput input = new MouseInput(type, button,
-                    owned ? gesture.shift : e.isShiftDown(), owned ? gesture.alt : e.isAltDown(),
-                    owned ? gesture.control : e.isControlDown(), notches);
-                int count = type == Type.WHEEL ? Math.abs(notches) : 1;
-                for (int i = 0; i < count; i++) {
-                    access.reportMouse(column, screenRow, input);
-                }
-            }
-            if (type == Type.RELEASED) gestures.remove(button);
-            return; // Reports need no copied screen content and no repaint.
-        }
-        switch (action) {
-            case START_SELECTION -> selection.start(absoluteRow, column, e.isAltDown());
-            case SELECT_WORD -> selection.word(absoluteRow, column);
-            case SELECT_LINE -> selection.line(absoluteRow);
-            case EXTEND_SELECTION -> selection.extend(absoluteRow, column);
-            case END_SELECTION -> {
-                selection.finish();
-                if (options.copyOnSelect() && selection.hasSelection()) copySelection();
-            }
-            case SCROLL_VIEW -> scrollBy(notches * WHEEL_LINES);
-            case SEND_ARROWS -> sendArrows(notches);
-            default -> { }
-        }
-        if (button == MouseInput.Button.RIGHT && gesture != null && e.isPopupTrigger() && !gesture.popupShown) {
-            gesture.popupShown = true;
-            contextMenuHandler.accept(e);
-        }
-        if (type == Type.RELEASED) gestures.remove(button);
-        if (action != MouseRouting.Action.NONE && action != MouseRouting.Action.OPEN_LINK) repaint();
-    }
-
-    /** AWT drag events usually have NOBUTTON; prefer the latest owned button still held. */
-    private MouseInput.Button gestureButton(MouseEvent event, Type type) {
-        if (type != Type.DRAGGED || event.getButton() != MouseEvent.NOBUTTON) return buttonOf(event);
-        MouseInput.Button result = MouseInput.Button.NONE;
-        long newest = -1;
-        int held = event.getModifiersEx() & (InputEvent.BUTTON1_DOWN_MASK | InputEvent.BUTTON2_DOWN_MASK
-            | InputEvent.BUTTON3_DOWN_MASK);
-        for (var entry : gestures.entrySet()) {
-            int mask = switch (entry.getKey()) {
-                case LEFT -> InputEvent.BUTTON1_DOWN_MASK;
-                case MIDDLE -> InputEvent.BUTTON2_DOWN_MASK;
-                case RIGHT -> InputEvent.BUTTON3_DOWN_MASK;
-                case NONE -> 0;
-            };
-            if ((held == 0 || (held & mask) != 0) && entry.getValue().sequence > newest) {
-                result = entry.getKey();
-                newest = entry.getValue().sequence;
-            }
-        }
-        return result;
     }
 
     void resizeSessionToFit() {
@@ -799,28 +640,6 @@ public final class TerminalView extends JComponent {
         repaint();
     }
 
-    private void sendArrows(int rotation) {
-        byte[] arrow = access.codeForKey(rotation < 0 ? KeyEvent.VK_UP : KeyEvent.VK_DOWN, 0);
-        if (arrow == null) {
-            return;
-        }
-        for (int i = 0; i < Math.abs(rotation); i++) {
-            session.write(arrow);
-        }
-    }
-
-    private void trackAltKeys(KeyEvent e) {
-        if (e.getKeyCode() != KeyEvent.VK_ALT) {
-            return;
-        }
-        boolean down = e.getID() == KeyEvent.KEY_PRESSED;
-        if (e.getKeyLocation() == KeyEvent.KEY_LOCATION_RIGHT) {
-            rightAltHeld = down;
-        } else {
-            leftAltHeld = down;
-        }
-    }
-
     private void restartBlink() {
         blinkOn = true;
         reconcileBlink();
@@ -877,48 +696,6 @@ public final class TerminalView extends JComponent {
         if (eligible) blinkTimer.start(); else blinkTimer.stop();
     }
 
-    /**
-     * Accumulates a wheel event's precise rotation and returns the whole notches it now adds up to (rounded toward
-     * zero), keeping the fractional remainder for the next event. Trackpads deliver many events whose precise
-     * rotation is well under one notch, and some events report an integer rotation of 0 despite a nonzero precise
-     * value, so acting on {@code getWheelRotation()} directly would under- or over-react.
-     */
-    private int notches(MouseWheelEvent e) {
-        wheelRemainder += e.getPreciseWheelRotation();
-        int whole = (int) wheelRemainder;
-        wheelRemainder -= whole;
-        return whole;
-    }
-
-    private static boolean isModifierOnly(int keyCode) {
-        return keyCode == KeyEvent.VK_SHIFT || keyCode == KeyEvent.VK_CONTROL || keyCode == KeyEvent.VK_ALT
-            || keyCode == KeyEvent.VK_ALT_GRAPH || keyCode == KeyEvent.VK_META;
-    }
-
-    private static Type typeOf(MouseEvent e) {
-        return switch (e.getID()) {
-            case MouseEvent.MOUSE_PRESSED -> Type.PRESSED;
-            case MouseEvent.MOUSE_RELEASED -> Type.RELEASED;
-            case MouseEvent.MOUSE_DRAGGED -> Type.DRAGGED;
-            case MouseEvent.MOUSE_MOVED -> Type.MOVED;
-            case MouseEvent.MOUSE_WHEEL -> Type.WHEEL;
-            default -> null;
-        };
-    }
-
-    private static MouseInput.Button buttonOf(MouseEvent e) {
-        if (SwingUtilities.isLeftMouseButton(e)) {
-            return MouseInput.Button.LEFT;
-        }
-        if (SwingUtilities.isMiddleMouseButton(e)) {
-            return MouseInput.Button.MIDDLE;
-        }
-        if (SwingUtilities.isRightMouseButton(e)) {
-            return MouseInput.Button.RIGHT;
-        }
-        return MouseInput.Button.NONE;
-    }
-
     /** Finds matches synchronously; callers on the EDT should prefer findAsync for long histories. */
     public FindResult find(SearchQuery query) { return search.find(query); }
     /** Searches on the bounded worker and delivers only the latest result on the EDT. */
@@ -932,4 +709,20 @@ public final class TerminalView extends JComponent {
     public FindResult findNext() { return search.next(); }
     public FindResult findPrevious() { return search.previous(); }
     public void clearFind() { search.clear(); }
+    void handleKey(KeyEvent event) { keyboard.handle(event); }
+    void handleMouse(MouseEvent event) { mouseInput.handle(event); }
+    /** Executes a reusable command synchronously. Requires the Event Dispatch Thread. */
+    public void execute(TerminalAction action) {
+        if (!SwingUtilities.isEventDispatchThread())
+            throw new IllegalStateException("Terminal actions require the EDT");
+        switch (java.util.Objects.requireNonNull(action,"action")) {
+            case COPY_SELECTION -> copySelection();
+            case PASTE_CLIPBOARD -> pasteClipboard();
+            case CLEAR_SCROLLBACK -> clearScrollback();
+            case FIND_NEXT -> findNext();
+            case FIND_PREVIOUS -> findPrevious();
+            case PREVIOUS_PROMPT -> scrollToPreviousPrompt();
+            case NEXT_PROMPT -> scrollToNextPrompt();
+        }
+    }
 }

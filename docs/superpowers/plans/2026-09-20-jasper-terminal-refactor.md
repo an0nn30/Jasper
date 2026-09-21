@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–8 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–9 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -1178,7 +1178,7 @@ capacity eight, rejection rather than caller-runs, fixed diagnostics and recover
 - Mouse methods: `handle(MouseEvent)`, `focusLost()`.
 - `TerminalView.execute(TerminalAction)` is EDT-only, synchronous, returns void.
 
-- [ ] **Step 1: Protect both actual routing and command invocation.**
+- [x] **Step 1: Protect both actual routing and command invocation.**
 
 Keep existing right-button/Shift/mode-change gesture tests and
 `reportsReadNoScreenLinesAndRequestNoRepaint`. Add:
@@ -1203,7 +1203,7 @@ Keep existing right-button/Shift/mode-change gesture tests and
 Run new action tests RED before the enum/dispatch code. Existing input tests
 remain green characterizations before extraction.
 
-- [ ] **Step 2: Move keyboard state and exact dispatch logic.**
+- [x] **Step 2: Move keyboard state and exact dispatch logic.**
 
 Move `suppressNextTyped`, `leftAltHeld`, `rightAltHeld`, `keys`, `handleKey`,
 `trackAltKeys`, and `isModifierOnly`. Substitute:
@@ -1223,7 +1223,7 @@ clears selection and restarts blink. The view retains shortcut policy and
 App shortcut/context setters remain view methods, and callbacks capture those
 current fields rather than their initial values.
 
-- [ ] **Step 3: Move mouse state and routing without changing press ownership.**
+- [x] **Step 3: Move mouse state and routing without changing press ownership.**
 
 Move `WHEEL_LINES`, gestures map, `Gesture`, gestureSequence, wheelRemainder,
 `handleMouse`, `gestureButton`, `notches`, `typeOf`, `buttonOf`, mouse modifier
@@ -1250,7 +1250,7 @@ listener does. Each release removes its own button; preserve gestureSequence's
 choice for NOBUTTON drag events. Do not fetch a snapshot before the REPORT early
 return. Coordinate clamping and scrolled-history screenRow checks remain intact.
 
-- [ ] **Step 4: Add the complete command surface and adapt standalone routing.**
+- [x] **Step 4: Add the complete command surface and adapt standalone routing.**
 
 ```java
 public enum TerminalAction {
@@ -1281,7 +1281,7 @@ their modifier tests. Migrate tests that invoke these shortcuts off the EDT to
 Page scrolling remains view-owned and precedes app routing as before. Direct
 find-next/previous methods keep returning FindResult for the app find bar.
 
-- [ ] **Step 5: Run keyboard, mouse, view, action and efficiency tests; document/commit.**
+- [x] **Step 5: Run keyboard, mouse, view, action and efficiency tests; document/commit.**
 
 `./gradlew :jasper-terminal:test --tests '*Input*' --tests '*Mouse*' --tests '*TerminalView*' --tests '*TerminalActionTest'`.
 Review typing after shortcuts, Enter pressed/typed suppression, AltGr,
