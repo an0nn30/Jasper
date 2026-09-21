@@ -46,7 +46,8 @@ class ShellIntegrationEndToEndTest {
         var commands = new CopyOnWriteArrayList<String>();
         var statuses = new CopyOnWriteArrayList<OptionalInt>();
         LaunchSettings settings = LaunchSettings.resolve(snapshotFor(zsh), "Mac OS X", inherited(), 80, 24, scripts);
-        try (TerminalSession session = TerminalSession.start(SessionLaunchOptions.builder().command(settings.command()).environment(settings.environment()).workingDirectory(home).grid(new GridSize(80, 24)).scrollback(1000).build())) {
+        try (TerminalSession session = TerminalSession.start(SessionLaunchOptions.builder().command(settings.command()).environment(settings.environment()).workingDirectory(home).grid(new GridSize(80, 24)).scrollback(1000)
+            .localHostNames(LocalHostNames.cached()).build())) {
             session.addListener(new TerminalSessionListener() {
                 @Override public void commandExecuted(String command, OptionalInt status,
                         Optional<Path> directory, java.time.Duration duration) {
