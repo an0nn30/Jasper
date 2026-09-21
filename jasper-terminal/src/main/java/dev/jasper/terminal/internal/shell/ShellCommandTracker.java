@@ -1,7 +1,5 @@
 package dev.jasper.terminal.internal.shell;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
@@ -27,7 +25,10 @@ public final class ShellCommandTracker {
     private final Consumer<String> commandStarted;
     private final Consumer<CompletedCommand> commandFinished;
     private final Runnable integrationDetected, cursorReset;
+    private final DirectoryProvenance provenance;
+    private final Consumer<RemoteLocation> remoteChanged;
     private volatile Path workingDirectory;
+    private volatile RemoteLocation remoteDirectory;
     private volatile boolean shellIntegrationDetected;
     private CommandLocation commandStart;
     private String pendingCommand, pendingCommandText;
@@ -35,12 +36,16 @@ public final class ShellCommandTracker {
     public ShellCommandTracker(LongSupplier clock, Supplier<CommandLocation> cursor,
                         Function<CommandLocation,String> capture, BooleanSupplier recordPrompt,
                         Consumer<Path> cwdChanged, Consumer<String> commandStarted,
-                        Consumer<CompletedCommand> commandFinished, Runnable integrationDetected, Runnable cursorReset) {
+                        Consumer<CompletedCommand> commandFinished, Runnable integrationDetected, Runnable cursorReset,
+                        DirectoryProvenance provenance, Consumer<RemoteLocation> remoteChanged) {
+        this.provenance = Objects.requireNonNull(provenance, "provenance"); this.remoteChanged = Objects.requireNonNull(remoteChanged, "remoteChanged");
         this.clock = Objects.requireNonNull(clock, "clock"); this.cursor = cursor; this.capture = capture;
         this.recordPrompt = recordPrompt; this.cwdChanged = cwdChanged; this.commandStarted = commandStarted;
         this.commandFinished = commandFinished; this.integrationDetected = integrationDetected; this.cursorReset = cursorReset;
     }
     public Optional<Path> workingDirectory() { return Optional.ofNullable(workingDirectory); }
+    /** The directory last reported when it is not on this machine; exactly one of this and the local one is present. */
+    public Optional<RemoteLocation> remoteDirectory() { return Optional.ofNullable(remoteDirectory); }
     public boolean detected() { return shellIntegrationDetected; }
     public void discardUnusedPayload() { pendingCommandText = null; }
     private void markCommandStart() { commandStart = cursor.get(); }
@@ -62,9 +67,20 @@ public final class ShellCommandTracker {
             return;
         }
         switch (args.get(1)) {
-            case "cwd" -> directoryFromUri(String.join(";", args.subList(2, args.size()))).ifPresent(directory -> {
-                workingDirectory = directory;
-                cwdChanged.accept(directory);
+            case "cwd" -> provenance.classify(String.join(";", args.subList(2, args.size()))).ifPresent(report -> {
+                // One of the two at a time: a remote path must never be readable through the local surface.
+                switch (report) {
+                    case DirectoryProvenance.Report.Local local -> {
+                        remoteDirectory = null;
+                        workingDirectory = local.directory();
+                        cwdChanged.accept(local.directory());
+                    }
+                    case DirectoryProvenance.Report.Remote remote -> {
+                        workingDirectory = null;
+                        remoteDirectory = remote.location();
+                        remoteChanged.accept(remote.location());
+                    }
+                }
             });
             case "cmd" -> pendingCommandText = args.size() > 2
                 ? decodeCommand(String.join(";", args.subList(2, args.size()))) : null;
@@ -138,19 +154,6 @@ public final class ShellCommandTracker {
             return OptionalInt.of(Integer.parseInt(args.get(3).trim()));
         } catch (NumberFormatException malformed) {
             return OptionalInt.empty();
-        }
-    }
-    /** The local path of an OSC 7 {@code file://host/path} URI; the host is ignored. */
-    public static Optional<Path> directoryFromUri(String uri) {
-        try {
-            URI parsed = new URI(uri);
-            String path = parsed.getPath();
-            if (!"file".equalsIgnoreCase(parsed.getScheme()) || path == null || path.isEmpty()) {
-                return Optional.empty();
-            }
-            return Optional.of(Path.of(new URI("file", null, path, null)));
-        } catch (URISyntaxException | IllegalArgumentException e) {
-            return Optional.empty();
         }
     }
 }

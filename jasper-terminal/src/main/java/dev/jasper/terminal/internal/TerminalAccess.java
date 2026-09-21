@@ -48,7 +48,8 @@ public final class TerminalAccess implements AutoCloseable {
         queries = engine.queries();
         shell = new ShellCommandTracker(clock, queries::cursor, queries::captureCommand, queries::recordPrompt,
             events.workingDirectoryChanged(), events.commandStarted(), events.commandFinished(),
-            events.screenChanged(), engine::resetCursorShape);
+            events.screenChanged(), engine::resetCursorShape,
+            new dev.jasper.terminal.internal.shell.DirectoryProvenance(local, java.util.Set.of()), location -> { });
         engine.setShellHooks(shell::accept, shell::discardUnusedPayload);
     }
 

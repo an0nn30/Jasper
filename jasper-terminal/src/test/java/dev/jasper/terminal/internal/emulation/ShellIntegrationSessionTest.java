@@ -116,18 +116,11 @@ class ShellIntegrationSessionTest {
             }
         });
 
-        connector.feed("\033]7;file://host/Users/me/My%20Dir\007");
+        connector.feed("\033]7;file:///Users/me/My%20Dir\007");
 
         Await.until(() -> session.workingDirectory().isPresent(), "working directory from OSC 7");
         assertThat(session.workingDirectory()).contains(Path.of("/Users/me/My Dir"));
         assertThat(reported.get()).isEqualTo(Path.of("/Users/me/My Dir"));
-    }
-
-    @Test
-    void onlyFileUrisWithAPathAreWorkingDirectories() {
-        assertThat(ShellCommandTracker.directoryFromUri("https://example.com/x")).isEmpty();
-        assertThat(ShellCommandTracker.directoryFromUri("not a uri")).isEmpty();
-        assertThat(ShellCommandTracker.directoryFromUri("file://host")).isEmpty();
     }
 
     @Test
