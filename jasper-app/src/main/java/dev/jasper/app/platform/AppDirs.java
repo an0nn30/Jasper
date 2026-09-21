@@ -43,6 +43,11 @@ public record AppDirs(Path root, Path configFile, Path logs) {
         return root.resolve("plugin-data");
     }
 
+    /** Application-owned layout state: panel placement, rail visibility and auxiliary window bounds. */
+    public Path uiState() {
+        return root.resolve("ui-state.toml");
+    }
+
     /**
      * The handoff endpoint's own directory. It is a subdirectory rather than {@link #root()}
      * because binding sets its parent to owner-only, and the root also holds the user's config.
