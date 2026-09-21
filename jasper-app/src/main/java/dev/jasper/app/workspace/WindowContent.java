@@ -36,6 +36,8 @@ import java.util.*;
 import java.util.function.Consumer;
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
+import dev.jasper.app.terminals.TerminalEvent;
+import dev.jasper.app.terminals.TerminalRegistry;
 
 /** Real window contents, independent of native JFrame construction for headless testing. */
 public final class WindowContent extends JPanel implements AutoCloseable {
@@ -82,6 +84,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         this, control, "Tab height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     private boolean closed;
     private boolean rearranging;
+    private WindowTerminals terminals;
     private boolean active = true;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
     private Runnable openSettings, reloadConfiguration;
@@ -191,6 +194,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         add(north, BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {
+                if (terminals != null) terminals.tabSelected();
                 if (commandPalette != null) commandPalette.dismiss();
                 update();
                 if (currentTab() != null) currentTab().focusTerminal();
@@ -373,6 +377,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public UUID id() { return id; }
 
     /** Connects with layout state that lives only as long as this window. */
+    /** Connects this window to the application-wide terminal registry, once. {@code toFront} raises the native window. */
+    public void connectTerminals(TerminalRegistry registry, Runnable toFront) {
+        if (closed || terminals != null) return;
+        terminals = new WindowTerminals(this, Objects.requireNonNull(registry), Objects.requireNonNull(toFront));
+    }
+
+    java.util.List<TerminalTab> terminalTabs() {
+        var result = new ArrayList<TerminalTab>();
+        for (int i = 0; i < tabs.getTabCount(); i++) result.add((TerminalTab) tabs.getComponentAt(i));
+        return result;
+    }
+
     public void connectContributions(Contributions model) { connectContributions(model, UiState.inMemory()); }
 
     /**
@@ -414,9 +430,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
     Path directory() { return currentPane() == null ? Path.of(System.getProperty("user.home")) : currentPane().directory(); }
 
-    public void newTab(Path directory) {
-        if (closed) return;
+    public void newTab(Path directory) { openTab(directory); }
+
+    TerminalTab openTab(Path directory) {
+        if (closed) return null;
         TerminalTab tab = new TerminalTab(directory, launcher);
+        if (terminals != null) terminals.tabOpened(tab);
         tab.onChanged = () -> {
             for (TerminalPane pane : tab.panes()) if (pane.view() == null) pane.applyTheme(themes.current().palette());
             update();
@@ -430,26 +449,46 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current().palette());
         tabs.addTab(tab.title(), tab);
         tabs.setSelectedComponent(tab); update(); tab.start();
+        return tab;
     }
 
     private void connectActivity(TerminalTab tab, TerminalPane pane) {
         emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
+        report(new TerminalEvent.PaneOpened(tab.id(), pane.id()));
         pane.onCommandStarted = command -> {
             long startedAt = System.nanoTime();
             emit(new WorkspaceActivity.Started(pane.id(), command, () -> System.nanoTime() - startedAt,
                 () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); },
                 pane.watched() && isActiveAndOpen() && tab == currentTab()));
+            report(new TerminalEvent.CommandStarted(pane.id(), command));
         };
-        pane.onTitleChanged = title -> emit(new WorkspaceActivity.TitleChanged(pane.id(), title));
-        pane.onClosed = () -> emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.CLOSED));
-        pane.onPaneFocused = () -> emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.FOCUSED));
+        pane.onTitleChanged = title -> {
+            emit(new WorkspaceActivity.TitleChanged(pane.id(), title));
+            report(new TerminalEvent.TitleChanged(pane.id(), title));
+        };
+        pane.onClosed = () -> {
+            emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.CLOSED));
+            report(new TerminalEvent.PaneClosed(tab.id(), pane.id()));
+        };
+        pane.onPaneFocused = () -> {
+            emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.FOCUSED));
+            report(new TerminalEvent.PaneFocused(tab.id(), pane.id()));
+        };
         pane.onPaneBlurred = () -> emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.BLURRED));
-        pane.onCommandFinished = (command, exitStatus, duration) -> emit(new WorkspaceActivity.Finished(
-            pane.id(), command, exitStatus, duration,
-            new WorkspaceActivity.Origin(anyWindowActive.getAsBoolean(), isActiveAndOpen(),
-                tab == currentTab(), pane.view() != null && pane.view().isFocusOwner()),
-            () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); }));
+        pane.onCommandFinished = (command, exitStatus, duration, workingDirectory) -> {
+            emit(new WorkspaceActivity.Finished(pane.id(), command, exitStatus, duration,
+                new WorkspaceActivity.Origin(anyWindowActive.getAsBoolean(), isActiveAndOpen(),
+                    tab == currentTab(), pane.view() != null && pane.view().isFocusOwner()),
+                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); }));
+            report(new TerminalEvent.CommandFinished(pane.id(), command, exitStatus, duration, workingDirectory));
+        };
+        pane.onDirectoryChanged = directory -> report(new TerminalEvent.DirectoryChanged(pane.id(), directory));
+        pane.onBell = () -> report(new TerminalEvent.Bell(tab.id(), pane.id()));
+        pane.onStarted = () -> report(new TerminalEvent.SessionStarted(pane.id()));
+        pane.onExited = status -> report(new TerminalEvent.SessionExited(pane.id(), status));
     }
+
+    private void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
         pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
@@ -491,7 +530,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     public void closeTab(TerminalTab tab) {
         int index = tabs.indexOfComponent(tab);
         if (index < 0) return;
-        tab.close(); tabs.removeTabAt(index); update();
+        Runnable change = () -> {
+            tab.close();
+            if (terminals != null) terminals.tabClosed(tab);
+            tabs.removeTabAt(index); update();
+        };
+        if (terminals != null) terminals.atomically(change); else change.run();
         if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
     }
 
@@ -530,6 +574,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             pane == null ? "" : size, pane != null && pane.running(), pane != null && pane.shellIntegrationDetected());
         onTitle.accept(currentTab() == null ? "Jasper" : currentTab().title());
         updateActions(); windowTabs.refresh(); onMinimumSizeChanged.run();
+        if (terminals != null) terminals.refresh();
     }
 
     ResolvedTheme theme() { return themes.current(); }
@@ -625,8 +670,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         showConfigDiagnostics = control -> {};
         windowTabs.close();
         themeRegistration.close();
-        for (int i = 0; i < tabs.getTabCount(); i++) ((TerminalTab) tabs.getComponentAt(i)).close();
+        Runnable closeTabs = () -> {
+            for (TerminalTab tab : terminalTabs()) { tab.close(); if (terminals != null) terminals.tabClosed(tab); }
+        };
+        if (terminals != null) terminals.atomically(closeTabs); else closeTabs.run();
         tabs.removeAll(); removeRootBindings();
+        if (terminals != null) { terminals.close(); terminals = null; }
         workspaceActions.disable();
         windowTabs.refresh();
         onThemeChanged = theme -> {};

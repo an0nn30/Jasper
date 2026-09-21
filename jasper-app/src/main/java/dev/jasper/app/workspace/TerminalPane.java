@@ -15,6 +15,10 @@ import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import dev.jasper.app.terminals.PaneSnapshot;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.concurrent.CompletableFuture;
 import javax.swing.*;
 
 /** Exactly one asynchronously launched shell and its retained output. Owned on the EDT. */
@@ -48,12 +52,20 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     Consumer<TerminalView> onReady = terminal -> {};
     Consumer<ShellHistoryEntry> onCommandExecuted = entry -> {};
 
-    /** A command finished: its text, exit status and how long it ran. Delivered on the EDT. */
+    /** A command finished: its text, exit status, how long it ran and where. Delivered on the EDT. */
     interface CommandFinished {
-        void accept(String command, java.util.OptionalInt exitStatus, java.time.Duration duration);
+        void accept(String command, java.util.OptionalInt exitStatus, java.time.Duration duration, java.util.Optional<Path> workingDirectory);
     }
 
-    CommandFinished onCommandFinished = (command, exitStatus, duration) -> {};
+    CommandFinished onCommandFinished = (command, exitStatus, duration, workingDirectory) -> {};
+    /** The shell reported a working directory. Delivered on the EDT. */
+    Consumer<java.util.Optional<Path>> onDirectoryChanged = directory -> {};
+    /** The terminal rang the bell. Delivered on the EDT. */
+    Runnable onBell = () -> {};
+    /** The session started. Delivered on the EDT. */
+    Runnable onStarted = () -> {};
+    /** The session ended, with its exit status when known. Delivered on the EDT, before the exit policy runs. */
+    Consumer<java.util.OptionalInt> onExited = status -> {};
 
     /** A command began. Delivered on the EDT. */
     Consumer<String> onCommandStarted = command -> {};
@@ -97,7 +109,11 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
                 onChanged.run();
             });
         }
-        @Override public void workingDirectoryChanged(Path directory) { queueUpdate(); }
+        @Override public void workingDirectoryChanged(Path directory) {
+            queueUpdate();
+            SwingUtilities.invokeLater(() -> { if (!closed) onDirectoryChanged.accept(java.util.Optional.ofNullable(directory)); });
+        }
+        @Override public void bell() { SwingUtilities.invokeLater(() -> { if (!closed) onBell.run(); }); }
 
         @Override public void commandExecuted(String command, java.util.OptionalInt exitStatus,
                 java.util.Optional<Path> workingDirectory, java.time.Duration duration) {
@@ -111,7 +127,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
             // commandExecuted arrives on the reader thread; everything downstream is Swing.
             SwingUtilities.invokeLater(() -> {
                 if (closed) return;
-                onCommandFinished.accept(command, exitStatus, duration);
+                onCommandFinished.accept(command, exitStatus, duration, workingDirectory);
                 runningCommand = "";
                 onChanged.run();
             });
@@ -169,6 +185,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
             // Read the policy on the EDT after onReady has applied the latest configuration.
             created.exitFuture().whenComplete((code, error) -> SwingUtilities.invokeLater(() -> {
                 if (closed || session != created) return;
+                onExited.accept(error == null && code != null ? java.util.OptionalInt.of(code) : java.util.OptionalInt.empty());
                 jobTimer.stop();
                 if (onExit == ShellExitBehavior.CLOSE
                     || (onExit == ShellExitBehavior.CLOSE_ON_SUCCESS && error == null && Integer.valueOf(0).equals(code))) {
@@ -179,6 +196,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
             }));
             removeAll(); add(findBar, BorderLayout.NORTH); add(view, BorderLayout.CENTER);
             onReady.accept(view); setActive(active);
+            onStarted.run();
             revalidate(); repaint(); onChanged.run();
             // A shell finishing its launch must not steal focus from a newer pane or a find field.
             if (active && isShowing() && allowLaunchFocus.getAsBoolean()) focusTerminal();
@@ -225,6 +243,35 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     public TerminalView view() { return view; }
     FindBar findBar() { return findBar; }
     public TerminalSession session() { return session; }
+
+    /** What this pane is right now, for the terminal registry. */
+    PaneSnapshot snapshot() {
+        if (session == null)
+            return new PaneSnapshot(title(), Optional.of(launchDirectory), 0, 0, false, PaneSnapshot.State.STARTING, OptionalInt.empty());
+        CompletableFuture<Integer> exit = session.exitFuture();
+        boolean exited = exit.isDone();
+        Integer code = exited && !exit.isCompletedExceptionally() ? exit.getNow(null) : null;
+        return new PaneSnapshot(title(), session.workingDirectory(), session.columns(), session.rows(), session.shellIntegrationDetected(),
+            exited ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING, code == null ? OptionalInt.empty() : OptionalInt.of(code));
+    }
+
+    /** The foreground job, asked off the EDT like the pane's own poll; empty when nothing runs here. */
+    CompletableFuture<Optional<String>> queryForegroundJob() {
+        TerminalSession current = session;
+        if (current == null || !running()) return CompletableFuture.completedFuture(Optional.empty());
+        var result = new CompletableFuture<Optional<String>>();
+        Thread.ofVirtual().name("jasper-foreground-job").start(() -> {
+            try { result.complete(current.foregroundJob()); }
+            catch (RuntimeException failure) { result.complete(Optional.empty()); }
+        });
+        return result;
+    }
+
+    /** Raw bytes to the running session; dropped when nothing runs here. */
+    void write(byte[] bytes) { if (running()) session.write(bytes); }
+    /** Through the view's paste path, so bracketed paste applies; dropped when nothing runs here. */
+    void paste(String text) { if (running() && view != null) view.paste(text); }
+    Optional<String> selectedText() { return view == null ? Optional.empty() : view.selectedText(); }
     boolean running() { return !closed && session != null && !session.exitFuture().isDone(); }
     boolean shellIntegrationDetected() { return session != null && session.shellIntegrationDetected(); }
     public Path directory() { return session == null ? launchDirectory : session.workingDirectory().orElse(launchDirectory); }
@@ -273,7 +320,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         onChanged = () -> {}; onFocused = () -> {}; onClose = () -> {}; onCommandStarted = command -> {};
         onPaneFocused = () -> {}; onPaneBlurred = () -> {};
         onTitleChanged = title -> {};
-        onCommandFinished = (command, exitStatus, duration) -> {};
+        onCommandFinished = (command, exitStatus, duration, workingDirectory) -> {};
+        onDirectoryChanged = directory -> {}; onBell = () -> {}; onStarted = () -> {}; onExited = status -> {};
         allowLaunchFocus = () -> false;
         onReady = terminal -> {}; onFailure = message -> {};
         onCommandExecuted = entry -> {};

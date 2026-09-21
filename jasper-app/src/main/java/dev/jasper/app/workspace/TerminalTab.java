@@ -12,6 +12,7 @@ import javax.swing.*;
 /** Split-tree renderer that reparents existing panes without replacing sessions. */
 public final class TerminalTab extends JPanel implements AutoCloseable {
     private final ShellLauncher launcher;
+    private final UUID id = UUID.randomUUID();
     private final TabState state = new TabState();
     private final Map<UUID, TerminalPane> panes = new LinkedHashMap<>();
     private final SplitTree tree;
@@ -52,6 +53,7 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
         return pane;
     }
 
+    public UUID id() { return id; }
     TerminalPane focusedPane() { return tree.focused().map(panes::get).orElse(null); }
     public java.util.List<TerminalPane> panes() { return java.util.List.copyOf(panes.values()); }
     SplitTree tree() { return tree; }
@@ -61,11 +63,15 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     }
     void rename(String name) { state.rename(name); onChanged.run(); }
 
-    public void split(SplitTree.Axis axis) {
-        TerminalPane current = focusedPane();
-        if (closed || current == null || !current.running()) return;
-        TerminalPane pane = createPane(current.directory());
+    public void split(SplitTree.Axis axis) { split(focusedPane(), axis, null); }
+
+    /** Splits a given pane, starting the new one in {@code directoryOrNull} or where the target is. Null when it cannot. */
+    TerminalPane split(TerminalPane target, SplitTree.Axis axis, Path directoryOrNull) {
+        if (closed || target == null || panes.get(target.id()) != target || !target.running()) return null;
+        if (focusedPane() != target) focus(target);
+        TerminalPane pane = createPane(directoryOrNull == null ? target.directory() : directoryOrNull);
         tree.split(pane.id(), axis); render(); onChanged.run(); pane.start();
+        return pane;
     }
 
     void focus(TerminalPane pane) {
