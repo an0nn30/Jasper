@@ -10,12 +10,12 @@ The three modules are `jasper-app` (product composition), `jasper-terminal`
 (terminal library) and `jasper-buddy` (JDK-only companion library). Start at the
 [documentation index](README.md) for each module's onboarding, architecture and
 maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merged into
-local `main`; plan 2 (actions and chrome placements) is implemented on
-`claude/plugin-sdk-plan-2`; plans 3–4 are not.
+local `main`, as is plan 2 (actions and chrome placements); plans 3–4 are not.
 
 ### Plugin SDK plan 2 — 2026-09-21
 
-Branch `claude/plugin-sdk-plan-2` (not merged, not pushed) implements
+Merged into local `main` by fast-forward on 2026-09-21 (not pushed); the merged result passed
+the same verification. The work implements
 [plan 2](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-2-actions-chrome.md): plugin
 actions that are palette commands with rebindable shortcuts, and their placements in the
 toolbar, menu bar, terminal context menu and status bar, all drawn by the application.
