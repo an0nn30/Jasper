@@ -5,6 +5,8 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.FontConfig;
+import dev.jasper.app.config.KeyBindings;
+import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.history.CommandHistory;
 import dev.jasper.app.history.ShellHistoryIndex;
 import dev.jasper.app.launch.LaunchSettings;
@@ -129,7 +131,7 @@ public final class JasperApplication {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             if (snippets != null) snippets.reload();
             loginItems.accept(snapshot.backgroundEnabled());
-            if (plugins != null) plugins.configurationChanged(snapshot.plugins());
+            if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
         });
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
             Desktop.getDesktop().setQuitHandler((event, response) -> {
@@ -166,6 +168,7 @@ public final class JasperApplication {
             state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
             launcher, directory, themes, configuration == null ? null : configuration.snapshot(), history, shellHistory, snippets);
         if (configuration != null) configuration.register(window.content());
+        window.content().connectContributions(contributions);
         window.content().onToggleBuddy = this::toggleBuddy;
         window.content().buddyEnabled = this::buddyEnabled;
         window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
@@ -270,6 +273,26 @@ public final class JasperApplication {
             if (replayed[0] && chromeChanged) plugins.themeChanged(theme.chrome() == BuiltinTheme.DARK);
             replayed[0] = true;
         });
+        reportBindingProblems();
+    }
+
+    /** What resolving the saved shortcuts against the contributed actions could not honor, right now. */
+    List<KeyBindings.Problem> bindingProblems() {
+        boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
+        ConfigSnapshot snapshot = configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot();
+        List<KeyBindings.Extension> extensions = new ArrayList<>();
+        for (ActionEntry action : contributions.actions())
+            if (KeyBindings.extensionId(action.id())) extensions.add(new KeyBindings.Extension(action.id(), action.defaultBinding()));
+        return snapshot.bindings(macOs).withExtensions(extensions).problems();
+    }
+
+    /** A user's binding for an unknown action is theirs to fix; a plugin's losing default is only worth a log line. */
+    private void reportBindingProblems() {
+        for (KeyBindings.Problem problem : bindingProblems()) {
+            if (problem.kind() == KeyBindings.Problem.Kind.UNKNOWN_ACTION && configuration != null)
+                configuration.report("keybindings.\"" + problem.actionId() + "\"", problem.message());
+            else LOG.log(System.Logger.Level.INFO, "Keybinding for " + problem.actionId() + ": " + problem.message());
+        }
     }
 
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,

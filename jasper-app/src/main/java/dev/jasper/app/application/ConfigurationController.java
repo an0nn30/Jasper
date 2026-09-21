@@ -54,6 +54,9 @@ final class ConfigurationController implements AutoCloseable {
         service.start(this::accept);
     }
 
+    /** The platform the saved shortcuts were parsed for. */
+    boolean macOs() { return service.macOs(); }
+
     ConfigSnapshot snapshot() {
         requireEdt();
         return state.snapshot();
