@@ -14,6 +14,18 @@ public final class AppIcons {
         return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Jasper.chromeForeground", source)));
     }
 
+    /**
+     * A chrome-sized icon from an SVG that another class loader holds, recolored like the bundled icons.
+     * The color is read from the look and feel at paint time, so the icon follows theme changes.
+     */
+    public static javax.swing.Icon themed(ClassLoader loader, String svgResourcePath) {
+        java.util.Objects.requireNonNull(loader, "loader");
+        if (svgResourcePath == null || loader.getResource(svgResourcePath) == null)
+            throw new IllegalArgumentException("No such icon resource: " + svgResourcePath);
+        FlatSVGIcon icon = new FlatSVGIcon(svgResourcePath, 16, 16, loader);
+        return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Jasper.chromeForeground", source)));
+    }
+
     private static Color themed(String key, Color source) {
         Color target = UIManager.getColor(key);
         if (target == null) return source;
