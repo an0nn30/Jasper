@@ -9,12 +9,13 @@ and worktree were removed. Those merge operations did not push to origin.
 The three modules are `jasper-app` (product composition), `jasper-terminal`
 (terminal library) and `jasper-buddy` (JDK-only companion library). Start at the
 [documentation index](README.md) for each module's onboarding, architecture and
-maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented on
-`claude/plugin-sdk-plan-1`; plans 2–4 are not.
+maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merged into
+local `main`; plans 2–4 are not.
 
 ### Plugin SDK plan 1 — 2026-09-21
 
-Branch `claude/plugin-sdk-plan-1` (not merged, not pushed) implements
+Merged into local `main` by fast-forward through `13b9646` on 2026-09-21 (not pushed); the
+merged result passed the same verification. The work implements
 [plan 1](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-1-core-runtime.md) of the
 [plugin SDK design](superpowers/specs/2026-09-21-jasper-plugin-sdk-design.md): the JDK-only
 `jasper-sdk`, `jasper-sdk-testkit` with a contract suite that both the fake and the
