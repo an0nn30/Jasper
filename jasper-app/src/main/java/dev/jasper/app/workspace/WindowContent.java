@@ -11,6 +11,7 @@ import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.KeyBindings;
+import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.history.CommandHistory;
 import dev.jasper.app.history.ShellHistoryIndex;
 import dev.jasper.app.launch.ShellLauncher;
@@ -59,6 +60,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private javax.swing.Timer paletteTailCleanup;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
     private KeyBindings bindings;
+    private final UUID id = UUID.randomUUID();
+    private KeyBindings baseBindings;
+    private WindowContributions contributed;
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
     private final ThemeController themes;
@@ -150,6 +154,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                   ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock,
                   CommandHistory history, boolean macOs, ShellHistoryIndex shellHistory, SnippetStore snippets) {
         super(new BorderLayout());
+        this.baseBindings = bindings;
         this.bindings = bindings;
         this.macOs = macOs;
         this.themes = themes;
@@ -208,9 +213,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void installRootBindings(JRootPane root) {
         removeRootBindings();
         bindingRoot = root;
-        for (ActionId id : ActionId.values()) bindings.strokeFor(id).ifPresent(stroke -> {
-            root.getInputMap(WHEN_IN_FOCUSED_WINDOW).put(stroke, id.id());
-            root.getActionMap().put(id.id(), new AbstractAction() {
+        bindings.strokes().forEach((actionId, stroke) -> {
+            root.getInputMap(WHEN_IN_FOCUSED_WINDOW).put(stroke, actionId);
+            root.getActionMap().put(actionId, new AbstractAction() {
                 @Override public void actionPerformed(ActionEvent event) {
                     dispatchShortcut(stroke, KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner());
                 }
@@ -264,19 +269,26 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     private void removeRootBindings() {
         if (bindingRoot == null) return;
-        for (ActionId id : ActionId.values()) {
-            bindings.strokeFor(id).ifPresent(stroke -> bindingRoot.getInputMap(WHEN_IN_FOCUSED_WINDOW).remove(stroke));
-            bindingRoot.getActionMap().remove(id.id());
-        }
+        bindings.strokes().forEach((actionId, stroke) -> {
+            bindingRoot.getInputMap(WHEN_IN_FOCUSED_WINDOW).remove(stroke);
+            bindingRoot.getActionMap().remove(actionId);
+        });
         bindingRoot = null;
     }
 
     void setBindings(KeyBindings replacement) {
+        baseBindings = Objects.requireNonNull(replacement);
+        rebind();
+    }
+
+    /** Effective bindings are the saved ones plus contributed actions in registration order. */
+    void rebind() {
         JRootPane root = bindingRoot;
         removeRootBindings();
-        bindings = Objects.requireNonNull(replacement);
+        bindings = contributed == null ? baseBindings : baseBindings.withExtensions(contributed.extensions()).bindings();
         for (ActionId id : ActionId.values())
             action(id).putValue(Action.ACCELERATOR_KEY, bindings.strokeFor(id).orElse(null));
+        if (contributed != null) contributed.applyAccelerators();
         if (root != null) installRootBindings(root);
         toolbar().revalidate(); toolbar().repaint();
         windowTabs.refresh();
@@ -347,6 +359,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
     public boolean isActiveAndOpen() { return active && !closed; }
+
+    /** Stable identity of this window for extensions; never a Swing object. */
+    public UUID id() { return id; }
+
+    /**
+     * Connects this window to the application-wide contributions model, once. Contributed actions
+     * become palette commands and shortcuts here; their toolbar, menu and status placements follow.
+     */
+    public void connectContributions(Contributions model) {
+        if (closed || contributed != null) return;
+        contributed = new WindowContributions(this, Objects.requireNonNull(model));
+        rebind();
+    }
     boolean updatingActions() { return workspaceActions.updating(); }
     Action action(ActionId id) { return workspaceActions.action(id); }
     KeyBindings bindings() { return bindings; }
@@ -442,9 +467,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     boolean dispatchShortcut(KeyStroke stroke, Component source) {
         if (paletteKeys.dispatchShortcut(stroke, source == null ? this : source)) return true;
-        Optional<ActionId> found = bindings.actionFor(stroke);
+        Optional<String> found = bindings.idFor(stroke);
         if (found.isEmpty()) return false;
-        ActionId id = found.get();
+        Optional<ActionId> builtIn = ActionId.forId(found.get());
+        if (builtIn.isEmpty()) {
+            // A recognized contributed shortcut is an app key, never terminal input, even while disabled.
+            if (contributed != null) contributed.invoke(found.get());
+            return true;
+        }
+        ActionId id = builtIn.get();
         if (source instanceof JTextComponent && (id == ActionId.COPY || id == ActionId.PASTE)) return false;
         updateActions();
         // A recognized but unavailable command is still an app key, never terminal input.
@@ -551,6 +582,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         paletteKeys.close();
+        if (contributed != null) { contributed.close(); contributed = null; }
         commandPalette.close(); windowCommands.close(); commands.close();
         if (historyRegistration != null) { historyRegistration.close(); historyRegistration = null; }
         if (snippetsRegistration != null) { snippetsRegistration.close(); snippetsRegistration = null; }
