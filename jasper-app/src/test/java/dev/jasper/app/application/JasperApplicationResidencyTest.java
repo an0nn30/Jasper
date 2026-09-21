@@ -174,4 +174,14 @@ class JasperApplicationResidencyTest {
         // the test's name actually promises.
         assertThat(application.resident()).as("a matching request does not touch residency").isTrue();
     }
+
+    @Test void aRetireRequestRunsTheNormalQuitPathEvenFromAnotherBuild() throws Exception {
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = application(terminated::countDown);
+        edt(() -> application.residency(true));
+        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/resident.jar"), 1L, DesktopTestSupport.HOME);
+        var retire = new LaunchRequest("token", Path.of("/another-build.jar"), 2L, LaunchRequest.Kind.RETIRE);
+        assertThat(handler.apply(retire)).isEqualTo(LaunchRequest.Response.OK);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).as("a resident process with no windows quits").isTrue();
+    }
 }

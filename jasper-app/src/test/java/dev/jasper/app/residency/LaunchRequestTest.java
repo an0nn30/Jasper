@@ -46,4 +46,17 @@ class LaunchRequestTest {
                 .isEqualTo(LaunchRequest.Response.PROTOCOL);
         }
     }
+
+    @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    @Test void anOpenRequestIsByteIdenticalToTheOldProtocolAndARetireAddsOneField() {
+        var open = new LaunchRequest("t0ken", Path.of("/app.jar"), 7L);
+        assertThat(open.kind()).isEqualTo(LaunchRequest.Kind.OPEN);
+        assertThat(open.encode()).isEqualTo("jasper\t1\tt0ken\tL2FwcC5qYXI=\t7\n");
+        var retire = new LaunchRequest("t0ken", Path.of("/app.jar"), 7L, LaunchRequest.Kind.RETIRE);
+        assertThat(retire.encode()).isEqualTo("jasper\t1\tt0ken\tL2FwcC5qYXI=\t7\tretire\n");
+        assertThat(LaunchRequest.decode(retire.encode())).isEqualTo(retire);
+        assertThat(LaunchRequest.decode(open.encode())).isEqualTo(open);
+        assertThat(LaunchRequest.decode("jasper\t1\tt0ken\tL2FwcC5qYXI=\t7\tdance\n")).as("an unknown kind is not an open request").isNull();
+        assertThat(LaunchRequest.decode("jasper\t1\tt0ken\tL2FwcC5qYXI=\t7\tretire\textra\n")).isNull();
+    }
 }

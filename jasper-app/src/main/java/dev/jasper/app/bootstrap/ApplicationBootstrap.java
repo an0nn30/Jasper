@@ -242,11 +242,17 @@ public final class ApplicationBootstrap {
     /**
      * The resident process's side of a handoff. A stale request also ends residency: the endpoint
      * goes away with the reply, so the last window closing must run the normal bounded shutdown
-     * rather than leaving a process with nothing to reach it and no cleanup on the way out.
+     * rather than leaving a process with nothing to reach it and no cleanup on the way out. A retire
+     * request runs the normal quit path; the endpoint is released by the application's shutdown, not here.
      */
     static java.util.function.Function<LaunchRequest, LaunchRequest.Response> handoffHandler(
             JasperApplication application, Path source, long modified, Path home) {
         return request -> {
+            // Before the staleness check: a recovery launch may well come from another build.
+            if (request.kind() == LaunchRequest.Kind.RETIRE) {
+                SwingUtilities.invokeLater(application::quit);
+                return LaunchRequest.Response.OK;
+            }
             if (stale(request, source, modified)) {
                 SwingUtilities.invokeLater(() -> application.endpointReleased());
                 return LaunchRequest.Response.STALE;

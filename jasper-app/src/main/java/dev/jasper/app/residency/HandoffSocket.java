@@ -114,12 +114,28 @@ public final class HandoffSocket implements AutoCloseable {
      * normally.
      */
     public static boolean handOff(Path socketPath, Path tokenPath, Path codeSource, long modified) {
+        return exchange(socketPath, tokenPath, codeSource, modified, LaunchRequest.Kind.OPEN) == LaunchRequest.Response.OK;
+    }
+
+    /**
+     * Asks a resident process to quit through its normal quit path. True only when it accepted; it then
+     * releases the endpoint as part of its shutdown, which {@link #live} observes. Blocks, bounded.
+     */
+    public static boolean retire(Path socketPath, Path tokenPath, Path codeSource, long modified) {
+        return exchange(socketPath, tokenPath, codeSource, modified, LaunchRequest.Kind.RETIRE) == LaunchRequest.Response.OK;
+    }
+
+    /** True while some process accepts connections on the endpoint: a plain launch would hand off to it. */
+    public static boolean live(Path socketPath) { return owned(socketPath); }
+
+    private static LaunchRequest.Response exchange(Path socketPath, Path tokenPath, Path codeSource, long modified,
+                                                   LaunchRequest.Kind kind) {
         String token = readToken(tokenPath);
-        if (token == null) return false;
+        if (token == null) return LaunchRequest.Response.PROTOCOL;
         // codeSource() is nullable; an unresolvable source compares equal to itself and to nothing else.
-        var request = new LaunchRequest(token, codeSource == null ? Path.of("") : codeSource, modified);
+        var request = new LaunchRequest(token, codeSource == null ? Path.of("") : codeSource, modified, kind);
         var answer = new CompletableFuture<LaunchRequest.Response>();
-        // A wedged owner must not hang the launch, so the exchange is bounded from outside it.
+        // A wedged owner must not hang the caller, so the exchange is bounded from outside it.
         Thread worker = Thread.ofPlatform().daemon().name("jasper-handoff").start(() -> {
             try (SocketChannel client = SocketChannel.open(UnixDomainSocketAddress.of(socketPath))) {
                 write(client, request.encode());
@@ -132,13 +148,13 @@ public final class HandoffSocket implements AutoCloseable {
             }
         });
         try {
-            return answer.get(HANDOFF_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS) == LaunchRequest.Response.OK;
+            return answer.get(HANDOFF_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
         } catch (TimeoutException | ExecutionException failure) {
             worker.interrupt();
-            return false;
+            return LaunchRequest.Response.PROTOCOL;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
-            return false;
+            return LaunchRequest.Response.PROTOCOL;
         }
     }
 

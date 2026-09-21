@@ -224,4 +224,18 @@ class HandoffSocketTest {
         }
         Files.deleteIfExists(socket());
     }
+
+    @Test void aRetireReachesTheHandlerAsARetireAndLivenessFollowsTheEndpoint() throws Exception {
+        List<LaunchRequest> seen = new CopyOnWriteArrayList<>();
+        assertThat(HandoffSocket.live(socket())).as("nothing bound yet").isFalse();
+        try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {
+            assertThat(HandoffSocket.live(socket())).isTrue();
+            assertThat(HandoffSocket.retire(socket(), token(), Path.of("/app.jar"), 7L)).isTrue();
+            assertThat(seen).singleElement().satisfies(request -> assertThat(request.kind()).isEqualTo(LaunchRequest.Kind.RETIRE));
+            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 7L)).isTrue();
+            assertThat(seen.get(1).kind()).isEqualTo(LaunchRequest.Kind.OPEN);
+        }
+        assertThat(HandoffSocket.live(socket())).isFalse();
+        assertThat(HandoffSocket.retire(socket(), token(), Path.of("/app.jar"), 7L)).as("nobody to ask").isFalse();
+    }
 }

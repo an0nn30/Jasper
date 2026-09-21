@@ -12,7 +12,7 @@ import java.util.Objects;
  * cold launch would, so that {@code jasper} from a shell does not behave differently depending on
  * whether a daemon happened to be running.
  */
-public record LaunchRequest(String token, Path codeSource, long codeSourceModified) {
+public record LaunchRequest(String token, Path codeSource, long codeSourceModified, Kind kind) {
     private static final String MAGIC = "jasper";
     private static final int PROTOCOL = 1;
     private static final int FIELDS = 5;
@@ -20,21 +20,42 @@ public record LaunchRequest(String token, Path codeSource, long codeSourceModifi
     public LaunchRequest {
         Objects.requireNonNull(token, "token");
         Objects.requireNonNull(codeSource, "codeSource");
+        Objects.requireNonNull(kind, "kind");
     }
 
-    /** One newline-terminated line. The path is base64 so a tab or newline in it survives. */
+    /** What is asked of the resident process. */
+    public enum Kind {
+        /** Reveal a window, as a cold launch would open one. */
+        OPEN,
+        /** Quit through the normal quit path, so a recovery launch can replace the plugin set. */
+        RETIRE
+    }
+
+    /** An ordinary launch. */
+    public LaunchRequest(String token, Path codeSource, long codeSourceModified) {
+        this(token, codeSource, codeSourceModified, Kind.OPEN);
+    }
+
+    /**
+     * One newline-terminated line. The path is base64 so a tab or newline in it survives. An open request
+     * is exactly the five fields it always was: an older resident must still understand it well enough
+     * to answer {@code stale} and release the endpoint. Only a retire carries a sixth field.
+     */
     String encode() {
-        return String.join("\t", MAGIC, Integer.toString(PROTOCOL), token,
-            encode(codeSource), Long.toString(codeSourceModified)) + "\n";
+        String line = String.join("\t", MAGIC, Integer.toString(PROTOCOL), token,
+            encode(codeSource), Long.toString(codeSourceModified));
+        return line + (kind == Kind.RETIRE ? "\tretire" : "") + "\n";
     }
 
     /** Null for anything this build cannot act on, including a future protocol. Never throws. */
     static LaunchRequest decode(String line) {
         String[] parts = line.strip().split("\t", -1);
-        if (parts.length != FIELDS || !MAGIC.equals(parts[0])) return null;
+        if ((parts.length != FIELDS && parts.length != FIELDS + 1) || !MAGIC.equals(parts[0])) return null;
+        if (parts.length == FIELDS + 1 && !parts[FIELDS].equals("retire")) return null;
         try {
             if (Integer.parseInt(parts[1]) != PROTOCOL) return null;
-            return new LaunchRequest(parts[2], decodePath(parts[3]), Long.parseLong(parts[4]));
+            return new LaunchRequest(parts[2], decodePath(parts[3]), Long.parseLong(parts[4]),
+                parts.length == FIELDS ? Kind.OPEN : Kind.RETIRE);
         } catch (IllegalArgumentException malformed) {
             // Covers NumberFormatException, a bad base64 body and an unusable path alike.
             return null;
