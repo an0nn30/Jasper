@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.contributions.Contributions;
 import dev.jasper.sdk.plugin.Plugin;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -24,7 +25,7 @@ import java.util.function.Function;
 final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Function<String, Map<String, Object>> settings, BiConsumer<String, String> configReport,
-                       Duration drainGrace) { }
+                       Duration drainGrace, Contributions contributions, BooleanSupplier dark) { }
 
     record Outcome(PluginStatus.State state, String reason) { }
 

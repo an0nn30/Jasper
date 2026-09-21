@@ -6,6 +6,8 @@ import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.activity.ActivityHandle;
 import dev.jasper.sdk.activity.ActivitySpec;
+import dev.jasper.sdk.Variant;
+import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
@@ -13,6 +15,11 @@ import dev.jasper.sdk.plugin.PluginConfig;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.services.ServiceUnavailableException;
 import dev.jasper.sdk.services.Services;
+import dev.jasper.sdk.ui.Actions;
+import dev.jasper.sdk.ui.Appearance;
+import dev.jasper.sdk.ui.Menus;
+import dev.jasper.sdk.ui.StatusBar;
+import dev.jasper.sdk.ui.Toolbar;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -42,12 +49,17 @@ final class HostedContext implements PluginContext {
     private final List<Subscription> owned = new ArrayList<>();
     private final ExecutorService executor;
     volatile State state = State.STARTING;
+    private final HostedUi ui;
     Plugin plugin;
 
     HostedContext(PluginHost host, HostedPlugin hosted, PluginSettings settings) {
         this.host = host; this.hosted = hosted; this.settings = settings;
         this.id = hosted.info().id();
         this.executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("jasper-plugin-" + id + "-", 0).factory());
+        this.ui = new HostedUi(id, host.environment.contributions(), host.containment, host.environment.ui(),
+            host.environment.onUi(), () -> state != State.CLOSED, hosted.loader(),
+            () -> host.environment.dark().getAsBoolean() ? Variant.DARK : Variant.LIGHT,
+            handler -> events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant())));
     }
 
     private void requireOpen() {
@@ -62,6 +74,7 @@ final class HostedContext implements PluginContext {
     /** Closes everything the context handed out. Interrupting is for a failed start; shutdown drains first. */
     void teardown(boolean interrupt, String reason) {
         state = State.CLOSED;
+        ui.closeAll();
         List<Subscription> copy;
         synchronized (owned) { copy = new ArrayList<>(owned); owned.clear(); }
         for (int i = copy.size() - 1; i >= 0; i--) copy.get(i).close();
@@ -95,6 +108,12 @@ final class HostedContext implements PluginContext {
     }
 
     @Override public PluginConfig config() { return settings; }
+
+    @Override public Actions actions() { return ui.actions(); }
+    @Override public Toolbar toolbar() { return ui.toolbar(); }
+    @Override public Menus menus() { return ui.menus(); }
+    @Override public StatusBar statusBar() { return ui.statusBar(); }
+    @Override public Appearance appearance() { return ui.appearance(); }
 
     @Override public Executor background() {
         return task -> {

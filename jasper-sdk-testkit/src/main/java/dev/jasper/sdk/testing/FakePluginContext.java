@@ -131,19 +131,19 @@ public final class FakePluginContext implements PluginContext {
     }
 
     /** Action registration. */
-    public Actions actions() { return ui.actions(); }
+    @Override public Actions actions() { return ui.actions(); }
 
     /** Toolbar placements. */
-    public Toolbar toolbar() { return ui.toolbar(); }
+    @Override public Toolbar toolbar() { return ui.toolbar(); }
 
     /** Menu placements. */
-    public Menus menus() { return ui.menus(); }
+    @Override public Menus menus() { return ui.menus(); }
 
     /** Status bar items. */
-    public StatusBar statusBar() { return ui.statusBar(); }
+    @Override public StatusBar statusBar() { return ui.statusBar(); }
 
     /** The host's variant, change notifications, and icons checked against the plugin's own class loader. */
-    public Appearance appearance() {
+    @Override public Appearance appearance() {
         return new Appearance() {
             @Override public Variant variant() { return ui.variant(); }
             @Override public Subscription onChanged(java.util.function.Consumer<Variant> handler) {

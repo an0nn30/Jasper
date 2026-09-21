@@ -66,7 +66,7 @@ class FakeUiTest {
     @Test void appearanceFollowsTheHostAndIconsComeFromThePluginsLoader() {
         try (var host = new FakePluginHost()) {
             List<Variant> seen = new ArrayList<>();
-            var context = host.start(INFO, Set.of(), Set.of(), plugin -> ((FakePluginContext) plugin).appearance().onChanged(seen::add));
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> plugin.appearance().onChanged(seen::add));
             assertThat(context.appearance().variant()).isEqualTo(Variant.DARK);
             host.setVariant(Variant.LIGHT);
             host.flush();

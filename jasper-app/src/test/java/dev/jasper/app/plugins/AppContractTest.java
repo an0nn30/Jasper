@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.contributions.Contributions;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
@@ -24,6 +25,7 @@ import javax.swing.SwingUtilities;
 /** The application's runtime must pass the same contract as the testkit fake, on the real EDT. */
 class AppContractTest extends PluginContractTest {
     static void onEdt(Runnable action) {
+        if (SwingUtilities.isEventDispatchThread()) { action.run(); return; }
         try { SwingUtilities.invokeAndWait(action); }
         catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
         catch (InvocationTargetException failure) {
@@ -34,18 +36,29 @@ class AppContractTest extends PluginContractTest {
     }
 
     static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace) {
-        var created = new AtomicReference<PluginHost>();
-        onEdt(() -> created.set(new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
+        return host(data, tables, drainGrace, onEdtValue(Contributions::new), new java.util.concurrent.atomic.AtomicBoolean(true));
+    }
+
+    static <T> T onEdtValue(java.util.function.Supplier<T> supplier) {
+        var value = new AtomicReference<T>();
+        onEdt(() -> value.set(supplier.get()));
+        return value.get();
+    }
+
+    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
+                           Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark) {
+        return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()),
-            (key, message) -> { }, drainGrace))));
-        return created.get();
+            (key, message) -> { }, drainGrace, contributions, dark::get)));
     }
 
     @Override protected ContractHarness newHarness() {
         Path data;
         try { data = Files.createTempDirectory("jasper-contract"); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
-        PluginHost host = host(data, Map.of(), Duration.ofMillis(200));
+        Contributions contributions = onEdtValue(Contributions::new);
+        var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
+        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark);
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
         return new ContractHarness() {
@@ -60,6 +73,59 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public <T> void publishApp(Topic<T> topic, T payload) { host.bus.publish(EventBus.APP, topic, payload); }
             @Override public List<ActivityEvent> activityLog() { return List.copyOf(log); }
+            @Override public List<String> actions() {
+                return onEdtValue(() -> contributions.actions().stream()
+                    .map(action -> action.id() + "|" + action.title() + "|" + action.enabled()).toList());
+            }
+            @Override public boolean invoke(String actionId, java.util.UUID windowId, java.util.UUID paneIdOrNull) {
+                return onEdtValue(() -> contributions.action(actionId).filter(dev.jasper.app.contributions.ActionEntry::enabled).map(action -> {
+                    action.invoke(new Contributions.Invocation(windowId, java.util.Optional.ofNullable(paneIdOrNull)));
+                    return true;
+                }).orElse(false));
+            }
+            @Override public List<String> toolbar() {
+                return onEdtValue(() -> {
+                    List<String> lines = new java.util.ArrayList<>();
+                    for (var entry : contributions.toolbar()) {
+                        switch (entry) {
+                            case dev.jasper.app.contributions.ToolbarEntry.Button button -> {
+                                if (contributions.action(button.actionId()).isPresent()) lines.add("button:" + button.actionId());
+                            }
+                            case dev.jasper.app.contributions.ToolbarEntry.Dropdown dropdown -> {
+                                List<String> live = dropdown.actionIds().stream().filter(id -> contributions.action(id).isPresent()).toList();
+                                if (!live.isEmpty()) lines.add("menu:" + dropdown.title() + ":" + String.join(",", live));
+                            }
+                        }
+                    }
+                    return lines;
+                });
+            }
+            @Override public List<String> menu(String target) {
+                return onEdtValue(() -> {
+                    List<String> lines = new java.util.ArrayList<>();
+                    boolean first = true;
+                    for (var section : contributions.menus()) {
+                        var where = section.target();
+                        String key = switch (where.type()) {
+                            case STANDARD -> where.key(); case TOP_LEVEL -> "top:" + where.key(); case CONTEXT -> "context";
+                        };
+                        if (!key.equals(target)) continue;
+                        if (!first) lines.add("===");
+                        first = false;
+                        render(contributions, section.entries(), "", lines);
+                    }
+                    return lines;
+                });
+            }
+            @Override public List<String> status() {
+                return onEdtValue(() -> contributions.status().stream().filter(dev.jasper.app.contributions.StatusEntry::visible)
+                    .map(item -> item.id() + "|" + (item.left() ? "LEFT" : "RIGHT") + "|" + item.text() + "|"
+                        + (item.tooltip() == null ? "" : item.tooltip()) + "|" + (item.actionId() == null ? "" : item.actionId())).toList());
+            }
+            @Override public void setVariant(dev.jasper.sdk.Variant variant) {
+                dark.set(variant == dev.jasper.sdk.Variant.DARK);
+                host.bus.publish(EventBus.APP, dev.jasper.sdk.events.AppEvents.THEME_CHANGED, new dev.jasper.sdk.events.AppEvents.ThemeChanged(variant));
+            }
             @Override public void stopAll() {
                 var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
                 onEdt(() -> pending.set(host.stop()));
@@ -67,5 +133,20 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public void close() { stopAll(); flush(); }
         };
+    }
+
+    private static void render(Contributions contributions, List<dev.jasper.app.contributions.MenuEntry> entries, String indent, List<String> lines) {
+        for (var entry : entries) {
+            switch (entry) {
+                case dev.jasper.app.contributions.MenuEntry.Item item -> {
+                    if (contributions.action(item.actionId()).isPresent()) lines.add(indent + "item:" + item.actionId());
+                }
+                case dev.jasper.app.contributions.MenuEntry.Separator separator -> lines.add(indent + "---");
+                case dev.jasper.app.contributions.MenuEntry.Submenu submenu -> {
+                    lines.add(indent + "submenu:" + submenu.title());
+                    render(contributions, submenu.entries(), indent + "  ", lines);
+                }
+            }
+        }
     }
 }

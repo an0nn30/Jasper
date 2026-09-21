@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.sdk.JasperSdk;
 import dev.jasper.sdk.Subscription;
@@ -49,6 +50,8 @@ public final class PluginRuntime {
     private final Options options;
     private final ActivityNotifier notifier;
     private final BiConsumer<String, String> configReport;
+    private final Contributions contributions;
+    private volatile boolean dark = true;
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
     private volatile Map<String, Map<String, Object>> tables = Map.of();
@@ -61,11 +64,14 @@ public final class PluginRuntime {
      * @param options locations and mode
      * @param notifier receives plugin activities for Buddy
      * @param configReport receives plugin complaints about their settings as key and message
+     * @param contributions the application-wide model that plugin chrome contributions are written to
      */
-    public PluginRuntime(Options options, ActivityNotifier notifier, BiConsumer<String, String> configReport) {
+    public PluginRuntime(Options options, ActivityNotifier notifier, BiConsumer<String, String> configReport,
+                         Contributions contributions) {
         this.options = Objects.requireNonNull(options);
         this.notifier = Objects.requireNonNull(notifier);
         this.configReport = Objects.requireNonNull(configReport);
+        this.contributions = Objects.requireNonNull(contributions);
     }
 
     /**
@@ -86,9 +92,11 @@ public final class PluginRuntime {
      * Discovers, resolves, loads and starts plugins in dependency order. Call once, before the first window.
      *
      * @param pluginTables the {@code [plugins."<id>"]} tables of the current configuration
+     * @param dark whether the current look is dark
      */
-    public void start(Map<String, Map<String, Object>> pluginTables) {
+    public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         if (host != null) throw new IllegalStateException("Plugins already started");
+        this.dark = dark;
         long began = System.nanoTime();
         tables = Map.copyOf(pluginTables);
         List<String> problems = new ArrayList<>();
@@ -108,7 +116,7 @@ public final class PluginRuntime {
         statuses.addAll(resolution.rejected());
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.dataRoot().resolve(id),
-            id -> tables.getOrDefault(id, Map.of()), configReport, DRAIN_GRACE));
+            id -> tables.getOrDefault(id, Map.of()), configReport, DRAIN_GRACE, contributions, () -> this.dark));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         Map<String, PluginLoader.Loaded> loaded = new LinkedHashMap<>();
@@ -152,6 +160,7 @@ public final class PluginRuntime {
      * @param dark whether the new look is dark
      */
     public void themeChanged(boolean dark) {
+        this.dark = dark;
         PluginHost current = host;
         if (current != null) current.bus.publish(EventBus.APP, AppEvents.THEME_CHANGED,
             new AppEvents.ThemeChanged(dark ? Variant.DARK : Variant.LIGHT));

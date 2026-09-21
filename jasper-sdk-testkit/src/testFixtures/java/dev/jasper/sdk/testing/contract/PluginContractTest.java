@@ -2,6 +2,7 @@ package dev.jasper.sdk.testing.contract;
 
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.activity.ActivityHandle;
@@ -10,6 +11,14 @@ import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.services.ServiceUnavailableException;
+import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.PluginAction;
+import dev.jasper.sdk.ui.PluginMenu;
+import dev.jasper.sdk.ui.Side;
+import dev.jasper.sdk.ui.StandardMenu;
+import dev.jasper.sdk.ui.StatusItem;
+import dev.jasper.sdk.ui.StatusItemSpec;
+import dev.jasper.sdk.ui.ToolbarItem;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +38,7 @@ import static dev.jasper.sdk.activity.ActivityEvent.State.PROGRESS;
 import static dev.jasper.sdk.activity.ActivityEvent.State.STARTED;
 import static dev.jasper.sdk.activity.ActivityEvent.State.SUCCEEDED;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -250,5 +260,136 @@ public abstract class PluginContractTest {
         assertThatIllegalStateException().isThrownBy(() -> closed.activities().begin(ActivitySpec.of("late")));
         assertThatThrownBy(() -> closed.background().execute(() -> { })).isInstanceOf(RejectedExecutionException.class);
         assertThat(closed.log()).isNotNull();
+    }
+
+    @Test void actionsAreNamespacedUniqueInvocableAndContained() {
+        List<String> ran = Collections.synchronizedList(new ArrayList<>());
+        var run = new AtomicReference<PluginAction>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            run.set(context.actions().register(ActionSpec.of("test.alpha.run", "Run").withDefaultBinding("cmd+alt+j"),
+                invoked -> ran.add(invoked.window().id() + "/" + invoked.pane().map(pane -> pane.id().toString()).orElse("none"))));
+            context.actions().register(ActionSpec.of("test.alpha.boom", "Boom"), invoked -> { throw new IllegalStateException("handler failure"); });
+            assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("test.alpha.run", "Twice"), invoked -> { }));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("test.beta.run", "Foreign"), invoked -> { }));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("test.alphabet.run", "Foreign"), invoked -> { }));
+        });
+        assertThat(h.actions()).containsExactly("test.alpha.run|Run|true", "test.alpha.boom|Boom|true");
+        UUID window = UUID.randomUUID(), pane = UUID.randomUUID();
+        h.ui(() -> {
+            assertThat(h.invoke("test.alpha.run", window, pane)).isTrue();
+            assertThat(h.invoke("test.alpha.run", window, null)).isTrue();
+            assertThat(h.invoke("test.alpha.boom", window, null)).as("a throwing handler is contained").isTrue();
+            assertThat(h.invoke("test.alpha.absent", window, null)).isFalse();
+            run.get().setTitle("Run Now");
+            run.get().setEnabled(false);
+            assertThat(h.invoke("test.alpha.run", window, null)).isFalse();
+        });
+        assertThat(ran).containsExactly(window + "/" + pane, window + "/none");
+        assertThat(h.actions()).containsExactly("test.alpha.run|Run Now|false", "test.alpha.boom|Boom|true");
+    }
+
+    @Test void placementsNameOnlyThePluginsOwnActionsAndVanishWithThem() {
+        var run = new AtomicReference<PluginAction>();
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            run.set(context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { }));
+            context.actions().register(ActionSpec.of("test.alpha.stop", "Stop"), invoked -> { });
+            context.toolbar().add(ToolbarItem.action("test.alpha.run"));
+            context.toolbar().add(ToolbarItem.menu(new javax.swing.ImageIcon(), "Alpha", List.of("test.alpha.run", "test.alpha.stop")));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.toolbar().add(ToolbarItem.action("new_tab")));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.menus().standard(StandardMenu.FILE).add("test.alpha.absent"));
+        });
+        h.start(info("test.beta"), Set.of(), Set.of(), context ->
+            assertThatIllegalArgumentException().as("another plugin's action").isThrownBy(() -> context.toolbar().add(ToolbarItem.action("test.alpha.run"))));
+        assertThat(h.toolbar()).containsExactly("button:test.alpha.run", "menu:Alpha:test.alpha.run,test.alpha.stop");
+        h.ui(() -> run.get().close());
+        assertThat(h.toolbar()).containsExactly("menu:Alpha:test.alpha.stop");
+        h.ui(() -> assertThatIllegalArgumentException().as("a closed action cannot be placed again")
+            .isThrownBy(() -> alpha.get().toolbar().add(ToolbarItem.action("test.alpha.run"))));
+    }
+
+    @Test void menusAreMutableTreesInIndependentSections() {
+        var view = new AtomicReference<PluginMenu>();
+        var first = new AtomicReference<Subscription>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { });
+            PluginMenu section = context.menus().standard(StandardMenu.VIEW);
+            view.set(section);
+            first.set(section.add("test.alpha.run"));
+            section.addSeparator();
+            section.submenu("More").add("test.alpha.run");
+            context.menus().standard(StandardMenu.VIEW).add("test.alpha.run");
+            context.menus().create("test.alpha.menu", "Alpha").add("test.alpha.run");
+            context.menus().terminalContext().add("test.alpha.run");
+            assertThatIllegalArgumentException().isThrownBy(() -> context.menus().create("test.alpha.menu", "Again"));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.menus().create("test.beta.menu", "Foreign"));
+        });
+        assertThat(h.menu("VIEW")).containsExactly("item:test.alpha.run", "---", "submenu:More", "  item:test.alpha.run",
+            "===", "item:test.alpha.run");
+        assertThat(h.menu("top:test.alpha.menu")).containsExactly("item:test.alpha.run");
+        assertThat(h.menu("context")).containsExactly("item:test.alpha.run");
+        assertThat(h.menu("FILE")).isEmpty();
+        h.ui(() -> { first.get().close(); first.get().close(); });
+        assertThat(h.menu("VIEW")).containsExactly("---", "submenu:More", "  item:test.alpha.run", "===", "item:test.alpha.run");
+        h.ui(() -> view.get().clear());
+        assertThat(h.menu("VIEW")).containsExactly("===", "item:test.alpha.run");
+        h.ui(() -> view.get().close());
+        assertThat(h.menu("VIEW")).containsExactly("item:test.alpha.run");
+    }
+
+    @Test void statusItemsAreOrderedGlobalAndInertAfterClose() {
+        var late = new AtomicReference<StatusItem>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { });
+            late.set(context.statusBar().add(new StatusItemSpec("test.alpha.late", Side.RIGHT, 20)));
+            StatusItem early = context.statusBar().add(new StatusItemSpec("test.alpha.early", Side.LEFT, 10));
+            late.get().setText("Late");
+            early.setText("two\nlines");
+            early.setTooltip("tip");
+            early.setAction("test.alpha.run");
+            assertThatIllegalArgumentException().isThrownBy(() -> early.setAction("new_tab"));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.statusBar().add(new StatusItemSpec("test.alpha.early", Side.LEFT, 0)));
+            assertThatIllegalArgumentException().isThrownBy(() -> context.statusBar().add(new StatusItemSpec("test.beta.item", Side.LEFT, 0)));
+        });
+        assertThat(h.status()).containsExactly("test.alpha.early|LEFT|two lines|tip|test.alpha.run", "test.alpha.late|RIGHT|Late||");
+        h.ui(() -> late.get().setVisible(false));
+        assertThat(h.status()).containsExactly("test.alpha.early|LEFT|two lines|tip|test.alpha.run");
+        h.ui(() -> { late.get().close(); late.get().close(); assertThatCode(() -> late.get().setText("after close")).doesNotThrowAnyException(); });
+        assertThat(h.status()).hasSize(1);
+    }
+
+    @Test void stoppingOrFailingRemovesEveryContributionAndAppearanceFollowsTheHost() {
+        List<Variant> seen = Collections.synchronizedList(new ArrayList<>());
+        var failed = new AtomicReference<PluginContext>();
+        h.start(info("test.doomed"), Set.of(), Set.of(), context -> {
+            failed.set(context);
+            context.actions().register(ActionSpec.of("test.doomed.run", "Run"), invoked -> { });
+            context.toolbar().add(ToolbarItem.action("test.doomed.run"));
+            context.statusBar().add(new StatusItemSpec("test.doomed.item", Side.LEFT, 0)).setText("Doomed");
+            throw new IllegalStateException("start failure");
+        });
+        assertThat(h.actions()).isEmpty();
+        assertThat(h.toolbar()).isEmpty();
+        assertThat(h.status()).isEmpty();
+        h.ui(() -> assertThatIllegalStateException().isThrownBy(() ->
+            failed.get().actions().register(ActionSpec.of("test.doomed.late", "Late"), invoked -> { })));
+
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            context.actions().register(ActionSpec.of("test.alpha.run", "Run"), invoked -> { });
+            context.menus().standard(StandardMenu.TAB).add("test.alpha.run");
+            context.appearance().onChanged(seen::add);
+            assertThatIllegalArgumentException().isThrownBy(() -> context.appearance().icon("no/such/icon.svg"));
+        });
+        assertThat(alpha.get().appearance().variant()).isEqualTo(Variant.DARK);
+        h.setVariant(Variant.LIGHT);
+        h.flush();
+        assertThat(alpha.get().appearance().variant()).isEqualTo(Variant.LIGHT);
+        assertThat(seen).containsExactly(Variant.LIGHT);
+        h.stopAll();
+        assertThat(h.actions()).isEmpty();
+        assertThat(h.menu("TAB")).isEmpty();
     }
 }

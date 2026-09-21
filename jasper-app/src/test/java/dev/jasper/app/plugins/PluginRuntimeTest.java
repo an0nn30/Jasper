@@ -50,7 +50,8 @@ class PluginRuntimeTest {
         var created = new AtomicReference<PluginRuntime>();
         onEdt(() -> created.set(new PluginRuntime(new PluginRuntime.Options(bundled, user, dev, safeMode,
             root.resolve("plugins.toml"), root.resolve("plugins.lock"), root.resolve("plugin-data")),
-            new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> reports.add(key + ": " + message))));
+            new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> reports.add(key + ": " + message),
+            new dev.jasper.app.contributions.Contributions())));
         return created.get();
     }
 
@@ -66,7 +67,7 @@ class PluginRuntimeTest {
     @Test void runsADevelopmentPluginBridgesItsActivityAndStopsIt() throws Exception {
         Path dev = probe(root.resolve("dev"), "dev.example.probe");
         PluginRuntime runtime = runtime(null, root.resolve("absent"), dev, false, new ArrayList<>());
-        onEdt(() -> runtime.start(Map.of("dev.example.probe", Map.<String, Object>of("greeting", "hello"))));
+        onEdt(() -> runtime.start(Map.of("dev.example.probe", Map.<String, Object>of("greeting", "hello")), true));
         settle();
         Path data = root.resolve("plugin-data/dev.example.probe");
         assertThat(data.resolve("started")).hasContent("hello");
@@ -98,18 +99,18 @@ class PluginRuntimeTest {
         Path user = root.resolve("user");
         probe(user, "dev.example.probe");
         PluginRuntime unreviewed = runtime(null, user, null, false, new ArrayList<>());
-        onEdt(() -> unreviewed.start(Map.of()));
+        onEdt(() -> unreviewed.start(Map.of(), true));
         assertThat(unreviewed.statusLines()).singleElement().asString().contains("NEEDS_CONSENT");
         assertThat(root.resolve("plugin-data/dev.example.probe/started")).doesNotExist();
 
         Files.writeString(root.resolve("plugins.toml"), "version = 1\n[plugins.\"dev.example.probe\"]\nenabled = true\nconsented = []\n");
         PluginRuntime consented = runtime(null, user, null, false, new ArrayList<>());
-        onEdt(() -> consented.start(Map.of()));
+        onEdt(() -> consented.start(Map.of(), true));
         assertThat(consented.statusLines()).singleElement().asString().contains("ACTIVE");
         onEdt(consented::stop);
 
         PluginRuntime safe = runtime(null, user, null, true, new ArrayList<>());
-        onEdt(() -> safe.start(Map.of()));
+        onEdt(() -> safe.start(Map.of(), true));
         assertThat(safe.statusLines()).singleElement().asString().contains("DISABLED", "safe mode");
     }
 
@@ -119,7 +120,7 @@ class PluginRuntimeTest {
         PluginJars.build(bundled.resolve("dev.example.broken"), "broken.jar",
             PluginJars.descriptor("dev.example.broken", "1.0.0", "fix.broken.Missing"), Map.of(), List.of());
         PluginRuntime runtime = runtime(bundled, root.resolve("absent"), null, false, new ArrayList<>());
-        onEdt(() -> runtime.start(Map.of()));
+        onEdt(() -> runtime.start(Map.of(), true));
         assertThat(runtime.statusLines()).hasSize(2)
             .anySatisfy(line -> assertThat(line).contains("dev.example.broken", "FAILED", "fix.broken.Missing"))
             .anySatisfy(line -> assertThat(line).contains("dev.example.probe", "ACTIVE"));

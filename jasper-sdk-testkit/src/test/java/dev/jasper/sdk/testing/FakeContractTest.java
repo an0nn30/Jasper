@@ -22,6 +22,12 @@ class FakeContractTest extends PluginContractTest {
             @Override public void flush() { host.flush(); }
             @Override public <T> void publishApp(Topic<T> topic, T payload) { host.publishApp(topic, payload); }
             @Override public List<ActivityEvent> activityLog() { return host.activityLog(); }
+            @Override public List<String> actions() { return host.actions(); }
+            @Override public boolean invoke(String actionId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.invoke(actionId, windowId, paneIdOrNull); }
+            @Override public List<String> toolbar() { return host.toolbar(); }
+            @Override public List<String> menu(String target) { return host.menu(target); }
+            @Override public List<String> status() { return host.status(); }
+            @Override public void setVariant(dev.jasper.sdk.Variant variant) { host.setVariant(variant); }
             @Override public void stopAll() { host.stopAll(); }
             @Override public void close() { host.close(); }
         };

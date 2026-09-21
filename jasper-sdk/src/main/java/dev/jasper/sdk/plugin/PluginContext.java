@@ -4,6 +4,11 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.services.Services;
+import dev.jasper.sdk.ui.Actions;
+import dev.jasper.sdk.ui.Appearance;
+import dev.jasper.sdk.ui.Menus;
+import dev.jasper.sdk.ui.StatusBar;
+import dev.jasper.sdk.ui.Toolbar;
 import java.nio.file.Path;
 import java.util.concurrent.Executor;
 
@@ -70,4 +75,39 @@ public interface PluginContext {
      * @return the registry as seen by this plugin
      */
     Services services();
+
+    /**
+     * Action registration.
+     *
+     * @return the actions service as seen by this plugin
+     */
+    Actions actions();
+
+    /**
+     * The main toolbar's plugin section.
+     *
+     * @return the toolbar service
+     */
+    Toolbar toolbar();
+
+    /**
+     * Menu bar and terminal context menu contributions.
+     *
+     * @return the menus service
+     */
+    Menus menus();
+
+    /**
+     * Status bar items.
+     *
+     * @return the status bar service
+     */
+    StatusBar statusBar();
+
+    /**
+     * The application's look, change notifications and theme-aware icons.
+     *
+     * @return the appearance service
+     */
+    Appearance appearance();
 }

@@ -23,11 +23,12 @@ class BundledSamplePluginTest {
         assertThat(staged.resolve("dev.jasper.sample")).isDirectory();
         var deck = new BuddyTestSupport();
         var runtime = new AtomicReference<PluginRuntime>();
+        dev.jasper.app.contributions.Contributions contributions = AppContractTest.onEdtValue(dev.jasper.app.contributions.Contributions::new);
         onEdt(() -> {
             runtime.set(new PluginRuntime(new PluginRuntime.Options(staged, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock"), root.resolve("plugin-data")),
-                new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> { }));
-            runtime.get().start(Map.of("dev.jasper.sample", Map.<String, Object>of("demo_activity", true, "demo_step_millis", 0L)));
+                new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> { }, contributions));
+            runtime.get().start(Map.of("dev.jasper.sample", Map.<String, Object>of("demo_activity", true, "demo_step_millis", 0L)), true);
         });
         assertThat(runtime.get().statusLines()).singleElement().asString()
             .contains("dev.jasper.sample", "0.1.0", "BUNDLED", "ACTIVE");
