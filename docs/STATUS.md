@@ -37,6 +37,14 @@ were corrected (`PluginTablesTest` expects the loader's quoted diagnostic keys;
 assertion in `PluginHostTest` now waits on a latch, and `installDist` also carries bundled
 plugins in `lib/plugins`, which the plan had omitted.
 
+Known flake, not caused by this branch: `TerminalAppIntegrationTest.rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation`
+(`"reflow"` case) fails about one full `check --rerun-tasks` in eight under parallel load, at
+the same rate on the baseline code (`claude/plugin-sdk-design`, identical to `main` apart from
+documents) as here; it passed six of six isolated reruns. Its final `findAsync` callback asserts
+inside the callback, so a wrong count and a slow search both surface as the same five-second
+latch timeout. `jasper-terminal` is untouched by this branch. Every other test was green in all
+20 full runs made while investigating.
+
 Open items: the sample plugin ships in the application image and should leave it when the
 Vault plugin arrives. Until plan 3's Plugins manager, a user plugin can only be consented by
 editing `plugins.toml`. Native acceptance is pending and user-run; the checklist is at the end
