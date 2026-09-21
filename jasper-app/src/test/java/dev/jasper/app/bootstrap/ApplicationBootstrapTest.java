@@ -65,6 +65,11 @@ class ApplicationBootstrapTest {
             assertThat(ApplicationBootstrap.handsOff(new AppArguments(dir.resolve("other.toml"), false, false), dirs)).isFalse();
             // And a resident process never hands off to itself.
             assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, true), dirs)).isFalse();
+            // Recovery and development launches must never be swallowed by the process they are
+            // meant to get away from.
+            assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false, true, null, false), dirs)).isFalse();
+            assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false, false, dir.resolve("p"), false), dirs)).isFalse();
+            assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false, false, null, true), dirs)).isFalse();
         }
     }
 
@@ -79,6 +84,9 @@ class ApplicationBootstrapTest {
         // A --config launch is standalone: it never claims the shared endpoint, setting or not.
         assertThat(ApplicationBootstrap.residentRole(new AppArguments(Path.of("other.toml"), false, false), true)).isFalse();
         assertThat(ApplicationBootstrap.residentRole(new AppArguments(Path.of("other.toml"), false, false), false)).isFalse();
+        assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false, true, null, false), true)).isFalse();
+        assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false, false, Path.of("p"), false), true)).isFalse();
+        assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false, false, null, true), true)).isFalse();
     }
 
     @Test void staleFlagsADifferentPathOrModificationTimeButNotAMatchingUnresolvedSource() {

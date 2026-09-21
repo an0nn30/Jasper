@@ -63,7 +63,7 @@ public final class ApplicationBootstrap {
             boolean resident = service.initialState().snapshot().backgroundEnabled();
             Path home = Path.of(System.getProperty("user.home"));
             String appPath = System.getProperty("jpackage.app-path");
-            boolean standalone = options.configOverride() != null;
+            boolean standalone = options.standaloneLaunch();
             if (!standalone && options.background() && !resident) {
                 reconcileLoginItem(false, appPath, home);
                 LOG.log(System.Logger.Level.INFO,
@@ -84,7 +84,7 @@ public final class ApplicationBootstrap {
                     if (!options.background()) { application.newWindow(home); return; }
                     if (!application.resident()) {
                         LOG.log(System.Logger.Level.WARNING, standalone
-                            ? "Started with --config and --background, but a --config launch is always standalone and cannot be resident; exiting"
+                            ? "Started with --background, but a --config, --safe-mode, --plugin-dir or --standalone launch is always standalone and cannot be resident; exiting"
                             : "Started with --background but the handoff endpoint is unavailable; exiting");
                         application.quit();
                     } else application.warmUp();
@@ -210,20 +210,22 @@ public final class ApplicationBootstrap {
     }
 
     /**
-     * True when a resident process accepted this launch and there is nothing left to do. A launch
-     * pointed at another configuration file never hands off, because the resident process is
-     * holding a different one; neither does a resident process starting up.
+     * True when a resident process accepted this launch and there is nothing left to do. A standalone
+     * launch ({@code --config}, {@code --safe-mode}, {@code --plugin-dir}, {@code --standalone}) never hands
+     * off, because the resident process holds a different configuration or plugin set, or is the very
+     * process a recovery launch is escaping; neither does a resident process starting up.
      */
     static boolean handsOff(AppArguments options, AppDirs dirs) {
-        if (options.background() || options.configOverride() != null) return false;
+        if (options.background() || options.standaloneLaunch()) return false;
         Path source = HandoffSocket.codeSource();
         return HandoffSocket.handOff(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source));
     }
 
-    /** Residency needs the shared endpoint, so a launch pointed at another configuration never
-     *  claims it: a later plain launch would otherwise be handed a window built from that file. */
+    /** Residency needs the shared endpoint, so a standalone launch ({@code --config}, {@code --safe-mode},
+     *  {@code --plugin-dir}, {@code --standalone}) never claims it: a later plain launch would otherwise be
+     *  handed a window built from that configuration or plugin set. */
     static boolean residentRole(AppArguments options, boolean enabled) {
-        return enabled && options.configOverride() == null;
+        return enabled && !options.standaloneLaunch();
     }
 
     /** True when a request comes from a different build than this one. A resident process must not

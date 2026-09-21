@@ -42,4 +42,27 @@ class AppArgumentsTest {
         }
         assertThat(AppArguments.USAGE).contains("--background");
     }
+
+    @Test void pluginFlagsParseOnceAndMakeTheLaunchStandalone() {
+        AppArguments plain = AppArguments.parse(new String[0], cwd);
+        assertThat(plain.safeMode()).isFalse();
+        assertThat(plain.pluginDir()).isNull();
+        assertThat(plain.standalone()).isFalse();
+        assertThat(plain.standaloneLaunch()).isFalse();
+
+        assertThat(AppArguments.parse(new String[]{"--safe-mode"}, cwd).standaloneLaunch()).isTrue();
+        assertThat(AppArguments.parse(new String[]{"--standalone"}, cwd).standaloneLaunch()).isTrue();
+        assertThat(AppArguments.parse(new String[]{"--config", "c.toml"}, cwd).standaloneLaunch()).isTrue();
+        AppArguments dev = AppArguments.parse(new String[]{"--plugin-dir", "build/../out", "--safe-mode"}, cwd);
+        assertThat(dev.pluginDir()).isEqualTo(cwd.resolve("out"));
+        assertThat(dev.safeMode()).isTrue();
+        assertThat(dev.standaloneLaunch()).isTrue();
+
+        for (String[] args : new String[][]{{"--safe-mode", "--safe-mode"}, {"--standalone", "--standalone"},
+                {"--plugin-dir"}, {"--plugin-dir", "--help"}, {"--plugin-dir", ""}, {"--plugin-dir", "a", "--plugin-dir", "b"}}) {
+            assertThatIllegalArgumentException().as(java.util.Arrays.toString(args))
+                .isThrownBy(() -> AppArguments.parse(args, cwd)).withMessageContaining("Usage:");
+        }
+        assertThat(AppArguments.USAGE).contains("--safe-mode", "--plugin-dir <path>", "--standalone");
+    }
 }
