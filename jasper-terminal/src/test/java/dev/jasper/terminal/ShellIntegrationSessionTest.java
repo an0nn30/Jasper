@@ -41,7 +41,7 @@ class ShellIntegrationSessionTest {
         captured = new CopyOnWriteArrayList<>();
         statuses = new CopyOnWriteArrayList<>();
         durations = new CopyOnWriteArrayList<>();
-        session.addListener(new TerminalSession.Listener() {
+        session.addListener(new TerminalSessionListener() {
             @Override public void commandExecuted(String command, OptionalInt exitStatus,
                     Optional<Path> workingDirectory, java.time.Duration duration) {
                 captured.add(command);
@@ -103,7 +103,7 @@ class ShellIntegrationSessionTest {
     @DisabledOnOs(OS.WINDOWS) // POSIX path in the URI
     void osc7SetsTheWorkingDirectory() throws Exception {
         AtomicReference<Path> reported = new AtomicReference<>();
-        session.addListener(new TerminalSession.Listener() {
+        session.addListener(new TerminalSessionListener() {
             @Override
             public void workingDirectoryChanged(Path directory) {
                 reported.set(directory);
@@ -161,7 +161,7 @@ class ShellIntegrationSessionTest {
     @Test
     void erasingTheScrollbackForgetsPromptsAndTellsListeners() throws Exception {
         AtomicBoolean reset = new AtomicBoolean();
-        session.addListener(new TerminalSession.Listener() {
+        session.addListener(new TerminalSessionListener() {
             @Override
             public void scrollbackReset() {
                 reset.set(true);
@@ -179,11 +179,11 @@ class ShellIntegrationSessionTest {
     @Test
     void cursorStyleResetRestoresTheConfiguredCursor() throws Exception {
         connector.feed("\033[6 q");
-        Await.until(() -> session.display().cursorShape() == CursorShape.STEADY_VERTICAL_BAR, "beam requested");
+        Await.until(() -> new CursorRequest(CursorStyle.BEAM, false).equals(session.internalAccess().snapshot().cursorShape()), "beam requested");
 
         connector.feed("\033[0 q");
 
-        Await.until(() -> session.display().cursorShape() == null, "back to the configured cursor");
+        Await.until(() -> session.internalAccess().snapshot().cursorShape() == null, "back to the configured cursor");
     }
 
     /** tmux sends XTVERSION when it opens a session; it says nothing about the cursor. */
@@ -192,19 +192,19 @@ class ShellIntegrationSessionTest {
         connector.feed("\033[>qready");
 
         Await.until(() -> "ready".equals(session.snapshot().lineText(0)), "text after the query");
-        assertThat(session.display().cursorShape()).isNull();
+        assertThat(session.internalAccess().snapshot().cursorShape()).isNull();
     }
 
     /** A query must not discard a shape the running program asked for either. */
     @Test
     void theTerminalVersionQueryKeepsAShapeTheProgramAlreadyRequested() throws Exception {
         connector.feed("\033[6 q");
-        Await.until(() -> session.display().cursorShape() == CursorShape.STEADY_VERTICAL_BAR, "beam requested");
+        Await.until(() -> new CursorRequest(CursorStyle.BEAM, false).equals(session.internalAccess().snapshot().cursorShape()), "beam requested");
 
         connector.feed("\033[>qready");
 
         Await.until(() -> "ready".equals(session.snapshot().lineText(0)), "text after the query");
-        assertThat(session.display().cursorShape()).isEqualTo(CursorShape.STEADY_VERTICAL_BAR);
+        assertThat(session.internalAccess().snapshot().cursorShape()).isEqualTo(new CursorRequest(CursorStyle.BEAM, false));
     }
 
     @Test
@@ -321,7 +321,7 @@ class ShellIntegrationSessionTest {
         var reported = new CopyOnWriteArrayList<java.time.Duration>();
         var started = new CopyOnWriteArrayList<String>();
         try (var timed = new TerminalSession(timedConnector, 20, 4, 100, clock::get)) {
-            timed.addListener(new TerminalSession.Listener() {
+            timed.addListener(new TerminalSessionListener() {
                 @Override public void commandStarted(String command) { started.add(command); }
 
                 @Override public void commandExecuted(String command, OptionalInt exitStatus,
@@ -359,7 +359,7 @@ class ShellIntegrationSessionTest {
     @Test void theCommandStartMarkIsReportedBeforeTheCommandFinishes() throws Exception {
         var started = new CopyOnWriteArrayList<String>();
         listenForCommands();
-        session.addListener(new TerminalSession.Listener() {
+        session.addListener(new TerminalSessionListener() {
             @Override public void commandStarted(String command) { started.add(command); }
         });
 
@@ -379,7 +379,7 @@ class ShellIntegrationSessionTest {
     @Test void aCycleWithNothingTypedReportsNoStart() throws Exception {
         var started = new CopyOnWriteArrayList<String>();
         listenForCommands();
-        session.addListener(new TerminalSession.Listener() {
+        session.addListener(new TerminalSessionListener() {
             @Override public void commandStarted(String command) { started.add(command); }
         });
 

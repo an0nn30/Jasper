@@ -1,6 +1,7 @@
 package dev.jasper.app;
 
 import dev.jasper.terminal.TerminalSession;
+import dev.jasper.terminal.TerminalSessionListener;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -132,7 +133,7 @@ class TerminalTitleIntegrationTest {
         Fixture f = open("read step; printf '" + burst + "'; read step");
         CountDownLatch parsed = new CountDownLatch(1);
         edt(() -> {
-            f.content.currentPane().session().addListener(new TerminalSession.Listener() {
+            f.content.currentPane().session().addListener(new TerminalSessionListener() {
                 @Override public void titleChanged(String title) {
                     if (title.equals("Prompt directory")) parsed.countDown();
                 }

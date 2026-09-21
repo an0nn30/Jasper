@@ -62,8 +62,8 @@ class SessionInputTest {
 
     @Test
     void bracketedPasteWrapsTheTextAndRemovesEmbeddedEndMarkers() throws Exception {
-        connector.feed("\033[?2004h");
-        Await.until(() -> session.display().bracketedPaste(), "bracketed paste on");
+        connector.feed("\033[?2004h\033]0;paste-ready\007");
+        Await.until(() -> session.title().equals("paste-ready"), "bracketed paste on");
 
         session.paste("x\033[201~y");
 
@@ -71,8 +71,8 @@ class SessionInputTest {
     }
 
     @Test void aPasteFollowedByARawReturnKeepsTheReturnOutsideTheBracket() throws Exception {
-        connector.feed("\033[?2004h");
-        Await.until(() -> session.display().bracketedPaste(), "bracketed paste on");
+        connector.feed("\033[?2004h\033]0;paste-ready\007");
+        Await.until(() -> session.title().equals("paste-ready"), "bracketed paste on");
         session.paste("ls -la\n");
         session.write("\r");
         assertThat(connector.written()).isEqualTo("\033[200~ls -la\r\033[201~\r");

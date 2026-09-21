@@ -178,9 +178,15 @@ class ShellExitBehaviorTest {
         start(policy, false, false); deliver();
         // Real reader completion is numeric and exitFuture returns a defensive copy. Inject only the
         // otherwise-unreachable exceptional result, keeping the real pane subscription and owner wiring.
-        var field = TerminalSession.class.getDeclaredField("exit");
-        field.setAccessible(true);
-        var exit = (CompletableFuture<?>) field.get(owner.currentPane().session());
+        var accessField = TerminalSession.class.getDeclaredField("access");
+        accessField.setAccessible(true);
+        var access = accessField.get(owner.currentPane().session());
+        var engineField = access.getClass().getDeclaredField("engine");
+        engineField.setAccessible(true);
+        var engine = engineField.get(access);
+        var exitField = engine.getClass().getDeclaredField("exit");
+        exitField.setAccessible(true);
+        var exit = (CompletableFuture<?>) exitField.get(engine);
         edt(() -> exit.completeExceptionally(new IllegalStateException("exit failed")));
         edt(() -> assertThat(empty).hasValue(closes ? 1 : 0));
     }

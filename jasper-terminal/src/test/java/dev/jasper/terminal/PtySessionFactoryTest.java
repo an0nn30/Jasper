@@ -9,7 +9,7 @@ class PtySessionFactoryTest {
     AtomicInteger closes = new AtomicInteger();
     TtyConnector connector = new FakeConnectorForClose(closes);
     RuntimeException failure = new IllegalStateException("engine setup failed");
-    assertThatThrownBy(() -> PtySessionFactory.finish(connector, () -> { throw failure; }))
+    assertThatThrownBy(() -> PtySessionFactory.finish(connector::close, () -> { throw failure; }))
         .isSameAs(failure);
     assertThat(closes).hasValue(1);
 }
@@ -18,7 +18,7 @@ class PtySessionFactoryTest {
     var connector = new FakeConnectorForClose(new AtomicInteger());
     connector.failure = new IllegalArgumentException("cleanup");
     var failure = new AssertionError("startup");
-    assertThatThrownBy(() -> PtySessionFactory.finish(connector, () -> { throw failure; }))
+    assertThatThrownBy(() -> PtySessionFactory.finish(connector::close, () -> { throw failure; }))
         .isSameAs(failure).hasSuppressedException(connector.failure);
 }
 @Test void environmentIsCopiedAndTerminalCapabilitiesAreEnforced() {
@@ -42,4 +42,16 @@ private static final class FakeConnectorForClose implements TtyConnector {
     public void close() { closes.incrementAndGet(); if (failure != null) throw failure; }
 }
 
+
+    @Test @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void startupFailureClosesTheNativeChild() throws Exception {
+        var options = SessionLaunchOptions.builder().command(java.util.List.of("/bin/sh", "-c", "read line"))
+            .environment(System.getenv()).workingDirectory(java.nio.file.Path.of(System.getProperty("user.home"))).build();
+        PtyChild child = PtyChild.start(options);
+        var failure = new IllegalStateException("engine setup");
+        try {
+            assertThatThrownBy(() -> PtySessionFactory.finish(child, () -> { throw failure; })).isSameAs(failure);
+            Await.until(() -> !child.isConnected(), "startup failure closed native child");
+        } finally { child.close(); }
+    }
 }

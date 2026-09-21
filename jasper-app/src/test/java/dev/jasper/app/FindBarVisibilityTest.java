@@ -73,7 +73,7 @@ class FindBarVisibilityTest {
     }
 
     @Test void hidingRunningSearchRejectsLateResultAndResumesRetainedNavigation() throws Exception {
-        Object buffer = field(session, "buffer");
+        Object buffer = field(field(field(session, "access"), "engine"), "buffer");
         buffer.getClass().getMethod("lock").invoke(buffer);
         ThreadPoolExecutor executor;
         try {

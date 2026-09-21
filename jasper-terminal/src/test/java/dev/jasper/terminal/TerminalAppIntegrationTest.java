@@ -452,9 +452,7 @@ class TerminalAppIntegrationTest {
     }
 
     private TerminalTextBuffer terminalBuffer() throws ReflectiveOperationException {
-        var field = TerminalSession.class.getDeclaredField("buffer");
-        field.setAccessible(true);
-        return (TerminalTextBuffer) field.get(session);
+        return SessionInspection.buffer(session);
     }
 
     private ThreadPoolExecutor searchExecutor() throws ReflectiveOperationException {

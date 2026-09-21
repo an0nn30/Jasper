@@ -1,6 +1,7 @@
 package dev.jasper.app;
 
 import dev.jasper.terminal.TerminalSession;
+import dev.jasper.terminal.TerminalSessionListener;
 import dev.jasper.terminal.TerminalView;
 import java.nio.file.*;
 import java.util.*;
@@ -120,7 +121,7 @@ class ConfiguredTerminalBehaviorTest {
     /** Await reader BEL while holding EDT so the queued attachment check is deterministic. */
     private void bell() {
         var received = new CountDownLatch(1);
-        var probe = new TerminalSession.Listener() {
+        var probe = new TerminalSessionListener() {
             @Override public void bell() { received.countDown(); }
         };
         session.addListener(probe);

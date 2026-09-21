@@ -25,9 +25,7 @@ class MouseReportingEfficiencyTest {
             connector.finish();
             session.exitFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
             TerminalView view = new TerminalView(session, TerminalOptions.defaults());
-            var bufferField = TerminalSession.class.getDeclaredField("buffer");
-            bufferField.setAccessible(true);
-            TerminalTextBuffer buffer = (TerminalTextBuffer) bufferField.get(session);
+            TerminalTextBuffer buffer = SessionInspection.buffer(session);
             var storageField = TerminalTextBuffer.class.getDeclaredField("screenLinesStorage");
             storageField.setAccessible(true);
             Object storage = storageField.get(buffer);

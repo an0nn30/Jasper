@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–5 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–6 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -802,7 +802,7 @@ CWD, clear/reflow and alternate-screen tests before the full check.
 - Engine public construction uses `PtyChild`; its test-only-in-use connector constructor remains package-private in emulation.
 - Session listener is the existing nested Listener moved to a top-level type, with corrected callback/thread documentation.
 
-- [ ] **Step 1: Pin consumer behavior and listener threading before moving it.**
+- [x] **Step 1: Pin consumer behavior and listener threading before moving it.**
 
 Keep `TerminalSessionTest`, `SessionInputTest`, and `TerminalAppIntegrationTest` as
 characterization tests. Add this direct callback test beside the engine fixture:
@@ -861,7 +861,7 @@ constructor/reset initialization. Constructor-time callbacks must not dereferenc
 an uninitialized tracker. The factory starts reading only after construction has
 returned successfully. The composition constructor does not start a thread.
 
-- [ ] **Step 2: Extract the remaining emulator implementation, not query/shell code.**
+- [x] **Step 2: Extract the remaining emulator implementation, not query/shell code.**
 
 Move the remaining constructor initialization, reader loop, exit marker, input,
 resize, clear, key encoding, mouse report and bracketed paste bodies to
@@ -899,7 +899,7 @@ screen/bell/reset, Consumer for title/cwd/alternate/command events); do not add 
 new event interface with one implementation. The facade maps CompletedCommand
 to the existing four-argument commandExecuted callback.
 
-- [ ] **Step 3: Freeze the complete bridge allowlist and migrate view calls.**
+- [x] **Step 3: Freeze the complete bridge allowlist and migrate view calls.**
 
 Besides the supported lifecycle delegates above, the internal bridge exposes:
 
@@ -940,7 +940,7 @@ both modules, tests, and benchmark code. Forward legacy flat constructors only
 until Task 11 migrates fixtures and consumers; no compatibility facade survives
 acceptance.
 
-- [ ] **Step 4: Run session/input/app integration suites, document callback contracts, commit.**
+- [x] **Step 4: Run session/input/app integration suites, document callback contracts, commit.**
 
 `./gradlew :jasper-terminal:test :jasper-app:test --tests '*Terminal*'` is not used
 because `--tests` applies ambiguously across tasks; run module-specific commands

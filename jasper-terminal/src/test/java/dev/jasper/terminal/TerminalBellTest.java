@@ -137,13 +137,13 @@ class TerminalBellTest {
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         CountDownLatch processed = new CountDownLatch(1);
-        var blocker = new TerminalSession.Listener() {
+        var blocker = new TerminalSessionListener() {
             @Override public void bell() {
                 entered.countDown();
                 await(release);
             }
         };
-        var probe = new TerminalSession.Listener() {
+        var probe = new TerminalSessionListener() {
             @Override public void bell() { processed.countDown(); }
         };
         onEdt(() -> {
@@ -199,7 +199,7 @@ class TerminalBellTest {
     /** Hold EDT while real reader-thread BEL callbacks finish, so coalescing and stale queues are deterministic. */
     private void feedBells(int count) {
         CountDownLatch received = new CountDownLatch(count);
-        var probe = new TerminalSession.Listener() {
+        var probe = new TerminalSessionListener() {
             @Override public void bell() { received.countDown(); }
         };
         session.addListener(probe);

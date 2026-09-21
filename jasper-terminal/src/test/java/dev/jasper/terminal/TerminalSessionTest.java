@@ -43,7 +43,7 @@ class TerminalSessionTest {
     @Test
     void screenChangesAreReported() throws Exception {
         AtomicInteger changes = new AtomicInteger();
-        session.addListener(new TerminalSession.Listener() {
+        session.addListener(new TerminalSessionListener() {
             @Override
             public void screenChanged() {
                 changes.incrementAndGet();
@@ -65,7 +65,7 @@ class TerminalSessionTest {
     @Test
     void titleIsReported() throws Exception {
         AtomicReference<String> title = new AtomicReference<>();
-        session.addListener(new TerminalSession.Listener() {
+        session.addListener(new TerminalSessionListener() {
             @Override
             public void titleChanged(String newTitle) {
                 title.set(newTitle);
@@ -81,7 +81,7 @@ class TerminalSessionTest {
     @Test
     void bellIsReported() throws Exception {
         AtomicInteger bells = new AtomicInteger();
-        session.addListener(new TerminalSession.Listener() {
+        session.addListener(new TerminalSessionListener() {
             @Override
             public void bell() {
                 bells.incrementAndGet();
@@ -115,10 +115,10 @@ class TerminalSessionTest {
     @Test
     void cursorShapeRequestsAreRecordedAndClearedByReset() throws Exception {
         connector.feed("\033[6 q");
-        Await.until(() -> session.display().cursorShape() == CursorShape.STEADY_VERTICAL_BAR, "beam cursor request");
+        Await.until(() -> new CursorRequest(CursorStyle.BEAM, false).equals(session.internalAccess().snapshot().cursorShape()), "beam cursor request");
 
         connector.feed("\033c");
-        Await.until(() -> session.display().cursorShape() == null, "reset clears the request");
+        Await.until(() -> session.internalAccess().snapshot().cursorShape() == null, "reset clears the request");
     }
 
     @Test
@@ -126,7 +126,7 @@ class TerminalSessionTest {
         connector.feed("abc");
         Await.until(() -> session.snapshot().cursorColumn() == 3, "cursor after abc");
         AtomicInteger changes = new AtomicInteger();
-        session.addListener(new TerminalSession.Listener() {
+        session.addListener(new TerminalSessionListener() {
             @Override
             public void screenChanged() {
                 changes.incrementAndGet();
@@ -144,5 +144,37 @@ class TerminalSessionTest {
         connector.finish();
 
         assertThat(session.exitFuture().get(10, TimeUnit.SECONDS)).isZero();
+    }
+@Test void clearHistoryNotificationRunsOnTheCallingThread() throws Exception {
+    AtomicReference<Thread> delivered = new AtomicReference<>();
+    session.addListener(new TerminalSessionListener() {
+        @Override public void scrollbackReset() { delivered.set(Thread.currentThread()); }
+    });
+    connector.feed("one\r\ntwo\r\nthree\r\nfour\r\nfive");
+    Await.until(() -> session.internalAccess().snapshot().historyLines() > 0, "history exists");
+    Thread caller = Thread.currentThread();
+    session.clearScrollback();
+    assertThat(delivered.get()).isSameAs(caller);
+}
+
+    @Test void commandStartListenersCanQueryTheBufferFromAnotherThread() throws Exception {
+        var outcome = new java.util.concurrent.CompletableFuture<Boolean>();
+        session.addListener(new TerminalSessionListener() {
+            @Override public void commandStarted(String command) {
+                var queried = new java.util.concurrent.CountDownLatch(1);
+                Thread.ofPlatform().daemon().start(() -> {
+                    session.internalAccess().snapshot();
+                    queried.countDown();
+                });
+                try { outcome.complete(queried.await(2, TimeUnit.SECONDS)); }
+                catch (InterruptedException failure) { outcome.completeExceptionally(failure); }
+            }
+        });
+        connector.feed("\033]133;A\007$ \033]133;B\007echo test\r\n\033]133;C\007");
+        assertThat(outcome.get(5, TimeUnit.SECONDS)).as("command listener holds no buffer lock").isTrue();
+    }
+    @Test void aSessionReaderCannotBeStartedTwice() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> session.internalAccess().startReading())
+            .isInstanceOf(IllegalStateException.class);
     }
 }

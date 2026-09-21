@@ -20,7 +20,7 @@ class TerminalResetConcurrencyTest {
             assertThat(session.snapshot().cursorShape()).isEqualTo(new CursorRequest(CursorStyle.BEAM, false));
             CountDownLatch clearing = new CountDownLatch(1);
             CountDownLatch resume = new CountDownLatch(1);
-            session.addListener(new TerminalSession.Listener() {
+            session.addListener(new TerminalSessionListener() {
                 @Override public void scrollbackReset() {
                     clearing.countDown();
                     try {

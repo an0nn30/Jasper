@@ -61,6 +61,7 @@ public final class TerminalView extends JComponent {
     private static final float MAX_FONT_SIZE = 72f;
 
     private final TerminalSession session;
+    private final TerminalAccess access;
     private TerminalOptions options;
     private FontSet fonts;
     private Palette palette;
@@ -76,7 +77,7 @@ public final class TerminalView extends JComponent {
     private final Timer frameTimer;
     private final Timer blinkTimer;
     private final Timer bellTimer;
-    private TerminalSession.Listener listener;
+    private TerminalSessionListener listener;
     private volatile long attachmentGeneration;
     /** A fresh coalescing token on attachment or mode change also invalidates queued deliveries. */
     private volatile AtomicBoolean pendingBell;
@@ -129,7 +130,8 @@ public final class TerminalView extends JComponent {
 
     public TerminalView(TerminalSession session, TerminalOptions options) {
         this.session = session;
-        this.observedAbsoluteRowEpoch = session.absoluteRowEpoch();
+        this.access = session.internalAccess();
+        this.observedAbsoluteRowEpoch = access.absoluteRowEpoch();
         this.options = options;
         this.fontSize = options.fontSize();
         this.fonts = new FontSet(options.fontFamily(), fontSize, options.fallbackFonts(), options.ligatures(),
@@ -262,7 +264,7 @@ public final class TerminalView extends JComponent {
             return;
         }
         viewport.follow();
-        session.paste(text);
+        access.paste(text);
         repaint();
     }
 
@@ -272,7 +274,7 @@ public final class TerminalView extends JComponent {
     public Optional<String> selectedText() {
         reconcileAbsoluteRows();
         if (selection == null) return Optional.empty();
-        Optional<String> text = session.selectedText(selection, selectedLiveCells);
+        Optional<String> text = access.selectedText(selection, selectedLiveCells);
         if (text.isEmpty()) setSelection(null);
         return text;
     }
@@ -413,7 +415,7 @@ public final class TerminalView extends JComponent {
     public FindResult find(String query, boolean regex, boolean caseSensitive) {
         invalidatePendingSearch();
         try {
-            matches = session.search(query, regex, caseSensitive);
+            matches = access.search(new SearchQuery(query, regex, caseSensitive));
         } catch (PatternSyntaxException invalid) {
             matches = List.of();
             currentMatch = -1;
@@ -466,7 +468,7 @@ public final class TerminalView extends JComponent {
         List<TerminalSearch.Match> found;
         FindResult result;
         try {
-            found = session.search(query, regex, caseSensitive);
+            found = access.search(new SearchQuery(query, regex, caseSensitive));
             result = new FindResult(found.size(), found.size(), null);
         } catch (PatternSyntaxException invalid) {
             found = List.of();
@@ -519,8 +521,8 @@ public final class TerminalView extends JComponent {
 
     /** Scrolls so the nearest prompt above the view is at the top. */
     public void scrollToPreviousPrompt() {
-        ScreenSnapshot snapshot = session.snapshot(viewport.topRow());
-        List<Long> prompts = session.promptRows();
+        ScreenSnapshot snapshot = access.snapshot(viewport.topRow());
+        List<Long> prompts = access.promptRows();
         for (int i = prompts.size() - 1; i >= 0; i--) {
             if (prompts.get(i) < snapshot.firstRow()) {
                 viewport.showAtTop(prompts.get(i), snapshot);
@@ -532,8 +534,8 @@ public final class TerminalView extends JComponent {
 
     /** Scrolls so the next prompt below the top of the view is at the top, or back to the live screen. */
     public void scrollToNextPrompt() {
-        ScreenSnapshot snapshot = session.snapshot(viewport.topRow());
-        for (long prompt : session.promptRows()) {
+        ScreenSnapshot snapshot = access.snapshot(viewport.topRow());
+        for (long prompt : access.promptRows()) {
             if (prompt > snapshot.firstRow()) {
                 viewport.showAtTop(prompt, snapshot);
                 repaint();
@@ -552,8 +554,8 @@ public final class TerminalView extends JComponent {
     @Override
     protected void paintComponent(Graphics g) {
         reconcileAbsoluteRows();
-        if (selection != null && !session.selectionUnchanged(selectedLiveCells)) setSelection(null);
-        ScreenSnapshot snapshot = session.snapshot(viewport.topRow());
+        if (selection != null && !access.selectionUnchanged(selectedLiveCells)) setSelection(null);
+        ScreenSnapshot snapshot = access.snapshot(viewport.topRow());
         CursorStyle style = CursorRequest.effective(snapshot.cursorShape(), options.cursorStyle());
         boolean blinks = CursorRequest.effectiveBlink(snapshot.cursorShape(), options.cursorBlink());
         boolean focused = isFocusOwner();
@@ -625,12 +627,12 @@ public final class TerminalView extends JComponent {
 
     void handleMouse(MouseEvent e) {
         Type type = typeOf(e);
-        if (type == null || (type == Type.MOVED && !session.mouseReporting())) return;
+        if (type == null || (type == Type.MOVED && !access.mouseReporting())) return;
         if (macOs && type == Type.WHEEL && e.isShiftDown()) return;
         int notches = type == Type.WHEEL ? notches((MouseWheelEvent) e) : 0;
         if (type == Type.WHEEL && notches == 0) return;
 
-        MouseGeometry grid = session.mouseGeometry(viewport.topRow());
+        MouseGeometry grid = access.mouseGeometry(viewport.topRow());
         int column = Math.max(0, Math.min(grid.width() - 1, e.getX() / fonts.cellWidth()));
         int row = Math.max(0, Math.min(grid.height() - 1, e.getY() / fonts.cellHeight()));
         long absoluteRow = grid.firstRow() + row;
@@ -641,11 +643,11 @@ public final class TerminalView extends JComponent {
             requestFocusInWindow();
             boolean linkModifier = macOs ? e.isMetaDown() : e.isControlDown();
             action = MouseRouting.decide(type, button, e.getClickCount(), e.isShiftDown(),
-                linkModifier, session.mouseReporting(), grid.alternateBuffer());
+                linkModifier, access.mouseReporting(), grid.alternateBuffer());
             // Command-click is deliberately local on macOS, even if the program requests reports.
             if (button == MouseInput.Button.LEFT && ((macOs && linkModifier)
                 || action == MouseRouting.Action.OPEN_LINK)) {
-                Optional<String> link = session.linkAt(absoluteRow, column);
+                Optional<String> link = access.linkAt(absoluteRow, column);
                 if (link.isPresent()) {
                     linkOpener.accept(link.get());
                     action = MouseRouting.Action.OPEN_LINK;
@@ -657,7 +659,7 @@ public final class TerminalView extends JComponent {
             if (button != MouseInput.Button.NONE) gestures.put(button, gesture);
         } else if (type == Type.DRAGGED || type == Type.RELEASED) {
             action = gesture == null
-                ? (session.mouseReporting() && !e.isShiftDown() ? MouseRouting.Action.REPORT : MouseRouting.Action.NONE)
+                ? (access.mouseReporting() && !e.isShiftDown() ? MouseRouting.Action.REPORT : MouseRouting.Action.NONE)
                 : switch (gesture.action) {
                 case REPORT -> MouseRouting.Action.REPORT;
                 case START_SELECTION, SELECT_WORD, SELECT_LINE -> type == Type.DRAGGED
@@ -666,7 +668,7 @@ public final class TerminalView extends JComponent {
             };
         } else {
             action = MouseRouting.decide(type, button, e.getClickCount(), e.isShiftDown(), false,
-                session.mouseReporting(), grid.alternateBuffer());
+                access.mouseReporting(), grid.alternateBuffer());
         }
 
         if (action == MouseRouting.Action.REPORT) {
@@ -678,7 +680,7 @@ public final class TerminalView extends JComponent {
                     owned ? gesture.control : e.isControlDown(), notches);
                 int count = type == Type.WHEEL ? Math.abs(notches) : 1;
                 for (int i = 0; i < count; i++) {
-                    session.reportMouse(column, screenRow, input);
+                    access.reportMouse(column, screenRow, input);
                 }
             }
             if (type == Type.RELEASED) gestures.remove(button);
@@ -691,19 +693,19 @@ public final class TerminalView extends JComponent {
                 pendingAnchor = Selection.at(absoluteRow, column, e.isAltDown());
             }
             case SELECT_WORD -> {
-                wordAnchor = session.wordSelection(absoluteRow, column);
+                wordAnchor = access.wordSelection(absoluteRow, column);
                 setSelection(wordAnchor);
                 pendingAnchor = null;
             }
             case SELECT_LINE -> {
                 wordAnchor = null;
-                setSelection(session.lineSelection(absoluteRow));
+                setSelection(access.lineSelection(absoluteRow));
                 pendingAnchor = null;
             }
             case EXTEND_SELECTION -> {
                 Selection next = selection == null ? pendingAnchor : selection;
                 if (wordAnchor != null) {
-                    Selection word = session.wordSelection(absoluteRow, column);
+                    Selection word = access.wordSelection(absoluteRow, column);
                     boolean before = word.startRow() < wordAnchor.startRow()
                         || (word.startRow() == wordAnchor.startRow() && word.startColumn() < wordAnchor.startColumn());
                     next = before
@@ -733,7 +735,7 @@ public final class TerminalView extends JComponent {
 
     private void setSelection(Selection next) {
         selection = next;
-        selectedLiveCells = next == null ? List.of() : session.selectedLiveCells(next);
+        selectedLiveCells = next == null ? List.of() : access.selectedLiveCells(next);
     }
 
     /** AWT drag events usually have NOBUTTON; prefer the latest owned button still held. */
@@ -773,7 +775,7 @@ public final class TerminalView extends JComponent {
      * for when those rows stop naming the same lines. Runs on the Event Dispatch Thread.
      */
     private void forgetAbsoluteRows() {
-        observedAbsoluteRowEpoch = session.absoluteRowEpoch();
+        observedAbsoluteRowEpoch = access.absoluteRowEpoch();
         invalidatePendingSearch();
         setSelection(null);
         pendingAnchor = null;
@@ -787,7 +789,7 @@ public final class TerminalView extends JComponent {
 
     /** Reconciles row-state changes that may have happened while this view had no session listener. */
     private void reconcileAbsoluteRows() {
-        if (observedAbsoluteRowEpoch != session.absoluteRowEpoch()) {
+        if (observedAbsoluteRowEpoch != access.absoluteRowEpoch()) {
             forgetAbsoluteRows();
         }
     }
@@ -809,8 +811,8 @@ public final class TerminalView extends JComponent {
         bellSound = Objects.requireNonNull(sound, "sound");
     }
 
-    private TerminalSession.Listener listenerFor(long generation) {
-        return new TerminalSession.Listener() {
+    private TerminalSessionListener listenerFor(long generation) {
+        return new TerminalSessionListener() {
             @Override
             public void screenChanged() {
                 markDirty(generation);
@@ -945,12 +947,12 @@ public final class TerminalView extends JComponent {
     }
 
     private void scrollBy(int lines) {
-        viewport.scrollBy(lines, session.snapshot(viewport.topRow()));
+        viewport.scrollBy(lines, access.snapshot(viewport.topRow()));
         repaint();
     }
 
     private void sendArrows(int rotation) {
-        byte[] arrow = session.codeForKey(rotation < 0 ? KeyEvent.VK_UP : KeyEvent.VK_DOWN, 0);
+        byte[] arrow = access.codeForKey(rotation < 0 ? KeyEvent.VK_UP : KeyEvent.VK_DOWN, 0);
         if (arrow == null) {
             return;
         }
@@ -970,7 +972,7 @@ public final class TerminalView extends JComponent {
 
     private void revealCurrentMatch() {
         if (currentMatch >= 0) {
-            viewport.reveal(matches.get(currentMatch).row(), session.snapshot(viewport.topRow()));
+            viewport.reveal(matches.get(currentMatch).row(), access.snapshot(viewport.topRow()));
         }
         repaint();
     }
@@ -1043,7 +1045,7 @@ public final class TerminalView extends JComponent {
 
     private void reconcileBlink() {
         boolean eligible = renderingActive && isFocusOwner() && !exited
-            && session.blinkingCursorInView(viewport.topRow(), options.cursorBlink());
+            && access.blinkingCursorInView(viewport.topRow(), options.cursorBlink());
         if (eligible) blinkTimer.start(); else blinkTimer.stop();
     }
 

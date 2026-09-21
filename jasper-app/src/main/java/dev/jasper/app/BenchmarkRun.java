@@ -1,6 +1,7 @@
 package dev.jasper.app;
 
 import dev.jasper.terminal.TerminalSession;
+import dev.jasper.terminal.TerminalSessionListener;
 import javax.swing.*;
 import java.awt.Dimension;
 import java.awt.GraphicsEnvironment;
@@ -244,7 +245,7 @@ final class BenchmarkRun implements AutoCloseable {
             TerminalSession session = TerminalSession.start(BenchmarkFixture.command(data, child.control, options.timeoutSeconds()),
                 BenchmarkFixture.environment(), directory, 120, 36, scrollback);
             Child captured = child;
-            session.addListener(new TerminalSession.Listener() {
+            session.addListener(new TerminalSessionListener() {
                 @Override public void titleChanged(String title) {
                     if (title.equals(BenchmarkFixture.START)) captured.streamStart = System.nanoTime();
                     if (title.equals(BenchmarkFixture.END)) captured.streamEnd = System.nanoTime();

@@ -66,7 +66,7 @@ final class TerminalPane extends JPanel implements AutoCloseable {
      * going to the background. Swing reports all four as a focus loss, the last as a temporary one.
      */
     Runnable onPaneBlurred = () -> {};
-    private final TerminalSession.Listener listener = new TerminalSession.Listener() {
+    private final TerminalSessionListener listener = new TerminalSessionListener() {
         @Override public void screenChanged() { queueUpdate(); }
 
         @Override public void commandStarted(String command) {
