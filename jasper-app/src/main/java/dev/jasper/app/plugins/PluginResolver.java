@@ -58,7 +58,7 @@ final class PluginResolver {
     }
 
     /** Higher version wins; on a tie a development copy beats a user copy beats the bundled one. */
-    private static final Comparator<PluginCandidate> ORDER = Comparator
+    static final Comparator<PluginCandidate> ORDER = Comparator
         .comparing((PluginCandidate candidate) -> candidate.descriptor().version())
         .thenComparing(candidate -> candidate.origin().ordinal());
 

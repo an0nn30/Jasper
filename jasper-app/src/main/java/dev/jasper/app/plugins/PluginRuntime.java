@@ -44,6 +44,54 @@ public final class PluginRuntime {
     public record Options(Path bundledDirectory, Path userDirectory, Path developmentDirectory, boolean safeMode,
                           Path stateFile, Path lockFile, Path dataRoot) { }
 
+    /**
+     * One plugin as the Plugins manager shows it: what is running, what the next launch would run,
+     * and what the user may do about it.
+     *
+     * @param id the plugin id
+     * @param name its display name
+     * @param version the version the next launch would consider, or the running one when it is being removed
+     * @param description the descriptor's description, possibly empty
+     * @param vendor the descriptor's vendor, possibly empty
+     * @param origin {@code Bundled}, {@code Installed} or {@code Development}
+     * @param state {@code ACTIVE}, {@code DISABLED}, {@code NEEDS_CONSENT}, {@code SKIPPED} or {@code FAILED} in this process, or {@code NOT_LOADED} for a plugin found since launch that would load
+     * @param reason why, possibly empty
+     * @param capabilities what the plugin declares, sorted
+     * @param unconsented the declared capabilities the user has not consented to, sorted
+     * @param requires its dependencies, for display
+     * @param errors contained failures of the plugin in this process
+     * @param enabled whether the saved state enables it
+     * @param needsConsent whether it needs a review before it can load
+     * @param canToggle whether enabling and disabling is offered
+     * @param canRemove whether removal is offered
+     * @param pendingRemoval whether it is marked for removal
+     * @param pendingInstall whether a staged version waits for the next launch
+     * @param pending what a restart changes for this plugin, or empty
+     */
+    public record Row(String id, String name, String version, String description, String vendor, String origin,
+                      String state, String reason, List<String> capabilities, List<String> unconsented,
+                      List<String> requires, int errors, boolean enabled, boolean needsConsent, boolean canToggle,
+                      boolean canRemove, boolean pendingRemoval, boolean pendingInstall, String pending) {
+        /** Copies the lists. */
+        public Row {
+            capabilities = List.copyOf(capabilities);
+            unconsented = List.copyOf(unconsented);
+            requires = List.copyOf(requires);
+        }
+    }
+
+    /**
+     * Every plugin, sorted by id.
+     *
+     * @param rows the plugins
+     * @param restartNeeded whether the next launch would run a different plugin set than this process
+     * @param safeMode whether this process runs without user plugins
+     */
+    public record Snapshot(List<Row> rows, boolean restartNeeded, boolean safeMode) {
+        /** Copies the rows. */
+        public Snapshot { rows = List.copyOf(rows); }
+    }
+
     private static final System.Logger LOG = System.getLogger(PluginRuntime.class.getName());
     private static final Duration DRAIN_GRACE = Duration.ofMillis(1500);
     private static final Duration LOCK_WAIT = Duration.ofSeconds(2);
