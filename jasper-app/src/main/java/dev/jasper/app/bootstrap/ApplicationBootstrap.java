@@ -71,7 +71,7 @@ public final class ApplicationBootstrap {
                 service.close(); System.exit(0); return;
             }
             compose(service, () -> new CommandHistory(dirs.commandHistory()),
-                history -> createApplication(service, history, dirs), application -> {
+                history -> createApplication(service, history, dirs, options), application -> {
                     if (!standalone)
                         application.loginItems(loginItemReconciler(enabled -> reconcileLoginItem(enabled, appPath, home)));
                     if (!residentRole(options, resident)) return null;
@@ -97,7 +97,8 @@ public final class ApplicationBootstrap {
         }
     }
 
-    private static JasperApplication createApplication(ConfigService service, CommandHistory history, AppDirs dirs) {
+    private static JasperApplication createApplication(ConfigService service, CommandHistory history, AppDirs dirs,
+                                                       AppArguments options) {
         var acquired = new StartupResources();
         try {
             ApplicationIcon.installTaskbarIcon();
@@ -111,6 +112,7 @@ public final class ApplicationBootstrap {
             var snippets = acquired.own(new SnippetStore(dirs.snippets(), new ConfigEditor()::open));
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
                 () -> System.exit(0), shellHistory, snippets, integrationDir);
+            application.startPlugins(HandoffSocket.codeSource(), options.pluginDir(), options.safeMode(), dirs);
             acquired.transfer();
             return application;
         } catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }

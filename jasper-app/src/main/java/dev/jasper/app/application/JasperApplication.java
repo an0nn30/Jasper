@@ -10,9 +10,12 @@ import dev.jasper.app.history.ShellHistoryIndex;
 import dev.jasper.app.launch.LaunchSettings;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.notifications.CommandNotice;
 import dev.jasper.app.notifications.CommandNotifier;
+import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.NativeNotifier;
+import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.platform.SystemFonts;
 import dev.jasper.app.snippets.SnippetStore;
 import dev.jasper.app.workspace.TerminalWindow;
@@ -61,6 +64,9 @@ public final class JasperApplication {
     private final dev.jasper.app.lifecycle.Subscription buddyAppearance;
     private final NativeNotifier nativeNotifier = new NativeNotifier();
     private final CommandNotifier notifications;
+    private PluginRuntime plugins;
+    private ActivityNotifier activityNotifier;
+    private dev.jasper.app.lifecycle.Subscription pluginTheme;
 
     private int configuredLongCommandSeconds() {
         return configuration == null ? 10 : configuration.snapshot().longCommandSeconds();
@@ -122,6 +128,7 @@ public final class JasperApplication {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             if (snippets != null) snippets.reload();
             loginItems.accept(snapshot.backgroundEnabled());
+            if (plugins != null) plugins.configurationChanged(snapshot.plugins());
         });
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
             Desktop.getDesktop().setQuitHandler((event, response) -> {
@@ -244,6 +251,26 @@ public final class JasperApplication {
         shellHistory.refresh();
     }
 
+    /**
+     * Starts plugins once, before the first window, so their contributions are in place when windows
+     * appear. {@code codeSource} locates bundled plugins beside the application jar and may be null;
+     * {@code developmentDirectory} is the {@code --plugin-dir} value or null.
+     */
+    public void startPlugins(Path codeSource, Path developmentDirectory, boolean safeMode, AppDirs dirs) {
+        if (plugins != null || quitting || stopped) return;
+        activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
+        plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
+            developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock(), dirs.pluginData()), activityNotifier,
+            (key, message) -> { if (configuration != null) configuration.report(key, message); });
+        plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins());
+        boolean[] replayed = new boolean[1];
+        // subscribe replays the current theme at once; plugins read the look on demand, so only later changes are events.
+        pluginTheme = themes.subscribe((theme, chromeChanged) -> {
+            if (replayed[0] && chromeChanged) plugins.themeChanged(theme.chrome() == BuiltinTheme.DARK);
+            replayed[0] = true;
+        });
+    }
+
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
                                         BiFunction<Path, LaunchSettings, TerminalSession> start) {
         return windowLauncher(executor, snapshots, start, null);
@@ -338,18 +365,26 @@ public final class JasperApplication {
         if (stopped) return;
         stopped = true;
         quitting = true;
+        // Armed before anything else: a plugin's stop() that blocks the EDT cannot be abandoned, and
+        // await() below is never reached in that case.
+        shutdown.arm(() -> plugins == null ? null : plugins.executing());
         launches.close();
-        notifications.close();
-        buddyAppearance.close();
-        buddy.close();
+        // Application-owned state first, so none of it depends on plugins behaving.
         history.close();
         shellHistory.close();
         if (snippets != null) snippets.close();
+        List<CompletableFuture<?>> pluginWork = plugins == null ? List.of() : plugins.stop();
+        if (pluginTheme != null) pluginTheme.close();
+        notifications.close();
+        if (activityNotifier != null) activityNotifier.close();
+        buddyAppearance.close();
+        buddy.close();
         if (configuration != null) configuration.close();
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
         if (reopenListener != null) { Desktop.getDesktop().removeAppEventListener(reopenListener); reopenListener = null; }
         // Cross-process locks and socket probes must not hold up Swing or the exit deadline.
         List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());
+        pending.addAll(pluginWork);
         for (Runnable action : java.util.List.copyOf(shutdownActions)) pending.add(processCleanup(action));
         shutdownActions.clear();
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
