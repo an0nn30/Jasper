@@ -17,7 +17,7 @@ class TerminalResetConcurrencyTest {
             session.startReading();
             connector.feed("before\033[3;8H\033[6 q\033]0;ready\007");
             Await.until(() -> session.title().equals("ready"), "initial cursor and text");
-            assertThat(session.snapshot().cursorShape()).isEqualTo(CursorShape.STEADY_VERTICAL_BAR);
+            assertThat(session.snapshot().cursorShape()).isEqualTo(new CursorRequest(CursorStyle.BEAM, false));
             CountDownLatch clearing = new CountDownLatch(1);
             CountDownLatch resume = new CountDownLatch(1);
             session.addListener(new TerminalSession.Listener() {

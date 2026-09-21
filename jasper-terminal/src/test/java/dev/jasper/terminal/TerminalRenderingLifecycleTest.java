@@ -114,10 +114,10 @@ class TerminalRenderingLifecycleTest {
         });
         connector.feed("\033[?25h\033[2 q");
         Await.until(() -> session.snapshot().cursorVisible()
-            && session.snapshot().cursorShape() == com.jediterm.terminal.CursorShape.STEADY_BLOCK, "steady cursor");
+            && JediCellReader.cursor(com.jediterm.terminal.CursorShape.STEADY_BLOCK).equals(session.snapshot().cursorShape()), "steady cursor");
         onEdt(() -> { tick("frameTimer"); assertThat(timer("blinkTimer").isRunning()).isFalse(); });
         connector.feed("\033[1 q");
-        Await.until(() -> session.snapshot().cursorShape() == com.jediterm.terminal.CursorShape.BLINK_BLOCK, "blinking cursor");
+        Await.until(() -> JediCellReader.cursor(com.jediterm.terminal.CursorShape.BLINK_BLOCK).equals(session.snapshot().cursorShape()), "blinking cursor");
         onEdt(() -> { tick("frameTimer"); assertThat(timer("blinkTimer").isRunning()).isTrue(); });
         connector.finish();
         Await.until(view::exited, "view exit");

@@ -27,7 +27,7 @@ class RowTextTest {
         assertThat(row.lastColumns()).containsExactly(1, 2, 3);
     }
 
-    private static TerminalLine line(String text) {
-        return new TerminalLine(new TerminalLine.TextEntry(TextStyle.EMPTY, new CharBuffer(text)));
+    private static TerminalRow line(String text) {
+        return new JediCellReader().capture(new TerminalLine(new TerminalLine.TextEntry(TextStyle.EMPTY, new CharBuffer(text))), text.length());
     }
 }

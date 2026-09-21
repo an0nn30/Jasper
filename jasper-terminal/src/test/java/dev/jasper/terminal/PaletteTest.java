@@ -14,13 +14,13 @@ class PaletteTest {
 
     @Test
     void nullColorsUseThemeDefaults() {
-        assertThat(palette.foreground(null)).isEqualTo(palette.foreground());
-        assertThat(palette.background(null)).isEqualTo(palette.background());
+        assertThat(CellStyle.resolve(CellAttributes.DEFAULT, palette).foreground()).isEqualTo(palette.foreground());
+        assertThat(CellStyle.resolve(CellAttributes.DEFAULT, palette).background()).isEqualTo(palette.background());
     }
 
     @Test
     void firstSixteenIndexesComeFromTheTheme() {
-        assertThat(palette.foreground(TerminalColor.index(1))).isEqualTo(palette.ansi().get(1));
+        assertThat(CellStyle.resolve(new CellAttributes(JediCellReader.color(TerminalColor.index(1)), -1, 0, null), palette).foreground()).isEqualTo(palette.ansi().get(1));
         assertThat(palette.indexed(15)).isEqualTo(palette.ansi().get(15));
     }
 
@@ -40,7 +40,7 @@ class PaletteTest {
 
     @Test
     void rgbColorsPassThrough() {
-        assertThat(palette.foreground(TerminalColor.rgb(10, 20, 30))).isEqualTo(new Color(10, 20, 30));
+        assertThat(CellStyle.resolve(new CellAttributes(JediCellReader.color(TerminalColor.rgb(10, 20, 30)), -1, 0, null), palette).foreground()).isEqualTo(new Color(10, 20, 30));
     }
 
     @Test

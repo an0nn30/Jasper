@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–3 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–4 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -524,7 +524,7 @@ Verify no child/thread remains after the existing forced-close regression.
 - `MouseInput(Type type, Button button, boolean shift, boolean alt, boolean control, int wheelDirection)`; nested enums reproduce current event/button names.
 - `TerminalRow.capture(int width,String text,boolean wrapped,BiConsumer<char[],CellAttributes[]> fill)`, `getText()`, `isWrapped()`, `length()`, `readCells(...)`, `attributesAt(int)`.
 
-- [ ] **Step 1: Protect detached-row ownership and run existing Unicode fixtures.**
+- [x] **Step 1: Protect detached-row ownership and run existing Unicode fixtures.**
 
 ```java
 @Test void aCapturedRowRemainsIndependentOfItsProducer() {
@@ -550,7 +550,7 @@ move snapshot/mouse conversion helpers there first. Task 5 moves snapshot querie
 into BufferQueries and Task 6 moves protocol input into JediTermEngine. Do not
 reference a not-yet-created engine from the runnable Task 4 checkpoint.
 
-- [ ] **Step 2: Implement the concrete immutable row boundary.**
+- [x] **Step 2: Implement the concrete immutable row boundary.**
 
 ```java
 public final class TerminalRow {
@@ -648,7 +648,7 @@ from the six corresponding `TextStyle.Option` values, and preserve URI only for
 4,096 entries, matching the former bound. `TerminalRow.capture` receives
 `line.getText()`, `line.isWrapped()`, and the synchronous cell-fill lambda.
 
-- [ ] **Step 3: Migrate algorithms using this exact substitution map.**
+- [x] **Step 3: Migrate algorithms using this exact substitution map.**
 
 | Existing code | Replacement |
 | --- | --- |
@@ -671,7 +671,7 @@ in the existing order. Preserve the style cache and palette replacement behavior
 Move `jediEvent`'s conversion body from view to the emulator adapter; preserve
 its reversed X11 wheel naming. Expose no vendor enum through Jasper input values.
 
-- [ ] **Step 4: Compare allocation/capture cost before accepting this boundary.**
+- [x] **Step 4: Compare allocation/capture cost before accepting this boundary.**
 
 Run the Task 1 fixtures and all terminal tests. Capture direct from the live row
 once; avoid a vendor `.copy()` followed by arrays. Reuse `RunBuilder` scratch
@@ -682,7 +682,7 @@ If measured results show a repeatable regression outside baseline variability,
 stop this checkpoint and revise the representation before continuing; record
 what changed and why. Do not quietly drop the comparison.
 
-- [ ] **Step 5: Review and commit the boundary independently of later package moves.**
+- [x] **Step 5: Review and commit the boundary independently of later package moves.**
 
 Retain tests for default/indexed/RGB colors, inversions/dimming/hidden text,
 hyperlinks, CJK/emoji, clipping, copy, soft wraps, and malformed surrogates.

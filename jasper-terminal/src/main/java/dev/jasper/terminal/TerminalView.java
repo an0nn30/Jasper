@@ -1,8 +1,6 @@
 package dev.jasper.terminal;
 
-import com.jediterm.core.input.MouseEvent.Type;
-import com.jediterm.terminal.emulator.mouse.MouseButtonCodes;
-import com.jediterm.terminal.emulator.mouse.MouseButtonModifierFlags;
+import dev.jasper.terminal.MouseInput.Type;
 
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
@@ -94,20 +92,20 @@ public final class TerminalView extends JComponent {
     private Selection wordAnchor;
     private List<TerminalSession.SelectedCells> selectedLiveCells = List.of();
     /** Press ownership and report modifiers survive until that button's matching release. */
-    private final java.util.EnumMap<MouseRouting.Button, Gesture> gestures =
-        new java.util.EnumMap<>(MouseRouting.Button.class);
+    private final java.util.EnumMap<MouseInput.Button, Gesture> gestures =
+        new java.util.EnumMap<>(MouseInput.Button.class);
     private long gestureSequence;
     private double wheelRemainder;
 
     private static final class Gesture {
         final MouseRouting.Action action;
-        final int modifiers;
+        final boolean shift, alt, control;
         final long sequence;
         boolean popupShown;
 
-        Gesture(MouseRouting.Action action, int modifiers, long sequence) {
+        Gesture(MouseRouting.Action action, boolean shift, boolean alt, boolean control, long sequence) {
             this.action = action;
-            this.modifiers = modifiers;
+            this.shift = shift; this.alt = alt; this.control = control;
             this.sequence = sequence;
         }
     }
@@ -556,8 +554,8 @@ public final class TerminalView extends JComponent {
         reconcileAbsoluteRows();
         if (selection != null && !session.selectionUnchanged(selectedLiveCells)) setSelection(null);
         ScreenSnapshot snapshot = session.snapshot(viewport.topRow());
-        CursorStyle style = CursorStyle.effective(snapshot.cursorShape(), options.cursorStyle());
-        boolean blinks = CursorStyle.effectiveBlink(snapshot.cursorShape(), options.cursorBlink());
+        CursorStyle style = CursorRequest.effective(snapshot.cursorShape(), options.cursorStyle());
+        boolean blinks = CursorRequest.effectiveBlink(snapshot.cursorShape(), options.cursorBlink());
         boolean focused = isFocusOwner();
         reconcileBlink();
         boolean on = exited || !blinks || !focused || blinkOn;
@@ -636,7 +634,7 @@ public final class TerminalView extends JComponent {
         int column = Math.max(0, Math.min(grid.width() - 1, e.getX() / fonts.cellWidth()));
         int row = Math.max(0, Math.min(grid.height() - 1, e.getY() / fonts.cellHeight()));
         long absoluteRow = grid.firstRow() + row;
-        MouseRouting.Button button = gestureButton(e, type);
+        MouseInput.Button button = gestureButton(e, type);
         Gesture gesture = gestures.get(button);
         MouseRouting.Action action;
         if (type == Type.PRESSED) {
@@ -645,7 +643,7 @@ public final class TerminalView extends JComponent {
             action = MouseRouting.decide(type, button, e.getClickCount(), e.isShiftDown(),
                 linkModifier, session.mouseReporting(), grid.alternateBuffer());
             // Command-click is deliberately local on macOS, even if the program requests reports.
-            if (button == MouseRouting.Button.LEFT && ((macOs && linkModifier)
+            if (button == MouseInput.Button.LEFT && ((macOs && linkModifier)
                 || action == MouseRouting.Action.OPEN_LINK)) {
                 Optional<String> link = session.linkAt(absoluteRow, column);
                 if (link.isPresent()) {
@@ -655,8 +653,8 @@ public final class TerminalView extends JComponent {
                     action = MouseRouting.Action.START_SELECTION;
                 }
             }
-            gesture = new Gesture(action, mouseModifiers(e), ++gestureSequence);
-            if (button != MouseRouting.Button.NONE) gestures.put(button, gesture);
+            gesture = new Gesture(action, e.isShiftDown(), e.isAltDown(), e.isControlDown(), ++gestureSequence);
+            if (button != MouseInput.Button.NONE) gestures.put(button, gesture);
         } else if (type == Type.DRAGGED || type == Type.RELEASED) {
             action = gesture == null
                 ? (session.mouseReporting() && !e.isShiftDown() ? MouseRouting.Action.REPORT : MouseRouting.Action.NONE)
@@ -674,11 +672,13 @@ public final class TerminalView extends JComponent {
         if (action == MouseRouting.Action.REPORT) {
             int screenRow = row - grid.scrollOffset();
             if (screenRow >= 0) {
-                int modifiers = gesture != null && type != Type.WHEEL && type != Type.MOVED
-                    ? gesture.modifiers : mouseModifiers(e);
+                boolean owned = gesture != null && type != Type.WHEEL && type != Type.MOVED;
+                MouseInput input = new MouseInput(type, button,
+                    owned ? gesture.shift : e.isShiftDown(), owned ? gesture.alt : e.isAltDown(),
+                    owned ? gesture.control : e.isControlDown(), notches);
                 int count = type == Type.WHEEL ? Math.abs(notches) : 1;
                 for (int i = 0; i < count; i++) {
-                    session.reportMouse(column, screenRow, jediEvent(type, button, modifiers, notches));
+                    session.reportMouse(column, screenRow, input);
                 }
             }
             if (type == Type.RELEASED) gestures.remove(button);
@@ -723,7 +723,7 @@ public final class TerminalView extends JComponent {
             case SEND_ARROWS -> sendArrows(notches);
             default -> { }
         }
-        if (button == MouseRouting.Button.RIGHT && gesture != null && e.isPopupTrigger() && !gesture.popupShown) {
+        if (button == MouseInput.Button.RIGHT && gesture != null && e.isPopupTrigger() && !gesture.popupShown) {
             gesture.popupShown = true;
             contextMenuHandler.accept(e);
         }
@@ -737,9 +737,9 @@ public final class TerminalView extends JComponent {
     }
 
     /** AWT drag events usually have NOBUTTON; prefer the latest owned button still held. */
-    private MouseRouting.Button gestureButton(MouseEvent event, Type type) {
+    private MouseInput.Button gestureButton(MouseEvent event, Type type) {
         if (type != Type.DRAGGED || event.getButton() != MouseEvent.NOBUTTON) return buttonOf(event);
-        MouseRouting.Button result = MouseRouting.Button.NONE;
+        MouseInput.Button result = MouseInput.Button.NONE;
         long newest = -1;
         int held = event.getModifiersEx() & (InputEvent.BUTTON1_DOWN_MASK | InputEvent.BUTTON2_DOWN_MASK
             | InputEvent.BUTTON3_DOWN_MASK);
@@ -1076,39 +1076,17 @@ public final class TerminalView extends JComponent {
         };
     }
 
-    private static MouseRouting.Button buttonOf(MouseEvent e) {
+    private static MouseInput.Button buttonOf(MouseEvent e) {
         if (SwingUtilities.isLeftMouseButton(e)) {
-            return MouseRouting.Button.LEFT;
+            return MouseInput.Button.LEFT;
         }
         if (SwingUtilities.isMiddleMouseButton(e)) {
-            return MouseRouting.Button.MIDDLE;
+            return MouseInput.Button.MIDDLE;
         }
         if (SwingUtilities.isRightMouseButton(e)) {
-            return MouseRouting.Button.RIGHT;
+            return MouseInput.Button.RIGHT;
         }
-        return MouseRouting.Button.NONE;
-    }
-
-    private static int mouseModifiers(MouseEvent e) {
-        return (e.isShiftDown() ? MouseButtonModifierFlags.MOUSE_BUTTON_SHIFT_FLAG : 0)
-            | (e.isAltDown() ? MouseButtonModifierFlags.MOUSE_BUTTON_META_FLAG : 0)
-            | (e.isControlDown() ? MouseButtonModifierFlags.MOUSE_BUTTON_CTRL_FLAG : 0);
-    }
-
-    private static com.jediterm.core.input.MouseEvent jediEvent(Type type, MouseRouting.Button held,
-                                                               int modifiers, int notches) {
-        if (type == Type.WHEEL) {
-            // JediTerm names these X11 buttons opposite to terminal scroll direction (4 = up, 5 = down).
-            int button = notches < 0 ? MouseButtonCodes.SCROLLDOWN : MouseButtonCodes.SCROLLUP;
-            return new com.jediterm.core.input.MouseWheelEvent(button, modifiers, Integer.signum(notches));
-        }
-        int button = switch (held) {
-            case LEFT -> MouseButtonCodes.LEFT;
-            case MIDDLE -> MouseButtonCodes.MIDDLE;
-            case RIGHT -> MouseButtonCodes.RIGHT;
-            case NONE -> MouseButtonCodes.RELEASE;
-        };
-        return new com.jediterm.core.input.MouseEvent(type, button, modifiers);
+        return MouseInput.Button.NONE;
     }
 
     private static String readSystemClipboard() {

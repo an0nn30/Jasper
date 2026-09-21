@@ -1,6 +1,5 @@
 package dev.jasper.terminal;
 
-import com.jediterm.terminal.model.TerminalLine;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +22,7 @@ final class TerminalSearch {
         return Pattern.compile(regex ? query : Pattern.quote(query), flags);
     }
 
-    static List<Match> find(Pattern pattern, long firstRow, List<TerminalLine> lines, int width) {
+    static List<Match> find(Pattern pattern, long firstRow, List<TerminalRow> lines, int width) {
         List<Match> matches = new ArrayList<>();
         for (int i = 0; i < lines.size(); i++) {
             RowText row = RowText.of(lines.get(i), width);

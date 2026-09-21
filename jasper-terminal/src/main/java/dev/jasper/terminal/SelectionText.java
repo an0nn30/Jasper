@@ -1,8 +1,5 @@
 package dev.jasper.terminal;
 
-import com.jediterm.terminal.TextStyle;
-import com.jediterm.terminal.model.TerminalLine;
-import com.jediterm.terminal.util.CharUtils;
 
 import java.util.function.LongFunction;
 
@@ -11,20 +8,19 @@ final class SelectionText {
     private SelectionText() {
     }
 
-    static String extract(Selection selection, LongFunction<TerminalLine> lineAt, int width) {
+    static String extract(Selection selection, LongFunction<TerminalRow> lineAt, int width) {
         StringBuilder out = new StringBuilder();
         char[] chars = new char[width];
-        TextStyle[] styles = new TextStyle[width];
         for (long row = selection.startRow(); row <= selection.endRow(); row++) {
-            TerminalLine line = lineAt.apply(row);
+            TerminalRow line = lineAt.apply(row);
             if (line == null) {
                 continue;
             }
-            RunBuilder.readCells(line, width, chars, styles);
+            line.readCells(width, chars, null);
             int[] columns = wholeCharacterColumns(selection.columnsOn(row, width), chars);
             StringBuilder rowText = new StringBuilder();
             for (int column = columns[0]; column <= columns[1]; column++) {
-                if (chars[column] != CharUtils.DWC) {
+                if (chars[column] != TerminalRow.CONTINUATION) {
                     rowText.append(chars[column]);
                 }
             }
@@ -44,9 +40,9 @@ final class SelectionText {
     static int[] wholeCharacterColumns(int[] columns, char[] chars) {
         int from = columns[0];
         int to = columns[1];
-        if (from > 0 && from < chars.length && (chars[from] == CharUtils.DWC
+        if (from > 0 && from < chars.length && (chars[from] == TerminalRow.CONTINUATION
             || (Character.isLowSurrogate(chars[from]) && Character.isHighSurrogate(chars[from - 1])))) from--;
-        if (to >= 0 && to + 1 < chars.length && (chars[to + 1] == CharUtils.DWC
+        if (to >= 0 && to + 1 < chars.length && (chars[to + 1] == TerminalRow.CONTINUATION
             || (Character.isHighSurrogate(chars[to]) && Character.isLowSurrogate(chars[to + 1])))) to++;
         return new int[] {from, to};
     }

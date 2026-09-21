@@ -1,7 +1,5 @@
 package dev.jasper.terminal;
 
-import com.jediterm.terminal.TextStyle;
-import com.jediterm.terminal.util.CharUtils;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -131,10 +129,10 @@ final class TerminalPainter {
 
     private void drawCharacterUnderBlockCursor(Graphics2D g, ScreenSnapshot snapshot, int column, int row, int x, int y) {
         char[] chars = new char[snapshot.width()];
-        TextStyle[] styles = new TextStyle[snapshot.width()];
-        RunBuilder.readCells(snapshot.lines().get(row), snapshot.width(), chars, styles);
+        CellAttributes[] styles = new CellAttributes[snapshot.width()];
+        snapshot.lines().get(row).readCells(snapshot.width(), chars, styles);
         char c = chars[column];
-        if (c == ' ' || c == CharUtils.DWC || Character.isSurrogate(c)) {
+        if (c == ' ' || c == TerminalRow.CONTINUATION || Character.isSurrogate(c)) {
             return;
         }
         CellStyle style = CellStyle.resolve(styles[column], palette);

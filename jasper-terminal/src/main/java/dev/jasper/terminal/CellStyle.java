@@ -1,31 +1,33 @@
 package dev.jasper.terminal;
 
-import com.jediterm.terminal.HyperlinkStyle;
-import com.jediterm.terminal.TextStyle;
-import com.jediterm.terminal.TextStyle.Option;
 
 import java.awt.Color;
 
 /** A cell's style with colors fully resolved (inverse, dim and hidden already applied). */
 record CellStyle(Color foreground, Color background, boolean bold, boolean italic, boolean underline) {
 
-    static CellStyle resolve(TextStyle style, Palette palette) {
-        Color fg = palette.foreground(style.getForeground());
-        Color bg = palette.background(style.getBackground());
-        if (style.hasOption(Option.INVERSE)) {
+    static CellStyle resolve(CellAttributes style, Palette palette) {
+        Color fg = resolve(style.foreground(), palette.foreground(), palette);
+        Color bg = resolve(style.background(), palette.background(), palette);
+        if (style.has(CellAttributes.INVERSE)) {
             Color swap = fg;
             fg = bg;
             bg = swap;
         }
-        if (style.hasOption(Option.DIM)) {
+        if (style.has(CellAttributes.DIM)) {
             fg = blend(fg, bg, 0.5f);
         }
-        if (style.hasOption(Option.HIDDEN)) {
+        if (style.has(CellAttributes.HIDDEN)) {
             fg = bg;
         }
         return new CellStyle(fg, bg,
-            style.hasOption(Option.BOLD), style.hasOption(Option.ITALIC),
-            style.hasOption(Option.UNDERLINED) || style instanceof HyperlinkStyle);
+            style.has(CellAttributes.BOLD), style.has(CellAttributes.ITALIC),
+            style.has(CellAttributes.UNDERLINE));
+    }
+
+    private static Color resolve(int encoded, Color fallback, Palette palette) {
+        if (encoded == -1) return fallback;
+        return (encoded & 0x01000000) != 0 ? new Color(encoded & 0x00ffffff) : palette.indexed(encoded);
     }
 
     static Color blend(Color from, Color to, float amount) {

@@ -47,3 +47,32 @@ user-run; none is established by these headless measurements.
   metadata probe. Cost: these Unix-specific integration tests require Bash.
 
 Full baseline after fixture corrections: 1,050 tests, 1,048 passed and two environment skips, zero failures/errors. The tab-title override test showed the same `(sh)`/`(bash)` mismatch in the full run and received the same explicit-executable fixture correction.
+
+## Vendor-free row boundary (Task 4)
+
+The initial full-width cell arrays failed the allocation gate: plain capture
+60,336 bytes / 0.0186 ms; mixed capture 76,176 bytes / 0.0146 ms. The next compact
+candidate still converted styles under the lock and cost 0.0037/0.0056 ms.
+The accepted representation copies entry membership and text-length metadata,
+then converts styles during cell reads outside the lock for detached rows.
+Live query rows use the same Jasper contract only while holding the lock.
+Both are real production implementations of `TerminalRow`.
+
+JediTerm 3.76 replaces text entries on writes; its entry-copy implementation
+shares them too. The one in-place entry mutation changes trailing NUL padding
+to spaces on append. Detached rows preserve the pre-append text length and
+normalize NUL cells to spaces, protecting both text and cell semantics. Tests
+cover overwrite, output-array mutation and append-after-NUL independence. This
+pinned-vendor assumption must be rechecked on a dependency upgrade.
+
+Same JBR, fixtures, warmup and batching as baseline:
+
+| Operation | Median ms | Range ms | Bytes/op |
+| --- | ---: | ---: | ---: |
+| Plain capture | 0.0014 | 0.0008–0.0015 | 4,281 |
+| Plain capture + paint | 1.1572 | 1.1494–1.1677 | 800,240 |
+| Mixed capture | 0.0008 | 0.0007–0.0008 | 3,792 |
+| Mixed capture + paint | 0.5569 | 0.5544–0.5573 | 655,528 |
+
+Capture allocation and time improve over baseline; scratch-array reuse also
+reduces painting allocation. These remain headless samples, not native FPS/RSS.

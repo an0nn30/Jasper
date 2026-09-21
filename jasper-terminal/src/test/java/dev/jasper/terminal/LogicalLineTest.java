@@ -29,7 +29,7 @@ class LogicalLineTest {
     @Test
     void anUnboundedWrapSourceRequiresOnlyBoundedMetadataReads() {
         AtomicInteger reads = new AtomicInteger();
-        TerminalLine wrapped = line(true);
+        TerminalRow wrapped = line(true);
         LogicalLine line = LogicalLine.around(1_000_000, 5, row -> {
             reads.incrementAndGet();
             return wrapped;
@@ -79,9 +79,9 @@ class LogicalLineTest {
         }
     }
 
-    private static TerminalLine line(boolean wrapped) {
+    private static TerminalRow line(boolean wrapped) {
         TerminalLine line = new TerminalLine(new TerminalLine.TextEntry(TextStyle.EMPTY, new CharBuffer("")));
         line.setWrapped(wrapped);
-        return line;
+        return new JediCellReader().capture(line, line.length());
     }
 }

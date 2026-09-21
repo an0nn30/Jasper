@@ -10,10 +10,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CommandCaptureTest {
-    private static TerminalLine line(String text, boolean wrapped) {
+    private static TerminalRow line(String text, boolean wrapped) {
         var line = new TerminalLine(new TerminalLine.TextEntry(TextStyle.EMPTY, new CharBuffer(text)));
         line.setWrapped(wrapped);
-        return line;
+        return new JediCellReader().capture(line, line.length());
     }
 
     @Test void joinsWrappedRowsSkipsThePromptAndStripsContinuationCells() {

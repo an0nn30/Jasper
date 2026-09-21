@@ -58,9 +58,9 @@ class TerminalSearchTest {
 
     private static List<TerminalSearch.Match> find(String query, boolean regex, boolean caseSensitive, long firstRow,
                                                    String... rows) {
-        List<TerminalLine> lines = Arrays.stream(rows)
+        List<TerminalRow> lines = Arrays.stream(rows)
             .map(text -> new TerminalLine(new TerminalLine.TextEntry(TextStyle.EMPTY, new CharBuffer(text))))
-            .toList();
+            .map(line -> new JediCellReader().capture(line, WIDTH)).toList();
         return TerminalSearch.find(TerminalSearch.pattern(query, regex, caseSensitive), firstRow, lines, WIDTH);
     }
 }

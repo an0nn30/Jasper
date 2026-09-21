@@ -1,10 +1,10 @@
 package dev.jasper.terminal;
 
-import com.jediterm.core.input.MouseEvent.Type;
+import dev.jasper.terminal.MouseInput.Type;
 import org.junit.jupiter.api.Test;
 
 import static dev.jasper.terminal.MouseRouting.Action;
-import static dev.jasper.terminal.MouseRouting.Button;
+import static dev.jasper.terminal.MouseInput.Button;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MouseRoutingTest {

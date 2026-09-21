@@ -44,20 +44,20 @@ class SelectionTextTest {
 
     @Test
     void rowsNoLongerInTheScrollbackAreSkipped() {
-        TerminalLine kept = line("xyz", false);
+        TerminalRow kept = line("xyz", false);
 
         String text = SelectionText.extract(new Selection(0, 0, 1, 2, false), row -> row == 1 ? kept : null, 5);
 
         assertThat(text).isEqualTo("xyz");
     }
 
-    private static TerminalLine line(String text, boolean wrapped) {
+    private static TerminalRow line(String text, boolean wrapped) {
         TerminalLine line = new TerminalLine(new TerminalLine.TextEntry(TextStyle.EMPTY, new CharBuffer(text)));
         line.setWrapped(wrapped);
-        return line;
+        return new JediCellReader().capture(line, line.length());
     }
 
-    private static String extract(Selection selection, int width, TerminalLine... lines) {
+    private static String extract(Selection selection, int width, TerminalRow... lines) {
         return SelectionText.extract(selection, row -> row >= 0 && row < lines.length ? lines[(int) row] : null, width);
     }
 }

@@ -1,6 +1,7 @@
 package dev.jasper.terminal;
 
-import com.jediterm.core.input.MouseEvent;
+import com.jediterm.terminal.emulator.mouse.MouseButtonCodes;
+import com.jediterm.terminal.emulator.mouse.MouseButtonModifierFlags;
 import com.jediterm.core.util.TermSize;
 import com.jediterm.terminal.ArrayTerminalDataStream;
 import com.jediterm.terminal.HyperlinkStyle;
@@ -94,6 +95,7 @@ public final class TerminalSession implements AutoCloseable {
     private final LongSupplier clock;
     private final TtyConnector connector;
     private final PtyConnector pty;
+    private final JediCellReader cells = new JediCellReader();
     private final TerminalTextBuffer buffer;
     private final JediTerminal terminal;
     private final SessionDisplay display;
@@ -199,6 +201,55 @@ public final class TerminalSession implements AutoCloseable {
                 listeners.forEach(Listener::scrollbackReset);
             }
         });
+    }
+
+    /** Call with the buffer lock held, so {@code discardedLines} and the buffer agree. */
+    private ScreenSnapshot capture(TerminalTextBuffer buffer, JediTerminal terminal, SessionDisplay display,
+                                  long discardedLines, long requestedTopRow) {
+        buffer.lock();
+        try {
+            int width = buffer.getWidth();
+            int height = buffer.getHeight();
+            boolean alternate = buffer.isUsingAlternateBuffer();
+            int history = buffer.getHistoryLinesCount();
+            int scrollable = alternate ? 0 : history;
+            long liveTop = discardedLines + history;
+            int offset = requestedTopRow == ScreenSnapshot.FOLLOW_OUTPUT
+                ? 0
+                : (int) Math.max(0, Math.min(scrollable, liveTop - requestedTopRow));
+            List<TerminalRow> lines = new ArrayList<>(height);
+            for (int row = 0; row < height; row++) {
+                lines.add(cells.capture(buffer.getLine(row - offset), width));
+            }
+            return new ScreenSnapshot(width, height, lines,
+                terminal.getCursorX() - 1, terminal.getCursorY() - 1 + offset,
+                display.cursorVisible(), JediCellReader.cursor(display.cursorShape()),
+                liveTop - offset, offset, scrollable, alternate);
+        } finally {
+            buffer.unlock();
+        }
+    }
+
+    private static com.jediterm.core.input.MouseEvent jediEvent(MouseInput event) {
+        MouseInput.Type type = event.type();
+        MouseInput.Button held = event.button();
+        int notches = event.wheelDirection();
+        int modifiers = (event.shift() ? MouseButtonModifierFlags.MOUSE_BUTTON_SHIFT_FLAG : 0)
+            | (event.alt() ? MouseButtonModifierFlags.MOUSE_BUTTON_META_FLAG : 0)
+            | (event.control() ? MouseButtonModifierFlags.MOUSE_BUTTON_CTRL_FLAG : 0);
+
+        if (type == MouseInput.Type.WHEEL) {
+            // JediTerm names these X11 buttons opposite to terminal scroll direction (4 = up, 5 = down).
+            int button = notches < 0 ? MouseButtonCodes.SCROLLDOWN : MouseButtonCodes.SCROLLUP;
+            return new com.jediterm.core.input.MouseWheelEvent(button, modifiers, Integer.signum(notches));
+        }
+        int button = switch (held) {
+            case LEFT -> MouseButtonCodes.LEFT;
+            case MIDDLE -> MouseButtonCodes.MIDDLE;
+            case RIGHT -> MouseButtonCodes.RIGHT;
+            case NONE -> MouseButtonCodes.RELEASE;
+        };
+        return new com.jediterm.core.input.MouseEvent(com.jediterm.core.input.MouseEvent.Type.valueOf(type.name()), button, modifiers);
     }
 
     void startReading() {
@@ -339,7 +390,7 @@ public final class TerminalSession implements AutoCloseable {
     ScreenSnapshot snapshot(long topRow) {
         buffer.lock();
         try {
-            return ScreenSnapshot.capture(buffer, terminal, display, discardedLines, topRow);
+            return capture(buffer, terminal, display, discardedLines, topRow);
         } finally {
             buffer.unlock();
         }
@@ -366,7 +417,7 @@ public final class TerminalSession implements AutoCloseable {
     boolean blinkingCursorInView(long requestedTopRow, boolean configuredBlink) {
         buffer.lock();
         try {
-            if (!display.cursorVisible() || !CursorStyle.effectiveBlink(display.cursorShape(), configuredBlink)) {
+            if (!display.cursorVisible() || !CursorRequest.effectiveBlink(JediCellReader.cursor(display.cursorShape()), configuredBlink)) {
                 return false;
             }
             int history = buffer.getHistoryLinesCount();
@@ -405,7 +456,7 @@ public final class TerminalSession implements AutoCloseable {
     String lineText(long absoluteRow) {
         buffer.lock();
         try {
-            TerminalLine line = lineAtLocked(absoluteRow);
+            TerminalRow line = lineAtLocked(absoluteRow);
             return line == null ? null : line.getText();
         } finally {
             buffer.unlock();
@@ -435,7 +486,7 @@ public final class TerminalSession implements AutoCloseable {
             List<SelectedCells> cells = new ArrayList<>();
             char[] chars = new char[width];
             for (long row = first; row <= last; row++) {
-                RunBuilder.readCells(lineAtLocked(row), width, chars, null);
+                lineAtLocked(row).readCells(width, chars, null);
                 int[] columns = SelectionText.wholeCharacterColumns(selection.columnsOn(row, width), chars);
                 if (columns[0] <= columns[1]) {
                     cells.add(new SelectedCells(row, columns[0], new String(chars, columns[0], columns[1] - columns[0] + 1)));
@@ -472,9 +523,9 @@ public final class TerminalSession implements AutoCloseable {
         int width = buffer.getWidth();
         char[] chars = new char[width];
         for (SelectedCells selected : cells) {
-            TerminalLine line = lineAtLocked(selected.row());
+            TerminalRow line = lineAtLocked(selected.row());
             if (line == null || selected.column() + selected.cells().length() > width) return false;
-            RunBuilder.readCells(line, width, chars, null);
+            line.readCells(width, chars, null);
             for (int i = 0; i < selected.cells().length(); i++) {
                 if (chars[selected.column() + i] != selected.cells().charAt(i)) return false;
             }
@@ -494,7 +545,7 @@ public final class TerminalSession implements AutoCloseable {
         int history;
         long firstRow;
         int width;
-        List<TerminalLine> lines;
+        List<TerminalRow> lines;
         buffer.lock();
         try {
             history = buffer.isUsingAlternateBuffer() ? 0 : buffer.getHistoryLinesCount();
@@ -502,7 +553,7 @@ public final class TerminalSession implements AutoCloseable {
             width = buffer.getWidth();
             lines = new ArrayList<>(history + buffer.getHeight());
             for (int row = -history; row < buffer.getHeight(); row++) {
-                lines.add(buffer.getLine(row).copy());
+                lines.add(cells.capture(buffer.getLine(row), width));
             }
         } finally {
             buffer.unlock();
@@ -526,13 +577,13 @@ public final class TerminalSession implements AutoCloseable {
     }
 
     /** Reports a mouse event at a screen cell, clamped onto the screen; false when the program did not ask for it. */
-    boolean reportMouse(int column, int row, MouseEvent event) {
+    boolean reportMouse(int column, int row, MouseInput event) {
         if (!mouseReporting()) {
             return false;
         }
         int x = Math.max(0, Math.min(columns - 1, column));
         int y = Math.max(0, Math.min(rows - 1, row));
-        return terminal.onMouseEvent(x, y, event, new MouseEventProcessingSettings(true, usingAlternateBuffer(), false));
+        return terminal.onMouseEvent(x, y, jediEvent(event), new MouseEventProcessingSettings(true, usingAlternateBuffer(), false));
     }
 
     /** Pastes text: newlines become carriage returns, wrapped in bracketed-paste markers when the program asked. */
@@ -554,14 +605,13 @@ public final class TerminalSession implements AutoCloseable {
         buffer.lock();
         try {
             if (column < 0 || column >= buffer.getWidth()) return Optional.empty();
-            TerminalLine line = lineAtLocked(absoluteRow);
+            TerminalRow line = lineAtLocked(absoluteRow);
             if (line == null) {
                 return Optional.empty();
             }
             if (column < line.length()
-                && line.getStyleAt(column) instanceof HyperlinkStyle hyperlink
-                && hyperlink.getLinkInfo() instanceof UriLink link) {
-                return openableScheme(link.uri()) ? Optional.of(link.uri()) : Optional.empty();
+                && line.attributesAt(column).link() != null) {
+                return openableScheme(line.attributesAt(column).link()) ? Optional.of(line.attributesAt(column).link()) : Optional.empty();
             }
             return urlAcrossWrappedRows(absoluteRow, column);
         } finally {
@@ -590,7 +640,7 @@ public final class TerminalSession implements AutoCloseable {
         int[] columns = new int[cells];
         int[] lastColumns = new int[cells];
         for (int rowIndex = 0; rowIndex < range.rowCount(); rowIndex++) {
-            TerminalLine line = lineAtLocked(range.firstRow() + rowIndex);
+            TerminalRow line = lineAtLocked(range.firstRow() + rowIndex);
             RowText rowText = RowText.of(line, width);
             int offset = rowIndex * width;
             for (int i = 0; i < rowText.text().length(); i++) {
@@ -609,7 +659,7 @@ public final class TerminalSession implements AutoCloseable {
     Selection wordSelection(long row, int column) {
         buffer.lock();
         try {
-            TerminalLine line = lineAtLocked(row);
+            TerminalRow line = lineAtLocked(row);
             if (line == null) {
                 return Selection.at(row, column, false);
             }
@@ -640,13 +690,13 @@ public final class TerminalSession implements AutoCloseable {
     }
 
     /** The line at an absolute row, or null outside the scrollback and screen. Call with the buffer lock held. */
-    private TerminalLine lineAtLocked(long absoluteRow) {
+    private TerminalRow lineAtLocked(long absoluteRow) {
         int history = buffer.getHistoryLinesCount();
         long bufferRow = absoluteRow - discardedLines - history;
         if (bufferRow < -history || bufferRow >= buffer.getHeight()) {
             return null;
         }
-        return buffer.getLine((int) bufferRow);
+        return cells.live(buffer.getLine((int) bufferRow));
     }
 
     private void onCustomCommand(List<String> args) {

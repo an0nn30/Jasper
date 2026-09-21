@@ -34,7 +34,7 @@ class WordBoundariesTest {
         assertThat(WordBoundaries.wordAt(line("abc"), 5, 99)).containsExactly(4, 4);
     }
 
-    private static TerminalLine line(String text) {
-        return new TerminalLine(new TerminalLine.TextEntry(TextStyle.EMPTY, new CharBuffer(text)));
+    private static TerminalRow line(String text) {
+        return new JediCellReader().capture(new TerminalLine(new TerminalLine.TextEntry(TextStyle.EMPTY, new CharBuffer(text))), text.length());
     }
 }

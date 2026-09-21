@@ -1,9 +1,5 @@
 package dev.jasper.terminal;
 
-import com.jediterm.terminal.TextStyle;
-import com.jediterm.terminal.model.CharBuffer;
-import com.jediterm.terminal.model.TerminalLine;
-import com.jediterm.terminal.util.CharUtils;
 
 import java.awt.Font;
 import java.util.ArrayList;
@@ -19,37 +15,26 @@ final class RunBuilder {
 
     private final FontSet fonts;
     private final Palette palette;
-    private final Map<TextStyle, CellStyle> styleCache = new HashMap<>();
+    private final Map<CellAttributes, CellStyle> styleCache = new HashMap<>();
 
     RunBuilder(FontSet fonts, Palette palette) {
         this.fonts = fonts;
         this.palette = palette;
     }
 
-    List<Run> build(TerminalLine line, int width) {
-        char[] chars = new char[width];
-        TextStyle[] styles = new TextStyle[width];
-        readCells(line, width, chars, styles);
+    private char[] chars = new char[0];
+    private CellAttributes[] styles = new CellAttributes[0];
+
+    List<Run> build(TerminalRow line, int width) {
+        if (chars.length < width) {
+            chars = new char[width];
+            styles = new CellAttributes[width];
+        }
+        line.readCells(width, chars, styles);
         return build(chars, styles, width);
     }
 
-    /** Pass null for styles when extracting only text, avoiding unused per-cell style storage. */
-    static void readCells(TerminalLine line, int width, char[] chars, TextStyle[] styles) {
-        Arrays.fill(chars, 0, width, ' ');
-        if (styles != null) Arrays.fill(styles, 0, width, TextStyle.EMPTY);
-        int column = 0;
-        for (TerminalLine.TextEntry entry : line.getEntries()) {
-            CharBuffer text = entry.getText();
-            TextStyle style = entry.getStyle();
-            for (int i = 0; i < text.length() && column < width; i++, column++) {
-                char c = text.charAt(i);
-                chars[column] = c == CharUtils.NUL_CHAR ? ' ' : c;
-                if (styles != null) styles[column] = style;
-            }
-        }
-    }
-
-    List<Run> build(char[] chars, TextStyle[] styles, int width) {
+    List<Run> build(char[] chars, CellAttributes[] styles, int width) {
         List<Run> runs = new ArrayList<>();
         Accumulator current = null;
         int column = 0;
@@ -63,13 +48,13 @@ final class RunBuilder {
                 codePoint = Character.toCodePoint(first, second);
                 span = 2;
             } else {
-                if (first == CharUtils.DWC) {
+                if (first == TerminalRow.CONTINUATION) {
                     first = ' ';
                 } else if (Character.isSurrogate(first)) {
                     first = REPLACEMENT_CHARACTER; // half of a pair whose partner is missing
                 }
                 codePoint = first;
-                span = column + 1 < width && chars[column + 1] == CharUtils.DWC ? 2 : 1;
+                span = column + 1 < width && chars[column + 1] == TerminalRow.CONTINUATION ? 2 : 1;
             }
             CellStyle style = styleOf(styles[column]);
             Font font = fonts.fontFor(codePoint, style.bold(), style.italic());
@@ -92,7 +77,7 @@ final class RunBuilder {
         return runs;
     }
 
-    private CellStyle styleOf(TextStyle style) {
+    private CellStyle styleOf(CellAttributes style) {
         if (styleCache.size() > MAX_CACHED_STYLES) {
             styleCache.clear();
         }

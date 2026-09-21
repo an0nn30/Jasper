@@ -28,7 +28,7 @@ class SessionInputTest {
     void rightClickIsReportedInSgrMode() throws Exception {
         enableSgrMouse();
 
-        boolean reported = session.reportMouse(0, 0, new MouseEvent(MouseEvent.Type.PRESSED, MouseButtonCodes.RIGHT, 0));
+        boolean reported = session.reportMouse(0, 0, new MouseInput(MouseInput.Type.PRESSED, MouseInput.Button.RIGHT, false, false, false, 0));
 
         assertThat(reported).isTrue();
         assertThat(connector.written()).isEqualTo("\033[<2;1;1M");
@@ -38,7 +38,7 @@ class SessionInputTest {
     void reportsAreClampedOntoTheScreen() throws Exception {
         enableSgrMouse();
 
-        session.reportMouse(-3, 99, new MouseEvent(MouseEvent.Type.PRESSED, MouseButtonCodes.LEFT, 0));
+        session.reportMouse(-3, 99, new MouseInput(MouseInput.Type.PRESSED, MouseInput.Button.LEFT, false, false, false, 0));
 
         assertThat(connector.written()).isEqualTo("\033[<0;1;4M");
     }
@@ -47,7 +47,7 @@ class SessionInputTest {
     void nothingIsReportedWithoutMouseMode() {
         assertThat(session.mouseReporting()).isFalse();
 
-        boolean reported = session.reportMouse(1, 1, new MouseEvent(MouseEvent.Type.PRESSED, MouseButtonCodes.LEFT, 0));
+        boolean reported = session.reportMouse(1, 1, new MouseInput(MouseInput.Type.PRESSED, MouseInput.Button.LEFT, false, false, false, 0));
 
         assertThat(reported).isFalse();
         assertThat(connector.written()).isEmpty();
@@ -117,7 +117,7 @@ class SessionInputTest {
     void motionWithoutAButtonIsNotReportedInClickOnlyMode() throws Exception {
         enableSgrMouse();
 
-        session.reportMouse(1, 1, new MouseEvent(MouseEvent.Type.MOVED, MouseButtonCodes.RELEASE, 0));
+        session.reportMouse(1, 1, new MouseInput(MouseInput.Type.MOVED, MouseInput.Button.NONE, false, false, false, 0));
 
         assertThat(connector.written()).isEmpty();
     }
@@ -126,7 +126,7 @@ class SessionInputTest {
     void draggingIsNotReportedInClickOnlyMode() throws Exception {
         enableSgrMouse();
 
-        session.reportMouse(1, 1, new MouseEvent(MouseEvent.Type.DRAGGED, MouseButtonCodes.LEFT, 0));
+        session.reportMouse(1, 1, new MouseInput(MouseInput.Type.DRAGGED, MouseInput.Button.LEFT, false, false, false, 0));
 
         assertThat(connector.written()).isEmpty();
     }
@@ -136,7 +136,7 @@ class SessionInputTest {
         connector.feed("\033[?1002h\033[?1006h");
         Await.until(session::mouseReporting, "mouse reporting on");
 
-        session.reportMouse(1, 1, new MouseEvent(MouseEvent.Type.DRAGGED, MouseButtonCodes.LEFT, 0));
+        session.reportMouse(1, 1, new MouseInput(MouseInput.Type.DRAGGED, MouseInput.Button.LEFT, false, false, false, 0));
 
         assertThat(connector.written()).isNotEmpty();
     }
@@ -146,7 +146,7 @@ class SessionInputTest {
         connector.feed("\033[?1003h\033[?1006h");
         Await.until(session::mouseReporting, "mouse reporting on");
 
-        session.reportMouse(1, 1, new MouseEvent(MouseEvent.Type.MOVED, MouseButtonCodes.RELEASE, 0));
+        session.reportMouse(1, 1, new MouseInput(MouseInput.Type.MOVED, MouseInput.Button.NONE, false, false, false, 0));
 
         assertThat(connector.written()).isNotEmpty();
     }

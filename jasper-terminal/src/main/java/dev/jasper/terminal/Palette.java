@@ -1,6 +1,5 @@
 package dev.jasper.terminal;
 
-import com.jediterm.terminal.TerminalColor;
 
 import java.awt.Color;
 import java.util.List;
@@ -55,22 +54,6 @@ public record Palette(Color foreground, Color background, Color cursor, Color se
         }
         int gray = 8 + 10 * (index - 232);
         return new Color(gray, gray, gray);
-    }
-
-    Color foreground(TerminalColor color) {
-        return color == null ? foreground : resolve(color);
-    }
-
-    Color background(TerminalColor color) {
-        return color == null ? background : resolve(color);
-    }
-
-    private Color resolve(TerminalColor color) {
-        if (color.isIndexed()) {
-            return indexed(color.getColorIndex());
-        }
-        com.jediterm.core.Color c = color.toColor();
-        return new Color(c.getRed(), c.getGreen(), c.getBlue());
     }
 
     private static int cubeLevel(int n) {

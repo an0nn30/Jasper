@@ -1,7 +1,5 @@
 package dev.jasper.terminal;
 
-import com.jediterm.terminal.model.TerminalLine;
-import com.jediterm.terminal.util.CharUtils;
 
 import java.util.function.LongFunction;
 
@@ -12,20 +10,20 @@ final class CommandCapture {
     private CommandCapture() {
     }
 
-    static String text(long firstRow, int firstColumn, long lastRow, int width, LongFunction<TerminalLine> lineAt) {
+    static String text(long firstRow, int firstColumn, long lastRow, int width, LongFunction<TerminalRow> lineAt) {
         if (lastRow < firstRow || width <= 0) return "";
         lastRow = Math.min(lastRow, firstRow + MAX_ROWS - 1);
         var text = new StringBuilder();
         char[] cells = new char[width];
         for (long row = firstRow; row <= lastRow; row++) {
-            TerminalLine line = lineAt.apply(row);
+            TerminalRow line = lineAt.apply(row);
             if (line == null) break;
-            RunBuilder.readCells(line, width, cells, null);
+            line.readCells(width, cells, null);
             int from = row == firstRow ? Math.min(firstColumn, width) : 0;
             var content = new StringBuilder(width - from);
             for (int column = from; column < width; column++) {
                 char cell = cells[column];
-                if (cell != CharUtils.DWC) content.append(cell);
+                if (cell != TerminalRow.CONTINUATION) content.append(cell);
             }
             text.append(content.toString().stripTrailing());
             if (row < lastRow && !line.isWrapped()) text.append('\n');

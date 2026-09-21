@@ -1,6 +1,5 @@
 package dev.jasper.terminal;
 
-import com.jediterm.terminal.model.TerminalLine;
 
 import java.util.function.LongFunction;
 
@@ -16,18 +15,18 @@ record LogicalLine(long firstRow, long lastRow, int columns, boolean truncated) 
     static final int MAX_TEXT_BYTES = 1 << 20;
     static final int MAX_CELLS = MAX_TEXT_BYTES / Character.BYTES;
 
-    static LogicalLine around(long row, int width, LongFunction<TerminalLine> lineAt) {
+    static LogicalLine around(long row, int width, LongFunction<TerminalRow> lineAt) {
         if (width <= 0) throw new IllegalArgumentException("Logical line width must be positive");
         if (width > MAX_CELLS) return new LogicalLine(row, row, MAX_CELLS, true);
         int limit = Math.min(MAX_ROWS, MAX_CELLS / width);
         int count = 1;
         long first = row;
         long last = row;
-        TerminalLine clicked = lineAt.apply(row);
+        TerminalRow clicked = lineAt.apply(row);
         if (clicked == null) return new LogicalLine(row, row, width, true);
         boolean truncated = false;
         while (first != Long.MIN_VALUE) {
-            TerminalLine above = lineAt.apply(first - 1);
+            TerminalRow above = lineAt.apply(first - 1);
             if (above == null || !above.isWrapped()) break;
             if (count == limit) {
                 truncated = true;
@@ -36,13 +35,13 @@ record LogicalLine(long firstRow, long lastRow, int columns, boolean truncated) 
             first--;
             count++;
         }
-        TerminalLine current = clicked;
+        TerminalRow current = clicked;
         while (current.isWrapped()) {
             if (last == Long.MAX_VALUE) {
                 truncated = true;
                 break;
             }
-            TerminalLine below = lineAt.apply(last + 1);
+            TerminalRow below = lineAt.apply(last + 1);
             if (below == null || count == limit) {
                 truncated = true;
                 break;

@@ -1,7 +1,5 @@
 package dev.jasper.terminal;
 
-import com.jediterm.terminal.model.TerminalLine;
-import com.jediterm.terminal.util.CharUtils;
 
 import java.util.Arrays;
 
@@ -11,15 +9,15 @@ import java.util.Arrays;
  */
 record RowText(String text, int[] columns, int[] lastColumns) {
 
-    static RowText of(TerminalLine line, int width) {
+    static RowText of(TerminalRow line, int width) {
         char[] chars = new char[width];
-        RunBuilder.readCells(line, width, chars, null);
+        line.readCells(width, chars, null);
         StringBuilder text = new StringBuilder(width);
         int[] columns = new int[width];
         int[] lastColumns = new int[width];
         int count = 0;
         for (int column = 0; column < width; column++) {
-            if (chars[column] == CharUtils.DWC) {
+            if (chars[column] == TerminalRow.CONTINUATION) {
                 if (count > 0) {
                     lastColumns[count - 1] = column;
                 }

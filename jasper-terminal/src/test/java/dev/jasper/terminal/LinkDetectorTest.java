@@ -36,6 +36,6 @@ class LinkDetectorTest {
     }
 
     private static RowText row(String text) {
-        return RowText.of(new TerminalLine(new TerminalLine.TextEntry(TextStyle.EMPTY, new CharBuffer(text))), 60);
+        return RowText.of(new JediCellReader().capture(new TerminalLine(new TerminalLine.TextEntry(TextStyle.EMPTY, new CharBuffer(text))), 60), 60);
     }
 }

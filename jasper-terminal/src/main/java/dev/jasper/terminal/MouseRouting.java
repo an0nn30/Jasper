@@ -1,11 +1,10 @@
 package dev.jasper.terminal;
 
-import com.jediterm.core.input.MouseEvent;
+import dev.jasper.terminal.MouseInput.Button;
 
 /** Decides what a mouse event means for the terminal view. */
 final class MouseRouting {
 
-    enum Button { LEFT, MIDDLE, RIGHT, NONE }
 
     enum Action {
         REPORT, START_SELECTION, SELECT_WORD, SELECT_LINE, EXTEND_SELECTION, END_SELECTION,
@@ -20,12 +19,12 @@ final class MouseRouting {
      * @param linkModifier ⌘ on macOS, Ctrl on Linux and Windows
      * @param reporting    the program enabled mouse reporting
      */
-    static Action decide(MouseEvent.Type type, Button button, int clickCount, boolean shift, boolean linkModifier,
+    static Action decide(MouseInput.Type type, Button button, int clickCount, boolean shift, boolean linkModifier,
                          boolean reporting, boolean alternateBuffer) {
         if (reporting && !shift) {
             return Action.REPORT;
         }
-        if (type == MouseEvent.Type.WHEEL) {
+        if (type == MouseInput.Type.WHEEL) {
             return alternateBuffer ? Action.SEND_ARROWS : Action.SCROLL_VIEW;
         }
         if (button != Button.LEFT) {

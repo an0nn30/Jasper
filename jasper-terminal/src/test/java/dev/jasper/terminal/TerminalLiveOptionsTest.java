@@ -177,7 +177,7 @@ class TerminalLiveOptionsTest {
                 assertCursor(CursorStyle.BEAM);
             });
             connector.feed("\033[4 q");
-            Await.until(() -> session.snapshot().cursorShape() == CursorShape.STEADY_UNDERLINE, "program underline");
+            Await.until(() -> JediCellReader.cursor(CursorShape.STEADY_UNDERLINE).equals(session.snapshot().cursorShape()), "program underline");
             onEdt(() -> {
                 view.applyOptions(options(defaults.fontFamily(), 14f, defaults.fallbackFonts(), true, 1f,
                     CursorStyle.BLOCK, true, OptionAsMeta.LEFT, false, 100));
@@ -208,7 +208,7 @@ class TerminalLiveOptionsTest {
                 assertCursorVisible(true);
             });
             connector.feed("\033[1 q");
-            Await.until(() -> session.snapshot().cursorShape() == CursorShape.BLINK_BLOCK, "program blinking block");
+            Await.until(() -> JediCellReader.cursor(CursorShape.BLINK_BLOCK).equals(session.snapshot().cursorShape()), "program blinking block");
             onEdt(() -> assertCursorVisible(false));
             connector.feed("\033[0 q");
             Await.until(() -> session.snapshot().cursorShape() == null, "DECSCUSR zero resets configured cursor");

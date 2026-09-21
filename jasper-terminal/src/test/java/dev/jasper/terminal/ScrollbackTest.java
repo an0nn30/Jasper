@@ -100,10 +100,10 @@ class ScrollbackTest {
         ScreenSnapshot snapshot = session.snapshot(0); // "abye" at the top, then the wrapped message
         assertThat(snapshot.lineText(0)).isEqualTo("abye");
         assertThat(snapshot.lineText(1)).startsWith("[process");
-        TextStyle plain = snapshot.lines().get(0).getStyleAt(0);
-        TextStyle message = snapshot.lines().get(1).getStyleAt(1);
-        assertThat(message.getForeground()).isEqualTo(plain.getForeground());
-        assertThat(message.hasOption(TextStyle.Option.HIDDEN)).isFalse();
+        CellAttributes plain = snapshot.lines().get(0).attributesAt(0);
+        CellAttributes message = snapshot.lines().get(1).attributesAt(1);
+        assertThat(message.foreground()).isEqualTo(plain.foreground());
+        assertThat(message.has(CellAttributes.HIDDEN)).isFalse();
     }
 
     private void fiveLines() throws Exception {

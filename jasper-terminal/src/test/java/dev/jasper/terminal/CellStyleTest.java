@@ -17,7 +17,7 @@ class CellStyleTest {
 
     @Test
     void emptyStyleUsesThemeDefaults() {
-        CellStyle s = CellStyle.resolve(TextStyle.EMPTY, palette);
+        CellStyle s = CellStyle.resolve(new JediCellReader().attributes(TextStyle.EMPTY), palette);
         assertThat(s.foreground()).isEqualTo(palette.foreground());
         assertThat(s.background()).isEqualTo(palette.background());
         assertThat(s.bold()).isFalse();
@@ -28,7 +28,7 @@ class CellStyleTest {
     @Test
     void inverseSwapsForegroundAndBackground() {
         TextStyle style = new TextStyle(TerminalColor.index(1), null, EnumSet.of(Option.INVERSE));
-        CellStyle s = CellStyle.resolve(style, palette);
+        CellStyle s = CellStyle.resolve(new JediCellReader().attributes(style), palette);
         assertThat(s.foreground()).isEqualTo(palette.background());
         assertThat(s.background()).isEqualTo(palette.ansi().get(1));
     }
@@ -36,19 +36,19 @@ class CellStyleTest {
     @Test
     void hiddenTextUsesBackgroundAsForeground() {
         TextStyle style = new TextStyle(TerminalColor.index(2), null, EnumSet.of(Option.HIDDEN));
-        assertThat(CellStyle.resolve(style, palette).foreground()).isEqualTo(palette.background());
+        assertThat(CellStyle.resolve(new JediCellReader().attributes(style), palette).foreground()).isEqualTo(palette.background());
     }
 
     @Test
     void dimBlendsForegroundHalfwayToBackground() {
         TextStyle style = new TextStyle(TerminalColor.rgb(200, 200, 200), TerminalColor.rgb(0, 0, 0), EnumSet.of(Option.DIM));
-        assertThat(CellStyle.resolve(style, palette).foreground()).isEqualTo(new Color(100, 100, 100));
+        assertThat(CellStyle.resolve(new JediCellReader().attributes(style), palette).foreground()).isEqualTo(new Color(100, 100, 100));
     }
 
     @Test
     void boldItalicUnderlineFlags() {
         TextStyle style = new TextStyle(null, null, EnumSet.of(Option.BOLD, Option.ITALIC, Option.UNDERLINED));
-        CellStyle s = CellStyle.resolve(style, palette);
+        CellStyle s = CellStyle.resolve(new JediCellReader().attributes(style), palette);
         assertThat(s.bold()).isTrue();
         assertThat(s.italic()).isTrue();
         assertThat(s.underline()).isTrue();
@@ -58,6 +58,6 @@ class CellStyleTest {
     void hyperlinksAreUnderlined() {
         TextStyle link = new HyperlinkStyle(TextStyle.EMPTY, new LinkInfo(() -> { }));
 
-        assertThat(CellStyle.resolve(link, palette).underline()).isTrue();
+        assertThat(CellStyle.resolve(new JediCellReader().attributes(link), palette).underline()).isTrue();
     }
 }
