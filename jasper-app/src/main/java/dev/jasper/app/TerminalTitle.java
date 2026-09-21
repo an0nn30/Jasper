@@ -19,4 +19,8 @@ final class TerminalTitle {
     static String singleLine(String title) {
         return title == null ? "" : title.replace("\r", "").replace("\n", " ↵ ");
     }
+    /** The window title for a shell-reported title; "Jasper" when the shell has not set one. */
+    static String windowTitle(String shellTitle) {
+        return shellTitle == null || shellTitle.isBlank() ? "Jasper" : shellTitle;
+    }
 }

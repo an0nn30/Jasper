@@ -19,7 +19,7 @@ class MockUiTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var root = new JRootPane();
-            try (var title = MacTitleBar.install(root, owner, true, value -> {})) {
+            try (var title = WindowContent.installTitleBar(root, owner, true, value -> {})) {
                 assertThat(title).isNotNull();
                 root.setSize(958, 958); layoutTree(root);
                 assertThat(owner.toolbar().getHeight()).isEqualTo(53);

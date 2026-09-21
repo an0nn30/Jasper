@@ -204,7 +204,7 @@ public final class CommandPalettePreview {
                 var owner = new WindowContent(launcher, DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
                     themes, KeyBindings.defaults(true), System::nanoTime, history, true, index, snippets);
                 var root = new JRootPane();
-                var titleBar = MacTitleBar.install(root, owner, true, title -> {});
+                var titleBar = WindowContent.installTitleBar(root, owner, true, title -> {});
                 owner.installRootBindings(root);
                 var fixture = new Fixture(pending, sessions, themes, history, index, snippets, snippetsDirectory,
                     owner, root, titleBar);

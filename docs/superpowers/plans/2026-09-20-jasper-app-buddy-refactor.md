@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Approved for native execution; Tasks 1–2 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Tasks 1–3 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -293,7 +293,7 @@ Add the following test to ConfigLoaderTest (same package as ConfigSnapshot), the
 
 **Interfaces:** `ThemeController.subscribe(BiConsumer<ResolvedTheme,Boolean>) -> Subscription`; workspace-owned `WindowCallbacks(Consumer<Path> newWindow,Runnable quit,Consumer<TerminalWindow> activated,Consumer<TerminalWindow> closed,Consumer<WindowCallbacks.State> stateChanged)`; nested `State(TerminalWindow window,boolean showing,boolean iconified)`. `MacTitleBar.install(JRootPane,JComponent,JComponent,IntSupplier,Runnable,boolean) -> MacTitleBar`; `setTitle(String,boolean)`, `setLight(boolean)`, `refreshHeight()`, `setActive(boolean)`, `attach(JFrame)`, `close()`.
 
-- [ ] Replace ThemeController's existing owner-registration test with callback registration while preserving all install/rollback tests. Add this test on the EDT using existing `DesktopTestSupport.edt`:
+- [x] Replace ThemeController's existing owner-registration test with callback registration while preserving all install/rollback tests. Add this test on the EDT using existing `DesktopTestSupport.edt`:
 
 ```java
 @Test void closingThemeSubscriptionStopsFurtherDelivery() throws Exception {
@@ -309,8 +309,8 @@ Add the following test to ConfigLoaderTest (same package as ConfigSnapshot), the
 }
 ```
 
-- [ ] Run `./gradlew :jasper-app:test --tests '*ThemeControllerTest'`; expect missing `subscribe`.
-- [ ] Replace `Set<WindowContent> owners` by an ordered set of `BiConsumer<ResolvedTheme,Boolean>`. Replace the apply-loop target with `listener.accept(next, chromeChanged)`. Implement registration with rollback if initial delivery fails:
+- [x] Run `./gradlew :jasper-app:test --tests '*ThemeControllerTest'`; expect missing `subscribe`.
+- [x] Replace `Set<WindowContent> owners` by an ordered set of `BiConsumer<ResolvedTheme,Boolean>`. Replace the apply-loop target with `listener.accept(next, chromeChanged)`. Implement registration with rollback if initial delivery fails:
 
 ```java
 Subscription subscribe(java.util.function.BiConsumer<ResolvedTheme, Boolean> listener) {
@@ -324,11 +324,11 @@ Subscription subscribe(java.util.function.BiConsumer<ResolvedTheme, Boolean> lis
 
 WindowContent owns and closes its returned subscription. ConfigurationController remains an application coordinator over config, theme and workspace. Remove all ThemeController imports/references to WindowContent.
 
-- [ ] Add the callback record with compact-constructor null checks on all five components. Replace TerminalWindow's `JasperApplication` field with the record. Its event handlers call `callbacks.activated().accept(this)`, `callbacks.closed().accept(this)` and `callbacks.stateChanged().accept(new WindowCallbacks.State(this, showing, iconified))`. Application constructs it from its existing methods. Move configuration registration out of TerminalWindow into JasperApplication immediately after window construction and before showing; pass the initial snapshot for sizing. Do not move ConfigurationController into workspace.
+- [x] Add the callback record with compact-constructor null checks on all five components. Replace TerminalWindow's `JasperApplication` field with the record. Its event handlers call `callbacks.activated().accept(this)`, `callbacks.closed().accept(this)` and `callbacks.stateChanged().accept(new WindowCallbacks.State(this, showing, iconified))`. Application constructs it from its existing methods. Move configuration registration out of TerminalWindow into JasperApplication immediately after window construction and before showing; pass the initial snapshot for sizing. Do not move ConfigurationController into workspace.
 
-- [ ] Decouple MacTitleBar: transplant the existing geometry/painting/native methods; replace stored `WindowContent` with supplied `JComponent tabs`, `IntSupplier tabHeight`, and `Runnable minimumSizeChanged`. Use `tabs.getMinimumSize()/setBounds`, `tabHeight.getAsInt()` and `minimumSizeChanged.run()`. Workspace wires title/theme/height notifications and calls `windowTabs().setActive` itself. `setTitle` updates the label and single-tab visibility; `setLight` sets the existing Aqua/DarkAqua root property then refreshes colors. `install` sets the root content, creates the wrapper only when supported, and never registers workspace callbacks. Move the exact `Main.windowTitle` body into `TerminalTitle.windowTitle` and update callers/tests. Close detaches native/listener resources; workspace clears its callbacks when it closes.
+- [x] Decouple MacTitleBar: transplant the existing geometry/painting/native methods; replace stored `WindowContent` with supplied `JComponent tabs`, `IntSupplier tabHeight`, and `Runnable minimumSizeChanged`. Use `tabs.getMinimumSize()/setBounds`, `tabHeight.getAsInt()` and `minimumSizeChanged.run()`. Workspace wires title/theme/height notifications and calls `windowTabs().setActive` itself. `setTitle` updates the label and single-tab visibility; `setLight` sets the existing Aqua/DarkAqua root property then refreshes colors. `install` sets the root content, creates the wrapper only when supported, and never registers workspace callbacks. Move the exact `Main.windowTitle` body into `TerminalTitle.windowTitle` and update callers/tests. Close detaches native/listener resources; workspace clears its callbacks when it closes.
 
-- [ ] Run `./gradlew :jasper-app:test`; verify `rg 'WindowContent|JasperApplication|BuiltinTheme|Main\.' A/MacTitleBar.java` has no matches (expand `A` to its defined path). Commit `refactor: separate theme and platform ownership` with trailer.
+- [x] Run `./gradlew :jasper-app:test`; verify `rg 'WindowContent|JasperApplication|BuiltinTheme|Main\.' A/MacTitleBar.java` has no matches (expand `A` to its defined path). Commit `refactor: separate theme and platform ownership` with trailer.
 
 ## Task 4: Give workspace actions, settings and activity explicit owners
 

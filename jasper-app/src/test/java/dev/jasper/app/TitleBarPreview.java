@@ -18,7 +18,7 @@ public final class TitleBarPreview {
             edt(() -> {
                 var owner = content(launcher(new ArrayDeque<>()));
                 var root = new JRootPane();
-                try (var bar = MacTitleBar.install(root, owner, true, title -> {})) {
+                try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                     for (BuiltinTheme theme : BuiltinTheme.values()) {
                         owner.selectTheme(theme);
                         while (owner.tabStrip().getTabCount() > 1) owner.closeTab(owner.currentTab());

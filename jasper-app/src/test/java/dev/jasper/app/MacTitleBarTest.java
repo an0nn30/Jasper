@@ -22,7 +22,7 @@ class MacTitleBarTest {
             var owner = content(launcher(new ArrayDeque<>()));
             var root = new JRootPane();
             var metadata = new AtomicReference<String>();
-            try (var bar = MacTitleBar.install(root, owner, true, metadata::set)) {
+            try (var bar = WindowContent.installTitleBar(root, owner, true, metadata::set)) {
                 assertThat(root.getClientProperty("apple.awt.fullWindowContent")).isEqualTo(true);
                 assertThat(root.getClientProperty("apple.awt.transparentTitleBar")).isEqualTo(true);
                 assertThat(root.getClientProperty("apple.awt.windowTitleVisible")).isEqualTo(false);
@@ -42,7 +42,7 @@ class MacTitleBarTest {
             var owner = content(launcher(new ArrayDeque<>()));
             var root = new JRootPane();
             var metadata = new AtomicReference<String>();
-            assertThat(MacTitleBar.install(root, owner, false, metadata::set)).isNull();
+            assertThat(WindowContent.installTitleBar(root, owner, false, metadata::set)).isNull();
             assertThat(root.getContentPane()).isSameAs(owner);
             assertThat(root.getClientProperty("apple.awt.fullWindowContent")).isNull();
             assertThat(root.getClientProperty("apple.awt.transparentTitleBar")).isNull();
@@ -60,7 +60,7 @@ class MacTitleBarTest {
             var root = new JRootPane();
             var minimumChanges = new AtomicInteger();
             owner.onMinimumSizeChanged = minimumChanges::incrementAndGet;
-            try (var bar = MacTitleBar.install(root, owner, true, title -> {})) {
+            try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 assertThat(bar.getPreferredSize().height).isEqualTo(38);
                 JComponent tabs = WindowTabsTest.named(bar, "windowTabs");
                 assertThat(tabs).as("the real tabs are in the native header").isNotNull();
@@ -97,7 +97,7 @@ class MacTitleBarTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var root = new JRootPane();
-            try (var bar = MacTitleBar.install(root, owner, true, title -> {})) {
+            try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 assertThat(bar).isNotNull();
                 owner.installRootBindings(root);
                 bar.setSize(400, 28);
@@ -123,7 +123,7 @@ class MacTitleBarTest {
             var owner = content(launcher(new ArrayDeque<>()));
             var root = new JRootPane();
             int listeners = root.getPropertyChangeListeners(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS).length;
-            var bar = MacTitleBar.install(root, owner, true, title -> {});
+            var bar = WindowContent.installTitleBar(root, owner, true, title -> {});
             assertThat(bar).isNotNull();
             assertThat(root.getPropertyChangeListeners(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS)).hasSize(listeners + 1);
             owner.close(); bar.close();

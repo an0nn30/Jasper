@@ -13,60 +13,38 @@ import javax.swing.*;
 
 /** Native window boundary; all terminal behavior lives in the actual WindowContent component. */
 final class TerminalWindow implements AutoCloseable {
-    private final JasperApplication application;
+    private final WindowCallbacks callbacks;
     private final JFrame frame = new JFrame("Jasper");
     private final WindowContent content;
     private final MacTitleBar titleBar;
     private boolean closed;
     private final WindowAdapter events = new WindowAdapter() {
         @Override public void windowClosing(WindowEvent event) { close(); }
-        @Override public void windowActivated(WindowEvent event) { setActive(true); application.windowActivated(TerminalWindow.this); }
+        @Override public void windowActivated(WindowEvent event) { setActive(true); callbacks.activated().accept(TerminalWindow.this); }
         @Override public void windowDeactivated(WindowEvent event) { setActive(false); }
         @Override public void windowOpened(WindowEvent event) { reportState(); }
         @Override public void windowIconified(WindowEvent event) { reportState(); }
         @Override public void windowDeiconified(WindowEvent event) { reportState(); }
     };
 
-    TerminalWindow(JasperApplication application, ShellLauncher launcher, Path directory, ThemeController themes) {
-        this(application, launcher, directory, themes, null);
-    }
-
-    TerminalWindow(JasperApplication application, ShellLauncher launcher, Path directory, ThemeController themes,
-                   ConfigurationController configuration) {
-        this(application, launcher, directory, themes, configuration, new CommandHistory());
-    }
-
-    TerminalWindow(JasperApplication application, ShellLauncher launcher, Path directory, ThemeController themes,
-                   ConfigurationController configuration, CommandHistory history) {
-        this(application, launcher, directory, themes, configuration, history, new ShellHistoryIndex(java.util.List.of()));
-    }
-
-    TerminalWindow(JasperApplication application, ShellLauncher launcher, Path directory, ThemeController themes,
-                   ConfigurationController configuration, CommandHistory history, ShellHistoryIndex shellHistory) {
-        this(application, launcher, directory, themes, configuration, history, shellHistory, null);
-    }
-
-    TerminalWindow(JasperApplication application, ShellLauncher launcher, Path directory, ThemeController themes,
-                   ConfigurationController configuration, CommandHistory history, ShellHistoryIndex shellHistory,
-                   SnippetStore snippets) {
-        this.application = application;
+    TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, ThemeController themes,
+                   ConfigSnapshot initial, CommandHistory history, ShellHistoryIndex shellHistory, SnippetStore snippets) {
+        this.callbacks = callbacks;
         frame.setIconImages(ApplicationIcon.images(SystemInfo.isMacOS));
-        content = new WindowContent(launcher, directory, application::newWindow, application::quit, this::close, themes,
+        content = new WindowContent(launcher, directory, callbacks.newWindow(), callbacks.quit(), this::close, themes,
             KeyBindings.defaults(SystemInfo.isMacOS), System::nanoTime, history, SystemInfo.isMacOS, shellHistory, snippets);
-        content.onToggleBuddy = application::toggleBuddy;
-        content.buddyEnabled = application::buddyEnabled;
-        if (configuration != null) {
-            content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(configuration.snapshot()));
-            configuration.register(content);
+        if (initial != null) {
+            content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(initial));
+            content.applyConfiguration(initial, SystemInfo.isMacOS);
         }
-        titleBar = MacTitleBar.install(frame.getRootPane(), content, SystemInfo.isMacFullWindowContentSupported, frame::setTitle);
+        titleBar = WindowContent.installTitleBar(frame.getRootPane(), content, SystemInfo.isMacFullWindowContentSupported, frame::setTitle);
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.setJMenuBar(content.menuBar());
         content.installRootBindings(frame.getRootPane());
         content.onMinimumSizeChanged = this::updateMinimumSize;
         if (titleBar != null) titleBar.attach(frame);
         frame.addWindowListener(events); frame.pack();
-        if (configuration != null) {
+        if (initial != null) {
             updateMinimumSize();
             frame.setSize(InitialWindowSize.fit(frame.getSize(), frame.getMinimumSize(), usableBounds()));
         }
@@ -102,8 +80,8 @@ final class TerminalWindow implements AutoCloseable {
     }
 
     private void reportState() {
-        application.windowStateChanged(this, frame.isShowing(),
-            (frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0);
+        callbacks.stateChanged().accept(new WindowCallbacks.State(this, frame.isShowing(),
+            (frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0));
     }
 
     void toFront() {
@@ -129,6 +107,6 @@ final class TerminalWindow implements AutoCloseable {
         closed = true; content.close();
         if (titleBar != null) titleBar.close();
         frame.removeWindowListener(events); frame.dispose();
-        application.windowClosed(this);
+        callbacks.closed().accept(this);
     }
 }

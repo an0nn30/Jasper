@@ -262,8 +262,4 @@ public final class Main {
         }
     }
 
-    /** The window title for a shell-reported title; "Jasper" when the shell has not set one. */
-    static String windowTitle(String shellTitle) {
-        return shellTitle == null || shellTitle.isBlank() ? "Jasper" : shellTitle;
-    }
 }

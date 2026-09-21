@@ -13,6 +13,18 @@ import static dev.jasper.app.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.*;
 
 class ThemeControllerTest {
+@Test void closingThemeSubscriptionStopsFurtherDelivery() throws Exception {
+    DesktopTestSupport.edt(() -> {
+        var changes = new java.util.ArrayList<ResolvedTheme>();
+        var themes = new ThemeController(theme -> true);
+        var registration = themes.subscribe((theme, delegates) -> changes.add(theme));
+        assertThat(changes).hasSize(1);
+        registration.close(); registration.close();
+        themes.select(BuiltinTheme.LIGHT);
+        assertThat(changes).hasSize(1);
+    });
+}
+
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
     @Test @DisabledOnOs(OS.WINDOWS)

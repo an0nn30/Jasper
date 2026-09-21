@@ -149,7 +149,7 @@ class TabMotionTest {
             try (var f = new Fixture()) {
                 f.add("second");
                 var root = new JRootPane();
-                try (var header = MacTitleBar.install(root, f.owner, true, title -> {})) {
+                try (var header = WindowContent.installTitleBar(root, f.owner, true, title -> {})) {
                     layout(header, 958, 38);
                     Rectangle allocation = f.strip.getBounds();
                     f.owner.currentTab().rename("long title ".repeat(100)); layout(header, 958, 38);

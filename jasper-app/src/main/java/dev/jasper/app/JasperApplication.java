@@ -147,7 +147,13 @@ final class JasperApplication {
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(startSession(path, settings)), shellIntegrationDir);
-        TerminalWindow window = new TerminalWindow(this, launcher, directory, themes, configuration, history, shellHistory, snippets);
+        TerminalWindow window = new TerminalWindow(new WindowCallbacks(this::newWindow, this::quit,
+            this::windowActivated, this::windowClosed,
+            state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
+            launcher, directory, themes, configuration == null ? null : configuration.snapshot(), history, shellHistory, snippets);
+        if (configuration != null) configuration.register(window.content());
+        window.content().onToggleBuddy = this::toggleBuddy;
+        window.content().buddyEnabled = this::buddyEnabled;
         window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
         window.content().onCommandStarted = (command, pane, elapsed, focus, watched) ->
             notifications.started(pane, command, elapsed, focus, watched);

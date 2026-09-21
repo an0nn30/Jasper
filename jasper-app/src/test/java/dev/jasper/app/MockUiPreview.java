@@ -66,7 +66,7 @@ public final class MockUiPreview {
                 owner[0].tabStrip().setSelectedIndex(0);
                 owner[0].currentTab().rename("dustin");
                 root[0] = new JRootPane();
-                header[0] = MacTitleBar.install(root[0], owner[0], true, title -> {});
+                header[0] = WindowContent.installTitleBar(root[0], owner[0], true, title -> {});
                 owner[0].installRootBindings(root[0]);
             });
             while (!pending.isEmpty()) pending.remove().run();

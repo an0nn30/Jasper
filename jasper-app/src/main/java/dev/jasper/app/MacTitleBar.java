@@ -7,13 +7,15 @@ import com.jetbrains.WindowDecorations;
 import java.awt.*;
 import java.awt.event.*;
 import java.beans.PropertyChangeListener;
-import java.util.function.Consumer;
+import java.util.function.IntSupplier;
 import javax.swing.*;
 
 /** Integrated title tabs; macOS retains ownership of the decorated window and its gestures. */
 final class MacTitleBar extends JPanel implements AutoCloseable {
     private final JRootPane root;
-    private final WindowContent content;
+    private final JComponent tabs;
+    private final IntSupplier tabHeight;
+    private final Runnable minimumSizeChanged;
     private final JLabel title = new JLabel("Jasper", SwingConstants.CENTER);
     private final PropertyChangeListener boundsChanged;
     private JFrame frame;
@@ -32,41 +34,37 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
             SwingUtilities.invokeLater(this::refreshNativeGeometry);
     };
 
-    /** Called before pack; the platform argument keeps configuration testable without a JFrame. */
-    static MacTitleBar install(JRootPane root, WindowContent content, boolean supported, Consumer<String> nativeTitle) {
+    /** Called before pack; the host owns its component and notification wiring. */
+    static MacTitleBar install(JRootPane root, JComponent content, JComponent tabs,
+                               IntSupplier tabHeight, Runnable minimumSizeChanged, boolean supported) {
         root.setContentPane(content);
-        content.onTitle = value -> nativeTitle.accept(Main.windowTitle(value));
         if (!supported) return null;
-
         root.putClientProperty("apple.awt.fullWindowContent", true);
         root.putClientProperty("apple.awt.transparentTitleBar", true);
         root.putClientProperty("apple.awt.windowTitleVisible", false);
-        var bar = new MacTitleBar(root, content);
+        var bar = new MacTitleBar(root, tabs, tabHeight, minimumSizeChanged);
         var surface = new JPanel(new BorderLayout());
         surface.add(bar, BorderLayout.NORTH); surface.add(content, BorderLayout.CENTER);
         root.setContentPane(surface);
-        content.onTitle = value -> {
-            String displayTitle = Main.windowTitle(value);
-            nativeTitle.accept(displayTitle);
-            if (!displayTitle.equals(bar.title.getText())) bar.title.setText(displayTitle);
-            bar.title.setVisible(content.tabStrip().getTabCount() <= 1);
-            bar.revalidate(); bar.repaint();
-        };
-        content.onThemeChanged = theme -> bar.applyTheme(theme.chrome());
-        content.onTabHeightChanged = bar::refreshHeight;
-        bar.applyTheme(content.theme().chrome());
-        content.update();
         return bar;
     }
 
-    private MacTitleBar(JRootPane root, WindowContent content) {
+    private MacTitleBar(JRootPane root, JComponent tabs, IntSupplier tabHeight, Runnable minimumSizeChanged) {
         super(null);
-        this.root = root; this.content = content;
-        boundsChanged = event -> { revalidate(); repaint(); content.onMinimumSizeChanged.run(); };
+        this.root = root; this.tabs = tabs;
+        this.tabHeight = tabHeight; this.minimumSizeChanged = minimumSizeChanged;
+        boundsChanged = event -> { revalidate(); repaint(); minimumSizeChanged.run(); };
         title.putClientProperty("html.disable", true);
         title.getAccessibleContext().setAccessibleName("Window title");
-        add(title); add(content.windowTabs());
+        add(title); add(tabs);
         root.addPropertyChangeListener(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, boundsChanged);
+    }
+
+    /** Updates metadata independently of the window's workspace model. */
+    void setTitle(String value, boolean singleTab) {
+        if (closed) return;
+        if (!value.equals(title.getText())) title.setText(value);
+        title.setVisible(singleTab); revalidate(); repaint();
     }
 
     /** Public JBR API only. Root properties above remain the fallback on other runtimes. */
@@ -90,7 +88,7 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
         int right = (int) Math.ceil(nativeTitle.getRightInset());
         if (nativeLeft != left || nativeRight != right) {
             nativeLeft = left; nativeRight = right;
-            revalidate(); repaint(); content.onMinimumSizeChanged.run();
+            revalidate(); repaint(); minimumSizeChanged.run();
         }
     }
 
@@ -101,16 +99,16 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
         return Math.max(UIScale.scale(120), Math.max(nativeLeft, controlsEnd) + UIScale.scale(8));
     }
 
-    private int titleHeight() { return UIScale.scale(content.tabHeight()); }
+    private int titleHeight() { return UIScale.scale(tabHeight.getAsInt()); }
 
-    private void refreshHeight() {
+    void refreshHeight() {
         if (closed) return;
         refreshNativeGeometry();
         revalidate(); repaint(); root.revalidate(); root.repaint();
     }
 
     @Override public Dimension getMinimumSize() {
-        return new Dimension(safeInset() + nativeRight + content.windowTabs().getMinimumSize().width, titleHeight());
+        return new Dimension(safeInset() + nativeRight + tabs.getMinimumSize().width, titleHeight());
     }
     @Override public Dimension getPreferredSize() { return new Dimension(Math.max(UIScale.scale(400), getMinimumSize().width), titleHeight()); }
 
@@ -118,21 +116,21 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
         refreshNativeGeometry();
         int left = Math.min(safeInset(), getWidth());
         int available = Math.max(0, getWidth() - left - nativeRight);
-        content.windowTabs().setBounds(left, 0, available, getHeight());
+        tabs.setBounds(left, 0, available, getHeight());
         // A lone session uses the ordinary centered window title. Reserve the same space
         // at both ends so native controls cannot shift the title away from the window center.
         int inset = Math.max(left, nativeRight);
         title.setBounds(inset, 0, Math.max(0, getWidth() - 2 * inset), getHeight());
     }
 
-    private void applyTheme(BuiltinTheme theme) {
+    void setLight(boolean light) {
         if (closed) return;
         root.putClientProperty("apple.awt.windowAppearance",
-            theme == BuiltinTheme.LIGHT ? "NSAppearanceNameAqua" : "NSAppearanceNameDarkAqua");
+            light ? "NSAppearanceNameAqua" : "NSAppearanceNameDarkAqua");
         refreshColors();
     }
 
-    void setActive(boolean active) { this.active = active; content.windowTabs().setActive(active); refreshColors(); }
+    void setActive(boolean active) { this.active = active; refreshColors(); }
 
     private void refreshColors() {
         setBackground(UIManager.getColor("Jasper.titleBackground"));
@@ -158,8 +156,5 @@ final class MacTitleBar extends JPanel implements AutoCloseable {
             decorations.setCustomTitleBar(frame, null);
             frame = null; nativeTitle = null; decorations = null;
         }
-        content.onThemeChanged = theme -> {};
-        content.onTabHeightChanged = () -> {};
-        content.onTitle = value -> {};
     }
 }

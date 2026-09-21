@@ -18,6 +18,10 @@ Existing javac/doclint warnings are nonfatal and will be reviewed with documenta
 1. Baseline captured; all 114 production app types mapped by the approved plan.
 2. Settings/subscription/builder tests failed on absent APIs, then passed. Full app suite passed (732 tests, one expected skip). Existing config/search behavior retained.
 
+3. Theme subscription/title-bar APIs failed before extraction, then focused and full app tests passed (733 tests, one expected skip).
+
+Task 3: Ruling: Keep pre-pack initial snapshot application in TerminalWindow, then register with ConfigurationController from the application — preserves geometry before pack while removing reverse ownership; wrong ordering would change initial sizing. WindowContent.installTitleBar is the workspace adapter exercised by existing headless title-bar tests. No trivial callback-record-only test; real wiring is covered by those integration tests.
+
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.

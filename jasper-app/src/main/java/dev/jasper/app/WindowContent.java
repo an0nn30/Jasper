@@ -43,6 +43,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
     private float configuredFontSize = TerminalPane.DEFAULT_FONT_SIZE;
     private final WindowChrome chrome;
     private final ThemeController themes;
+    private final Subscription themeRegistration;
     private JRootPane bindingRoot;
     Runnable onMinimumSizeChanged = () -> {};
     static final int DEFAULT_TAB_HEIGHT = 38;
@@ -179,8 +180,27 @@ final class WindowContent extends JPanel implements AutoCloseable {
                 if (currentTab() != null) currentTab().focusTerminal();
             }
         });
-        themes.register(this);
+        themeRegistration = themes.subscribe(this::applyTheme);
         newTab(directory);
+    }
+
+    /** Workspace adapter: wires title/theme values to the platform-only title bar. */
+    static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
+                                      Consumer<String> nativeTitle) {
+        var bar = MacTitleBar.install(root, content, content.windowTabs(), content::tabHeight,
+            () -> content.onMinimumSizeChanged.run(), supported);
+        content.onTitle = value -> {
+            String display = TerminalTitle.windowTitle(value);
+            nativeTitle.accept(display);
+            if (bar != null) bar.setTitle(display, content.tabStrip().getTabCount() <= 1);
+        };
+        if (bar != null) {
+            content.onThemeChanged = theme -> bar.setLight(theme.chrome() == BuiltinTheme.LIGHT);
+            content.onTabHeightChanged = bar::refreshHeight;
+            bar.setLight(content.theme().chrome() == BuiltinTheme.LIGHT);
+        }
+        content.update();
+        return bar;
     }
 
     void installRootBindings(JRootPane root) {
@@ -651,7 +671,7 @@ final class WindowContent extends JPanel implements AutoCloseable {
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};
         windowTabs.close();
-        themes.unregister(this);
+        themeRegistration.close();
         for (int i = 0; i < tabs.getTabCount(); i++) ((TerminalTab) tabs.getComponentAt(i)).close();
         tabs.removeAll(); removeRootBindings();
         actions.values().forEach(action -> action.setEnabled(false));

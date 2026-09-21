@@ -7,10 +7,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import dev.jasper.app.lifecycle.Subscription;
 import java.util.function.Predicate;
 import javax.swing.*;
 
-/** Application-owned, EDT-confined theme selection and window contents. */
+/** Application-owned, EDT-confined theme selection and value subscriptions. */
 final class ThemeController {
     // FlatLaf appends registrations, so register this package once rather than once per switch.
     static { FlatLaf.registerCustomDefaultsSource("dev.jasper.app.themes"); }
@@ -21,7 +23,7 @@ final class ThemeController {
         }
     }
 
-    private final Set<WindowContent> owners = new LinkedHashSet<>();
+    private final Set<BiConsumer<ResolvedTheme, Boolean>> listeners = new LinkedHashSet<>();
     private final Predicate<BuiltinTheme> installer;
     private ThemeState state = ThemeState.defaults();
 
@@ -47,15 +49,17 @@ final class ThemeController {
         if (chromeChanged) installOrThrow(next.chrome());
         state = candidate;
         if (!previous.equals(next) || choiceChanged)
-            for (WindowContent owner : List.copyOf(owners)) owner.applyTheme(next, chromeChanged);
+            for (var listener : List.copyOf(listeners)) listener.accept(next, chromeChanged);
     }
 
-    void register(WindowContent owner) {
-        requireEdt();
-        if (owners.add(Objects.requireNonNull(owner))) owner.applyTheme(current(), true);
+    /** Replays current appearance; the subscribing owner closes its registration on disposal. */
+    Subscription subscribe(BiConsumer<ResolvedTheme, Boolean> listener) {
+        requireEdt(); Objects.requireNonNull(listener);
+        if (!listeners.add(listener)) return new Subscription(() -> {});
+        try { listener.accept(current(), true); }
+        catch (RuntimeException | Error failure) { listeners.remove(listener); throw failure; }
+        return new Subscription(() -> { requireEdt(); listeners.remove(listener); });
     }
-
-    void unregister(WindowContent owner) { requireEdt(); owners.remove(owner); }
 
     private void installOrThrow(BuiltinTheme theme) {
         LookAndFeel previous = UIManager.getLookAndFeel();

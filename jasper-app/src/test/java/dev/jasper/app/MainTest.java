@@ -8,12 +8,12 @@ class MainTest {
 
     @Test
     void windowTitleFallsBackToJasperWhenTheShellHasNoTitle() {
-        assertThat(Main.windowTitle(null)).isEqualTo("Jasper");
-        assertThat(Main.windowTitle(" ")).isEqualTo("Jasper");
+        assertThat(TerminalTitle.windowTitle(null)).isEqualTo("Jasper");
+        assertThat(TerminalTitle.windowTitle(" ")).isEqualTo("Jasper");
     }
 
     @Test
     void windowTitleUsesTheShellTitle() {
-        assertThat(Main.windowTitle("vim README.md")).isEqualTo("vim README.md");
+        assertThat(TerminalTitle.windowTitle("vim README.md")).isEqualTo("vim README.md");
     }
 }
