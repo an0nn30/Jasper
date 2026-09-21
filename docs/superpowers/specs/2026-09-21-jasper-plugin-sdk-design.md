@@ -1,7 +1,7 @@
 # Jasper plugin SDK
 
 **Date:** 2026-09-21  
-**Status:** Design approved section by section in conversation on 2026-09-21; awaiting the user's review of this written spec. Nothing is implemented.  
+**Status:** Design approved section by section in conversation on 2026-09-21; revised the same day after an external review (section 15); awaiting the user's review of this written spec. Nothing is implemented.  
 **Baseline:** `1f8ba74` on `main`, after the app/Buddy refactor and documentation audit.  
 **Scope:** A supported plugin SDK (`jasper-sdk`), the application runtime that loads third-party plugins, the UI, terminal, event and service extension surfaces, and the verification and documentation that keep them honest. The Credential Vault and SSH plugins are consumers of this SDK and get their own specs.
 
@@ -41,8 +41,10 @@ This spec amends the binding authorities. On 2026-09-21 the user lifted the
 implementations" still holds and is satisfied throughout (section 12). The
 JediTerm boundary, the terminal and application allowlists, the threading rules
 and source hygiene all remain in force. The Phase 1 two-week trial gate recorded
-in `docs/STATUS.md` still governs when the **SSH plugin** itself begins; SDK plans
-1–3 do not touch the terminal foundation and plan 4's terminal change is additive.
+in `docs/STATUS.md` still governs when the **SSH plugin** itself begins. SDK plans
+1–3 do not touch the terminal foundation. Plan 4 adds `attach` and makes one
+behavior change to local sessions, working-directory provenance (section 6), which
+the user should weigh against that gate when plan 4 is scheduled.
 
 ### Lessons taken from TermLab
 
@@ -74,7 +76,8 @@ hard-coded to the local PTY.
   types.
 - **`jasper-terminal`** gains one allowlisted entry point,
   `TerminalSession.attach(...)`, with its own module-local `TerminalConnection`
-  record, ported from the `codex/rail-vault-implementation` worktree.
+  record. The record shape comes from the `codex/rail-vault-implementation`
+  worktree; the connector behind it is redesigned (section 6).
 - **In-repo plugins** live under `plugins/`: `plugins/sample` (this spec), later
   `plugins/vault-api`, `plugins/vault`, `plugins/ssh`. They compile against
   `jasper-sdk` only (SSH also `compileOnly` against `vault-api`), ship in the app
@@ -177,12 +180,28 @@ public interface Plugin {
   times each `start` and logs slow ones.
 - If `start` throws, every registration the plugin made is rolled back, the plugin
   is `FAILED`, its hard dependents are `SKIPPED`, and the app continues.
-- At shutdown, in reverse dependency order and on the EDT: `stop()`, then the
-  runtime closes every `Subscription` the plugin still holds in reverse
-  registration order, closes its windows, dialogs and plugin-provided sessions,
-  fails its open activities, and shuts down its executor. The whole plugin
-  shutdown has a time budget consistent with fast quit; a plugin that exceeds it
-  is abandoned and logged.
+- Shutdown, in this order:
+  1. The app writes its own persistent state (panel and window state,
+     `plugins.toml`) so that nothing app-owned depends on plugins behaving.
+  2. The app **arms an independent process-exit deadline** on a non-EDT platform
+     thread, before any plugin code runs. Today `ApplicationShutdown.await` only
+     bounds asynchronous futures and is itself started from the EDT, so it cannot
+     fire if an EDT callback never returns; the deadline must be armed first and
+     must not need the EDT to fire. When it fires the process terminates; the
+     existing process shutdown hook still releases the handoff endpoint and logs.
+  3. On the EDT, in reverse dependency order: `stop()`, then the runtime closes
+     every `Subscription` the plugin still holds in reverse registration order,
+     closes its windows and dialogs, cancels its pending session attempts, fails
+     its open activities, and stops admitting tasks to its executor.
+  4. Asynchronous remainders join the existing bounded wait: the termination of
+     each plugin executor, and the `exited` future of each attached connection
+     whose `close` has been invoked (section 6).
+- `stop()` must return promptly and must not block on I/O; work that needs time
+  belongs on `background()` before or during `stop()` and is bounded by step 4.
+  **A blocked EDT callback cannot be abandoned:** while `stop()` or a handler
+  blocks the EDT, no further EDT cleanup runs, later plugins' `stop()` is not
+  called, and the armed deadline ends the process. That is the reason for step 1.
+  The runtime logs which plugin's callback was executing when the deadline fired.
 
 ### Context
 
@@ -213,10 +232,21 @@ public interface PluginContext {
 }
 ```
 
-`dev.jasper.sdk.Subscription` is a final, idempotent `AutoCloseable` with the same
-contract as the app's `lifecycle.Subscription`. Every `register`, `add`,
-`subscribe` and `publish(service)` call returns one (or a handle extending it). A
-plugin may close one early; the runtime closes whatever remains.
+```java
+public interface Subscription extends AutoCloseable {
+    @Override void close();       // idempotent; never throws; safe from any thread
+}
+```
+
+`Subscription` is an **interface** (implemented by the app and by the testkit), so
+the handle types `PluginAction`, `PluginMenu` and `StatusItem` can extend it. Every
+`register`, `add` and `subscribe` call returns one or a handle extending it. A
+plugin may close one early; the runtime closes whatever remains. `close()` may be
+called from any thread: on the EDT the contribution is removed, and no further
+event is delivered, before `close()` returns; off the EDT the removal is posted to
+the EDT, and at most one delivery already in progress may still complete. All
+other handle methods (`setText`, `setEnabled`, `PluginMenu.add`, …) are EDT-only.
+Service publication deliberately returns no `Subscription` (section 8).
 
 ### Capabilities
 
@@ -243,16 +273,29 @@ per-consumer grant (section 8).
 
 ### Threading
 
+Plugin code is called under two distinct contracts.
+
+**Callbacks** (UI and events):
+
 - **EDT only:** `start`, `stop`, every registration call, every UI factory, every
-  action handler, and every event handler. Registries throw
-  `IllegalStateException` off the EDT, like `CommandRegistry.requireEdt()`.
-- **Any thread:** `log`, `background`, `dataDirectory`, `config` getters,
-  `events().publish`, `activities()` handles, `services().require/find`,
+  action handler, every event handler, the session `connector`, and per-consumer
+  service factories. Registries throw `IllegalStateException` off the EDT, like
+  `CommandRegistry.requireEdt()`.
+- **Plugin `background()` executor:** `PendingSession.onCancelled` handlers, which
+  usually abort blocking network work.
+- **Callable from any thread:** `log`, `background`, `dataDirectory`, `config`
+  getters, `events().publish`, `activities()` handles, `services().require/find`
+  (a cache lookup that runs no provider code), `Subscription.close`,
   `PaneHandle.sendText/sendBytes/paste`, and every `PendingSession` method.
-- A plugin's `TerminalConnection.output` is read on the session's reader thread;
-  `resize` and `close` may be called from any thread.
-- Plugin code never runs on a session reader thread or under the terminal buffer
-  lock. The app hops to the EDT before any plugin sees an event.
+- No callback runs on a session reader thread or under the terminal buffer lock.
+  The app hops to the EDT before any plugin sees an event.
+
+**Transport operations** (the members of a `TerminalConnection`, section 6) are
+plugin code that necessarily runs on terminal threads: `output.read` on the
+session's reader thread, `input.write`/`flush` and `resize` on the session's
+app-owned writer thread, and `close` on an app worker. None ever runs on the EDT or
+under the buffer lock. Transport code must not touch Swing or call EDT-only SDK
+methods.
 
 ### Containment
 
@@ -288,7 +331,16 @@ These are the targeted changes to current code, each exposed in app-native types
    `notifications` does not import the SDK. `jasper-buddy` is unchanged.
 6. **`platform/MacTitleBar`** supports a title-only (no tabs) mode for plugin
    windows.
-7. **`jasper-terminal`**: `TerminalSession.attach` (section 6).
+7. **`jasper-terminal`** (section 6): `TerminalSession.attach`, with an app-owned
+   outbound writer per attached session (the rail-vault `StreamConnector` writes
+   and flushes synchronously on the caller's thread and is not ported as is), and
+   **working-directory provenance**: `ShellCommandTracker.directoryFromUri`
+   currently discards the OSC 7 host, so local and remote directories are
+   indistinguishable. This one is a behavior change to local sessions, not only an
+   additive entry point.
+8. **`application/ApplicationShutdown`** arms its deadline before plugin shutdown
+   begins (section 3), and **`bootstrap`** treats `--safe-mode` and `--plugin-dir`
+   as standalone launches (section 10).
 
 ## 5. UI surface
 
@@ -449,10 +501,14 @@ public interface Terminals {
 // WindowHandle: id, tabs, activeTab, isActive, isOpen, toFront
 // TabHandle:    id, window, panes, activePane, title, select, isOpen
 // PaneHandle:   id, tab, info, foregroundJob, sendText, sendBytes, paste, selection, focus, isOpen
-public record PaneInfo(String title, Optional<Path> workingDirectory, int columns, int rows,
+public record PaneInfo(String title, Optional<Path> workingDirectory,
+                       Optional<RemoteDirectory> remoteDirectory, int columns, int rows,
                        boolean shellIntegration, SessionKind kind,
-                       Optional<String> providerPluginId, SessionState state) {}
-// SessionKind: LOCAL, PLUGIN.  SessionState: CONNECTING, RUNNING, EXITED (with exit status)
+                       Optional<String> providerPluginId, SessionState state,
+                       OptionalInt exitStatus) {}
+public record RemoteDirectory(String host, String path) {}
+// SessionKind: LOCAL, PLUGIN.  SessionState: CONNECTING, RUNNING, EXITED.
+// exitStatus is present only when EXITED with a known status.
 ```
 
 - `foregroundJob()` returns `CompletableFuture<Optional<String>>` because the
@@ -484,41 +540,115 @@ public record SessionSpec(String title, Optional<Icon> icon, ExitPolicy onExit,
                           Consumer<PendingSession> connector) {}
 public enum ExitPolicy { KEEP_OPEN, CLOSE_PANE }     // plugins normally choose KEEP_OPEN
 
-public interface PendingSession {                     // every method is safe from any thread
+public interface PendingSession {                     // one connection attempt; every method is safe from any thread
     PaneHandle pane();
     int columns(); int rows();                        // the size to request for the remote pty
     void status(String text);
     void attach(TerminalConnection connection);
     void fail(String message);
-    Subscription onCancelled(Runnable handler);       // the user closed the pane or pressed Cancel
+    boolean isCancelled();
+    Subscription onCancelled(Runnable handler);
 }
 
 public record TerminalConnection(
-    InputStream output,                               // remote to terminal; read on the reader thread
+    InputStream output,                               // remote to terminal; EOF after the remote side ends
     OutputStream input,                               // terminal to remote
     BiConsumer<Integer, Integer> resize,              // columns, rows
-    CompletableFuture<Integer> exited,                // exit status
-    Runnable close) {                                 // must promptly unblock any pending read
+    CompletableFuture<Integer> exited,                // exit status; exceptional completion = unknown status
+    Runnable close) {                                 // idempotent; unblocks a pending read; returns promptly
     public static final String TERM = "xterm-256color";
 }
 ```
 
+#### Attempts, ownership and cancellation
+
 - The app opens the pane with a placeholder (status line and Cancel) and calls
   `connector.accept(pending)` on the EDT; the plugin does its work on
-  `background()` and ends with exactly one of `attach` or `fail`. A second call is
-  ignored and logged.
-- When `exited` completes under `KEEP_OPEN`, the pane stays with a
-  "disconnected (exit N)" banner and a **Reconnect** button that calls the same
-  `connector` again with a fresh `PendingSession`. First connect and reconnect
-  share one path. This shape is compatible with workspace restore later; restore is
-  out of scope because Jasper has none today.
+  `background()`. A connector that throws is treated as `fail(message)`.
+- Each connector invocation receives a fresh `PendingSession` representing **one
+  attempt** with the states `PENDING` → `ATTACHED` | `FAILED` | `CANCELLED`. The
+  transition is atomic and the first one wins. A pane has at most one live attempt.
+- **Cancellation** happens when the user presses Cancel, the pane, tab or window
+  closes, the providing plugin stops, or the app shuts down. `onCancelled` handlers
+  run at most once, on the plugin's `background()` executor; a handler registered
+  after cancellation is scheduled immediately. `isCancelled()` supports polling.
+- **Ownership transfers at the call to `attach`, whatever the outcome.** The app
+  guarantees that `close` is invoked exactly once for every connection passed to
+  `attach`. If the attempt is no longer `PENDING` (cancelled, already completed,
+  pane gone, app shutting down), the connection is **rejected**: the app never
+  reads it and invokes its `close` at once on an app worker. This is the guarantee
+  `SessionLaunchCoordinator.track` already gives late-acquired local sessions, so a
+  connect that finishes after the user cancelled cannot leak a live connection.
+  Anything the plugin must release with the session (the SSH client session behind
+  a channel) is therefore released from `close`.
+- `status` and `fail` on an attempt that is not `PENDING` are ignored and logged at
+  debug.
+- **Reconnect isolation:** Reconnect is offered only once the previous attempt is
+  terminal and its connection's `close` has been invoked. It calls the same
+  `connector` with a fresh `PendingSession`; calls arriving on a stale attempt
+  follow the rules above, so a slow first attempt cannot attach into a later one.
+  A failed reconnect returns the pane to the disconnected banner with the failure
+  message and Reconnect still available. First connect and reconnect share one
+  path, which is compatible with workspace restore later; restore is out of scope
+  because Jasper has none today.
+
+#### Exit and drain
+
+- `exited` completing normally gives the exit status. Completing exceptionally or
+  by cancellation, or an `IOException` from `output` or `input`, is a transport
+  failure: the state becomes `EXITED` with an empty `exitStatus` and the banner
+  shows the failure message.
+- After `exited` completes the app keeps reading `output` until EOF or a bounded
+  drain window elapses, then invokes `close`, and only then publishes
+  `SESSION_STATE_CHANGED` and shows the banner, so final output is on screen before
+  "disconnected (exit N)". Under `CLOSE_PANE` the pane closes after the same drain.
+- When the app closes first (user closes the pane, shutdown), it invokes `close` and
+  the connection's `exited` future joins the bounded shutdown wait (section 3).
+  If `close` does not unblock the reader within a bound, the daemon reader thread
+  is abandoned and logged.
+
+#### Transport contract
+
+A stalled network must never freeze typing, pasting or window resizing, so the
+terminal layer, not the plugin, owns outbound queuing for attached sessions:
+
+- Each attached session has one app-owned writer thread and a bounded outbound
+  queue (4 MiB). `TerminalSession.write` and `resize` on an attached session only
+  enqueue and return; they never call plugin code on the caller's thread.
+- Writes reach `input.write` followed by `flush` in submission order. Resizes are
+  coalesced (latest wins) and delivered through the same thread, so their order
+  relative to writes is preserved.
+- **Backpressure:** a write that does not fit is rejected whole, never partially,
+  and the pane shows an "input dropped: remote is not accepting input" notice.
+  Nothing blocks.
+- **Failure:** an `IOException` from `write` or `flush` is a transport failure as
+  above.
+- `output.read` may block indefinitely on the reader thread; that is inherent and
+  the reason `close` must unblock it. `resize` and `close` should return promptly,
+  but only the writer thread or an app worker ever waits on them.
+- The local PTY path is unchanged by this spec.
+
+#### Terminal integration
+
 - `TerminalSession.attach(connection, grid, scrollback)` joins the app-facing
   allowlist. The attached stream runs through the same `ShellIntegrationFilter`
   chain as a local PTY, so a remote shell with integration produces the same
   command events, and Buddy notices and other plugins work on SSH panes unchanged.
   No JediTerm type appears in any signature.
-- `PaneInfo.workingDirectory` is empty for a plugin session when the OSC 7 host is
-  not the local machine.
+- **Working-directory provenance.** The terminal layer keeps the OSC 7 host instead
+  of discarding it and classifies each report. It is *local* when the session is a
+  local PTY and the host is empty, `localhost`, or equals the machine's host name
+  (case-insensitive, compared on the first DNS label). Everything else, and every
+  report on an attached session, is *remote*. The existing local `Path` surface
+  (`TerminalSession.workingDirectory()`, `workingDirectoryChanged`, and the
+  directory on `commandExecuted`) carries local directories only and becomes empty
+  while the shell reports a remote one; a remote report is exposed separately as
+  host plus path string. Consequently command history, "new tab/split in the same
+  directory" and launch capture never receive a remote path, including when the
+  user runs `ssh` by hand inside a local pane, which today mislabels the remote
+  directory as local. In the SDK, `PaneInfo.workingDirectory` is the local value,
+  `PaneInfo.remoteDirectory` the remote one, and `CWD_CHANGED` and
+  `COMMAND_FINISHED` carry both.
 - The plugin requests `TerminalConnection.TERM` on the remote pty.
 - A user "Split Right" on a plugin pane opens a local shell; duplicating through
   the provider is not in v1.
@@ -566,7 +696,7 @@ to a sealed family would break plugins' exhaustive switches at runtime.
 
 | Holder | Topics |
 |---|---|
-| `TerminalEvents` (subscribe needs `terminal.observe`) | `WINDOW_OPENED`, `WINDOW_CLOSED`, `WINDOW_ACTIVATED`, `TAB_OPENED`, `TAB_CLOSED`, `TAB_SELECTED`, `PANE_OPENED`, `PANE_CLOSED`, `PANE_FOCUSED`, `ACTIVE_PANE_CHANGED`, `TITLE_CHANGED`, `CWD_CHANGED`, `COMMAND_STARTED`, `COMMAND_FINISHED` (pane, command, exit status, duration, working directory), `SESSION_STATE_CHANGED`, `BELL` |
+| `TerminalEvents` (subscribe needs `terminal.observe`) | `WINDOW_OPENED`, `WINDOW_CLOSED`, `WINDOW_ACTIVATED`, `TAB_OPENED`, `TAB_CLOSED`, `TAB_SELECTED`, `PANE_OPENED`, `PANE_CLOSED`, `PANE_FOCUSED`, `ACTIVE_PANE_CHANGED`, `TITLE_CHANGED`, `CWD_CHANGED`, `COMMAND_STARTED`, `COMMAND_FINISHED` (pane, command, exit status, duration, local and remote working directory), `SESSION_STATE_CHANGED`, `BELL` |
 | `AppEvents` (no capability) | `THEME_CHANGED`, `CONFIG_RELOADED` |
 
 A bridge in `dev.jasper.app.plugins` translates the app's internal
@@ -615,24 +745,37 @@ public record ActivityEvent(UUID id, String sourcePluginId, String title, State 
 
 ```java
 public interface Services {
-    <T> Subscription publish(Class<T> api, T implementation);
-    <T> Subscription publish(Class<T> api, Function<PluginInfo, T> perConsumer);
+    <T> void publish(Class<T> api, T implementation);                      // only during start()
+    <T> void publish(Class<T> api, Function<PluginInfo, T> perConsumer);   // only during start()
     <T> T require(Class<T> api);            // throws ServiceUnavailableException
     <T> Optional<T> find(Class<T> api);
 }
 ```
 
+- **Lifetime.** A publication lasts from the provider's successful `start` until the
+  provider stops at shutdown. There is no withdrawal, so `publish` returns no
+  `Subscription`. It may be called only on the EDT during the provider's own
+  `start` and throws `IllegalStateException` afterwards.
+- **Commit on success.** Publications become visible only when the provider's
+  `start` returns normally. If `start` throws after publishing, the publications
+  are discarded with the rest of the rollback; since dependents start strictly
+  later, no consumer ever observes a service from a plugin that failed to start.
+- **Factory thread.** A per-consumer factory is never run by `require` or `find`.
+  The runtime invokes it on the EDT, once for each plugin that declares `requires`
+  on the provider (hard or optional), immediately before that consumer's `start`,
+  and caches the result. `require` and `find` are pure cache lookups from any
+  thread and execute no provider code. A factory that throws is contained; that
+  consumer gets `ServiceUnavailableException` or an empty `find`.
+
 - `api` must be an interface loaded by the publisher's own classloader from one of
   its `exports` packages; that is the ownership check. One provider per API class.
   Pluggable back ends are the API owner's business.
-- The per-consumer overload is called once per consuming plugin with that
-  consumer's verified `PluginInfo`, and the result is cached. It gives the provider
-  caller attribution without stack-walking or caller-supplied identity. It supports
-  consent and audit; it is not a security boundary.
-- Hard dependencies start first, so `require` inside `start` works when the
-  provider published inside its own `start`. A provider that failed to start leaves
-  hard dependents `SKIPPED` and optional dependents with an empty `find`. Because
-  changes apply on restart, a provider never disappears at runtime.
+- The per-consumer overload receives the consumer's verified `PluginInfo`. It gives
+  the provider caller attribution without stack-walking or caller-supplied
+  identity. It supports consent and audit; it is not a security boundary.
+- Hard dependencies start first, so `require` inside `start` always works for a
+  provider that started. A provider that failed to start leaves hard dependents
+  `SKIPPED` and optional dependents with an empty `find`.
 - The app publishes nothing here; its API is the `PluginContext`.
 - An exported package holds only interfaces, records and `Topic` constants, built
   as a separate API jar (for example `plugins/vault-api` → `vault-api.jar`) shipped
@@ -664,8 +807,42 @@ reports status, unlocks, fetches the credential (grant prompt on first use),
 connects, prompts for an unknown host key with `windows().dialog`, attaches, and
 closes the credential. A Vault auto-lock leaves live SSH sessions running because
 SSH holds no secret after connecting. A later SFTP transfer uses
-`activities().begin(...)` and appears on Buddy with no SFTP-specific code. The
-walkthrough forced no SDK addition.
+`activities().begin(...)` and appears on Buddy with no SFTP-specific code.
+
+### Failure walkthroughs
+
+These exercise the lifecycle contracts rather than the extension points; each is a
+required test scenario (section 11).
+
+1. **Cancellation while the Vault is unlocking.** The SSH connector is awaiting
+   `ensureUnlocked` when the pane closes (a window-modal unlock prompt makes the
+   pane's own Cancel unreachable, so this arrives through tab or window close, or
+   quit). The attempt becomes `CANCELLED`; SSH's `onCancelled` handler runs on its
+   `background()` executor and cancels the future it is waiting on. Requirement
+   carried into the Vault spec: cancelling a future returned by `VaultApi`
+   withdraws that request, and the prompt is dismissed when no other requester is
+   waiting. No connection exists yet, so nothing else needs disposal.
+2. **Cancellation that loses the race with connect.** The user cancels; MINA
+   finishes connecting anyway and SSH calls `attach`. The attempt is `CANCELLED`,
+   so the connection is rejected and its `close` runs at once, releasing the
+   channel and the client session. The credential was already closed by SSH's
+   try-with-resources.
+3. **Shutdown during connection.** Quit cancels every pending attempt (as in 1) and
+   invokes `close` on every attached connection; their `exited` futures and the
+   plugin executors join the bounded wait. An `attach` that arrives afterwards is
+   rejected as in 2. If SSH's `stop()` or a handler blocks the EDT, the deadline
+   armed before plugin shutdown ends the process; app-owned state was already
+   written.
+4. **Failed reconnect.** A session exits; the banner offers Reconnect. The second
+   attempt fails authentication and calls `fail(message)`: the pane returns to the
+   banner with that message and Reconnect still offered. If the first attempt's
+   late `status` or `attach` arrives during the second attempt, it is addressed to
+   a terminal attempt and is ignored or rejected.
+5. **Service published, then `start` fails.** The Vault publishes `VaultApi` and
+   then throws while registering UI. Its registrations roll back, the publication
+   is discarded without ever becoming visible, the Vault is `FAILED`, and SSH is
+   `SKIPPED` with the reason "requires dev.jasper.vault, which failed to start". No
+   per-consumer factory ran.
 
 ## 9. Plugin configuration and data
 
@@ -699,9 +876,30 @@ descriptor, unpack into the user plugins directory, consent); remove (recorded a
 performed at next launch, since jars are loaded). Any pending change shows a
 "Restart to apply" banner with Restart now.
 
-Launch flags: `--safe-mode` starts with no user plugins (recovery from one that
-breaks startup); `--plugin-dir <path>` loads a development plugin directory with
-consent pre-granted.
+### Launch flags and residency
+
+`--safe-mode` starts with no user plugins (recovery from one that breaks startup);
+`--plugin-dir <path>` additionally loads a development plugin directory with
+consent pre-granted. Today the bootstrap hands a launch off to a resident process
+before creating the application, which would reopen the very process that holds
+the problematic plugin. Both flags therefore follow the existing `--config`
+precedent and are **always standalone**: the launch never hands off, never binds or
+claims the shared endpoint, and cannot be resident (combined with `--background`
+it logs a warning and exits, as `--config` does). A resident process, if one is
+running, is left alone and keeps its plugins; the standalone process exists to
+reach the Plugins manager. Because two processes may then hold `plugins.toml`, the
+manager re-reads the file before each atomic write and changes only the entries it
+is editing.
+
+**Restart now** goes through the normal quit path, including the running-session
+confirmation. The old process performs its orderly shutdown and releases the
+handoff endpoint off the EDT *before* the replacement is spawned, so the new
+process cannot hand off to the one that is exiting. The replacement is started
+from the current process's own command line (`ProcessHandle.info()`), preserving
+the launch options (`--config`, `--plugin-dir`) except `--background`, and except
+`--safe-mode` when the button is used from a safe-mode process, where it reads
+"Restart normally". If the command line cannot be determined, the button degrades
+to Quit with a message asking the user to reopen Jasper.
 
 ## 11. Testing
 
@@ -711,8 +909,11 @@ consent pre-granted.
   Used by the in-repo plugins' unit tests and available to third parties.
 - **Shared contract suite** run against both the fake and the real app context:
   event ordering and no re-entrant delivery, `Subscription` idempotence, capability
-  gating, topic ownership, activity lifecycle and coalescing, service ownership and
-  per-consumer caching.
+  gating, topic ownership, activity lifecycle and coalescing, service ownership,
+  publish-only-during-start, commit-on-success and per-consumer caching, and
+  `PendingSession` attempt states (first transition wins, rejected connections are
+  closed exactly once, late `onCancelled` registration fires, stale attempts are
+  isolated from a reconnect).
 - **Runtime tests (headless):** descriptor parsing, version ranges, duplicate ids,
   topological order, cycles, cascading skips, consent state and capability-set
   growth, start rollback, shutdown budget, and classloader filtering against small
@@ -721,8 +922,17 @@ consent pre-granted.
   panel persistence, toolbar and menu sections, status items, string-keyed
   keybinding precedence, plugin windows' owner and lifecycle, pending and
   disconnected pane states.
-- **Terminal tests:** `TerminalSession.attach` over piped streams (resize, exit,
-  close unblocking reads, shell-integration events), ported from rail-vault.
+- **Terminal tests:** `TerminalSession.attach` over piped streams: resize, exit
+  status, exceptional exit, drain before disconnect, `close` unblocking reads and
+  invoked exactly once, shell-integration events; a stalled `input` never blocks
+  the caller of `write` or `resize`, ordering and resize coalescing hold, and an
+  overflowing write is rejected whole. Working-directory provenance: local, remote
+  and hand-run `ssh` inside a local pane, across `workingDirectory`, command events
+  and history.
+- **Lifecycle scenarios:** the five failure walkthroughs in section 8, plus the
+  exit deadline firing while a plugin's `stop()` blocks the EDT (driven through an
+  injected terminate action, as `ApplicationShutdown` is tested today), and
+  standalone behavior of `--safe-mode` and `--plugin-dir` against a bound endpoint.
 - **`plugins/sample`:** a panel, an action, a toolbar item, a menu, a status item,
   an activity, an injection action and a loopback echo session. An integration test
   loads it from a real jar; its sources are the compiled examples in the authoring
@@ -744,7 +954,8 @@ consent pre-granted.
 - **`verifyTerminalArchitecture`:** allowlist gains `session.TerminalConnection`;
   `attach` is part of the already-listed `TerminalSession`.
 - **Two real implementations:** `Plugin` (sample, then Vault and SSH);
-  `PluginContext` and the service interfaces (the app and the testkit);
+  `PluginContext`, `Subscription`, the handle types and the service interfaces (the
+  app and the testkit);
   `PanelFactory` and other callbacks are functional interfaces. SDK types with a
   single shape are records or final classes.
 - The package-info sentence "app types are not an external plugin API" stays true:
@@ -766,8 +977,9 @@ behavior.
    `Services`, `Activities`, `AppEvents`); the `app.plugins` runtime (descriptor,
    resolution, classloaders, consent state, lifecycle, containment);
    `verifySdkArchitecture` and `verifyPluginArchitecture`; the testkit and contract
-   suite; `plugins/sample`; the Activity → Buddy bridge; `--safe-mode` and
-   `--plugin-dir`. Context accessors for later plans throw
+   suite; `plugins/sample`; the Activity → Buddy bridge; the shutdown order with the
+   exit deadline armed before plugin shutdown; `--safe-mode` and `--plugin-dir` as
+   standalone launches. Context accessors for later plans throw
    `UnsupportedOperationException` until their plan lands. User-directory plugins
    that need consent are reported in the log only until plan 3. *Demo: the bundled
    sample loads from a real jar and its demo activity appears on Buddy.*
@@ -778,12 +990,16 @@ behavior.
 3. **Rail, panels, windows and the Plugins manager.** Rail and three regions in
    `WindowContent`; `Panels`, `Rail`; `PluginWindow` and `PluginDialog`; panel and
    window state persistence; the Plugins manager with install, consent,
-   enable/disable and the restart banner. *Demo: the sample panel toggles from the
+   enable/disable, the restart banner and Restart now (endpoint released before
+   the replacement starts). *Demo: the sample panel toggles from the
    rail and moves between regions; a plugin installed from a zip goes through
    consent.*
 4. **Terminal API and plugin sessions.** Handles and `Terminals`; capability gating
-   and audit logging; the `TerminalEvents` bridge; `TerminalSession.attach` and the
-   allowlist update; pending and disconnected pane states with Reconnect. *Demo: the
+   and audit logging; the `TerminalEvents` bridge; `TerminalSession.attach` with the
+   app-owned writer, drain and exactly-once `close`, and the allowlist update;
+   working-directory provenance in the terminal layer and its consumers;
+   `PendingSession` attempts with pending and disconnected pane states and
+   Reconnect. *Demo: the
    sample opens a loopback echo session and injects text into the active pane.*
 
 Order: 1, 2, 3, 4. Plans 2 and 3 are separate because each is a sizeable refactor of
@@ -806,3 +1022,39 @@ chrome components; a settings-page extension point; a storage abstraction; a
 general notice API; automatic disabling of misbehaving plugins; palette scopes
 contributed by plugins (the `PaletteScope` seam stays internal until a plugin needs
 it).
+
+## 15. Review record
+
+**2026-09-21, external review (ChatGPT), relayed by the user.** Seven findings, each
+checked against the code at the baseline and accepted:
+
+1. *Shutdown timeout could not work as written.* Confirmed: `ApplicationShutdown`
+   bounds futures and is started from the EDT, so it cannot abandon a blocked EDT
+   callback. Section 3 now arms an independent exit deadline first, writes app state
+   before plugin code runs, and states that a blocked EDT callback cannot be
+   abandoned.
+2. *Pending sessions lacked ownership and cancellation rules.* Section 6 now defines
+   attempts, ownership transfer at `attach`, exactly-once `close`, rejection of late
+   connections, late `onCancelled` registration, reconnect isolation, exceptional
+   exit and drain.
+3. *Transport could block critical threads.* Confirmed: the rail-vault
+   `StreamConnector` writes and flushes on the caller's thread and
+   `JediTermEngine.write`/`resize` call the connector directly. Section 6 gives the
+   terminal layer an app-owned writer with ordering, coalesced resize, whole-write
+   rejection and failure handling; section 3 separates callback and transport
+   threading and withdraws the claim that no plugin code runs on a reader thread.
+4. *Remote working directories could not be suppressed by an adapter.* Confirmed:
+   `ShellCommandTracker.directoryFromUri` discards the host. Section 6 moves
+   provenance into the terminal layer and applies it to command events, history and
+   local splits. `PaneInfo.remoteDirectory` was added so the remote value is not
+   simply lost; it can be struck if unwanted.
+5. *Recovery and development flags had no residency semantics.* Section 10 makes both
+   standalone on the `--config` precedent and defines Restart now.
+6. *Service lifetime contradicted the returned subscription.* `publish` now returns
+   nothing, is limited to `start`, commits on success, and factories run on the EDT
+   before each consumer starts.
+7. *`Subscription` hierarchy was not valid Java.* It is now an interface with
+   any-thread idempotent `close`.
+
+The review's broader recommendation, failure walkthroughs, is section 8's new
+subsection and a required test group in section 11.
