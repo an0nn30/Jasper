@@ -23,6 +23,26 @@ public record AppDirs(Path root, Path configFile, Path logs) {
         return root.resolve("shell-integration");
     }
 
+    /** User-installed plugins, one directory per plugin id. */
+    public Path plugins() {
+        return root.resolve("plugins");
+    }
+
+    /** Enabled flags, consented capabilities and pending removals. */
+    public Path pluginState() {
+        return root.resolve("plugins.toml");
+    }
+
+    /** Cross-process lock held around every change to {@link #pluginState()}. */
+    public Path pluginLock() {
+        return root.resolve("plugins.lock");
+    }
+
+    /** Parent of each plugin's private data directory. */
+    public Path pluginData() {
+        return root.resolve("plugin-data");
+    }
+
     /**
      * The handoff endpoint's own directory. It is a subdirectory rather than {@link #root()}
      * because binding sets its parent to owner-only, and the root also holds the user's config.
