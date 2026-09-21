@@ -65,7 +65,7 @@ are package-private in `internal.emulation`; native ownership lives in
 | `PtyChild`, `ForegroundJobResolver` | Native I/O, bounded shutdown and process metadata; one per session |
 | `JediTermEngine` | Reader, emulator/display, protocol input, locked reset and vendor translation |
 | `BufferQueries`, `JediCellReader` | Locked buffer reads and vendor-free row capture; no Swing state |
-| `AbsoluteRowState` | Discard count, prompt rows and reset epoch, protected by buffer lock |
+| `AbsoluteRowState` | Discard count and prompt rows coordinated with buffer mutations; volatile/atomic and copied publication for readers |
 | `ShellCommandTracker` | Ordered shell marks, command text, cwd and monotonic duration |
 | `TerminalAccess` | Unsupported concrete composition bridge; never the live buffer |
 | `TerminalView`, `Viewport` | Swing assembly, one viewport, coordinated invalidation, attachment lifecycle |
@@ -141,12 +141,17 @@ sequenceDiagram
     Search-->>View: immutable matches, reveal current, callback
 ```
 
-Clearing, invalidating or detaching cancels publication. Cancellation can be
-cooperative; a stale worker must never publish merely because it finished.
+Clearing, invalidating, hiding or detaching cancels pending publication. Cancellation
+is best effort: the current matching loop does not check interruption, and Java regex
+matching may continue after cancellation. A stale worker must never publish merely
+because it finished.
 An atomic row epoch is also captured at admission and checked before publication,
 because a completed worker can already be queued ahead of the EDT reset notification.
 The worker expires after one idle second. Visible highlights are bounded to the
-viewport rather than rebuilt for every match in history.
+viewport rather than rebuilt for every match in history. Search captures all retained
+rows (only live rows on the alternate screen), then matches each physical row
+independently: a match does not span soft wraps. New output alone does not rerun
+a search or advance its query generation; results describe the captured rows.
 
 ```mermaid
 sequenceDiagram
@@ -174,12 +179,13 @@ one long-lived shell session.
 | Work | Contract |
 | --- | --- |
 | Emulator loop and shell cycle | One reader per session; hooks fully wired before start |
-| Live rows, cursor, history and prompt marks | Every read holds reentrant buffer lock; bounded work only |
+| Live buffer rows, cursor and history | Every read holds reentrant buffer lock; regex and painting run after capture releases it |
+| Published metadata | Grid dimensions/title/cwd use volatile state; row epoch is atomic and prompt rows are copied from a concurrent list |
 | View, viewport, selections, highlights, fonts and timers | EDT; `execute` enforces this, other Swing methods rely on caller contract |
 | Regex | Worker over captured rows; latest generation publishes on EDT |
 | Screen/reset/alternate notifications | Synchronous on causing thread, possibly under buffer lock; never wait for EDT |
 | Title/cwd/command callbacks | Reader protocol path; command callbacks after capture releases lock |
-| Exit future | Completes at reader end; continuation thread unspecified |
+| Exit future | Completes after output ends, child wait and exit-message rendering into the buffer; continuation thread unspecified |
 | Foreground process lookup | Query off EDT; caller rejects stale results |
 | Browser | Shared lazy worker, queue capacity 8; fixed logs, no raw target in logs |
 | Child creation/waiting | Startup off EDT; close starts bounded asynchronous native cleanup |
@@ -192,7 +198,7 @@ one long-lived shell session.
 | Close called repeatedly | Child's atomic close guard makes cleanup idempotent |
 | View removed | Listener removed, search cancelled, timers and queued attachment work invalidated; session stays open |
 | View reattached | New attachment generation; stale frame/bell/search work cannot act as current work |
-| Hidden view | Frame/blink work suppressed until useful again |
+| Hidden view | Frame/blink work suppressed and pending search publication cancelled; existing highlights remain |
 | Invalid regex | Empty matches plus user-facing error result |
 | Search/browser work superseded or rejected | Search retains latest admission; browser drops rejected work without blocking EDT |
 | History reset/reflow/buffer switch | Invalidate absolute-coordinate state together |

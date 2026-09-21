@@ -9,8 +9,8 @@ import com.jediterm.terminal.model.TerminalSelection;
 import java.util.function.Consumer;
 
 /**
- * Receives display callbacks from the emulator on the reader thread and keeps the resulting state
- * for the view to read. Drawing is done by {@code TerminalView}, not here.
+ * Receives display callbacks on the emulator's calling thread (normally the reader, or a
+ * resize caller) and publishes the resulting state for the view to read. Drawing is done by {@code TerminalView}, not here.
  */
 final class SessionDisplay implements TerminalDisplay {
     private final Consumer<String> onTitle;

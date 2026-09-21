@@ -1,46 +1,55 @@
 # Jasper — Status and Handoff
 
-**Application/Buddy refactor (2026-09-20):** Approved for native execution on
-`codex/app-architecture-design`, based on merged main `c7b796b`.
-[Spec](superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md) and
-[plan](superpowers/plans/2026-09-20-jasper-app-buddy-refactor.md) are the authorities.
-Tasks 1–12 are implemented and verified: settings/builders/subscriptions, theme and platform
-boundaries, workspace owners/activity, palette controller with stale-result guards,
-launch/shutdown coordination, startup rollback, and the extracted Buddy library/facade. Latest full check:
-1,127 tests across three modules, zero failures/errors, two expected skips. Buddy application policy and producer closure are isolated. Final package DAGs and packaged resources pass. Onboarding, compiled feature recipes and strict Javadoc now pass. Independent review and the fresh-reader exercise are complete. Two important shutdown findings were fixed with failing-then-passing regressions: endpoint cleanup now runs off EDT within the exit bound, and shutdown tracks accepted launches through late child cleanup. No deferred minors. Next: choose integration into main or a PR.
-Execution rulings and exact checks are in the
-[verification report](app-refactor-verification.md). No GUI, merge or push.
-The terminal refactor is merged; older notes below describe its earlier handoff.
+## Current state — 2026-09-21
 
-**Terminal architecture refactor (2026-09-20):** Implemented independently on
-`codex/terminal-refactor-native` in the isolated `terminal-refactor-4830` worktree.
-The terminal now has supported session/view/config/search/rendering packages,
-concrete owners for process, emulator, queries, shell state and view behavior,
-fluent immutable options, and reusable actions. Affected app callers are migrated;
-the broader app redesign and plugin SDK remain separate work.
+Both architecture refactors are merged into local `main`: terminal through
+`c7b796b`, application/Buddy through `9b30dc2`. The completed app-refactor branch
+and worktree were removed. Those merge operations did not push to origin.
 
-Start at the [terminal onboarding guide](../jasper-terminal/README.md), then
-[architecture](terminal-architecture.md) and [maintenance recipes](terminal-maintenance.md).
-The [approved refactor spec](superpowers/specs/2026-09-20-jasper-terminal-refactor-design.md)
-amends Phase 1's structural restriction for this scope. The
-[plan](superpowers/plans/2026-09-20-jasper-terminal-refactor.md) is the execution record;
-its historical status/checklist details have a deferred synchronization note.
-Use this handoff and [verification report](terminal-refactor-verification.md) for current state.
+The three modules are `jasper-app` (product composition), `jasper-terminal`
+(terminal library) and `jasper-buddy` (JDK-only companion library). Start at the
+[documentation index](README.md) for each module's onboarding, architecture and
+maintenance guides. No plugin SDK has been implemented.
 
-Fresh `./gradlew verifyTerminalArchitecture check --rerun-tasks`: **1,083 tests,
-1,081 passed, two expected environment skips, zero failures/errors**. Package DAG,
-app allowlist, vendor-free signatures, documentation links/examples and JavaDoc
-doclint pass (missing-tag warnings remain nonfatal). Independent review found
-one important queued-search/reset race; four deterministic regressions failed
-before the row-epoch publication guard and pass afterward. The fresh-reader
-onboarding review located the key, shell-event and lifecycle owners correctly;
-a narrow live-option reconstruction-site note remains deferred. Full review,
-rulings, measurement evidence and both minor notes are in the verification report.
+The approved [terminal amendment](superpowers/specs/2026-09-20-jasper-terminal-refactor-design.md)
+and [app/Buddy amendment](superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md)
+extend the original Phase 1 design. Their plans and verification reports preserve
+execution decisions: [terminal](terminal-refactor-verification.md),
+[app/Buddy](app-refactor-verification.md).
 
-Desktop visual/clipboard/keyboard acceptance, native throughput/RSS, Windows
-runtime acceptance and the daily-use trial remain user-run. No GUI, native
-benchmark, merge or push was performed. The original checkout's modified
-TerminalTitle.java and untracked assessment/worktrees remain untouched.
+Merged-result verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture check :jasper-app:installDist`
+passed with **1,127 tests: 1,125 passed, two expected environment skips, no failures
+or errors** (app 609, Buddy 163, terminal 355). Architecture guards, Javadoc doclint,
+compiled guide examples and packaged-resource checks passed. Javadoc missing-tag
+warnings are nonfatal; headless checks do not establish native acceptance.
+
+Independent reviews are complete. The terminal queued-search/reset defect and
+the app endpoint-lock/accepted-launch shutdown defects were fixed with regression
+tests. The two terminal documentation follow-ups (option reconstruction sites and
+plan completion markers) are addressed by the [documentation audit](documentation-audit.md). App review
+left no deferred minors.
+
+## Open acceptance work
+
+- User-run desktop behavior: window placement, physical keyboard/clipboard,
+  fonts/IME, Buddy native windows, shell exits and residency.
+- Windows native packaging and desktop acceptance.
+- Fresh native throughput/RSS measurements on the refactored code; the dated
+  [readiness measurements](terminal-readiness.md) apply only to their recorded revisions.
+- The two-week daily-use trial has not started.
+
+Use the [packaging checklist](packaging.md#native-acceptance-checklist) and
+[benchmark protocol](benchmarks.md). Agents must not launch native windows or
+benchmarks without the user's applicable authorization.
+
+## Historical implementation notes
+
+The remainder is an archive of earlier handoffs, not a current task queue.
+Branch names, paths, package layouts, test counts, approvals and “next steps”
+below describe their dated checkpoints. They do not override the current state
+above or the maintained guides. In particular, older custom-theme/Follow System
+features and flat app/Buddy packages have since been replaced. Historical artifacts
+absent from this checkout are identified as such rather than linked as available.
 
 **Background residency (2026-09-17):** On `claude/background-daemon` (from main `1f1afeb`, with `main` `b56d098` since merged in), Jasper gains an
 opt-in `[background] enabled` setting (default `false`) that keeps the process running with no
@@ -808,7 +817,7 @@ bracketed paste enabled. No GUI, merge or push.
 
 **Jasper silver app icon (2026-09-14):** On `codex/jasper-silver-icon`, the user-selected Silver Desk Buddy turtle replaces Eclipse in the editable master, platform SVGs, macOS ICNS, Windows ICO, and all Swing/Dock PNG sizes. The master matches the approved silver study exactly; Windows uses tighter corners and a larger footprint. The generator and [icon guide](../packaging/icons/README.md) now describe Jasper. `./gradlew check :jasper-app:packageDist` passed: XML totals 662 tests, 661 passed, one existing font skip; terminal checks were up to date. Mac app package verification passed and the DMG rebuilt. All 15 ICO frames match their runtime PNGs byte-for-byte. Native Windows packaging and live desktop appearance remain unverified. Application names/identifiers remain Jasper for this icon-only change. Existing unrelated working changes were preserved; no GUI, commit, merge, or push.
 
-**Rail, vault and SSH planning (2026-09-13):** On `codex/rail-vault-design`, the user requested the rail and working SSH connections, with a credential vault first. The [vault product design](superpowers/specs/2026-09-13-jasper-vault-product-design.md) consolidates approved conversation decisions: dedicated manager, separate logins and imported encrypted keys, explicit Unlock with optional OS-stored remembered access (seven days, configurable), and inactivity locking (15 minutes, configurable/disabled). Auto-lock retains valid remembered access; explicit Lock clears it. Existing SSH sessions survive either lock. The user-supplied [UI mocks](design/credential-manager/README.md) now govern manager and Add credential layout: navigation sidebar, upper table, lower editor and explicit Save/Revert. Product-spec review and technical design precede implementation plans. This updates sequencing without declaring the Phase 1 trial complete. Existing split-divider working changes are preserved and unrelated. No implementation, GUI, merge or push for this planning work.
+**Rail, vault and SSH planning (2026-09-13):** On `codex/rail-vault-design`, the user requested the rail and working SSH connections, with a credential vault first. The `2026-09-13-jasper-vault-product-design.md` (not present in this checkout) consolidates approved conversation decisions: dedicated manager, separate logins and imported encrypted keys, explicit Unlock with optional OS-stored remembered access (seven days, configurable), and inactivity locking (15 minutes, configurable/disabled). Auto-lock retains valid remembered access; explicit Lock clears it. Existing SSH sessions survive either lock. The user-supplied UI mocks (the historical credential-manager folder is not present in this checkout) now govern manager and Add credential layout: navigation sidebar, upper table, lower editor and explicit Save/Revert. Product-spec review and technical design precede implementation plans. This updates sequencing without declaring the Phase 1 trial complete. Existing split-divider working changes are preserved and unrelated. No implementation, GUI, merge or push for this planning work.
 
 **Split divider visibility (2026-09-13):** On `codex/visible-split-dividers`, terminal splits now have a continuous 2px separator inside an 8px resize target, with brighter grips and hover/pressed backgrounds. Purple, classic dark, and light each supply a contrasting separator color. The rendered-pixel regression failed before the change and passes afterward across both orientations and theme replacement; existing nested split, ratio, and zoom tests pass. `./gradlew check` passed: 662 tests, 661 passed, one existing font skip (terminal tests up to date). Headless nested-pane previews are reproducible with `./gradlew :jasper-app:mockUiPreview --args='/absolute/output --splits'`; purple and light renders were visually inspected. The preview explicitly paints the real AWT divider because peerless Swing printing skips it. No native GUI, merge, or push for this follow-up.
 
@@ -818,7 +827,7 @@ bracketed paste enabled. No GUI, merge or push.
 
 **Command palette implementation (2026-09-12):** Complete and independently reviewed on `codex/command-palette-design` in `.worktrees/command-palette`, branched from main `1db31b1`; the main checkout remains unchanged. Cmd/Ctrl+K opens the centered themed palette, Cmd/Ctrl+1–5 runs numbered results, and three shared recents persist across restarts. Commands register through window-owned Swing actions without a plugin framework. All six task gates and final whole-branch/scoped review are complete through runtime fix `28a7ff0`. Final review corrected selected-result visibility after query/reorder changes in short scrolled cards; two actual-viewport regressions reproduced the defect before the fix. Fresh `./gradlew check --rerun-tasks` executed all eight tasks: 661 tests, 660 passed, one existing font skip, zero failures/errors. Actual purple/classic/light renders and separate 2× UI scaling were inspected; matching-only medians were 18.3–93.9 µs over 1,000 indexed commands. Branch-wide diff checks and source hygiene passed after temporary-report cleanup. [Guide and extension example](command-palette.md), [visuals, measurements and review record](design/command-palette/README.md), [plan](superpowers/plans/2026-09-12-jasper-command-palette.md), [native acceptance checklist](superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md). Native focus, IME, accessibility, Windows desktop and real restart acceptance remain user-run. No GUI, packaging, merge or push.
 
-**Default purple theme (2026-09-12):** `jasper-dark-purple` now supplies the default app chrome and terminal colors, including the dark half of Follow System. Explicit `jasper-dark` remains classic; `jasper-light` is unchanged. Custom files keep their existing fixed classic palette inheritance. Source defaults, generated config template, root example and documentation are updated. `./gradlew check` executed both modules: 585 tests, 584 passed and one existing font skip. Actual purple/classic/light Swing + ANSI previews were rendered headlessly and inspected; independent review found no actionable issues. The Mac app/DMG was rebuilt and package verification passed with the official Eclipse icon. The user has approved merging the completed icon/theme work into `main` and publishing it to `origin`. No live settings, GUI or installation changes were performed. [Palette and rendered UI](design/jasper-dark-purple/README.md).
+**Default purple theme (2026-09-12):** `jasper-dark-purple` now supplies the default app chrome and terminal colors, including the dark half of Follow System. Explicit `jasper-dark` remains classic; `jasper-light` is unchanged. Custom files keep their existing fixed classic palette inheritance. Source defaults, generated config template, root example and documentation are updated. `./gradlew check` executed both modules: 585 tests, 584 passed and one existing font skip. Actual purple/classic/light Swing + ANSI previews were rendered headlessly and inspected; independent review found no actionable issues. The Mac app/DMG was rebuilt and package verification passed with the official Eclipse icon. The user has approved merging the completed icon/theme work into `main` and publishing it to `origin`. No live settings, GUI or installation changes were performed. Historical palette/render folder `design/jasper-dark-purple/` is not present in this checkout.
 
 **Official app icon (2026-09-12):** The user-approved brighter Eclipse design is integrated into native packaging and runtime windows. Native macOS ICNS and Windows ICO inputs, runtime window/Dock PNGs and a reproducible SVG export script are in place. macOS uses one 100px margin on the 1024px canvas and a rounded squircle; Windows uses tighter corners and a 32px margin. `./gradlew check :jasper-app:packageDist` passed: 580 tests in result XML, 579 passed and one existing skip (unchanged terminal checks up to date). Native Mac image/DMG, bundle icon bytes, strict signature and all icon containers were verified; independent review found no issues. Live Mac Dock/Cmd+Tab and Windows desktop/native packaging acceptance remain pending. The 444 rejected/exploratory design files were moved out of the repo to Trash after verifying the official master and all archived hashes; this is explicitly authorized cleanup and supersedes the earlier preservation note below. Main integration and publication are authorized; no GUI launch or installation performed. [Official icon assets and evidence](../packaging/icons/README.md).
 

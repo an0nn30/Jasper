@@ -1,6 +1,10 @@
 package dev.jasper.buddy.config;
 
-/** Immutable host-supplied appearance and callbacks. Build performs no I/O; callbacks execute on the EDT. */
+/**
+ * Immutable host-supplied appearance and callback references. Building is thread-independent and
+ * performs no I/O; presentation invokes callbacks on the EDT. A builder is caller-confined.
+ * The host owns persistence, visibility decisions and producer lifetimes.
+ */
 public final class BuddyOptions {
     private final java.awt.Font primaryFont;
     private final boolean dark;
@@ -21,9 +25,9 @@ public final class BuddyOptions {
         return new Builder(primaryFont).dark(dark).initialPosition(initialPosition)
             .positionChanged(positionChanged).activateHost(activateHost).toggleRequested(toggleRequested);
     }
-    /** Returns the immutable resolved host font from which presentation derives its styles and sizes. */
+    /** Returns the resolved host font from which presentation derives fixed styles and point sizes. Changing this font's point size alone is not a global scale setting. */
     public java.awt.Font primaryFont() { return primaryFont; }
-    /** Returns the explicit host chrome mode; no look-and-feel vendor detection occurs in this library. */
+    /** Returns the explicit notice-card material mode; the menu bubble remains dark. No look-and-feel vendor detection occurs in this library. */
     public boolean dark() { return dark; }
     /** Returns the optional initial location; applied and monitor-clamped only on first native realization. */
     public java.util.Optional<BuddyPosition> initialPosition() { return java.util.Optional.ofNullable(initialPosition); }
@@ -43,7 +47,7 @@ public final class BuddyOptions {
         private Builder(java.awt.Font font) { primaryFont = java.util.Objects.requireNonNull(font, "primaryFont"); }
         /** Uses a nonnull resolved host font; does not discover an OS font. */
         public Builder primaryFont(java.awt.Font value) { primaryFont = java.util.Objects.requireNonNull(value); return this; }
-        /** Selects dark or light material independently of the installed look and feel. */
+        /** Selects dark or light notice-card material independently of the installed look and feel. */
         public Builder dark(boolean value) { dark = value; return this; }
         /** Sets initial screen coordinates; null clears them and chooses the default corner. */
         public Builder initialPosition(BuddyPosition value) { initialPosition = value; return this; }

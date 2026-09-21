@@ -41,14 +41,14 @@ public final class ConfigTemplate {
             # enabled = true
 
             [notifications]
-            # Live. Notify when a command that ran at least this long finishes in a tab you are not
+            # Live. Notify when a command that ran at least this long finishes in a pane you are not
             # looking at. Needs shell integration: the duration comes from its command marks.
             # Zero disables notifications. Range 0-3600.
             # long_command_seconds = 10
 
             [background]
-            # Keep Jasper running with no windows after the last one closes, so the next launch is
-            # instant, and start it in the background at login. Quit still exits completely.
+            # Keep Jasper running with no windows after the last one closes to reduce next-launch startup
+            # work, and start it in the background at login. Quit still exits completely.
             # Residency applies from the next start; the login item updates as soon as you save.
             # Autostart needs an installed Jasper, not a development run.
             # enabled = false
@@ -59,11 +59,11 @@ public final class ConfigTemplate {
 
             [palette.scopes.history]
             # Search shell history from the palette (Cmd+R on macOS, Ctrl+Shift+R elsewhere); updates live.
-            # Reads zsh, bash, fish, nushell and PowerShell history files; Jasper writes no history of its own.
+            # Reads zsh, bash, fish, nushell and PowerShell history files; the live shell-history index is not persisted.
             # enabled = true
-            # Commands ranked below more substantial ones in the History palette. Each entry is a
+            # On an empty History query, these commands rank below more substantial ones. Each entry is a
             # single word matched against a command's first word, so "cd .." is trivial but
-            # "cd path && build" is not. Still listed and searchable, just never above real work.
+            # "cd path && build" is not. A nonempty search uses match quality, directory and recency.
             # An empty list turns this off; setting the key replaces the default list entirely.
             # trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
 

@@ -4,7 +4,7 @@ and the runtime PNG strip. Requires Python 3 and Pillow (dev machine only).
 
 After the master has been hand-edited in LibreSprite, re-export the PNG with:
   /Applications/libresprite.app/Contents/MacOS/libresprite --batch packaging/buddy/jasper-buddy.ase \
-      --sheet jasper-app/src/main/resources/dev/jasper/app/buddy/jasper-buddy.png
+      --sheet jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png
 and do not run this script again (it would overwrite the hand edits).
 """
 import struct
@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFilter
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-PNG = ROOT / "jasper-app/src/main/resources/dev/jasper/app/buddy/jasper-buddy.png"
+PNG = ROOT / "jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png"
 ASE = HERE / "jasper-buddy.ase"
 
 W, H = 42, 48

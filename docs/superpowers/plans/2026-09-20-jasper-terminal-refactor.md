@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Execution status:** Tasks 1–12 implemented on `codex/terminal-refactor-native`; final independent review and onboarding assessment complete, important search/reset finding fixed with four regressions. Current evidence and deferred minor synchronization notes are in the verification report. Native execution and one final independent review were selected by the user. Recorded deviations and measurement evidence are in [STATUS](../../STATUS.md) and [verification](../../terminal-refactor-verification.md). Task 11 migrates the actual WindowContent action catalog and uses Java 25 multi-release jdeps with batched javap.
+**Execution status:** Tasks 1–12 implemented on `codex/terminal-refactor-native`; final independent review and onboarding assessment complete, important search/reset finding fixed with four regressions. Merged into local main through `c7b796b`; current evidence is in the verification report. Completion markers were synchronized in the 2026-09-21 documentation audit. Native execution and one final independent review were selected by the user. Recorded deviations and measurement evidence are in [STATUS](../../STATUS.md) and [verification](../../terminal-refactor-verification.md). Task 11 migrates the actual WindowContent action catalog and uses Java 25 multi-release jdeps with batched javap.
 
 **Goal:** Make the terminal library independently understandable and maintainable through cohesive packages, explicit ownership, fluent immutable options, reusable actions, and tested developer documentation.
 
@@ -12,7 +12,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–10 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; the independent whole-branch review is complete. This execution is independent of the older refactor branch. Tasks 1–12 are complete, including documented execution deviations; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -1449,7 +1449,7 @@ repository callers have migrated. `internalAccess()` remains a deliberately
 unsupported bridge member, despite being on a supported type; checks prohibit
 app bytecode from calling it.
 
-- [ ] **Step 1: Add a failing architecture check before relocation.**
+- [x] **Step 1: Add a failing architecture check before relocation.**
 
 Create architecture tests that assert no production Java source remains directly
 in `dev/jasper/terminal`, no app dependency on `.internal.`, no vendor imports
@@ -1534,7 +1534,7 @@ from the app's `check` (which already needs terminal classes); do not make
 terminal unit tests depend on app compilation. Batch javap calls if tool startup
 is material, but preserve one-class attribution in failure messages.
 
-- [ ] **Step 2: Relocate cohesive groups and fixtures.**
+- [x] **Step 2: Relocate cohesive groups and fixtures.**
 
 Move the value packages first, rendering/text next, internal process/shell/engine
 next, and session/view last. Use IDE/compiler assistance or explicit imports;
@@ -1590,7 +1590,7 @@ confined to test sources. Keep
 Await and TestFonts in a test-support package and make their required members
 public within test artifacts only. Do not export test fixtures from the main jar.
 
-- [ ] **Step 3: Migrate all app and benchmark consumers and the action adapter.**
+- [x] **Step 3: Migrate all app and benchmark consumers and the action adapter.**
 
 Find the complete inventory with:
 
@@ -1611,7 +1611,7 @@ direct. No second app action catalog. Replace repeated TerminalOptions
 construction used for one-value changes with `toBuilder` where behavior matches;
 app config construction may retain the canonical constructor.
 
-- [ ] **Step 4: Enforce public signature and supported-type rules.**
+- [x] **Step 4: Enforce public signature and supported-type rules.**
 
 Use reflection in `TerminalArchitectureTest` over compiled terminal classes:
 for each public class, inspect constructors, declared public/protected methods,
@@ -1747,7 +1747,7 @@ remove `.class`) with `Class.forName(name,false,getClass().getClassLoader())`.
 Do not initialize vendor/native classes merely to inspect their signatures.
 No unlisted bridge type is added to the allowlist just to make a failure pass.
 
-- [ ] **Step 5: Run architecture checks, both modules and benchmark compilation; commit.**
+- [x] **Step 5: Run architecture checks, both modules and benchmark compilation; commit.**
 
 `./gradlew verifyTerminalArchitecture check`. Benchmark source lives in the app
 main sources, so compiling it does not launch benchmark windows. Inspect source
@@ -1766,7 +1766,7 @@ obsolete vendor imports only after all callers compile.
 example, then locate the owner/test for an action, live option, or shell event.
 No historical plan reading is required for normal maintenance.
 
-- [ ] **Step 1: Add build-checked usage examples.**
+- [x] **Step 1: Add build-checked usage examples.**
 
 Use this complete example test for the builder/query/action catalog. The launch
 example is compiled as a method but not invoked by the headless test runner.
@@ -1828,7 +1828,7 @@ invent a new launch manager; Jasper's existing ShellLauncher already owns that
 application concern. Session close must retain its existing bounded/asynchronous
 process cleanup rather than blocking the EDT on a process wait.
 
-- [ ] **Step 2: Write the module README with this concrete reading path.**
+- [x] **Step 2: Write the module README with this concrete reading path.**
 
 ```markdown
 # Jasper terminal
@@ -1874,7 +1874,7 @@ Add the final package table, compiled configuration/embedding code linked to its
 source, exit/listener example, and teardown example. Link all public entry points
 to their source or generated JavaDoc. Do not copy stale historical package paths.
 
-- [ ] **Step 3: Write architecture and maintenance guides using final owners.**
+- [x] **Step 3: Write architecture and maintenance guides using final owners.**
 
 Architecture must contain the final dependency graph; input/output/search/event
 sequence diagrams; the spec's ownership/thread/failure tables; examples of
@@ -1904,7 +1904,7 @@ alone is insufficient. A shell event must preserve emulator order and must not
 block while the buffer lock is held. Feature recipes explain where future SDK
 work attaches without claiming an SDK exists now.
 
-- [ ] **Step 4: Complete JavaDoc/package contracts and make documentation checks executable.**
+- [x] **Step 4: Complete JavaDoc/package contracts and make documentation checks executable.**
 
 For each package write a package-info describing its single responsibility,
 allowed dependencies, internal/supported status, thread owner, and principal
@@ -1937,7 +1937,7 @@ external URLs and validate fragments against generated heading anchors where
 used. Keep Markdown embedding examples sourced from the compiled example file,
 or compare marked code blocks with that source so examples cannot drift silently.
 
-- [ ] **Step 5: Perform human onboarding acceptance and whole-branch verification.**
+- [x] **Step 5: Perform human onboarding acceptance and whole-branch verification.**
 
 A fresh reviewer follows the README without conversation history and identifies
 (a) the owner/test for a key change, (b) the event path for a shell mark, (c) all
@@ -1958,7 +1958,7 @@ resolve findings, and run focused regressions plus the full check after fixes.
 Do not claim native visual/throughput/RSS acceptance from headless evidence.
 The verification report keeps those user-run checks pending with exact commands.
 
-- [ ] **Step 6: Commit the completed documentation/evidence and hand off integration.**
+- [x] **Step 6: Commit the completed documentation/evidence and hand off integration.**
 
 Update STATUS and spec/plan banners with completion, deviations, tests and pending
 native checks. Report the branch and commit. Do not merge or push without the
@@ -1989,7 +1989,7 @@ plan blocks were checked (Python parsed only, not executed). Java and Kotlin
 excerpts have not been compiled as implementation. No production changes or
 implementation scripts were run.
 
-Task 4's row representation refinement is explicitly pending plan approval and
-measurement. Baseline title-test diagnosis is a prerequisite, not a proposed
-unverified fix. Recheck signatures against the execution checkout before editing;
-any mismatch is recorded and resolved before proceeding, not guessed around.
+That self-review describes the pre-execution plan. Task 4 was subsequently measured
+and implemented with compact detached rows; the execution banner and verification
+report record the final decision. Use the maintained architecture/maintenance guides
+for current signatures, not the intermediate snippets in this dated plan.

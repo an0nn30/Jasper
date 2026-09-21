@@ -1,6 +1,6 @@
 # Instructions for coding agents working on Jasper
 
-Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferred findings and next steps. The design spec (`docs/superpowers/specs/2026-09-10-jasper-phase-1-terminal-design.md`) and its approved [terminal refactor amendment](docs/superpowers/specs/2026-09-20-jasper-terminal-refactor-design.md) are the binding authorities; plans live in `docs/superpowers/plans/`.
+Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferred findings and next steps. The design spec (`docs/superpowers/specs/2026-09-10-jasper-phase-1-terminal-design.md`) and its approved [terminal](docs/superpowers/specs/2026-09-20-jasper-terminal-refactor-design.md) and [app/Buddy](docs/superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md) refactor amendments are the binding authorities; plans live in `docs/superpowers/plans/`.
 
 ## Build and test
 
@@ -53,6 +53,8 @@ Plans are written with `superpowers:writing-plans` (complete code in every step,
 
 ## App and Buddy contributor entry points
 
+Use the [documentation index](docs/README.md) for all three modules, including
+[Buddy architecture](docs/buddy-architecture.md) and [Buddy maintenance](docs/buddy-maintenance.md).
 Start with [app onboarding](jasper-app/README.md), [Buddy embedding](jasper-buddy/README.md),
 [architecture](docs/app-architecture.md) and [maintenance recipes](docs/app-maintenance.md).
 App public visibility is for internal feature collaboration, not a plugin ABI. Package-info

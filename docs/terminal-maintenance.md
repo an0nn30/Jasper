@@ -58,7 +58,10 @@ reach the child.
    and build forwarding in [TerminalOptions](../jasper-terminal/src/main/java/dev/jasper/terminal/config/TerminalOptions.java).
 3. Apply it in `TerminalView.applyOptions` and its specific controller. Test an
    already-running session in [TerminalLiveOptionsTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/TerminalLiveOptionsTest.java),
-   including retention of unrelated appearance and no process restart.
+   including retention of unrelated appearance and no process restart. Also update
+   the full `TerminalOptions` reconstruction in `TerminalView.setPalette` and
+   `setFontSize`: both currently call the record constructor. Exercise each helper
+   with a nondefault value for the new option so recoloring or zooming cannot reset it.
 4. Separately update app [TerminalConfig](../jasper-app/src/main/java/dev/jasper/app/config/TerminalConfig.java),
    [ConfigLoader](../jasper-app/src/main/java/dev/jasper/app/config/ConfigLoader.java),
    [ConfigSnapshot](../jasper-app/src/main/java/dev/jasper/app/config/ConfigSnapshot.java), configuration
@@ -130,7 +133,11 @@ must consume snapshots, never expose the live buffer.
    for matching and [SearchController](../jasper-terminal/src/main/java/dev/jasper/terminal/view/SearchController.java)
    for admission, navigation or publication. Regex must run outside the buffer lock.
 3. Run `SearchControllerTest` and `TerminalAppIntegrationTest` for stale results,
-   detach/reset cancellation and bounded queue behavior; run
+   hide/detach/reset cancellation and bounded queue behavior. Preserve
+   `rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation`: it covers
+   history clear, RIS, alternate-screen switch and width reflow while a completed
+   search is already queued ahead of EDT reconciliation. Check the atomic row epoch
+   at admission and publication as well as query generation; run
    [TerminalSearchPaintingTest](../jasper-terminal/src/test/java/dev/jasper/terminal/view/TerminalSearchPaintingTest.java)
    for actual highlight behavior and viewport work bounds, then full check.
 

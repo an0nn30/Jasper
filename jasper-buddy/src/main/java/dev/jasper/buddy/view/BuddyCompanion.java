@@ -51,18 +51,18 @@ public final class BuddyCompanion implements AutoCloseable {
     public void orphan(BuddyNoticeId id) {
         requireEdt(); if (closed) return; deck.orphan(id); refresh();
     }
-    /** Disconnects activation and replaces a running producer's detail supplier with nonnull final text. The caller decides which notices were unfinished. */
+    /** Disconnects activation and replaces an existing notice's detail supplier with nonnull final text, regardless of state. The caller must choose this overload only when replacing the detail is intended; state and acknowledgement are preserved. */
     public void orphan(BuddyNoticeId id, String finalDetail) {
         requireEdt(); if (closed) return; deck.orphan(id, finalDetail); refresh();
     }
     /** Drops every notice and its callbacks, retaining presentation ownership. */
     public void clear() { requireEdt(); if (closed) return; deck.clear(); refresh(); }
-    /** Sets typing-animation intent; retained until first show, and ignored after close. */
+    /** Sets host-supplied typing-animation intent, retained while hidden and until first show. Does not create presentation or implement a notification threshold; ignored after close. */
     public void setWorking(boolean value) {
         requireEdt(); if (closed) return; working = value;
         if (window != null) window.setWorking(value);
     }
-    /** Realizes presentation lazily and shows it. Returns false after close, when headless, unsupported or missing its sprite; native runtime failures propagate for the host to handle. */
+    /** Realizes presentation lazily and shows it. Returns false after close, when headless, unsupported or missing its sprite; native runtime failures propagate for the host to handle. Failed availability is not cached here, so a host that wants one attempt must retain that decision. */
     public boolean show() {
         requireEdt(); if (closed) return false;
         if (window == null) window = BuddyWindow.create(options, deck);

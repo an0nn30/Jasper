@@ -19,8 +19,8 @@ import javax.swing.Timer;
 
 /**
  * The drawer's window: translucent, always on top and never focused, like the bubble it replaces.
- * Unlike the bubble it has no auto-hide timer — the drawer is a standing list, so it goes away only
- * when it is emptied, when a card is activated, or when the buddy does.
+ * Unlike the menu bubble it has no auto-hide timeout. It hides on pointer exit, after card
+ * activation, when emptied or when the companion hides; hiding does not clear the model.
  */
 final class BuddyDeckWindow {
     private final JWindow window = new JWindow();

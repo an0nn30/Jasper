@@ -1,3 +1,5 @@
+// Historical recipe only: SystemThemePreview was removed when custom themes were retired.
+// See comparison.md for the current bundled-theme preview task.
 // Run from the repository root: ./gradlew :jasper-app:mockUiPreview --init-script docs/design/plan-4c-themes/preview.gradle
 allprojects {
     afterEvaluate {

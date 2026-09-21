@@ -228,3 +228,11 @@ Final rulings on the reviewer's explicitly unjudged areas:
   migration approval. Cost: downstream callers outside this repository must migrate.
 - The plugin SDK and JPMS isolation remain excluded by design. Cost: plugins
   cannot load yet, and package names do not enforce runtime security isolation.
+
+## Documentation follow-up — 2026-09-21
+
+The refactor is merged into local main through `c7b796b`. The later app/Buddy
+refactor is merged through `9b30dc2`. Both deferred documentation minors are now
+resolved: the maintenance recipe explicitly covers `setPalette` and `setFontSize`
+option reconstruction, and Tasks 11–12 completion markers/status are synchronized.
+Earlier review findings and measurements above remain the historical record.

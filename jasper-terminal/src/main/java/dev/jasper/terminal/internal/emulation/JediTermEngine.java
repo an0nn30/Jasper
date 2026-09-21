@@ -244,7 +244,7 @@ public final class JediTermEngine implements AutoCloseable {
         return display.title();
     }
 
-    /** Completes with the exit code once the program's output has ended. */
+    /** Completes with the exit code after output ends, the child wait completes, and the exit message reaches the buffer. */
     public CompletableFuture<Integer> exitFuture() {
         return exit.copy();
     }
@@ -263,7 +263,7 @@ public final class JediTermEngine implements AutoCloseable {
         return rowState.epoch();
     }
 
-    /** Absolute rows of the prompts the shell marked with OSC 133;A that are still in the scrollback, oldest first. */
+    /** Absolute rows of the prompts the shell marked with OSC 133;A retained in history or the live screen, oldest first. */
     public List<Long> promptRows() {
         return rowState.prompts();
     }

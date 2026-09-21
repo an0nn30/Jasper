@@ -1,5 +1,7 @@
 # Terminal readiness handoff — 2026-09-12
 
+> Historical checkpoint: all test counts, CI results, package hashes and measurements below apply to their named revisions. For the current three-module build and remaining acceptance work, use [STATUS](STATUS.md).
+
 Local implementation and measurements are complete and integrated into `main` after user approval. Continue from `/Users/dustin/projects/moray`. All task reviews approved. Whole-branch review (`d3b5d11..5f4f804`) identified one hidden-search lifecycle gap; fix `8d84e7d` passed scoped re-review with no remaining findings. The reviewed branch was published, then merged locally with existing main-checkout files preserved. The [three-platform CI run](https://github.com/an0nn30/moray/actions/runs/34724855954) passed on macOS, Ubuntu and Windows at `c793925`. The **two-week trial has not started**; human native acceptance still precedes it.
 
 ## Delivered

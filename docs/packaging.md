@@ -36,9 +36,11 @@ or `jasper-app/build/packaging/dist/Jasper-<version>-windows-x64.zip`. The unpac
 image is `jasper-app/build/packaging/image/Jasper.app` on macOS and
 `jasper-app/build/packaging/image/Jasper` on Windows.
 
-The package bundles a runtime and needs no external Java. Current development
+The package includes `jasper-app.jar`, `jasper-terminal.jar`, `jasper-buddy.jar`,
+their runtime dependencies and a JBR runtime; it needs no external Java.
+The Buddy test-fixtures artifact is excluded from the production distribution. Current development
 packages have only jpackage's local ad-hoc signature, not a Developer ID signature,
-and use the official Eclipse icon. Distribution signing and notarization remain
+and use the official Silver Desk Buddy Jasper icon. Distribution signing and notarization remain
 outstanding. See [icon sources, platform framing and regeneration](../packaging/icons/README.md)
 for the macOS ICNS, Windows ICO and runtime PNG assets.
 
@@ -51,9 +53,9 @@ acceptance remain unexecuted on macOS.
 ### macOS
 
 - [ ] Open the DMG, drag Jasper to Applications, and launch it from Finder and from the Dock.
-- [ ] Confirm the Eclipse icon in Finder, Dock and Cmd+Tab at normal and Retina sizes; compare its apparent size with neighboring app icons.
+- [ ] Confirm the Silver Desk Buddy Jasper icon in Finder, Dock and Cmd+Tab at normal and Retina sizes; compare its apparent size with neighboring app icons.
 - [ ] With a minimal launcher environment, confirm the shell starts and UTF-8 text renders correctly.
-- [ ] Confirm native title controls and system theme changes.
+- [ ] Confirm native title controls and switching between the bundled Light and Dark themes.
 - [ ] Confirm multiple windows and shell-exit cleanup.
 - [ ] Confirm tmux mouse input including right-click and pane drag resizing.
 - [ ] Confirm vim and htop behavior.
@@ -73,11 +75,11 @@ acceptance remain unexecuted on macOS.
 ### Windows
 
 - [ ] Build on Windows with a JBR 25 x64 SDK, extract the entire ZIP to a path containing spaces, and launch `Jasper.exe` from Explorer.
-- [ ] Confirm the Eclipse icon in Explorer, the taskbar, Alt+Tab and titlebar at 100%, 150% and 200% display scale.
+- [ ] Confirm the Silver Desk Buddy Jasper icon in Explorer, the taskbar, Alt+Tab and titlebar at 100%, 150% and 200% display scale.
 - [ ] Confirm PowerShell/PTY input and resize behavior, including Unicode text.
 - [ ] Confirm clipboard operations and tab shortcuts.
 - [ ] Confirm the Settings location and live reload.
-- [ ] Confirm system theme changes, multiple windows, and shell-exit cleanup.
+- [ ] Confirm switching between the bundled Light and Dark themes, multiple windows, and shell-exit cleanup.
 - [ ] Confirm tmux mouse input including right-click and pane drag resizing.
 - [ ] Confirm vim and htop behavior.
 - [ ] Confirm ligatures, Nerd Font icons, emoji, CJK, and truecolor rendering.
@@ -88,7 +90,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm the `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, sign out and back in, and confirm Jasper is resident.
 - [ ] Confirm Quit exits completely and that setting `enabled = false` removes the Run value.
 
-## Terminal readiness verification
+## Historical terminal readiness verification
 
 The readiness branch's macOS arm64 package at runtime revision `8d84e7d` passed a fresh `./gradlew build :jasper-app:packageDist --rerun-tasks`: 576 tests, 575 passed and one known font skip, zero failures/errors; all 16 tasks executed. Native image/runtime/dependency checks, strict bundle seal and DMG integrity passed. This automated verification and controlled fixture benchmarking do not complete the interactive checklist above.
 

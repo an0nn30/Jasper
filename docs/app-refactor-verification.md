@@ -201,3 +201,10 @@ shutdown gaps above are now covered. Native desktop/Windows acceptance remains m
 
 Desktop visual/keyboard/clipboard behavior, native performance measurements and
 Windows runtime acceptance remain pending user execution. No GUI was launched.
+
+## Local integration — 2026-09-21
+
+User-authorized fast-forward merge placed the completed refactor on local `main`
+at `9b30dc2`. Full merged-result architecture/check/installDist verification passed:
+1,127 tests, 1,125 passed, two expected skips, zero failures/errors. The completed
+app-refactor worktree and branch were removed. No push was performed.

@@ -77,16 +77,16 @@ The History scope searches every command Jasper can find, from two places:
 | nushell | `$XDG_CONFIG_HOME/nushell/history.txt` (default `~/.config/nushell/history.txt`), plus `~/Library/Application Support/nushell/history.txt` on macOS | Plain lines. The SQLite backend is not read |
 | PowerShell | PSReadLine `ConsoleHost_history.txt` in its platform location | Plain lines; trailing backtick continuation |
 
-and **live capture**: while a shell session is running, Jasper watches for the
-OSC 133 B (command start) and C (output start) marks its shell integration
-emits and records the command text, working directory and exit status straight
-from the terminal, tagged with that pane's shell. A shell that never emits a B
-mark — because it has no shell integration configured — contributes nothing
-live and is covered by its history file alone. Jasper's own zsh, bash and fish
-scripts emit those marks and the exact command line automatically for new
-panes; see [Shell integration](configuration.md#shell-integration). A command
-you hide from your shell's own history with a leading space under bash's
-`HISTCONTROL=ignorespace` is left out of this list too.
+and **live capture**: shell integration marks the input start with OSC 133 B,
+execution/output start with C, and completion with D. Jasper's zsh, bash and fish
+scripts also supply exact command text; otherwise Jasper captures the text between
+B and C from the terminal. Exact text plus C can start capture without B. Completion
+publishes the command, current working directory and exit status when available;
+a subsequent new prompt can finish a pending command without an exit status.
+Shells without these integration signals contribute only their history files.
+See [Shell integration](configuration.md#shell-integration). Bash's integration
+suppresses live capture when it detects a command omitted under
+`HISTCONTROL=ignorespace` or `ignoreboth`.
 
 The list refreshes about once a second while the palette is open, so a command
 you just ran appears without reopening it — for any shell that writes its
@@ -97,21 +97,22 @@ you set `HISTTIMEFORMAT` — is ranked by when that file was last written rather
 than sinking below every timestamped entry, so a bash command from minutes ago
 sits above a zsh command from last week.
 
-Jasper writes no history file of its own — your shell's files are only ever
-read, never modified. On a History row, Enter pastes the command into the
-focused pane and Cmd+Enter (Ctrl+Enter elsewhere) pastes and runs it, exactly as
+Jasper does not persist the live shell-history index; your shell's files are only
+ever read, never modified. The separate Commands recents file is described above.
+On a History row, Enter pastes into the pane captured when the palette opened;
+Cmd+Enter (Ctrl+Enter elsewhere) pastes and runs it, exactly as
 a clipboard paste would (bracketed paste markers and newline normalization
 included). Commands pasted this way are not added to the Commands scope's
 recents; the shell's own history is the record.
 
-Entries are ranked by search-term match quality, then by recency; entries whose
-recorded working directory matches the target pane's current directory rank
-ahead within their tier. Timestamps come from the shell where the format
-supports them (zsh, bash with `HISTTIMEFORMAT`, live capture); entries without a
-known timestamp — bash without `HISTTIMEFORMAT`, nushell, PowerShell — sort
-after every timestamped entry, in their file's own order.
+For a nonempty query, entries rank by search-term match quality, then by a match
+to the origin pane's current directory, then by recency. Timestamps come from the
+shell where supported (zsh, bash with `HISTTIMEFORMAT`, live capture). Entries
+without timestamps use the file's modification time with offsets preserving file
+order. For an empty query, configured trivial commands move behind other entries;
+each group retains recency order.
 
-Set `history.enabled = false` under `[history]` to remove the History scope
+Set `enabled = false` under `[palette.scopes.history]` to remove the History scope
 entirely: it disappears from the scope picker and its shortcut does nothing.
 See [configuration](configuration.md#shell-history).
 
@@ -133,7 +134,7 @@ keywords = ["git", "rebase"]
 ```
 
 `name` is required, nonblank, at most 128 characters and unique ignoring case and surrounding
-whitespace. `command` is required, nonblank, may be multi-line, and at most 16 KiB. `keywords`
+whitespace. `command` is required, nonblank, may be multi-line, and at most 16,384 UTF-16 code units. `keywords`
 is an optional array of nonblank strings that also rank in search. File order is the order the
 empty query shows.
 
@@ -146,7 +147,7 @@ field is prefilled with the value you last typed for that placeholder name in th
 Enter substitutes every occurrence and runs the verb you chose; Escape returns to the list
 with your search intact. A snippet without placeholders skips the step entirely.
 
-Enter pastes the filled-in command into the focused pane; Cmd+Enter (Ctrl+Enter elsewhere)
+Enter pastes the filled-in command into the pane captured when the palette opened; Cmd+Enter (Ctrl+Enter elsewhere)
 pastes and runs it, the same as a History paste. Shift+Enter is Edit file: it creates
 `snippets.toml` with its header comment if missing, then opens it in the OS editor, the same
 mechanism Settings uses for `config.toml` — there is no in-app editor.
@@ -169,8 +170,8 @@ you fix the file and Reload Config.
 ## Scopes for features
 
 `PaletteScope` is the internal seam behind every scope; it is not a public
-plugin SDK. A scope supplies its own rows and verbs and never touches Swing —
-one shared renderer paints every scope's rows, and a scope's `search` and
+plugin SDK. A scope supplies data rows and verbs.
+One shared renderer paints every scope's rows, and a scope's `search` and
 `execute` methods see only a `PaletteContext`, never a window or pane. Two more
 hooks are optional: `available` is rechecked right before a verb runs (a scope
 can refuse a verb per row, for example when its target is no longer live), and
@@ -197,8 +198,8 @@ final class FakeFeatureScope implements PaletteScope {
     @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {
         context.target().paste().accept(row.title());
     }
-    @Override public CommandRegistry.Subscription onChanged(Runnable listener) {
-        return new CommandRegistry.Subscription(() -> {});
+    @Override public dev.jasper.app.lifecycle.Subscription onChanged(Runnable listener) {
+        return new dev.jasper.app.lifecycle.Subscription(() -> {});
     }
 }
 
@@ -206,10 +207,17 @@ var registration = owner.scopes().register(new FakeFeatureScope());
 // Feature disposal calls registration.close() on EDT.
 ```
 
-This is the seam a future plugin API would expose unchanged: a scope sees only
-its own query, produces only data rows, and receives no `WindowContent`,
-`TerminalPane` or JediTerm type. No plugin loading or discovery exists yet; this
-deliverable ships exactly three scopes: Commands, History and Snippets.
+Scopes receive no `WindowContent`, `TerminalPane` or JediTerm type. This internal
+contract makes no compatibility promise for a future plugin API. No plugin loading
+or discovery exists; Jasper ships Commands, History and Snippets.
+
+`WindowCommandPalette` captures the origin tab/pane and restores focus; changing
+scopes retains that target. `PaletteController` owns query, picker and step state.
+Completion callbacks are marshalled to EDT and recheck generation, step identity,
+registered scope and origin validity before publishing. Dismissal, scope changes,
+step cancellation, pane/tab changes and window closure invalidate stale results.
+These publication guards do not cancel an already-submitted file write. A provider
+that performs asynchronous side effects must own their cancellation/lifetime checks.
 
 The Commands scope itself wraps the existing command registry, which stays the
 same internal facility it always was. A feature that already belongs to a

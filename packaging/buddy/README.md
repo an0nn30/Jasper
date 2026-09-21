@@ -1,15 +1,21 @@
 # Jasper desk buddy sprite
 
 Pixel-art Jasper for the floating desk buddy: 42 × 48 art pixels per frame, drawn at
-2 logical px per art pixel by the app (84 × 96 window, 4 device px per art pixel on Retina).
+2 logical px per art pixel by Buddy (84 × 96 window, 4 device px per art pixel at 2× display scale).
 
-- `jasper-buddy.ase` — editable master for [LibreSprite](https://libresprite.github.io). One RGBA layer, seventeen frames.
-- `../../jasper-app/src/main/resources/dev/jasper/app/buddy/jasper-buddy.png` — runtime strip, 714 × 48, frames left to right.
-- `generate.py` — **the source of truth** for both files (Python 3 + Pillow). Every frame so far has
-  been drawn here, never by hand: rerunning it reproduces the committed PNG byte for byte. Change the
-  art here and rerun, rather than editing the `.ase` and stranding the script.
+- [jasper-buddy.ase](jasper-buddy.ase) — editable master for [LibreSprite](https://libresprite.github.io). One RGBA layer, 20 frames of 42 × 48.
+- [jasper-buddy.png](../../jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png) — runtime strip, 840 × 48, 20 frames left to right with no inter-frame padding.
+- [generate.py](generate.py) — programmatic artwork and exporter (Python 3 + Pillow).
+  Prefer editing its drawing functions and regenerating both artifacts together. Running
+  it normally overwrites the master and runtime strip; it does not preserve hand edits.
 
-## Frames (column order is fixed by `BuddyFrame` in the app)
+The runtime resource belongs to `jasper-buddy`, beside
+[BuddySprite](../../jasper-buddy/src/main/java/dev/jasper/buddy/internal/presentation/BuddySprite.java).
+Ordinary Gradle builds load committed artwork and run no generator.
+
+## Frames
+
+Column order is fixed by [BuddyFrame](../../jasper-buddy/src/main/java/dev/jasper/buddy/internal/animation/BuddyFrame.java).
 
 | # | Name | Meaning |
 |---|---|---|
@@ -34,11 +40,15 @@ Pixel-art Jasper for the floating desk buddy: 42 × 48 art pixels per frame, dra
 | 18 | `TYPE_B` | As A, right hand raised instead |
 | 19 | `TYPE_REST` | As A with both hands down, the beat between bursts |
 
-Frames 17–19 are the working animation, cycled while a command has been running past the
-notification threshold. Frames 0–13 are poses. Frames 14–16 are overlays: transparent except for the stars, cycled on top of
+Frames 17–19 are the working animation, requested by the host through `setWorking(true)`.
+Jasper's command policy decides when to request it; Buddy has no notification threshold.
+Frames 0–13 are poses. Frames 14–16 are overlays: transparent except for the stars, cycled on top of
 the body while he fades in at spawn, so they never replace a pose.
 
-## Palette (from `../icons/jasper.svg`)
+## Palette
+
+Character colors follow [the application artwork](../icons/jasper.svg); laptop colors
+are explicit constants in `generate.py`.
 
 | Role | Hex |
 |---|---|
@@ -59,27 +69,38 @@ the body while he fades in at spawn, so they never replace a pose.
 
 ## Editing and exporting
 
-Open `jasper-buddy.ase` in LibreSprite, edit, save, then export the runtime strip:
+For the generated-art workflow, edit `generate.py` and run from the repository root:
+
+```sh
+python3 packaging/buddy/generate.py
+python3 packaging/buddy/generate.py --verify-only
+./gradlew :jasper-buddy:test --tests '*BuddySpriteTest' --tests '*BuddyApiTest'
+```
+
+The first command overwrites both committed artifacts and verifies that each master
+frame matches its PNG cell. `--verify-only` reads existing artifacts without writing:
+it checks frame count and compares the `.ase` pixels with the PNG cells. It does not
+compare those pixels with newly generated drawing output, so passing that check alone
+does not establish that hand-edited artwork matches the generator. `BuddySpriteTest`
+checks exact dimensions/frame count, transparent side/bottom margins, nearest-neighbor
+scaling and distinguishing artwork; `BuddyApiTest` decodes the resource from the jar.
+Keep the Java enum order, generator frame order, master and runtime PNG synchronized.
+
+If a human chooses to edit the master in LibreSprite, export to the current runtime path:
 
 ```sh
 /Applications/libresprite.app/Contents/MacOS/libresprite --batch packaging/buddy/jasper-buddy.ase \
-    --sheet jasper-app/src/main/resources/dev/jasper/app/buddy/jasper-buddy.png
+    --sheet jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png
 ```
 
-Keep seventeen frames of 42 × 48 with a transparent left, right and bottom margin;
-`BuddySpriteTest` fails the build otherwise. Ordinary Gradle builds need neither
-LibreSprite nor Python.
+That is a human-run export alternative, not part of Gradle verification. Keep 20 frames
+of 42 × 48, no inter-frame padding, and transparent left/right/bottom margins. Do not run
+the generator's writing mode after hand edits unless those edits have been ported back
+to its drawing functions. No LibreSprite export was run during this documentation audit.
 
-**Verified 2026-09-14:** `libresprite --batch packaging/buddy/jasper-buddy.ase --sheet <out>.png`
-produced no output and no window, and did not exit within 60 seconds; it was killed
-(`kill -9`) rather than retried, per the project's unattended-agent rules. No exported
-PNG was produced to compare against the committed strip. The `.ase` master round-trips
-correctly through `generate.py`'s own reader/writer (`generate.py`'s `main()` re-reads
-the `.ase` it just wrote and asserts it matches the PNG pixel-for-pixel, which passed).
-The committed `jasper-buddy.png` (714 × 48, no padding, written directly by `generate.py`)
-remains authoritative for the runtime resource; a human with a GUI session should
-re-attempt the LibreSprite batch export if the master is hand-edited later.
-
-**Rerun 2026-09-14:** the three spawn sparkle overlays were added by rerunning `generate.py`, which
-was safe because the master had still not been hand-edited in LibreSprite. The first fourteen cells
-of the regenerated PNG are byte-identical to the previous strip.
+Historical acceptance on 2026-09-14 found that LibreSprite's batch export produced no
+output and did not exit within 60 seconds; the process was killed. That check used the
+then-current 17-frame, 714 × 48 strip and is not validation of today's 20-frame artwork
+or current native export. The `.ase` reader/writer verification is independent of
+LibreSprite. See [Buddy maintenance](../../docs/buddy-maintenance.md) for headless
+image previews and the manual native-acceptance boundary.

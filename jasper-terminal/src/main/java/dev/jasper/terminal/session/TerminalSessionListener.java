@@ -9,6 +9,8 @@ import java.util.OptionalInt;
  * resize and clear operations can notify on their calling thread. Screen/reset callbacks
  * may hold the buffer lock: return promptly and marshal UI work onto the EDT.
  * Command-start/finish callbacks run after command capture releases the buffer lock.
+ * Listener exceptions are not isolated from the source thread; callbacks should return promptly
+ * without throwing. Removing a listener does not cancel an already in-flight notification.
  */
 public interface TerminalSessionListener {
     /** Visible buffer contents changed; may be called while holding the buffer lock. */
@@ -37,9 +39,9 @@ public interface TerminalSessionListener {
 
     /**
      * The shell marked the start of a command it is about to run (OSC 133 C). Reader thread, and
-     * fired outside the buffer lock. Exactly one start per {@link #commandExecuted}, except when
-     * the pane is closed mid-command — then there is a start and no finish, which is precisely
-     * the case a running notice exists to show.
+     * fired outside the buffer lock when nonempty command text is available. A normal shell cycle
+     * pairs this with {@link #commandExecuted}; an incomplete or interrupted protocol cycle may
+     * have no finish. Closing the session does not synthesize a command completion.
      */
     public default void commandStarted(String command) {
     }
@@ -48,6 +50,7 @@ public interface TerminalSessionListener {
      * The shell ran a command it marked with OSC 133 B/C (and D when it sends one). Reader thread.
      * {@code duration} is measured from the command-start mark. A cycle that never saw one has no
      * command to report either, so it fires no callback at all rather than one with a zero duration.
+     * The directory is the last OSC 7 value at completion, not a snapshot taken at command start.
      */
     public default void commandExecuted(String command, OptionalInt exitStatus, Optional<Path> workingDirectory,
                                  Duration duration) {

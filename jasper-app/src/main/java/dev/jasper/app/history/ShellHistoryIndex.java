@@ -28,7 +28,7 @@ import javax.swing.SwingUtilities;
 
 /**
  * Application-wide shell history. One serial worker reads files and merges live captures; immutable
- * snapshots are published on the EDT. Jasper never writes a history file.
+ * snapshots are published on the EDT. This index never writes shell-history files or persists its live capture.
  */
 public final class ShellHistoryIndex implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(ShellHistoryIndex.class.getName());

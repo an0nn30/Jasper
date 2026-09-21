@@ -1,6 +1,6 @@
 # Configuration
 
-Jasper reads UTF-8 TOML at startup and watches it for changes once per second. Starting Jasper does not create directories or files. Click **Settings** to create a commented template if the file is absent, then open it in your operating system's editor. Jasper tries Edit, then Open, then revealing the file in Finder/Explorer when supported. If all attempts fail, Jasper shows the error. Existing files are never overwritten by Settings.
+Jasper reads UTF-8 TOML at startup and watches it for changes once per second. Reading configuration does not create the config file. Normal desktop startup can create application data: logs, extracted shell-integration scripts, and (when enabled) residency files. Click **Settings** to create a commented template if the file is absent, then open it in your operating system's editor. Jasper tries Edit, then Open, then revealing the file in Finder/Explorer when supported. If all attempts fail, Jasper shows the error. Existing files are never overwritten by Settings.
 
 For a copyable starting point, use the root [config.example.toml](../config.example.toml). It contains every supported non-shortcut setting as an explicit built-in default, an empty environment table and optional platform-specific shortcut examples.
 
@@ -12,7 +12,7 @@ For a copyable starting point, use the root [config.example.toml](../config.exam
 | Linux | `$XDG_CONFIG_HOME/jasper/config.toml`, or `~/.config/jasper/config.toml` when unset or relative |
 | Windows | `%APPDATA%/jasper/config.toml`, or `~/AppData/Roaming/jasper/config.toml` when unavailable |
 
-Use `--config <path>` to select a different file. Relative paths resolve from the process's working directory. The override changes only the configuration file location. Settings creates only that file's parent directories when needed.
+Use `--config <path>` to select a different file. Relative paths resolve from the process's working directory. The override changes the configuration file location and makes the launch standalone (no residency or login-item changes; see [background residency](#background-residency)). Other data, including logs, snippets, command-usage history and Buddy position, still uses the default Jasper application directory. Settings creates only the selected config file's parent directories when needed.
 
 ```bash
 ./gradlew :jasper-app:run --args='--config /absolute/path/to/config.toml'
@@ -35,6 +35,19 @@ lines = 45
 
 [buddy]
 enabled = true
+
+[notifications]
+long_command_seconds = 10
+
+[background]
+enabled = false
+
+[palette]
+max_results = 5
+
+[palette.scopes.history]
+enabled = true
+trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
 
 [font]
 family = "JetBrains Mono"
@@ -108,7 +121,7 @@ variant = "dark"
 
 `buddy.enabled` shows the pixel-art Jasper who floats above other windows while at least one
 terminal window is open and not minimized. Hover to make him wave; drag him anywhere (the
-position is saved in `buddy.toml` beside `config.toml`); double-click him to bring the last
+position is saved in `buddy.toml` in the default Jasper application directory); double-click him to bring the last
 active terminal window forward. Left alone he sits down after 20 seconds and retreats into his
 shell to sleep after a minute; hovering wakes him and earns a one-second wave. View → Show
 Jasper, the command palette and right-click → Hide Jasper toggle him for the current session; a
@@ -130,8 +143,8 @@ On Windows, that windowless process has no UI at all — no tray icon, nothing t
 does not put an icon in the notification area). It is not a lockout: launch Jasper again and the
 handoff reveals a window, from which Quit works normally.
 
-Nothing of yours keeps running: a resident Jasper holds no shell, no PTY and no child process.
-Your shells have already exited through the usual pane-close path before the last window goes.
+Residency keeps no pane session alive intentionally: once pane cleanup completes, it holds no shell, PTY or child process.
+Closing panes requests shell termination; process cleanup is asynchronous, so a child can briefly be finishing cleanup after the last window disappears.
 
 Enabling it also registers Jasper to start in the background at login:
 
@@ -258,8 +271,8 @@ exposing each tmux pane as a separate Jasper tab.
 
 ### Shell history
 
-`palette.scopes.history.trivial_commands` lists the commands ranked below more substantial ones in the History
-palette. It defaults to `["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]` —
+`palette.scopes.history.trivial_commands` lists the commands ranked below more substantial ones when the History
+palette query is empty. It defaults to `["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]` —
 often the most recent thing you typed, so strict recency pushed the work you came back for off the
 first page.
 
@@ -269,9 +282,10 @@ is real work, and `clearcache --all` is not caught by `clear`. An entry containi
 never match and is rejected with a diagnostic.
 
 Setting the key **replaces** the default list rather than adding to it, so include any defaults you
-want to keep. An empty list (`trivial_commands = []`) turns de-ranking off entirely and restores
-strict recency. De-ranked commands are still listed and still searchable — searching for `clear`
-finds it — they just never sort above real work.
+want to keep. An empty list (`trivial_commands = []`) turns trivial-command de-ranking off;
+other ordering rules, including timestamps and query match quality, still apply. De-ranked commands remain listed and searchable. A nonempty query ranks match
+quality first, then working-directory affinity and recency; it does not apply this
+trivial-command partition.
 
 `palette.scopes.history.enabled` adds the History scope to the [command palette](command-palette.md): Cmd+R on
 macOS or Ctrl+Shift+R elsewhere searches every shell history file Jasper can find plus commands
@@ -304,7 +318,7 @@ A visual bell flashes a short foreground overlay for 150ms. Sound uses the syste
 
 ### Shell, environment and history
 
-Each new tab or split requests a new pane. Jasper captures its shell command, arguments, environment, scrollback capacity and shell label before dispatching the background launch. A reload cannot change an already queued request. Existing sessions retain those settings. Pending views still receive the latest live font and behavior settings when ready.
+Each new tab or split requests a new pane. Jasper captures its shell command, arguments, environment, scrollback capacity, shell-integration mode and shell label before dispatching the background launch. A reload cannot change an already queued request. Existing sessions retain those settings. Pending views still receive the latest live font and behavior settings when ready.
 
 With an empty program, macOS/Linux use the inherited `SHELL` followed by `-l`; when `SHELL` is unavailable or blank, the fallback is `/bin/zsh` on macOS and `/bin/bash` on Linux. Windows uses `powershell.exe -NoLogo`. Configured arguments append to that default command. An explicit program gets only the configured arguments, with no implicit login flag. Jasper does not split strings, expand shell expressions or parse a shell command line.
 
@@ -455,7 +469,7 @@ Syntax errors, wrong types, unreadable files, invalid UTF-8 and files larger tha
 
 ## Remaining configuration work
 
-App logging remains planned; see the [packaging guide](packaging.md) for desktop launcher details. Unsupported keys warn. Native font rendering, keyboard behavior, audio, screen sizing and editor integration still require the user-run [terminal configuration checklist](superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md), alongside the acceptance checks linked from the README.
+Bounded application logging is implemented; see [diagnostics](diagnostics.md) for paths and privacy rules and the [packaging guide](packaging.md) for desktop launcher details. Unsupported keys warn. Native font rendering, keyboard behavior, audio, screen sizing and editor integration still require the user-run [terminal configuration checklist](superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md), alongside the acceptance checks linked from the README.
 
 
 ## Theme variant

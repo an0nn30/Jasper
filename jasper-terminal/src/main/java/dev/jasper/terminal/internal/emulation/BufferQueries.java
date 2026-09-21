@@ -241,7 +241,7 @@ public final class BufferQueries {
 
     /**
      * The link at an absolute row and column: an OSC 8 hyperlink, or else a URL written in the text. A program chooses
-     * an OSC 8 target freely, so only web and mail schemes are opened; a cell whose OSC 8 target has any other scheme
+     * an OSC 8 target freely, so only http, https, ftp and mailto schemes are accepted; a cell whose OSC 8 target has any other scheme
      * has no link at all, whatever its text says.
      */
     public Optional<String> linkAt(long absoluteRow, int column) {

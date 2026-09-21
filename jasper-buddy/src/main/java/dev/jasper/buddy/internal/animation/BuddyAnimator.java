@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
  * pop around him, the sparkles stop, and he waves for a second before standing. Left alone he then
  * stands, sits down after {@link #SIT_AFTER_NANOS}, tucks into his shell after
  * {@link #SLEEP_AFTER_NANOS} and then sleeps. Those postures are absolute deadlines measured from
- * the boredom origin, so a tick that arrives hours late (a closed lid) resolves in constant time
+ * the boredom origin, so an idle-posture tick that arrives hours late resolves in constant time
  * instead of replaying every step. {@link #greet} — the pointer entering, or the user coming back to
  * a Jasper window — plays a one-second greeting and restarts the boredom clock, waking him first if
  * he is tucked or asleep. {@link #poke} — the user typing — restarts the same clock without a wave.
@@ -62,7 +62,7 @@ public final class BuddyAnimator {
     private BuddyFrame blinkFrame = BuddyFrame.BLINK;
     private long stepDue;
     private int step;
-    /** A command has been running past the notification threshold. */
+    /** Host-supplied working intent; notification thresholds are outside this library. */
     private boolean working;
     /** The last time passed to {@link #tick}, so setWorking can schedule from the present. */
     private long lastTick;
@@ -132,7 +132,7 @@ public final class BuddyAnimator {
         }
     }
 
-    /** Applies everything due at or before {@code now}; bounded work however late the tick is. */
+    /** Applies transitions due at or before {@code now}. Idle posture resolves absolute deadlines; working animation advances each elapsed typing step. */
     public void tick(long now) {
         lastTick = now;
         // WAKING -> GREETING -> RESTING -> settled posture is the longest chain of mode changes.
@@ -150,8 +150,8 @@ public final class BuddyAnimator {
     }
 
     /**
-     * A long command is running: he sits down with the laptop and types until it finishes. Idempotent,
-     * so the tracker can call it on every finish without restarting the animation.
+     * Applies host working intent: he sits down with the laptop and types until it is cleared.
+     * Idempotent, so repeating the current value does not restart the animation.
      */
     public void setWorking(boolean value) {
         if (working == value) return;

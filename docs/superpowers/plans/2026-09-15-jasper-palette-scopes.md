@@ -1796,7 +1796,7 @@ and extend the non-macOS comment to `"# cmd means Ctrl+Shift; some defaults add 
 enabled = true
 ```
 
-`docs/configuration.md`: add the row `| `history.enabled` | `true` | Boolean | Live |` after `buddy.enabled`, a `### Shell history` subsection after the desk buddy one ("`history.enabled` adds the History scope to the [command palette](command-palette.md): Cmd+R on macOS or Ctrl+Shift+R elsewhere searches every shell history file Jasper can find plus commands it saw run through shell integration. Disabling it removes the scope and its shortcut does nothing."), add `history_palette` to the action ID list in "Shortcuts", and a sentence in "Command palette shortcuts" naming Cmd+R / Ctrl+Shift+R.
+`docs/configuration.md`: add the row `| `history.enabled` | `true` | Boolean | Live |` after `buddy.enabled`, a `### Shell history` subsection after the desk buddy one ("`history.enabled` adds the History scope to the [command palette](../../command-palette.md): Cmd+R on macOS or Ctrl+Shift+R elsewhere searches every shell history file Jasper can find plus commands it saw run through shell integration. Disabling it removes the scope and its shortcut does nothing."), add `history_palette` to the action ID list in "Shortcuts", and a sentence in "Command palette shortcuts" naming Cmd+R / Ctrl+Shift+R.
 
 - [ ] **Step 5: Run the tests**
 

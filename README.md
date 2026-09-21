@@ -12,10 +12,11 @@ Current progress, limitations and next steps: [docs/STATUS.md](docs/STATUS.md). 
 
 ## Developing Jasper
 
-Start with the [terminal onboarding guide](jasper-terminal/README.md), then
-[architecture](docs/terminal-architecture.md) and [feature recipes](docs/terminal-maintenance.md).
-The terminal has a supported packaged API, fluent options, reusable actions and
-build-checked examples. The application architecture and plugin SDK are separate future work.
+Use the [documentation index](docs/README.md) to choose an entry point:
+[application](jasper-app/README.md), [terminal library](jasper-terminal/README.md),
+or [Buddy library](jasper-buddy/README.md). All three modules have documented
+ownership, threading and extension routes. Builders, command registries and
+concrete lifecycle owners support the current features; a plugin SDK remains future work.
 
 ## Requirements
 
@@ -92,9 +93,9 @@ The default output is `jasper-app\build\packaging\dist\Jasper-1.0.0-windows-x64.
 
 ## Using the application
 
-On macOS: Cmd+T new tab, Cmd+N new window, Cmd+D split right, Cmd+Shift+D split down, Cmd+Option+arrows focus a pane, Cmd+Shift+Enter zoom, Cmd+F find, F2 rename, Cmd+W close tab, Cmd+Shift+W close pane. Tabs have close controls, support middle-click close and drag reorder. Opening and closing tabs animate with a quick eased settle; the active underline slides with selection and closing gaps. Closing stops the shell immediately. A blank rename restores the shell/directory title. Cmd+1–9 selects an existing tab; Cmd+Shift+[ / Cmd+Shift+] moves to the previous/next tab and wraps at the ends.
+On macOS: Cmd+T new tab, Cmd+N new window, Cmd+D split right, Cmd+Shift+D split down, Cmd+Option+arrows focus a pane, Cmd+Shift+Enter zoom, Cmd+F find, F2 rename, Cmd+W close tab, Cmd+Shift+W close pane. Tabs have hover close controls, support middle-click close and drag reorder. On macOS, a single tab is represented by a centered title; multiple tabs share the available title-bar width. Opening and closing tabs animate with a quick eased settle; tab widths adjust as the row changes. Closing stops the shell immediately. A blank rename restores the shell/directory title. Cmd+1–9 selects an existing tab; Cmd+Shift+[ / Cmd+Shift+] moves to the previous/next tab and wraps at the ends.
 
-Cmd+= / Cmd+- / Cmd+0 changes or resets the focused pane's font. Cmd+K clears history while retaining the live screen. Menus expose the full action list. View controls toolbar labels/visibility, status visibility and light/dark appearance across all windows and terminals, including hidden panes. Theme changes retain shells, scrollback, split ratios and font choices. On macOS the tabs share the title surface, with the toolbar immediately below. The title/tab row defaults to 38 logical pixels. View → Tab height… adjusts it from 28–72 pixels for the current window, with a reset to 38; Cancel preserves the previous height. View choices are temporary overrides and survive unrelated configuration reloads. The default app font is 16 points; Cmd+0 restores the configured size.
+Cmd+= / Cmd+- / Cmd+0 changes or resets the focused pane's font. Cmd+Shift+K clears history while retaining the live screen; Cmd+K opens the command palette. Menus expose the full action list. View controls toolbar labels/visibility, status visibility and light/dark appearance across all windows and terminals, including hidden panes. Theme changes retain shells, scrollback, split ratios and font choices. On macOS the tabs share the title surface, with the toolbar immediately below. The title/tab row defaults to 38 logical pixels. View → Tab height… adjusts it from 28–72 pixels for the current window, with a reset to 38; Cancel preserves the previous height. View choices are temporary overrides and survive unrelated configuration reloads. The default app font is 16 points; Cmd+0 restores the configured size.
 
 Settings opens the TOML configuration, creating a commented template only when absent. Saved tab height, toolbar/status visibility, font family/fallback/size/ligatures/line height, cursor/input/copy/bell options, shell-exit behavior, inactive-pane dimming, theme and shortcuts reload live across windows. Shell command, exact arguments, environment and scrollback defaults apply to new pane requests; columns/lines supply the initial grid for new windows. Existing sessions continue running. Reload config forces a read; the status indicator opens file diagnostics. See [configuration](docs/configuration.md) for the complete settings table, defaults/ranges, paths, `--config`, shell/shortcut examples and error behavior.
 
@@ -128,7 +129,8 @@ Working-directory inheritance and prompt navigation use OSC 7 and OSC 133 emitte
 ## Contributor architecture guides
 
 Start with the [app onboarding](jasper-app/README.md), [terminal onboarding](jasper-terminal/README.md),
-or [Buddy embedding guide](jasper-buddy/README.md). The [app architecture](docs/app-architecture.md)
+or [Buddy embedding guide](jasper-buddy/README.md). The [documentation index](docs/README.md)
+links architecture and maintenance guides for each module. The [app architecture](docs/app-architecture.md)
 and [maintenance recipes](docs/app-maintenance.md) explain feature ownership, lifecycle and
 where to add commands, settings, providers and notices. [STATUS](docs/STATUS.md) records
 verified checkpoints and remaining manual acceptance.

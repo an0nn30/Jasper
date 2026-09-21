@@ -53,6 +53,10 @@ class SessionLaunchCoordinatorTest {
             assertThat(pending.getFirst()).isNotDone();
             session.close();
             pending.getFirst().get(5, TimeUnit.SECONDS);
+            // The copied exit future and the coordinator's removal callback are independent
+            // dependents. Await its drain too before asserting that bookkeeping is empty.
+            CompletableFuture.allOf(coordinator.pendingExits().toArray(CompletableFuture[]::new))
+                .get(5, TimeUnit.SECONDS);
             assertThat(coordinator.pendingExits()).isEmpty();
             assertThatThrownBy(() -> coordinator.execute(() -> {})).isInstanceOf(RejectedExecutionException.class);
         } finally { coordinator.close(); }

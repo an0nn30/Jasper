@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-20
 
-**Status:** Approved and implemented on `codex/terminal-refactor-native`. The [implementation plan](../plans/2026-09-20-jasper-terminal-refactor.md) ran natively on an independent worktree. Final independent review is complete; its important search/reset finding is fixed with four regressions and a fresh full check. [Verification and deferred minor notes](../../terminal-refactor-verification.md) record the final evidence. Native desktop acceptance remains user-run. The connector adapter is in internal.emulation; native ownership is in internal.process. Compact row capture follows the measured opaque-adapter approach.
+**Status:** Approved, implemented on `codex/terminal-refactor-native`, and merged into local `main` through `c7b796b`. The [implementation plan](../plans/2026-09-20-jasper-terminal-refactor.md) ran natively on an independent worktree. Final independent review is complete; its important search/reset finding is fixed with four regressions and a fresh full check. [Verification and review notes](../../terminal-refactor-verification.md) record the final evidence. Native desktop acceptance remains user-run. The connector adapter is in internal.emulation; native ownership is in internal.process. Compact row capture follows the measured opaque-adapter approach.
 
 **Scope:** `jasper-terminal`, its documentation and tests, and migration of affected repository callers.
 

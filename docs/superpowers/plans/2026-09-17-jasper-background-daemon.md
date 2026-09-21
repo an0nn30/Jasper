@@ -1981,7 +1981,7 @@ And to the **Windows** checklist:
 
 - [ ] **Step 4: Record the work in STATUS.md**
 
-Add a new entry at the top of `docs/STATUS.md`, in the style of the existing ones: the branch and base commit, what shipped, the decisions, the deviations from the spec found during implementation, the exact test counts from Step 1, links to the [design spec](superpowers/specs/2026-09-17-jasper-background-daemon-design.md) and this [plan](superpowers/plans/2026-09-17-jasper-background-daemon.md), and an explicit **Still user-run** list naming every item from Step 3 plus the cold-versus-warm timing, since none of it can be verified headlessly and no GUI was launched.
+Add a new entry at the top of `docs/STATUS.md`, in the style of the existing ones: the branch and base commit, what shipped, the decisions, the deviations from the spec found during implementation, the exact test counts from Step 1, links to the [design spec](../specs/2026-09-17-jasper-background-daemon-design.md) and this [plan](2026-09-17-jasper-background-daemon.md), and an explicit **Still user-run** list naming every item from Step 3 plus the cold-versus-warm timing, since none of it can be verified headlessly and no GUI was launched.
 
 - [ ] **Step 5: Verify the documentation matches the code**
 

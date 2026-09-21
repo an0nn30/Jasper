@@ -56,8 +56,9 @@ focused tests and then `./gradlew check`. Use native inline implementation for t
 approved plan, with one independent whole-branch review. Do not push or merge without
 current authorization. Update docs and executable examples with API changes.
 
-A new setting must propagate through its builder, parser, template, example config,
-workspace live comparison and launch capture; the maintenance guide lists every stop.
+A new setting must propagate through its builder, parser, template and example config,
+then through its owning live-setting comparison or launch capture as appropriate;
+the maintenance guide lists each route.
 A new resource must be tested from the produced jar. FlatLaf and shell-integration
 resource paths remain under `dev/jasper/app/`; moving a Java class can still require
 updating reflective class names in `.properties` files.

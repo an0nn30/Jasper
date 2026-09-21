@@ -138,7 +138,7 @@ public final class BuddyWindow {
         if (column != null) column.endDrag();
     }
 
-    /** Null when headless or the toolkit lacks always-on-top or per-pixel translucency; logs once. */
+    /** Returns null when headless, unsupported or the sprite is unavailable. Unsupported/resource failures log per attempt; the host decides whether to retry. Other initialization failures are rethrown after rollback. */
     public static BuddyWindow create(BuddyOptions options, BuddyDeck deck) {
         if (GraphicsEnvironment.isHeadless()) return null;
         GraphicsDevice device = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
@@ -161,7 +161,7 @@ public final class BuddyWindow {
         }
     }
 
-    /** The application owns the contents; the buddy only gives the two surfaces somewhere to sit. */
+    /** Attaches the companion-owned model to the drawer and column owned by this presentation. */
     void attachDeck(BuddyDeck deck) {
         if (disposed || drawer != null) return;
         drawer = new BuddyDeckWindow(options, deck, () -> column.refresh());
@@ -187,7 +187,7 @@ public final class BuddyWindow {
         drawer.showBeside(window.getBounds());
     }
 
-    /** A long command is in flight: he sits down with the laptop until it finishes. */
+    /** Applies host working intent to the animator without acquiring presentation or deciding policy. */
     public void setWorking(boolean working) {
         animator.setWorking(working);
         window.repaint();

@@ -63,7 +63,7 @@ public final class TerminalAccess implements AutoCloseable {
     public List<TerminalSearch.Match> search(SearchQuery query) { return queries.search(query.text(), query.regex(), query.caseSensitive()); }
     /**
      * The link at an absolute row and column: an OSC 8 hyperlink, or else a URL written in the text. A program chooses
-     * an OSC 8 target freely, so only web and mail schemes are opened; a cell whose OSC 8 target has any other scheme
+     * an OSC 8 target freely, so only http, https, ftp and mailto schemes are accepted; a cell whose OSC 8 target has any other scheme
      * has no link at all, whatever its text says.
      Unsupported module collaboration API. */
     public Optional<String> linkAt(long absoluteRow, int column) { return queries.linkAt(absoluteRow, column); }
@@ -87,7 +87,7 @@ public final class TerminalAccess implements AutoCloseable {
     public String title() { return engine.title(); }
     /** Current foreground job's executable name, when the OS exposes it. Query off the EDT. Unsupported module collaboration API. */
     public Optional<String> foregroundJob() { return engine.foregroundJob(); }
-    /** Completes with the exit code once the program's output has ended. Unsupported module collaboration API. */
+    /** Completes with the exit code after output ends, the child wait completes, and the exit message reaches the buffer. Unsupported module collaboration API. */
     public CompletableFuture<Integer> exitFuture() { return engine.exitFuture(); }
     /** Unsupported module collaboration API; used only by terminal owners. */
     public void close() { engine.close(); }
@@ -97,7 +97,7 @@ public final class TerminalAccess implements AutoCloseable {
     public byte[] codeForKey(int keyCode, int modifiers) { return engine.codeForKey(keyCode, modifiers); }
     /** Monotonic generation for history, reflow and alternate-buffer changes that invalidate absolute rows. Unsupported module collaboration API. */
     public long absoluteRowEpoch() { return engine.absoluteRowEpoch(); }
-    /** Absolute rows of the prompts the shell marked with OSC 133;A that are still in the scrollback, oldest first. Unsupported module collaboration API. */
+    /** Absolute rows of the prompts the shell marked with OSC 133;A retained in history or the live screen, oldest first. Unsupported module collaboration API. */
     public List<Long> promptRows() { return engine.promptRows(); }
     /** Whether the program asked for mouse reports, so clicks go to it instead of to local selection. Unsupported module collaboration API. */
     public boolean mouseReporting() { return engine.mouseReporting(); }

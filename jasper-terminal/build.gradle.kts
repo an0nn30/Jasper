@@ -33,3 +33,12 @@ tasks.named("check") { dependsOn(tasks.named("javadoc")) }
 tasks.withType<Test>().configureEach {
     systemProperty("jasper.repoRoot", rootProject.projectDir.absolutePath)
 }
+
+// Documentation tests read these files at runtime, so docs-only edits must invalidate test results.
+tasks.test {
+    inputs.files(rootProject.fileTree("docs") { include("**/*.md") },
+        rootProject.file("README.md"), rootProject.file("AGENTS.md"),
+        rootProject.file("jasper-app/README.md"), rootProject.file("jasper-terminal/README.md"),
+        rootProject.file("jasper-buddy/README.md"), rootProject.fileTree("packaging") { include("**/*.md") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}

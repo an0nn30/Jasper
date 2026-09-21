@@ -53,8 +53,8 @@ sequenceDiagram
   Bootstrap->>App: Compose on EDT; transfer owners after wiring
   App->>Buddy: Configure one companion model; native show remains lazy
   App->>Workspace: Create window with immutable launch snapshot and callbacks
-  Workspace->>Launches: Admit shell start on executor
-  Launches-->>Workspace: Marshal result to EDT; close if origin expired
+  Workspace->>Launches: ShellLauncher submits captured request
+  Launches-->>Workspace: ShellLauncher delivers on EDT; pane rejects closed origin
   Bootstrap->>Resources: Transfer successful startup ownership
   Workspace-->>App: Pane/window activity and closure
   App->>Workspace: Quit closes panes and subscriptions
@@ -73,9 +73,13 @@ A pane owns its admitted session. The launch coordinator stops admission and clo
 late arrivals; it does not force-close a session before its pane has completed cleanup.
 Shutdown waits for accepted launch workers, their late child exits, tracked process exits,
 command-history flush and endpoint cleanup with the existing two-second bound. Endpoint
-lock/probe cleanup runs on daemon workers; both ordinary quit and startup rollback leave
-the EDT responsive. Residency retains indexes/config/history after the last window,
-but retains no closed pane, PTY or child process. Quit closes all owners.
+lock/probe cleanup runs on daemon workers; both ordinary quit and startup rollback
+queue this cleanup without blocking EDT. The two-second bound covers the application
+wait, not a promise that every cleanup succeeds or the JVM exits within two seconds.
+The process shutdown hook backs up endpoint cleanup and drains logging separately.
+Residency retains indexes/config/history after the last window,
+and does not intentionally retain pane sessions; asynchronous child cleanup may
+briefly continue after the last window closes. Quit closes all owners.
 
 ## Threading and cancellation
 
@@ -86,7 +90,10 @@ Swing synchronously while holding a terminal buffer lock.
 
 Palette completion captures a generation, step, scope and origin. A queued callback
 rechecks them after reaching EDT; dismissal, scope replacement or origin closure
-invalidates it. Subscriptions close once and detach from the actual owner.
+invalidates it. WindowCommandPalette separately captures the pane/tab and requires
+them to remain current in an active, open workspace. Completion guards prevent stale
+UI publication; they do not undo provider work already submitted, such as a snippet
+append. Subscriptions close once and detach from the actual owner.
 
 Workspace OPENED precedes command events; app notification wiring registers opaque pane
 IDs. CLOSED removes the active ID before timer cancellation/orphaning. A saved delayed
@@ -97,12 +104,24 @@ closing clears model closures and all presentation resources.
 ## Saved versus temporary configuration
 
 `ConfigSnapshot` validates immutable canonical values; builder and toBuilder use that same
-validation. `WorkspaceConfiguration` compares the new saved value with the last saved
-value: unchanged defaults preserve temporary font/theme/toolbar choices, while a changed
-saved default applies live where supported. Existing terminal views copy their current
-options before replacing configured fields, preserving unrelated options. New-session
-settings are captured by LaunchSettings when each launch is requested. ThemeController
-publishes resolved values; platform title bars receive components and callbacks.
+validation. `WorkspaceConfiguration` compares each live saved field with its previous
+saved value: unchanged defaults preserve temporary font, toolbar, status-bar and tab-height
+choices. `ConfigurationController` sends appearance to `ThemeController`, whose ThemeState
+separately preserves a temporary theme choice until the saved appearance changes.
+
+Existing terminal views copy current options before replacing configured fields, preserving
+unrelated options and temporary font size when the saved size is unchanged. Live fields
+include font, cursor, Option-as-Meta, copy-on-select and bell behavior; pane dimming and
+shell-exit policy are updated separately. Scrollback capacity, shell command/arguments,
+environment and integration mode are captured by `LaunchSettings` for each launch request.
+The initial grid is captured once per window by `JasperApplication.windowLauncher`; a later
+saved grid change applies to new windows. Scrollback capacity belongs to the session and
+is not resized by applying view options. A pending pane receives the latest live view
+configuration in `WindowContent.configurePane` when its session arrives.
+
+ThemeController publishes resolved values; platform title bars receive components and
+callbacks. Application-level Buddy enablement, snippet reload and login-item reconciliation
+are wired by JasperApplication. Residency is decided at startup, not changed by a reload.
 
 ## Package ownership
 

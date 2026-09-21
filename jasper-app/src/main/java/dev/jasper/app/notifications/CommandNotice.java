@@ -8,7 +8,8 @@ public final class CommandNotice {
 
     /**
      * Where a finished command ran, relative to what the user is looking at. All four come from state
-     * the app already keeps: {@code WindowContent.active}, whether the pane's tab is the selected one,
+     * the app already keeps: whether any window and the originating window are active, whether
+     * the pane's tab is selected,
      * and whether the pane itself owns the keyboard focus.
      */
     public record Origin(boolean anyWindowActive, boolean ownWindowActive, boolean ownTabSelected,

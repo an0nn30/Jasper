@@ -10,9 +10,9 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * The notification drawer: notices newest first, nothing auto-hides, cleared only by the user or by
- * quitting. It knows nothing about panes, tabs or commands — a producer supplies the identity — so a
- * later sftp transfer or SSH session posts here without the deck changing at all.
+ * Bounded notice model: newest-first replacement, acknowledgement and orphaning. Notices have no
+ * expiry timer; dismissal, clear and capacity eviction remove them. A producer supplies identity,
+ * state and callbacks, so the model knows nothing about panes, command thresholds or persistence.
  *
  * <p>EDT only, like the rest of the buddy's state.
  */
@@ -24,9 +24,9 @@ public final class BuddyDeck {
     /** Notices the reader has already looked at. About the reader, not about the thing. */
     private final Set<BuddyNoticeId> seen = new HashSet<>();
     /**
-     * Bumped only by {@link #post}. A surface compares it to the last value it drew to know a notice
-     * genuinely arrived, rather than being told separately — being told separately is exactly how
-     * the arrival animation came to have no production caller at all.
+     * Bumped only by {@link #post}; distinguishes a new post from title, acknowledgement or orphan
+     * mutations. Retained as internal model bookkeeping; presentation currently refreshes through
+     * the facade and keys motion by notice identity.
      */
     private int generation;
     private List<BuddyNotice> columnSnapshot, noticeSnapshot;
@@ -107,10 +107,9 @@ public final class BuddyDeck {
     }
 
     /**
-     * As {@link #orphan(BuddyNoticeId)}, and freezes what it says. Only for a notice that was still
-     * running: it would otherwise tick forever against a process that no longer exists. A notice that
-     * had already finished keeps its own words — rewriting them would lose what happened, which is
-     * the very thing orphaning is shaped to preserve.
+     * As {@link #orphan(BuddyNoticeId)}, and replaces the detail supplier with fixed text regardless
+     * of state. The producer chooses whether to freeze unfinished details; use the other overload
+     * when an already completed notice must retain its own wording. Does not acknowledge the notice.
      */
     public void orphan(BuddyNoticeId id, String finalDetail) {
         Objects.requireNonNull(id, "id");
@@ -121,7 +120,7 @@ public final class BuddyDeck {
             : notice);
     }
 
-    /** Newest first. A copy: the caller may be painting while a producer posts. */
+    /** Cached immutable newest-first snapshot. Later EDT mutations invalidate the cache without changing an earlier snapshot. */
     public List<BuddyNotice> notices() {
         if (noticeSnapshot == null) noticeSnapshot = List.copyOf(notices);
         return noticeSnapshot;

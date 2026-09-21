@@ -6,14 +6,14 @@ import java.util.function.Supplier;
 /**
  * One thing worth showing. {@code id} is whatever produced it — a terminal pane today, an sftp
  * transfer or an SSH session later — and a later notice with the same source and key replaces this
- * one rather than stacking on top of it. Two producers cannot collide, because the source is part of
- * the identity.
+ * one rather than stacking on top of it. Different source strings distinguish producers; each
+ * producer must choose keys that are unique within its own source.
  *
  * <p>{@code detail} is a supplier rather than a string so a running notice can tick without the deck
  * being re-posted every second, and so a future transfer can report bytes through the same field.
  *
  * <p>Identity is {@link #id()}, never {@code equals}: the record holds two lambdas, so its
- * generated {@code equals} compares them by reference and means nothing useful.
+ * generated {@code equals} includes callback equality as well as the displayed values.
  * <p>Construction is resource-free. Detail and activation run on EDT and must not block.
  * @param id nonnull source-qualified identity with stable equality
  * @param kind nonnull task or connection kind
@@ -35,7 +35,20 @@ public record BuddyNotice(BuddyNoticeId id, Kind kind, String title, State state
 
     /** Task and connection lifecycle states; kind compatibility is validated at construction. */
     public enum State {
-        RUNNING, NEEDS_INPUT, DONE, FAILED, UP, DEGRADED, DOWN;
+        /** A task is in progress. */
+        RUNNING,
+        /** A task is waiting for user input. */
+        NEEDS_INPUT,
+        /** A task completed successfully. */
+        DONE,
+        /** A task failed. */
+        FAILED,
+        /** A connection is available. */
+        UP,
+        /** A connection is available with a problem needing attention. */
+        DEGRADED,
+        /** A connection is unavailable. */
+        DOWN;
 
         /** A task is never UP; a connection is never DONE. */
         public boolean fits(Kind kind) {
@@ -56,21 +69,21 @@ public record BuddyNotice(BuddyNoticeId id, Kind kind, String title, State state
     }
 
     /**
-     * Still happening, so it belongs above his head whether or not you have seen it. An orphan never
-     * is: its pane is gone, so a command left in {@code RUNNING} is not running any more — nothing
-     * will ever move it on, and without this it would sit above his head for the rest of the session.
+     * True for a non-orphaned RUNNING/NEEDS_INPUT task or UP/DEGRADED connection. Live notices
+     * remain eligible for the column after acknowledgement. Null activation makes a notice
+     * non-live without changing its state; an unacknowledged orphan is still eligible as unseen.
      */
     public boolean live() {
         return !orphaned() && (state == State.RUNNING || state == State.NEEDS_INPUT
             || state == State.UP || state == State.DEGRADED);
     }
 
-    /** Wants you specifically: it ended, it broke, or it is waiting on you. */
+    /** True for NEEDS_INPUT, DONE, FAILED, DEGRADED and DOWN. Derived from state alone, independently of orphaning or acknowledgement. */
     public boolean wantsAttention() { return state != State.RUNNING && state != State.UP; }
 
     /**
-     * Its origin is gone — the pane closed. Still worth reading, so this is a missing action rather
-     * than another state: a pane closed after a successful build must still say it succeeded.
+     * True exactly when activation is null. Orphaning keeps the recorded outcome: a producer
+     * closing after a successful operation must not rewrite its DONE state.
      */
     public boolean orphaned() { return activate == null; }
 

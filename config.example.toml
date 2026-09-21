@@ -19,13 +19,13 @@ lines = 45
 enabled = true
 
 [notifications]
-# Live. Notify when a command that ran at least this long finishes in a tab you are not looking at.
+# Live. Notify when a command that ran at least this long finishes in a pane you are not looking at.
 # Needs shell integration: the duration comes from its command marks. Zero disables. Range 0-3600.
 long_command_seconds = 10
 
 [background]
 # Restart required for residency; the login item updates on reload. Keep Jasper running with no
-# windows after the last one closes so the next launch is instant, and start it in the background
+# windows after the last one closes so the next launch can reuse the warm process, and start it in the background
 # at login. Quit (Cmd+Q) still exits completely. Autostart requires an installed Jasper: a
 # ./gradlew run development session stays resident but never registers a login item.
 enabled = false
@@ -37,11 +37,12 @@ max_results = 5
 
 [palette.scopes.history]
 # Live. Search shell history from the palette with Cmd+R (macOS) or Ctrl+Shift+R.
-# Jasper only reads zsh, bash, fish, nushell and PowerShell history files; it writes no history of its own.
+# Jasper reads zsh, bash, fish, nushell and PowerShell history files without rewriting them.
+# Live shell history stays in memory; command-palette usage is stored separately.
 enabled = true
-# Live. Commands ranked below more substantial ones in the History palette. Each entry is a single
+# Live. On an empty History query, these commands rank below more substantial ones. Each entry is a single
 # word matched against a command's first word, so "cd .." is trivial but "cd path && build" is not.
-# Still listed and still searchable, just never above real work. An empty list turns this off;
+# Nonempty queries rank match quality, directory and recency instead. An empty list turns this off;
 # setting the key replaces the default list entirely rather than adding to it.
 trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
 

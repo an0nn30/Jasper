@@ -12,7 +12,7 @@ Build with JBR SDK 25 and the wrapper; these commands do not launch the GUI:
 ./gradlew check :jasper-app:packageApp :jasper-app:verifyPackage
 ```
 
-Copy the entire verified image outside `jasper-app/build/packaging` before changing terminal source. Keep a revision label, command arguments and SHA-256 of the application/terminal JARs alongside the results. Never label a dirty working tree as an exact commit. A later package build replaces its build outputs.
+Copy the entire verified image outside `jasper-app/build/packaging` before changing terminal source. Keep a revision label, command arguments and SHA-256 of the all Jasper JARs present in that image (app, terminal, and Buddy in current builds) alongside the results. Never label a dirty working tree as an exact commit. A later package build replaces its build outputs.
 
 macOS example (replace paths and revision with the actual preserved baseline):
 

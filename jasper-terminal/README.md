@@ -15,7 +15,7 @@ emulation, rendering, input, selection, search and shell events.
 4. Read the [compiled examples](src/test/java/dev/jasper/terminal/examples/TerminalExamplesTest.java).
 5. Choose a [maintenance recipe](../docs/terminal-maintenance.md).
 
-`./gradlew check` runs both modules' headless tests, JavaDoc doclint and package/API
+`./gradlew check` runs all three modules' headless tests, JavaDoc doclint and package/API
 checks. `./gradlew verifyTerminalArchitecture` checks compiled dependencies alone.
 Generate API documentation with `./gradlew :jasper-terminal:javadoc`; open
 `jasper-terminal/build/docs/javadoc/index.html` afterward. Tests do not open GUI
@@ -95,7 +95,9 @@ calling thread. Screen/reset callbacks can hold the buffer lock, so never wait
 for the EDT inside one. Post UI work and reject stale pane/attachment callbacks
 in the owning application. Exit continuations must not assume EDT delivery.
 Registering a listener does not replay earlier events; read current metadata
-where initial state matters.
+where initial state matters. Listener exceptions propagate on the source thread, so
+callbacks must return promptly without throwing. Removing a listener does not cancel
+an already in-flight notification.
 
 <!-- example:events -->
 ```java
@@ -128,9 +130,10 @@ static void updateView(TerminalView view) {
 }
 ```
 
-A removed view cancels presentation work; it does not close the session. A session
-exit ends its process, not its Swing pane. Applications decide whether an exited
-pane remains visible. The owner removes listeners and closes the session when
+A removed view cancels presentation work; it does not close the session. The exit
+future completes after output ends, the reader waits for the child, and the exit
+message is added to the buffer; it does not dispose the Swing pane. Applications
+decide whether an exited pane remains visible. The owner removes listeners and closes the session when
 its pane is disposed. `close` is safe to repeat.
 
 <!-- example:teardown -->
@@ -161,6 +164,7 @@ headless module tests, never as a production embedding API.
 
 The [maintenance guide](../docs/terminal-maintenance.md) gives edit/test routes for
 actions, keys, live settings, shell events, rendering, search, mouse and process
-metadata. The future plugin SDK and broader app refactor are separate work. Keep
-application policy in `jasper-app`; don't expose an internal buffer or controller
-as a shortcut to implementing a plugin.
+metadata. For application-side ownership, see the completed
+[app/Buddy architecture guide](../docs/app-architecture.md). The plugin SDK remains
+future work. Keep application policy in `jasper-app`; don't expose an internal
+buffer or controller as a shortcut to implementing a plugin.

@@ -7,8 +7,8 @@ terminal input or output.
 Logs are stored beside Jasper's other application data:
 
 - macOS: `~/.config/jasper/logs`
-- Linux: `$XDG_CONFIG_HOME/jasper/logs`, or `~/.config/jasper/logs` when `XDG_CONFIG_HOME` is unset
-- Windows: `%APPDATA%\jasper\logs`, or the user's `AppData\Roaming\jasper\logs` directory when `APPDATA` is unavailable
+- Linux: `$XDG_CONFIG_HOME/jasper/logs`, or `~/.config/jasper/logs` when `XDG_CONFIG_HOME` is unset, blank, invalid or relative
+- Windows: `%APPDATA%\jasper\logs`, or the user's `AppData\Roaming\jasper\logs` directory when `APPDATA` is unavailable, invalid or relative
 
 Each running Jasper process obtains its own numbered log files and locks. It keeps three UTF-8 files of approximately
 1 MiB each. Older records rotate out automatically. Diagnostics are queued so reporting from the Swing event thread

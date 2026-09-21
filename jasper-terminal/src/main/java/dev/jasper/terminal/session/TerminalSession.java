@@ -57,15 +57,15 @@ public final class TerminalSession implements AutoCloseable {
     public void resize(int newColumns, int newRows) { access.resize(newColumns, newRows); }
     /** Clears saved history while preserving the live screen and notifying listeners that absolute rows were reset. */
     public void clearScrollback() { access.clearScrollback(); }
-    /** Returns the current width in cells under the buffer lock. */
+    /** Returns the last requested, clamped grid width from published state; not an atomic width/height snapshot. */
     public int columns() { return access.columns(); }
-    /** Returns the current height in cells under the buffer lock. */
+    /** Returns the last requested, clamped grid height from published state; not an atomic width/height snapshot. */
     public int rows() { return access.rows(); }
     /** Returns the last program-reported title, initially empty. */
     public String title() { return access.title(); }
     /** Current foreground job's executable name, when the OS exposes it. Query off the EDT. */
     public Optional<String> foregroundJob() { return access.foregroundJob(); }
-    /** Completes with the exit code once the program's output has ended. */
+    /** Completes with the exit code after output ends, the child wait completes, and the exit message reaches the buffer. */
     public CompletableFuture<Integer> exitFuture() { return access.exitFuture(); }
     /** Closes this session once, initiating bounded asynchronous child cleanup. Safe to repeat; does not remove any Swing view. */
     public void close() { access.close(); }

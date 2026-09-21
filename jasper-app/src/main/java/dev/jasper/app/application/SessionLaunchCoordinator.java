@@ -11,7 +11,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 
-/** Owns launch admission and sessions across worker/EDT races; closing never waits for a worker. */
+/** Owns launch admission and exit tracking across worker/EDT races; panes own admitted-session close. */
 final class SessionLaunchCoordinator implements Executor, AutoCloseable {
     private final Object lock = new Object();
     private final ExecutorService executor;
@@ -38,7 +38,7 @@ final class SessionLaunchCoordinator implements Executor, AutoCloseable {
         }
     }
 
-    /** Transfers an acquired session to this owner, or closes it if shutdown won the race. */
+    /** Tracks an acquired session until exit, closing it immediately if shutdown won the race. */
     TerminalSession track(TerminalSession session) {
         Objects.requireNonNull(session);
         synchronized (lock) {

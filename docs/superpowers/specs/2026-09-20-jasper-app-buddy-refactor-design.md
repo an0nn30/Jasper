@@ -1,7 +1,7 @@
 # Jasper application and Buddy architecture
 
 **Date:** 2026-09-20  
-**Status:** Written specification approved by the user’s “continue”. Implementation plan awaiting review; no production changes yet.
+**Status:** Approved, implemented and merged into local `main` through `9b30dc2` on 2026-09-21. Independent review and fresh-reader acceptance are complete; two shutdown findings were fixed and all headless checks pass. Native acceptance remains user-run. See the [verification report](../../app-refactor-verification.md).
 **Baseline:** `c7b796b` on `main`, after the terminal refactor merge.  
 **Scope:** Reorganize `jasper-app`, extract `jasper-buddy`, migrate repository callers/resources/build wiring, and provide executable developer documentation.
 

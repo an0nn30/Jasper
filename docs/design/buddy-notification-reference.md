@@ -61,17 +61,17 @@ in the drawer refreshes the live column as well.
 
 ## Reproduce
 
-Run `./gradlew check :jasper-app:buddyNotificationPreview`. The preview creates no
+Run `./gradlew check :jasper-buddy:buddyNotificationPreview`. The preview creates no
 window and starts no shell. It writes actual-component 2x PNGs and 60fps frame
-sequences to `jasper-app/build/reports/buddy-notifications/`. The sample titles
+sequences to `jasper-buddy/build/reports/buddy-notifications/`. The sample titles
 match the reference solely for comparing font placement; production notices keep
 the real command and status text. The render includes Jasper's actual sprite.
 
 Encode the dark sequence with:
 
 ```sh
-ffmpeg -framerate 60 -i jasper-app/build/reports/buddy-notifications/dark/%04d.png \
-  -c:v libx264 -pix_fmt yuv420p jasper-app/build/reports/buddy-notifications/dark.mp4
+ffmpeg -framerate 60 -i jasper-buddy/build/reports/buddy-notifications/dark/%04d.png \
+  -c:v libx264 -pix_fmt yuv420p jasper-buddy/build/reports/buddy-notifications/dark.mp4
 ```
 
 Headless regression coverage includes measured arrival positions, interrupted
@@ -109,9 +109,9 @@ column and the drawer use the same painter and request 16ms frames while a visib
 running task shimmers; other live details keep the one-second cadence. Hiding or
 disposing a surface stops its timer.
 
-`./gradlew :jasper-app:buddyMotionPreview` renders actual components, placement and
+`./gradlew :jasper-buddy:buddyMotionPreview` renders actual components, placement and
 sprite without native windows, using a scripted upward/downward drag in both
-themes. Frames and encoded previews are in `jasper-app/build/reports/buddy-motion/`.
+themes. Frames and encoded previews are in `jasper-buddy/build/reports/buddy-motion/`.
 Tests cover highlight direction and glyph-only changes, completed-task stability,
 midpoint/edge placement, interrupted flips, velocity continuity, monitor bounds,
 initial placement, direction-order interpolation, and pointer targets. Native
@@ -132,7 +132,7 @@ images. Title/detail/shimmer remain live; light/dark materials have distinct cac
 keys. Deck list snapshots invalidate on every relevant mutation. Settled shimmer
 requests only its text rectangle, with a full final frame after movement settles.
 
-Run `./gradlew :jasper-app:buddyPerformanceMeasurement` for the headless actual-paint
+Run `./gradlew :jasper-buddy:buddyPerformanceMeasurement` for the headless actual-paint
 benchmark (three running capsules at 2x, 200 warm-up and 600 measured frames). On the
 development Mac the median/p95/p99 fell from 0.983/1.251/1.454ms to
 0.731/0.896/0.981ms. RGBA before/after images differed by at most one channel value

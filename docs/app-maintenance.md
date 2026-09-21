@@ -8,7 +8,7 @@ its real production lifecycle. No example opens a GUI or starts a child process.
 
 ## Workspace command or shortcut
 
-Start with [ActionId](../jasper-app/src/main/java/dev/jasper/app/commands/ActionId.java), [WorkspaceActions](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActions.java) and [WindowCommands](../jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommands.java). Register a real Swing action, add its stable ID/keywords, then define the default shortcut in ActionId and validation in KeyBindings. Enablement must resolve the current pane at dispatch time. Do not capture the first pane in a long-lived action. Close registrations with the owning workspace.
+Start with [ActionId](../jasper-app/src/main/java/dev/jasper/app/commands/ActionId.java), [WorkspaceActions](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActions.java) and [WindowCommands](../jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommands.java). Register a real Swing action, add its stable ID/keywords, then define the default shortcut in ActionId and check platform resolution/collision validation in KeyBindings. If a new action needs nonstandard platform modifiers, update KeyBindings.effectiveDefaultBinding as well. Enablement must resolve the current pane at dispatch time. Do not capture the first pane in a long-lived action. Close registrations with the owning workspace.
 
 <!-- example:command -->
 ```java
@@ -35,7 +35,7 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 
 ## Palette scope
 
-Implement the existing [PaletteScope](../jasper-app/src/main/java/dev/jasper/app/palette/PaletteScope.java) contract, following [ShellHistoryScope](../jasper-app/src/main/java/dev/jasper/app/palette/builtin/ShellHistoryScope.java). Register it when WindowContent composes scopes; return bounded rows using context.maxResults. Keep search/availability free of I/O, refresh provider data on its worker, and notify via a closeable subscription. PaletteController owns queued completion generations; never bypass its stale-origin checks.
+Implement the existing [PaletteScope](../jasper-app/src/main/java/dev/jasper/app/palette/PaletteScope.java) contract, following [ShellHistoryScope](../jasper-app/src/main/java/dev/jasper/app/palette/builtin/ShellHistoryScope.java). Register it when WindowContent composes scopes; use WindowCommandPalette for overlay/focus/target integration; return bounded rows using context.maxResults. Keep search/availability free of I/O, refresh provider data on its worker, and notify via a closeable subscription. PaletteController owns queued completion generations; never bypass its stale-origin checks. Those checks protect UI publication, not cancellation of already-submitted provider work. Providers own cancellation and side-effect lifetime checks. Return dev.jasper.app.lifecycle.Subscription from onChanged.
 
 <!-- example:scope -->
 ```java
@@ -68,7 +68,7 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 
 ## Saved, live and session-only settings
 
-Start with [ConfigSnapshot](../jasper-app/src/main/java/dev/jasper/app/config/ConfigSnapshot.java) and [WorkspaceConfiguration](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceConfiguration.java). Every new field must update: canonical validation; defaults; builder and toBuilder copying; ConfigLoader parsing/diagnostics; ConfigTemplate; root config.example.toml; WorkspaceConfiguration comparison against the previous saved value; and, for new-session-only values, LaunchSettings capture and SessionLaunchOptions construction. Update reload/override tests and docs. Session-only overrides remain owner state and are not written back. A saved value changing may reset an override; an unchanged value must preserve it.
+Start with [ConfigSnapshot](../jasper-app/src/main/java/dev/jasper/app/config/ConfigSnapshot.java) and [WorkspaceConfiguration](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceConfiguration.java). Every new field must update: canonical validation; defaults; builder and toBuilder copying; ConfigLoader parsing/diagnostics; ConfigTemplate; root config.example.toml; comparison against the previous saved value in the responsible live owner (WorkspaceConfiguration for view/workspace fields, ThemeController for appearance, JasperApplication for app policy); and, for new-session-only values, LaunchSettings capture and SessionLaunchOptions construction. Update reload/override tests and docs. Session-only overrides remain owner state and are not written back. A saved value changing may reset an override; an unchanged value must preserve it. Check WindowContent.configurePane for pending-session attachment as well as existing views. Shell, environment, integration and scrollback are captured per launch; columns/lines are captured once per window in JasperApplication.windowLauncher. See the architecture guide for this distinction.
 
 <!-- example:settings -->
 ```java
@@ -82,7 +82,7 @@ assertThat(updated.keybindings()).isEqualTo(original.keybindings());
 Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`, then the feature checks:
 
 ```sh
-./gradlew :jasper-app:test --tests "*ConfigSnapshotBuilderTest" --tests "*ExpandedConfigTest" --tests "*ConfigurationControllerTest" --tests "*ShellLauncherTest"
+./gradlew :jasper-app:test --tests "*ConfigSnapshotBuilderTest" --tests "*ExpandedConfigTest" --tests "*ConfigTemplateTest" --tests "*ConfigurationControllerTest" --tests "*ShellLauncherTest"
 ```
 
 ## History or snippet provider behavior
@@ -149,7 +149,7 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 
 ## Session lifecycle change
 
-Begin with [SessionLaunchCoordinator](../jasper-app/src/main/java/dev/jasper/app/application/SessionLaunchCoordinator.java), [ShellLauncher](../jasper-app/src/main/java/dev/jasper/app/launch/ShellLauncher.java) and [TerminalPane](../jasper-app/src/main/java/dev/jasper/app/workspace/TerminalPane.java). Capture launch settings when requested, start off EDT, and validate lifetime after delivery to EDT. Close a late returned session and never attach it. Pane close owns admitted sessions; application shutdown stops admission and waits off EDT via ApplicationShutdown. Keep TERM/COLORTERM and the terminal library threading contract. This example builds options only; it launches no shell.
+Begin with [SessionLaunchCoordinator](../jasper-app/src/main/java/dev/jasper/app/application/SessionLaunchCoordinator.java), [ShellLauncher](../jasper-app/src/main/java/dev/jasper/app/launch/ShellLauncher.java) and [TerminalPane](../jasper-app/src/main/java/dev/jasper/app/workspace/TerminalPane.java). Capture launch settings when requested, start off EDT, and validate lifetime after delivery to EDT. Close a late returned session and never attach it. Pane close owns admitted sessions; application shutdown stops admission and waits off EDT via ApplicationShutdown. Keep the coordinator drain future in that wait so accepted launch workers and their late children remain tracked even if no session existed at shutdown start. Register endpoint/process cleanup through JasperApplication.onShutdown: it runs on a daemon worker within the bounded application wait, so callbacks must not touch Swing. Keep TERM/COLORTERM and the terminal library threading contract. This example builds options only; it launches no shell.
 
 <!-- example:session -->
 ```java
@@ -164,7 +164,7 @@ assertThat(launch.grid()).isEqualTo(new GridSize(80, 24));
 Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`, then the feature checks:
 
 ```sh
-./gradlew :jasper-app:test --tests "*SessionLaunchCoordinatorTest" --tests "*JasperApplicationShutdownTest" --tests "*ShellLauncherTest"
+./gradlew :jasper-app:test --tests "*SessionLaunchCoordinatorTest" --tests "*ApplicationShutdownTest" --tests "*JasperApplicationShutdownTest" --tests "*ShellLauncherTest"
 ```
 
 ## Review checklist
