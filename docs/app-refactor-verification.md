@@ -64,6 +64,19 @@ Availability, hide-preserves-model, listener removal and strict position writes 
 
 Task 10: Ruling: Add an ownership predicate and a JDK activity-registration callback to BuddyIntegration rather than coupling it to TerminalWindow. The plan’s four-argument test seam omitted appearance and key-listener ownership inputs; the actual seam takes BuddyOptions, companion, visibility, show, ownership and registration. Cost if wrong: extra constructor inputs; production filtering and headless exactly-once removal use the same path. Position persistence is tested through the real options factory and drag callback, without adding public inspection methods.
 
+### Task 11 — Final packages and artifacts
+
+The new bytecode checker rejected the flat root before migration. Both full package
+DAGs, Buddy JDK-only dependencies and API signatures now pass without exemptions.
+`verifyTerminalArchitecture verifyApplicationArchitecture check :jasper-app:installDist`
+passes: app 596, Buddy 162, terminal 355; 1,113 total, two expected skips, zero errors.
+Actual jar resources decode and exclude test fixtures. Distribution includes all
+three Jasper jars. The controlled child JVM now has a JDK-only nested entry point;
+its moved public fixture method otherwise caused JVM method discovery to resolve
+the terminal library before main. No desktop launcher was run.
+
+Task 11: Ruling: Place integration tests with the workspace they drive and keep package-local test access fixtures beside private owners; share pure worker/config/layout fixtures under testsupport. This avoids exposing palette widgets, bootstrap hooks or native session test seams in production. Public configuration/value factories are cross-feature contracts, while ConfigurationController stays package-private. Cost if wrong: more small test support files to navigate; no test artifact enters production. FlatLaf defaults retain their resource path but name the relocated public SplitDividerBorder; icon loads use absolute resource paths. Both regressions were observed RED and pass after correction.
+
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.

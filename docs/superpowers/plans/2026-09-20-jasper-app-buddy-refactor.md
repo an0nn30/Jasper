@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Approved for native execution; Tasks 1–10 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Tasks 1–11 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -765,7 +765,7 @@ Translate workspace OPENED into `opened` before any started event; registration 
 
 **Interfaces:** Gradle task `verifyApplicationArchitecture`, wired into app and Buddy check; supported Buddy allowlist exactly five top-level types plus their nested types. Root launcher remains `dev.jasper.app.Main`; benchmark entry points become `dev.jasper.app.benchmark.Bench` and `.MemoryBench`.
 
-- [ ] Add architecture checks before moves. Expand the existing root terminal checker pattern into the new script: use the JBR toolchain's jdeps/javap, compiled production class directories and complete runtime classpaths. Record class edges with `-verbose:class -filter:none --multi-release 25`. These predicates define the required checks:
+- [x] Add architecture checks before moves. Expand the existing root terminal checker pattern into the new script: use the JBR toolchain's jdeps/javap, compiled production class directories and complete runtime classpaths. Record class edges with `-verbose:class -filter:none --multi-release 25`. These predicates define the required checks:
 
 ```kotlin
 val buddySupported = setOf(
@@ -792,8 +792,8 @@ fun assertAcyclic(graph: Map<String, Set<String>>) {
 
 For each app→Buddy edge require `topLevel(target) in buddySupported`. For Buddy edges forbid app, terminal and third-party prefixes; allow Java/JDK dependencies. Check the full app package DAG and Buddy package DAG, excluding same-package edges only. Ban root app production types except Main. Run `javap -public -s` on all supported Buddy types and nested types, verify all referenced types are JDK or allowlisted Buddy, then `javap -c -p` on app to catch fully qualified/internalAccess bytecode references. Preserve existing terminal rules. No cycle allowlist or ignored violation list.
 
-- [ ] Run `./gradlew verifyApplicationArchitecture`; expect flat-root and vendor/Buddy boundary failures before the migration. Do not relax the rule to pass the old layout.
-- [ ] Apply the manifest moves, package declarations and explicit imports. Promote only cross-package contracts and enum/record constructors actually consumed elsewhere. Keep WorkspaceActions/WorkspaceConfiguration and presentation-private helpers package-private. Move tests that assert internals alongside their owner; cross-feature tests use supported collaboration methods, not reflective field access.
+- [x] Run `./gradlew verifyApplicationArchitecture`; expect flat-root and vendor/Buddy boundary failures before the migration. Do not relax the rule to pass the old layout.
+- [x] Apply the manifest moves, package declarations and explicit imports. Promote only cross-package contracts and enum/record constructors actually consumed elsewhere. Keep WorkspaceActions/WorkspaceConfiguration and presentation-private helpers package-private. Move tests that assert internals alongside their owner; cross-feature tests use supported collaboration methods, not reflective field access.
 
 ```python
 # For each reviewed manifest entry, move one source while preserving its body.
@@ -810,8 +810,8 @@ def move_java(source, target, package):
 ```
 
 Use this helper against the exhaustive class manifest, not a filename-prefix guess. Review imports after each package group. The atomic task may temporarily fail compilation while moves are in progress; its commit must be fully runnable.
-- [ ] Update preview task mainClass names to each test owner's actual package. Buddy-only previews execute against Buddy's test runtime; app integration previews remain app-owned and use supported facade/value contracts. Their optional execution remains outside check. Keep FlatLaf defaults at `dev/jasper/app/themes` and shell integration resource paths unchanged unless a test proves all callers migrated. Benchmark launchers use the new benchmark package. jpackage continues using Main and the application runtime classpath, now including Buddy.
-- [ ] Test resources from actual jars, not `src/main/resources`. Make resource tests depend on both `jar` tasks and pass their paths via Gradle system properties. In the test open `JarFile` and assert exact entries:
+- [x] Update preview task mainClass names to each test owner's actual package. Buddy-only previews execute against Buddy's test runtime; app integration previews remain app-owned and use supported facade/value contracts. Their optional execution remains outside check. Keep FlatLaf defaults at `dev/jasper/app/themes` and shell integration resource paths unchanged unless a test proves all callers migrated. Benchmark launchers use the new benchmark package. jpackage continues using Main and the application runtime classpath, now including Buddy.
+- [x] Test resources from actual jars, not `src/main/resources`. Make resource tests depend on both `jar` tasks and pass their paths via Gradle system properties. In the test open `JarFile` and assert exact entries:
 
 ```java
 try (var jar = new java.util.jar.JarFile(System.getProperty("jasper.buddyJar"))) {
@@ -824,7 +824,7 @@ try (var jar = new java.util.jar.JarFile(System.getProperty("jasper.buddyJar")))
 ```
 
 Also assert the app jar contains every FlatLaf and shell-integration entry recorded in Task 1, excludes old Buddy sprite/classes and all test fixtures, and both library jars lack app classes. Check installDist contains both library jars. Do not run the produced desktop launcher.
-- [ ] Run `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture check :jasper-app:installDist`; commit `refactor: organize app packages and enforce boundaries` with trailer.
+- [x] Run `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture check :jasper-app:installDist`; commit `refactor: organize app packages and enforce boundaries` with trailer.
 
 ## Task 12: Deliver onboarding, maintenance recipes and final verification
 

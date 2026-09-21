@@ -111,3 +111,5 @@ val verifyTerminalArchitecture = tasks.register("verifyTerminalArchitecture") {
 gradle.projectsEvaluated {
     appProject.tasks.named("check") { dependsOn(verifyTerminalArchitecture) }
 }
+
+apply(from = "gradle/application-architecture.gradle.kts")

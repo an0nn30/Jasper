@@ -22,6 +22,10 @@ application {
 }
 
 tasks.test {
+    dependsOn(tasks.jar, ":jasper-buddy:jar", ":jasper-terminal:jar")
+    systemProperty("jasper.appJar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
+    systemProperty("jasper.buddyJar", project(":jasper-buddy").layout.buildDirectory.file("libs/jasper-buddy.jar").get().asFile.absolutePath)
+    systemProperty("jasper.terminalJar", project(":jasper-terminal").layout.buildDirectory.file("libs/jasper-terminal.jar").get().asFile.absolutePath)
     val configExample = rootProject.layout.projectDirectory.file("config.example.toml")
     inputs.file(configExample).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(rootProject.file("packaging/icons/Jasper.icns"), rootProject.file("packaging/icons/Jasper.ico"))
@@ -35,7 +39,7 @@ for ((taskName, entryPoint) in listOf("bench" to "Bench", "memoryBench" to "Memo
         group = "verification"
         description = "Opt-in native ${if (taskName == "bench") "throughput" else "memory"} benchmark; requires --args with --output and --revision."
         classpath = sourceSets["main"].runtimeClasspath
-        mainClass = "dev.jasper.app.$entryPoint"
+        mainClass = "dev.jasper.app.benchmark.$entryPoint"
         jvmArgs("--enable-native-access=ALL-UNNAMED", "-Dapple.awt.application.name=Jasper benchmark")
     }
 }
@@ -46,7 +50,7 @@ tasks.register<JavaExec>("mockUiPreview") {
     description = "Renders reference-sized dark/light Swing previews headlessly."
     dependsOn(tasks.testClasses)
     classpath = sourceSets["test"].runtimeClasspath
-    mainClass = "dev.jasper.app.MockUiPreview"
+    mainClass = "dev.jasper.app.workspace.MockUiPreview"
     jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
     args(rootProject.layout.projectDirectory.dir("docs/design").asFile.absolutePath)
 }
@@ -63,7 +67,12 @@ for ((taskName, entryPoint) in listOf(
         group = "verification"
         dependsOn(tasks.testClasses)
         classpath = sourceSets["test"].runtimeClasspath
-        mainClass = "dev.jasper.app.$entryPoint"
+        mainClass = when (entryPoint) {
+            "CommandPalettePreview" -> "dev.jasper.app.workspace.$entryPoint"
+            "TitleBarPreview" -> "dev.jasper.app.workspace.$entryPoint"
+            "CommandSearchMeasurement" -> "dev.jasper.app.commands.$entryPoint"
+            else -> "dev.jasper.app.history.$entryPoint"
+        }
         jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
         providers.gradleProperty("jasper.uiScale").orNull?.let {
             systemProperty("flatlaf.uiScale", it)

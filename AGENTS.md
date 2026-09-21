@@ -16,7 +16,7 @@ Start with [`docs/STATUS.md`](docs/STATUS.md): current state, open items, deferr
 
 ## Architecture rules (from the spec and the plans' Global Constraints)
 
-- Modules: `jasper-terminal` (package `dev.jasper.terminal`) and `jasper-app` (`dev.jasper.app`). `jasper-terminal` never depends on `jasper-app`.
+- Modules: `jasper-terminal` (`dev.jasper.terminal`), `jasper-app` (`dev.jasper.app`) and JDK-only `jasper-buddy` (`dev.jasper.buddy`). Both libraries are independent of the application and each other. The [approved app/Buddy amendment](docs/superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md) defines the supported Buddy facade/values; app production code never imports Buddy internals. `verifyApplicationArchitecture` checks both full package DAGs and vendor-free Buddy signatures.
 - JediTerm (`org.jetbrains.jediterm:jediterm-core:3.76`, from `https://packages.jetbrains.team/maven/p/ij/intellij-dependencies`, not Maven Central) is an `implementation` dependency of `jasper-terminal` only. **No public method in `jasper-terminal` takes or returns a JediTerm type.** Do not add `jediterm-ui` or `jediterm-pty`.
 - No interface without two real implementations. No plugin API in phase 1. No abstraction over "emulator backends".
 - Child processes get `TERM=xterm-256color` and `COLORTERM=truecolor`.

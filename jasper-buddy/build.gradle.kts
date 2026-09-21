@@ -14,3 +14,8 @@ for ((taskName, entryPoint) in listOf(
         jvmArgs("-Djava.awt.headless=true")
     }
 }
+
+tasks.test {
+    dependsOn(tasks.jar)
+    systemProperty("jasper.buddyJar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
+}
