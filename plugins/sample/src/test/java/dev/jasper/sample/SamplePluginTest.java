@@ -62,7 +62,7 @@ class SamplePluginTest {
             host.setConfig("dev.jasper.sample", Map.of("demo_ui", true, "demo_step_millis", 0L));
             host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
             assertThat(host.failures()).isEmpty();
-            assertThat(host.actions()).containsExactly("dev.jasper.sample.demo|Run Sample Activity|true");
+            assertThat(host.actions()).contains("dev.jasper.sample.demo|Run Sample Activity|true");
             assertThat(host.toolbar()).containsExactly("button:dev.jasper.sample.demo");
             assertThat(host.menu("top:dev.jasper.sample.menu")).containsExactly("item:dev.jasper.sample.demo");
             assertThat(host.menu("VIEW")).containsExactly("item:dev.jasper.sample.demo");
@@ -70,11 +70,27 @@ class SamplePluginTest {
             assertThat(host.status()).containsExactly("dev.jasper.sample.status|RIGHT|Sample: idle|Run the sample activity|dev.jasper.sample.demo");
 
             assertThat(host.invoke("dev.jasper.sample.demo", java.util.UUID.randomUUID(), null)).isTrue();
-            assertThat(host.actions()).as("no second run while one is going").containsExactly("dev.jasper.sample.demo|Run Sample Activity|false");
+            assertThat(host.actions()).as("no second run while one is going").contains("dev.jasper.sample.demo|Run Sample Activity|false");
             assertThat(host.runBackground()).isEqualTo(1);
             host.flush();
             assertThat(host.status()).singleElement().asString().contains("|Sample: ready|");
-            assertThat(host.actions()).containsExactly("dev.jasper.sample.demo|Run Sample Activity|true");
+            assertThat(host.actions()).contains("dev.jasper.sample.demo|Run Sample Activity|true");
+        }
+    }
+
+    @Test void theDemoUiAddsAPanelARailButtonAndAWindow() {
+        try (var host = new FakePluginHost()) {
+            host.setConfig("dev.jasper.sample", Map.of("demo_ui", true, "demo_step_millis", 0L));
+            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            assertThat(host.failures()).isEmpty();
+            assertThat(host.panels()).containsExactly("dev.jasper.sample.panel|Sample|LEFT");
+            assertThat(host.rail()).containsExactly("dev.jasper.sample.about");
+            assertThat(host.openPanel("dev.jasper.sample.panel", java.util.UUID.randomUUID())).isNotNull();
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.invoke("dev.jasper.sample.about", java.util.UUID.randomUUID(), null)).isTrue();
+            assertThat(host.invoke("dev.jasper.sample.about", java.util.UUID.randomUUID(), null)).isTrue();
+            assertThat(host.windows()).as("a singleton").containsExactly("dev.jasper.sample.about-window|About Sample|true");
+            assertThat(host.failures()).isEmpty();
         }
     }
 }

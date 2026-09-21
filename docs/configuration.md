@@ -410,6 +410,8 @@ demo_ui = true            # add the sample's action to the toolbar, menus and st
 
 Installed plugins live in `plugins/<id>/` beside `config.toml`; their enabled state and
 consented capabilities are in `plugins.toml`, and their private data under `plugin-data/<id>/`.
+`ui-state.toml` beside `config.toml` remembers panel placement, rail visibility and plugin window
+bounds; it is written by Jasper and is not meant to be edited.
 
 ## Shortcuts
 
@@ -450,7 +452,8 @@ Plugin actions are bound by their quoted id, for example:
 
 A plugin may suggest a default shortcut; yours always wins, and Jasper's built-in shortcuts win
 over a plugin's suggestion. A binding for an action that no installed plugin provides is
-reported as a configuration warning.
+reported as a configuration warning. Every panel also has a `<panel id>.toggle` action you can
+bind the same way.
 
 ## Command palette shortcuts
 

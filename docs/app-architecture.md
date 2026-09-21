@@ -135,7 +135,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `root` | Stable launcher only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT argument/handoff flow and EDT composition. StartupResources owns rollback until explicit transfer. |
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
-| `workspace` | EDT windows, tabs, splits, panes, action/config adapters and activity events. WindowContent closes subscriptions/panes; each pane closes its session. |
+| `workspace` | EDT windows, tabs, splits, panes, panel regions and the rail, action/config adapters and activity events. WindowContent closes subscriptions/panes; each pane closes its session. |
 | `commands` | EDT action registry and pure command ranking/metadata. Registry owns listeners until registration or registry close. |
 | `palette` | EDT scope/query/step state, keyboard routing and Swing card. Controller owns scope listeners and invalidates asynchronous completions on close. |
 | `palette.builtin` | EDT adapters for commands, shell history and snippets. Providers own I/O; scope subscriptions are disposed by the palette. |
@@ -145,6 +145,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `launch` | Immutable launch capture and shell integration extraction; ShellLauncher starts off EDT and delivers on EDT. Receiving pane owns the session. |
 | `history` | Pure parsing/snapshots plus EDT indexes backed by workers. Application owns indexes and command-history flush at shutdown. |
 | `snippets` | Immutable snippet values, bounded persistence and EDT store over workers. Application closes the store; caller closes subscriptions. |
+| `windows` | Application-built auxiliary windows and dialogs: a headless surface core and the only other native frame boundary besides TerminalWindow. Application owns AuxiliaryWindows and closes it at shutdown. |
 | `notifications` | EDT terminal and activity notice production, active producer identities, attention and visibility policy. Application closes notifiers before companion. |
 | `residency` | Bounded interprocess protocol and endpoint workers. Bootstrap transfers endpoint close to application shutdown and process-hook backup. |
 | `platform` | OS adapters, icons, fonts, title-bar paint and logging. Callers own registrations and native handles; Swing operations run on EDT and logging has its own worker. |

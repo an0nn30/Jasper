@@ -10,7 +10,40 @@ The three modules are `jasper-app` (product composition), `jasper-terminal`
 (terminal library) and `jasper-buddy` (JDK-only companion library). Start at the
 [documentation index](README.md) for each module's onboarding, architecture and
 maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merged into
-local `main`, as is plan 2 (actions and chrome placements); plans 3–4 are not.
+local `main`, as is plan 2 (actions and chrome placements). Plan 3a (rail, panels and plugin
+windows) is implemented on `claude/plugin-sdk-plan-3a`; the spec's plan 3 was split into 3a and
+3b. Plans 3b and 4 are not started.
+
+### Plugin SDK plan 3a — 2026-09-21
+
+Implemented on `claude/plugin-sdk-plan-3a` (worktree `.worktrees/plugin-sdk-plan-3a`), not yet
+merged or pushed. The work implements
+[plan 3a](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-3a-rail-panels-windows.md):
+plugin panels in left, right and bottom regions toggled from a single left rail, rail action
+buttons, and application-built plugin windows and dialogs, with panel placement, rail
+visibility and window bounds remembered in `ui-state.toml`. The SDK is 0.3.0. New app packages
+and types: `dev.jasper.app.windows` (`AuxiliarySurface`, `AuxiliaryWindows`, `NativeShells`),
+`workspace.WorkspaceRegions` and `workspace.WindowRail`, `persistence.UiState`, and panels and
+rail actions in the `contributions` model. See
+[SDK architecture](sdk-architecture.md#panels-the-rail-and-plugin-windows).
+
+Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks`
+passed with **1,277 tests: 1,275 passed, two expected environment skips, no failures or
+errors** (app 719, Buddy 163, terminal 355, SDK 12, testkit 22, sample plugin 6). The contract
+suite grew from 14 to 17 cases and passes for the testkit fake and for the application.
+Native acceptance (the checklist at the end of the plan) is pending: agents do not launch the GUI.
+
+Scope decisions, recorded in the plan: the spec's plan 3 is split into 3a (this) and 3b (the
+Plugins manager, zip install and consent, the restart banner, the retire request and "Restart
+normally"); `WindowOwner` is an ordinary interface in `dev.jasper.sdk` because a sealed
+interface cannot permit subtypes in other packages of the unnamed module; `onClosing` and
+`onClosed` return a `Subscription`; regions have no header or close button; rail visibility
+is app state in `ui-state.toml`, not a `config.toml` key; quit closes plugin windows without
+consulting their closing guards, closing by hand consults them; `MacTitleBar` needed no new
+mode; and the SDK version is 0.3.0 with the sample's range `>=0.3, <0.4`. The process now
+stays alive while a plugin window is open, even with no terminal window and residency off.
+
+Deviations from the plan text: `PanelAndWindowValuesTest` needed `import dev.jasper.sdk.WindowOwner`, which the plan's test omitted. `AuxiliaryWindowsTest`'s singleton case uses distinct ids for its singleton and non-singleton windows: a singleton request returns any open window with that id, so the plan's shared id made the expected count wrong. The headless split-pane fallback in Task 4 was not needed; exact pixel sizes pass headlessly. Test code reaches the headless `AuxiliaryWindows` through a new `AppContractTest.headlessWindows()` helper instead of repeating the construction, because `PluginRuntimeTest` has a parameter named `dev` that shadows the `dev.jasper` package in a qualified name. `JasperApplicationPluginsTest.bindingProblemsSeparateUnknownUserIdsFromDroppedPluginDefaults` now awaits termination after `quit`: shutdown writes `ui-state.toml` into the temporary home, which raced JUnit's deletion of that directory.
 
 ### Plugin SDK plan 2 — 2026-09-21
 

@@ -35,6 +35,8 @@ class BundledSamplePluginTest {
             assertThat(contributions.action("dev.jasper.sample.demo")).get()
                 .satisfies(action -> assertThat(action.icon()).as("an SVG from the plugin's own jar").isNotNull());
             assertThat(contributions.toolbar()).hasSize(1);
+            assertThat(contributions.panels()).singleElement().satisfies(panel -> assertThat(panel.id()).isEqualTo("dev.jasper.sample.panel"));
+            assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about");
             assertThat(contributions.status()).singleElement().satisfies(item -> assertThat(item.text()).startsWith("Sample:"));
         });
         assertThat(runtime.get().statusLines()).singleElement().asString()

@@ -9,8 +9,9 @@ plugin writer's view.
 | --- | --- | --- |
 | `jasper-sdk` | Interfaces and values plugins compile against | JDK |
 | `jasper-sdk-testkit` | `FakePluginHost` and the abstract `PluginContractTest` | JDK, SDK |
-| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `contributions`, `notifications`, `persistence`, `platform` |
-| `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections and status entries | `lifecycle` |
+| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `contributions`, `notifications`, `persistence`, `platform`, `windows` |
+| `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `lifecycle` |
+| `dev.jasper.app.windows` | Application-built auxiliary windows: headless `AuxiliarySurface`, native `NativeShells` | `appearance`, `lifecycle`, `persistence`, `platform` |
 | `plugins/sample` | Bundled end-to-end fixture and documentation example | SDK (`compileOnly`) |
 
 `verifySdkArchitecture`, `verifyPluginArchitecture` and `verifyApplicationArchitecture`
@@ -67,6 +68,28 @@ user's configuration, built-in defaults, then plugin defaults in load order. The
 reports a user binding for an unknown action as a configuration warning and logs a dropped
 plugin default.
 
+## Panels, the rail and plugin windows
+
+Panels and rail actions are part of the `Contributions` model. Each window's
+`WindowContributions` keeps one lazily built instance per panel, shows at most one per region
+through `WorkspaceRegions` (nested split panes rebuilt around the terminal deck: bottom wraps
+the deck, right wraps that, left wraps that), and renders `WindowRail`. A window with nothing
+contributed has no rail and its old layout. Requests to show, hide or toggle a panel travel
+through the model tagged with a window id, so an action or a `PanelHost` reaches exactly one
+window. Every panel gets an application-registered `<panel id>.toggle` action and a View →
+Panels entry.
+
+Plugin windows follow the `TerminalWindow`/`WindowContent` split: `AuxiliarySurface` holds the
+content, title, closing guards and lifetime and is fully tested headlessly; `NativeShells`
+is the only code that constructs a frame or dialog, and adds the icon, the macOS title bar,
+a minimal menu bar, theme tracking and remembered bounds. Dialogs are parented through
+`WindowOwner`, so an SDK type never exposes a frame.
+
+`persistence.UiState` (`ui-state.toml`) holds panel region, visibility and size, rail
+visibility and auxiliary window bounds. It is application state, not configuration: strict
+read, atomic write, defaults when unreadable. The process stays alive while a plugin window
+is open.
+
 ## Shutdown
 
 `JasperApplication.shutdown` arms `ApplicationShutdown`'s exit deadline, closes
@@ -83,6 +106,5 @@ disagree, the implementation is wrong, not the contract.
 
 ## Not yet implemented
 
-The rail, panels, plugin windows and the Plugins manager with install, consent and restart
-(plan 3); handle queries, injection, plugin-provided sessions, capability gating and the
+The Plugins manager with install, consent and restart (plan 3b); handle queries, injection, plugin-provided sessions, capability gating and the
 cleanup worker (plan 4).

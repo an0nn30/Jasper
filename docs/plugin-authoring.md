@@ -1,8 +1,8 @@
 # Writing a Jasper plugin
 
-This guide covers what the SDK offers today (0.2): lifecycle, configuration, events,
-activities, services, actions and their placements in the toolbar, menus and status bar.
-Panels, plugin windows and terminal access arrive in later SDK versions. The contract is in the
+This guide covers what the SDK offers today (0.3): lifecycle, configuration, events,
+activities, services, actions and their placements, panels, the rail, and application-built
+windows and dialogs. Terminal access arrives in a later SDK version. The contract is in the
 [design](superpowers/specs/2026-09-21-jasper-plugin-sdk-design.md); the runtime is described
 in the [SDK architecture](sdk-architecture.md).
 
@@ -15,7 +15,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.2, <0.3"
+sdk = ">=0.3, <0.4"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide
 exports = []                       # packages other plugins may use
 
@@ -88,6 +88,7 @@ private static void installUi(PluginContext context, long stepMillis) {
         status.setText(event.terminal() ? "Sample: ready" : "Sample: " + Math.round(event.fraction().orElse(0) * 100) + "%");
         if (event.terminal()) demo[0].setEnabled(true);
     });
+    installPanelAndWindow(context, stepMillis);
 }
 ```
 
@@ -103,6 +104,71 @@ private static void installUi(PluginContext context, long stepMillis) {
   follows the theme. Use monochrome artwork.
 - **Threads.** Register and mutate on the event thread. Event handlers already run there, so
   updating a status item from a handler, as the sample does, needs no marshaling.
+
+## Panels, the rail and windows
+
+A panel is a Swing component in the left, right or bottom region of every terminal window.
+Register it once; Jasper asks your factory for one instance per window, the first time the
+panel is shown there, and gives the panel a rail icon, a `<panel id>.toggle` action and a
+View → Panels entry. One panel shows per region; the user can move a panel to another region
+from its rail icon, and Jasper remembers where it was and how big.
+
+A rail button runs one of your actions. A plugin window is a frame Jasper builds: icon, macOS
+title bar, menu bar, theme tracking and remembered bounds are its job; the content is yours.
+Dialogs belong to a terminal window or to one of your windows, so they are parented correctly
+without your plugin ever seeing a frame.
+
+<!-- example:pluginpanels -->
+```java
+private static void installPanelAndWindow(PluginContext context, long stepMillis) {
+    var icon = context.appearance().icon("dev/jasper/sample/flask.svg");
+    // One instance per window, built the first time the panel is shown there.
+    context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", icon, Anchor.LEFT), host -> {
+        var run = new JButton("Run sample activity");
+        run.addActionListener(event -> context.background().execute(() -> demo(context, stepMillis)));
+        var panel = new JPanel(new BorderLayout(0, 8));
+        panel.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+        panel.add(new JLabel("Sample panel"), BorderLayout.NORTH);
+        panel.add(run, BorderLayout.SOUTH);
+        return panel;
+    });
+
+    context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(icon), invoked -> {
+        // The application builds the frame, title bar and menu bar; a singleton comes back while it is open.
+        PluginWindow window = context.windows().create(
+            new WindowSpec("dev.jasper.sample.about-window", "About Sample", new Dimension(360, 200), true));
+        var details = new JButton("Details…");
+        details.addActionListener(event -> {
+            PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample details", window, true));
+            var close = new JButton("Close");
+            close.addActionListener(closing -> dialog.close());
+            var body = new JPanel(new BorderLayout(0, 8));
+            body.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+            body.add(new JLabel("Sample plugin " + context.plugin().version()), BorderLayout.CENTER);
+            body.add(close, BorderLayout.SOUTH);
+            dialog.setContent(body);
+            dialog.show();
+        });
+        var content = new JPanel(new BorderLayout(0, 8));
+        content.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        content.add(new JLabel("This window's chrome belongs to Jasper; its content to the plugin."), BorderLayout.CENTER);
+        content.add(details, BorderLayout.SOUTH);
+        window.setContent(content);
+        window.show();
+        window.toFront();
+    });
+    context.rail().add("dev.jasper.sample.about");
+}
+```
+
+- Share your own model between panel instances; never share components.
+- `PanelHost.onClosed` tells an instance its window is gone. `onVisibility` tells it when it
+  is shown or hidden, which is the moment to start or stop refreshing.
+- `WindowSurface.onClosing` guards run when the user closes the window; returning false keeps
+  it open. Quitting Jasper does not consult them. `close()` closes at once.
+- A modal dialog's `show()` returns after the dialog has closed.
+- The application closes a plugin's panels, windows and dialogs when the plugin stops.
+- Jasper stays running while any plugin window is open, even with no terminal window.
 
 ## Rules that matter
 
@@ -137,6 +203,9 @@ try (var host = new FakePluginHost()) {
 
 `host.actions()`, `host.toolbar()`, `host.menu("VIEW")`, `host.status()` and
 `host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.
+`host.panels()`, `host.openPanel(id, windowId)`, `host.rail()`, `host.windows()` and
+`host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
+`<panel id>.toggle` action or View → Panels menu.
 
 ## Running a plugin in Jasper
 

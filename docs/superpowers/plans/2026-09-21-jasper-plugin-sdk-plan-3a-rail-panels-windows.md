@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Record every deviation from this text here and in `docs/STATUS.md`.
+**Status:** Implemented on `claude/plugin-sdk-plan-3a`; native acceptance pending. Deviations from this text: (1) `PanelAndWindowValuesTest` needed `import dev.jasper.sdk.WindowOwner`, which the plan's test omitted. (2) `AuxiliaryWindowsTest`'s singleton case uses distinct ids for its singleton and non-singleton windows: a singleton request returns any open window with that id, so the plan's shared id made the expected count wrong. (3) The headless split-pane fallback in Task 4 was not needed; exact pixel sizes pass headlessly. (4) Test code reaches the headless `AuxiliaryWindows` through a new `AppContractTest.headlessWindows()` helper instead of repeating the construction, because `PluginRuntimeTest` has a parameter named `dev` that shadows the `dev.jasper` package in a qualified name. (5) `JasperApplicationPluginsTest.bindingProblemsSeparateUnknownUserIdsFromDroppedPluginDefaults` now awaits termination after `quit`: shutdown writes `ui-state.toml` into the temporary home, which raced JUnit's deletion of that directory.
 
 **Goal:** Give plugins side and bottom panels toggled from a single left rail, rail action buttons, and application-built windows and dialogs with consistent chrome, with panel placement and window bounds remembered across launches; proven by the sample plugin.
 
