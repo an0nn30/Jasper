@@ -55,13 +55,13 @@ public final class TerminalView extends JComponent {
     private static final int BLINK_MILLIS = 530;
     private static final int BELL_MILLIS = 150;
     private static final int WHEEL_LINES = 3;
-    private static final long SEARCH_IDLE_MILLIS = 1_000;
     private static final float DEFAULT_FONT_SIZE = 14f;
     private static final float MIN_FONT_SIZE = 6f;
     private static final float MAX_FONT_SIZE = 72f;
 
     private final TerminalSession session;
     private final TerminalAccess access;
+    private final SearchController search;
     private TerminalOptions options;
     private FontSet fonts;
     private Palette palette;
@@ -110,13 +110,7 @@ public final class TerminalView extends JComponent {
             this.sequence = sequence;
         }
     }
-    private List<TerminalSearch.Match> matches = List.of();
-    private int currentMatch = -1;
-    private final Object searchLock = new Object();
-    private long searchGeneration;
     private long observedAbsoluteRowEpoch;
-    private ThreadPoolExecutor searchExecutor;
-    private Future<?> pendingSearch;
     private volatile boolean exited;
     private float fontSize;
     private float inactiveDim;
@@ -131,6 +125,8 @@ public final class TerminalView extends JComponent {
     public TerminalView(TerminalSession session, TerminalOptions options) {
         this.session = session;
         this.access = session.internalAccess();
+        this.search = new SearchController(access::search,
+            row -> viewport.reveal(row, access.snapshot(viewport.topRow())), this::repaint);
         this.observedAbsoluteRowEpoch = access.absoluteRowEpoch();
         this.options = options;
         this.fontSize = options.fontSize();
@@ -244,7 +240,7 @@ public final class TerminalView extends JComponent {
             session.removeListener(listener);
             listener = null;
         }
-        invalidatePendingSearch();
+        search.cancelPending();
         super.removeNotify();
     }
 
@@ -408,114 +404,6 @@ public final class TerminalView extends JComponent {
         if (bounded != inactiveDim) {
             inactiveDim = bounded;
             repaint();
-        }
-    }
-
-    /** Finds matches in the scrollback and screen and shows the newest one. */
-    public FindResult find(String query, boolean regex, boolean caseSensitive) {
-        invalidatePendingSearch();
-        try {
-            matches = access.search(new SearchQuery(query, regex, caseSensitive));
-        } catch (PatternSyntaxException invalid) {
-            matches = List.of();
-            currentMatch = -1;
-            repaint();
-            return new FindResult(0, 0, invalid.getDescription());
-        }
-        currentMatch = matches.size() - 1;
-        revealCurrentMatch();
-        return findResult();
-    }
-
-    /**
-     * Searches away from the Event Dispatch Thread. At most one running and one queued request are retained; only the
-     * latest generation may change highlights or invoke its callback, and that callback always runs on the EDT.
-     */
-    public void findAsync(String query, boolean regex, boolean caseSensitive, Consumer<FindResult> callback) {
-        Consumer<FindResult> completion = callback == null ? result -> { } : callback;
-        long generation;
-        ThreadPoolExecutor executor;
-        synchronized (searchLock) {
-            generation = ++searchGeneration;
-            if (pendingSearch != null) {
-                pendingSearch.cancel(true);
-            }
-            executor = searchExecutor();
-            executor.getQueue().clear();
-            pendingSearch = executor.submit(() -> calculateFind(generation, query, regex, caseSensitive, completion));
-        }
-    }
-
-    /** Moves to the next newer match, wrapping around. */
-    public FindResult findNext() {
-        return stepMatch(1);
-    }
-
-    /** Moves to the next older match, wrapping around. */
-    public FindResult findPrevious() {
-        return stepMatch(-1);
-    }
-
-    public void clearFind() {
-        invalidatePendingSearch();
-        matches = List.of();
-        currentMatch = -1;
-        repaint();
-    }
-
-    private void calculateFind(long generation, String query, boolean regex, boolean caseSensitive,
-                               Consumer<FindResult> callback) {
-        List<TerminalSearch.Match> found;
-        FindResult result;
-        try {
-            found = access.search(new SearchQuery(query, regex, caseSensitive));
-            result = new FindResult(found.size(), found.size(), null);
-        } catch (PatternSyntaxException invalid) {
-            found = List.of();
-            result = new FindResult(0, 0, invalid.getDescription());
-        }
-        List<TerminalSearch.Match> completedMatches = found;
-        FindResult completedResult = result;
-        SwingUtilities.invokeLater(() -> applyFind(generation, completedMatches, completedResult, callback));
-    }
-
-    private void applyFind(long generation, List<TerminalSearch.Match> found, FindResult result,
-                           Consumer<FindResult> callback) {
-        synchronized (searchLock) {
-            if (generation != searchGeneration) {
-                return;
-            }
-            pendingSearch = null;
-        }
-        matches = found;
-        currentMatch = found.size() - 1;
-        revealCurrentMatch();
-        callback.accept(result);
-    }
-
-    private ThreadPoolExecutor searchExecutor() {
-        if (searchExecutor == null || searchExecutor.isShutdown()) {
-            searchExecutor = new ThreadPoolExecutor(1, 1, SEARCH_IDLE_MILLIS, TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(1), runnable -> {
-                    Thread thread = new Thread(runnable, "jasper-terminal-search");
-                    thread.setDaemon(true);
-                    return thread;
-                }, new ThreadPoolExecutor.DiscardOldestPolicy());
-            searchExecutor.allowCoreThreadTimeOut(true);
-        }
-        return searchExecutor;
-    }
-
-    private void invalidatePendingSearch() {
-        synchronized (searchLock) {
-            searchGeneration++;
-            if (pendingSearch != null) {
-                pendingSearch.cancel(true);
-                pendingSearch = null;
-            }
-            if (searchExecutor != null) {
-                searchExecutor.getQueue().clear();
-            }
         }
     }
 
@@ -776,12 +664,10 @@ public final class TerminalView extends JComponent {
      */
     private void forgetAbsoluteRows() {
         observedAbsoluteRowEpoch = access.absoluteRowEpoch();
-        invalidatePendingSearch();
         setSelection(null);
         pendingAnchor = null;
         wordAnchor = null;
-        matches = List.of();
-        currentMatch = -1;
+        search.clear();
         viewport.follow();
         repaint();
         notifyFindResultListener(new FindResult(0, 0, null));
@@ -923,16 +809,16 @@ public final class TerminalView extends JComponent {
         long last = first + snapshot.height() - 1;
         // Search results are sorted by row and column; skip the offscreen prefix in logarithmic time.
         int low = 0;
-        int high = matches.size();
+        int high = search.matches().size();
         while (low < high) {
             int middle = low + (high - low) / 2;
-            if (matches.get(middle).row() < first) low = middle + 1; else high = middle;
+            if (search.matches().get(middle).row() < first) low = middle + 1; else high = middle;
         }
-        for (int i = low; i < matches.size(); i++) {
-            TerminalSearch.Match match = matches.get(i);
+        for (int i = low; i < search.matches().size(); i++) {
+            TerminalSearch.Match match = search.matches().get(i);
             if (match.row() > last) break;
             highlights.add(new TerminalPainter.Highlight((int) (match.row() - first), match.startColumn(),
-                match.endColumn(), i == currentMatch ? currentMatchColor : matchColor));
+                match.endColumn(), i == search.currentIndex() ? currentMatchColor : matchColor));
         }
         if (selection != null) {
             for (int row = 0; row < snapshot.height(); row++) {
@@ -959,26 +845,6 @@ public final class TerminalView extends JComponent {
         for (int i = 0; i < Math.abs(rotation); i++) {
             session.write(arrow);
         }
-    }
-
-    private FindResult stepMatch(int direction) {
-        if (matches.isEmpty()) {
-            return findResult();
-        }
-        currentMatch = Math.floorMod(currentMatch + direction, matches.size());
-        revealCurrentMatch();
-        return findResult();
-    }
-
-    private void revealCurrentMatch() {
-        if (currentMatch >= 0) {
-            viewport.reveal(matches.get(currentMatch).row(), access.snapshot(viewport.topRow()));
-        }
-        repaint();
-    }
-
-    private FindResult findResult() {
-        return new FindResult(matches.size(), currentMatch + 1, null);
     }
 
     private void trackAltKeys(KeyEvent e) {
@@ -1036,7 +902,7 @@ public final class TerminalView extends JComponent {
         if (renderingActive) {
             markDirty(attachmentGeneration);
         } else {
-            invalidatePendingSearch();
+            search.cancelPending();
             pendingFrame = new AtomicBoolean();
             frameTimer.stop();
         }
@@ -1152,4 +1018,18 @@ public final class TerminalView extends JComponent {
             return executor;
         }
     }
+
+    /** Finds matches synchronously; callers on the EDT should prefer findAsync for long histories. */
+    public FindResult find(SearchQuery query) { return search.find(query); }
+    /** Searches on the bounded worker and delivers only the latest result on the EDT. */
+    public void findAsync(SearchQuery query, Consumer<FindResult> callback) { search.findAsync(query, callback); }
+    public FindResult find(String query, boolean regex, boolean caseSensitive) {
+        return find(new SearchQuery(query, regex, caseSensitive));
+    }
+    public void findAsync(String query, boolean regex, boolean caseSensitive, Consumer<FindResult> callback) {
+        findAsync(new SearchQuery(query, regex, caseSensitive), callback);
+    }
+    public FindResult findNext() { return search.next(); }
+    public FindResult findPrevious() { return search.previous(); }
+    public void clearFind() { search.clear(); }
 }

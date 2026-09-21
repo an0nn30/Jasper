@@ -256,9 +256,10 @@ class TerminalAppIntegrationTest {
                 onEdt(() -> view.findAsync("alpha", false, false, result -> callbackRan.set(true)));
                 executor = searchExecutor();
                 Await.until(() -> executor.getActiveCount() == 1, "search blocked on buffer");
-                var field = TerminalView.class.getDeclaredField("pendingSearch");
+                var controller = SessionInspection.field(view, "search");
+                var field = SearchController.class.getDeclaredField("pendingSearch");
                 field.setAccessible(true);
-                var pending = (java.util.concurrent.Future<?>) field.get(view);
+                var pending = (java.util.concurrent.Future<?>) field.get(controller);
                 onEdt(() -> {
                     parent.setVisible(false);
                     assertThat(view.isVisible()).isTrue();
@@ -456,8 +457,6 @@ class TerminalAppIntegrationTest {
     }
 
     private ThreadPoolExecutor searchExecutor() throws ReflectiveOperationException {
-        var field = TerminalView.class.getDeclaredField("searchExecutor");
-        field.setAccessible(true);
-        return (ThreadPoolExecutor) field.get(view);
+        return (ThreadPoolExecutor) SessionInspection.field(SessionInspection.field(view, "search"), "searchExecutor");
     }
 }

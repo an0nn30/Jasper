@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–6 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–7 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Task 6 tests startup cleanup through the factory’s shared Runnable close gate plus a real native child, avoiding a vendor parameter in the session factory. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -957,7 +957,7 @@ separately, then `./gradlew check`. Record any baseline-only failures explicitly
 - `FindResult find(SearchQuery)`, `void findAsync(SearchQuery,Consumer<FindResult>)`, `FindResult next()`, `previous()`, `void clear()`, `void cancelPending()`, `List<TerminalSearch.Match> matches()`, `int currentIndex()`.
 - All result state belongs to EDT; async admission/generation/queue state is guarded by the existing search lock.
 
-- [ ] **Step 1: Add a deterministic stale-completion regression.**
+- [x] **Step 1: Add a deterministic stale-completion regression.**
 
 ```java
 @Test void clearRejectsACompletionAlreadyQueuedForTheEdt() throws Exception {
@@ -989,7 +989,7 @@ No arbitrary sleep is needed. Add a second test with a blocked first query and a
 queued second/third query; only the latest callback may publish and the queue
 never exceeds one. Retain existing integration tests for detach and row reset.
 
-- [ ] **Step 2: Extract the complete search state machine.**
+- [x] **Step 2: Extract the complete search state machine.**
 
 Move the following fields and declarations from TerminalView:
 
@@ -1051,7 +1051,7 @@ public void findAsync(SearchQuery query, Consumer<FindResult> callback) {
 At Task 11, FindBar and all repository callers construct SearchQuery and the
 old overloads are removed. Next/previous/clear retain their existing API names.
 
-- [ ] **Step 3: Rewire reset/hidden/detached behavior and painting.**
+- [x] **Step 3: Rewire reset/hidden/detached behavior and painting.**
 
 `forgetAbsoluteRows()` calls `search.clear()`. `removeNotify()` and hidden-view
 rendering suppression call `search.cancelPending()`. Highlights read
@@ -1062,7 +1062,7 @@ package; retain real component painting/selection tests. A package-private
 also used as a documented diagnostic; otherwise inspect the owner in the test
 rather than expose this on the public view.
 
-- [ ] **Step 4: Run search, painting and app integration regressions; document/commit.**
+- [x] **Step 4: Run search, painting and app integration regressions; document/commit.**
 
 `./gradlew :jasper-terminal:test --tests '*Search*' --tests '*TerminalAppIntegrationTest'`.
 Then the full terminal suite. Test invalid regex, empty query, next/previous wrap,

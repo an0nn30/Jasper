@@ -58,8 +58,9 @@ class TerminalSearchPaintingTest {
     }
 
     private static void set(TerminalView view, String name, Object value) throws Exception {
-        var field = TerminalView.class.getDeclaredField(name);
+        var controller = SessionInspection.field(view, "search");
+        var field = SearchController.class.getDeclaredField(name);
         field.setAccessible(true);
-        field.set(view, value);
+        field.set(controller, value);
     }
 }

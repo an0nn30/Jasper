@@ -62,7 +62,7 @@ class FindBarVisibilityTest {
             assertThat(bar.isShowing()).isFalse();
             assertThat(timer().isRunning()).as("hidden debounce stopped").isFalse();
             fireDebounce(); // a timer delivery already queued when the tab hid must also be harmless
-            assertThat(field(view, "pendingSearch")).isNull();
+            assertThat(field(field(view, "search"), "pendingSearch")).isNull();
             assertThat(bar.queryField().getText()).isEqualTo("alpha");
             tabs.setSelectedIndex(0);
             assertThat(timer().isRunning()).isTrue();
@@ -78,15 +78,15 @@ class FindBarVisibilityTest {
         ThreadPoolExecutor executor;
         try {
             edt(() -> { prepareQuery(); bar.next(); }); // starts search immediately and queues one navigation step
-            executor = (ThreadPoolExecutor) field(view, "searchExecutor");
+            executor = (ThreadPoolExecutor) field(field(view, "search"), "searchExecutor");
             until(() -> executor.getActiveCount() == 1);
-            Future<?> pending = (Future<?>) field(view, "pendingSearch");
+            Future<?> pending = (Future<?>) field(field(view, "search"), "pendingSearch");
             edt(() -> {
                 tabs.setSelectedIndex(1);
                 assertThat(pending.isCancelled()).isTrue();
                 bar.next(); // preserve navigation while hidden without launching work
                 fireDebounce();
-                assertThat(field(view, "pendingSearch")).isNull();
+                assertThat(field(field(view, "search"), "pendingSearch")).isNull();
             });
         } finally { buffer.getClass().getMethod("unlock").invoke(buffer); }
         until(() -> executor.getActiveCount() == 0);
@@ -95,7 +95,7 @@ class FindBarVisibilityTest {
             assertThat(view.findNext()).isEqualTo(new FindResult(0, 0, null));
             tabs.setSelectedIndex(0);
             fireDebounce();
-            assertThat(field(view, "searchExecutor")).isSameAs(executor);
+            assertThat(field(field(view, "search"), "searchExecutor")).isSameAs(executor);
         });
         until(() -> bar.result().count() == 3);
         edt(() -> assertThat(bar.result()).isEqualTo(new FindResult(3, 2, null)));
@@ -110,7 +110,7 @@ class FindBarVisibilityTest {
             assertThat(bar.result()).isEqualTo(new FindResult(3, 1, null));
             tabs.setSelectedIndex(0);
             assertThat(timer().isRunning()).isFalse();
-            assertThat(field(view, "pendingSearch")).isNull();
+            assertThat(field(field(view, "search"), "pendingSearch")).isNull();
             assertThat(bar.result()).isEqualTo(new FindResult(3, 1, null));
             bar.next();
             assertThat(bar.result()).isEqualTo(new FindResult(3, 2, null));
