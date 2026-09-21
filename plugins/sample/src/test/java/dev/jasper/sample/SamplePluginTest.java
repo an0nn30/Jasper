@@ -6,6 +6,15 @@ import dev.jasper.sdk.testing.FakePluginHost;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import dev.jasper.sdk.Capabilities;
+import dev.jasper.sdk.terminal.PaneInfo;
+import dev.jasper.sdk.terminal.SessionKind;
+import dev.jasper.sdk.terminal.SessionState;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SamplePluginTest {
@@ -91,6 +100,42 @@ class SamplePluginTest {
             assertThat(host.invoke("dev.jasper.sample.about", java.util.UUID.randomUUID(), null)).isTrue();
             assertThat(host.windows()).as("a singleton").containsExactly("dev.jasper.sample.about-window|About Sample|true");
             assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    private static final PluginInfo OBSERVING = new PluginInfo("dev.jasper.sample", "Sample", "0.1.0",
+        Set.of(Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_INJECT));
+
+    @Test void theTerminalDemoTypesIntoAPaneAndShowsTheLastExitStatus() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "build");
+            UUID pane = host.addTerminalPane(tab, new PaneInfo("zsh", Optional.of(Path.of("/src")), Optional.empty(), 80, 24, true,
+                SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty()));
+            host.activateTerminalWindow(window);
+            host.setConfig("dev.jasper.sample", Map.of("demo_terminal", true));
+            host.start(OBSERVING, Set.of(), Set.of(), new SamplePlugin());
+            assertThat(host.failures()).isEmpty();
+            assertThat(host.menu("context")).contains("item:dev.jasper.sample.greet");
+            assertThat(host.status()).as("hidden until a command finishes").noneMatch(line -> line.startsWith("dev.jasper.sample.last"));
+
+            assertThat(host.invoke("dev.jasper.sample.greet", window, pane)).isTrue();
+            assertThat(host.invoke("dev.jasper.sample.greet", window, null)).as("falls back to the active pane").isTrue();
+            assertThat(host.sent(pane)).containsExactly("write:echo 'hello from the sample plugin'", "write:echo 'hello from the sample plugin'");
+
+            host.commandFinished(pane, "make test", OptionalInt.of(2), Duration.ofMillis(1500));
+            host.flush();
+            assertThat(host.status()).anyMatch(line -> line.startsWith("dev.jasper.sample.last|LEFT|make test: exit 2"));
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void theTerminalDemoIsSkippedWithoutItsCapabilities() {
+        try (var host = new FakePluginHost()) {
+            host.setConfig("dev.jasper.sample", Map.of("demo_terminal", true));
+            host.start(INFO, Set.of(), Set.of(), new SamplePlugin());
+            assertThat(host.active("dev.jasper.sample")).isTrue();
+            assertThat(host.failures()).isEmpty();
+            assertThat(host.actions()).noneMatch(line -> line.startsWith("dev.jasper.sample.greet"));
         }
     }
 }

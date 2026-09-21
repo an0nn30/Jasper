@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Record every deviation from this text here and in `docs/STATUS.md`.
+**Status:** Implemented on `claude/plugin-sdk-plan-4`; native acceptance pending. Deviations from this text: (1) Task 0's separate baseline `check` was not run: the branch starts at the commit local `main` was fast-forwarded to, and that merged result had just passed the full verification. (2) `MissingCapabilityException`'s two private fields carry Javadoc comments, because doclint warns about uncommented fields of a serializable class. (3) `TerminalBridgeTest` builds `new Containment(() -> true)`; the plan assumed a no-argument constructor and said to follow `EventBusTest` otherwise. (4) `AppContractTest` needed `import java.util.UUID`, which the plan's harness code assumed. (5) The testkit's `openRequests()` also lists `front|<window id>` lines for `toFront()`, documented in its Javadoc; both contract harnesses filter them out, so the shared format is unchanged. (6) Task 6's second harness block repeated what Task 4 had already put into `AppContractTest.newHarness()` and was not applied twice. (7) Every compiled example in `docs/plugin-authoring.md` was re-copied from the sample source, not only the new one: `start()` gained the `demo_terminal` line, so the `plugin` example changed too.
 
 **Goal:** Let a plugin find the active window, tab and pane, read pane metadata, follow terminal events, type or paste into a pane, read the selection, and open local tabs and splits, each behind the capability the user consented to.
 

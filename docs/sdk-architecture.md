@@ -9,7 +9,8 @@ plugin writer's view.
 | --- | --- | --- |
 | `jasper-sdk` | Interfaces and values plugins compile against | JDK |
 | `jasper-sdk-testkit` | `FakePluginHost` and the abstract `PluginContractTest` | JDK, SDK |
-| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `contributions`, `notifications`, `persistence`, `platform`, `windows` |
+| `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `contributions`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
+| `dev.jasper.app.terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane | `lifecycle` |
 | `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `lifecycle` |
 | `dev.jasper.app.windows` | Application-built auxiliary windows: headless `AuxiliarySurface`, native `NativeShells` | `appearance`, `lifecycle`, `persistence`, `platform` |
 | `dev.jasper.app.pluginmanager` | The Plugins manager window: passive Swing view, consent view and controller over app-native rows | `plugins`, `restart`, `windows` |
@@ -92,6 +93,24 @@ visibility and auxiliary window bounds. It is application state, not configurati
 read, atomic write, defaults when unreadable. The process stays alive while a plugin window
 is open.
 
+## Terminal API
+
+`dev.jasper.app.terminals.TerminalRegistry` is the seam between windows and everything that must
+not hold a Swing object. Each `WindowContent` registers a `WindowEntry` through
+`workspace.WindowTerminals`: records of suppliers and callbacks that read the window's tabs and
+panes on demand, so structure is never stale, plus id-only `TerminalEvent`s for what happens. The
+registry derives one fact itself, the active pane (the focused pane of the selected tab of the
+window used last), and reports it once per change; `atomically` keeps a tab or window close from
+reporting a transient "no active pane".
+
+In `dev.jasper.app.plugins`, `HostedTerminals` gives each plugin its own handles. A handle holds
+ids and the last values it saw and looks its target up on every call, which is what makes a closed
+pane harmless. Gated methods ask the plugin's `CapabilityGate` first; the declared capability set
+is the granted set, because the resolver loads a user plugin only after consent to everything it
+declares. `TerminalBridge` republishes registry events as `TerminalEvents` topics on the queued
+bus, and subscribing to a `jasper.terminal.*` topic needs `terminal.observe`. Payloads carry ids,
+not handles: a handle is bound to one plugin's gate, a payload is shared by all subscribers.
+
 ## Plugins manager, install and restart
 
 Nothing is loaded or unloaded in a running process. The manager edits `plugins.toml` through
@@ -135,5 +154,6 @@ disagree, the implementation is wrong, not the contract.
 
 ## Not yet implemented
 
-Handle queries, injection, plugin-provided sessions, capability gating and the cleanup worker
-(plan 4).
+Plugin-provided sessions (`TerminalSession.attach`, the app-owned writer, drain, `PendingSession`,
+Reconnect), the cleanup worker, `OpenRequest.session`, working-directory provenance with
+`RemoteDirectory`, and explicit commands in `LocalSpec` (plan 4b).

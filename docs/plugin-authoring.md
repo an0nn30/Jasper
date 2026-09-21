@@ -1,8 +1,9 @@
 # Writing a Jasper plugin
 
-This guide covers what the SDK offers today (0.3): lifecycle, configuration, events,
-activities, services, actions and their placements, panels, the rail, and application-built
-windows and dialogs. Terminal access arrives in a later SDK version. The contract is in the
+This guide covers what the SDK offers today (0.4): lifecycle, configuration, events,
+activities, services, actions and their placements, panels, the rail, application-built
+windows and dialogs, and terminals: finding panes, following terminal events, typing into a
+pane and opening tabs. Plugin-provided sessions arrive in a later SDK version. The contract is in the
 [design](superpowers/specs/2026-09-21-jasper-plugin-sdk-design.md); the runtime is described
 in the [SDK architecture](sdk-architecture.md).
 
@@ -15,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.3, <0.4"
+sdk = ">=0.4, <0.5"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide
 exports = []                       # packages other plugins may use
 
@@ -44,6 +45,7 @@ classes in `dev.jasper.*` platform packages or in a package a dependency exports
     }
     long stepMillis = delay;
     if (context.config().bool("demo_ui").orElse(false)) installUi(context, stepMillis);
+    if (context.config().bool("demo_terminal").orElse(false)) installTerminalDemo(context);
     if (context.config().bool("demo_activity").orElse(false))
         context.background().execute(() -> demo(context, stepMillis));
 }
@@ -170,6 +172,63 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
 - The application closes a plugin's panels, windows and dialogs when the plugin stops.
 - Jasper stays running while any plugin window is open, even with no terminal window.
 
+## Terminals and capabilities
+
+`context.terminals()` finds windows, tabs and panes; an action's context names the window and pane
+it was invoked on. Handles keep an id, never a Swing object, and two handles for the same pane are
+equal. Finding things needs no capability. What a handle may do does:
+
+| Capability | Lets your plugin |
+|---|---|
+| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()`, and subscribe to `TerminalEvents` |
+| `terminal.selection` | read `PaneHandle.selection()` |
+| `terminal.inject` | `sendText`, `sendBytes`, `paste` |
+| `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()` |
+
+Declare them in `plugin.toml`; the user is shown the list before your plugin loads. A gated call
+without the capability throws `MissingCapabilityException`. Jasper logs gated calls with your plugin
+id and the amount of data, never the content.
+
+<!-- example:pluginterminal -->
+```java
+private static void installTerminalDemo(PluginContext context) {
+    // Capabilities are declared in plugin.toml and consented to by the user. A gated call without one
+    // throws MissingCapabilityException, so a plugin that can live without a capability checks first.
+    if (!context.plugin().capabilities().containsAll(List.of(Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_INJECT))) {
+        context.log().log(System.Logger.Level.INFO, "The terminal demo needs terminal.observe and terminal.inject");
+        return;
+    }
+    context.actions().register(ActionSpec.of(GREET, "Insert Sample Greeting").withKeywords(List.of("sample", "type", "terminal")), invoked ->
+        // The pane the action was invoked on, or else the one the user used last. sendText adds nothing:
+        // without a newline the text waits at the prompt, and the user decides whether to run it.
+        invoked.pane().or(() -> context.terminals().activePane())
+            .ifPresent(pane -> pane.sendText("echo 'hello from the sample plugin'")));
+    context.menus().terminalContext().add(GREET);
+
+    StatusItem last = context.statusBar().add(new StatusItemSpec("dev.jasper.sample.last", Side.LEFT, 100));
+    last.setVisible(false);
+    // Terminal events name panes by id and arrive later, on the event thread; there is no replay.
+    context.events().subscribe(TerminalEvents.COMMAND_FINISHED, finished -> {
+        last.setText(finished.command() + ": " + (finished.exitStatus().isPresent() ? "exit " + finished.exitStatus().getAsInt() : "done"));
+        last.setVisible(true);
+    });
+}
+```
+
+- **A pane can close at any moment.** Commands to a closed handle are ignored, queries return the
+  last value the handle saw, and `isOpen()` tells. Do not treat that as an error.
+- **Events carry ids**, because a handle belongs to the plugin that obtained it: call
+  `context.terminals().pane(event.paneId())`. They arrive later, on the event thread, and there is
+  no replay: read the current state first, then subscribe.
+- **Threads.** Everything here is event-thread only, except `sendText`, `sendBytes` and `paste`,
+  which you may call from any thread; calls from one thread keep their order.
+  `foregroundJob()` completes on a worker thread.
+- **`sendText` adds nothing.** End a command with `"\n"` if you mean to run it; leaving it out lets
+  the user look first. `paste` behaves like the user's own paste, bracketed when the program asked.
+- **Working directories are hints.** They are whatever the shell last reported and may not exist.
+- To run a command in a new tab, open one with `OpenRequest.local()` or `localIn(directory)` and
+  `sendText` to the pane you get back; the tab runs the user's configured shell.
+
 ## Rules that matter
 
 - **Threads.** Subscribe and publish services on the event thread. `publish`, activity
@@ -206,6 +265,11 @@ try (var host = new FakePluginHost()) {
 `host.panels()`, `host.openPanel(id, windowId)`, `host.rail()`, `host.windows()` and
 `host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
 `<panel id>.toggle` action or View → Panels menu.
+`host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `activateTerminalWindow`,
+`focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
+`host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
+`titleChanged`, `cwdChanged`, `sessionExited` and `bell` publish terminal events, delivered by
+`flush()`. Give the `PluginInfo` you start with the capabilities your `plugin.toml` declares.
 
 ## Running a plugin in Jasper
 

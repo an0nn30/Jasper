@@ -27,6 +27,8 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import dev.jasper.sdk.Capabilities;
+import dev.jasper.sdk.terminal.TerminalEvents;
 
 /**
  * Logs, listens for theme changes and, when configured, shows a short activity on Buddy
@@ -35,6 +37,7 @@ import javax.swing.JPanel;
 public final class SamplePlugin implements Plugin {
     private static final int STEPS = 10;
     private static final String DEMO = "dev.jasper.sample.demo";
+    private static final String GREET = "dev.jasper.sample.greet";
 
     /** Created by the runtime. */
     public SamplePlugin() { }
@@ -51,6 +54,7 @@ public final class SamplePlugin implements Plugin {
         }
         long stepMillis = delay;
         if (context.config().bool("demo_ui").orElse(false)) installUi(context, stepMillis);
+        if (context.config().bool("demo_terminal").orElse(false)) installTerminalDemo(context);
         if (context.config().bool("demo_activity").orElse(false))
             context.background().execute(() -> demo(context, stepMillis));
     }
@@ -127,6 +131,31 @@ public final class SamplePlugin implements Plugin {
         context.rail().add("dev.jasper.sample.about");
     }
     // example:pluginpanels:end
+
+    // example:pluginterminal:start
+    private static void installTerminalDemo(PluginContext context) {
+        // Capabilities are declared in plugin.toml and consented to by the user. A gated call without one
+        // throws MissingCapabilityException, so a plugin that can live without a capability checks first.
+        if (!context.plugin().capabilities().containsAll(List.of(Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_INJECT))) {
+            context.log().log(System.Logger.Level.INFO, "The terminal demo needs terminal.observe and terminal.inject");
+            return;
+        }
+        context.actions().register(ActionSpec.of(GREET, "Insert Sample Greeting").withKeywords(List.of("sample", "type", "terminal")), invoked ->
+            // The pane the action was invoked on, or else the one the user used last. sendText adds nothing:
+            // without a newline the text waits at the prompt, and the user decides whether to run it.
+            invoked.pane().or(() -> context.terminals().activePane())
+                .ifPresent(pane -> pane.sendText("echo 'hello from the sample plugin'")));
+        context.menus().terminalContext().add(GREET);
+
+        StatusItem last = context.statusBar().add(new StatusItemSpec("dev.jasper.sample.last", Side.LEFT, 100));
+        last.setVisible(false);
+        // Terminal events name panes by id and arrive later, on the event thread; there is no replay.
+        context.events().subscribe(TerminalEvents.COMMAND_FINISHED, finished -> {
+            last.setText(finished.command() + ": " + (finished.exitStatus().isPresent() ? "exit " + finished.exitStatus().getAsInt() : "done"));
+            last.setVisible(true);
+        });
+    }
+    // example:pluginterminal:end
 
     private static void demo(PluginContext context, long stepMillis) {
         ActivityHandle activity = context.activities().begin(

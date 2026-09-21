@@ -5,3 +5,4 @@ entry = "dev.jasper.sample.SamplePlugin"
 sdk = ">=0.4, <0.5"
 description = "Exercises the plugin runtime end to end; inert unless demo_activity is set."
 vendor = "Jasper"
+capabilities = ["terminal.observe", "terminal.inject"]

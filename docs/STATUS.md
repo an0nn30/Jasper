@@ -12,14 +12,50 @@ The three modules are `jasper-app` (product composition), `jasper-terminal`
 maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merged into
 local `main`, as is plan 2 (actions and chrome placements). Plan 3a (rail, panels and plugin
 windows) is merged too; the spec's plan 3 was split into 3a and 3b. Plan 3b (Plugins manager,
-install and restart) is implemented on `claude/plugin-sdk-plan-3b`, not yet merged. The spec's plan 4 is
-split into 4a (terminal API: observe, inject, open) and 4b (plugin-provided sessions); 4a is planned
-on `claude/plugin-sdk-plan-4`, which branches from the 3b tip.
+install and restart) is merged too. The spec's plan 4 is split into 4a (terminal API: observe,
+inject, open) and 4b (plugin-provided sessions); 4a is implemented on `claude/plugin-sdk-plan-4`,
+and 4b is not started.
+
+### Plugin SDK plan 4a — 2026-09-21
+
+Implemented on `claude/plugin-sdk-plan-4` (worktree `.worktrees/plugin-sdk-plan-4`), not yet merged
+or pushed. The work implements
+[plan 4a](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-4a-terminal-api.md): plugins find the
+active window, tab and pane through `context.terminals()`, read pane metadata, follow sixteen
+`TerminalEvents` topics, type and paste into a pane, read the selection, and open local tabs and
+splits, each behind the capability the user consented to (`MissingCapabilityException` otherwise,
+with an audit log that never contains content). New app package `dev.jasper.app.terminals`
+(`TerminalRegistry`: pull-based window, tab and pane entries, id-only events, the derived active
+pane); `workspace.WindowTerminals`; `plugins.CapabilityGate`, `HostedTerminals` and
+`TerminalBridge`; the testkit's `FakeWorkspace` and `FakeTerminals`. The SDK is 0.4.0 and the
+bundled sample declares `terminal.observe` and `terminal.inject`. `jasper-terminal` is untouched.
+See [SDK architecture](sdk-architecture.md#terminal-api).
+
+Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks`
+passed with **1,359 tests: 1,357 passed, two expected environment skips, no failures or
+errors** (app 787, Buddy 163, terminal 355, SDK 16, testkit 30, sample plugin 8). The contract
+suite grew from 17 to 23 cases and passes for the testkit fake and for the application. Native
+acceptance (the seven-step checklist at the end of the plan) is pending: agents do not launch the GUI.
+
+Scope decisions, recorded in the plan: the spec's plan 4 is split into 4a (this) and 4b
+(`TerminalSession.attach` with the app-owned writer, drain and exactly-once `close`,
+`PendingSession`, pending and disconnected pane states, Reconnect, the cleanup worker,
+`OpenRequest.session`, and working-directory provenance; the only part that touches
+`jasper-terminal`); event payloads carry ids rather than handles, because a handle is bound to the
+plugin that obtained it; `openTab` and `split` return `Optional<PaneHandle>`; `LocalSpec` carries
+only a working directory; `terminal.observe` gates `info()`, `foregroundJob()`, `TabHandle.title()`
+and every `jasper.terminal.*` topic, while identity, structure and visible navigation need no
+capability; injection, selection reads, opens and a plugin's first terminal subscription are
+audited at INFO, metadata queries are not; the 4b shapes (`remoteDirectory`, `SessionKind.PLUGIN`,
+`CONNECTING`) are already in the SDK and unused; `foregroundJob()` completes on a worker thread;
+and the SDK version is 0.4.0.
+
+Deviations from the plan text: Task 0's separate baseline `check` was not run: the branch starts at the commit local `main` was fast-forwarded to, and that merged result had just passed the full verification. `MissingCapabilityException`'s two private fields carry Javadoc comments, because doclint warns about uncommented fields of a serializable class. `TerminalBridgeTest` builds `new Containment(() -> true)`; the plan assumed a no-argument constructor and said to follow `EventBusTest` otherwise. `AppContractTest` needed `import java.util.UUID`, which the plan's harness code assumed. The testkit's `openRequests()` also lists `front|<window id>` lines for `toFront()`, documented in its Javadoc; both contract harnesses filter them out, so the shared format is unchanged. Task 6's second harness block repeated what Task 4 had already put into `AppContractTest.newHarness()` and was not applied twice. Every compiled example in `docs/plugin-authoring.md` was re-copied from the sample source, not only the new one: `start()` gained the `demo_terminal` line, so the `plugin` example changed too.
 
 ### Plugin SDK plan 3b — 2026-09-21
 
-Implemented on `claude/plugin-sdk-plan-3b` (worktree `.worktrees/plugin-sdk-plan-3b`), not yet
-merged or pushed. The work implements
+Merged into local `main` by fast-forward on 2026-09-21 at `4cf8b3a` (not pushed); the merged
+result passed the same verification. The work implements
 [plan 3b](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-3b-manager-install-restart.md):
 the application-owned Plugins manager (File → Manage Plugins…, action `plugins.manage`) that lists
 every plugin with state, reason, capabilities, requirements and error count; enables and disables
