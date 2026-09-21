@@ -2,12 +2,15 @@ package dev.jasper.sdk.testing;
 
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.Variant;
 import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.activity.ActivityHandle;
 import dev.jasper.sdk.activity.ActivitySpec;
+import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
+import dev.jasper.sdk.ui.ToolbarItem;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -54,6 +57,7 @@ public final class FakePluginHost implements AutoCloseable {
     private final List<String> failures = new CopyOnWriteArrayList<>();
     final List<String> reports = new CopyOnWriteArrayList<>();
     private Path dataRoot;
+    private volatile Variant variant = Variant.DARK;
 
     /**
      * Starts a plugin the way the application would. A plugin whose hard requirement is not active is
@@ -198,6 +202,108 @@ public final class FakePluginHost implements AutoCloseable {
         }
     }
 
+    Variant variant() { return variant; }
+
+    void recordFailure(String line) { failures.add(line); }
+
+    boolean actionExists(String actionId) {
+        for (FakePluginContext context : contexts.values()) if (context.ui.actions.containsKey(actionId)) return true;
+        return false;
+    }
+
+    /**
+     * Changes the look and announces it.
+     *
+     * @param next the new variant
+     */
+    public void setVariant(Variant next) {
+        variant = Objects.requireNonNull(next, "next");
+        publishApp(AppEvents.THEME_CHANGED, new AppEvents.ThemeChanged(next));
+    }
+
+    /**
+     * Registered actions in registration order.
+     *
+     * @return lines of the form {@code id|title|enabled}
+     */
+    public List<String> actions() {
+        List<String> lines = new ArrayList<>();
+        for (FakePluginContext context : contexts.values())
+            for (FakeUi.Action action : context.ui.actions.values())
+                lines.add(action.spec.id() + "|" + action.title + "|" + action.enabled);
+        return lines;
+    }
+
+    /**
+     * Invokes an action as a window would.
+     *
+     * @param actionId the action
+     * @param windowId the invoking window
+     * @param paneIdOrNull the pane the action concerns, or null
+     * @return whether an enabled action ran
+     */
+    public boolean invoke(String actionId, UUID windowId, UUID paneIdOrNull) {
+        for (FakePluginContext context : contexts.values())
+            if (context.ui.actions.containsKey(actionId)) return context.ui.invoke(actionId, windowId, paneIdOrNull);
+        return false;
+    }
+
+    /**
+     * The toolbar's plugin section.
+     *
+     * @return {@code button:id} or {@code menu:title:id,id}; closed actions are omitted
+     */
+    public List<String> toolbar() {
+        List<String> lines = new ArrayList<>();
+        for (FakePluginContext context : contexts.values()) {
+            for (ToolbarItem item : context.ui.toolbar) {
+                switch (item) {
+                    case ToolbarItem.Button button -> { if (actionExists(button.actionId())) lines.add("button:" + button.actionId()); }
+                    case ToolbarItem.Dropdown dropdown -> {
+                        List<String> live = dropdown.actionIds().stream().filter(this::actionExists).toList();
+                        if (!live.isEmpty()) lines.add("menu:" + dropdown.title() + ":" + String.join(",", live));
+                    }
+                }
+            }
+        }
+        return lines;
+    }
+
+    /**
+     * One menu target's contributed entries.
+     *
+     * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code context} or {@code top:<menuId>}
+     * @return {@code item:id}, {@code ---} and {@code submenu:title} lines, children indented, sections separated by {@code ===}
+     */
+    public List<String> menu(String target) {
+        List<String> lines = new ArrayList<>();
+        boolean first = true;
+        for (FakePluginContext context : contexts.values()) {
+            for (FakeUi.Menu section : context.ui.sections) {
+                if (!section.target.equals(target)) continue;
+                if (!first) lines.add("===");
+                first = false;
+                section.render(lines, "");
+            }
+        }
+        return lines;
+    }
+
+    /**
+     * Visible status items, ascending priority.
+     *
+     * @return lines of the form {@code id|side|text|tooltip|actionId}
+     */
+    public List<String> status() {
+        List<FakeUi.Status> items = new ArrayList<>();
+        for (FakePluginContext context : contexts.values()) items.addAll(context.ui.status);
+        return items.stream().filter(item -> item.visible)
+            .sorted(java.util.Comparator.comparingInt((FakeUi.Status item) -> item.spec.priority()))
+            .map(item -> item.spec.id() + "|" + item.spec.side() + "|" + item.text + "|"
+                + (item.tooltip == null ? "" : item.tooltip) + "|" + (item.actionId == null ? "" : item.actionId))
+            .toList();
+    }
+
     Path dataRoot() {
         if (dataRoot == null) {
             try { dataRoot = Files.createTempDirectory("jasper-fake-plugins"); }
@@ -209,6 +315,7 @@ public final class FakePluginHost implements AutoCloseable {
     private void teardown(FakePluginContext context, String reason) {
         context.state = FakePluginContext.State.CLOSED;
         context.closeOwned();
+        context.ui.closeAll();
         String id = context.plugin().id();
         for (var list : subscribers.values()) list.removeIf(entry -> entry.pluginId().equals(id));
         for (ActivityEvent open : List.copyOf(running.values())) {

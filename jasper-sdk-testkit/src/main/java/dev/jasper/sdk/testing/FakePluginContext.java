@@ -6,6 +6,8 @@ import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
 import dev.jasper.sdk.activity.ActivityHandle;
 import dev.jasper.sdk.activity.ActivitySpec;
+import dev.jasper.sdk.Variant;
+import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
@@ -13,6 +15,11 @@ import dev.jasper.sdk.plugin.PluginConfig;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.services.ServiceUnavailableException;
 import dev.jasper.sdk.services.Services;
+import dev.jasper.sdk.ui.Actions;
+import dev.jasper.sdk.ui.Appearance;
+import dev.jasper.sdk.ui.Menus;
+import dev.jasper.sdk.ui.StatusBar;
+import dev.jasper.sdk.ui.Toolbar;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -42,9 +49,11 @@ public final class FakePluginContext implements PluginContext {
     final CopyOnWriteArrayList<Runnable> configListeners = new CopyOnWriteArrayList<>();
     final Map<Class<?>, Object> services = new ConcurrentHashMap<>();
     private final List<Subscription> owned = new ArrayList<>();
+    final FakeUi ui;
 
     FakePluginContext(FakePluginHost host, PluginInfo info, Set<String> requires, Plugin plugin) {
         this.host = host; this.info = info; this.requires = requires; this.plugin = plugin;
+        this.ui = new FakeUi(host, this);
     }
 
     void requireOpen() {
@@ -117,6 +126,33 @@ public final class FakePluginContext implements PluginContext {
             }
             @Override public <T> Optional<T> find(Class<T> api) {
                 return Optional.ofNullable(api.cast(services.get(api)));
+            }
+        };
+    }
+
+    /** Action registration. */
+    public Actions actions() { return ui.actions(); }
+
+    /** Toolbar placements. */
+    public Toolbar toolbar() { return ui.toolbar(); }
+
+    /** Menu placements. */
+    public Menus menus() { return ui.menus(); }
+
+    /** Status bar items. */
+    public StatusBar statusBar() { return ui.statusBar(); }
+
+    /** The host's variant, change notifications, and icons checked against the plugin's own class loader. */
+    public Appearance appearance() {
+        return new Appearance() {
+            @Override public Variant variant() { return ui.variant(); }
+            @Override public Subscription onChanged(java.util.function.Consumer<Variant> handler) {
+                return events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant()));
+            }
+            @Override public javax.swing.Icon icon(String svgResourcePath) {
+                if (svgResourcePath == null || plugin.getClass().getClassLoader().getResource(svgResourcePath) == null)
+                    throw new IllegalArgumentException("No such icon resource: " + svgResourcePath);
+                return FakeUi.blankIcon();
             }
         };
     }
