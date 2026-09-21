@@ -119,9 +119,9 @@ class ShellIntegrationSessionTest {
 
     @Test
     void onlyFileUrisWithAPathAreWorkingDirectories() {
-        assertThat(TerminalSession.directoryFromUri("https://example.com/x")).isEmpty();
-        assertThat(TerminalSession.directoryFromUri("not a uri")).isEmpty();
-        assertThat(TerminalSession.directoryFromUri("file://host")).isEmpty();
+        assertThat(ShellCommandTracker.directoryFromUri("https://example.com/x")).isEmpty();
+        assertThat(ShellCommandTracker.directoryFromUri("not a uri")).isEmpty();
+        assertThat(ShellCommandTracker.directoryFromUri("file://host")).isEmpty();
     }
 
     @Test

@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-20-jasper-terminal-refactor-design.md).
 
-**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–4 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
+**Status:** Execution authorized on 2026-09-20, natively, in `codex/terminal-refactor-native`. The user's native choice supersedes per-task subagents; one independent whole-branch review remains required. This execution is independent of the older refactor branch. Tasks 1–5 are implemented; Task 2 value tests are grouped in FluentOptionsTest rather than separate files. Task 4 rejected full-width arrays after measurements; its implemented TerminalRow has locked live and compact detached implementations, with detached style conversion during reads. The verification report records the pinned-vendor assumption and performance evidence. Progress and rulings are recorded in the plan-specific execution ledger and STATUS.
 
 ## Global Constraints
 
@@ -701,7 +701,7 @@ hyperlinks, CJK/emoji, clipping, copy, soft wraps, and malformed surrogates.
 - Tracker constructor: `(LongSupplier clock, Supplier<CommandLocation> cursor, Function<CommandLocation,String> capture, BooleanSupplier recordPrompt, Consumer<Path> cwdChanged, Consumer<String> commandStarted, Consumer<CompletedCommand> commandFinished, Runnable integrationDetected, Runnable cursorReset)`.
 - Tracker methods: `accept(List<String>)`, `discardUnusedPayload()`, `Optional<Path> workingDirectory()`, `boolean detected()`.
 
-- [ ] **Step 1: Pin repeated-prompt and monotonic-start behavior without a PTY.**
+- [x] **Step 1: Pin repeated-prompt and monotonic-start behavior without a PTY.**
 
 ```java
 @Test void repeatedPromptDoesNotFinishACommandBeforeItsStatus() {
@@ -727,7 +727,7 @@ hyperlinks, CJK/emoji, clipping, copy, soft wraps, and malformed surrogates.
 
 Run this RED before extraction. Existing shell tests remain end-to-end checks.
 
-- [ ] **Step 2: Move query methods with their locks into BufferQueries.**
+- [x] **Step 2: Move query methods with their locks into BufferQueries.**
 
 Constructor is package-private `(TerminalTextBuffer buffer, JediTerminal terminal,
 SessionDisplay display, AbsoluteRowState rows, JediCellReader cells)`; these types
@@ -756,7 +756,7 @@ and `lineText` accessor. Search captures once under lock and matches afterward.
 `CommandCapture.text` under that same lock. `recordPrompt()` captures the
 absolute cursor row under the lock and delegates to `AbsoluteRowState`.
 
-- [ ] **Step 3: Move row identity and shell state to their owners.**
+- [x] **Step 3: Move row identity and shell state to their owners.**
 
 `AbsoluteRowState` owns the existing atomic epoch, volatile discard count and
 copy-on-write prompt list. `discard(n)` increments the count and prunes earlier
@@ -783,7 +783,7 @@ the buffer lock. History/alternate changes call `discardUnusedPayload()` to
 preserve the current invalidation semantics; do not add a command-finish event
 when a session closes mid-command.
 
-- [ ] **Step 4: Run shell, row, search and full tests; document/commit.**
+- [x] **Step 4: Run shell, row, search and full tests; document/commit.**
 
 `./gradlew :jasper-terminal:test --tests '*Shell*' --tests '*Scrollback*' --tests '*Search*' --tests '*Selection*'`.
 Check existing duplicate-A, absent-B, malformed/overlong payload, command-duration,

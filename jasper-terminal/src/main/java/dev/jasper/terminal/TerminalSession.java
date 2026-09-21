@@ -4,7 +4,6 @@ import com.jediterm.terminal.emulator.mouse.MouseButtonCodes;
 import com.jediterm.terminal.emulator.mouse.MouseButtonModifierFlags;
 import com.jediterm.core.util.TermSize;
 import com.jediterm.terminal.ArrayTerminalDataStream;
-import com.jediterm.terminal.HyperlinkStyle;
 import com.jediterm.terminal.RequestOrigin;
 import com.jediterm.terminal.TerminalOutputStream;
 import com.jediterm.terminal.TtyBasedArrayDataStream;
@@ -22,34 +21,21 @@ import com.jediterm.terminal.model.hyperlinks.LinkResultItem;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
-import java.util.regex.Pattern;
 
 /** A program running in a pseudo-terminal, emulated by JediTerm on a dedicated reader thread. */
 public final class TerminalSession implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(TerminalSession.class.getName());
-    /** Schemes an OSC 8 hyperlink may open; anything else could launch an application or a custom handler. */
-    private static final Set<String> OSC8_SCHEMES = Set.of("http", "https", "ftp", "mailto");
-    /** Longer than this is not a command line; ShellHistoryParser bounds its own lines the same way. */
-    private static final int MAX_COMMAND_BYTES = 16 * 1024;
 
     /** Callbacks arrive on the session's reader thread. */
     public interface Listener {
@@ -92,7 +78,6 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
-    private final LongSupplier clock;
     private final TtyConnector connector;
     private final PtyConnector pty;
     private final JediCellReader cells = new JediCellReader();
@@ -101,26 +86,11 @@ public final class TerminalSession implements AutoCloseable {
     private final SessionDisplay display;
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
     private final CompletableFuture<Integer> exit = new CompletableFuture<>();
-    private final List<Long> promptRows = new CopyOnWriteArrayList<>();
-    /** Generation of resets that make previously captured absolute rows obsolete. */
-    private final AtomicLong absoluteRowEpoch = new AtomicLong();
-    /** Lines dropped off the top of the scrollback so far; the base of absolute row numbers. */
-    private volatile long discardedLines;
-    private volatile Path workingDirectory;
+    private final AbsoluteRowState rowState = new AbsoluteRowState();
+    private final BufferQueries queries;
+    private ShellCommandTracker shell;
     private volatile int columns;
     private volatile int rows;
-    /** Set on the reader thread at the first prompt mark, read on the Event Dispatch Thread. */
-    private volatile boolean shellIntegrationDetected;
-    // Reader thread only: tracks the command typed between OSC 133 B and C.
-    private long commandStartRow = -1;
-    private int commandStartColumn;
-    private String pendingCommand;
-    private String pendingCommandText;
-    /**
-     * nanoTime at the command-start mark. Only meaningful while {@code pendingCommand} is set, which
-     * is the same moment it is written — a zero here is a real reading, not a "never started" flag.
-     */
-    private long commandStartedAt;
 
     /** Starts {@code command} in a new pseudo-terminal and begins emulating its output. */
     public static TerminalSession start(List<String> command, Map<String, String> environment, Path workingDirectory,
@@ -140,7 +110,6 @@ public final class TerminalSession implements AutoCloseable {
 
     /** {@code clock} supplies monotonic nanoseconds; tests drive it instead of sleeping. */
     TerminalSession(TtyConnector connector, int columns, int rows, int scrollback, LongSupplier clock) {
-        this.clock = Objects.requireNonNull(clock, "clock");
         this.connector = new ShellIntegrationConnector(connector);
         this.pty = connector instanceof PtyConnector value ? value : null;
         this.columns = columns;
@@ -152,8 +121,8 @@ public final class TerminalSession implements AutoCloseable {
             () -> listeners.forEach(Listener::bell),
             () -> listeners.forEach(Listener::screenChanged),
             alternate -> {
-                absoluteRowEpoch.incrementAndGet();
-                pendingCommandText = null;
+                rowState.invalidate();
+                if (shell != null) shell.discardUnusedPayload();
                 listeners.forEach(l -> l.alternateBufferChanged(alternate));
             });
         terminal = new JediTerminal(display, buffer, styleState) {
@@ -183,51 +152,29 @@ public final class TerminalSession implements AutoCloseable {
             }
         });
         buffer.addModelListener(() -> listeners.forEach(Listener::screenChanged));
-        terminal.addCustomCommandListener(this::onCustomCommand);
+        queries = new BufferQueries(buffer, terminal, display, rowState, cells);
+        shell = new ShellCommandTracker(clock, queries::cursor, queries::captureCommand, queries::recordPrompt,
+            directory -> listeners.forEach(l -> l.workingDirectoryChanged(directory)),
+            command -> listeners.forEach(l -> l.commandStarted(command)),
+            command -> listeners.forEach(l -> l.commandExecuted(command.command(), command.status(), command.directory(), command.duration())),
+            () -> listeners.forEach(Listener::screenChanged), display::resetCursorShape);
+        terminal.addCustomCommandListener(shell::accept);
         // Without a filter JediTerm drops OSC 8 links; one item spanning the whole URI makes it keep them.
         terminal.setUrlHyperlinkFilter(uri -> new LinkResult(new LinkResultItem(0, uri.length(), new UriLink(uri))));
         buffer.addChangesListener(new TextBufferChangesListener() {
             @Override
             public void linesDiscardedFromHistory(List<TerminalLine> lines) {
-                discardedLines += lines.size(); // reader thread, under the buffer lock
-                promptRows.removeIf(row -> row < discardedLines);
+                rowState.discard(lines.size()); // reader thread, under the buffer lock
             }
 
             @Override
             public void historyCleared() {
-                absoluteRowEpoch.incrementAndGet();
-                promptRows.clear();
-                pendingCommandText = null;
+                rowState.invalidate();
+                rowState.clearPrompts();
+                if (shell != null) shell.discardUnusedPayload();
                 listeners.forEach(Listener::scrollbackReset);
             }
         });
-    }
-
-    /** Call with the buffer lock held, so {@code discardedLines} and the buffer agree. */
-    private ScreenSnapshot capture(TerminalTextBuffer buffer, JediTerminal terminal, SessionDisplay display,
-                                  long discardedLines, long requestedTopRow) {
-        buffer.lock();
-        try {
-            int width = buffer.getWidth();
-            int height = buffer.getHeight();
-            boolean alternate = buffer.isUsingAlternateBuffer();
-            int history = buffer.getHistoryLinesCount();
-            int scrollable = alternate ? 0 : history;
-            long liveTop = discardedLines + history;
-            int offset = requestedTopRow == ScreenSnapshot.FOLLOW_OUTPUT
-                ? 0
-                : (int) Math.max(0, Math.min(scrollable, liveTop - requestedTopRow));
-            List<TerminalRow> lines = new ArrayList<>(height);
-            for (int row = 0; row < height; row++) {
-                lines.add(cells.capture(buffer.getLine(row - offset), width));
-            }
-            return new ScreenSnapshot(width, height, lines,
-                terminal.getCursorX() - 1, terminal.getCursorY() - 1 + offset,
-                display.cursorVisible(), JediCellReader.cursor(display.cursorShape()),
-                liveTop - offset, offset, scrollable, alternate);
-        } finally {
-            buffer.unlock();
-        }
     }
 
     private static com.jediterm.core.input.MouseEvent jediEvent(MouseInput event) {
@@ -318,8 +265,8 @@ public final class TerminalSession implements AutoCloseable {
         try {
             terminal.resize(size, RequestOrigin.User);
             if (widthChanged) {
-                absoluteRowEpoch.incrementAndGet();
-                promptRows.clear(); // JediTerm reflows soft-wrapped lines, so recorded rows now name other lines
+                rowState.invalidate();
+                rowState.clearPrompts(); // JediTerm reflows soft-wrapped lines, so recorded rows now name other lines
             }
         } finally {
             buffer.unlock();
@@ -369,68 +316,17 @@ public final class TerminalSession implements AutoCloseable {
 
     /** The directory the shell last reported with OSC 7, if any. */
     public Optional<Path> workingDirectory() {
-        return Optional.ofNullable(workingDirectory);
+        return shell.workingDirectory();
     }
 
     /** True once the shell has reported its first prompt (mark A) through Jasper's shell integration. */
     public boolean shellIntegrationDetected() {
-        return shellIntegrationDetected;
+        return shell.detected();
     }
 
     @Override
     public void close() {
         connector.close();
-    }
-
-    ScreenSnapshot snapshot() {
-        return snapshot(ScreenSnapshot.FOLLOW_OUTPUT);
-    }
-
-    /** The rows starting at an absolute top row (clamped to the scrollback), or the live screen for FOLLOW_OUTPUT. */
-    ScreenSnapshot snapshot(long topRow) {
-        buffer.lock();
-        try {
-            return capture(buffer, terminal, display, discardedLines, topRow);
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    /** Geometry only: mouse reports do not need copied lines or cursor/style data. */
-    record MouseGeometry(int width, int height, long firstRow, int scrollOffset, boolean alternateBuffer) { }
-
-    MouseGeometry mouseGeometry(long requestedTopRow) {
-        buffer.lock();
-        try {
-            int history = buffer.getHistoryLinesCount();
-            boolean alternate = buffer.isUsingAlternateBuffer();
-            long liveTop = discardedLines + history;
-            int offset = requestedTopRow == ScreenSnapshot.FOLLOW_OUTPUT ? 0
-                : (int) Math.max(0, Math.min(alternate ? 0 : history, liveTop - requestedTopRow));
-            return new MouseGeometry(buffer.getWidth(), buffer.getHeight(), liveTop - offset, offset, alternate);
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    /** Cursor eligibility without copying terminal lines; called only while a view can actually blink. */
-    boolean blinkingCursorInView(long requestedTopRow, boolean configuredBlink) {
-        buffer.lock();
-        try {
-            if (!display.cursorVisible() || !CursorRequest.effectiveBlink(JediCellReader.cursor(display.cursorShape()), configuredBlink)) {
-                return false;
-            }
-            int history = buffer.getHistoryLinesCount();
-            long liveTop = discardedLines + history;
-            long offset = requestedTopRow == ScreenSnapshot.FOLLOW_OUTPUT ? 0
-                : Math.max(0, Math.min(buffer.isUsingAlternateBuffer() ? 0 : history, liveTop - requestedTopRow));
-            long row = terminal.getCursorY() - 1L + offset;
-            // Like TerminalPainter, pin a pending-wrap cursor to the final cell.
-            int column = Math.min(terminal.getCursorX() - 1, buffer.getWidth() - 1);
-            return row >= 0 && row < buffer.getHeight() && column >= 0;
-        } finally {
-            buffer.unlock();
-        }
     }
 
     byte[] codeForKey(int keyCode, int modifiers) {
@@ -443,123 +339,12 @@ public final class TerminalSession implements AutoCloseable {
 
     /** Monotonic generation for history, reflow and alternate-buffer changes that invalidate absolute rows. */
     long absoluteRowEpoch() {
-        return absoluteRowEpoch.get();
+        return rowState.epoch();
     }
 
     /** Absolute rows of the prompts the shell marked with OSC 133;A that are still in the scrollback, oldest first. */
     List<Long> promptRows() {
-        long oldest = discardedLines;
-        return promptRows.stream().filter(row -> row >= oldest).toList();
-    }
-
-    /** The text of the line at an absolute row, or null when it is no longer in the scrollback. */
-    String lineText(long absoluteRow) {
-        buffer.lock();
-        try {
-            TerminalRow line = lineAtLocked(absoluteRow);
-            return line == null ? null : line.getText();
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    /** The text of a selection: soft-wrapped rows joined, wide characters whole, trailing spaces trimmed. */
-    String text(Selection selection) {
-        buffer.lock();
-        try {
-            return SelectionText.extract(selection, this::lineAtLocked, buffer.getWidth());
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    /** Only the selected intersection with the live grid is retained, never a copy of selected scrollback. */
-    record SelectedCells(long row, int column, String cells) { }
-
-    List<SelectedCells> selectedLiveCells(Selection selection) {
-        buffer.lock();
-        try {
-            int width = buffer.getWidth();
-            long liveTop = absoluteRow(0);
-            long first = Math.max(liveTop, selection.startRow());
-            long last = Math.min(liveTop + buffer.getHeight() - 1, selection.endRow());
-            List<SelectedCells> cells = new ArrayList<>();
-            char[] chars = new char[width];
-            for (long row = first; row <= last; row++) {
-                lineAtLocked(row).readCells(width, chars, null);
-                int[] columns = SelectionText.wholeCharacterColumns(selection.columnsOn(row, width), chars);
-                if (columns[0] <= columns[1]) {
-                    cells.add(new SelectedCells(row, columns[0], new String(chars, columns[0], columns[1] - columns[0] + 1)));
-                }
-            }
-            return List.copyOf(cells);
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    boolean selectionUnchanged(List<SelectedCells> cells) {
-        buffer.lock();
-        try {
-            return selectionUnchangedLocked(cells);
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    /** Validation and extraction share a lock so Copy cannot pick up an overwrite between the two. */
-    Optional<String> selectedText(Selection selection, List<SelectedCells> cells) {
-        buffer.lock();
-        try {
-            return selectionUnchangedLocked(cells)
-                ? Optional.of(SelectionText.extract(selection, this::lineAtLocked, buffer.getWidth())) : Optional.empty();
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    private boolean selectionUnchangedLocked(List<SelectedCells> cells) {
-        if (cells.isEmpty()) return true;
-        int width = buffer.getWidth();
-        char[] chars = new char[width];
-        for (SelectedCells selected : cells) {
-            TerminalRow line = lineAtLocked(selected.row());
-            if (line == null || selected.column() + selected.cells().length() > width) return false;
-            line.readCells(width, chars, null);
-            for (int i = 0; i < selected.cells().length(); i++) {
-                if (chars[selected.column() + i] != selected.cells().charAt(i)) return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Every match in the scrollback and on screen, oldest first; an empty query finds nothing. On the alternate
-     * screen only its own rows are searched, since the scrollback behind it is not what the user is looking at.
-     */
-    List<TerminalSearch.Match> search(String query, boolean regex, boolean caseSensitive) {
-        if (query.isEmpty()) {
-            return List.of();
-        }
-        Pattern pattern = TerminalSearch.pattern(query, regex, caseSensitive);
-        int history;
-        long firstRow;
-        int width;
-        List<TerminalRow> lines;
-        buffer.lock();
-        try {
-            history = buffer.isUsingAlternateBuffer() ? 0 : buffer.getHistoryLinesCount();
-            firstRow = absoluteRow(-history);
-            width = buffer.getWidth();
-            lines = new ArrayList<>(history + buffer.getHeight());
-            for (int row = -history; row < buffer.getHeight(); row++) {
-                lines.add(cells.capture(buffer.getLine(row), width));
-            }
-        } finally {
-            buffer.unlock();
-        }
-        // Run regex matching outside the lock so a slow pattern cannot stall the reader thread
-        return TerminalSearch.find(pattern, firstRow, lines, width);
+        return rowState.prompts();
     }
 
     /** Whether the program asked for mouse reports, so clicks go to it instead of to local selection. */
@@ -596,258 +381,45 @@ public final class TerminalSession implements AutoCloseable {
         }
     }
 
+    ScreenSnapshot snapshot() { return queries.snapshot(); }
+
+    /** The rows starting at an absolute top row (clamped to the scrollback), or the live screen for FOLLOW_OUTPUT. */
+    ScreenSnapshot snapshot(long topRow) { return queries.snapshot(topRow); }
+
+    MouseGeometry mouseGeometry(long requestedTopRow) { return queries.mouseGeometry(requestedTopRow); }
+
+    /** Cursor eligibility without copying terminal lines; called only while a view can actually blink. */
+    boolean blinkingCursorInView(long requestedTopRow, boolean configuredBlink) { return queries.blinkingCursorInView(requestedTopRow, configuredBlink); }
+
+    /** The text of the line at an absolute row, or null when it is no longer in the scrollback. */
+    String lineText(long absoluteRow) { return queries.lineText(absoluteRow); }
+
+    /** The text of a selection: soft-wrapped rows joined, wide characters whole, trailing spaces trimmed. */
+    String text(Selection selection) { return queries.text(selection); }
+
+    List<SelectedCells> selectedLiveCells(Selection selection) { return queries.selectedLiveCells(selection); }
+
+    boolean selectionUnchanged(List<SelectedCells> cells) { return queries.selectionUnchanged(cells); }
+
+    /** Validation and extraction share a lock so Copy cannot pick up an overwrite between the two. */
+    Optional<String> selectedText(Selection selection, List<SelectedCells> cells) { return queries.selectedText(selection, cells); }
+
+    /**
+     * Every match in the scrollback and on screen, oldest first; an empty query finds nothing. On the alternate
+     * screen only its own rows are searched, since the scrollback behind it is not what the user is looking at.
+     */
+    List<TerminalSearch.Match> search(String query, boolean regex, boolean caseSensitive) { return queries.search(query, regex, caseSensitive); }
+
     /**
      * The link at an absolute row and column: an OSC 8 hyperlink, or else a URL written in the text. A program chooses
      * an OSC 8 target freely, so only web and mail schemes are opened; a cell whose OSC 8 target has any other scheme
      * has no link at all, whatever its text says.
      */
-    Optional<String> linkAt(long absoluteRow, int column) {
-        buffer.lock();
-        try {
-            if (column < 0 || column >= buffer.getWidth()) return Optional.empty();
-            TerminalRow line = lineAtLocked(absoluteRow);
-            if (line == null) {
-                return Optional.empty();
-            }
-            if (column < line.length()
-                && line.attributesAt(column).link() != null) {
-                return openableScheme(line.attributesAt(column).link()) ? Optional.of(line.attributesAt(column).link()) : Optional.empty();
-            }
-            return urlAcrossWrappedRows(absoluteRow, column);
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    private static boolean openableScheme(String uri) {
-        int colon = uri.indexOf(':');
-        String scheme = colon < 0 ? "" : uri.substring(0, colon).toLowerCase(Locale.ROOT);
-        return OSC8_SCHEMES.contains(scheme);
-    }
-
-    /**
-     * A plain-text URL search that follows soft wraps: joins the wrapped screen rows around {@code absoluteRow}
-     * into one logical line (the same wrap-walking {@link #lineSelection} uses) before searching, so a URL split
-     * across a wrap boundary is still recognized as one link. Call with the buffer lock held.
-     */
-    private Optional<String> urlAcrossWrappedRows(long absoluteRow, int column) {
-        int width = buffer.getWidth();
-        LogicalLine range = LogicalLine.around(absoluteRow, width, this::lineAtLocked);
-        if (range.truncated()) return Optional.empty();
-        // The shared traversal bounds this multiplication to at most MAX_CELLS.
-        int cells = range.rowCount() * width;
-        StringBuilder text = new StringBuilder(cells);
-        int[] columns = new int[cells];
-        int[] lastColumns = new int[cells];
-        for (int rowIndex = 0; rowIndex < range.rowCount(); rowIndex++) {
-            TerminalRow line = lineAtLocked(range.firstRow() + rowIndex);
-            RowText rowText = RowText.of(line, width);
-            int offset = rowIndex * width;
-            for (int i = 0; i < rowText.text().length(); i++) {
-                int index = text.length();
-                text.append(rowText.text().charAt(i));
-                columns[index] = offset + rowText.columns()[i];
-                lastColumns[index] = offset + rowText.lastColumns()[i];
-            }
-        }
-        int virtualColumn = (int) ((absoluteRow - range.firstRow()) * width) + column;
-        RowText combined = new RowText(text.toString(), columns, lastColumns);
-        return LinkDetector.urlAt(combined, virtualColumn);
-    }
+    Optional<String> linkAt(long absoluteRow, int column) { return queries.linkAt(absoluteRow, column); }
 
     /** The word at an absolute row and column, as a stream selection. */
-    Selection wordSelection(long row, int column) {
-        buffer.lock();
-        try {
-            TerminalRow line = lineAtLocked(row);
-            if (line == null) {
-                return Selection.at(row, column, false);
-            }
-            int[] word = WordBoundaries.wordAt(line, buffer.getWidth(), column);
-            return new Selection(row, word[0], row, word[1], false);
-        } finally {
-            buffer.unlock();
-        }
-    }
+    Selection wordSelection(long row, int column) { return queries.wordSelection(row, column); }
 
     /** A logical line, bounded by {@link LogicalLine}'s extreme-line fallback, always including the clicked row. */
-    Selection lineSelection(long row) {
-        buffer.lock();
-        try {
-            LogicalLine range = LogicalLine.around(row, buffer.getWidth(), this::lineAtLocked);
-            return new Selection(range.firstRow(), 0, range.lastRow(), range.columns() - 1, false);
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    /**
-     * The absolute row of a buffer row (0 = top of the live screen, negative = scrollback). An absolute row stays
-     * attached to its line while output scrolls. Call with the buffer lock held.
-     */
-    private long absoluteRow(int bufferRow) {
-        return discardedLines + buffer.getHistoryLinesCount() + bufferRow;
-    }
-
-    /** The line at an absolute row, or null outside the scrollback and screen. Call with the buffer lock held. */
-    private TerminalRow lineAtLocked(long absoluteRow) {
-        int history = buffer.getHistoryLinesCount();
-        long bufferRow = absoluteRow - discardedLines - history;
-        if (bufferRow < -history || bufferRow >= buffer.getHeight()) {
-            return null;
-        }
-        return cells.live(buffer.getLine((int) bufferRow));
-    }
-
-    private void onCustomCommand(List<String> args) {
-        if (args.size() < 2 || !"jasper".equals(args.get(0))) {
-            return;
-        }
-        switch (args.get(1)) {
-            case "cwd" -> directoryFromUri(String.join(";", args.subList(2, args.size()))).ifPresent(directory -> {
-                workingDirectory = directory;
-                listeners.forEach(l -> l.workingDirectoryChanged(directory));
-            });
-            case "cmd" -> pendingCommandText = args.size() > 2
-                ? decodeCommand(String.join(";", args.subList(2, args.size()))) : null;
-            case "mark" -> {
-                String mark = args.size() > 2 ? args.get(2) : "";
-                switch (mark) {
-                    case "A" -> {
-                        // A shell that emits its own A (fish 4) must not flush the cycle early:
-                        // the command would be reported without the status its own D carries.
-                        if (!shellIntegrationDetected) {
-                            // The mark draws nothing, so without this the owner only learns that
-                            // integration is live when the prompt that follows happens to repaint.
-                            shellIntegrationDetected = true;
-                            listeners.forEach(Listener::screenChanged);
-                        }
-                        // Only the flush is conditional. A prompt never sits inside a cycle, so a
-                        // half-started capture and a payload no C consumed are dropped either way;
-                        // a prompt redrawn in place (zle reset-prompt) repeats the row and would
-                        // otherwise leave both behind for the next C to pick up.
-                        if (recordPrompt()) flushPendingCommand(OptionalInt.empty());
-                        commandStartRow = -1;
-                        pendingCommandText = null;
-                    }
-                    case "B" -> markCommandStart();
-                    case "C" -> captureCommand();
-                    case "D" -> flushPendingCommand(exitStatus(args));
-                    default -> {
-                        // Other FinalTerm marks carry nothing Jasper tracks.
-                    }
-                }
-            }
-            case "cursor-reset" -> display.resetCursorShape();
-            default -> {
-                // A command from a newer Jasper shell-integration script; nothing to do.
-            }
-        }
-    }
-
-    /** Records the prompt row; false when this A repeats the row Jasper already marked. */
-    private boolean recordPrompt() {
-        buffer.lock();
-        try {
-            long row = absoluteRow(terminal.getCursorY() - 1);
-            if (!promptRows.isEmpty() && promptRows.getLast() == row) return false;
-            promptRows.add(row);
-            return true;
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    private void markCommandStart() {
-        buffer.lock();
-        try {
-            commandStartRow = absoluteRow(terminal.getCursorY() - 1);
-            commandStartColumn = terminal.getCursorX() - 1;
-        } finally {
-            buffer.unlock();
-        }
-    }
-
-    /**
-     * At C the shell has echoed the command and moved on. Jasper's shell-integration scripts send the exact
-     * command line first (the {@code cmd} custom command); when that is missing or malformed, fall back to
-     * reading the rows from B to the cursor.
-     */
-    private void captureCommand() {
-        String reported = pendingCommandText;
-        pendingCommandText = null;
-        buffer.lock();
-        try {
-            String text = reported;
-            if (text == null) {
-                if (commandStartRow < 0) return;
-                long endRow = absoluteRow(terminal.getCursorY() - 1);
-                if (terminal.getCursorX() - 1 == 0) endRow--; // Enter moved the cursor to a fresh line
-                text = CommandCapture.text(commandStartRow, commandStartColumn, endRow, buffer.getWidth(), this::lineAtLocked);
-            }
-            commandStartRow = -1;
-            pendingCommand = text.isEmpty() ? null : text;
-            commandStartedAt = clock.getAsLong();
-        } finally {
-            buffer.unlock();
-        }
-        // Outside the lock: a listener runs arbitrary code and the buffer lock must stay short.
-        String started = pendingCommand;
-        if (started != null) listeners.forEach(l -> l.commandStarted(started));
-    }
-
-    /**
-     * Decodes the base64 UTF-8 {@code cmd} payload from Jasper's shell-integration scripts, or null if
-     * malformed — the caller then falls back to reading the command off the screen. The payload is the
-     * exact command line, so it is not trimmed; it is only bounded, because OSC 1341 is an open channel
-     * and the history index enforces the same limit on the lines it parses from disk.
-     */
-    private static String decodeCommand(String encoded) {
-        String trimmed = encoded.trim();
-        if (trimmed.length() > (MAX_COMMAND_BYTES / 3 + 1) * 4) return null;
-        try {
-            byte[] bytes = Base64.getDecoder().decode(trimmed);
-            if (bytes.length > MAX_COMMAND_BYTES) return null;
-            String text = StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();
-            return text.isEmpty() ? null : text;
-        } catch (IllegalArgumentException | CharacterCodingException malformed) {
-            return null;
-        }
-    }
-
-    private void flushPendingCommand(OptionalInt exitStatus) {
-        String command = pendingCommand;
-        long startedAt = commandStartedAt;
-        pendingCommand = null;
-        pendingCommandText = null;
-        if (command == null) return;
-        // Only captureCommand sets pendingCommand, and it stamps the clock in the same breath, so a
-        // non-null command always has a real start. nanoTime is monotonic, so this cannot go negative.
-        Duration ran = Duration.ofNanos(clock.getAsLong() - startedAt);
-        Optional<Path> directory = workingDirectory();
-        listeners.forEach(l -> l.commandExecuted(command, exitStatus, directory, ran));
-    }
-
-    private static OptionalInt exitStatus(List<String> args) {
-        if (args.size() < 4) return OptionalInt.empty();
-        try {
-            return OptionalInt.of(Integer.parseInt(args.get(3).trim()));
-        } catch (NumberFormatException malformed) {
-            return OptionalInt.empty();
-        }
-    }
-
-    /** The local path of an OSC 7 {@code file://host/path} URI; the host is ignored. */
-    static Optional<Path> directoryFromUri(String uri) {
-        try {
-            URI parsed = new URI(uri);
-            String path = parsed.getPath();
-            if (!"file".equalsIgnoreCase(parsed.getScheme()) || path == null || path.isEmpty()) {
-                return Optional.empty();
-            }
-            return Optional.of(Path.of(new URI("file", null, path, null)));
-        } catch (URISyntaxException | IllegalArgumentException e) {
-            return Optional.empty();
-        }
-    }
+    Selection lineSelection(long row) { return queries.lineSelection(row); }
 }

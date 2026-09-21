@@ -90,7 +90,7 @@ public final class TerminalView extends JComponent {
     /** Where a click-drag started; becomes the selection on the first drag. */
     private Selection pendingAnchor;
     private Selection wordAnchor;
-    private List<TerminalSession.SelectedCells> selectedLiveCells = List.of();
+    private List<SelectedCells> selectedLiveCells = List.of();
     /** Press ownership and report modifiers survive until that button's matching release. */
     private final java.util.EnumMap<MouseInput.Button, Gesture> gestures =
         new java.util.EnumMap<>(MouseInput.Button.class);
@@ -630,7 +630,7 @@ public final class TerminalView extends JComponent {
         int notches = type == Type.WHEEL ? notches((MouseWheelEvent) e) : 0;
         if (type == Type.WHEEL && notches == 0) return;
 
-        TerminalSession.MouseGeometry grid = session.mouseGeometry(viewport.topRow());
+        MouseGeometry grid = session.mouseGeometry(viewport.topRow());
         int column = Math.max(0, Math.min(grid.width() - 1, e.getX() / fonts.cellWidth()));
         int row = Math.max(0, Math.min(grid.height() - 1, e.getY() / fonts.cellHeight()));
         long absoluteRow = grid.firstRow() + row;

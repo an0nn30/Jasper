@@ -32,9 +32,11 @@ class EvictionTest {
     @Test
     void anEvictedPromptIsRemovedFromTheStoredPromptRows() throws Exception {
         assertThat(session.promptRows()).doesNotContain(0L).isEmpty();
-        Field promptRows = TerminalSession.class.getDeclaredField("promptRows");
+        Field rowState = TerminalSession.class.getDeclaredField("rowState");
+        rowState.setAccessible(true);
+        Field promptRows = AbsoluteRowState.class.getDeclaredField("prompts");
         promptRows.setAccessible(true);
-        assertThat((List<?>) promptRows.get(session)).isEmpty();
+        assertThat((List<?>) promptRows.get(rowState.get(session))).isEmpty();
     }
 
     @Test
