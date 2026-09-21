@@ -93,6 +93,18 @@ public final class PluginRuntime {
     }
 
     /**
+     * Carries out pending plugin removals and installs. Call once per launch, before {@link #start} and
+     * never on the EDT: it waits, bounded, for the cross-process state lock. Never throws.
+     *
+     * @param userDirectory plugins the user installed
+     * @param stateFile {@code plugins.toml}
+     * @param lockFile cross-process lock for the state file
+     */
+    public static void maintain(Path userDirectory, Path stateFile, Path lockFile) {
+        PluginMaintenance.apply(userDirectory, new PluginStateStore(stateFile, lockFile, LOCK_WAIT));
+    }
+
+    /**
      * Discovers, resolves, loads and starts plugins in dependency order. Call once, before the first window.
      *
      * @param pluginTables the {@code [plugins."<id>"]} tables of the current configuration

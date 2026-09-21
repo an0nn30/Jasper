@@ -20,7 +20,10 @@ final class PluginDiscovery {
         List<PluginCandidate> found = new ArrayList<>();
         if (root == null || !Files.isDirectory(root)) return found;
         List<Path> directories;
-        try (var children = Files.list(root)) { directories = children.filter(Files::isDirectory).sorted().toList(); }
+        try (var children = Files.list(root)) {
+            directories = children.filter(Files::isDirectory)
+                .filter(path -> !path.getFileName().toString().startsWith(".")).sorted().toList();
+        }
         catch (IOException failure) { problems.add(root + ": cannot be listed: " + failure.getMessage()); return found; }
         for (Path directory : directories) {
             Optional<PluginCandidate> candidate = single(directory, origin, problems);

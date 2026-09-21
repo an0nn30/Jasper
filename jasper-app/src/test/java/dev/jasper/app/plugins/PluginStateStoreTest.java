@@ -77,4 +77,24 @@ class PluginStateStoreTest {
         Files.writeString(dir.resolve("plugins.toml"), "version = 1\n[plugins.\"a.b\"]\nenabled = \"yes\"\n");
         assertThatThrownBy(() -> store(Duration.ofSeconds(1)).read()).isInstanceOf(IOException.class);
     }
+
+    @Test void managerEditsKeepTheFieldsTheyDoNotName() throws Exception {
+        PluginStateStore store = store(Duration.ofSeconds(2));
+        store.transact(PluginStateStore.consenting("dev.example.tool", Set.of("terminal.observe")));
+        assertThat(store.read().get("dev.example.tool")).isEqualTo(new PluginStateStore.Entry(true, Set.of("terminal.observe"), false));
+        store.transact(PluginStateStore.enabling("dev.example.tool", false));
+        store.transact(PluginStateStore.removing("dev.example.tool", true));
+        assertThat(store.read().get("dev.example.tool")).isEqualTo(new PluginStateStore.Entry(false, Set.of("terminal.observe"), true));
+        store.transact(PluginStateStore.consenting("dev.example.tool", Set.of("terminal.inject")));
+        assertThat(store.read().get("dev.example.tool")).as("consent enables and cancels a removal")
+            .isEqualTo(new PluginStateStore.Entry(true, Set.of("terminal.inject"), false));
+    }
+
+    @Test void cancellingARemovalNeverLeavesAnEntryThatOnlyLooksReviewed() throws Exception {
+        PluginStateStore store = store(Duration.ofSeconds(2));
+        store.transact(PluginStateStore.removing("dev.example.unreviewed", true));
+        assertThat(store.read()).containsKey("dev.example.unreviewed");
+        store.transact(PluginStateStore.removing("dev.example.unreviewed", false));
+        assertThat(store.read()).as("an entry means reviewed, so a default one is dropped").isEmpty();
+    }
 }

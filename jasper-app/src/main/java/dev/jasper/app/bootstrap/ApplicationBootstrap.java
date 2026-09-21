@@ -48,6 +48,8 @@ public final class ApplicationBootstrap {
             acquired.own((AutoCloseable) () -> removeShutdownHook(shutdown));
             System.setProperty("apple.awt.application.appearance", "system");
             System.setProperty("apple.laf.useScreenMenuBar", "true");
+            // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.
+            JasperApplication.preparePlugins(dirs);
             SwingUtilities.invokeLater(() -> startDesktop(service, options, dirs, log, exceptions, shutdown, endpoint));
             // The posted EDT composition owns service; the process hook owns logging and the endpoint.
             acquired.transfer();

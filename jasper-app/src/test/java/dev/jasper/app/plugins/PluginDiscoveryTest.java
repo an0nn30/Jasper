@@ -58,4 +58,13 @@ class PluginDiscoveryTest {
             .extracting(PluginCandidate::id).isEqualTo("dev.example.dev");
         assertThat(problems).isEmpty();
     }
+
+    @Test void dotDirectoriesBelongToTheApplicationAndAreNotPlugins() throws Exception {
+        PluginJars.build(root.resolve(".pending").resolve("dev.example.tool"), "tool.jar",
+            PluginJars.descriptor("dev.example.tool", "1.0.0", "fix.tool.Main"), Map.of(), List.of());
+        Files.createDirectories(root.resolve(".staging-abc"));
+        List<String> problems = new ArrayList<>();
+        assertThat(PluginDiscovery.scan(root, PluginCandidate.Origin.USER, problems)).isEmpty();
+        assertThat(problems).isEmpty();
+    }
 }

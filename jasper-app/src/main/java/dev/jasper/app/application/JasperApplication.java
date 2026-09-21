@@ -260,6 +260,11 @@ public final class JasperApplication {
         shellHistory.refresh();
     }
 
+    /** Launch housekeeping for plugins: pending removals and installs. Off the EDT, before {@link #startPlugins}. */
+    public static void preparePlugins(AppDirs dirs) {
+        PluginRuntime.maintain(dirs.plugins(), dirs.pluginState(), dirs.pluginLock());
+    }
+
     /**
      * Starts plugins once, before the first window, so their contributions are in place when windows
      * appear. {@code codeSource} locates bundled plugins beside the application jar and may be null;

@@ -81,6 +81,33 @@ final class PluginStateStore {
         } finally { IN_PROCESS.unlock(); }
     }
 
+    /** Enables or disables, keeping consent and a pending removal. */
+    static UnaryOperator<Map<String, Entry>> enabling(String id, boolean enabled) {
+        return state -> {
+            Entry now = state.getOrDefault(id, Entry.DEFAULT);
+            state.put(id, new Entry(enabled, now.consented(), now.remove()));
+            return state;
+        };
+    }
+
+    /** The user reviewed exactly these capabilities: that enables the plugin and cancels a pending removal. */
+    static UnaryOperator<Map<String, Entry>> consenting(String id, Set<String> capabilities) {
+        return state -> { state.put(id, new Entry(true, capabilities, false)); return state; };
+    }
+
+    /**
+     * Marks or unmarks a removal. An entry means the user reviewed the plugin, so unmarking never
+     * leaves a default entry behind: it would let an unreviewed plugin without capabilities load.
+     */
+    static UnaryOperator<Map<String, Entry>> removing(String id, boolean remove) {
+        return state -> {
+            Entry now = state.getOrDefault(id, Entry.DEFAULT);
+            Entry next = new Entry(now.enabled(), now.consented(), remove);
+            if (next.equals(Entry.DEFAULT)) state.remove(id); else state.put(id, next);
+            return state;
+        };
+    }
+
     private static FileLock acquire(FileChannel channel, long deadline) throws IOException {
         while (true) {
             try {
