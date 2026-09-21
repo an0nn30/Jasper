@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Approved for native execution; Tasks 1–6 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Tasks 1–7 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -497,7 +497,7 @@ Retain elapsed-time logging from existing shutdown around the completion block. 
 
 **Interfaces:** `StartupResources.own(T extends AutoCloseable)->T`, `release(AutoCloseable)`, `transfer()`, `close()`, `rollback(Throwable)`; `ApplicationBootstrap.main(String[])`, existing `start(String[],PrintStream,PrintStream,BiConsumer<ConfigService,AppArguments>)->int`, role/handoff helpers unchanged except ownership. `Main.main(String[])` delegates only.
 
-- [ ] Write the rollback test before the owner:
+- [x] Write the rollback test before the owner:
 
 ```java
 @Test void rollbackIsReverseOrderedOnceOnlyAndPreservesOriginalFailure() {
@@ -512,7 +512,7 @@ Retain elapsed-time logging from existing shutdown around the completion block. 
 }
 ```
 
-- [ ] Run the focused test for RED. Add this complete rollback implementation, documenting caller thread ownership:
+- [x] Run the focused test for RED. Add this complete rollback implementation, documenting caller thread ownership:
 
 ```java
 public final class StartupResources implements AutoCloseable {
@@ -546,7 +546,7 @@ public final class StartupResources implements AutoCloseable {
 }
 ```
 
-- [ ] Move the remaining Main implementation into ApplicationBootstrap, preserving start's early argument validation and AF_UNIX handoff before any Swing/toolkit/font operation. Rename `Main.class` synchronization to ApplicationBootstrap.class. The only Main body is:
+- [x] Move the remaining Main implementation into ApplicationBootstrap, preserving start's early argument validation and AF_UNIX handoff before any Swing/toolkit/font operation. Rename `Main.class` synchronization to ApplicationBootstrap.class. The only Main body is:
 
 ```java
 public final class Main {
@@ -558,8 +558,8 @@ public final class Main {
 ```
 
 Until Task 11, qualify ApplicationBootstrap in its current flat package instead. No temporary delegating business methods remain on Main.
-- [ ] Replace cleanup branches with explicit acquisition registration immediately after successful acquisition. AppLog/exception handler/hook have process-lifetime ownership after startup; history/config move to JasperApplication on successful construction; endpoint remains owned by a process-lifetime close callback and the shutdown hook. Register `removeShutdownHook` as a rollback action before transferring successful startup. Use separate startup scopes for pre-EDT setup and EDT composition; never share an unsynchronized mutable ledger across threads. Transfer only after the receiving owner is wired. Preserve asynchronous log cleanup and original startup diagnostics, standalone isolation, background bind failure exit and code-source stale refusal.
-- [ ] Extend startup tests to inject failures at history acquired, application construction, endpoint bound and first window creation boundaries using package-private JDK callback constructor seams on ApplicationBootstrap. Assert reverse cleanup, endpoint can bind again, restored default exception handler, zero created windows for handoff/background failure, and exactly one termination. Keep start tests that inspect configuration and nonzero exit codes. Run full app tests; commit `refactor: isolate bootstrap and startup rollback` with trailer.
+- [x] Replace cleanup branches with explicit acquisition registration immediately after successful acquisition. AppLog/exception handler/hook have process-lifetime ownership after startup; history/config move to JasperApplication on successful construction; endpoint remains owned by a process-lifetime close callback and the shutdown hook. Register `removeShutdownHook` as a rollback action before transferring successful startup. Use separate startup scopes for pre-EDT setup and EDT composition; never share an unsynchronized mutable ledger across threads. Transfer only after the receiving owner is wired. Preserve asynchronous log cleanup and original startup diagnostics, standalone isolation, background bind failure exit and code-source stale refusal.
+- [x] Extend startup tests to inject failures at history acquired, application construction, endpoint bound and first window creation boundaries using package-private JDK callback constructor seams on ApplicationBootstrap. Assert reverse cleanup, endpoint can bind again, restored default exception handler, zero created windows for handoff/background failure, and exactly one termination. Keep start tests that inspect configuration and nonzero exit codes. Run full app tests; commit `refactor: isolate bootstrap and startup rollback` with trailer.
 
 ## Task 8: Establish Buddy values and remove application dependencies
 

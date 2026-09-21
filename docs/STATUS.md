@@ -1,16 +1,17 @@
 # Jasper — Status and Handoff
 
-**Application/Buddy architecture (2026-09-20):** The user approved the
-[written specification](superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md).
-The [implementation plan](superpowers/plans/2026-09-20-jasper-app-buddy-refactor.md)
-is drafted and self-reviewed on `codex/app-architecture-design`, based on merged
-main `c7b796b`. It has 12 runnable checkpoints covering concrete app owners,
-package boundaries, Buddy extraction, regression checks and onboarding. Native
-execution remains the selected method. Native implementation is approved and underway. Baseline checks passed: 1,083 tests,
-zero failures/errors, two expected skips. Tasks 1–6 are committed: launch admission and bounded shutdown, palette controller/generation protection, workspace action/configuration owners and typed activity plus independent settings/subscriptions/builders, theme value subscriptions, and platform/window ownership separation. Initial settings still apply before window packing; configuration registration now belongs to the application. Two explicit dependency details
-are recorded for review: platform title-bar callbacks and Buddy dark-mode input.
-The terminal refactor is merged into the main checkout; older execution notes
-below record its pre-integration handoff.
+**Application/Buddy refactor (2026-09-20):** Approved for native execution on
+`codex/app-architecture-design`, based on merged main `c7b796b`.
+[Spec](superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md) and
+[plan](superpowers/plans/2026-09-20-jasper-app-buddy-refactor.md) are the authorities.
+Tasks 1–7 are committed: settings/builders/subscriptions, theme and platform
+boundaries, workspace owners/activity, palette controller with stale-result guards,
+launch/shutdown coordination, and startup rollback. Latest full app suite:
+746 tests, zero failures/errors, one expected skip. Next: Buddy values/module,
+presentation facade, app integration, final packages/checks and onboarding.
+Execution rulings and exact checks are in the
+[verification report](app-refactor-verification.md). No GUI, merge or push.
+The terminal refactor is merged; older notes below describe its earlier handoff.
 
 **Terminal architecture refactor (2026-09-20):** Implemented independently on
 `codex/terminal-refactor-native` in the isolated `terminal-refactor-4830` worktree.

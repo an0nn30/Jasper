@@ -144,7 +144,7 @@ class JasperApplicationResidencyTest {
         java.util.concurrent.atomic.AtomicInteger terminations = new java.util.concurrent.atomic.AtomicInteger();
         JasperApplication application = application(terminations::incrementAndGet);
         edt(() -> application.residency(true));
-        var handler = Main.handoffHandler(application, Path.of("/old.jar"), 1L, DesktopTestSupport.HOME);
+        var handler = ApplicationBootstrap.handoffHandler(application, Path.of("/old.jar"), 1L, DesktopTestSupport.HOME);
         assertThat(handler.apply(new LaunchRequest("t", Path.of("/new.jar"), 2L)))
             .isEqualTo(LaunchRequest.Response.STALE);
         edt(() -> { });
@@ -158,7 +158,7 @@ class JasperApplicationResidencyTest {
         JasperApplication application = application(() -> { });
         edt(() -> application.residency(true));
         edt(application::quit);   // So the queued openOrRaise is inert and no window is created.
-        var handler = Main.handoffHandler(application, Path.of("/same.jar"), 7L, DesktopTestSupport.HOME);
+        var handler = ApplicationBootstrap.handoffHandler(application, Path.of("/same.jar"), 7L, DesktopTestSupport.HOME);
         assertThat(handler.apply(new LaunchRequest("t", Path.of("/same.jar"), 7L)))
             .isEqualTo(LaunchRequest.Response.OK);
         edt(() -> { });

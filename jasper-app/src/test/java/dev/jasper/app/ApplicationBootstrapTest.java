@@ -8,15 +8,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
-class MainConfigurationTest {
+class ApplicationBootstrapTest {
     @TempDir Path directory;
     @Test void helpAndErrorsExitBeforeConfigurationOrDesktopStartup() {
         var out = new ByteArrayOutputStream(); var error = new ByteArrayOutputStream();
         var stdout = new PrintStream(out); var stderr = new PrintStream(error);
-        assertThat(Main.start(new String[]{"--help"}, stdout, stderr,
+        assertThat(ApplicationBootstrap.start(new String[]{"--help"}, stdout, stderr,
             (service, options) -> { throw new AssertionError("Unexpected startup"); })).isZero();
         assertThat(out.toString()).contains("--config", "--help");
-        assertThat(Main.start(new String[]{"--config"}, stdout, stderr,
+        assertThat(ApplicationBootstrap.start(new String[]{"--config"}, stdout, stderr,
             (service, options) -> { throw new AssertionError("Unexpected startup"); })).isEqualTo(2);
         assertThat(error.toString()).contains("requires a file path");
     }
@@ -25,7 +25,7 @@ class MainConfigurationTest {
         Files.writeString(config, "[window]\ntab_height=47\n");
         var received = new AtomicReference<ConfigService>();
         try {
-            int result = Main.start(new String[]{"--config", config.toString()}, System.out, System.err, (service, options) -> {
+            int result = ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err, (service, options) -> {
                 assertThat(SwingUtilities.isEventDispatchThread()).isFalse(); received.set(service);
             });
             assertThat(result).isZero();
@@ -40,7 +40,7 @@ class MainConfigurationTest {
         Files.writeString(config, "ui.theme.variant='light'");
         var received = new AtomicReference<ConfigService>();
         try {
-            assertThat(Main.start(new String[]{"--config", config.toString()}, System.out, System.err,
+            assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err,
                 (service, options) -> received.set(service))).isZero();
             assertThat(received.get().initialState().snapshot().variant()).isEqualTo(Appearance.LIGHT);
         } finally {
@@ -55,40 +55,40 @@ class MainConfigurationTest {
             assertThat(endpoint).isNotNull();
             // The control: with this endpoint listening, an ordinary launch does hand off. That is
             // what makes the two refusals below attributable to the guard rather than to silence.
-            assertThat(Main.handsOff(new AppArguments(null, false, false), dirs)).isTrue();
+            assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false), dirs)).isTrue();
             // A different configuration file is a different Jasper; the resident one holds another.
-            assertThat(Main.handsOff(new AppArguments(dir.resolve("other.toml"), false, false), dirs)).isFalse();
+            assertThat(ApplicationBootstrap.handsOff(new AppArguments(dir.resolve("other.toml"), false, false), dirs)).isFalse();
             // And a resident process never hands off to itself.
-            assertThat(Main.handsOff(new AppArguments(null, false, true), dirs)).isFalse();
+            assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, true), dirs)).isFalse();
         }
     }
 
     @Test void withNothingListeningThereIsNothingToHandOffTo(@TempDir Path dir) {
         AppDirs dirs = new AppDirs(dir, dir.resolve("config.toml"), dir.resolve("logs"));
-        assertThat(Main.handsOff(new AppArguments(null, false, false), dirs)).isFalse();
+        assertThat(ApplicationBootstrap.handsOff(new AppArguments(null, false, false), dirs)).isFalse();
     }
 
     @Test void residentRoleIsOnlyTrueWithTheSettingOnAndNoConfigOverride() {
-        assertThat(Main.residentRole(new AppArguments(null, false, false), true)).isTrue();
-        assertThat(Main.residentRole(new AppArguments(null, false, false), false)).isFalse();
+        assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false), true)).isTrue();
+        assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false), false)).isFalse();
         // A --config launch is standalone: it never claims the shared endpoint, setting or not.
-        assertThat(Main.residentRole(new AppArguments(Path.of("other.toml"), false, false), true)).isFalse();
-        assertThat(Main.residentRole(new AppArguments(Path.of("other.toml"), false, false), false)).isFalse();
+        assertThat(ApplicationBootstrap.residentRole(new AppArguments(Path.of("other.toml"), false, false), true)).isFalse();
+        assertThat(ApplicationBootstrap.residentRole(new AppArguments(Path.of("other.toml"), false, false), false)).isFalse();
     }
 
     @Test void staleFlagsADifferentPathOrModificationTimeButNotAMatchingUnresolvedSource() {
         Path source = Path.of("/app.jar");
-        assertThat(Main.stale(new LaunchRequest("t", source, 100L), source, 100L)).isFalse();
-        assertThat(Main.stale(new LaunchRequest("t", Path.of("/other.jar"), 100L), source, 100L)).isTrue();
-        assertThat(Main.stale(new LaunchRequest("t", source, 999L), source, 100L)).isTrue();
+        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", source, 100L), source, 100L)).isFalse();
+        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", Path.of("/other.jar"), 100L), source, 100L)).isTrue();
+        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", source, 999L), source, 100L)).isTrue();
         // An unresolvable code source normalises to the same empty path on both sides.
-        assertThat(Main.stale(new LaunchRequest("t", Path.of(""), 0L), null, 0L)).isFalse();
+        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", Path.of(""), 0L), null, 0L)).isFalse();
     }
 
     @Test void loginItemReconcilerDedupesAndRunsOffTheCallingThread() throws Exception {
         var applied = new java.util.concurrent.LinkedBlockingQueue<Boolean>();
         var threadNames = new java.util.concurrent.LinkedBlockingQueue<String>();
-        var reconciler = Main.loginItemReconciler(enabled -> {
+        var reconciler = ApplicationBootstrap.loginItemReconciler(enabled -> {
             threadNames.add(Thread.currentThread().getName());
             applied.add(enabled);
         });
@@ -111,12 +111,21 @@ class MainConfigurationTest {
     @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.MAC)
     @Test void reconcilingTheLoginItemWritesAndRemovesIt(@TempDir Path fakeHome) {
         Path plist = fakeHome.resolve("Library/LaunchAgents/dev.jasper.background.plist");
-        Main.reconcileLoginItem(true, "/Applications/Jasper.app/Contents/MacOS/Jasper", fakeHome);
+        ApplicationBootstrap.reconcileLoginItem(true, "/Applications/Jasper.app/Contents/MacOS/Jasper", fakeHome);
         assertThat(plist).exists();
-        Main.reconcileLoginItem(false, "/Applications/Jasper.app/Contents/MacOS/Jasper", fakeHome);
+        ApplicationBootstrap.reconcileLoginItem(false, "/Applications/Jasper.app/Contents/MacOS/Jasper", fakeHome);
         assertThat(plist).doesNotExist();
         // A development run has no installed path, so nothing is ever written.
-        Main.reconcileLoginItem(true, null, fakeHome);
+        ApplicationBootstrap.reconcileLoginItem(true, null, fakeHome);
         assertThat(plist).doesNotExist();
+    }
+    @Test void failedDesktopDispatchClosesConfigurationAndPreservesError() {
+        var received = new AtomicReference<ConfigService>();
+        var original = new AssertionError("desktop dispatch");
+        try {
+            assertThatThrownBy(() -> ApplicationBootstrap.start(new String[]{"--config", directory.resolve("config.toml").toString()},
+                System.out, System.err, (service, options) -> { received.set(service); throw original; })).isSameAs(original);
+            assertThat(received.get().reload()).isCompletedExceptionally();
+        } finally { if (received.get() != null) received.get().close(); }
     }
 }

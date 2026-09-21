@@ -116,7 +116,7 @@ class AppLogTest {
         Thread.setDefaultUncaughtExceptionHandler(prior);
         try {
             try (var log = AppLog.install(sink, 8, 500);
-                 var exceptions = Main.installUnexpectedExceptionHandler()) {
+                 var exceptions = ApplicationBootstrap.installUnexpectedExceptionHandler()) {
                 assertThat(log.enabled()).isTrue();
                 assertThat(exceptions).isNotNull();
                 assertThat(Thread.getDefaultUncaughtExceptionHandler()).isNotSameAs(prior);
@@ -146,7 +146,7 @@ class AppLogTest {
         var cleanupDone = new CountDownLatch(1);
 
         assertTimeout(Duration.ofMillis(300), () -> SwingUtilities.invokeAndWait(() ->
-            Main.closeLogAfterStartupFailure(log, () -> {
+            ApplicationBootstrap.closeLogAfterStartupFailure(log, () -> {
                 cleanupThread.set(Thread.currentThread());
                 cleanupDone.countDown();
             })));
@@ -210,7 +210,7 @@ class AppLogTest {
             assertThat(namespace.getUseParentHandlers()).isFalse();
             System.getLogger("dev.jasper.app.Test").log(System.Logger.Level.ERROR,
                 "Failed-open diagnostic {0}", "SECRET_FAILED_PARAMETER");
-            try (var exceptions = Main.installUnexpectedExceptionHandler()) {
+            try (var exceptions = ApplicationBootstrap.installUnexpectedExceptionHandler()) {
                 assertThat(exceptions).isNotNull();
                 Thread failure = Thread.ofPlatform().unstarted(() -> {
                     throw new IllegalStateException("SECRET_FAILED_UNCAUGHT");

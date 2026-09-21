@@ -36,6 +36,9 @@ final class JasperApplication {
     private java.util.function.Consumer<Boolean> loginItems = enabled -> { };
     private boolean shutdownQueued;
     private boolean stopped;
+    private final java.util.List<Runnable> shutdownActions = new java.util.ArrayList<>();
+    private java.awt.desktop.AppReopenedListener reopenListener;
+    private boolean quitHandlerInstalled;
     private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
     private final ApplicationShutdown shutdown;
@@ -116,16 +119,18 @@ final class JasperApplication {
             if (snippets != null) snippets.reload();
             loginItems.accept(snapshot.backgroundEnabled());
         });
-        if (supports(Desktop.Action.APP_QUIT_HANDLER)) Desktop.getDesktop().setQuitHandler((event, response) -> {
-            // Cancel the native immediate JVM exit; pane close owns bounded child cleanup.
-            response.cancelQuit(); SwingUtilities.invokeLater(this::quit);
-        });
+        if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
+            Desktop.getDesktop().setQuitHandler((event, response) -> {
+                response.cancelQuit(); SwingUtilities.invokeLater(this::quit);
+            });
+            quitHandlerInstalled = true;
+        }
         // Clicking the Dock icon of a running Jasper creates no process: AppKit sends this instead.
         // Registered whether or not residency is on, because a window that is merely minimized
         // should come back the same way.
         if (supports(Desktop.Action.APP_EVENT_REOPENED)) {
-            Desktop.getDesktop().addAppEventListener((java.awt.desktop.AppReopenedListener) event ->
-                SwingUtilities.invokeLater(() -> openOrRaise(Path.of(System.getProperty("user.home")))));
+            reopenListener = event -> SwingUtilities.invokeLater(() -> openOrRaise(Path.of(System.getProperty("user.home"))));
+            Desktop.getDesktop().addAppEventListener(reopenListener);
         }
     }
 
@@ -346,6 +351,12 @@ final class JasperApplication {
         for (TerminalWindow window : List.copyOf(windows)) window.content().updateActions();
     }
 
+    /** Registers process integration cleanup transferred by bootstrap; invoked on the EDT at shutdown. */
+    void onShutdown(Runnable action) {
+        if (stopped) action.run();
+        else shutdownActions.add(java.util.Objects.requireNonNull(action));
+    }
+
     void quit() {
         quitting = true;
         for (TerminalWindow window : List.copyOf(windows)) window.close();
@@ -371,7 +382,10 @@ final class JasperApplication {
         shellHistory.close();
         if (snippets != null) snippets.close();
         if (configuration != null) configuration.close();
-        if (supports(Desktop.Action.APP_QUIT_HANDLER)) Desktop.getDesktop().setQuitHandler(null);
+        if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
+        if (reopenListener != null) { Desktop.getDesktop().removeAppEventListener(reopenListener); reopenListener = null; }
+        for (Runnable action : java.util.List.copyOf(shutdownActions)) action.run();
+        shutdownActions.clear();
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
         List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());
         pending.add(history.closedFuture());

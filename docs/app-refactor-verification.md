@@ -34,6 +34,10 @@ Task 5: Ruling: PaletteController creates its card and accepts explicit action-r
 
 Task 6: Ruling: Preserve the established pane-owned close sequence: coordinator.close stops admission but does not force-close already admitted sessions. The plan’s forced-close instruction broke terminationWaitsForAClosedShellToExit; the spec preserves existing shutdown behavior. Late arrivals still close immediately. Cost if wrong: unattached previously admitted sessions wait until bounded JVM termination, as before. The app has no accessible fake connector fixture; tests use an isolated child JVM through the supported terminal API, not a shell or GUI. exitFuture returns copies, so assertions follow completion rather than future identity.
 
+7. Bootstrap/rollback tests and Error cleanup regression passed after RED. Full app suite: 746 tests, one expected skip. Main is a thin delegate; acquisition scopes preserve original failures and release endpoint ownership.
+
+Task 7: Ruling: Use an EDT compose transaction with explicit creation/bind/presentation functions instead of unspecified constructor injection. It is the actual production path and exposes no test-only hook. Bootstrap transfers endpoint cleanup to application shutdown and a process hook; application now removes its stored Dock reopen listener. Cost if wrong: startup ordering or endpoint availability; real bind/rebind and failure-before-presentation tests cover the transaction.
+
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.
