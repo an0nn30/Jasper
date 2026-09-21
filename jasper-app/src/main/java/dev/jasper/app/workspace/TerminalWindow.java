@@ -107,6 +107,8 @@ public final class TerminalWindow implements AutoCloseable {
     public WindowContent content() { return content; }
     public boolean closed() { return closed; }
     public Dimension size() { return frame.getSize(); }
+    /** The native window, for parenting application-built dialogs; never exposed to extensions. */
+    public java.awt.Window nativeWindow() { return frame; }
     public void resize(Dimension size) { frame.setSize(size); }
 
     public void show() { frame.setVisible(true); reportState(); if (content.currentTab() != null) content.currentTab().focusTerminal(); }
