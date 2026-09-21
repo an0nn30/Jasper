@@ -3,7 +3,7 @@ package dev.jasper.sdk.terminal;
 import java.util.UUID;
 
 /** One application window. Implemented by the application; holds no Swing object. */
-public interface WindowHandle {
+public interface WindowHandle extends dev.jasper.sdk.WindowOwner {
     /**
      * The window's identity for as long as it is open.
      *
