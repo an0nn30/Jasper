@@ -16,7 +16,7 @@ import java.util.function.Supplier;
 public record PaneEntry(UUID id, UUID tabId, Supplier<PaneSnapshot> snapshot,
                         Supplier<CompletableFuture<Optional<String>>> foregroundJob, Consumer<byte[]> write, Consumer<String> paste,
                         Supplier<Optional<String>> selection, Runnable focus,
-                        BiFunction<SplitAxis, Optional<Path>, Optional<PaneEntry>> split) {
+                        BiFunction<SplitAxis, OpenSpec, Optional<PaneEntry>> split) {
     /** Entries are recreated on every query; a pane is its id. */
     @Override public boolean equals(Object other) { return other instanceof PaneEntry entry && entry.id.equals(id); }
     @Override public int hashCode() { return id.hashCode(); }

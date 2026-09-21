@@ -24,6 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import dev.jasper.app.terminals.OpenSpec;
 
 /**
  * One plugin's view of the terminal registry. Handles hold ids and the last values they saw, never an entry:
@@ -56,7 +57,8 @@ final class HostedTerminals implements Terminals {
             case STARTING -> SessionState.CONNECTING; case RUNNING -> SessionState.RUNNING; case EXITED -> SessionState.EXITED;
         };
         return new PaneInfo(snapshot.title(), snapshot.workingDirectory(), Optional.empty(), snapshot.columns(), snapshot.rows(),
-            snapshot.shellIntegration(), SessionKind.LOCAL, Optional.empty(), state, snapshot.exitStatus());
+            snapshot.shellIntegration(), snapshot.providerId().isPresent() ? SessionKind.PLUGIN : SessionKind.LOCAL, snapshot.providerId(), state,
+            snapshot.exitStatus());
     }
 
     private final class Window implements WindowHandle {
@@ -195,7 +197,7 @@ final class HostedTerminals implements Terminals {
         Optional<WindowEntry> target = registry.window(window.id());
         if (target.isEmpty()) return Optional.empty();
         gate.audit(Capabilities.TERMINAL_OPEN, "opened a tab in window " + window.id());
-        return target.get().openTab().apply(local.spec().workingDirectory()).map(Pane::new);
+        return target.get().openTab().apply(new OpenSpec.Local(local.spec().workingDirectory())).map(Pane::new);
     }
 
     @Override public Optional<PaneHandle> split(PaneHandle target, Direction direction, OpenRequest request) {
@@ -206,7 +208,7 @@ final class HostedTerminals implements Terminals {
         Optional<PaneEntry> entry = registry.pane(target.id());
         if (entry.isEmpty()) return Optional.empty();
         gate.audit(Capabilities.TERMINAL_OPEN, "split pane " + target.id());
-        return entry.get().split().apply(direction == Direction.RIGHT ? SplitAxis.RIGHT : SplitAxis.DOWN, local.spec().workingDirectory())
+        return entry.get().split().apply(direction == Direction.RIGHT ? SplitAxis.RIGHT : SplitAxis.DOWN, new OpenSpec.Local(local.spec().workingDirectory()))
             .map(Pane::new);
     }
 

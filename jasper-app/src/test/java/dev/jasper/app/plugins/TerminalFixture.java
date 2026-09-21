@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import dev.jasper.app.terminals.OpenSpec;
 
 /** A scripted workspace behind a real {@link TerminalRegistry}: what windows do, without windows. EDT only. */
 final class TerminalFixture {
@@ -35,11 +36,12 @@ final class TerminalFixture {
 
     private PaneEntry entry(Pane pane) {
         return new PaneEntry(pane.id, pane.tab.id,
-            () -> new PaneSnapshot(pane.title, Optional.ofNullable(pane.directory), 80, 24, true, PaneSnapshot.State.RUNNING, OptionalInt.empty()),
+            () -> new PaneSnapshot(pane.title, Optional.ofNullable(pane.directory), 80, 24, true, PaneSnapshot.State.RUNNING, OptionalInt.empty(), Optional.empty()),
             () -> CompletableFuture.completedFuture(Optional.of("vim")),
             bytes -> pane.sent.add("write:" + new String(bytes, StandardCharsets.UTF_8)), text -> pane.sent.add("paste:" + text),
             () -> Optional.ofNullable(pane.selection), () -> focusPane(pane.id),
-            (axis, directory) -> {
+            (axis, spec) -> {
+                Optional<Path> directory = spec instanceof OpenSpec.Local local ? local.directory() : Optional.<Path>empty();
                 opened.add("split|" + pane.id + "|" + axis + "|" + directory.map(Path::toString).orElse("-"));
                 UUID created = addPane(pane.tab.id, "split", directory.orElse(pane.directory));
                 focusPane(created);
@@ -57,7 +59,8 @@ final class TerminalFixture {
         windows.put(window.id, window);
         window.registration = registry.addWindow(new WindowEntry(window.id, () -> window.tabs.stream().map(this::entry).toList(),
             () -> Optional.ofNullable(window.selected).map(this::entry), () -> registry.activeWindow().map(WindowEntry::id).equals(Optional.of(window.id)),
-            () -> opened.add("front|" + window.id), directory -> {
+            () -> opened.add("front|" + window.id), spec -> {
+                Optional<Path> directory = spec instanceof OpenSpec.Local local ? local.directory() : Optional.<Path>empty();
                 opened.add("tab|" + window.id + "|" + directory.map(Path::toString).orElse("-"));
                 UUID tab = addTab(window.id, "opened");
                 return Optional.of(entry(panes.get(addPane(tab, "opened", directory.orElse(null)))));

@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import dev.jasper.app.terminals.OpenSpec;
 
 /**
  * One window's presence in the terminal registry: entries that read this window's tabs and panes on demand,
@@ -45,13 +46,15 @@ final class WindowTerminals implements AutoCloseable {
     PaneEntry entry(TerminalTab tab, TerminalPane pane) {
         return new PaneEntry(pane.id(), tab.id(), pane::snapshot, pane::queryForegroundJob, pane::write, pane::paste, pane::selectedText,
             () -> { owner.selectTab(tab); tab.focus(pane); pane.focusTerminal(); },
-            (axis, directory) -> Optional.ofNullable(tab.split(pane, axis == SplitAxis.RIGHT ? SplitTree.Axis.RIGHT : SplitTree.Axis.DOWN,
-                directory.orElse(null))).map(created -> entry(tab, created)));
+            (axis, spec) -> spec instanceof OpenSpec.Local local
+                ? Optional.ofNullable(tab.split(pane, axis == SplitAxis.RIGHT ? SplitTree.Axis.RIGHT : SplitTree.Axis.DOWN,
+                    local.directory().orElse(null))).map(created -> entry(tab, created))
+                : Optional.empty());
     }
 
-    private Optional<PaneEntry> openTab(Optional<Path> directory) {
-        if (closed) return Optional.empty();
-        TerminalTab tab = owner.openTab(directory.orElseGet(owner::directory));
+    private Optional<PaneEntry> openTab(OpenSpec spec) {
+        if (closed || !(spec instanceof OpenSpec.Local local)) return Optional.empty();
+        TerminalTab tab = owner.openTab(local.directory().orElseGet(owner::directory));
         return tab == null || tab.focusedPane() == null ? Optional.empty() : Optional.of(entry(tab, tab.focusedPane()));
     }
 

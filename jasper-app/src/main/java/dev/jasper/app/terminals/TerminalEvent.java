@@ -24,6 +24,8 @@ public sealed interface TerminalEvent {
     record CommandStarted(UUID paneId, String command) implements TerminalEvent { }
     record CommandFinished(UUID paneId, String command, OptionalInt exitStatus, Duration duration,
                            Optional<Path> directory) implements TerminalEvent { }
+    /** A provided session started connecting, first or again. */
+    record SessionConnecting(UUID paneId) implements TerminalEvent { }
     record SessionStarted(UUID paneId) implements TerminalEvent { }
     record SessionExited(UUID paneId, OptionalInt exitStatus) implements TerminalEvent { }
     record Bell(UUID tabId, UUID paneId) implements TerminalEvent { }

@@ -247,12 +247,12 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     /** What this pane is right now, for the terminal registry. */
     PaneSnapshot snapshot() {
         if (session == null)
-            return new PaneSnapshot(title(), Optional.of(launchDirectory), 0, 0, false, PaneSnapshot.State.STARTING, OptionalInt.empty());
+            return new PaneSnapshot(title(), Optional.of(launchDirectory), 0, 0, false, PaneSnapshot.State.STARTING, OptionalInt.empty(), Optional.empty());
         CompletableFuture<Integer> exit = session.exitFuture();
         boolean exited = exit.isDone();
         Integer code = exited && !exit.isCompletedExceptionally() ? exit.getNow(null) : null;
         return new PaneSnapshot(title(), session.workingDirectory(), session.columns(), session.rows(), session.shellIntegrationDetected(),
-            exited ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING, code == null ? OptionalInt.empty() : OptionalInt.of(code));
+            exited ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING, code == null ? OptionalInt.empty() : OptionalInt.of(code), Optional.empty());
     }
 
     /** The foreground job, asked off the EDT like the pane's own poll; empty when nothing runs here. */

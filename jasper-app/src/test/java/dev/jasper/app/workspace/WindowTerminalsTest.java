@@ -19,6 +19,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
+import dev.jasper.app.terminals.OpenSpec;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -70,7 +71,7 @@ class WindowTerminalsTest {
             pane.paste().accept("ignored");
             assertThat(pane.selection().get()).isEmpty();
             assertThat(pane.foregroundJob().get()).isCompletedWithValue(Optional.empty());
-            assertThat(pane.split().apply(SplitAxis.RIGHT, Optional.empty())).as("nothing runs there yet").isEmpty();
+            assertThat(pane.split().apply(SplitAxis.RIGHT, new OpenSpec.Local(Optional.empty()))).as("nothing runs there yet").isEmpty();
             registry.windowActivated(window.id());
             assertThat(registry.activePane()).contains(pane);
             window.toFront().run();
@@ -89,14 +90,14 @@ class WindowTerminalsTest {
             assertThat(first.snapshot().get().columns()).isPositive();
         });
 
-        Optional<PaneEntry> split = onEdt(() -> first.split().apply(SplitAxis.DOWN, Optional.empty()));
+        Optional<PaneEntry> split = onEdt(() -> first.split().apply(SplitAxis.DOWN, new OpenSpec.Local(Optional.empty())));
         assertThat(split).isPresent();
         edt(() -> {
             assertThat(events).contains(new TerminalEvent.PaneOpened(first.tabId(), split.get().id()));
             assertThat(registry.tab(first.tabId()).orElseThrow().panes().get()).containsExactly(first, split.get());
         });
 
-        Optional<PaneEntry> opened = onEdt(() -> registry.window(windowId).orElseThrow().openTab().apply(Optional.of(HOME)));
+        Optional<PaneEntry> opened = onEdt(() -> registry.window(windowId).orElseThrow().openTab().apply(new OpenSpec.Local(Optional.of(HOME))));
         assertThat(opened).isPresent();
         UUID secondTab = opened.get().tabId();
         edt(() -> {

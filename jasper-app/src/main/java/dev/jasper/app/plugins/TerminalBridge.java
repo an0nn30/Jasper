@@ -34,6 +34,8 @@ final class TerminalBridge {
                 case TerminalEvent.CommandStarted fact -> bus.publish(EventBus.APP, TerminalEvents.COMMAND_STARTED, new TerminalEvents.CommandStarted(fact.paneId(), fact.command()));
                 case TerminalEvent.CommandFinished fact -> bus.publish(EventBus.APP, TerminalEvents.COMMAND_FINISHED,
                     new TerminalEvents.CommandFinished(fact.paneId(), fact.command(), fact.exitStatus(), fact.duration(), fact.directory(), Optional.empty()));
+                case TerminalEvent.SessionConnecting fact -> bus.publish(EventBus.APP, TerminalEvents.SESSION_STATE_CHANGED,
+                    new TerminalEvents.SessionStateChanged(fact.paneId(), SessionState.CONNECTING, OptionalInt.empty()));
                 case TerminalEvent.SessionStarted fact -> bus.publish(EventBus.APP, TerminalEvents.SESSION_STATE_CHANGED,
                     new TerminalEvents.SessionStateChanged(fact.paneId(), SessionState.RUNNING, OptionalInt.empty()));
                 case TerminalEvent.SessionExited fact -> bus.publish(EventBus.APP, TerminalEvents.SESSION_STATE_CHANGED,
