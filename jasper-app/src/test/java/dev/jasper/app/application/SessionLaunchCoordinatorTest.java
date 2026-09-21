@@ -57,4 +57,35 @@ class SessionLaunchCoordinatorTest {
             assertThatThrownBy(() -> coordinator.execute(() -> {})).isInstanceOf(RejectedExecutionException.class);
         } finally { coordinator.close(); }
     }
+    @Test void shutdownWaitIncludesAcceptedLaunchAndLateChildExit() throws Exception {
+        var executor = Executors.newSingleThreadExecutor();
+        var coordinator = new SessionLaunchCoordinator(executor);
+        var acquired = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var terminated = new CountDownLatch(1);
+        var session = new AtomicReference<TerminalSession>();
+        var shutdown = new ApplicationShutdown(terminated::countDown);
+        try {
+            coordinator.execute(() -> {
+                try {
+                    session.set(ControlledSessionChild.start()); acquired.countDown();
+                    if (!release.await(5, TimeUnit.SECONDS)) throw new AssertionError("Launch not released");
+                    coordinator.track(session.get());
+                } catch (Exception failure) { throw new CompletionException(failure); }
+            });
+            assertThat(acquired.await(5, TimeUnit.SECONDS)).isTrue();
+            DesktopTestSupport.edt(() -> { coordinator.close(); shutdown.await(coordinator.pendingExits()); });
+            assertThat(terminated.await(200, TimeUnit.MILLISECONDS)).as("accepted factory still owns a child").isFalse();
+            release.countDown();
+            assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(session.get().exitFuture()).isDone();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(coordinator.pendingExits()).isEmpty();
+        } finally {
+            release.countDown(); coordinator.close();
+            if (session.get() != null) session.get().close();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+        }
+    }
+
 }

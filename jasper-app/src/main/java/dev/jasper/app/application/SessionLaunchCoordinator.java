@@ -16,6 +16,8 @@ final class SessionLaunchCoordinator implements Executor, AutoCloseable {
     private final Object lock = new Object();
     private final ExecutorService executor;
     private final Set<TerminalSession> sessions = new LinkedHashSet<>();
+    private final CompletableFuture<Void> drained = new CompletableFuture<>();
+    private int inFlight;
     private boolean closed;
 
     SessionLaunchCoordinator(ExecutorService executor) { this.executor = Objects.requireNonNull(executor); }
@@ -23,7 +25,16 @@ final class SessionLaunchCoordinator implements Executor, AutoCloseable {
     @Override public void execute(Runnable launch) {
         synchronized (lock) {
             if (closed) throw new RejectedExecutionException("Application launch owner is closed");
-            executor.execute(launch);
+            Objects.requireNonNull(launch);
+            inFlight++;
+            try {
+                executor.execute(() -> {
+                    try { launch.run(); }
+                    finally { synchronized (lock) { inFlight--; completeDrain(); } }
+                });
+            } catch (RuntimeException | Error failure) {
+                inFlight--; completeDrain(); throw failure;
+            }
         }
     }
 
@@ -31,25 +42,29 @@ final class SessionLaunchCoordinator implements Executor, AutoCloseable {
     TerminalSession track(TerminalSession session) {
         Objects.requireNonNull(session);
         synchronized (lock) {
-            if (!closed) {
-                sessions.add(session);
-                session.exitFuture().whenComplete((code, failure) -> {
-                    synchronized (lock) { sessions.remove(session); }
-                });
-                return session;
-            }
+            sessions.add(session);
+            session.exitFuture().whenComplete((code, failure) -> {
+                synchronized (lock) { sessions.remove(session); completeDrain(); }
+            });
+            if (!closed) return session;
         }
         session.close();
         return session;
     }
 
-    /** Snapshot of unfinished exits, suitable for the application's bounded shutdown wait. */
+    /** Snapshot of exits plus accepted launches and their late-child cleanup during shutdown. */
     List<CompletableFuture<?>> pendingExits() {
         synchronized (lock) {
             var pending = new ArrayList<CompletableFuture<?>>();
             for (var session : sessions) if (!session.exitFuture().isDone()) pending.add(session.exitFuture());
+            if (closed && !drained.isDone()) pending.add(drained.copy());
             return List.copyOf(pending);
         }
+    }
+
+    /** Called under lock: no accepted factory or tracked child can outlive this completion. */
+    private void completeDrain() {
+        if (closed && inFlight == 0 && sessions.isEmpty()) drained.complete(null);
     }
 
     /** Stops admission; accepted sessions remain owned by their panes until those panes close. */
@@ -58,6 +73,7 @@ final class SessionLaunchCoordinator implements Executor, AutoCloseable {
             if (closed) return;
             closed = true;
             executor.shutdown();
+            completeDrain();
         }
     }
 }

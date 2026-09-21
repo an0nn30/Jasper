@@ -311,9 +311,12 @@ public final class JasperApplication {
         for (TerminalWindow window : List.copyOf(windows)) window.content().updateActions();
     }
 
-    /** Registers process integration cleanup transferred by bootstrap; invoked on the EDT at shutdown. */
+    /**
+     * Registers process cleanup before quit. Each action runs on a daemon worker and participates
+     * in the bounded exit wait; callbacks must not access Swing. Registration is EDT-owned.
+     */
     public void onShutdown(Runnable action) {
-        if (stopped) action.run();
+        if (stopped) processCleanup(java.util.Objects.requireNonNull(action));
         else shutdownActions.add(java.util.Objects.requireNonNull(action));
     }
 
@@ -345,12 +348,18 @@ public final class JasperApplication {
         if (configuration != null) configuration.close();
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
         if (reopenListener != null) { Desktop.getDesktop().removeAppEventListener(reopenListener); reopenListener = null; }
-        for (Runnable action : java.util.List.copyOf(shutdownActions)) action.run();
+        // Cross-process locks and socket probes must not hold up Swing or the exit deadline.
+        List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());
+        for (Runnable action : java.util.List.copyOf(shutdownActions)) pending.add(processCleanup(action));
         shutdownActions.clear();
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
-        List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());
         pending.add(history.closedFuture());
         shutdown.await(pending);
+    }
+
+    private static CompletableFuture<Void> processCleanup(Runnable action) {
+        return CompletableFuture.runAsync(action, work ->
+            Thread.ofPlatform().name("jasper-process-cleanup").daemon().start(work));
     }
 
     private static boolean supports(Desktop.Action action) {

@@ -64,4 +64,38 @@ class ApplicationBootstrapRollbackTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(history.closedFuture()).isCompleted();
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void contendedEndpointCannotBlockEdtOrBoundedTermination(boolean presentationFails) throws Exception {
+        var service = new ConfigService(dir.resolve("config.toml"), true);
+        var history = new CommandHistory();
+        var terminated = new CountDownLatch(1);
+        var marker = new CountDownLatch(1);
+        var endpoint = HandoffSocket.bind(dir.resolve("socket"), dir.resolve("token"), dir.resolve("lock"),
+            request -> LaunchRequest.Response.OK);
+        assertThat(endpoint).isNotNull();
+        var original = new IllegalStateException("presentation");
+        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        try (var child = new dev.jasper.app.testsupport.EndpointLockChild(dir.resolve("lock"))) {
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                try {
+                    var application = ApplicationBootstrap.compose(service, () -> history,
+                        owned -> new JasperApplication(service, null, owned, null, terminated::countDown),
+                        app -> endpoint, app -> { if (presentationFails) throw original; });
+                    application.quit();
+                } catch (Throwable caught) { failure.set(caught); }
+                finally { javax.swing.SwingUtilities.invokeLater(marker::countDown); }
+            });
+            assertThat(marker.await(1, TimeUnit.SECONDS)).as("EDT responsive with endpoint lock held").isTrue();
+            assertThat(failure.get()).isSameAs(presentationFails ? original : null);
+            assertThat(terminated.await(4, TimeUnit.SECONDS)).as("bounded exit with endpoint lock held").isTrue();
+        } finally {
+            // The child releases the lock before we wait for EDT cleanup, including on RED.
+            assertThat(marker.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+            endpoint.close();
+        }
+    }
+
 }

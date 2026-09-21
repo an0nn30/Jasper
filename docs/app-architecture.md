@@ -71,8 +71,10 @@ leave a background process. Logging cleanup and final process waiting do not blo
 
 A pane owns its admitted session. The launch coordinator stops admission and closes
 late arrivals; it does not force-close a session before its pane has completed cleanup.
-Shutdown snapshots pending process exits and command-history flush, then waits off EDT
-with the existing bound. Residency retains indexes/config/history after the last window,
+Shutdown waits for accepted launch workers, their late child exits, tracked process exits,
+command-history flush and endpoint cleanup with the existing two-second bound. Endpoint
+lock/probe cleanup runs on daemon workers; both ordinary quit and startup rollback leave
+the EDT responsive. Residency retains indexes/config/history after the last window,
 but retains no closed pane, PTY or child process. Quit closes all owners.
 
 ## Threading and cancellation

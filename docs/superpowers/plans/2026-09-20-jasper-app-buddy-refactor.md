@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Approved for native execution; Tasks 1–11 complete; Task 12 implementation verified, final review pending, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Tasks 1–12 complete; independent review and shutdown fixes verified, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -859,7 +859,7 @@ Explain that real applications call show on EDT; this headless test intentionall
 ```
 
 Use Task 1's XML counting script extended with `jasper-buddy`. Run the AGENTS.md source-character hygiene scan across all three production source roots. Review `git diff --check` and resource contents. Retain manual desktop/Windows/performance gaps explicitly; headless success is not visual/native acceptance.
-- [ ] Perform a fresh-reader exercise: starting only with the app README, locate the owner and test for adding a command, changing a live font default and posting/orphaning a Buddy notice. Record any navigation gaps and fix the docs. Request one independent whole-branch review under the preserved native workflow; fix material findings and rerun affected checks. Do not merge/push automatically: the earlier main merge authorization covered the terminal refactor.
+- [x] Perform a fresh-reader exercise: starting only with the app README, locate the owner and test for adding a command, changing a live font default and posting/orphaning a Buddy notice. Record any navigation gaps and fix the docs. Request one independent whole-branch review under the preserved native workflow; fix material findings and rerun affected checks. Do not merge/push automatically: the earlier main merge authorization covered the terminal refactor.
 - [x] Commit `docs: onboard app and Buddy contributors` with trailer. Present runnable results, verified counts, final review findings and manual acceptance instructions to the user.
 
 ## Completion criteria and execution record
@@ -871,7 +871,7 @@ Keep one commit per task; preserve all user changes outside scope. A task that n
 | Task | Status | Validation / deviations |
 | --- | --- | --- |
 | 1–11 | Complete | Runnable task commits; exact checks and rulings in verification report |
-| 12 | Implementation verified | Guides/examples/doclint and fresh 1,124-test run pass; final independent review pending |
+| 12 | Complete | Guides/examples/doclint, independent review and fresh-reader exercise pass; two shutdown fixes verified RED→GREEN; final 1,127-test run passes |
 
 ## Planning self-review
 
@@ -879,4 +879,4 @@ Keep one commit per task; preserve all user changes outside scope. A task that n
 - Dependency refinement: MacTitleBar receives Swing components and callbacks; `Main.windowTitle` moves to workspace. BuddyOptions carries explicit dark mode because the current painter calls FlatLaf. Neither requires a new shared module.
 - Signature consistency: settings defaults live in config, Subscription in lifecycle; activity IDs are opaque; Buddy ID mutators return void; only show returns boolean; supported allowlist has five top-level types.
 - Review Focus: startup Task 7; late launches Tasks 6–7; palette generations Task 5; saved/live settings Tasks 2/4/6; Buddy lifetime and stale producers Tasks 8–10.
-- Implementation follows the recorded task checkpoints; the verification report records corrected transfer details and rulings. Final review remains a separate native-workflow gate.
+- Implementation follows the recorded task checkpoints; the verification report records corrected transfer details and rulings. Final review completed; endpoint cleanup moved off EDT and accepted launch/late-child cleanup joined the bounded shutdown wait. Detailed findings and verification are in the report.

@@ -24,7 +24,7 @@ Task 3: Ruling: Keep pre-pack initial snapshot application in TerminalWindow, th
 
 4. Workspace activity tests failed on absent API; new lifecycle tests and full app suite pass (735 tests, one expected skip). Existing config/action coverage passes after owner extraction.
 
-Task 4: Ruling: Reuse the pane’s existing immutable UUID as opaque activity identity instead of allocating a second Object — it cannot retain UI and already identifies that producer. Wire pane lifetime at creation, before shell readiness, to cover early close. Existing config integration tests already exercise unchanged overrides, changed fonts and captured next-session settings; retain those instead of duplicating them. Replace the proposed record-shape test with observable OPENED/CLOSED and unsubscribe tests.
+Task 4: Ruling: Reuse the pane’s existing immutable UUID as opaque activity identity instead of allocating a second Object — it cannot retain UI and already identifies that producer. Wire pane lifetime at creation, before shell readiness, to cover early close. Existing config integration tests already exercise unchanged overrides, changed fonts and captured next-session settings; retain those instead of duplicating them. Replace the proposed record-shape test with observable OPENED/CLOSED and unsubscribe tests. Cost if wrong: producer identity or early-lifetime event coverage could diverge; tests cover creation and closure.
 
 5. Queued reused-step completion regression failed before the generation guard; all three invalidation paths now pass. Full app suite: 736 tests, one expected skip. Logger-capture test follows the new controller owner.
 
@@ -97,7 +97,8 @@ Task 12: Ruling: Expose ConfigSnapshot.Builder/toBuilder across app feature pack
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.
-App/Buddy guards will be added at the package migration checkpoint.
+App/Buddy bytecode DAG, JDK-only Buddy dependency and supported-signature guards pass
+without exemptions and are wired into check.
 
 ## Packaged resources
 
@@ -167,7 +168,34 @@ artifacts were already absent in this checkout; no new links point to them.
 
 ## Independent review
 
-Pending the complete implementation; one fresh review follows native execution.
+One fresh independent whole-branch review of `c7b796b..1081047` found two
+Important shutdown defects, no Critical findings, no deferred minors and no
+items declined for judgment. Both were confirmed and fixed in one native pass:
+
+- Endpoint close previously took a cross-process lock on EDT, before the exit
+  timeout. Bootstrap now transfers endpoint ownership directly to the application;
+  registered cleanup runs on daemon workers inside the bounded wait, including
+  presentation-failure rollback. `contendedEndpointCannotBlockEdtOrBoundedTermination`
+  failed for both ordinary quit and rollback with a real child-JVM-held lock,
+  then passed. No window or login shell was opened.
+- Accepted launches were absent from the shutdown snapshot until `track` received
+  their sessions. The coordinator now accounts for accepted workers and late-child
+  exits through a drain future. `shutdownWaitIncludesAcceptedLaunchAndLateChildExit`
+  failed on premature termination, then passed using a controlled child JVM.
+  Already admitted sessions retain their pane-owned close sequence.
+
+Final fresh full verification after fixes:
+`./gradlew verifyTerminalArchitecture verifyApplicationArchitecture check :jasper-app:installDist --rerun-tasks`
+— BUILD SUCCESSFUL, all 23 tasks executed. **1,127 tests: app 609 (one skip),
+Buddy 163, terminal 355 (one skip); 1,125 passed, zero failures/errors.**
+Production source hygiene and `git diff --check` pass. Distribution contains all
+three Jasper jars and no test fixtures. Javadoc missing-tag warnings remain nonfatal.
+
+The fresh-reader exercise started at the app README and located all three routes
+without navigation gaps: command/shortcut owners and tests; saved/live font defaults
+and preservation tests; Buddy posting/orphaning policy and lifecycle tests.
+The reviewer assessed every execution ruling as reasonable; the Task 6 and Task 7
+shutdown gaps above are now covered. Native desktop/Windows acceptance remains manual.
 
 ## Manual acceptance
 

@@ -131,7 +131,8 @@ public final class ApplicationBootstrap {
             acquired.release(history); acquired.release(service);
             HandoffSocket endpoint = bindEndpoint.apply(application);
             if (endpoint != null) {
-                acquired.own(endpoint);
+                // The application owns endpoint cleanup even if presentation fails below.
+                // Rollback queues quit; it must never take the endpoint's process lock on EDT.
                 application.onShutdown(endpoint::close);
             }
             application.residency(endpoint != null);
