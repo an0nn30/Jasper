@@ -6,8 +6,8 @@ The [implementation plan](superpowers/plans/2026-09-20-jasper-app-buddy-refactor
 is drafted and self-reviewed on `codex/app-architecture-design`, based on merged
 main `c7b796b`. It has 12 runnable checkpoints covering concrete app owners,
 package boundaries, Buddy extraction, regression checks and onboarding. Native
-execution remains the selected method. Plan review is next; no production changes
-or new test runs have been made during planning. Two explicit dependency details
+execution remains the selected method. Native implementation is approved and underway. Baseline checks passed: 1,083 tests,
+zero failures/errors, two expected skips. No production changes yet. Two explicit dependency details
 are recorded for review: platform title-bar callbacks and Buddy dark-mode input.
 The terminal refactor is merged into the main checkout; older execution notes
 below record its pre-integration handoff.

@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Planning only, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. No task below has been executed. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Task 1 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -110,13 +110,13 @@ Tests move beside their owner. Integration tests that join features belong to `a
 
 **Interfaces:** Consumes the existing Gradle `check` and `verifyTerminalArchitecture` tasks. Produces a recorded baseline of tests, resources, launcher names and Git revision; no production API.
 
-- [ ] Run the baseline without opening a GUI:
+- [x] Run the baseline without opening a GUI:
 
 ```bash
 ./gradlew verifyTerminalArchitecture check --rerun-tasks
 ```
 
-- [ ] Record XML totals and inventory with these commands. Do not copy the historical 1,083 total if the checkout differs.
+- [x] Record XML totals and inventory with these commands. Do not copy the historical 1,083 total if the checkout differs.
 
 ```python
 from pathlib import Path
@@ -133,8 +133,8 @@ for p in sorted(Path('jasper-app/src/main/resources').rglob('*')):
 rg -n 'dev\.jasper\.app\.|getResource|registerCustomDefaultsSource' jasper-app gradle packaging README.md
 ```
 
-- [ ] Write the verification ledger with headings `Baseline`, `Task checkpoints`, `Architecture`, `Packaged resources`, `Documentation`, `Independent review`, `Manual acceptance`. Under baseline record actual commands, revision, results and expected skips. Under manual acceptance state desktop, native performance and Windows runtime checks are pending user execution.
-- [ ] Commit only the documentation files with message `docs: record app refactor baseline` and the required trailer.
+- [x] Write the verification ledger with headings `Baseline`, `Task checkpoints`, `Architecture`, `Packaged resources`, `Documentation`, `Independent review`, `Manual acceptance`. Under baseline record actual commands, revision, results and expected skips. Under manual acceptance state desktop, native performance and Windows runtime checks are pending user execution.
+- [x] Commit only the documentation files with message `docs: record app refactor baseline` and the required trailer.
 
 ## Task 2: Make settings and subscriptions independent values
 
