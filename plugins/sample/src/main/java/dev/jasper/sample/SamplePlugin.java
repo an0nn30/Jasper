@@ -29,6 +29,9 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.terminal.TerminalEvents;
+import dev.jasper.sdk.terminal.OpenRequest;
+import dev.jasper.sdk.terminal.PendingSession;
+import dev.jasper.sdk.terminal.SessionSpec;
 
 /**
  * Logs, listens for theme changes and, when configured, shows a short activity on Buddy
@@ -38,6 +41,7 @@ public final class SamplePlugin implements Plugin {
     private static final int STEPS = 10;
     private static final String DEMO = "dev.jasper.sample.demo";
     private static final String GREET = "dev.jasper.sample.greet";
+    private static final String ECHO = "dev.jasper.sample.echo";
 
     /** Created by the runtime. */
     public SamplePlugin() { }
@@ -55,6 +59,7 @@ public final class SamplePlugin implements Plugin {
         long stepMillis = delay;
         if (context.config().bool("demo_ui").orElse(false)) installUi(context, stepMillis);
         if (context.config().bool("demo_terminal").orElse(false)) installTerminalDemo(context);
+        if (context.config().bool("demo_session").orElse(false)) installSessionDemo(context, stepMillis);
         if (context.config().bool("demo_activity").orElse(false))
             context.background().execute(() -> demo(context, stepMillis));
     }
@@ -156,6 +161,32 @@ public final class SamplePlugin implements Plugin {
         });
     }
     // example:pluginterminal:end
+
+    // example:pluginsession:start
+    private static void installSessionDemo(PluginContext context, long stepMillis) {
+        if (!context.plugin().capabilities().contains(Capabilities.SESSION_PROVIDE)) {
+            context.log().log(System.Logger.Level.INFO, "The session demo needs session.provide");
+            return;
+        }
+        context.actions().register(ActionSpec.of(ECHO, "Open Sample Echo Session").withKeywords(List.of("sample", "session", "echo")), invoked ->
+            // The pane appears at once, waiting. The connector runs on the event thread for the first connect
+            // and for every Reconnect, so it only hands the work to the background executor.
+            context.terminals().openTab(invoked.window(), OpenRequest.session(SessionSpec.of("Sample echo",
+                pending -> context.background().execute(() -> connectEcho(pending, stepMillis))))));
+    }
+
+    private static void connectEcho(PendingSession pending, long stepMillis) {
+        pending.status("Connecting to the sample echo…");
+        // A real connect blocks here; onCancelled is where it would be aborted.
+        var waiting = Thread.currentThread();
+        var registration = pending.onCancelled(waiting::interrupt);
+        try { Thread.sleep(stepMillis); }
+        catch (InterruptedException cancelled) { return; }
+        finally { registration.close(); }
+        // From attach on, Jasper owns the connection and closes it exactly once, even if the user cancelled meanwhile.
+        pending.attach(new EchoSession().connection());
+    }
+    // example:pluginsession:end
 
     private static void demo(PluginContext context, long stepMillis) {
         ActivityHandle activity = context.activities().begin(

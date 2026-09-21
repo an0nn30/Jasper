@@ -407,6 +407,7 @@ demo_activity = true      # show a short demonstration activity on Buddy at star
 demo_step_millis = 300    # 0 to 5000
 demo_ui = true            # add the sample's action to the toolbar, menus and status bar
 demo_terminal = true      # add "Insert Sample Greeting" and show the last command's exit status
+demo_session = true       # add "Open Sample Echo Session", a pane whose session the plugin provides
 ```
 
 Installed plugins live in `plugins/<id>/` beside `config.toml`; their enabled state and

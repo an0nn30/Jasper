@@ -174,6 +174,24 @@ is rewritten to restore configuration. Keep split-chunk parsing and payload
 bounds. Do not infer a command's duration from session exit; commands run inside
 one long-lived shell session.
 
+## Attached sessions
+
+`TerminalSession.attach(AttachedConnection, GridSize, scrollback)` runs a program that is not a
+local process. `internal.transport.AttachedTransport` (JDK only) owns the connection: the reader
+thread decodes `output`; one writer thread delivers writes, each followed by a flush, and resizes in
+submission order from a 4 MiB queue, so `write` and `resize` only enqueue and a stalled remote
+cannot block the EDT; a write that does not fit is rejected whole and reported through
+`TerminalSessionListener.inputDropped`; a resize directly behind another queued resize replaces it.
+After the connection's `exited` future completes, output is read to its end or until a two-second
+drain window closes the connection. `close` reaches the connection exactly once, from whichever
+side ends first. `internal.emulation.AttachedConnector` adapts the transport to JediTerm, so
+attached output runs through the same `ShellIntegrationConnector` chain as a PTY.
+
+An attached session differs from a PTY session in four ways: it writes no exit line into the
+buffer; `exitFuture()` completes exceptionally when the status is unknown or the transport failed;
+`foregroundJob()` is empty; and it never reports a local working directory, because the path a
+remote shell reports is a path on another machine.
+
 ## Threads and failures
 
 | Work | Contract |

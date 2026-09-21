@@ -1,9 +1,9 @@
 # Writing a Jasper plugin
 
-This guide covers what the SDK offers today (0.4): lifecycle, configuration, events,
+This guide covers what the SDK offers today (0.5): lifecycle, configuration, events,
 activities, services, actions and their placements, panels, the rail, application-built
 windows and dialogs, and terminals: finding panes, following terminal events, typing into a
-pane and opening tabs. Plugin-provided sessions arrive in a later SDK version. The contract is in the
+pane, opening tabs, and providing a pane's session, such as a remote connection. The contract is in the
 [design](superpowers/specs/2026-09-21-jasper-plugin-sdk-design.md); the runtime is described
 in the [SDK architecture](sdk-architecture.md).
 
@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.4, <0.5"
+sdk = ">=0.5, <0.6"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide
 exports = []                       # packages other plugins may use
 
@@ -46,6 +46,7 @@ classes in `dev.jasper.*` platform packages or in a package a dependency exports
     long stepMillis = delay;
     if (context.config().bool("demo_ui").orElse(false)) installUi(context, stepMillis);
     if (context.config().bool("demo_terminal").orElse(false)) installTerminalDemo(context);
+    if (context.config().bool("demo_session").orElse(false)) installSessionDemo(context, stepMillis);
     if (context.config().bool("demo_activity").orElse(false))
         context.background().execute(() -> demo(context, stepMillis));
 }
@@ -184,6 +185,7 @@ equal. Finding things needs no capability. What a handle may do does:
 | `terminal.selection` | read `PaneHandle.selection()` |
 | `terminal.inject` | `sendText`, `sendBytes`, `paste` |
 | `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()` |
+| `session.provide` | `Terminals.openTab` and `split` with `OpenRequest.session(...)` |
 
 Declare them in `plugin.toml`; the user is shown the list before your plugin loads. A gated call
 without the capability throws `MissingCapabilityException`. Jasper logs gated calls with your plugin
@@ -229,6 +231,64 @@ private static void installTerminalDemo(PluginContext context) {
 - To run a command in a new tab, open one with `OpenRequest.local()` or `localIn(directory)` and
   `sendText` to the pane you get back; the tab runs the user's configured shell.
 
+## Providing a session
+
+A provided session is a pane whose program is yours: an SSH channel, a serial line, a container
+shell. You describe it with a `SessionSpec` and open it like any tab. The pane appears at once
+with a status line and Cancel; your `connector` is then called, on the event thread, once for the
+first connect and once for every Reconnect, each time with a fresh `PendingSession`.
+
+<!-- example:pluginsession -->
+```java
+private static void installSessionDemo(PluginContext context, long stepMillis) {
+    if (!context.plugin().capabilities().contains(Capabilities.SESSION_PROVIDE)) {
+        context.log().log(System.Logger.Level.INFO, "The session demo needs session.provide");
+        return;
+    }
+    context.actions().register(ActionSpec.of(ECHO, "Open Sample Echo Session").withKeywords(List.of("sample", "session", "echo")), invoked ->
+        // The pane appears at once, waiting. The connector runs on the event thread for the first connect
+        // and for every Reconnect, so it only hands the work to the background executor.
+        context.terminals().openTab(invoked.window(), OpenRequest.session(SessionSpec.of("Sample echo",
+            pending -> context.background().execute(() -> connectEcho(pending, stepMillis))))));
+}
+
+private static void connectEcho(PendingSession pending, long stepMillis) {
+    pending.status("Connecting to the sample echo…");
+    // A real connect blocks here; onCancelled is where it would be aborted.
+    var waiting = Thread.currentThread();
+    var registration = pending.onCancelled(waiting::interrupt);
+    try { Thread.sleep(stepMillis); }
+    catch (InterruptedException cancelled) { return; }
+    finally { registration.close(); }
+    // From attach on, Jasper owns the connection and closes it exactly once, even if the user cancelled meanwhile.
+    pending.attach(new EchoSession().connection());
+}
+```
+
+- **One attempt, one outcome.** Exactly one of `attach`, `fail` and cancellation takes effect; the
+  first wins and later calls are ignored. Every `PendingSession` method is safe from any thread.
+- **Ownership transfers at `attach`, whatever the outcome.** Jasper invokes your connection's
+  `close` exactly once: when the pane closes, when the session ends, or at once if the attempt was
+  already cancelled. Release everything that belongs to the session there, and never count on
+  `attach` having "worked".
+- **Cancellation** happens when the user presses Cancel, the pane closes, your plugin stops or
+  Jasper quits. `onCancelled` handlers run at most once, on Jasper's cleanup thread, and at once
+  when registered late. Use them to abort a blocking connect.
+- **Threads.** `output.read` runs on the session's reader thread and may block; `close` must
+  unblock it. `input.write`, `flush` and `resize` run only on Jasper's writer thread for that
+  session, so a stalled network never freezes the user's typing; when its 4 MiB queue is full the
+  pane says input was dropped. `close` runs on the cleanup thread. None of them runs on the event
+  thread, and none of them may touch Swing.
+- **Ending.** Complete `exited` with the status. Jasper keeps reading `output` to its end, for at
+  most two seconds, so the last output is on screen before the pane says "Disconnected (exit N)".
+  Completing `exited` exceptionally, or an `IOException` from a stream, is a connection failure, and
+  its message is shown. `ExitPolicy.CLOSE_PANE` closes the pane instead.
+- **The remote pty** should be requested with `TerminalConnection.TERM` and the attempt's
+  `columns()` and `rows()`; the pane resizes it through `resize` once it has been laid out.
+- A remote shell with Jasper's shell integration produces the same command events as a local one.
+  Working directories it reports are not exposed yet: a remote path must never look local.
+- `PipedInputStream` fails once the thread that wrote last has ended. The sample uses a queue.
+
 ## Rules that matter
 
 - **Threads.** Subscribe and publish services on the event thread. `publish`, activity
@@ -270,6 +330,9 @@ try (var host = new FakePluginHost()) {
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
 `titleChanged`, `cwdChanged`, `sessionExited` and `bell` publish terminal events, delivered by
 `flush()`. Give the `PluginInfo` you start with the capabilities your `plugin.toml` declares.
+A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`, `sessionOutput`,
+`cancelSession` and `reconnectSession`; `flush()` notices exits. The fake runs cancellation handlers
+and closes inline where Jasper uses its cleanup thread.
 
 ## Running a plugin in Jasper
 

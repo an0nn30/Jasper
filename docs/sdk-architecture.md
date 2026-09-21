@@ -111,6 +111,22 @@ declares. `TerminalBridge` republishes registry events as `TerminalEvents` topic
 bus, and subscribing to a `jasper.terminal.*` topic needs `terminal.observe`. Payloads carry ids,
 not handles: a handle is bound to one plugin's gate, a payload is shared by all subscribers.
 
+## Provided sessions
+
+`OpenRequest.session` needs `session.provide`. `HostedSessions` turns the `SessionSpec` into the
+app-native `terminals.SessionRequest`; the pane creates one `terminals.SessionAttempt` per connect
+and reconnect and calls the connector on the EDT. The attempt is the ownership boundary:
+`PENDING` becomes `ATTACHED`, `FAILED` or `CANCELLED` atomically, the first transition wins, and a
+connection offered to an attempt that is no longer pending is closed at once. The connection handed
+to the pane is a guarded copy whose `close` reaches the plugin's exactly once, on the
+`CleanupWorker`: an application-owned daemon thread that also runs cancellation handlers, never
+rejects, outlives the plugin's own executor, and joins the bounded shutdown wait. Stopping a plugin
+cancels what it is still connecting; attached sessions belong to their panes and close with them.
+
+`workspace.TerminalPane` shows a provided session in three states around one view: pending (status
+line, Cancel), running, and disconnected (how it ended, Reconnect or Retry, Close). Cancelling an
+attempt in a pane that never showed a session closes the pane.
+
 ## Plugins manager, install and restart
 
 Nothing is loaded or unloaded in a running process. The manager edits `plugins.toml` through
@@ -154,6 +170,5 @@ disagree, the implementation is wrong, not the contract.
 
 ## Not yet implemented
 
-Plugin-provided sessions (`TerminalSession.attach`, the app-owned writer, drain, `PendingSession`,
-Reconnect), the cleanup worker, `OpenRequest.session`, working-directory provenance with
-`RemoteDirectory`, and explicit commands in `LocalSpec` (plan 4b).
+Working-directory provenance (classifying OSC 7 reports by host and exposing `RemoteDirectory`)
+and explicit commands in `LocalSpec` (plan 4c).

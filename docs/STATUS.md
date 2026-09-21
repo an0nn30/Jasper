@@ -13,8 +13,47 @@ maintenance guides. Plugin SDK plan 1 (core and runtime) is implemented and merg
 local `main`, as is plan 2 (actions and chrome placements). Plan 3a (rail, panels and plugin
 windows) is merged too; the spec's plan 3 was split into 3a and 3b. Plan 3b (Plugins manager,
 install and restart) is merged too. The spec's plan 4 is split into 4a (terminal API: observe,
-inject, open) and 4b (plugin-provided sessions); 4a is merged too, and 4b is planned on
-`claude/plugin-sdk-plan-4b`. Working-directory provenance moved from 4b to a small plan 4c.
+inject, open) and 4b (plugin-provided sessions); 4a is merged too, and 4b is implemented on
+`claude/plugin-sdk-plan-4b`. Working-directory provenance moved from 4b to a small plan 4c, which is not started.
+
+### Plugin SDK plan 4b — 2026-09-21
+
+Implemented on `claude/plugin-sdk-plan-4b` (worktree `.worktrees/plugin-sdk-plan-4b`), not yet
+merged or pushed. The work implements
+[plan 4b](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-4b-plugin-sessions.md): a plugin opens
+a pane whose session it provides. `jasper-terminal` gained `TerminalSession.attach(AttachedConnection,
+GridSize, scrollback)`, the only addition to the app-facing allowlist, over a JDK-only
+`internal.transport.AttachedTransport` (one writer thread behind a 4 MiB queue, whole-write
+rejection reported through `TerminalSessionListener.inputDropped`, coalesced and ordered resizes, a
+two-second drain after exit, first failure wins, `close` exactly once) and a thin
+`internal.emulation.AttachedConnector`, so attached output runs through the same shell-integration
+chain as a PTY. The app gained `terminals.{OpenSpec, SessionRequest, SessionAttempt}`, pending and
+disconnected pane states with Reconnect, `plugins.CleanupWorker` and `HostedSessions`; the SDK
+gained `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` and
+`OpenRequest.session` behind `session.provide`, and is 0.5.0; the testkit gained `FakeSessions`;
+the bundled sample provides a loopback echo session. The local PTY path is unchanged. See
+[terminal architecture](terminal-architecture.md#attached-sessions) and
+[SDK architecture](sdk-architecture.md#provided-sessions).
+
+Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks`
+passed with **1,403 tests: 1,401 passed, two expected environment skips, no failures or
+errors** (app 806, Buddy 163, terminal 370, SDK 18, testkit 37, sample plugin 9). The contract
+suite grew from 23 to 29 cases and passes for the testkit fake and for the application. The new
+threading tests (`AttachedTransportTest`, `AttachedSessionTest`, `SessionPaneTest`,
+`AppContractTest`) were each rerun three to five times without a failure. Native acceptance (the
+eight-step checklist at the end of the plan) is pending: agents do not launch the GUI.
+
+Scope decisions, recorded in the plan: working-directory provenance (classifying OSC 7 reports by
+host, `RemoteDirectory`, the machine's local names in `SessionLaunchOptions`) moved to a small
+plan 4c, and 4b implements the one rule it needs, that an attached session never reports a local
+working directory; an attached session writes no exit line into the buffer; an unknown exit status
+or a transport failure is an exceptionally completed `exitFuture()`; Reconnect starts a fresh
+session and view in the same pane and does not carry scrollback over; cancelling closes the pane
+only when no session was ever shown in it, and otherwise returns to the disconnected bar; the
+attempt's grid is the window's configured initial grid; `SessionSpec.icon` is accepted and unused;
+a user's split of a provided pane opens a local shell at home; and the SDK version is 0.5.0.
+
+Deviations from the plan text: Task 0's separate baseline `check` was not run: the branch starts at the commit local `main` had just been verified at. `AttachedTransportTest`'s cut-off case accepts end of stream as well as an `IOException`: the fixture's `close` ends the pipe cleanly, and both are valid ways for the blocked read to end. `AttachedSessionTest` feeds shell-integration marks in the form the module's own tests use (BEL terminators, the command line ended by CR LF, a following prompt) instead of the ST-terminated sequence in the plan. In `TerminalPane` the `noticeTransient` field is declared before the timer whose initializer reads it; the plan's order was an illegal forward reference. `FakePluginHost.terminalPanes()` was added in Task 6 with the other drivers rather than in Task 8. `HostedTerminals` got a small `capability(OpenRequest)` helper for the audit line, and `plugins/package-info.java` lists `dev.jasper.terminal.session`. The terminal module's allowlist is documented in `jasper-terminal/README.md`'s package table; `docs/terminal-architecture.md` gained the "Attached sessions" section before "Threads and failures".
 
 ### Plugin SDK plan 4a — 2026-09-21
 

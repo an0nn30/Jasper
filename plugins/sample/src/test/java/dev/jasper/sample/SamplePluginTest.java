@@ -138,4 +138,27 @@ class SamplePluginTest {
             assertThat(host.actions()).noneMatch(line -> line.startsWith("dev.jasper.sample.greet"));
         }
     }
+
+    @Test void theSessionDemoProvidesAnEchoThatEndsOnControlD() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            host.setConfig("dev.jasper.sample", Map.of("demo_session", true, "demo_step_millis", 0L));
+            host.start(new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of(Capabilities.SESSION_PROVIDE)), Set.of(), Set.of(), new SamplePlugin());
+            assertThat(host.failures()).isEmpty();
+            assertThat(host.invoke("dev.jasper.sample.echo", window, null)).isTrue();
+            assertThat(host.openRequests()).containsExactly("session-tab|" + window + "|Sample echo");
+            UUID pane = host.terminalPanes().stream().filter(id -> host.sessionState(id).startsWith("CONNECTING")).findFirst().orElseThrow();
+            assertThat(host.sessionState(pane)).isEqualTo("CONNECTING|");
+            host.runBackground();
+            assertThat(host.sessionState(pane)).isEqualTo("RUNNING|");
+            assertThat(host.sessionOutput(pane)).contains("Sample echo session").endsWith("\r\n");
+            host.typeIntoSession(pane, "hi\r");
+            assertThat(host.sessionOutput(pane)).isEqualTo("hi\r\n");
+            host.typeIntoSession(pane, "\u0004");
+            host.flush();
+            assertThat(host.sessionState(pane)).isEqualTo("EXITED|exit 0");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
 }
