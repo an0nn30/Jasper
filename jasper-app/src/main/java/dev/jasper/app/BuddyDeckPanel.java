@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNotice;
+
 
 import java.awt.Dimension;
 import java.awt.FontMetrics;
@@ -150,7 +152,7 @@ final class BuddyDeckPanel extends JComponent {
         BuddyNotice notice = notices.get(index);
         Rectangle card = BuddyDeckLayout.expanded(index, BuddyCard.WIDTH, cardHeight(), scroll);
         if (BuddyDeckLayout.dismissTarget(card).contains(local)) {
-            deck.dismiss(notice.source(), notice.key());
+            deck.dismiss(notice.id().source(), notice.id().key());
             onNoticesChanged.run();
             hovered = -1;
             leaving = -1;

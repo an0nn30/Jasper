@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
@@ -12,8 +15,7 @@ class BuddyCardTest {
     private final JComponent owner = new JComponent() {};
 
     private static BuddyNotice notice(BuddyNotice.State state, String detail) {
-        return new BuddyNotice("terminal", "k", BuddyNotice.Kind.TASK, "./gradlew build", state,
-            () -> detail, () -> { });
+        return new BuddyNotice(new BuddyNoticeId("terminal", "k"), BuddyNotice.Kind.TASK, "./gradlew build", state, () -> detail, () -> { });
     }
 
     private void paint(BuddyNotice notice, boolean dismissable, int count) {
@@ -37,7 +39,7 @@ class BuddyCardTest {
         for (BuddyNotice.State state : BuddyNotice.State.values()) {
             BuddyNotice.Kind kind = state.fits(BuddyNotice.Kind.TASK)
                 ? BuddyNotice.Kind.TASK : BuddyNotice.Kind.CONNECTION;
-            BuddyNotice any = new BuddyNotice("s", "k", kind, "title", state, () -> "detail", () -> { });
+            BuddyNotice any = new BuddyNotice(new BuddyNoticeId("s", "k"), kind, "title", state, () -> "detail", () -> { });
             Rectangle bounds = new Rectangle(0, 0, BuddyCard.WIDTH, BuddyCard.height(owner));
             BufferedImage image = new BufferedImage(bounds.width, bounds.height, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = image.createGraphics();
@@ -47,8 +49,7 @@ class BuddyCardTest {
 
     /** A producer's supplier is arbitrary code; a broken one must not take the surface down. */
     @Test void aDetailSupplierThatThrowsIsSurvived() {
-        assertThat(BuddyCard.detailOf(new BuddyNotice("s", "k", BuddyNotice.Kind.TASK, "t",
-            BuddyNotice.State.RUNNING, () -> { throw new IllegalStateException("boom"); }, () -> { })))
+        assertThat(BuddyCard.detailOf(new BuddyNotice(new BuddyNoticeId("s", "k"), BuddyNotice.Kind.TASK, "t", BuddyNotice.State.RUNNING, () -> { throw new IllegalStateException("boom"); }, () -> { })))
             .isEmpty();
         assertThat(BuddyCard.detailOf(notice(BuddyNotice.State.DONE, null))).isEmpty();
         assertThat(BuddyCard.detailOf(notice(BuddyNotice.State.DONE, "Finished in 3s")))

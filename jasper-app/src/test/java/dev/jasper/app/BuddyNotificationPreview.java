@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
@@ -25,9 +28,7 @@ public final class BuddyNotificationPreview {
                 BuddyColumnPanel panel = new BuddyColumnPanel(deck, () -> { }, () -> { });
                 long[] now = {0};
                 panel.setClock(() -> now[0]);
-                deck.post(new BuddyNotice("preview", "one", BuddyNotice.Kind.TASK,
-                    theme == BuiltinTheme.LIGHT ? "New chat" : "Inspect release tracker CLI",
-                    BuddyNotice.State.RUNNING, () -> "Thinking", () -> { }));
+                deck.post(new BuddyNotice(new BuddyNoticeId("preview", "one"), BuddyNotice.Kind.TASK, theme == BuiltinTheme.LIGHT ? "New chat" : "Inspect release tracker CLI", BuddyNotice.State.RUNNING, () -> "Thinking", () -> { }));
                 panel.refresh();
                 panel.setSize(panel.getPreferredSize());
                 BuddySprite sprite = BuddySprite.load();

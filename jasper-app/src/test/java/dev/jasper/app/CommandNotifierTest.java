@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;

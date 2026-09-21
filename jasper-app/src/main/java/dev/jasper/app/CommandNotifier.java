@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Locale;
@@ -94,8 +97,7 @@ final class CommandNotifier {
         flight.cancel.run();
         flight.cancel = () -> {};
         if (running++ == 0) onWorkingChanged.accept(true);
-        deck.post(new BuddyNotice(SOURCE, key, BuddyNotice.Kind.TASK, flight.title,
-            BuddyNotice.State.RUNNING, flight.detail, flight.activate));
+        deck.post(new BuddyNotice(new BuddyNoticeId(SOURCE, key), BuddyNotice.Kind.TASK, flight.title, BuddyNotice.State.RUNNING, flight.detail, flight.activate));
         onDeckChanged.run();
     }
 
@@ -120,8 +122,7 @@ final class CommandNotifier {
         boolean succeeded = exitStatus.isEmpty() || exitStatus.getAsInt() == 0;
         String detail = succeeded ? "Finished in " + humanize(ran)
             : "Exited " + exitStatus.getAsInt() + " · " + humanize(ran);
-        deck.post(new BuddyNotice(SOURCE, key, BuddyNotice.Kind.TASK, title,
-            succeeded ? BuddyNotice.State.DONE : BuddyNotice.State.FAILED, () -> detail, activate));
+        deck.post(new BuddyNotice(new BuddyNoticeId(SOURCE, key), BuddyNotice.Kind.TASK, title, succeeded ? BuddyNotice.State.DONE : BuddyNotice.State.FAILED, () -> detail, activate));
         // You were looking straight at it, so it is already seen and never reaches the column.
         if (origin.ownPaneFocused()) deck.acknowledge(SOURCE, key);
         onDeckChanged.run();

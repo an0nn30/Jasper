@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.nio.file.*;
@@ -15,9 +18,7 @@ public final class BuddyMotionPreview {
             for (BuiltinTheme theme : new BuiltinTheme[]{BuiltinTheme.DARK, BuiltinTheme.LIGHT}) {
                 ThemeController.install(theme);
                 BuddyDeck deck = new BuddyDeck();
-                deck.post(new BuddyNotice("preview", "one", BuddyNotice.Kind.TASK,
-                    "Rebuild buddy notification bubbles", BuddyNotice.State.RUNNING,
-                    () -> "Thinking about the next command", () -> {}));
+                deck.post(new BuddyNotice(new BuddyNoticeId("preview", "one"), BuddyNotice.Kind.TASK, "Rebuild buddy notification bubbles", BuddyNotice.State.RUNNING, () -> "Thinking about the next command", () -> {}));
                 BuddyColumnPanel panel = new BuddyColumnPanel(deck, () -> {}, () -> {});
                 long[] clock = {0}; panel.setClock(() -> clock[0]); panel.refresh();
                 panel.setSize(panel.getPreferredSize());

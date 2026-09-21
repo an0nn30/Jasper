@@ -38,6 +38,12 @@ Task 6: Ruling: Preserve the established pane-owned close sequence: coordinator.
 
 Task 7: Ruling: Use an EDT compose transaction with explicit creation/bind/presentation functions instead of unspecified constructor injection. It is the actual production path and exposes no test-only hook. Bootstrap transfers endpoint cleanup to application shutdown and a process hook; application now removes its stored Dock reopen listener. Cost if wrong: startup ordering or endpoint availability; real bind/rebind and failure-before-presentation tests cover the transaction.
 
+### Task 8 — Buddy values
+
+Moved immutable notice identity/options into the new JDK-only Buddy module. Value
+tests failed on missing APIs before implementation. `./gradlew check` passed:
+app 741 tests (one skip), Buddy 7, terminal 355 (one skip); no failures/errors.
+
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.

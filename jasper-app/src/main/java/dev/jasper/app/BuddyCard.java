@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import com.formdev.flatlaf.FlatLaf;
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;

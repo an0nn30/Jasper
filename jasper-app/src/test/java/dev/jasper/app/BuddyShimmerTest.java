@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import javax.swing.JPanel;
@@ -11,8 +14,7 @@ class BuddyShimmerTest {
         var image = new BufferedImage(330, 56, BufferedImage.TYPE_INT_ARGB);
         var graphics = image.createGraphics();
         try {
-            BuddyCard.paint(graphics, new JPanel(), new BuddyNotice("test", "one", BuddyNotice.Kind.TASK,
-                "Title stays still", state, () -> "Thinking about the next command", () -> {}),
+            BuddyCard.paint(graphics, new JPanel(), new BuddyNotice(new BuddyNoticeId("test", "one"), BuddyNotice.Kind.TASK, "Title stays still", state, () -> "Thinking about the next command", () -> {}),
                 new Rectangle(0, 0, 330, 56), 0, 1, false, 0, time);
         } finally { graphics.dispose(); }
         return image;
@@ -49,13 +51,11 @@ class BuddyShimmerTest {
         var deck = new BuddyDeck();
         var panel = new BuddyColumnPanel(deck, () -> {}, () -> {});
         panel.setClock(() -> 0);
-        var task = new BuddyNotice("test", "one", BuddyNotice.Kind.TASK, "title",
-            BuddyNotice.State.RUNNING, () -> "Thinking", () -> {});
+        var task = new BuddyNotice(new BuddyNoticeId("test", "one"), BuddyNotice.Kind.TASK, "title", BuddyNotice.State.RUNNING, () -> "Thinking", () -> {});
         deck.post(task); panel.refresh(); panel.setClock(() -> 1_000_000_000L);
         assertThat(panel.needsAnimationFrames()).isTrue();
         deck.orphan("test", "one"); panel.refresh();
         assertThat(panel.needsAnimationFrames()).isFalse();
-        assertThat(BuddyCard.shimmers(new BuddyNotice("test", "two", BuddyNotice.Kind.TASK, "title",
-            BuddyNotice.State.NEEDS_INPUT, () -> "Waiting", () -> {}))).isFalse();
+        assertThat(BuddyCard.shimmers(new BuddyNotice(new BuddyNoticeId("test", "two"), BuddyNotice.Kind.TASK, "title", BuddyNotice.State.NEEDS_INPUT, () -> "Waiting", () -> {}))).isFalse();
     }
 }

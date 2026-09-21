@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
@@ -11,9 +14,7 @@ public final class BuddyPerformanceMeasurement {
         SwingUtilities.invokeAndWait(() -> {
             ThemeController.install(BuiltinTheme.DARK);
             var deck = new BuddyDeck();
-            for (int i = 0; i < 3; i++) deck.post(new BuddyNotice("bench", i, BuddyNotice.Kind.TASK,
-                "Rebuild buddy notification bubbles " + i, BuddyNotice.State.RUNNING,
-                () -> "Thinking about the next command", () -> {}));
+            for (int i = 0; i < 3; i++) deck.post(new BuddyNotice(new BuddyNoticeId("bench", i), BuddyNotice.Kind.TASK, "Rebuild buddy notification bubbles " + i, BuddyNotice.State.RUNNING, () -> "Thinking about the next command", () -> {}));
             long[] now = {1_000_000_000L};
             var panel = new BuddyColumnPanel(deck, () -> {}, () -> {});
             panel.setClock(() -> now[0]); panel.refresh(); panel.setSize(panel.getPreferredSize());

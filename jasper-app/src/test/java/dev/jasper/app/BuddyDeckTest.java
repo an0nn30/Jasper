@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -9,12 +12,11 @@ class BuddyDeckTest {
     private final BuddyDeck deck = new BuddyDeck();
 
     private static BuddyNotice running(String source, Object key, String title) {
-        return new BuddyNotice(source, key, BuddyNotice.Kind.TASK, title,
-            BuddyNotice.State.RUNNING, () -> "running", () -> { });
+        return new BuddyNotice(new BuddyNoticeId(source, key), BuddyNotice.Kind.TASK, title, BuddyNotice.State.RUNNING, () -> "running", () -> { });
     }
 
     private static BuddyNotice notice(String source, Object key, String title) {
-        return new BuddyNotice(source, key, BuddyNotice.Kind.TASK, title, BuddyNotice.State.DONE, () -> "done", () -> { });
+        return new BuddyNotice(new BuddyNoticeId(source, key), BuddyNotice.Kind.TASK, title, BuddyNotice.State.DONE, () -> "done", () -> { });
     }
 
     @Test void noticesComeBackNewestFirst() {
@@ -62,8 +64,7 @@ class BuddyDeckTest {
      * still say the build succeeded. Orphaning is a lost action, not a lost outcome.
      */
     @Test void orphaningKeepsTheOutcomeAndOnlyTakesAwayTheAction() {
-        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "./gradlew build", BuddyNotice.State.DONE,
-            () -> "Finished in 1m 12s", () -> { }));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "./gradlew build", BuddyNotice.State.DONE, () -> "Finished in 1m 12s", () -> { }));
 
         deck.orphan("terminal", "a", "Finished in 1m 12s");
 
@@ -76,8 +77,7 @@ class BuddyDeckTest {
     }
 
     @Test void orphaningFreezesARunningNoticeSoItStopsTicking() {
-        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "sleep 600", BuddyNotice.State.RUNNING,
-            () -> "Running · " + System.nanoTime(), () -> { }));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "sleep 600", BuddyNotice.State.RUNNING, () -> "Running · " + System.nanoTime(), () -> { }));
 
         deck.orphan("terminal", "a", "Stopped after 1m 12s");
 
@@ -111,13 +111,12 @@ class BuddyDeckTest {
 
     @Test void aNoticeNeedsAnIdentityAndSomethingToSay() {
         assertThatIllegalArgumentException().isThrownBy(() ->
-            new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "  ", BuddyNotice.State.DONE, () -> "d", () -> { }));
+            new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "  ", BuddyNotice.State.DONE, () -> "d", () -> { }));
     }
 
     /** The two-argument form is for a running notice only; this one must not rewrite what it said. */
     @Test void orphaningWithoutAReplacementKeepsWhatTheNoticeSaid() {
-        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "./gradlew build", BuddyNotice.State.DONE,
-            () -> "Finished in 1m 12s", () -> { }));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "./gradlew build", BuddyNotice.State.DONE, () -> "Finished in 1m 12s", () -> { }));
 
         deck.orphan("terminal", "a");
 

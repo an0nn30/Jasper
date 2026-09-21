@@ -1,4 +1,6 @@
-package dev.jasper.app;
+package dev.jasper.buddy.notice;
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.notice.BuddyNotice;
 
 import org.junit.jupiter.api.Test;
 
@@ -7,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 
 class BuddyNoticeTest {
     private static BuddyNotice of(BuddyNotice.Kind kind, BuddyNotice.State state) {
-        return new BuddyNotice("terminal", "k", kind, "title", state, () -> "d", () -> { });
+        return new BuddyNotice(new BuddyNoticeId("terminal", "k"), kind, "title", state, () -> "d", () -> { });
     }
 
     /** A tunnel never completes and a command is never "up"; an impossible notice cannot be built. */
@@ -56,8 +58,7 @@ class BuddyNoticeTest {
 
     /** Nothing is still happening once its origin is gone, whatever state it was left in. */
     @Test void anOrphanIsNeverLiveEvenIfItWasLeftRunning() {
-        BuddyNotice orphan = new BuddyNotice("terminal", "k", BuddyNotice.Kind.TASK, "sleep 600",
-            BuddyNotice.State.RUNNING, () -> "d", null);
+        BuddyNotice orphan = new BuddyNotice(new BuddyNoticeId("terminal", "k"), BuddyNotice.Kind.TASK, "sleep 600", BuddyNotice.State.RUNNING, () -> "d", null);
 
         assertThat(orphan.orphaned()).isTrue();
         assertThat(orphan.live()).isFalse();

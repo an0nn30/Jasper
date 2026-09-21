@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.session.SessionLaunchOptions;
 

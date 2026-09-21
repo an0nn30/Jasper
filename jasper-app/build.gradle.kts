@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":jasper-terminal"))
+    implementation(project(":jasper-buddy"))
     implementation("org.tomlj:tomlj:1.1.1")
     implementation("com.formdev:flatlaf:3.7")
     implementation("org.jetbrains.runtime:jbr-api:1.9.0")

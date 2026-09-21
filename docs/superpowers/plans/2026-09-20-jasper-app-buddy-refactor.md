@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Approved for native execution; Tasks 1–7 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Tasks 1–8 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -569,7 +569,7 @@ Until Task 11, qualify ApplicationBootstrap in its current flat package instead.
 
 **Planning refinement:** BuddyCard currently calls `FlatLaf.isLafDark()`. Add explicit `boolean dark` to BuddyOptions (default true, matching Jasper's default); the application supplies its resolved chrome mode on every theme change. This closes an actual vendor dependency without copying FlatLaf detection into the library. It is a value-only extension of the approved appearance contract.
 
-- [ ] Add value tests before implementing the API:
+- [x] Add value tests before implementing the API:
 
 ```java
 @Test void optionsCopyPreservesAllFields() {
@@ -596,7 +596,7 @@ Until Task 11, qualify ApplicationBootstrap in its current flat package instead.
 }
 ```
 
-- [ ] Include `jasper-buddy` in settings, with an empty dependency block and root-inherited Java/test conventions. Add `implementation(project(":jasper-buddy"))` to the app. Run the focused Buddy tests for RED, then add these complete values:
+- [x] Include `jasper-buddy` in settings, with an empty dependency block and root-inherited Java/test conventions. Add `implementation(project(":jasper-buddy"))` to the app. Run the focused Buddy tests for RED, then add these complete values:
 
 ```java
 public record BuddyPosition(int x, int y) {}
@@ -654,8 +654,8 @@ public final class BuddyOptions {
 }
 ```
 
-- [ ] Change BuddyNotice's identity components to `BuddyNoticeId id`, validate nonnull ID and preserve existing kind/state/title/detail checks. Keep `live`, `wantsAttention`, `orphaned` predicates; use `id.equals(otherId)` for identity. Replace all constructions and BuddyDeck's private Id record with the supported ID. This checkpoint may still have the model/presentation in the app; none is supported Buddy API.
-- [ ] Run `./gradlew check`; commit `refactor: define Buddy configuration and notice values` with trailer.
+- [x] Change BuddyNotice's identity components to `BuddyNoticeId id`, validate nonnull ID and preserve existing kind/state/title/detail checks. Keep `live`, `wantsAttention`, `orphaned` predicates; use `id.equals(otherId)` for identity. Replace all constructions and BuddyDeck's private Id record with the supported ID. This checkpoint may still have the model/presentation in the app; none is supported Buddy API.
+- [x] Run `./gradlew check`; commit `refactor: define Buddy configuration and notice values` with trailer.
 
 ## Task 9: Move Buddy model/presentation behind its lazy facade
 

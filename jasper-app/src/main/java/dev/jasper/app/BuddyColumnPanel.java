@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -80,12 +83,12 @@ final class BuddyColumnPanel extends JComponent {
 
     private static boolean sameOrder(List<Motion> first, List<Motion> second) {
         for (int i = 0; i < first.size(); i++)
-            if (!first.get(i).notice.sameAs(second.get(i).notice.source(), second.get(i).notice.key())) return false;
+            if (!first.get(i).notice.sameAs(second.get(i).notice.id())) return false;
         return true;
     }
 
     private Motion motionFor(BuddyNotice notice) {
-        for (Motion motion : motions) if (motion.notice.sameAs(notice.source(), notice.key())) return motion;
+        for (Motion motion : motions) if (motion.notice.sameAs(notice.id())) return motion;
         return null;
     }
 

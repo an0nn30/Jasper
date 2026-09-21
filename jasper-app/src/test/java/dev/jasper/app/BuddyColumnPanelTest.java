@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.buddy.notice.BuddyNoticeId;
+import dev.jasper.buddy.notice.BuddyNotice;
+
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -25,8 +28,7 @@ class BuddyColumnPanelTest {
     }
 
     private void post(String key, String title, BuddyNotice.State state) {
-        deck.post(new BuddyNotice("terminal", key, BuddyNotice.Kind.TASK, title, state,
-            () -> "detail", () -> activated.add(title)));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", key), BuddyNotice.Kind.TASK, title, state, () -> "detail", () -> activated.add(title)));
         panel.refresh();
         now += BubbleMotion.IN_NANOS;
     }
@@ -161,8 +163,7 @@ class BuddyColumnPanelTest {
 
     @Test void anArrivingBubbleKeepsAskingForFramesUntilItHasSettled() {
         assertThat(panel.animating()).isFalse();
-        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "one",
-            BuddyNotice.State.RUNNING, () -> "detail", () -> { }));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "one", BuddyNotice.State.RUNNING, () -> "detail", () -> { }));
         panel.refresh();
         assertThat(panel.animating()).isTrue();
         now = BubbleMotion.IN_NANOS / 2;
@@ -193,8 +194,7 @@ class BuddyColumnPanelTest {
     @Test void updatingTheSameNoticeKeepsItsPositionAndDoesNotReplayArrival() {
         post("a", "one", BuddyNotice.State.RUNNING);
         Rectangle before = panel.cardBounds(0);
-        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "one",
-            BuddyNotice.State.DONE, () -> "Finished", () -> { }));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "one", BuddyNotice.State.DONE, () -> "Finished", () -> { }));
         panel.refresh();
         assertThat(panel.cardBounds(0)).isEqualTo(before);
         assertThat(panel.animating()).isFalse();
@@ -204,21 +204,18 @@ class BuddyColumnPanelTest {
     @Test void resizingForANewArrivalDoesNotTeleportTheExistingCapsuleOnScreen() {
         post("a", "older", BuddyNotice.State.RUNNING);
         int before = panel.cardBounds(0).y - panel.getPreferredSize().height;
-        deck.post(new BuddyNotice("terminal", "b", BuddyNotice.Kind.TASK, "newer",
-            BuddyNotice.State.RUNNING, () -> "d", () -> { }));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "b"), BuddyNotice.Kind.TASK, "newer", BuddyNotice.State.RUNNING, () -> "d", () -> { }));
         panel.refresh();
         assertThat(panel.cardBounds(1).y - panel.getPreferredSize().height).isEqualTo(before);
         now += BubbleMotion.IN_NANOS / 6;
         int interrupted = panel.cardBounds(1).y - panel.getPreferredSize().height;
-        deck.post(new BuddyNotice("terminal", "c", BuddyNotice.Kind.TASK, "newest",
-            BuddyNotice.State.RUNNING, () -> "d", () -> { }));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "c"), BuddyNotice.Kind.TASK, "newest", BuddyNotice.State.RUNNING, () -> "d", () -> { }));
         panel.refresh();
         assertThat(panel.cardBounds(2).y - panel.getPreferredSize().height).isEqualTo(interrupted);
     }
 
     @Test void inputFollowsTheMovingCapsuleAndIgnoresItsTransparentCorners() {
-        deck.post(new BuddyNotice("terminal", "a", BuddyNotice.Kind.TASK, "one",
-            BuddyNotice.State.RUNNING, () -> "d", () -> activated.add("one")));
+        deck.post(new BuddyNotice(new BuddyNoticeId("terminal", "a"), BuddyNotice.Kind.TASK, "one", BuddyNotice.State.RUNNING, () -> "d", () -> activated.add("one")));
         panel.refresh();
         Rectangle bounds = panel.cardBounds(0);
         panel.handleMove(new Point(bounds.x + 1, bounds.y + 1));
