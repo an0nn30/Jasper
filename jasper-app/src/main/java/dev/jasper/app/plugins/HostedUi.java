@@ -3,20 +3,31 @@ package dev.jasper.app.plugins;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuTarget;
+import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.contributions.StatusEntry;
 import dev.jasper.app.contributions.ToolbarEntry;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.windows.AuxiliarySurface;
+import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.Variant;
+import dev.jasper.sdk.WindowOwner;
 import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.Appearance;
+import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.Menus;
+import dev.jasper.sdk.ui.PanelHost;
+import dev.jasper.sdk.ui.Panels;
 import dev.jasper.sdk.ui.PluginAction;
+import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginMenu;
+import dev.jasper.sdk.ui.PluginWindow;
+import dev.jasper.sdk.ui.Rail;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusBar;
@@ -24,6 +35,9 @@ import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.Toolbar;
 import dev.jasper.sdk.ui.ToolbarItem;
+import dev.jasper.sdk.ui.WindowSpec;
+import dev.jasper.sdk.ui.WindowSurface;
+import dev.jasper.sdk.ui.Windows;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +49,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.swing.Icon;
+import javax.swing.JComponent;
 
 /**
  * One plugin's chrome contributions, adapted onto the app-native model. It enforces what the model
@@ -53,14 +68,16 @@ final class HostedUi {
     private final ClassLoader loader;
     private final Supplier<Variant> variant;
     private final Function<Consumer<Variant>, Subscription> themeSubscriber;
+    private final AuxiliaryWindows windows;
     private final Set<String> ownActions = new HashSet<>();
     private final List<Runnable> closers = new ArrayList<>();
 
     HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
              BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
-             Function<Consumer<Variant>, Subscription> themeSubscriber) {
+             Function<Consumer<Variant>, Subscription> themeSubscriber, AuxiliaryWindows windows) {
         this.pluginId = pluginId; this.model = model; this.containment = containment; this.ui = ui; this.onUi = onUi;
         this.open = open; this.loader = loader; this.variant = variant; this.themeSubscriber = themeSubscriber;
+        this.windows = windows;
     }
 
     /** Registration needs an open context and the UI thread. */
@@ -193,6 +210,107 @@ final class HostedUi {
                 return themeSubscriber.apply(java.util.Objects.requireNonNull(handler, "handler"));
             }
             @Override public Icon icon(String svgResourcePath) { return AppIcons.themed(loader, svgResourcePath); }
+        };
+    }
+
+    private static WindowHandle handle(java.util.UUID id) { return () -> id; }
+
+    /** Wraps an application subscription so closing it is contained to the UI thread like every other registration. */
+    private Subscription wrap(dev.jasper.app.lifecycle.Subscription registration) { return subscription(registration::close); }
+
+    Panels panels() {
+        return (spec, factory) -> {
+            guard("register");
+            java.util.Objects.requireNonNull(factory, "factory");
+            requireNamespace(spec.id(), "A panel");
+            var entry = model.addPanel(spec.id(), spec.title(), spec.icon(), PanelRegion.valueOf(spec.defaultAnchor().name()), site -> {
+                JComponent[] built = {null};
+                containment.run(pluginId, "panel " + spec.id(), () -> built[0] = factory.create(host(site)));
+                return built[0];
+            });
+            return tracked(entry::close);
+        };
+    }
+
+    private PanelHost host(PanelSite site) {
+        return new PanelHost() {
+            @Override public WindowHandle window() { return handle(site.windowId()); }
+            @Override public void show() { requireUi("show"); site.show(); }
+            @Override public void hide() { requireUi("hide"); site.hide(); }
+            @Override public boolean visible() { return site.visible(); }
+            @Override public Subscription onVisibility(Consumer<Boolean> handler) {
+                requireUi("onVisibility");
+                return wrap(site.onVisibility(value -> containment.run(pluginId, "panel visibility", () -> handler.accept(value))));
+            }
+            @Override public Subscription onClosed(Runnable handler) {
+                requireUi("onClosed");
+                return wrap(site.onClosed(() -> containment.run(pluginId, "panel closed", handler)));
+            }
+        };
+    }
+
+    Rail rail() {
+        return actionId -> {
+            guard("add");
+            requireOwn(actionId);
+            var registration = model.addRailAction(actionId);
+            return tracked(registration::close);
+        };
+    }
+
+    /** One SDK view of an application surface; windows and dialogs differ only in their SDK type. */
+    private class Surface implements WindowSurface {
+        final AuxiliarySurface surface;
+        Surface(AuxiliarySurface surface) { this.surface = surface; }
+        @Override public void setContent(JComponent content) { requireUi("setContent"); surface.setContent(content); }
+        @Override public void show() { requireUi("show"); surface.show(); }
+        @Override public void toFront() { requireUi("toFront"); surface.toFront(); }
+        @Override public void setTitle(String title) { requireUi("setTitle"); if (!surface.closed()) surface.setTitle(title); }
+        @Override public Subscription onClosing(BooleanSupplier guard) {
+            requireUi("onClosing");
+            return wrap(surface.onClosing(() -> {
+                boolean[] allowed = {true};
+                containment.run(pluginId, "closing guard", () -> allowed[0] = guard.getAsBoolean());
+                return allowed[0];
+            }));
+        }
+        @Override public Subscription onClosed(Runnable handler) {
+            requireUi("onClosed");
+            return wrap(surface.onClosed(() -> containment.run(pluginId, "window closed", handler)));
+        }
+        @Override public void close() { subscription(surface::close).close(); }
+    }
+
+    private final class OwnedWindow extends Surface implements PluginWindow { OwnedWindow(AuxiliarySurface surface) { super(surface); } }
+    private final class OwnedDialog extends Surface implements PluginDialog { OwnedDialog(AuxiliarySurface surface) { super(surface); } }
+
+    private final java.util.Map<AuxiliarySurface, OwnedWindow> ownedWindows = new java.util.HashMap<>();
+
+    Windows windows() {
+        return new Windows() {
+            @Override public PluginWindow create(WindowSpec spec) {
+                guard("create");
+                requireNamespace(spec.id(), "A window");
+                AuxiliarySurface surface = windows.window(spec.id(), spec.title(), spec.preferredSize(), spec.singleton());
+                OwnedWindow existing = ownedWindows.get(surface);
+                if (existing != null) return existing;
+                var window = new OwnedWindow(surface);
+                ownedWindows.put(surface, window);
+                surface.onClosed(() -> ownedWindows.remove(surface));
+                closers.add(surface::close);
+                return window;
+            }
+            @Override public PluginDialog dialog(DialogSpec spec) {
+                guard("dialog");
+                WindowOwner owner = spec.owner();
+                AuxiliarySurface surface;
+                if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window)
+                    surface = windows.dialog(spec.title(), spec.modal(), window.surface);
+                else if (owner instanceof WindowHandle terminalWindow) surface = windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
+                else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
+                closers.add(surface::close);
+                return new OwnedDialog(surface);
+            }
         };
     }
 }

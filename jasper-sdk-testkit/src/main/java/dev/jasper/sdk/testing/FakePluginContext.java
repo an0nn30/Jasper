@@ -18,8 +18,11 @@ import dev.jasper.sdk.services.Services;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.Menus;
+import dev.jasper.sdk.ui.Panels;
+import dev.jasper.sdk.ui.Rail;
 import dev.jasper.sdk.ui.StatusBar;
 import dev.jasper.sdk.ui.Toolbar;
+import dev.jasper.sdk.ui.Windows;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -141,6 +144,15 @@ public final class FakePluginContext implements PluginContext {
 
     /** Status bar items. */
     @Override public StatusBar statusBar() { return ui.statusBar(); }
+
+    /** Side panels. */
+    public Panels panels() { return ui.panels(); }
+
+    /** Rail buttons. */
+    public Rail rail() { return ui.rail(); }
+
+    /** Plugin windows and dialogs. */
+    public Windows windows() { return ui.windows(); }
 
     /** The host's variant, change notifications, and icons checked against the plugin's own class loader. */
     @Override public Appearance appearance() {

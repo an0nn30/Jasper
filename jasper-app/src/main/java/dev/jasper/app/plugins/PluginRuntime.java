@@ -1,6 +1,7 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.sdk.JasperSdk;
 import dev.jasper.sdk.Subscription;
@@ -51,6 +52,7 @@ public final class PluginRuntime {
     private final ActivityNotifier notifier;
     private final BiConsumer<String, String> configReport;
     private final Contributions contributions;
+    private final AuxiliaryWindows windows;
     private volatile boolean dark = true;
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
@@ -65,13 +67,15 @@ public final class PluginRuntime {
      * @param notifier receives plugin activities for Buddy
      * @param configReport receives plugin complaints about their settings as key and message
      * @param contributions the application-wide model that plugin chrome contributions are written to
+     * @param windows builds plugin windows and dialogs
      */
     public PluginRuntime(Options options, ActivityNotifier notifier, BiConsumer<String, String> configReport,
-                         Contributions contributions) {
+                         Contributions contributions, AuxiliaryWindows windows) {
         this.options = Objects.requireNonNull(options);
         this.notifier = Objects.requireNonNull(notifier);
         this.configReport = Objects.requireNonNull(configReport);
         this.contributions = Objects.requireNonNull(contributions);
+        this.windows = Objects.requireNonNull(windows);
     }
 
     /**
@@ -116,7 +120,7 @@ public final class PluginRuntime {
         statuses.addAll(resolution.rejected());
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.dataRoot().resolve(id),
-            id -> tables.getOrDefault(id, Map.of()), configReport, DRAIN_GRACE, contributions, () -> this.dark));
+            id -> tables.getOrDefault(id, Map.of()), configReport, DRAIN_GRACE, contributions, () -> this.dark, windows));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         Map<String, PluginLoader.Loaded> loaded = new LinkedHashMap<>();

@@ -1,6 +1,9 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.windows.AuxiliarySurface;
+import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityEvent;
@@ -49,7 +52,16 @@ class AppContractTest extends PluginContractTest {
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark) {
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()),
-            (key, message) -> { }, drainGrace, contributions, dark::get)));
+            (key, message) -> { }, drainGrace, contributions, dark::get, headlessWindows())));
+    }
+
+    /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
+    static AuxiliaryWindows headlessWindows() { return headlessWindows(UiState.inMemory()); }
+
+    /** UI thread: plugin windows over shells that touch no native window. */
+    static AuxiliaryWindows headlessWindows(UiState state) {
+        return new AuxiliaryWindows(state, surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
+            () -> new java.awt.Rectangle(0, 0, 10, 10)));
     }
 
     @Override protected ContractHarness newHarness() {

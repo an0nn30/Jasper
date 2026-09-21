@@ -443,4 +443,67 @@ public final class FakePluginHost implements AutoCloseable {
             enqueue(event(state, last, Objects.requireNonNull(detail, "detail")));
         }
     }
+
+    /**
+     * Registered panels, registration order.
+     *
+     * @return lines of the form {@code id|title|LEFT|RIGHT|BOTTOM}, the last field being the default anchor
+     */
+    public List<String> panels() {
+        List<String> lines = new ArrayList<>();
+        for (FakePluginContext context : contexts.values())
+            for (FakeUi.Panel panel : context.ui.panels) lines.add(panel.spec.id() + "|" + panel.spec.title() + "|" + panel.spec.defaultAnchor());
+        return lines;
+    }
+
+    /**
+     * Invokes a panel's factory as a window showing it would. A factory failure is recorded.
+     *
+     * @param panelId the panel to build
+     * @param windowId the window the panel host reports
+     * @return the component, or null when there is no such panel or its factory failed
+     */
+    public javax.swing.JComponent openPanel(String panelId, UUID windowId) {
+        for (FakePluginContext context : contexts.values()) {
+            javax.swing.JComponent built = context.ui.openPanel(panelId, windowId);
+            if (built != null) return built;
+        }
+        return null;
+    }
+
+    /**
+     * Rail buttons in placement order; buttons whose action has closed are omitted.
+     *
+     * @return action ids
+     */
+    public List<String> rail() {
+        List<String> lines = new ArrayList<>();
+        for (FakePluginContext context : contexts.values())
+            for (String[] placed : context.ui.railActions) if (actionExists(placed[0])) lines.add(placed[0]);
+        return lines;
+    }
+
+    /**
+     * Every open plugin window and dialog, creation order.
+     *
+     * @return lines of the form {@code id|title|shown}, where a dialog's id is {@code dialog}
+     */
+    public List<String> windows() {
+        List<String> lines = new ArrayList<>();
+        for (FakePluginContext context : contexts.values())
+            for (FakeUi.FakeWindow window : context.ui.windows) lines.add(window.id + "|" + window.title + "|" + window.shown);
+        return lines;
+    }
+
+    /**
+     * Closes the first open window with this id as the user would, consulting its closing guards.
+     *
+     * @param windowId the window id, or {@code dialog}
+     * @return false when a guard vetoed the close or there is no such window
+     */
+    public boolean requestClose(String windowId) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows)) if (window.id.equals(windowId)) return window.requestClose();
+        return false;
+    }
 }

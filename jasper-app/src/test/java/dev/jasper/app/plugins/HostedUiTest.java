@@ -33,9 +33,13 @@ class HostedUiTest {
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final List<Consumer<Variant>> themeHandlers = new ArrayList<>();
     private Variant variant = Variant.DARK;
+    private final dev.jasper.app.persistence.UiState uiState = dev.jasper.app.persistence.UiState.inMemory();
+    private final dev.jasper.app.windows.AuxiliaryWindows auxiliary = new dev.jasper.app.windows.AuxiliaryWindows(uiState,
+        surface -> new dev.jasper.app.windows.AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
+            () -> new java.awt.Rectangle(0, 0, 10, 10)));
     private final HostedUi ui = new HostedUi("dev.x.tool", model, containment, Runnable::run, () -> true, open::get,
         HostedUiTest.class.getClassLoader(), () -> variant,
-        handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); });
+        handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary);
 
     @Test void actionsReachTheModelWithContainedHandlersAndVerifiedContext() {
         List<ActionContext> seen = new ArrayList<>();
@@ -156,7 +160,7 @@ class HostedUiTest {
         List<Runnable> posted = new ArrayList<>();
         AtomicBoolean onUi = new AtomicBoolean(true);
         var other = new HostedUi("dev.x.tool", model, containment, posted::add, onUi::get, () -> true,
-            HostedUiTest.class.getClassLoader(), () -> Variant.DARK, handler -> () -> { });
+            HostedUiTest.class.getClassLoader(), () -> Variant.DARK, handler -> () -> { }, auxiliary);
         PluginAction action = other.actions().register(ActionSpec.of("dev.x.tool.run", "Run"), context -> { });
         onUi.set(false);
         assertThatIllegalStateException().isThrownBy(() -> other.actions().register(ActionSpec.of("dev.x.tool.b", "B"), c -> { }))
@@ -167,5 +171,64 @@ class HostedUiTest {
         onUi.set(true);
         posted.forEach(Runnable::run);
         assertThat(model.action("dev.x.tool.run")).isEmpty();
+    }
+
+    @Test void panelsAndRailReachTheModelWithContainedFactories() {
+        ui.actions().register(ActionSpec.of("dev.x.tool.open", "Open"), context -> { });
+        List<dev.jasper.sdk.ui.PanelHost> hosts = new ArrayList<>();
+        Subscription panel = ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.x.tool.hosts", "Hosts", new javax.swing.ImageIcon(),
+            dev.jasper.sdk.ui.Anchor.RIGHT), host -> { hosts.add(host); return new javax.swing.JLabel("hosts"); });
+        ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.x.tool.broken", "Broken", new javax.swing.ImageIcon(),
+            dev.jasper.sdk.ui.Anchor.LEFT), host -> { throw new IllegalStateException("factory failure"); });
+        assertThatIllegalArgumentException().isThrownBy(() -> ui.panels().register(new dev.jasper.sdk.ui.PanelSpec("dev.other.panel", "Foreign",
+            new javax.swing.ImageIcon(), dev.jasper.sdk.ui.Anchor.LEFT), host -> new javax.swing.JLabel()));
+
+        var entry = model.panels().get(0);
+        assertThat(entry.defaultRegion()).isEqualTo(dev.jasper.app.contributions.PanelRegion.RIGHT);
+        UUID window = UUID.randomUUID();
+        boolean[] visible = {true};
+        var site = new dev.jasper.app.contributions.PanelSite(window, () -> visible[0] = true, () -> visible[0] = false, () -> visible[0]);
+        assertThat(entry.factory().apply(site)).isInstanceOf(javax.swing.JLabel.class);
+        assertThat(hosts).singleElement().satisfies(host -> {
+            assertThat(host.window().id()).isEqualTo(window);
+            host.hide();
+            assertThat(host.visible()).isFalse();
+        });
+        assertThat(model.panels().get(1).factory().apply(site)).as("a failed factory yields no component").isNull();
+        assertThat(containment.failures("dev.x.tool")).isEqualTo(1);
+
+        ui.rail().add("dev.x.tool.open");
+        assertThatIllegalArgumentException().isThrownBy(() -> ui.rail().add("new_tab"));
+        assertThat(model.railActions()).containsExactly("dev.x.tool.open");
+        panel.close();
+        assertThat(model.panels()).hasSize(1);
+        ui.closeAll();
+        assertThat(model.panels()).isEmpty();
+        assertThat(model.railActions()).isEmpty();
+    }
+
+    @Test void windowsAndDialogsAreBuiltByTheApplicationAndClosedWithThePlugin() {
+        var manager = ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.x.tool.manager", "Manager", new java.awt.Dimension(640, 480), true));
+        assertThat(ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.x.tool.manager", "Manager", new java.awt.Dimension(640, 480), true)))
+            .as("an open singleton is the same window").isSameAs(manager);
+        assertThatIllegalArgumentException().isThrownBy(() ->
+            ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.other.window", "Foreign", new java.awt.Dimension(10, 10), false)));
+        manager.setContent(new javax.swing.JLabel("content"));
+        manager.show();
+        List<String> events = new ArrayList<>();
+        manager.onClosing(() -> { throw new IllegalStateException("guard failure"); });
+        manager.onClosed(() -> events.add("closed"));
+        var prompt = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Unlock", manager, true));
+        var trust = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Trust?", (dev.jasper.sdk.terminal.WindowHandle) UUID::randomUUID, false));
+        assertThatIllegalArgumentException().as("an owner this application did not create")
+            .isThrownBy(() -> ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Bad", new dev.jasper.sdk.WindowOwner() { }, true)));
+        assertThat(auxiliary.open()).hasSize(3);
+        assertThat(auxiliary.open().get(0).requestClose()).as("a throwing guard is contained and allows the close").isTrue();
+        assertThat(events).containsExactly("closed");
+        assertThat(containment.failures("dev.x.tool")).isEqualTo(1);
+        assertThat(auxiliary.open()).as("the owner took its dialog with it").hasSize(1);
+        ui.closeAll();
+        assertThat(auxiliary.open()).isEmpty();
+        assertThatCode(() -> { prompt.close(); trust.close(); manager.setTitle("after close"); }).doesNotThrowAnyException();
     }
 }

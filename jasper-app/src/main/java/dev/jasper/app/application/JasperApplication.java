@@ -265,7 +265,10 @@ public final class JasperApplication {
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock(), dirs.pluginData()), activityNotifier,
-            (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions);
+            (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions,
+            new dev.jasper.app.windows.AuxiliaryWindows(dev.jasper.app.persistence.UiState.inMemory(),
+                surface -> new dev.jasper.app.windows.AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
+                    () -> new java.awt.Rectangle(0, 0, 10, 10))));
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome() == BuiltinTheme.DARK);
         boolean[] replayed = new boolean[1];
         // subscribe replays the current theme at once; plugins read the look on demand, so only later changes are events.

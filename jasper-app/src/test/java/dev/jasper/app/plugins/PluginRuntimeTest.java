@@ -51,7 +51,8 @@ class PluginRuntimeTest {
         onEdt(() -> created.set(new PluginRuntime(new PluginRuntime.Options(bundled, user, dev, safeMode,
             root.resolve("plugins.toml"), root.resolve("plugins.lock"), root.resolve("plugin-data")),
             new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> reports.add(key + ": " + message),
-            new dev.jasper.app.contributions.Contributions())));
+            new dev.jasper.app.contributions.Contributions(),
+            AppContractTest.headlessWindows())));
         return created.get();
     }
 

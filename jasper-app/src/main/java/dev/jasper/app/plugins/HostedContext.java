@@ -59,7 +59,8 @@ final class HostedContext implements PluginContext {
         this.ui = new HostedUi(id, host.environment.contributions(), host.containment, host.environment.ui(),
             host.environment.onUi(), () -> state != State.CLOSED, hosted.loader(),
             () -> host.environment.dark().getAsBoolean() ? Variant.DARK : Variant.LIGHT,
-            handler -> events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant())));
+            handler -> events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant())),
+            host.environment.windows());
     }
 
     private void requireOpen() {

@@ -27,7 +27,8 @@ class BundledSamplePluginTest {
         onEdt(() -> {
             runtime.set(new PluginRuntime(new PluginRuntime.Options(staged, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock"), root.resolve("plugin-data")),
-                new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> { }, contributions));
+                new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> { }, contributions,
+                AppContractTest.headlessWindows()));
             runtime.get().start(Map.of("dev.jasper.sample", Map.<String, Object>of("demo_activity", true, "demo_ui", true, "demo_step_millis", 0L)), true);
         });
         onEdt(() -> {
