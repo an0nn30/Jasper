@@ -1,5 +1,17 @@
 # Jasper — Status and Handoff
 
+**Application/Buddy architecture (2026-09-20):** The user approved the proposed
+three-module direction: keep `jasper-terminal`, reorganize `jasper-app` by
+responsibility, and extract `jasper-buddy` with an explicit supported boundary.
+The [written specification](superpowers/specs/2026-09-20-jasper-app-buddy-refactor-design.md)
+is drafted and self-reviewed on `codex/app-architecture-design`, based on merged
+main `c7b796b`. It maps all 114 existing app classes (93 remain in the app; 21 move
+to Buddy), keeps visibility policy and position-file persistence in the app, and
+specifies ownership, dependencies, migration, documentation and acceptance.
+Written-spec review is the next step; no implementation plan or production changes
+have been made. The terminal refactor is now merged into the main checkout;
+older execution notes below record its pre-integration handoff.
+
 **Terminal architecture refactor (2026-09-20):** Implemented independently on
 `codex/terminal-refactor-native` in the isolated `terminal-refactor-4830` worktree.
 The terminal now has supported session/view/config/search/rendering packages,
