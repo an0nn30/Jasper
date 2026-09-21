@@ -119,6 +119,7 @@ public final class FakePluginHost implements AutoCloseable {
 
     /** Delivers every queued event, including those queued by the deliveries themselves. */
     public void flush() {
+        workspace.sessions.pump();
         Runnable delivery;
         while ((delivery = events.poll()) != null) delivery.run();
     }
@@ -319,6 +320,7 @@ public final class FakePluginHost implements AutoCloseable {
 
     private void teardown(FakePluginContext context, String reason) {
         context.state = FakePluginContext.State.CLOSED;
+        workspace.sessions.stopping(context);
         context.closeOwned();
         context.ui.closeAll();
         String id = context.plugin().id();
@@ -677,4 +679,52 @@ public final class FakePluginHost implements AutoCloseable {
     public void bell(UUID paneId) {
         workspace.pane(paneId).ifPresent(pane -> publishApp(TerminalEvents.BELL, new TerminalEvents.PaneEvent(pane.tab.id, paneId)));
     }
+
+    /**
+     * A provided session's state.
+     *
+     * @param paneId the pane
+     * @return {@code CONNECTING|<status>}, {@code RUNNING|}, {@code EXITED|<how it ended>}, {@code LOCAL|} for a pane that is not a provided session, or {@code CLOSED|} for a pane that is gone
+     */
+    public String sessionState(UUID paneId) { return workspace.sessions.state(workspace.anyPane(paneId).orElse(null)); }
+
+    /**
+     * The user pressed Cancel. A pane that never showed a session closes; otherwise it returns to the disconnected state.
+     *
+     * @param paneId the pane
+     */
+    public void cancelSession(UUID paneId) { workspace.pane(paneId).ifPresent(workspace.sessions::cancel); }
+
+    /**
+     * The user pressed Reconnect or Retry on a session that ended: the connector runs again with a fresh attempt.
+     *
+     * @param paneId the pane
+     */
+    public void reconnectSession(UUID paneId) { workspace.pane(paneId).ifPresent(workspace.sessions::reconnect); }
+
+    /**
+     * Writes to an attached connection's input and flushes, on the calling thread.
+     *
+     * @param paneId the pane
+     * @param text what the user typed, as UTF-8
+     */
+    public void typeIntoSession(UUID paneId, String text) { workspace.pane(paneId).ifPresent(pane -> workspace.sessions.type(pane, text)); }
+
+    /**
+     * Reads what an attached connection's output has available, without blocking.
+     *
+     * @param paneId the pane
+     * @return the bytes as UTF-8 text, possibly empty
+     */
+    public String sessionOutput(UUID paneId) { return workspace.pane(paneId).map(workspace.sessions::output).orElse(""); }
+
+    /** Notices attached sessions whose exit future completed: closes them, reports the exit and applies the exit policy. {@link #flush()} does this first. */
+    public void pumpSessions() { workspace.sessions.pump(); }
+
+    /**
+     * Every open pane, in creation order.
+     *
+     * @return their ids
+     */
+    public List<UUID> terminalPanes() { return workspace.everyOpenPane().stream().map(pane -> pane.id).toList(); }
 }

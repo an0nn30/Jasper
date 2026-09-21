@@ -16,6 +16,7 @@ import java.util.UUID;
 final class FakeWorkspace {
     static final class Pane {
         final UUID id = UUID.randomUUID(); final Tab tab; PaneInfo info; String selection; String job; boolean open = true;
+        FakeSessions.Session session;
         final List<String> sent = new ArrayList<>();
         Pane(Tab tab, PaneInfo info) { this.tab = tab; this.info = info; }
     }
@@ -36,7 +37,11 @@ final class FakeWorkspace {
     Window lastActive;
     private UUID reportedActive;
 
-    FakeWorkspace(FakePluginHost host) { this.host = host; }
+    final FakeSessions sessions;
+
+    FakeWorkspace(FakePluginHost host) { this.host = host; this.sessions = new FakeSessions(host, this); }
+
+    List<Pane> everyOpenPane() { return everyPane.stream().filter(pane -> pane.open).toList(); }
 
     Optional<Window> window(UUID id) { return windows.stream().filter(window -> window.id.equals(id)).findFirst(); }
     Optional<Tab> tab(UUID id) { return everyTab.stream().filter(tab -> tab.open && tab.id.equals(id)).findFirst(); }
@@ -103,6 +108,7 @@ final class FakeWorkspace {
 
     void close(Pane pane) {
         if (!pane.open) return;
+        sessions.closing(pane);
         pane.open = false;
         Tab tab = pane.tab; Window window = tab.window;
         tab.panes.remove(pane);

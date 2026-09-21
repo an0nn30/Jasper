@@ -16,6 +16,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import dev.jasper.sdk.terminal.SessionKind;
+import dev.jasper.sdk.terminal.SessionState;
+import java.util.OptionalInt;
 
 /** One fake plugin's view of the scripted workspace, with the application's capability rules. */
 final class FakeTerminals implements Terminals {
@@ -137,24 +140,43 @@ final class FakeTerminals implements Terminals {
 
     @Override public Optional<PaneHandle> openTab(WindowHandle window, OpenRequest request) {
         Objects.requireNonNull(window, "window");
-        OpenRequest.Local local = local(request);
+        requireFor(request);
         context.requireOpen();
-        return workspace.window(window.id()).map(target -> {
-            workspace.openRequests.add("tab|" + target.id + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-"));
-            FakeWorkspace.Tab tab = workspace.addTab(target, "opened");
-            FakeWorkspace.Pane pane = workspace.addPane(tab, openedInfo(local));
-            return new Pane(pane.id, tab.id);
+        return workspace.window(window.id()).map(target -> switch (request) {
+            case OpenRequest.Local local -> {
+                workspace.openRequests.add("tab|" + target.id + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-"));
+                FakeWorkspace.Tab tab = workspace.addTab(target, "opened");
+                FakeWorkspace.Pane pane = workspace.addPane(tab, openedInfo(local));
+                yield new Pane(pane.id, tab.id);
+            }
+            case OpenRequest.Session session -> {
+                workspace.openRequests.add("session-tab|" + target.id + "|" + session.spec().title());
+                FakeWorkspace.Tab tab = workspace.addTab(target, session.spec().title());
+                FakeWorkspace.Pane pane = workspace.addPane(tab, sessionInfo(session));
+                workspace.sessions.connect(context, pane, session.spec());
+                yield new Pane(pane.id, tab.id);
+            }
         });
     }
 
     @Override public Optional<PaneHandle> split(PaneHandle target, Direction direction, OpenRequest request) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(direction, "direction");
-        OpenRequest.Local local = local(request);
+        requireFor(request);
         context.requireOpen();
         return workspace.pane(target.id()).map(model -> {
-            workspace.openRequests.add("split|" + model.id + "|" + direction + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-"));
-            FakeWorkspace.Pane pane = workspace.addPane(model.tab, openedInfo(local));
+            FakeWorkspace.Pane pane = switch (request) {
+                case OpenRequest.Local local -> {
+                    workspace.openRequests.add("split|" + model.id + "|" + direction + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-"));
+                    yield workspace.addPane(model.tab, openedInfo(local));
+                }
+                case OpenRequest.Session session -> {
+                    workspace.openRequests.add("session-split|" + model.id + "|" + direction + "|" + session.spec().title());
+                    FakeWorkspace.Pane created = workspace.addPane(model.tab, sessionInfo(session));
+                    workspace.sessions.connect(context, created, session.spec());
+                    yield created;
+                }
+            };
             workspace.focus(pane);
             return new Pane(pane.id, model.tab.id);
         });
@@ -163,13 +185,25 @@ final class FakeTerminals implements Terminals {
     private static PaneInfo openedInfo(OpenRequest.Local local) {
         PaneInfo blank = PaneInfo.unknown();
         return new PaneInfo("", local.spec().workingDirectory(), Optional.empty(), 80, 24, false, blank.kind(), Optional.empty(),
-            dev.jasper.sdk.terminal.SessionState.RUNNING, blank.exitStatus());
+            SessionState.RUNNING, blank.exitStatus());
     }
 
-    private OpenRequest.Local local(OpenRequest request) {
-        return switch (Objects.requireNonNull(request, "request")) {
-            case OpenRequest.Local local -> { require(Capabilities.TERMINAL_OPEN); yield local; }
-            case OpenRequest.Session session -> throw new UnsupportedOperationException("provided sessions arrive with the next commit");
-        };
+    private PaneInfo sessionInfo(OpenRequest.Session session) {
+        return new PaneInfo(session.spec().title(), Optional.empty(), Optional.empty(), 80, 24, false, SessionKind.PLUGIN,
+            Optional.of(context.plugin().id()), SessionState.CONNECTING, OptionalInt.empty());
+    }
+
+    /** A copy of a snapshot in another session state; an exit status is kept only for an exited session. */
+    static PaneInfo withState(PaneInfo info, SessionState state, OptionalInt exitStatus) {
+        return new PaneInfo(info.title(), info.workingDirectory(), info.remoteDirectory(), info.columns(), info.rows(), info.shellIntegration(),
+            info.kind(), info.providerPluginId(), state, state == SessionState.EXITED ? exitStatus : OptionalInt.empty());
+    }
+
+    /** Every request kind names its capability here, before anything else happens. */
+    private void requireFor(OpenRequest request) {
+        switch (Objects.requireNonNull(request, "request")) {
+            case OpenRequest.Local local -> require(Capabilities.TERMINAL_OPEN);
+            case OpenRequest.Session session -> require(Capabilities.SESSION_PROVIDE);
+        }
     }
 }
