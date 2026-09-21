@@ -1,0 +1,7 @@
+id = "dev.jasper.sample"
+name = "Sample"
+version = "0.1.0"
+entry = "dev.jasper.sample.SamplePlugin"
+sdk = ">=0.1, <0.2"
+description = "Exercises the plugin runtime end to end; inert unless demo_activity is set."
+vendor = "Jasper"

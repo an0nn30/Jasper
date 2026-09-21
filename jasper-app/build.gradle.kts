@@ -24,8 +24,22 @@ application {
     )
 }
 
+// Bundled plugins are separate jars in plugins/<id>/, never on the application classpath.
+val stagePlugins = tasks.register<Sync>("stagePlugins") {
+    from(project(":jasper-plugin-sample").tasks.named("jar")) { into("dev.jasper.sample") }
+    into(layout.buildDirectory.dir("plugins"))
+}
+// installDist and the distribution archives carry them beside the application jar, where the runtime looks.
+distributions { main { contents { from(stagePlugins) { into("lib/plugins") } } } }
+tasks.named<JavaExec>("run") {
+    dependsOn(stagePlugins)
+    systemProperty("jasper.plugins.bundled", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
+}
+
 tasks.test {
     systemProperty("jasper.repoRoot", rootProject.projectDir.absolutePath)
+    dependsOn(stagePlugins)
+    systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
     dependsOn(tasks.jar, ":jasper-buddy:jar", ":jasper-terminal:jar")
     systemProperty("jasper.appJar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
     systemProperty("jasper.buddyJar", project(":jasper-buddy").layout.buildDirectory.file("libs/jasper-buddy.jar").get().asFile.absolutePath)
@@ -101,6 +115,7 @@ tasks.test {
     inputs.files(rootProject.fileTree("docs") { include("**/*.md") },
         rootProject.file("README.md"), rootProject.file("AGENTS.md"),
         rootProject.file("jasper-app/README.md"), rootProject.file("jasper-terminal/README.md"),
-        rootProject.file("jasper-buddy/README.md"), rootProject.fileTree("packaging") { include("**/*.md") })
+        rootProject.file("jasper-buddy/README.md"), rootProject.file("jasper-sdk/README.md"),
+        rootProject.fileTree("plugins") { include("**/*.java") }, rootProject.fileTree("packaging") { include("**/*.md") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }

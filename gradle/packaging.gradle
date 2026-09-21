@@ -99,6 +99,7 @@ def stage = tasks.register('stagePackage', Sync) {
     from(configurations.runtimeClasspath)
     from(rootProject.file('config.example.toml'))
     from(rootProject.file('packaging/README.txt'))
+    from(tasks.named('stagePlugins')) { into('plugins') }
     into(inputDirectory)
     duplicatesStrategy = DuplicatesStrategy.FAIL
 }
@@ -163,9 +164,17 @@ def verifyPackage = tasks.register('verifyPackage') {
             if (!candidate.exists()) throw new GradleException("Package verification failed: missing ${candidate}")
         }
         inputDirectory.get().asFile.eachFile { staged ->
+            if (staged.isDirectory()) return
             File packaged = new File(appDir, staged.name)
             if (!packaged.isFile() || !Arrays.equals(Files.readAllBytes(staged.toPath()), Files.readAllBytes(packaged.toPath()))) {
                 throw new GradleException("Package verification failed: staged file differs or is missing: ${staged.name}")
+            }
+        }
+        File stagedPlugins = new File(inputDirectory.get().asFile, 'plugins')
+        stagedPlugins.eachFileRecurse(groovy.io.FileType.FILES) { staged ->
+            File packaged = new File(appDir, 'plugins/' + stagedPlugins.toPath().relativize(staged.toPath()).toString())
+            if (!packaged.isFile() || !Arrays.equals(Files.readAllBytes(staged.toPath()), Files.readAllBytes(packaged.toPath()))) {
+                throw new GradleException("Package verification failed: bundled plugin file differs or is missing: ${staged}")
             }
         }
         String cfg = config.getText('UTF-8')
