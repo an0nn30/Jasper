@@ -18,6 +18,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import dev.jasper.app.terminals.TerminalRegistry;
 
 /**
  * Plugin lifetimes on the UI thread: start in the order given, roll back a failed start completely,
@@ -27,7 +28,7 @@ final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Function<String, Map<String, Object>> settings, BiConsumer<String, String> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
-                       AuxiliaryWindows windows) { }
+                       AuxiliaryWindows windows, TerminalRegistry terminals) { }
 
     record Outcome(PluginStatus.State state, String reason) { }
 

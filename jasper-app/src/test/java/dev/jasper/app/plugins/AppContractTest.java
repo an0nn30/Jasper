@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
+import dev.jasper.app.terminals.TerminalRegistry;
 
 /** The application's runtime must pass the same contract as the testkit fake, on the real EDT. */
 class AppContractTest extends PluginContractTest {
@@ -50,14 +51,15 @@ class AppContractTest extends PluginContractTest {
 
     static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark) {
-        return host(data, tables, drainGrace, contributions, dark, onEdtValue(AppContractTest::headlessWindows));
+        return host(data, tables, drainGrace, contributions, dark, onEdtValue(AppContractTest::headlessWindows), onEdtValue(TerminalRegistry::new));
     }
 
     static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
-                           Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary) {
+                           Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
+                           TerminalRegistry terminals) {
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()),
-            (key, message) -> { }, drainGrace, contributions, dark::get, auxiliary)));
+            (key, message) -> { }, drainGrace, contributions, dark::get, auxiliary, terminals)));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
@@ -76,7 +78,8 @@ class AppContractTest extends PluginContractTest {
         Contributions contributions = onEdtValue(Contributions::new);
         var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
         AuxiliaryWindows auxiliary = onEdtValue(AppContractTest::headlessWindows);
-        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark, auxiliary);
+        TerminalFixture terminalFixture = onEdtValue(TerminalFixture::new);
+        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry);
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
         return new ContractHarness() {

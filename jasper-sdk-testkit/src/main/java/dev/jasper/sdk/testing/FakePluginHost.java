@@ -52,6 +52,7 @@ public final class FakePluginHost implements AutoCloseable {
     private final List<ActivityEvent> activityLog = new CopyOnWriteArrayList<>();
     private final Map<Class<?>, Provider> committed = new LinkedHashMap<>();
     private final Map<String, Map<Class<?>, Provider>> staged = new HashMap<>();
+    final FakeWorkspace workspace = new FakeWorkspace(this);
     private final Map<String, FakePluginContext> contexts = new LinkedHashMap<>();
     private final Map<String, Map<String, Object>> presets = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
@@ -506,4 +507,92 @@ public final class FakePluginHost implements AutoCloseable {
             for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows)) if (window.id.equals(windowId)) return window.requestClose();
         return false;
     }
+
+    /**
+     * Adds a terminal window. Windows, tabs and panes announce themselves on the terminal topics like the
+     * application's, delivered by {@link #flush()}.
+     *
+     * @return the new window's id
+     */
+    public UUID addTerminalWindow() { return workspace.addWindow().id; }
+
+    /**
+     * Adds and selects a tab.
+     *
+     * @param windowId an open window
+     * @param title the tab's title
+     * @return the new tab's id
+     */
+    public UUID addTerminalTab(UUID windowId, String title) {
+        return workspace.addTab(workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No such window: " + windowId)), title).id;
+    }
+
+    /**
+     * Adds a pane; a tab's first pane is its focused pane.
+     *
+     * @param tabId an open tab
+     * @param info what the pane reports
+     * @return the new pane's id
+     */
+    public UUID addTerminalPane(UUID tabId, dev.jasper.sdk.terminal.PaneInfo info) {
+        return workspace.addPane(workspace.tab(tabId).orElseThrow(() -> new IllegalArgumentException("No such tab: " + tabId)),
+            Objects.requireNonNull(info, "info")).id;
+    }
+
+    /**
+     * The user turned to a window.
+     *
+     * @param windowId the window
+     */
+    public void activateTerminalWindow(UUID windowId) { workspace.window(windowId).ifPresent(workspace::activate); }
+    /**
+     * The user focused a pane, which also selects its tab.
+     *
+     * @param paneId the pane
+     */
+    public void focusTerminalPane(UUID paneId) { workspace.pane(paneId).ifPresent(workspace::focus); }
+    /**
+     * Closes a pane; the last pane takes its tab with it, and the last tab its window.
+     *
+     * @param paneId the pane
+     */
+    public void closeTerminalPane(UUID paneId) { workspace.pane(paneId).ifPresent(workspace::close); }
+    /**
+     * Replaces what a pane reports, without an event.
+     *
+     * @param paneId the pane
+     * @param info the new snapshot
+     */
+    public void setPaneInfo(UUID paneId, dev.jasper.sdk.terminal.PaneInfo info) { workspace.pane(paneId).ifPresent(pane -> pane.info = Objects.requireNonNull(info, "info")); }
+    /**
+     * Sets the text selected in a pane.
+     *
+     * @param paneId the pane
+     * @param textOrNull the selection, or null for none
+     */
+    public void setSelection(UUID paneId, String textOrNull) { workspace.pane(paneId).ifPresent(pane -> pane.selection = textOrNull); }
+    /**
+     * Sets the program a pane reports in the foreground.
+     *
+     * @param paneId the pane
+     * @param nameOrNull the program, or null for unknown
+     */
+    public void setForegroundJob(UUID paneId, String nameOrNull) { workspace.pane(paneId).ifPresent(pane -> pane.job = nameOrNull); }
+
+    /**
+     * What plugins sent to a pane, in order; still readable after the pane closed.
+     *
+     * @param paneId the pane
+     * @return lines of the form {@code write:<the bytes as UTF-8 text>} or {@code paste:<text>}
+     */
+    public List<String> sent(UUID paneId) {
+        synchronized (workspace) { return workspace.anyPane(paneId).map(pane -> List.copyOf(pane.sent)).orElse(List.of()); }
+    }
+
+    /**
+     * What plugins asked to open or raise, in order.
+     *
+     * @return lines of the form {@code tab|<window id>|<directory or ->}, {@code split|<pane id>|<RIGHT or DOWN>|<directory or ->} or {@code front|<window id>}
+     */
+    public List<String> openRequests() { return List.copyOf(workspace.openRequests); }
 }

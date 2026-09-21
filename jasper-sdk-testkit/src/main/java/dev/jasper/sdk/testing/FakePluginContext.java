@@ -52,10 +52,12 @@ public final class FakePluginContext implements PluginContext {
     final CopyOnWriteArrayList<Runnable> configListeners = new CopyOnWriteArrayList<>();
     final Map<Class<?>, Object> services = new ConcurrentHashMap<>();
     private final List<Subscription> owned = new ArrayList<>();
+    final FakeTerminals terminals;
     final FakeUi ui;
 
     FakePluginContext(FakePluginHost host, PluginInfo info, Set<String> requires, Plugin plugin) {
         this.host = host; this.info = info; this.requires = requires; this.plugin = plugin;
+        this.terminals = new FakeTerminals(this, host.workspace);
         this.ui = new FakeUi(host, this);
     }
 
@@ -88,6 +90,9 @@ public final class FakePluginContext implements PluginContext {
             host.background.add(task);
         };
     }
+
+    /** The scripted windows, tabs and panes. */
+    public dev.jasper.sdk.terminal.Terminals terminals() { return terminals; }
 
     @Override public Events events() {
         return new Events() {

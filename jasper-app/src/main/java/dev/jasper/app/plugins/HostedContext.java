@@ -53,17 +53,22 @@ final class HostedContext implements PluginContext {
     private final ExecutorService executor;
     volatile State state = State.STARTING;
     private final HostedUi ui;
+    final CapabilityGate gate;
+    final HostedTerminals terminals;
     Plugin plugin;
 
     HostedContext(PluginHost host, HostedPlugin hosted, PluginSettings settings) {
         this.host = host; this.hosted = hosted; this.settings = settings;
         this.id = hosted.info().id();
         this.executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("jasper-plugin-" + id + "-", 0).factory());
+        this.gate = new CapabilityGate(id, hosted.info().capabilities());
+        this.terminals = new HostedTerminals(id, gate, host.environment.terminals(), host.environment.ui(), host.environment.onUi(),
+            () -> state != State.CLOSED);
         this.ui = new HostedUi(id, host.environment.contributions(), host.containment, host.environment.ui(),
             host.environment.onUi(), () -> state != State.CLOSED, hosted.loader(),
             () -> host.environment.dark().getAsBoolean() ? Variant.DARK : Variant.LIGHT,
             handler -> events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant())),
-            host.environment.windows());
+            host.environment.windows(), terminals);
     }
 
     private void requireOpen() {

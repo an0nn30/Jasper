@@ -55,7 +55,7 @@ class PluginRuntimeTest {
             root.resolve("plugins.toml"), root.resolve("plugins.lock"), root.resolve("plugin-data")),
             new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> reports.add(key + ": " + message),
             new dev.jasper.app.contributions.Contributions(),
-            AppContractTest.headlessWindows())));
+            AppContractTest.headlessWindows(), new dev.jasper.app.terminals.TerminalRegistry())));
         return created.get();
     }
 

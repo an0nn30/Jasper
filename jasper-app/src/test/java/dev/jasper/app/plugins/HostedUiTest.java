@@ -37,9 +37,12 @@ class HostedUiTest {
     private final dev.jasper.app.windows.AuxiliaryWindows auxiliary = new dev.jasper.app.windows.AuxiliaryWindows(uiState,
         surface -> new dev.jasper.app.windows.AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
             () -> new java.awt.Rectangle(0, 0, 10, 10)));
+    private final TerminalFixture terminalFixture = new TerminalFixture();
+    private final HostedTerminals terminals = new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", java.util.Set.of()),
+        terminalFixture.registry, Runnable::run, () -> true, () -> true);
     private final HostedUi ui = new HostedUi("dev.x.tool", model, containment, Runnable::run, () -> true, open::get,
         HostedUiTest.class.getClassLoader(), () -> variant,
-        handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary);
+        handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary, terminals);
 
     @Test void actionsReachTheModelWithContainedHandlersAndVerifiedContext() {
         List<ActionContext> seen = new ArrayList<>();
@@ -160,7 +163,7 @@ class HostedUiTest {
         List<Runnable> posted = new ArrayList<>();
         AtomicBoolean onUi = new AtomicBoolean(true);
         var other = new HostedUi("dev.x.tool", model, containment, posted::add, onUi::get, () -> true,
-            HostedUiTest.class.getClassLoader(), () -> Variant.DARK, handler -> () -> { }, auxiliary);
+            HostedUiTest.class.getClassLoader(), () -> Variant.DARK, handler -> () -> { }, auxiliary, terminals);
         PluginAction action = other.actions().register(ActionSpec.of("dev.x.tool.run", "Run"), context -> { });
         onUi.set(false);
         assertThatIllegalStateException().isThrownBy(() -> other.actions().register(ActionSpec.of("dev.x.tool.b", "B"), c -> { }))
@@ -219,7 +222,7 @@ class HostedUiTest {
         manager.onClosing(() -> { throw new IllegalStateException("guard failure"); });
         manager.onClosed(() -> events.add("closed"));
         var prompt = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Unlock", manager, true));
-        var trust = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Trust?", (dev.jasper.sdk.terminal.WindowHandle) UUID::randomUUID, false));
+        var trust = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Trust?", terminals.windowHandle(UUID.randomUUID()), false));
         assertThatIllegalArgumentException().as("an owner this application did not create")
             .isThrownBy(() -> ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Bad", new dev.jasper.sdk.WindowOwner() { }, true)));
         assertThat(auxiliary.open()).hasSize(3);

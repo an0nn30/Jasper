@@ -1,0 +1,52 @@
+package dev.jasper.sdk.testing;
+
+import dev.jasper.sdk.Capabilities;
+import dev.jasper.sdk.MissingCapabilityException;
+import dev.jasper.sdk.PluginInfo;
+import dev.jasper.sdk.terminal.PaneHandle;
+import dev.jasper.sdk.terminal.PaneInfo;
+import dev.jasper.sdk.terminal.SessionKind;
+import dev.jasper.sdk.terminal.SessionState;
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+
+class FakeTerminalsTest {
+    private static PaneInfo info(String title) {
+        return new PaneInfo(title, Optional.of(Path.of("/src")), Optional.empty(), 80, 24, true, SessionKind.LOCAL, Optional.empty(),
+            SessionState.RUNNING, OptionalInt.empty());
+    }
+
+    @Test void theHostScriptsAWorkspaceThatActionContextsSee() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "build"), pane = host.addTerminalPane(tab, info("make"));
+            host.activateTerminalWindow(window);
+            host.setSelection(pane, "selected");
+            host.setForegroundJob(pane, "vim");
+            var seen = new java.util.ArrayList<PaneHandle>();
+            var context = host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0",
+                Set.of(Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_INJECT)), Set.of(), Set.of(), plugin ->
+                plugin.actions().register(dev.jasper.sdk.ui.ActionSpec.of("dev.x.tool.type", "Type"), invoked -> seen.add(invoked.pane().orElseThrow())));
+            assertThat(context).isNotNull();
+            assertThat(host.invoke("dev.x.tool.type", window, pane)).isTrue();
+            PaneHandle handle = seen.get(0);
+            assertThat(handle.info()).isEqualTo(info("make"));
+            assertThat(handle.foregroundJob()).isCompletedWithValue(Optional.of("vim"));
+            assertThatThrownBy(handle::selection).isInstanceOf(MissingCapabilityException.class);
+            handle.sendText("make test\n");
+            handle.paste("pasted");
+            assertThat(host.sent(pane)).containsExactly("write:make test\n", "paste:pasted");
+            host.setPaneInfo(pane, info("make test"));
+            assertThat(handle.info().title()).isEqualTo("make test");
+            host.closeTerminalPane(pane);
+            assertThat(handle.isOpen()).isFalse();
+            assertThat(handle.info().title()).isEqualTo("make test");
+            assertThat(host.sent(pane)).as("kept for the test to read after the pane closed").hasSize(2);
+            assertThat(host.openRequests()).isEmpty();
+        }
+    }
+}

@@ -132,8 +132,8 @@ final class FakeUi {
     boolean invoke(String actionId, UUID windowId, UUID paneIdOrNull) {
         Action action = actions.get(actionId);
         if (action == null || !action.enabled) return false;
-        WindowHandle window = () -> windowId;
-        Optional<PaneHandle> pane = Optional.ofNullable(paneIdOrNull).map(id -> (PaneHandle) () -> id);
+        WindowHandle window = context.terminals.windowHandle(windowId);
+        Optional<PaneHandle> pane = Optional.ofNullable(paneIdOrNull).map(context.terminals::paneHandle);
         try {
             action.handler.accept(new ActionContext() {
                 @Override public WindowHandle window() { return window; }
@@ -265,7 +265,7 @@ final class FakeUi {
             boolean[] visible = {true};
             try {
                 return panel.factory.create(new PanelHost() {
-                    @Override public WindowHandle window() { return () -> windowId; }
+                    @Override public WindowHandle window() { return context.terminals.windowHandle(windowId); }
                     @Override public void show() { visible[0] = true; }
                     @Override public void hide() { visible[0] = false; }
                     @Override public boolean visible() { return visible[0]; }

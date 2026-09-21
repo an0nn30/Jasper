@@ -69,15 +69,17 @@ final class HostedUi {
     private final Supplier<Variant> variant;
     private final Function<Consumer<Variant>, Subscription> themeSubscriber;
     private final AuxiliaryWindows windows;
+    private final HostedTerminals terminals;
     private final Set<String> ownActions = new HashSet<>();
     private final List<Runnable> closers = new ArrayList<>();
 
     HostedUi(String pluginId, Contributions model, Containment containment, Consumer<Runnable> ui, BooleanSupplier onUi,
              BooleanSupplier open, ClassLoader loader, Supplier<Variant> variant,
-             Function<Consumer<Variant>, Subscription> themeSubscriber, AuxiliaryWindows windows) {
+             Function<Consumer<Variant>, Subscription> themeSubscriber, AuxiliaryWindows windows, HostedTerminals terminals) {
         this.pluginId = pluginId; this.model = model; this.containment = containment; this.ui = ui; this.onUi = onUi;
         this.open = open; this.loader = loader; this.variant = variant; this.themeSubscriber = themeSubscriber;
         this.windows = windows;
+        this.terminals = terminals;
     }
 
     /** Registration needs an open context and the UI thread. */
@@ -133,7 +135,7 @@ final class HostedUi {
             requireNamespace(spec.id(), "An action");
             ActionEntry entry = model.addAction(spec.id(), spec.title(), spec.icon().orElse(null), spec.keywords(),
                 spec.defaultBinding(), invocation -> containment.run(pluginId, "action " + spec.id(), () ->
-                    handler.accept(new Context(invocation::windowId, invocation.paneId().map(id -> (PaneHandle) () -> id)))));
+                    handler.accept(new Context(terminals.windowHandle(invocation.windowId()), invocation.paneId().map(terminals::paneHandle)))));
             ownActions.add(spec.id());
             Subscription removal = tracked(() -> { ownActions.remove(spec.id()); entry.close(); });
             return new PluginAction() {
@@ -213,8 +215,6 @@ final class HostedUi {
         };
     }
 
-    private static WindowHandle handle(java.util.UUID id) { return () -> id; }
-
     /** Wraps an application subscription so closing it is contained to the UI thread like every other registration. */
     private Subscription wrap(dev.jasper.app.lifecycle.Subscription registration) { return subscription(registration::close); }
 
@@ -234,7 +234,7 @@ final class HostedUi {
 
     private PanelHost host(PanelSite site) {
         return new PanelHost() {
-            @Override public WindowHandle window() { return handle(site.windowId()); }
+            @Override public WindowHandle window() { return terminals.windowHandle(site.windowId()); }
             @Override public void show() { requireUi("show"); site.show(); }
             @Override public void hide() { requireUi("hide"); site.hide(); }
             @Override public boolean visible() { return site.visible(); }
