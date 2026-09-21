@@ -113,3 +113,5 @@ gradle.projectsEvaluated {
 }
 
 apply(from = "gradle/application-architecture.gradle.kts")
+
+apply(from = "gradle/sdk-architecture.gradle.kts")
