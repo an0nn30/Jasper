@@ -24,14 +24,12 @@ import javax.swing.SwingUtilities;
 /** Application-level window and shell ownership; closing a window never exits sibling windows. */
 final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
-    /** Upper bound on waiting for closed shells and the history file before the JVM is terminated. */
-    private static final long EXIT_GRACE_MILLIS = 2_000;
     /** At most one buddy poke per second, however fast the user types. */
     private static final long POKE_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(1);
     private final ThemeController themes = new ThemeController();
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
-    private final ExecutorService launches = Executors.newThreadPerTaskExecutor(
-        Thread.ofPlatform().name("jasper-shell-launch-", 0).factory());
+    private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
+        Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
     private boolean quitting;
     private boolean resident;
@@ -40,11 +38,10 @@ final class JasperApplication {
     private boolean stopped;
     private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
-    private final Runnable terminate;
+    private final ApplicationShutdown shutdown;
     private final ShellHistoryIndex shellHistory;
     private final SnippetStore snippets;
     private final Path shellIntegrationDir;
-    private final Set<TerminalSession> sessions = ConcurrentHashMap.newKeySet();
     private final BuddyVisibility buddyVisibility = new BuddyVisibility();
     private final Path buddyStateFile;
     private BuddyWindow buddy;
@@ -109,7 +106,7 @@ final class JasperApplication {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         this.buddyStateFile = buddyStateFile;
-        this.terminate = terminate;
+        this.shutdown = new ApplicationShutdown(terminate);
         this.shellHistory = shellHistory;
         this.snippets = snippets;
         this.shellIntegrationDir = shellIntegrationDir;
@@ -260,11 +257,7 @@ final class JasperApplication {
     }
 
     /** Remembers a shell so shutdown can wait for it to leave before terminating the JVM. */
-    TerminalSession track(TerminalSession session) {
-        sessions.add(session);
-        session.exitFuture().whenComplete((code, error) -> sessions.remove(session));
-        return session;
-    }
+    TerminalSession track(TerminalSession session) { return launches.track(session); }
 
     void windowClosed(TerminalWindow window) {
         windows.remove(window);
@@ -371,7 +364,7 @@ final class JasperApplication {
         if (stopped) return;
         stopped = true;
         quitting = true;
-        launches.shutdown();
+        launches.close();
         removeKeyWatch();
         if (buddy != null) buddy.dispose();
         history.close();
@@ -380,17 +373,9 @@ final class JasperApplication {
         if (configuration != null) configuration.close();
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) Desktop.getDesktop().setQuitHandler(null);
         // Nothing else ends the JVM: without an explicit exit, AWT waits a full quiet second before it lets go.
-        long started = System.nanoTime();
-        List<CompletableFuture<?>> pending = new ArrayList<>();
+        List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());
         pending.add(history.closedFuture());
-        for (TerminalSession session : List.copyOf(sessions)) pending.add(session.exitFuture());
-        CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new))
-            .orTimeout(EXIT_GRACE_MILLIS, TimeUnit.MILLISECONDS)
-            .whenComplete((ignored, failure) -> Thread.ofPlatform().name("jasper-exit").start(() -> {
-                LOG.log(System.Logger.Level.INFO, "Shutdown finished in " + (System.nanoTime() - started) / 1_000_000
-                    + " ms" + (failure == null ? "" : " (cleanup timed out)"));
-                terminate.run();
-            }));
+        shutdown.await(pending);
     }
 
     private static boolean supports(Desktop.Action action) {

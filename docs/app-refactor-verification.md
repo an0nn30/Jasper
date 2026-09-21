@@ -30,6 +30,10 @@ Task 4: Ruling: Reuse the pane’s existing immutable UUID as opaque activity id
 
 Task 5: Ruling: PaletteController creates its card and accepts explicit action-refresh/error/reopen callbacks; the plan’s injected card could not wire its final callbacks without a construction cycle. PaletteKeyRouter now consumes the controller plus an open callback, removing another reverse workspace dependency. Keep integration tests beside the workspace instead of duplicating fixtures in a controller-only test. Cost if wrong: keyboard/focus or failure-reporting regressions; existing integration suites cover these paths.
 
+6. Coordinator/shutdown API tests failed before implementation; late arrival, pane-owned exit, once-only off-EDT termination and timeout tests pass. Full app suite: 740 tests, one expected skip.
+
+Task 6: Ruling: Preserve the established pane-owned close sequence: coordinator.close stops admission but does not force-close already admitted sessions. The plan’s forced-close instruction broke terminationWaitsForAClosedShellToExit; the spec preserves existing shutdown behavior. Late arrivals still close immediately. Cost if wrong: unattached previously admitted sessions wait until bounded JVM termination, as before. The app has no accessible fake connector fixture; tests use an isolated child JVM through the supported terminal API, not a shell or GUI. exitFuture returns copies, so assertions follow completion rather than future identity.
+
 ## Architecture
 
 Existing terminal allowlist, internal-access and package DAG checks pass.

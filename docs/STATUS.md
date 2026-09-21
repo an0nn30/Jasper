@@ -7,7 +7,7 @@ is drafted and self-reviewed on `codex/app-architecture-design`, based on merged
 main `c7b796b`. It has 12 runnable checkpoints covering concrete app owners,
 package boundaries, Buddy extraction, regression checks and onboarding. Native
 execution remains the selected method. Native implementation is approved and underway. Baseline checks passed: 1,083 tests,
-zero failures/errors, two expected skips. Tasks 1–5 are committed: palette controller/generation protection, workspace action/configuration owners and typed activity plus independent settings/subscriptions/builders, theme value subscriptions, and platform/window ownership separation. Initial settings still apply before window packing; configuration registration now belongs to the application. Two explicit dependency details
+zero failures/errors, two expected skips. Tasks 1–6 are committed: launch admission and bounded shutdown, palette controller/generation protection, workspace action/configuration owners and typed activity plus independent settings/subscriptions/builders, theme value subscriptions, and platform/window ownership separation. Initial settings still apply before window packing; configuration registration now belongs to the application. Two explicit dependency details
 are recorded for review: platform title-bar callbacks and Buddy dark-mode input.
 The terminal refactor is merged into the main checkout; older execution notes
 below record its pre-integration handoff.
@@ -1077,3 +1077,5 @@ Task 1 was independently approved with no required fixes. Task 2 added RED/GREEN
 ## Authorized publication and Windows CI test portability
 
 The readiness branch was pushed after explicit user approval. Initial CI passed macOS/Linux but failed three Windows app tests. Test-only `a5f4dc1` uses the platform line separator for the exact logging fallback assertion and adds method-level Windows exclusions for two existing `/bin/sh` fixtures. Production code, package and measured runtime remain unchanged. Focused 15/15 and local full 575 passed/one known skip; `c793925` additionally fixes an off-EDT test resize race without weakening its grid/connector assertions; focused8/full575pass1skip and the confirming three-platform run passed. Details and the controller-review substitution caused by the agent service's thread limit are recorded in the [readiness handoff](terminal-readiness.md#publication-and-ci-follow-up).
+
+App refactor execution ruling: coordinator shutdown preserves pane-owned session close; late arrivals close immediately. The controlled lifecycle tests use a child JVM through supported APIs because app tests cannot access terminal fake connectors.

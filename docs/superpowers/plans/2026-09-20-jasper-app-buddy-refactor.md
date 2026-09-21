@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Approved for native execution; Tasks 1–5 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Tasks 1–6 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -453,9 +453,9 @@ current.complete().accept(palette.stepValues(), result -> {
 
 **Interfaces:** `SessionLaunchCoordinator(ExecutorService)`, `TerminalSession track(TerminalSession)`, `List<CompletableFuture<?>> pendingExits()`, `void close()`; `ApplicationShutdown(Runnable terminate)`, `void await(List<CompletableFuture<?>> pending)`. Both concrete owners are application-internal. `ShellLauncher` continues to receive an Executor, settings Supplier and `(Path,LaunchSettings)->TerminalSession` factory; it never depends on application.
 
-- [ ] Add deterministic tests using existing fake connector/session fixtures: block factory return on a latch, close pane and coordinator, release factory, drain EDT, assert the returned session closes and no pane onReady fires. Also launch before close and assert tracked exit futures remain in the shutdown snapshot until completion. Do not use real shell processes for these cases.
-- [ ] Write a shutdown test with a completed future, an `AtomicInteger` terminate callback and latch; assert exactly one invocation even when `await` is called twice, and assert `SwingUtilities.isEventDispatchThread()` is false in terminate. A separate unfinished future test uses a package-private injected `Duration` constructor set to 10 ms and awaits termination with a bounded latch; production constructor uses exactly 2 seconds.
-- [ ] Run focused tests; missing owners are expected RED. Transplant the launch executor and session set from JasperApplication into SessionLaunchCoordinator. Synchronize admission/close/snapshot with a private lock. `track` immediately closes and returns a late session if stopped; otherwise records it and removes it on exit. Close stops admission before `executor.shutdown()` and closes a snapshot of tracked sessions outside the lock. Pane completion retains its existing closed check and closes late results before attachment.
+- [x] Add deterministic tests using existing fake connector/session fixtures: block factory return on a latch, close pane and coordinator, release factory, drain EDT, assert the returned session closes and no pane onReady fires. Also launch before close and assert tracked exit futures remain in the shutdown snapshot until completion. Do not use real shell processes for these cases.
+- [x] Write a shutdown test with a completed future, an `AtomicInteger` terminate callback and latch; assert exactly one invocation even when `await` is called twice, and assert `SwingUtilities.isEventDispatchThread()` is false in terminate. A separate unfinished future test uses a package-private injected `Duration` constructor set to 10 ms and awaits termination with a bounded latch; production constructor uses exactly 2 seconds.
+- [x] Run focused tests; missing owners are expected RED. Transplant the launch executor and session set from JasperApplication into SessionLaunchCoordinator. Synchronize admission/close/snapshot with a private lock. `track` immediately closes and returns a late session if stopped; otherwise records it and removes it on exit. Close stops admission before `executor.shutdown()`; already-admitted sessions remain pane-owned and tracked until exit (execution ruling preserves the existing shutdown test). Pane completion retains its existing closed check and closes late results before attachment.
 
 ```java
 public TerminalSession track(TerminalSession session) {
@@ -474,7 +474,7 @@ public TerminalSession track(TerminalSession session) {
 }
 ```
 
-- [ ] Extract the current allOf/orTimeout/exit-thread block into ApplicationShutdown. Keep the once gate on EDT and preserve the queued shutdown boundary so Quit can still be recorded by command history. Use this termination core:
+- [x] Extract the current allOf/orTimeout/exit-thread block into ApplicationShutdown. Keep the once gate on EDT and preserve the queued shutdown boundary so Quit can still be recorded by command history. Use this termination core:
 
 ```java
 void await(java.util.List<java.util.concurrent.CompletableFuture<?>> pending) {
@@ -489,7 +489,7 @@ void await(java.util.List<java.util.concurrent.CompletableFuture<?>> pending) {
 ```
 
 Retain elapsed-time logging from existing shutdown around the completion block. JasperApplication closes feature owners, history/config and desktop handlers before passing history.closedFuture plus coordinator.pendingExits. Off-EDT waiting never blocks Swing. Remove redundant launch/session/shutdown fields from JasperApplication.
-- [ ] Run `./gradlew :jasper-app:test`; commit `refactor: make launch and shutdown ownership explicit` with trailer.
+- [x] Run `./gradlew :jasper-app:test`; commit `refactor: make launch and shutdown ownership explicit` with trailer.
 
 ## Task 7: Extract startup composition with explicit rollback
 
