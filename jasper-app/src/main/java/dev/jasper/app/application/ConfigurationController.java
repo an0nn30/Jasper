@@ -22,6 +22,25 @@ final class ConfigurationController implements AutoCloseable {
     private ConfigService.State state;
     private boolean closed;
     private Consumer<ConfigSnapshot> applicationListener = snapshot -> {};
+    private final List<dev.jasper.app.config.ConfigDiagnostic> reported = new java.util.ArrayList<>();
+
+    /** The saved state plus problems plugins reported about their own tables since the last reload. */
+    ConfigService.State shown() {
+        requireEdt();
+        if (reported.isEmpty()) return state;
+        var merged = new java.util.ArrayList<>(state.diagnostics());
+        merged.addAll(reported);
+        return new ConfigService.State(state.snapshot(), merged, state.file(), state.present());
+    }
+
+    /** A plugin's complaint about one of its settings; shown with the file's diagnostics until the next reload. */
+    void report(String key, String message) {
+        requireEdt();
+        if (closed) return;
+        reported.add(new dev.jasper.app.config.ConfigDiagnostic(dev.jasper.app.config.ConfigDiagnostic.Severity.WARNING,
+            state.file(), 0, 0, key, message));
+        for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
+    }
 
     ConfigurationController(ThemeController themes, ConfigService service) {
         this(themes, service, new ConfigEditor()::open);
@@ -53,7 +72,7 @@ final class ConfigurationController implements AutoCloseable {
         owner.connectConfiguration(() -> reportFailure(owner, service.openSettings(editor)),
             () -> reportFailure(owner, service.reload()), () -> unregister(owner));
         owner.applyConfiguration(state.snapshot(), service.macOs());
-        owner.setConfigurationState(state);
+        owner.setConfigurationState(shown());
     }
 
     private void reportFailure(WindowContent owner, CompletableFuture<?> result) {
@@ -77,10 +96,11 @@ final class ConfigurationController implements AutoCloseable {
             for (WindowContent owner : List.copyOf(owners)) owner.onError.accept(failure.getMessage());
         }
         state = next;
+        reported.clear();
         applicationListener.accept(next.snapshot());
         for (WindowContent owner : List.copyOf(owners)) {
             owner.applyConfiguration(next.snapshot(), service.macOs());
-            owner.setConfigurationState(state);
+            owner.setConfigurationState(shown());
         }
     }
 

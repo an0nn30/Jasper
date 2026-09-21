@@ -16,7 +16,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                       FontConfig font, Appearance variant, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
                       boolean historyEnabled, int maxResults, List<String> trivialCommands,
-                      int longCommandSeconds, boolean backgroundEnabled) {
+                      int longCommandSeconds, boolean backgroundEnabled,
+                      Map<String, Map<String, Object>> plugins) {
     public ConfigSnapshot {
         if (longCommandSeconds < 0 || longCommandSeconds > 3600)
             throw new IllegalArgumentException("Long-command seconds must be 0\u20133600.");
@@ -31,6 +32,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         Objects.requireNonNull(variant, "variant");
         keybindings = Map.copyOf(keybindings);
         trivialCommands = List.copyOf(trivialCommands);
+        // Plugin tables arrive deeply immutable from the loader; only the outer map is copied here.
+        plugins = Map.copyOf(plugins);
         // A snapshot has no platform. At least one platform must accept its complete map;
         // the loader validates against the actual platform before constructing a snapshot.
         try {
@@ -42,6 +45,16 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                 throw new IllegalArgumentException("Keybindings must name known actions and valid, noncolliding shortcuts.");
             }
         }
+    }
+
+    /** Every constructor that predates plugin tables: no plugin settings. */
+    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
+                   FontConfig font, Appearance variant, Map<String, String> keybindings,
+                   int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
+                   boolean historyEnabled, int maxResults, List<String> trivialCommands,
+                   int longCommandSeconds, boolean backgroundEnabled) {
+        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled,
+            historyEnabled, maxResults, trivialCommands, longCommandSeconds, backgroundEnabled, Map.of());
     }
 
     /**
@@ -122,6 +135,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private List<String> trivialCommands;
         private int longCommandSeconds;
         private boolean backgroundEnabled;
+        private Map<String, Map<String, Object>> plugins;
         private Builder(ConfigSnapshot source) {
             tabHeight = source.tabHeight();
             toolbar = source.toolbar();
@@ -138,6 +152,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             trivialCommands = source.trivialCommands();
             longCommandSeconds = source.longCommandSeconds();
             backgroundEnabled = source.backgroundEnabled();
+            plugins = source.plugins();
         }
         public Builder tabHeight(int value) { tabHeight = value; return this; }
         public Builder toolbar(ToolbarMode value) { toolbar = value; return this; }
@@ -154,8 +169,9 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder trivialCommands(List<String> value) { trivialCommands = List.copyOf(value); return this; }
         public Builder longCommandSeconds(int value) { longCommandSeconds = value; return this; }
         public Builder backgroundEnabled(boolean value) { backgroundEnabled = value; return this; }
+        public Builder plugins(Map<String, Map<String, Object>> value) { plugins = Map.copyOf(value); return this; }
         public ConfigSnapshot build() {
-            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, historyEnabled, maxResults, trivialCommands, longCommandSeconds, backgroundEnabled);
+            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, historyEnabled, maxResults, trivialCommands, longCommandSeconds, backgroundEnabled, plugins);
         }
     }
 }

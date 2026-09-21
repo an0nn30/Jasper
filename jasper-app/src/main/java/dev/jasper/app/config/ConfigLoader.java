@@ -16,6 +16,7 @@ import org.tomlj.TomlTable;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -36,7 +37,7 @@ public final class ConfigLoader {
 
     private static final Map<List<String>, Set<String>> FIELDS = Map.ofEntries(
         Map.entry(List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy", "palette",
-            "notifications", "background")),
+            "notifications", "background", "plugins")),
         Map.entry(List.of("background"), Set.of("enabled")),
         Map.entry(List.of("buddy"), Set.of("enabled")),
         Map.entry(List.of("notifications"), Set.of("long_command_seconds")),
@@ -89,6 +90,8 @@ public final class ConfigLoader {
     private ShellIntegrationMode shellIntegration = ShellIntegrationMode.AUTO;
     private Appearance variant = Appearance.DARK;
     private Map<String, String> keybindings = Map.of();
+    private Map<String, Map<String, Object>> plugins = Map.of();
+    private static final java.util.regex.Pattern PLUGIN_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
 
     private ConfigLoader(Path file, String text, boolean macOs) {
         this.file = Objects.requireNonNull(file, "file");
@@ -113,7 +116,7 @@ public final class ConfigLoader {
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, historyEnabled, maxResults, trivialCommands, longCommandSeconds, backgroundEnabled);
+                buddyEnabled, historyEnabled, maxResults, trivialCommands, longCommandSeconds, backgroundEnabled, plugins);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -128,10 +131,12 @@ public final class ConfigLoader {
             Object value = table.get(List.of(key));
             boolean bindings = path.equals(List.of("keybindings"));
             boolean environment = path.equals(List.of("terminal", "env"));
-            if (FIELDS.containsKey(path) || bindings || environment) {
+            boolean pluginTables = path.equals(List.of("plugins"));
+            if (FIELDS.containsKey(path) || bindings || environment || pluginTables) {
                 if (!(value instanceof TomlTable nested)) typeError(path, "a table");
                 else if (bindings) readBindings(nested);
                 else if (environment) readEnvironment(nested);
+                else if (pluginTables) readPlugins(nested);
                 else readTable(path, nested);
             } else {
                 // Only schema-validated components reach this dispatch. Quoted dotted
@@ -139,6 +144,43 @@ public final class ConfigLoader {
                 readField(String.join(".", path), path, value);
             }
         }
+    }
+
+    /** Plugin tables are opaque to the application: no schema, so no unknown-key warnings inside them. */
+    private void readPlugins(TomlTable table) {
+        var staged = new LinkedHashMap<String, Map<String, Object>>();
+        for (String id : table.keySet()) {
+            List<String> path = List.of("plugins", id);
+            Object value = table.get(List.of(id));
+            if (!PLUGIN_ID.matcher(id).matches()) { warning(path, "Not a plugin id; ignored."); continue; }
+            if (!(value instanceof TomlTable nested)) { typeError(path, "a table"); continue; }
+            staged.put(id, freeze(path, nested));
+        }
+        plugins = Map.copyOf(staged);
+    }
+
+    private Map<String, Object> freeze(List<String> parent, TomlTable table) {
+        var result = new LinkedHashMap<String, Object>();
+        for (String key : table.keySet()) {
+            var path = new ArrayList<>(parent);
+            path.add(key);
+            Object value = table.get(List.of(key));
+            switch (value) {
+                case String text -> result.put(key, text);
+                case Long number -> result.put(key, number);
+                case Double number -> result.put(key, number);
+                case Boolean flag -> result.put(key, flag);
+                case TomlTable nested -> result.put(key, freeze(path, nested));
+                case TomlArray array -> {
+                    List<String> items = new ArrayList<>();
+                    for (int i = 0; i < array.size(); i++) if (array.get(i) instanceof String text) items.add(text);
+                    if (items.size() == array.size()) result.put(key, List.copyOf(items));
+                    else warning(path, "Only arrays of strings are supported in plugin settings; ignored.");
+                }
+                default -> warning(path, "Unsupported value type in plugin settings; ignored.");
+            }
+        }
+        return Collections.unmodifiableMap(result);
     }
 
     private void readField(String name, List<String> path, Object value) {
