@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -73,11 +75,11 @@ final class CommandHistory implements AutoCloseable {
         return recent;
     }
 
-    CommandRegistry.Subscription onChanged(Runnable listener) {
+    Subscription onChanged(Runnable listener) {
         CommandRegistry.requireEdt();
         if (closed) throw new IllegalStateException("History is closed");
         listeners.add(listener);
-        return new CommandRegistry.Subscription(() -> {
+        return new Subscription(() -> {
             CommandRegistry.requireEdt();
             listeners.remove(listener);
         });

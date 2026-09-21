@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.AbstractAction;
@@ -44,9 +46,9 @@ class CommandRegistryTest {
             action.putValue(Command.TITLE, null);
             action.putValue(Action.NAME, "Renamed");
             assertThat(registry.entries().getFirst().title()).isEqualTo("renamed");
-            assertThat(CommandSearch.find(registry.entries(), "renamed", List.of())).containsExactly(command);
+            assertThat(CommandSearch.find(registry.entries(), "renamed", List.of(), 5)).containsExactly(command);
             action.setEnabled(false);
-            assertThat(CommandSearch.find(registry.entries(), "renamed", List.of())).isEmpty();
+            assertThat(CommandSearch.find(registry.entries(), "renamed", List.of(), 5)).isEmpty();
             assertThat(changes).hasValue(4);
 
             changeSubscription.close();
@@ -82,7 +84,7 @@ class CommandRegistryTest {
             var command = new Command("test.change", action, List.of());
             var registration = registry.register(command);
             var notifications = new AtomicInteger();
-            CommandRegistry.Subscription[] self = new CommandRegistry.Subscription[1];
+            Subscription[] self = new Subscription[1];
             self[0] = registry.onChanged(() -> {
                 notifications.incrementAndGet();
                 self[0].close();

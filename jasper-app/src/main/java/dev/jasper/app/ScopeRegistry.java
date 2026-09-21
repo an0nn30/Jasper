@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,7 +14,7 @@ final class ScopeRegistry implements AutoCloseable {
     private final List<Runnable> listeners = new ArrayList<>();
     private boolean closed;
 
-    CommandRegistry.Subscription register(PaletteScope scope) {
+    Subscription register(PaletteScope scope) {
         CommandRegistry.requireEdt();
         if (closed) throw new IllegalStateException("Registry is closed");
         String id = PaletteScope.requireValidId(scope.id());
@@ -20,17 +22,17 @@ final class ScopeRegistry implements AutoCloseable {
         if (scope.verbs().isEmpty()) throw new IllegalArgumentException("Scope needs at least one verb: " + id);
         scopes.put(id, scope);
         notifyListeners();
-        return new CommandRegistry.Subscription(() -> {
+        return new Subscription(() -> {
             CommandRegistry.requireEdt();
             if (scopes.remove(id, scope)) notifyListeners();
         });
     }
 
-    CommandRegistry.Subscription onChanged(Runnable listener) {
+    Subscription onChanged(Runnable listener) {
         CommandRegistry.requireEdt();
         if (closed) throw new IllegalStateException("Registry is closed");
         listeners.add(listener);
-        return new CommandRegistry.Subscription(() -> { CommandRegistry.requireEdt(); listeners.remove(listener); });
+        return new Subscription(() -> { CommandRegistry.requireEdt(); listeners.remove(listener); });
     }
 
     List<PaletteScope> scopes() { CommandRegistry.requireEdt(); return List.copyOf(scopes.values()); }

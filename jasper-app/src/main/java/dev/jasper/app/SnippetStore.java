@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -70,10 +72,10 @@ final class SnippetStore implements AutoCloseable {
     /** Values last used for each placeholder name in this process. EDT only. */
     Map<String, String> lastValues() { CommandRegistry.requireEdt(); return lastValues; }
 
-    CommandRegistry.Subscription onChanged(Runnable listener) {
+    Subscription onChanged(Runnable listener) {
         CommandRegistry.requireEdt();
         listeners.add(listener);
-        return new CommandRegistry.Subscription(() -> { CommandRegistry.requireEdt(); listeners.remove(listener); });
+        return new Subscription(() -> { CommandRegistry.requireEdt(); listeners.remove(listener); });
     }
 
     /** Re-reads unconditionally: startup and Reload Config. */

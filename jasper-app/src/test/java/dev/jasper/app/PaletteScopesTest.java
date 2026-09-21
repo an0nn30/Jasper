@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
@@ -49,9 +51,9 @@ class PaletteScopesTest {
         @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {
             executed.add(row.id() + ":" + verb.id() + ":" + context.target().shellName().get());
         }
-        @Override public CommandRegistry.Subscription onChanged(Runnable listener) {
+        @Override public Subscription onChanged(Runnable listener) {
             listeners.add(listener);
-            return new CommandRegistry.Subscription(() -> listeners.remove(listener));
+            return new Subscription(() -> listeners.remove(listener));
         }
     }
 

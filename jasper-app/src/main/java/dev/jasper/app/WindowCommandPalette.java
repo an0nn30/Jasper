@@ -1,5 +1,9 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.config.HistorySettings;
+import dev.jasper.app.config.PaletteSettings;
+
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.*;
 import java.awt.event.*;
@@ -18,12 +22,12 @@ final class WindowCommandPalette implements AutoCloseable {
     private final boolean macOs;
     private final CommandPalette palette;
     private final Overlay overlay = new Overlay();
-    private final CommandRegistry.Subscription scopesListener;
+    private final Subscription scopesListener;
     private final ComponentAdapter resize = new ComponentAdapter() {
         @Override public void componentResized(ComponentEvent event) { layoutOverlay(); }
         @Override public void componentMoved(ComponentEvent event) { layoutOverlay(); }
     };
-    private CommandRegistry.Subscription scopeListener;
+    private Subscription scopeListener;
     private PaletteScope active;
     private PaletteStep step;
     private PaletteContext context;
@@ -36,8 +40,8 @@ final class WindowCommandPalette implements AutoCloseable {
     // A step's complete() may deliver asynchronously; without this, two quick Enter presses
     // would call complete() twice before the first result arrives.
     private boolean completing;
-    private int maxResults = PaletteContext.DEFAULT_MAX_RESULTS;
-    private java.util.List<String> trivialCommands = ShellHistoryScope.DEFAULT_TRIVIAL;
+    private int maxResults = PaletteSettings.DEFAULT_MAX_RESULTS;
+    private java.util.List<String> trivialCommands = HistorySettings.defaults().trivialCommands();
 
     WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, String defaultScopeId, boolean macOs) {
         this.owner = owner; this.scopes = scopes; this.defaultScopeId = defaultScopeId; this.macOs = macOs;

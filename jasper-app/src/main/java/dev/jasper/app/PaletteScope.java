@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.util.List;
 import javax.swing.Icon;
 
@@ -33,7 +35,7 @@ interface PaletteScope {
      */
     default PaletteStep step(PaletteRow row, PaletteVerb verb, PaletteContext context) { return null; }
     void execute(PaletteRow row, PaletteVerb verb, PaletteContext context);
-    CommandRegistry.Subscription onChanged(Runnable listener);
+    Subscription onChanged(Runnable listener);
 
     static String requireValidId(String id) {
         if (id == null || !id.matches("[a-z][a-z0-9_.-]{0,127}"))

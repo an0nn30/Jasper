@@ -1,5 +1,6 @@
 package dev.jasper.app;
 
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -23,10 +24,6 @@ final class CommandSearch {
         String title = normalize(command.title());
         return new Entry(command, title, List.of(WORD.split(title)),
             normalize(String.join(" ", command.keywords())));
-    }
-
-    static List<Command> find(List<Entry> entries, String query, List<String> recent) {
-        return find(entries, query, recent, PaletteContext.DEFAULT_MAX_RESULTS);
     }
 
     static List<Command> find(List<Entry> entries, String query, List<String> recent, int limit) {

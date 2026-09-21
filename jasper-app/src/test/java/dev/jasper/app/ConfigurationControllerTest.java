@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.ToolbarMode;
+
 import dev.jasper.terminal.config.BellMode;
 import dev.jasper.terminal.config.CursorStyle;
 import dev.jasper.terminal.config.OptionAsMeta;
@@ -82,7 +84,7 @@ class ConfigurationControllerTest {
         start("[font]\nsize=19\n"); edt(this::owner); launchAll();
         var first = owners.getFirst();
         edt(() -> {
-            first.setTabHeight(60); first.setToolbarMode(WindowContent.ToolbarMode.HIDDEN);
+            first.setTabHeight(60); first.setToolbarMode(ToolbarMode.HIDDEN);
             first.setStatusVisible(false); first.selectTheme(BuiltinTheme.LIGHT); first.currentPane().view().setFontSize(28);
         });
         reload("# comment\n[font]\nsize=19\nunknown=1\n");
@@ -180,8 +182,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             owner.close();
             assertThat(owner.action(ActionId.OPEN_SETTINGS).isEnabled()).isFalse();
-            var late = new ConfigService.State(new ConfigSnapshot(55, WindowContent.ToolbarMode.ICONS, false,
-                22, BuiltinTheme.DARK, Map.of()), List.of(), file, true);
+            var late = new ConfigService.State(new ConfigSnapshot(55, ToolbarMode.ICONS, false, FontConfig.defaults().withSize(22), BuiltinTheme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), file, true);
             controller.accept(late);
             assertThat(owner.tabHeight()).isEqualTo(48);
             assertThat(owner.status().configButton().isEnabled()).isFalse();
@@ -212,8 +213,7 @@ class ConfigurationControllerTest {
             themes = new ThemeController(theme -> theme != BuiltinTheme.LIGHT && ThemeController.install(theme));
             controller = new ConfigurationController(themes, service);
             owner().onError = errors::add;
-            var state = new ConfigService.State(new ConfigSnapshot(53, WindowContent.ToolbarMode.ICONS, true,
-                18, BuiltinTheme.LIGHT, Map.of()), List.of(), directory.resolve("config.toml"), true);
+            var state = new ConfigService.State(new ConfigSnapshot(53, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(18), BuiltinTheme.LIGHT.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
             controller.accept(state);
             assertThat(owners.getFirst().tabHeight()).isEqualTo(53);
             assertThat(owners.getFirst().theme().chrome()).isEqualTo(BuiltinTheme.DARK);
@@ -227,8 +227,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             var owner = owner();
             owner.onThemeChanged = ignored -> { throw new IllegalStateException("application callback"); };
-            var next = new ConfigService.State(new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS_AND_LABELS,
-                true, 16, BuiltinTheme.LIGHT, Map.of()), List.of(), directory.resolve("config.toml"), true);
+            var next = new ConfigService.State(new ConfigSnapshot(38, ToolbarMode.ICONS_AND_LABELS, true, FontConfig.defaults().withSize(16), BuiltinTheme.LIGHT.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
             assertThatThrownBy(() -> controller.accept(next)).isInstanceOf(IllegalStateException.class)
                 .hasMessage("application callback");
         });

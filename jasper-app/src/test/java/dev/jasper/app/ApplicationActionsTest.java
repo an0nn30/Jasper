@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.ToolbarMode;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -30,7 +32,7 @@ class ApplicationActionsTest {
             assertThat(ui.action(ActionId.OPEN_SETTINGS).isEnabled()).isFalse();
             assertThat(ui.action(ActionId.RELOAD_CONFIG).isEnabled()).isFalse();
             assertThat(ui.dispatchShortcut(ui.bindings().strokeFor(ActionId.PASTE).orElseThrow(), new JTextField())).isFalse();
-            ui.setToolbarMode(WindowContent.ToolbarMode.HIDDEN);
+            ui.setToolbarMode(ToolbarMode.HIDDEN);
             assertThat(ui.toolbar().isVisible()).isFalse();
             ui.setStatusVisible(false); assertThat(ui.status().isVisible()).isFalse();
             ui.close();

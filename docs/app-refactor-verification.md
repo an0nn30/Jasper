@@ -16,6 +16,7 @@ Existing javac/doclint warnings are nonfatal and will be reviewed with documenta
 ## Task checkpoints
 
 1. Baseline captured; all 114 production app types mapped by the approved plan.
+2. Settings/subscription/builder tests failed on absent APIs, then passed. Full app suite passed (732 tests, one expected skip). Existing config/search behavior retained.
 
 ## Architecture
 

@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.ToolbarMode;
+
 import dev.jasper.terminal.config.BellMode;
 import dev.jasper.terminal.config.CursorStyle;
 import dev.jasper.terminal.config.OptionAsMeta;
@@ -213,7 +215,7 @@ class ExpandedConfigTest {
             List.of("Symbols Nerd Font Mono", "Apple Color Emoji"), true, 1f));
         assertThat(snapshot.terminal()).isEqualTo(new TerminalConfig(new TerminalConfig.Shell("", List.of()),
             Map.of(), 10000, OptionAsMeta.LEFT, CursorStyle.BLOCK, true, .3f, false, BellMode.VISUAL));
-        var legacy = new ConfigSnapshot(40, WindowContent.ToolbarMode.HIDDEN, false, 22f, BuiltinTheme.LIGHT, Map.of());
+        var legacy = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(22f), BuiltinTheme.LIGHT.appearance(), Map.of(), 150, 45, TerminalConfig.defaults());
         assertThat(legacy.font().size()).isEqualTo(22f);
         assertThat(legacy.fontSize()).isEqualTo(22f);
         assertThat(legacy.columns()).isEqualTo(150);
@@ -310,10 +312,10 @@ class ExpandedConfigTest {
             assertThatIllegalArgumentException().isThrownBy(() -> new TerminalConfig(shell, Map.of(), 12, OptionAsMeta.NONE, CursorStyle.BLOCK, true, dim, false, BellMode.NONE));
         }
         for (int columns : new int[]{4, 501}) {
-            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS, true, font, BuiltinTheme.DARK, Map.of(), columns, 45, terminal));
+            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, font, BuiltinTheme.DARK.appearance(), Map.of(), columns, 45, terminal));
         }
         for (int lines : new int[]{1, 201}) {
-            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS, true, font, BuiltinTheme.DARK, Map.of(), 150, lines, terminal));
+            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, font, BuiltinTheme.DARK.appearance(), Map.of(), 150, lines, terminal));
         }
     }
 

@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -9,21 +11,6 @@ import java.util.Optional;
 import javax.swing.SwingUtilities;
 
 final class CommandRegistry implements AutoCloseable {
-    static final class Subscription implements AutoCloseable {
-        private Runnable removal;
-
-        Subscription(Runnable removal) {
-            this.removal = removal;
-        }
-
-        @Override public void close() {
-            if (removal == null) return;
-            Runnable once = removal;
-            removal = null;
-            once.run();
-        }
-    }
-
     private record Registered(Command command, PropertyChangeListener listener) {}
 
     private final Map<String, Registered> commands = new LinkedHashMap<>();

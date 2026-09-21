@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.ToolbarMode;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
@@ -116,9 +118,9 @@ class MockUiTest {
             });
             buttons.getFirst().doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
-            owner.setToolbarMode(WindowContent.ToolbarMode.HIDDEN); layoutTree(owner);
+            owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(owner);
             assertThat(owner.currentPane().getHeight()).isEqualTo(432);
-            owner.setToolbarMode(WindowContent.ToolbarMode.ICONS); layoutTree(owner);
+            owner.setToolbarMode(ToolbarMode.ICONS); layoutTree(owner);
             assertThat(owner.currentPane().getHeight()).isEqualTo(379);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
         });

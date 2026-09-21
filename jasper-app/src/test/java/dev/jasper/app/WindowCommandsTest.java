@@ -10,9 +10,9 @@ class WindowCommandsTest {
         DesktopTestSupport.edt(() -> {
             try (var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()))) {
                 var entries = owner.commands().entries();
-                assertThat(CommandSearch.find(entries, "new tab", java.util.List.of())).isNotEmpty();
-                assertThat(CommandSearch.find(entries, "split", java.util.List.of()).stream().map(Command::id)).doesNotContain("split_right", "split_down");
-                assertThat(CommandSearch.find(entries, "paste", java.util.List.of()).stream().map(Command::id)).doesNotContain("paste");
+                assertThat(CommandSearch.find(entries, "new tab", java.util.List.of(), 5)).isNotEmpty();
+                assertThat(CommandSearch.find(entries, "split", java.util.List.of(), 5).stream().map(Command::id)).doesNotContain("split_right", "split_down");
+                assertThat(CommandSearch.find(entries, "paste", java.util.List.of(), 5).stream().map(Command::id)).doesNotContain("paste");
                 assertThat(owner.action(ActionId.SPLIT_RIGHT).getValue(Action.NAME)).isEqualTo(ActionId.SPLIT_RIGHT.label());
                 assertThat(owner.action(ActionId.SPLIT_RIGHT).getValue(Command.TITLE)).isEqualTo("Split Right \u00b7 Vertical");
                 assertThat(entries.stream().map(e -> e.command().id())).contains("select_tab_1", "view.tab_height", "view.appearance.dark");
@@ -33,7 +33,7 @@ class WindowCommandsTest {
                     .filter(c -> c.id().equals("view.buddy")).findFirst().orElseThrow();
                 assertThat(command.title()).isEqualTo("Hide Jasper");
                 assertThat(command.action().getValue(Action.SELECTED_KEY)).isEqualTo(true);
-                assertThat(CommandSearch.find(owner.commands().entries(), "jasper", java.util.List.of()).stream().map(Command::id))
+                assertThat(CommandSearch.find(owner.commands().entries(), "jasper", java.util.List.of(), 5).stream().map(Command::id))
                     .contains("view.buddy");
                 var viewMenu = owner.menuBar().getMenu(2);
                 var item = java.util.Arrays.stream(viewMenu.getMenuComponents())

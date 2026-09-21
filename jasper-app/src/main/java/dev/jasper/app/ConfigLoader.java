@@ -1,5 +1,9 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.HistorySettings;
+import dev.jasper.app.config.PaletteSettings;
+import dev.jasper.app.config.ToolbarMode;
+
 import dev.jasper.terminal.config.BellMode;
 import dev.jasper.terminal.config.CursorStyle;
 import dev.jasper.terminal.config.OptionAsMeta;
@@ -55,14 +59,14 @@ final class ConfigLoader {
     private final List<ConfigDiagnostic> diagnostics = new ArrayList<>();
     private boolean rejected;
     private int tabHeight = 38;
-    private WindowContent.ToolbarMode toolbar = WindowContent.ToolbarMode.ICONS_AND_LABELS;
+    private ToolbarMode toolbar = ToolbarMode.ICONS_AND_LABELS;
     private boolean statusBar = true;
     private boolean buddyEnabled = true;
     private boolean backgroundEnabled;
     private boolean historyEnabled = true;
     private int longCommandSeconds = 10;
-    private List<String> trivialCommands = ShellHistoryScope.DEFAULT_TRIVIAL;
-    private int maxResults = PaletteContext.DEFAULT_MAX_RESULTS;
+    private List<String> trivialCommands = HistorySettings.defaults().trivialCommands();
+    private int maxResults = PaletteSettings.DEFAULT_MAX_RESULTS;
     private int columns = 150;
     private int lines = 45;
     private String fontFamily = FontConfig.defaults().family();
@@ -142,8 +146,8 @@ final class ConfigLoader {
             case "window.columns" -> columns = integer(path, value, 5, 500, columns);
             case "window.lines" -> lines = integer(path, value, 2, 200, lines);
             case "window.toolbar" -> toolbar = choice(path, value, Map.of(
-                "icons_and_labels", WindowContent.ToolbarMode.ICONS_AND_LABELS,
-                "icons", WindowContent.ToolbarMode.ICONS, "hidden", WindowContent.ToolbarMode.HIDDEN), toolbar);
+                "icons_and_labels", ToolbarMode.ICONS_AND_LABELS,
+                "icons", ToolbarMode.ICONS, "hidden", ToolbarMode.HIDDEN), toolbar);
             case "window.status_bar" -> statusBar = bool(path, value, statusBar);
             case "buddy.enabled" -> buddyEnabled = bool(path, value, buddyEnabled);
             case "background.enabled" -> backgroundEnabled = bool(path, value, backgroundEnabled);
@@ -152,7 +156,7 @@ final class ConfigLoader {
             case "palette.scopes.history.enabled" -> historyEnabled = bool(path, value, historyEnabled);
             case "palette.scopes.history.trivial_commands" -> trivialCommands = lowercased(strings(path, value,
                 ConfigLoader::trivialName, trivialCommands));
-            case "palette.max_results" -> maxResults = integer(path, value, PaletteContext.MIN_MAX_RESULTS, PaletteContext.MAX_MAX_RESULTS, maxResults);
+            case "palette.max_results" -> maxResults = integer(path, value, PaletteSettings.MIN_MAX_RESULTS, PaletteSettings.MAX_MAX_RESULTS, maxResults);
             case "font.family" -> fontFamily = string(path, value, ConfigLoader::fontName,
                 "Use a nonblank font name without NUL; using the default.", fontFamily);
             case "font.size" -> fontSize = number(path, value, 6, 72, fontSize);

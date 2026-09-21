@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
@@ -64,10 +66,10 @@ final class CommandsScope implements PaletteScope {
         history.record(command.id());
     }
 
-    @Override public CommandRegistry.Subscription onChanged(Runnable listener) {
+    @Override public Subscription onChanged(Runnable listener) {
         var registryListener = registry.onChanged(listener);
         var historyListener = history.onChanged(listener);
-        return new CommandRegistry.Subscription(() -> { registryListener.close(); historyListener.close(); });
+        return new Subscription(() -> { registryListener.close(); historyListener.close(); });
     }
 
     private List<Command> available(List<String> ids, int limit) {

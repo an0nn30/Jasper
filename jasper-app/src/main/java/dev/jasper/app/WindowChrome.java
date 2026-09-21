@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.ToolbarMode;
+
 import java.awt.*;
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.event.*;
@@ -36,7 +38,7 @@ final class WindowChrome {
             ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6, ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9);
         menuBar.add(file); menuBar.add(edit); menuBar.add(view); menuBar.add(pane); menuBar.add(tab);
         JMenu modes = new JMenu("Toolbar");
-        for (WindowContent.ToolbarMode mode : WindowContent.ToolbarMode.values()) {
+        for (ToolbarMode mode : ToolbarMode.values()) {
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));
             item.setActionCommand(mode.name());
             toolbarModes.add(item); modes.add(item);
@@ -260,10 +262,10 @@ final class WindowChrome {
         return menu;
     }
 
-    void setToolbarMode(WindowContent.ToolbarMode mode) {
-        toolbar.setVisible(mode != WindowContent.ToolbarMode.HIDDEN);
+    void setToolbarMode(ToolbarMode mode) {
+        toolbar.setVisible(mode != ToolbarMode.HIDDEN);
         for (var component : toolbar.getComponents()) if (component instanceof JButton button) {
-            button.setText(mode == WindowContent.ToolbarMode.ICONS ? null : (String) button.getClientProperty("label"));
+            button.setText(mode == ToolbarMode.ICONS ? null : (String) button.getClientProperty("label"));
         }
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }

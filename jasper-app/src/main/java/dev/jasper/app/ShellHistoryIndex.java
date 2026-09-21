@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -80,11 +82,11 @@ final class ShellHistoryIndex implements AutoCloseable {
 
     ShellHistorySnapshot snapshot() { CommandRegistry.requireEdt(); return snapshot; }
 
-    CommandRegistry.Subscription onChanged(Runnable listener) {
+    Subscription onChanged(Runnable listener) {
         CommandRegistry.requireEdt();
         listeners.add(listener);
         startPolling();
-        return new CommandRegistry.Subscription(() -> {
+        return new Subscription(() -> {
             CommandRegistry.requireEdt();
             listeners.remove(listener);
             if (listeners.isEmpty() && poll != null) poll.stop();

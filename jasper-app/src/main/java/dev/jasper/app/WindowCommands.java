@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.config.ToolbarMode;
+
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,7 +14,7 @@ import javax.swing.Action;
 /** Adapts existing window actions to searchable commands, including the shared View menu actions. */
 final class WindowCommands implements AutoCloseable {
     private final WindowContent owner;
-    private final List<CommandRegistry.Subscription> registrations = new ArrayList<>();
+    private final List<Subscription> registrations = new ArrayList<>();
     private final Map<String, Action> views = new LinkedHashMap<>();
 
     WindowCommands(WindowContent owner, CommandRegistry registry) {
@@ -44,7 +47,7 @@ final class WindowCommands implements AutoCloseable {
             List.of("split", "vertical", "right", "side by side", "pane"))));
         registrations.add(registry.register(new Command("split_down", owner.action(ActionId.SPLIT_DOWN),
             List.of("split", "horizontal", "down", "above below", "pane"))));
-        for (var mode : WindowContent.ToolbarMode.values()) {
+        for (var mode : ToolbarMode.values()) {
             String label = switch (mode) { case ICONS_AND_LABELS -> "Icons and Labels"; case ICONS -> "Icons Only"; case HIDDEN -> "Hidden"; };
             add(registry, "view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT), label,
                 "Toolbar: " + label, () -> owner.setToolbarMode(mode));
@@ -88,14 +91,14 @@ final class WindowCommands implements AutoCloseable {
         boolean buddy = owner.buddyEnabled.getAsBoolean();
         view("view.buddy").putValue(Command.TITLE, buddy ? "Hide Jasper" : "Show Jasper");
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);
-        for (var mode : WindowContent.ToolbarMode.values())
+        for (var mode : ToolbarMode.values())
             view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)).putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
         for (var appearance : Appearance.values())
             view("view.appearance." + appearance.name().toLowerCase(java.util.Locale.ROOT)).putValue(Action.SELECTED_KEY, owner.appearance() == appearance);
     }
 
     @Override public void close() {
-        registrations.forEach(CommandRegistry.Subscription::close); registrations.clear();
+        registrations.forEach(Subscription::close); registrations.clear();
         views.values().forEach(action -> action.setEnabled(false));
     }
 }

@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,14 +62,6 @@ final class ShellHistoryScope implements PaletteScope {
                 done.accept(error != null ? PaletteStep.Result.error(error)
                     : PaletteStep.Result.reopen(SNIPPETS_ID, SnippetsScope.rowId(saved.name()), saved.name()))));
     }
-
-    /**
-     * The default {@code history.trivial_commands}: noise at the top of a recency list. They are still
-     * listed and still searchable — de-ranking never removes a row — but they stop crowding out the work
-     * you came back for. A user list replaces this one; an empty list turns de-ranking off.
-     */
-    static final List<String> DEFAULT_TRIVIAL =
-        List.of("exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout");
 
     /**
      * True for a short command whose first word is in {@code trivial}; "cd deep/path && build" is real
@@ -151,7 +145,7 @@ final class ShellHistoryScope implements PaletteScope {
         if (verb.equals(PASTE_RUN)) context.target().sendReturn().run();
     }
 
-    @Override public CommandRegistry.Subscription onChanged(Runnable listener) { return index.onChanged(listener); }
+    @Override public Subscription onChanged(Runnable listener) { return index.onChanged(listener); }
 
     private static PaletteRow row(ShellHistoryEntry entry, boolean tagged) {
         String title = entry.command().replace("\r", "").replace("\n", " ↵ ");

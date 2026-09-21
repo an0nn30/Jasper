@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -17,8 +19,8 @@ class PaletteScopeModelTest {
             @Override public List<PaletteVerb> verbs() { return List.of(new PaletteVerb("run", "Run")); }
             @Override public PaletteResults search(String query, PaletteContext context) { return PaletteResults.none(); }
             @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {}
-            @Override public CommandRegistry.Subscription onChanged(Runnable listener) {
-                return new CommandRegistry.Subscription(() -> {});
+            @Override public Subscription onChanged(Runnable listener) {
+                return new Subscription(() -> {});
             }
         };
     }

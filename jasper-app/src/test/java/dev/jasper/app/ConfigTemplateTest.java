@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.ToolbarMode;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -75,7 +77,7 @@ class ConfigTemplateTest {
             assertThat(all.rejected()).isFalse();
             assertThat(all.diagnostics()).isEmpty();
             assertThat(all.snapshot().tabHeight()).isEqualTo(38);
-            assertThat(all.snapshot().toolbar()).isEqualTo(WindowContent.ToolbarMode.ICONS_AND_LABELS);
+            assertThat(all.snapshot().toolbar()).isEqualTo(ToolbarMode.ICONS_AND_LABELS);
             assertThat(all.snapshot().statusBar()).isTrue();
             assertThat(all.snapshot().buddyEnabled()).isTrue();
             assertThat(all.snapshot().historyEnabled()).isTrue();

@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.ToolbarMode;
+
 import com.formdev.flatlaf.FlatClientProperties;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -109,7 +111,7 @@ class MacTitleBarTest {
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0x696c77));
                 bar.setActive(true);
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0x383a42));
-                owner.setToolbarMode(WindowContent.ToolbarMode.HIDDEN);
+                owner.setToolbarMode(ToolbarMode.HIDDEN);
                 assertThat(bar.isVisible()).isTrue();
                 assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 38);
             }

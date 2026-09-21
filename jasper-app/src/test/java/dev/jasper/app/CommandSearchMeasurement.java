@@ -58,7 +58,7 @@ public final class CommandSearchMeasurement {
     private static Result measure(List<CommandSearch.Entry> catalog, Query query) {
         long checksum = blackhole;
         for (int i = 0; i < WARMUP_CALLS; i++) checksum = consume(checksum,
-            CommandSearch.find(catalog, query.text, List.of()));
+            CommandSearch.find(catalog, query.text, List.of(), 5));
 
         var allocation = allocationBean();
         long threadId = Thread.currentThread().threadId();
@@ -67,7 +67,7 @@ public final class CommandSearchMeasurement {
         int resultCount = -1;
         for (int i = 0; i < SAMPLE_CALLS; i++) {
             long started = System.nanoTime();
-            List<Command> matches = CommandSearch.find(catalog, query.text, List.of());
+            List<Command> matches = CommandSearch.find(catalog, query.text, List.of(), 5);
             samples[i] = System.nanoTime() - started;
             resultCount = matches.size();
             checksum = consume(checksum, matches);

@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -49,7 +51,7 @@ class CommandHistoryTest {
             var history = new CommandHistory();
             var first = new ArrayList<List<String>>();
             var second = new ArrayList<List<String>>();
-            CommandRegistry.Subscription subscription = history.onChanged(
+            Subscription subscription = history.onChanged(
                 () -> first.add(history.recent()));
             history.onChanged(() -> second.add(history.recent()));
 

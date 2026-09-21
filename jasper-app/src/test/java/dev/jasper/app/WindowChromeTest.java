@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.ToolbarMode;
+
 import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.FlatLightLaf;
 import java.util.ArrayDeque;
@@ -63,12 +65,12 @@ class WindowChromeTest {
             assertThat(buttons.get(6).isEnabled()).isFalse();
             List<Icon> icons = buttons.stream().map(AbstractButton::getIcon).toList();
 
-            owner.setToolbarMode(WindowContent.ToolbarMode.ICONS);
+            owner.setToolbarMode(ToolbarMode.ICONS);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
             assertThat(buttons).extracting(AbstractButton::getIcon).containsExactlyElementsOf(icons);
-            owner.setToolbarMode(WindowContent.ToolbarMode.HIDDEN);
+            owner.setToolbarMode(ToolbarMode.HIDDEN);
             assertThat(owner.toolbar().isVisible()).isFalse();
-            owner.setToolbarMode(WindowContent.ToolbarMode.ICONS_AND_LABELS);
+            owner.setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
             assertThat(owner.toolbar().isVisible()).isTrue();
             assertThat(buttons).extracting(JButton::getText)
                 .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find", "Settings", "Reload config");

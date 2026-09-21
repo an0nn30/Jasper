@@ -1,5 +1,7 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -109,7 +111,7 @@ final class SnippetsScope implements PaletteScope {
         if (row.token() instanceof Snippet snippet) paste(snippet.fill(Map.of()), verb, context);
     }
 
-    @Override public CommandRegistry.Subscription onChanged(Runnable listener) { return store.onChanged(listener); }
+    @Override public Subscription onChanged(Runnable listener) { return store.onChanged(listener); }
 
     private static void paste(String text, PaletteVerb verb, PaletteContext context) {
         context.target().paste().accept(text);

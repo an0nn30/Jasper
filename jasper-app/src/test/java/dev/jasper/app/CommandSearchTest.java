@@ -19,7 +19,7 @@ class CommandSearchTest {
             };
             entries.add(CommandSearch.entry(new Command("test." + i, action, List.of("split"))));
         }
-        var matches = CommandSearch.find(entries, " SPLIT ", List.of("test.0"));
+        var matches = CommandSearch.find(entries, " SPLIT ", List.of("test.0"), 5);
         assertThat(matches).hasSize(5);
         assertThat(matches.getFirst().id()).isEqualTo("test.7");
         assertThat(matches.get(1).id()).isEqualTo("test.0");
@@ -33,7 +33,7 @@ class CommandSearchTest {
             };
             entries.add(CommandSearch.entry(new Command("test." + i, action, List.of())));
         }
-        assertThat(CommandSearch.find(entries, "other", List.of())).hasSize(5);
+        assertThat(CommandSearch.find(entries, "other", List.of(), 5)).hasSize(5);
         assertThat(CommandSearch.find(entries, "other", List.of(), 2)).hasSize(2);
         assertThat(CommandSearch.find(entries, "other", List.of(), 20)).hasSize(8);
     }
@@ -46,10 +46,10 @@ class CommandSearchTest {
             entry("test.word", "Resize Split", List.of()),
             entry("test.prefix", "Split Right", List.of()),
             entry("test.exact", "Split", List.of()));
-        assertThat(CommandSearch.find(entries, "split", List.of()))
+        assertThat(CommandSearch.find(entries, "split", List.of(), 5))
             .extracting(Command::id)
             .containsExactly("test.exact", "test.prefix", "test.word", "test.substring", "test.keyword");
-        assertThat(CommandSearch.find(entries, "sxpt", List.of()))
+        assertThat(CommandSearch.find(entries, "sxpt", List.of(), 5))
             .extracting(Command::id)
             .containsExactly("test.fuzzy");
     }
@@ -59,10 +59,10 @@ class CommandSearchTest {
             entry("test.mixed", "Alpha Command", List.of("z")),
             entry("test.keyword", "Other", List.of("ac", "z")),
             entry("test.missing", "Alpha Command", List.of()));
-        assertThat(CommandSearch.find(entries, "ac z", List.of()))
+        assertThat(CommandSearch.find(entries, "ac z", List.of(), 5))
             .extracting(Command::id)
             .containsExactly("test.keyword", "test.mixed");
-        assertThat(CommandSearch.find(entries, "open split", List.of()))
+        assertThat(CommandSearch.find(entries, "open split", List.of(), 5))
             .isEmpty();
     }
 
@@ -70,7 +70,7 @@ class CommandSearchTest {
         var disabled = entry("test.disabled", "Connect", List.of());
         disabled.command().action().setEnabled(false);
         var unicode = entry("test.unicode", "Café Session", List.of());
-        assertThat(CommandSearch.find(List.of(disabled, unicode), " CAFÉ ", List.of()))
+        assertThat(CommandSearch.find(List.of(disabled, unicode), " CAFÉ ", List.of(), 5))
             .extracting(Command::id)
             .containsExactly("test.unicode");
     }
@@ -78,7 +78,7 @@ class CommandSearchTest {
     @Test void recencyBreaksEqualRelevanceAndResultsAreBoundedAndImmutable() {
         var entries = new ArrayList<CommandSearch.Entry>();
         for (int i = 0; i < 8; i++) entries.add(entry("test." + i, "Open", List.of()));
-        var matches = CommandSearch.find(entries, "open", List.of("test.5", "test.2"));
+        var matches = CommandSearch.find(entries, "open", List.of("test.5", "test.2"), 5);
         assertThat(matches).hasSize(5);
         assertThat(matches.subList(0, 2)).extracting(Command::id)
             .containsExactly("test.5", "test.2");
@@ -88,7 +88,7 @@ class CommandSearchTest {
     @Test void emptyAndNoMatchQueriesReturnEmptyImmutableResults() {
         var entries = List.of(entry("test.open", "Open", List.of()));
         for (String query : List.of("", "   ", "missing")) {
-            var results = CommandSearch.find(entries, query, List.of());
+            var results = CommandSearch.find(entries, query, List.of(), 5);
             assertThat(results).isEmpty();
             assertThatThrownBy(results::clear).isInstanceOf(UnsupportedOperationException.class);
         }

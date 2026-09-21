@@ -10,7 +10,7 @@
 
 **Spec:** [Approved app/Buddy design](../specs/2026-09-20-jasper-app-buddy-refactor-design.md).
 
-**Status:** Approved for native execution; Task 1 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
+**Status:** Approved for native execution; Tasks 1–2 complete, based on `c7b796b`; design commit `d33a669`. Native execution preference is preserved. Execution is tracked below and in the verification report. Each completed task must update its checkboxes and record deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 
@@ -142,7 +142,7 @@ rg -n 'dev\.jasper\.app\.|getResource|registerCustomDefaultsSource' jasper-app g
 
 **Interfaces:** Produces `PaletteSettings(int maxResults)`, constants `DEFAULT_MAX_RESULTS=5`, `MIN_MAX_RESULTS=1`, `MAX_MAX_RESULTS=20`; `HistorySettings(boolean enabled,List<String> trivialCommands)`, `defaults()`; `ToolbarMode`; `Subscription(Runnable)` and `void close()`. `ConfigSnapshot` retains its 15-component canonical constructor and accessor names at this checkpoint.
 
-- [ ] Write value tests (JUnit/AssertJ imports) before adding the classes:
+- [x] Write value tests (JUnit/AssertJ imports) before adding the classes:
 
 ```java
 @Test void historyDefensivelyCopiesAndPreservesAnExplicitEmptyList() {
@@ -170,8 +170,8 @@ rg -n 'dev\.jasper\.app\.|getResource|registerCustomDefaultsSource' jasper-app g
 }
 ```
 
-- [ ] Run `./gradlew :jasper-app:test --tests '*SettingsValuesTest' --tests '*SubscriptionTest'`; expect missing-class compilation failures.
-- [ ] Add these complete leaf implementations (one public type per named file with its package and imports):
+- [x] Run `./gradlew :jasper-app:test --tests '*SettingsValuesTest' --tests '*SubscriptionTest'`; expect missing-class compilation failures.
+- [x] Add these complete leaf implementations (one public type per named file with its package and imports):
 
 ```java
 public enum ToolbarMode { ICONS_AND_LABELS, ICONS, HIDDEN }
@@ -204,14 +204,14 @@ public final class Subscription implements AutoCloseable {
 
 `Subscription` is caller-thread-confined: the owner retains its EDT checks. Do not silently make callbacks concurrent.
 
-- [ ] Migrate references using this exhaustive search, then delete the nested enum/subscription and obsolete constructors:
+- [x] Migrate references using this exhaustive search, then delete the nested enum/subscription and obsolete constructors:
 
 ```bash
 rg -n 'WindowContent.ToolbarMode|CommandRegistry.Subscription|DEFAULT_TRIVIAL|PaletteContext.(MIN_MAX_RESULTS|MAX_MAX_RESULTS|DEFAULT_MAX_RESULTS)|CommandSearch.find' jasper-app/src
 ```
 
 `ConfigSnapshot` validates `new PaletteSettings(maxResults)` and uses `HistorySettings.defaults().trivialCommands()`. Replace its `BuiltinTheme` constructors at call sites with `theme.appearance()` and `FontConfig.defaults().withSize(size)`. Keep convenience constructors only when they depend entirely on config-owned values. Move `PaletteContext` bounds/default references to config values; remove provider-dependent defaults. Delete the three-argument `CommandSearch.find`; pass an explicit limit at every caller (5 for callers that previously used its default). Preserve the four-argument ranking implementation exactly.
-- [ ] Add a ConfigSnapshot builder/toBuilder, preserving all 15 canonical fields. Keep `defaults()` constructing the canonical record directly to avoid builder recursion. Place this code inside ConfigSnapshot; retain its existing Map/List imports. All validation still runs in the canonical constructor.
+- [x] Add a ConfigSnapshot builder/toBuilder, preserving all 15 canonical fields. Keep `defaults()` constructing the canonical record directly to avoid builder recursion. Place this code inside ConfigSnapshot; retain its existing Map/List imports. All validation still runs in the canonical constructor.
 
 ```java
 static Builder builder() { return new Builder(defaults()); }
@@ -285,7 +285,7 @@ Add the following test to ConfigLoaderTest (same package as ConfigSnapshot), the
 }
 ```
 
-- [ ] Run `./gradlew :jasper-app:test`; commit `refactor: isolate settings and lifecycle values` with trailer.
+- [x] Run `./gradlew :jasper-app:test`; commit `refactor: isolate settings and lifecycle values` with trailer.
 
 ## Task 3: Replace reverse ownership with subscriptions and window callbacks
 

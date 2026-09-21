@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.HistorySettings;
+import dev.jasper.app.config.ToolbarMode;
+
 import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -56,7 +59,7 @@ class ConfigLoaderTest {
         assertThat(result.diagnostics()).isEmpty();
         var state = result.snapshot();
         assertThat(state.tabHeight()).isEqualTo(44);
-        assertThat(state.toolbar()).isEqualTo(WindowContent.ToolbarMode.ICONS);
+        assertThat(state.toolbar()).isEqualTo(ToolbarMode.ICONS);
         assertThat(state.statusBar()).isFalse();
         assertThat(state.fontSize()).isEqualTo(18f);
         assertThat(state.variant()).isEqualTo(Appearance.LIGHT);
@@ -70,7 +73,7 @@ class ConfigLoaderTest {
     @Test void acceptsNumericBoundariesAndEveryToolbarChoice() {
         for (int height : new int[]{28, 72}) assertThat(parse("window.tab_height=" + height).snapshot().tabHeight()).isEqualTo(height);
         for (float size : new float[]{6f, 72f, 13.5f}) assertThat(parse("font.size=" + size).snapshot().fontSize()).isEqualTo(size);
-        assertThat(parse("window.toolbar='hidden'").snapshot().toolbar()).isEqualTo(WindowContent.ToolbarMode.HIDDEN);
+        assertThat(parse("window.toolbar='hidden'").snapshot().toolbar()).isEqualTo(ToolbarMode.HIDDEN);
         assertThat(parse("window.toolbar='icons_and_labels'").diagnostics()).isEmpty();
     }
 
@@ -188,7 +191,7 @@ class ConfigLoaderTest {
     @Test void snapshotAndResultDefensivelyCopyCollections() {
         var bindings = new HashMap<String,String>();
         bindings.put("copy", "none");
-        var snapshot = new ConfigSnapshot(40, WindowContent.ToolbarMode.HIDDEN, false, 20f, BuiltinTheme.LIGHT, bindings);
+        var snapshot = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(20f), BuiltinTheme.LIGHT.appearance(), bindings, 150, 45, TerminalConfig.defaults());
         bindings.put("copy", "cmd+c");
         assertThat(snapshot.bindings(true).strokeFor(ActionId.COPY)).isEmpty();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> snapshot.keybindings().put("paste", "none"));
@@ -201,14 +204,13 @@ class ConfigLoaderTest {
 
     @Test void directSnapshotsRejectInvalidScalarFieldsAndBindings() {
         for (int height : new int[]{0, 27, 73}) assertThatIllegalArgumentException().isThrownBy(() ->
-            new ConfigSnapshot(height, WindowContent.ToolbarMode.ICONS, true, 16f, BuiltinTheme.DARK, Map.of()));
+            new ConfigSnapshot(height, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), BuiltinTheme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
         for (float size : new float[]{0, 5.9f, 72.1f, Float.NaN, Float.POSITIVE_INFINITY}) assertThatIllegalArgumentException().isThrownBy(() ->
-            new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS, true, size, BuiltinTheme.DARK, Map.of()));
-        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, null, true, 16f, BuiltinTheme.DARK, Map.of()));
-        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS, true, 16f, null, Map.of()));
+            new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(size), BuiltinTheme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
+        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, null, true, FontConfig.defaults().withSize(16f), BuiltinTheme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
+        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), (Appearance) null, Map.of(), 150, 45, TerminalConfig.defaults()));
         for (Map<String,String> bindings : java.util.List.of(Map.of("unknown", "none"), Map.of("copy", "cmd+secret"))) {
-            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, WindowContent.ToolbarMode.ICONS,
-                true, 16f, BuiltinTheme.DARK, bindings));
+            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), BuiltinTheme.DARK.appearance(), bindings, 150, 45, TerminalConfig.defaults()));
         }
     }
 
@@ -307,7 +309,7 @@ class ConfigLoaderTest {
 
     @Test void trivialCommandsParsesValidatesAndDefaultsToTheBuiltInList() {
         assertThat(parse("").snapshot().trivialCommands())
-            .isEqualTo(ShellHistoryScope.DEFAULT_TRIVIAL)
+            .isEqualTo(HistorySettings.defaults().trivialCommands())
             .contains("exit", "clear", "cd");
 
         assertThat(parse("[palette.scopes.history]\ntrivial_commands=['foo','BAR']\n").snapshot().trivialCommands())
@@ -319,11 +321,11 @@ class ConfigLoaderTest {
 
         // An entry with whitespace could never match: only a command's first word is compared.
         var spaced = parse("[palette.scopes.history]\ntrivial_commands=['git status']\n");
-        assertThat(spaced.snapshot().trivialCommands()).isEqualTo(ShellHistoryScope.DEFAULT_TRIVIAL);
+        assertThat(spaced.snapshot().trivialCommands()).isEqualTo(HistorySettings.defaults().trivialCommands());
         assertThat(spaced.diagnostics()).isNotEmpty();
 
         var wrongType = parse("[palette.scopes.history]\ntrivial_commands='exit'\n");
-        assertThat(wrongType.snapshot().trivialCommands()).isEqualTo(ShellHistoryScope.DEFAULT_TRIVIAL);
+        assertThat(wrongType.snapshot().trivialCommands()).isEqualTo(HistorySettings.defaults().trivialCommands());
         assertThat(wrongType.diagnostics()).isNotEmpty();
     }
 

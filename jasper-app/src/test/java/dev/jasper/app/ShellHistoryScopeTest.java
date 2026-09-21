@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.app.config.HistorySettings;
+import dev.jasper.app.config.PaletteSettings;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -161,13 +164,13 @@ class ShellHistoryScopeTest {
     }
 
     private static PaletteContext context(boolean deprioritizeTrivial) {
-        return context(deprioritizeTrivial ? ShellHistoryScope.DEFAULT_TRIVIAL : List.of());
+        return context(deprioritizeTrivial ? HistorySettings.defaults().trivialCommands() : List.of());
     }
 
     private static PaletteContext context(List<String> trivial) {
         return new PaletteContext(true,
             new PaletteTarget(s -> {}, () -> {}, Optional::empty, () -> "zsh", () -> true),
-            PaletteContext.DEFAULT_MAX_RESULTS, trivial);
+            PaletteSettings.DEFAULT_MAX_RESULTS, trivial);
     }
 
     /** exit and clear are genuinely the most recent commands; they are still not what you are looking for. */
@@ -212,7 +215,7 @@ class ShellHistoryScopeTest {
     }
 
     @Test void onlyAShortCommandWhoseFirstWordIsTrivialCounts() {
-        var set = ShellHistoryScope.DEFAULT_TRIVIAL;
+        var set = HistorySettings.defaults().trivialCommands();
         assertThat(ShellHistoryScope.trivial("clear", set)).isTrue();
         assertThat(ShellHistoryScope.trivial("cd ..", set)).isTrue();
         assertThat(ShellHistoryScope.trivial("ls -la", set)).isTrue();

@@ -1,5 +1,8 @@
 package dev.jasper.app;
 
+import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.config.ToolbarMode;
+
 import dev.jasper.terminal.view.TerminalAction;
 
 import dev.jasper.terminal.view.TerminalView;
@@ -13,7 +16,6 @@ import javax.swing.text.JTextComponent;
 
 /** Real window contents, independent of native JFrame construction for headless testing. */
 final class WindowContent extends JPanel implements AutoCloseable {
-    enum ToolbarMode { ICONS_AND_LABELS, ICONS, HIDDEN }
     private final ShellLauncher launcher;
     private final Consumer<Path> newWindow;
     private final Runnable quit;
@@ -91,9 +93,9 @@ final class WindowContent extends JPanel implements AutoCloseable {
                     Runnable focus, boolean watched);
     }
     private ShellHistoryIndex shellHistory;
-    private CommandRegistry.Subscription historyRegistration;
+    private Subscription historyRegistration;
     private SnippetStore snippets;
-    private CommandRegistry.Subscription snippetsRegistration;
+    private Subscription snippetsRegistration;
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty) {
         this(launcher, directory, newWindow, quit, onEmpty, new ThemeController());
