@@ -7,6 +7,7 @@ import java.awt.event.ComponentEvent;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
+import dev.jasper.app.terminals.SessionRequest;
 import javax.swing.*;
 
 /** Split-tree renderer that reparents existing panes without replacing sessions. */
@@ -28,18 +29,21 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     Consumer<TerminalPane> onPaneCreated = pane -> {};
     Consumer<TerminalPane> configure = pane -> {};
 
-    TerminalTab(Path directory, ShellLauncher launcher) {
+    TerminalTab(Path directory, ShellLauncher launcher) { this(directory, launcher, null); }
+
+    TerminalTab(Path directory, ShellLauncher launcher, SessionRequest requestOrNull) {
         super(new BorderLayout());
         this.launcher = launcher;
-        TerminalPane pane = createPane(directory);
+        TerminalPane pane = createPane(directory, requestOrNull);
         tree = new SplitTree(pane.id());
         render();
     }
 
     void start() { focusedPane().start(); }
 
-    private TerminalPane createPane(Path directory) {
-        TerminalPane pane = new TerminalPane(directory, launcher);
+    /** {@code requestOrNull} makes the pane one whose session somebody else provides. */
+    private TerminalPane createPane(Path directory, SessionRequest requestOrNull) {
+        TerminalPane pane = new TerminalPane(directory, launcher, requestOrNull);
         panes.put(pane.id(), pane);
         pane.onChanged = () -> onChanged.run();
         pane.onFocused = () -> focus(pane);
@@ -66,10 +70,13 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     public void split(SplitTree.Axis axis) { split(focusedPane(), axis, null); }
 
     /** Splits a given pane, starting the new one in {@code directoryOrNull} or where the target is. Null when it cannot. */
-    TerminalPane split(TerminalPane target, SplitTree.Axis axis, Path directoryOrNull) {
+    TerminalPane split(TerminalPane target, SplitTree.Axis axis, Path directoryOrNull) { return split(target, axis, directoryOrNull, null); }
+
+    /** As above; a request makes the new pane a provided session. The user's own split never passes one: it opens a local shell. */
+    TerminalPane split(TerminalPane target, SplitTree.Axis axis, Path directoryOrNull, SessionRequest requestOrNull) {
         if (closed || target == null || panes.get(target.id()) != target || !target.running()) return null;
         if (focusedPane() != target) focus(target);
-        TerminalPane pane = createPane(directoryOrNull == null ? target.directory() : directoryOrNull);
+        TerminalPane pane = createPane(directoryOrNull == null ? target.directory() : directoryOrNull, requestOrNull);
         tree.split(pane.id(), axis); render(); onChanged.run(); pane.start();
         return pane;
     }

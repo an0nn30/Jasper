@@ -38,6 +38,7 @@ import javax.swing.*;
 import javax.swing.text.JTextComponent;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
+import dev.jasper.app.terminals.SessionRequest;
 
 /** Real window contents, independent of native JFrame construction for headless testing. */
 public final class WindowContent extends JPanel implements AutoCloseable {
@@ -432,9 +433,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     public void newTab(Path directory) { openTab(directory); }
 
-    TerminalTab openTab(Path directory) {
+    TerminalTab openTab(Path directory) { return openTab(directory, null); }
+
+    /** {@code requestOrNull} makes the tab's first pane a provided session instead of a local shell. */
+    TerminalTab openTab(Path directory, SessionRequest requestOrNull) {
         if (closed) return null;
-        TerminalTab tab = new TerminalTab(directory, launcher);
+        TerminalTab tab = new TerminalTab(directory, launcher, requestOrNull);
         if (terminals != null) terminals.tabOpened(tab);
         tab.onChanged = () -> {
             for (TerminalPane pane : tab.panes()) if (pane.view() == null) pane.applyTheme(themes.current().palette());
@@ -486,6 +490,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         pane.onBell = () -> report(new TerminalEvent.Bell(tab.id(), pane.id()));
         pane.onStarted = () -> report(new TerminalEvent.SessionStarted(pane.id()));
         pane.onExited = status -> report(new TerminalEvent.SessionExited(pane.id(), status));
+        pane.onConnecting = () -> report(new TerminalEvent.SessionConnecting(pane.id()));
     }
 
     private void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }

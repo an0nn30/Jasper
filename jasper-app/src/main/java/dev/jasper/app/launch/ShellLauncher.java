@@ -35,6 +35,18 @@ public final class ShellLauncher {
 
     public String label() { return label; }
 
+    /** The grid and scrollback a session starts with when no view has measured the pane yet. */
+    public record SessionDefaults(int columns, int lines, int scrollback) { }
+
+    /** From the current launch settings; a conventional terminal when there are none. EDT, like {@link #launch}. */
+    public SessionDefaults sessionDefaults() {
+        try {
+            LaunchSettings captured = settings == null ? null : settings.get();
+            if (captured != null) return new SessionDefaults(captured.columns(), captured.lines(), captured.scrollback());
+        } catch (RuntimeException unavailable) { /* fall through */ }
+        return new SessionDefaults(80, 24, 10_000);
+    }
+
     public String launch(Path directory, BiConsumer<TerminalSession, Throwable> completion) {
         final LaunchSettings captured;
         final String capturedLabel;

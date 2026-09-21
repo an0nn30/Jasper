@@ -46,15 +46,24 @@ final class WindowTerminals implements AutoCloseable {
     PaneEntry entry(TerminalTab tab, TerminalPane pane) {
         return new PaneEntry(pane.id(), tab.id(), pane::snapshot, pane::queryForegroundJob, pane::write, pane::paste, pane::selectedText,
             () -> { owner.selectTab(tab); tab.focus(pane); pane.focusTerminal(); },
-            (axis, spec) -> spec instanceof OpenSpec.Local local
-                ? Optional.ofNullable(tab.split(pane, axis == SplitAxis.RIGHT ? SplitTree.Axis.RIGHT : SplitTree.Axis.DOWN,
-                    local.directory().orElse(null))).map(created -> entry(tab, created))
-                : Optional.empty());
+            (axis, spec) -> {
+                SplitTree.Axis direction = axis == SplitAxis.RIGHT ? SplitTree.Axis.RIGHT : SplitTree.Axis.DOWN;
+                TerminalPane created = switch (spec) {
+                    case OpenSpec.Local local -> tab.split(pane, direction, local.directory().orElse(null), null);
+                    case OpenSpec.Session session -> tab.split(pane, direction, home(), session.request());
+                };
+                return Optional.ofNullable(created).map(split -> entry(tab, split));
+            });
     }
 
+    private static Path home() { return Path.of(System.getProperty("user.home")); }
+
     private Optional<PaneEntry> openTab(OpenSpec spec) {
-        if (closed || !(spec instanceof OpenSpec.Local local)) return Optional.empty();
-        TerminalTab tab = owner.openTab(local.directory().orElseGet(owner::directory));
+        if (closed) return Optional.empty();
+        TerminalTab tab = switch (spec) {
+            case OpenSpec.Local local -> owner.openTab(local.directory().orElseGet(owner::directory));
+            case OpenSpec.Session session -> owner.openTab(home(), session.request());
+        };
         return tab == null || tab.focusedPane() == null ? Optional.empty() : Optional.of(entry(tab, tab.focusedPane()));
     }
 
