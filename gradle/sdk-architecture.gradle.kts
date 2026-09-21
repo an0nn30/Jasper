@@ -5,7 +5,7 @@ import org.gradle.jvm.toolchain.JvmVendorSpec
 
 // SDK modules may reference only the JDK and dev.jasper.sdk, and their package graphs are acyclic.
 // A module listed here must have the java plugin applied and produce classes/java/main.
-val sdkModules = listOf(":jasper-sdk")
+val sdkModules = listOf(":jasper-sdk", ":jasper-sdk-testkit")
 // Resolved at configuration time, like the other architecture scripts; tasks must not call project() while running.
 val sdkProjects = sdkModules.associateWith { project(it) }
 val verifySdkArchitecture = tasks.register("verifySdkArchitecture") {

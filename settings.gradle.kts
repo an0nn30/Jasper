@@ -1,2 +1,2 @@
 rootProject.name = "jasper"
-include("jasper-terminal", "jasper-app", "jasper-buddy", "jasper-sdk")
+include("jasper-terminal", "jasper-app", "jasper-buddy", "jasper-sdk", "jasper-sdk-testkit")
