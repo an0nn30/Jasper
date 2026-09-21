@@ -36,19 +36,25 @@ public final class AuxiliaryWindows implements AutoCloseable {
         return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.DIALOG, modal, new Dimension(1, 1), null, owner, shells));
     }
 
+    /** Run after a close leaves no surface open; the application uses it to decide whether to exit. */
+    public Runnable onAllClosed = () -> { };
+    private boolean emptyReported = true;
+
     private AuxiliarySurface track(AuxiliarySurface surface) {
         open.add(surface);
+        emptyReported = false;
         surface.onClosed(() -> {
             open.remove(surface);
             // Dialogs die with their owner, as native dialogs do.
             for (AuxiliarySurface other : List.copyOf(open))
                 if (other.ownerSurface().filter(owner -> owner == surface).isPresent()) other.close();
-            if (surface.kind() != AuxiliarySurface.Kind.WINDOW) return;
-            surface.lastBounds().ifPresent(bounds -> {
+            if (surface.kind() == AuxiliarySurface.Kind.WINDOW) surface.lastBounds().ifPresent(bounds -> {
                 if (bounds.width <= 0 || bounds.height <= 0) return;
                 state.putWindow(surface.id(), new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height));
                 state.save();
             });
+            // Closing a window closes its dialogs from inside this handler, so report the transition once.
+            if (open.isEmpty() && !emptyReported) { emptyReported = true; onAllClosed.run(); }
         });
         return surface;
     }

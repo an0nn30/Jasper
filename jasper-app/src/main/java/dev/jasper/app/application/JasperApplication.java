@@ -15,11 +15,14 @@ import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.notifications.CommandNotice;
 import dev.jasper.app.notifications.CommandNotifier;
+import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.NativeNotifier;
 import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.platform.SystemFonts;
 import dev.jasper.app.snippets.SnippetStore;
+import dev.jasper.app.windows.AuxiliaryWindows;
+import dev.jasper.app.windows.NativeShells;
 import dev.jasper.app.workspace.TerminalWindow;
 import dev.jasper.app.workspace.WindowCallbacks;
 import dev.jasper.app.workspace.WorkspaceActivity;
@@ -67,6 +70,8 @@ public final class JasperApplication {
     private final NativeNotifier nativeNotifier = new NativeNotifier();
     private final CommandNotifier notifications;
     private PluginRuntime plugins;
+    private UiState uiState = UiState.inMemory();
+    private AuxiliaryWindows auxiliary;
     private final dev.jasper.app.contributions.Contributions contributions = new dev.jasper.app.contributions.Contributions();
     private ActivityNotifier activityNotifier;
     private dev.jasper.app.lifecycle.Subscription pluginTheme;
@@ -168,7 +173,7 @@ public final class JasperApplication {
             state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
             launcher, directory, themes, configuration == null ? null : configuration.snapshot(), history, shellHistory, snippets);
         if (configuration != null) configuration.register(window.content());
-        window.content().connectContributions(contributions);
+        window.content().connectContributions(contributions, uiState);
         window.content().onToggleBuddy = this::toggleBuddy;
         window.content().buddyEnabled = this::buddyEnabled;
         window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
@@ -263,12 +268,13 @@ public final class JasperApplication {
     public void startPlugins(Path codeSource, Path developmentDirectory, boolean safeMode, AppDirs dirs) {
         if (plugins != null || quitting || stopped) return;
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
+        uiState = UiState.load(dirs.uiState());
+        auxiliary = new AuxiliaryWindows(uiState, new NativeShells(themes, uiState, this::nativeWindow,
+            () -> newWindow(Path.of(System.getProperty("user.home"))), this::quit)::create);
+        auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock(), dirs.pluginData()), activityNotifier,
-            (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions,
-            new dev.jasper.app.windows.AuxiliaryWindows(dev.jasper.app.persistence.UiState.inMemory(),
-                surface -> new dev.jasper.app.windows.AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
-                    () -> new java.awt.Rectangle(0, 0, 10, 10))));
+            (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions, auxiliary);
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome() == BuiltinTheme.DARK);
         boolean[] replayed = new boolean[1];
         // subscribe replays the current theme at once; plugins read the look on demand, so only later changes are events.
@@ -322,6 +328,12 @@ public final class JasperApplication {
     /** Remembers a shell so shutdown can wait for it to leave before terminating the JVM. */
     TerminalSession track(TerminalSession session) { return launches.track(session); }
 
+    /** A terminal window's native window, for parenting application-built dialogs; null when it is gone. */
+    private java.awt.Window nativeWindow(java.util.UUID id) {
+        for (TerminalWindow window : windows) if (window.content().id().equals(id)) return window.nativeWindow();
+        return null;
+    }
+
     void windowClosed(TerminalWindow window) {
         windows.remove(window);
         buddy.removeWindow(window);
@@ -329,7 +341,8 @@ public final class JasperApplication {
         // Residency keeps the warm process: the command history, the shell-history index, the
         // snippets and the configuration watcher are precisely what makes the next window fast,
         // and shutdown would close all of them. Quit still terminates.
-        if (windows.isEmpty() && !resident) requestShutdown();
+        boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
+        if (windows.isEmpty() && !resident && !pluginWindowsOpen) requestShutdown();
         else updateBuddyActions();
     }
 
@@ -401,6 +414,9 @@ public final class JasperApplication {
         shellHistory.close();
         if (snippets != null) snippets.close();
         List<CompletableFuture<?>> pluginWork = plugins == null ? List.of() : plugins.stop();
+        // Plugins closed their own windows while stopping; this is the safety net, and the state's last write.
+        if (auxiliary != null) auxiliary.close();
+        uiState.save();
         if (pluginTheme != null) pluginTheme.close();
         notifications.close();
         if (activityNotifier != null) activityNotifier.close();

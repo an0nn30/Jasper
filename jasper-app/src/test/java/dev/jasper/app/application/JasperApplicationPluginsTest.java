@@ -90,16 +90,35 @@ class JasperApplicationPluginsTest {
         var worker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
         var service = new dev.jasper.app.config.ConfigService(dirs.configFile(), mac, worker, javax.swing.SwingUtilities::invokeLater);
         JasperApplication[] application = new JasperApplication[1];
+        var terminated = new CountDownLatch(1);
         try {
             edt(() -> {
-                application[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { });
+                application[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
                 application[0].startPlugins(null, dev, false, dirs);
                 assertThat(application[0].bindingProblems()).extracting(problem -> problem.kind() + " " + problem.actionId())
                     .containsExactlyInAnyOrder("UNKNOWN_ACTION dev.example.gone.action", "DEFAULT_DROPPED dev.example.keys.palette");
             });
         } finally {
             edt(application[0]::quit);
+            // Shutdown writes the layout state into the temporary home; let it finish before JUnit deletes that.
+            assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
             worker.shutdownNow();
         }
+    }
+
+    @Test void layoutStateIsLoadedForPluginsAndSavedAtShutdown() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        java.nio.file.Files.writeString(dirs.uiState(), "version = 1\nrail_visible = false\n");
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, null, false, dirs);
+        });
+        java.nio.file.Files.delete(dirs.uiState());
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(dirs.uiState()).as("saved again at shutdown, keeping what was loaded").exists()
+            .content().contains("rail_visible = false");
     }
 }

@@ -85,4 +85,15 @@ class AuxiliaryWindowsTest {
         assertThat(manager.closed() && prompt.closed() && trust.closed()).isTrue();
         assertThatIllegalArgumentException().isThrownBy(() -> windows.dialog("Late", true, manager));
     }
+
+    @Test void reportsWhenTheLastSurfaceCloses() {
+        List<String> events = new ArrayList<>();
+        windows.onAllClosed = () -> events.add("empty");
+        AuxiliarySurface first = windows.window("dev.x.a", "A", new Dimension(10, 10), false);
+        AuxiliarySurface second = windows.window("dev.x.b", "B", new Dimension(10, 10), false);
+        first.close();
+        assertThat(events).isEmpty();
+        second.close();
+        assertThat(events).containsExactly("empty");
+    }
 }
