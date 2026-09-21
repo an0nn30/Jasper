@@ -17,27 +17,52 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
+import dev.jasper.terminal.internal.shell.CompletedCommand;
+import dev.jasper.terminal.internal.transport.AttachedTransport;
 
 /** Internal module bridge; not an application or plugin API. No vendor objects escape. */
 public final class TerminalAccess implements AutoCloseable {
     private final JediTermEngine engine;
     private final BufferQueries queries;
     private final ShellCommandTracker shell;
+    private final boolean local;
     /** Unsupported module collaboration API; used only by terminal owners. */
     public TerminalAccess(PtyChild child, int columns, int rows, int scrollback, JediTermEngine.Events events) {
         this(new JediTermEngine(child, columns, rows, scrollback, events), events, System::nanoTime);
     }
     /** Unsupported module collaboration API; used only by terminal owners. */
-    public TerminalAccess(JediTermEngine engine, JediTermEngine.Events events, LongSupplier clock) {
+    public TerminalAccess(JediTermEngine engine, JediTermEngine.Events events, LongSupplier clock) { this(engine, events, clock, true); }
+
+    /** An attached connection instead of a child process. Unsupported module collaboration API. */
+    public TerminalAccess(AttachedTransport transport, int columns, int rows, int scrollback, JediTermEngine.Events events) {
+        this(transport, columns, rows, scrollback, withoutLocalDirectories(events), false);
+    }
+
+    private TerminalAccess(AttachedTransport transport, int columns, int rows, int scrollback, JediTermEngine.Events remote, boolean local) {
+        this(new JediTermEngine(transport, columns, rows, scrollback, remote), remote, System::nanoTime, local);
+    }
+
+    private TerminalAccess(JediTermEngine engine, JediTermEngine.Events events, LongSupplier clock, boolean local) {
         this.engine = engine;
+        this.local = local;
         queries = engine.queries();
         shell = new ShellCommandTracker(clock, queries::cursor, queries::captureCommand, queries::recordPrompt,
             events.workingDirectoryChanged(), events.commandStarted(), events.commandFinished(),
             events.screenChanged(), engine::resetCursorShape);
         engine.setShellHooks(shell::accept, shell::discardUnusedPayload);
     }
+
+    /**
+     * What an attached program reports as its directory is a path on another machine. Until reports are classified
+     * by host, none of them may reach consumers that treat a directory as local.
+     */
+    private static JediTermEngine.Events withoutLocalDirectories(JediTermEngine.Events events) {
+        return new JediTermEngine.Events(events.screenChanged(), events.titleChanged(), events.bell(), events.scrollbackReset(),
+            events.alternateBufferChanged(), directory -> { }, events.commandStarted(),
+            command -> events.commandFinished().accept(new CompletedCommand(command.command(), command.status(), Optional.empty(), command.duration())));
+    }
     /** Unsupported module collaboration API; used only by terminal owners. */
-    public Optional<Path> workingDirectory() { return shell.workingDirectory(); }
+    public Optional<Path> workingDirectory() { return local ? shell.workingDirectory() : Optional.empty(); }
     /** Unsupported module collaboration API; used only by terminal owners. */
     public boolean shellIntegrationDetected() { return shell.detected(); }
     /** Unsupported module collaboration API; used only by terminal owners. */

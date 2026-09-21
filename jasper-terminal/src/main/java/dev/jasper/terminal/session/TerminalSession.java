@@ -12,6 +12,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import java.util.function.Function;
+import dev.jasper.terminal.config.GridSize;
+import dev.jasper.terminal.internal.transport.AttachedTransport;
+import java.time.Duration;
 
 /**
  * A running terminal session. Start off the EDT; the application owns and closes it.
@@ -40,6 +43,28 @@ public final class TerminalSession implements AutoCloseable {
     /** Starts a validated launch description and owns cleanup if session construction fails. */
     public static TerminalSession start(SessionLaunchOptions options) throws IOException {
         return PtySessionFactory.start(Objects.requireNonNull(options, "options"));
+    }
+    static final int ATTACHED_QUEUE_BYTES = 4 * 1024 * 1024;
+    static final Duration ATTACHED_DRAIN = Duration.ofSeconds(2);
+
+    /**
+     * Runs a program that is not a local process. Ownership of the connection transfers at this call, whatever
+     * the outcome: its {@code close} is invoked exactly once, at the latest when the session is closed. Output
+     * runs through the same shell-integration chain as a local session, but an attached session never reports a
+     * local working directory. Writes and resizes only enqueue; see {@link TerminalSessionListener#inputDropped()}.
+     * Callable from any thread.
+     */
+    public static TerminalSession attach(AttachedConnection connection, GridSize grid, int scrollback) {
+        Objects.requireNonNull(connection, "connection");
+        TerminalSession[] created = new TerminalSession[1];
+        return PtySessionFactory.finish(connection.close(), () -> {
+            Objects.requireNonNull(grid, "grid");
+            if (scrollback < 0 || scrollback > 1_000_000) throw new IllegalArgumentException("Invalid scrollback capacity.");
+            var transport = new AttachedTransport(connection.output(), connection.input(), connection.resize(), connection.exited(),
+                connection.close(), () -> created[0].listeners.forEach(TerminalSessionListener::inputDropped), ATTACHED_QUEUE_BYTES, ATTACHED_DRAIN);
+            created[0] = new TerminalSession(events -> new TerminalAccess(transport, grid.columns(), grid.rows(), scrollback, events));
+            return created[0];
+        });
     }
     /** Registers for future synchronous notifications; does not replay current state. See TerminalSessionListener for thread/lock rules. */
     public void addListener(TerminalSessionListener listener) {

@@ -55,5 +55,11 @@ public interface TerminalSessionListener {
     public default void commandExecuted(String command, OptionalInt exitStatus, Optional<Path> workingDirectory,
                                  Duration duration) {
     }
-}
 
+    /**
+     * An attached session rejected input because the remote side is not accepting it and the outbound queue is
+     * full. Called on the thread that wrote; never wait for the EDT here.
+     */
+    public default void inputDropped() {
+    }
+}

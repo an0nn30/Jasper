@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import dev.jasper.terminal.internal.transport.AttachedTransport;
 
 /** A program running in a pseudo-terminal, emulated by JediTerm on a dedicated reader thread. */
 public final class JediTermEngine implements AutoCloseable {
@@ -40,6 +41,7 @@ public final class JediTermEngine implements AutoCloseable {
 
     private final TtyConnector connector;
     private final PtyConnector pty;
+    private final AttachedTransport attached;
     private final JediCellReader cells = new JediCellReader();
     private final TerminalTextBuffer buffer;
     private final JediTerminal terminal;
@@ -59,6 +61,7 @@ public final class JediTermEngine implements AutoCloseable {
         this.events = Objects.requireNonNull(events, "events");
         this.connector = new ShellIntegrationConnector(connector);
         this.pty = connector instanceof PtyConnector value ? value : null;
+        this.attached = connector instanceof AttachedConnector value ? value.transport() : null;
         this.columns = columns;
         this.rows = rows;
         StyleState styleState = new StyleState();
@@ -143,6 +146,7 @@ public final class JediTermEngine implements AutoCloseable {
 
     public void startReading() {
         if (!started.compareAndSet(false, true)) throw new IllegalStateException("session reader already started");
+        if (attached != null) attached.start();
         Thread.ofPlatform().name("jasper-session-reader").daemon().start(this::readLoop);
     }
 
@@ -164,8 +168,16 @@ public final class JediTermEngine implements AutoCloseable {
             Thread.currentThread().interrupt();
             code = -1;
         }
-        writeExitMessage(code);
-        exit.complete(code);
+        if (attached == null) {
+            writeExitMessage(code);
+            exit.complete(code);
+            return;
+        }
+        // An attached pane's banner reports the end; a failed transport or an unknown status is not an exit code.
+        Optional<String> failure = attached.failure();
+        if (failure.isPresent()) exit.completeExceptionally(new IOException(failure.get()));
+        else if (code == AttachedTransport.UNKNOWN_STATUS) exit.completeExceptionally(new IOException("The connection ended without an exit status"));
+        else exit.complete(code);
     }
 
     private void writeExitMessage(int code) {
@@ -316,6 +328,11 @@ public final class JediTermEngine implements AutoCloseable {
         Runnable bell, Runnable scrollbackReset, java.util.function.Consumer<Boolean> alternateBufferChanged,
         java.util.function.Consumer<Path> workingDirectoryChanged, java.util.function.Consumer<String> commandStarted,
         java.util.function.Consumer<CompletedCommand> commandFinished) { }
+
+    /** An attached connection instead of a child process. */
+    public JediTermEngine(AttachedTransport transport, int columns, int rows, int scrollback, Events events) {
+        this(new AttachedConnector(transport), columns, rows, scrollback, events);
+    }
 
     public JediTermEngine(PtyChild child, int columns, int rows, int scrollback, Events events) {
         this(new PtyConnector(child), columns, rows, scrollback, events);
