@@ -5,5 +5,5 @@ entry = "dev.jasper.vault.VaultPlugin"
 sdk = ">=0.7, <0.8"
 description = "Accounts, SSH keys and secure notes in one encrypted file bound to this device; other plugins fetch credentials under per-plugin grants."
 vendor = "Jasper"
-capabilities = []
+capabilities = ["palette.contribute"]
 exports = ["dev.jasper.vault.api"]

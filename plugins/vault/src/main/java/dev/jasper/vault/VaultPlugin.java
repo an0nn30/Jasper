@@ -22,14 +22,18 @@ import dev.jasper.vault.store.VaultFile;
 import dev.jasper.vault.ui.GrantPanel;
 import dev.jasper.vault.ui.PasswordPanel;
 import dev.jasper.vault.ui.PickerPanel;
+import dev.jasper.vault.ui.SecretClipboard;
+import dev.jasper.vault.ui.VaultScope;
 import java.awt.AWTEvent;
 import java.awt.Toolkit;
 import java.awt.event.AWTEventListener;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
@@ -45,6 +49,7 @@ public class VaultPlugin implements Plugin {
 
     private final Function<PluginContext, DeviceSecrets> secretsFactory;
     private final Executor ui;
+    private final Supplier<SecretClipboard> clipboardFactory;
     private PluginContext context;
     private LockManager lock;
     private VaultService service;
@@ -54,17 +59,25 @@ public class VaultPlugin implements Plugin {
     private GrantPrompt currentGrant;
     private Timer ticker;
     private AWTEventListener activity;
+    private VaultScope scope;
+    private SecretClipboard clipboard;
     private VaultSettings settings;
     /** Milliseconds for the inactivity clock; tests set it, production reads the wall clock. */
     long clock = -1;
 
     /** Created by the runtime: the platform keychain with the file fallback, completing on the EDT. */
     public VaultPlugin() {
-        this(context -> new DeviceSecrets(KeychainStore.forPlatform(context.dataDirectory()), new FileStore(context.dataDirectory().resolve("device.secret"))), SwingUtilities::invokeLater);
+        this(context -> new DeviceSecrets(KeychainStore.forPlatform(context.dataDirectory()), new FileStore(context.dataDirectory().resolve("device.secret"))), SwingUtilities::invokeLater, SecretClipboard::system);
     }
 
     /** For tests: the device secret store to use and the executor that stands in for the UI thread. */
-    VaultPlugin(Function<PluginContext, DeviceSecrets> secretsFactory, Executor ui) { this.secretsFactory = secretsFactory; this.ui = ui; }
+    VaultPlugin(Function<PluginContext, DeviceSecrets> secretsFactory, Executor ui) {
+        this(secretsFactory, ui, () -> new SecretClipboard(text -> { }, Optional::empty, clear -> { }));
+    }
+
+    VaultPlugin(Function<PluginContext, DeviceSecrets> secretsFactory, Executor ui, Supplier<SecretClipboard> clipboardFactory) {
+        this.secretsFactory = secretsFactory; this.ui = ui; this.clipboardFactory = clipboardFactory;
+    }
 
     @Override public void start(PluginContext context) throws Exception {
         this.context = context;
@@ -77,9 +90,12 @@ public class VaultPlugin implements Plugin {
             this::showUnlock, this::showGrant, this::showPick, context.notices()::error);
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
         context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("F8"),
-            invoked -> open(invoked.window()));
+            invoked -> open(invoked.window(), Optional.empty()));
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock")), invoked -> lock.lock());
         lockAction.setEnabled(false);
+        clipboard = clipboardFactory.get();
+        scope = new VaultScope(lock, service, clipboard, this::open, context.notices()::error);
+        context.palette().register(scope);
         context.config().onChanged(() -> { settings = VaultSettings.read(context.config(), context.dataDirectory()); timer.setTimeout(settings.autoLock()); });
         activity = event -> timer.touch();
         Toolkit.getDefaultToolkit().addAWTEventListener(activity, AWTEvent.KEY_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK);
@@ -90,11 +106,12 @@ public class VaultPlugin implements Plugin {
     @Override public void stop() {
         if (ticker != null) ticker.stop();
         if (activity != null) Toolkit.getDefaultToolkit().removeAWTEventListener(activity);
+        if (clipboard != null) clipboard.close();
         if (lock != null) lock.lock();
     }
 
     /** Open Vault…: create when there is no vault, unlock when locked; unlocked does nothing until 6b opens the manager. */
-    void open(WindowHandle window) {
+    void open(WindowHandle window, Optional<UUID> select) {
         switch (lock.state()) {
             case NO_VAULT -> showCreate(window);
             case LOCKED -> service.requestUnlock(window);
@@ -110,6 +127,7 @@ public class VaultPlugin implements Plugin {
         service.lockStateChanged(state);
         if (lockAction != null) lockAction.setEnabled(state == LockState.UNLOCKED);
         context.events().publish(VaultApi.LOCK_STATE_CHANGED, state);
+        if (scope != null) scope.changed();
     }
 
     void showCreate(WindowHandle owner) {
@@ -162,4 +180,5 @@ public class VaultPlugin implements Plugin {
     InactivityTimer timer() { return timer; }
     UnlockPrompt currentUnlock() { return currentUnlock; }
     GrantPrompt currentGrant() { return currentGrant; }
+    VaultScope scope() { return scope; }
 }

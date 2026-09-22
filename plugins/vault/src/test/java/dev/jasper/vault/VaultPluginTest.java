@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class VaultPluginTest {
-    static final PluginInfo INFO = new PluginInfo("dev.jasper.vault", "Credential Vault", "0.1.0", Set.of());
+    static final PluginInfo INFO = new PluginInfo("dev.jasper.vault", "Credential Vault", "0.1.0", Set.of(dev.jasper.sdk.Capabilities.PALETTE_CONTRIBUTE));
     static final PluginInfo SSH = new PluginInfo("dev.jasper.ssh", "SSH", "0.1.0", Set.of());
 
     static VaultPlugin plugin() {
@@ -47,6 +47,7 @@ class VaultPluginTest {
             });
             assertThat(host.failures()).isEmpty();
             assertThat(host.actions()).contains("dev.jasper.vault.open|Open Vault...|true", "dev.jasper.vault.lock|Lock Vault|false");
+            assertThat(host.scopes()).containsExactly("dev.jasper.vault.scope|Vault|copy_password,copy_username,open");
             UUID window = host.addTerminalWindow();
             assertThat(api.get().lockState()).isEqualTo(LockState.NO_VAULT);
             assertThat(host.invoke(VaultPlugin.OPEN, window, null)).isTrue();
