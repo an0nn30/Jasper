@@ -106,7 +106,7 @@ public final class NativeShells {
             if (bar != null) bar.close();
             natives.remove(surface);
             frame.dispose();
-        }, title -> { frame.setTitle(title); if (bar != null) bar.setTitle(title, true); }, frame::getBounds);
+        }, title -> { frame.setTitle(title); if (bar != null) bar.setTitle(title, true); }, frame::getBounds, (title, initial) -> chooseFile(frame, title, initial, Optional.empty()));
     }
 
     private AuxiliarySurface.Shell dialog(AuxiliarySurface surface) {
@@ -134,7 +134,7 @@ public final class NativeShells {
                 theme.close();
                 if (bar != null) bar.close();
                 natives.remove(surface); dialog.dispose();
-            }, title -> { dialog.setTitle(title); if (bar != null) bar.setTitle(title, true); }, dialog::getBounds);
+            }, title -> { dialog.setTitle(title); if (bar != null) bar.setTitle(title, true); }, dialog::getBounds, (title, initial) -> chooseFile(dialog, title, initial, Optional.empty()));
     }
 
     /** Shared, headless-testable title setup for both kinds of SDK/application auxiliary surface. */
@@ -153,15 +153,36 @@ public final class NativeShells {
      * @return the chosen file, or empty when the user cancelled
      */
     public Optional<Path> chooseFile(AuxiliarySurface owner, String title, String suffix) {
-        Frame parent = natives.get(owner) instanceof Frame frame ? frame : null;
-        var dialog = new FileDialog(parent, title, FileDialog.LOAD);
-        String wanted = suffix.toLowerCase(Locale.ROOT);
-        // macOS and Linux honor the filter; Windows honors the pattern.
-        dialog.setFilenameFilter((directory, name) -> name.toLowerCase(Locale.ROOT).endsWith(wanted));
-        dialog.setFile("*" + suffix);
-        dialog.setVisible(true);
-        String file = dialog.getFile();
-        return file == null ? Optional.empty() : Optional.of(Path.of(dialog.getDirectory(), file));
+        Window parent = natives.get(owner);
+        if (parent == null || !owner.shown()) throw new IllegalStateException("File selection needs a shown, open window");
+        Optional<Path> selected = chooseFile(parent, title, Optional.empty(), Optional.of(suffix));
+        return owner.closed() ? Optional.empty() : selected;
+    }
+
+    private static Optional<Path> chooseFile(Window owner, String title, Optional<Path> initialPath, Optional<String> suffix) {
+        // A dialog-owned picker must stay above its modal editor, not merely above the editor's frame.
+        FileDialog chooser = owner instanceof Dialog dialog ? new FileDialog(dialog, title, FileDialog.LOAD)
+            : new FileDialog((Frame) owner, title, FileDialog.LOAD);
+        try {
+            suffix.ifPresent(value -> {
+                String wanted = value.toLowerCase(Locale.ROOT);
+                // macOS and Linux honor the filter; Windows honors the pattern.
+                chooser.setFilenameFilter((directory, name) -> name.toLowerCase(Locale.ROOT).endsWith(wanted));
+                chooser.setFile("*" + value);
+            });
+            initialPath.map(path -> path.toAbsolutePath().normalize()).ifPresent(path -> {
+                if (java.nio.file.Files.isDirectory(path)) chooser.setDirectory(path.toString());
+                else {
+                    if (path.getParent() != null) chooser.setDirectory(path.getParent().toString());
+                    if (path.getFileName() != null) chooser.setFile(path.getFileName().toString());
+                }
+            });
+            chooser.setVisible(true);
+            String file = chooser.getFile();
+            return file == null ? Optional.empty() : Optional.of(Path.of(chooser.getDirectory(), file).toAbsolutePath().normalize());
+        } finally {
+            chooser.dispose();
+        }
     }
 
     /** A minimal menu bar: macOS otherwise shows only the application menu while this window has focus. */

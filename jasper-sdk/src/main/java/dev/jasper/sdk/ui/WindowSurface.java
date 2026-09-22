@@ -2,6 +2,8 @@ package dev.jasper.sdk.ui;
 
 import dev.jasper.sdk.Subscription;
 import java.util.function.BooleanSupplier;
+import java.nio.file.Path;
+import java.util.Optional;
 import javax.swing.JComponent;
 
 /**
@@ -29,6 +31,19 @@ public interface WindowSurface extends Subscription {
      * @param title non-blank title
      */
     void setTitle(String title);
+
+    /**
+     * Opens a native chooser for one existing file, owned by this window or dialog.
+     * Blocks on the UI thread while the platform pumps events. If the owner closes during
+     * selection, the result is discarded. This does not read the selected file.
+     *
+     * @param title non-blank chooser title
+     * @param initialPath optional file or directory to start from; never null
+     * @return an absolute normalized path, or empty on cancellation or owner closure
+     * @throws IllegalStateException if the plugin is stopped or this surface is not shown or is closed
+     * @since 0.7.1
+     */
+    Optional<Path> chooseFile(String title, Optional<Path> initialPath);
 
     /**
      * Adds a guard consulted when the user tries to close the window. Any guard returning false keeps

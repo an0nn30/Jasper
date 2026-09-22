@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
@@ -264,6 +265,10 @@ final class HostedUi {
         Surface(AuxiliarySurface surface) { this.surface = surface; }
         @Override public void setContent(JComponent content) { requireUi("setContent"); surface.setContent(content); }
         @Override public void show() { requireUi("show"); surface.show(); }
+        @Override public Optional<Path> chooseFile(String title, Optional<Path> initialPath) {
+            guard("chooseFile");
+            return surface.chooseFile(title, initialPath);
+        }
         @Override public void toFront() { requireUi("toFront"); surface.toFront(); }
         @Override public void setTitle(String title) { requireUi("setTitle"); if (!surface.closed()) surface.setTitle(title); }
         @Override public Subscription onClosing(BooleanSupplier guard) {

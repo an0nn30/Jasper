@@ -71,7 +71,7 @@ class AppContractTest extends PluginContractTest {
     /** UI thread: plugin windows over shells that touch no native window. */
     static AuxiliaryWindows headlessWindows(UiState state) {
         return new AuxiliaryWindows(state, surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
-            () -> new java.awt.Rectangle(0, 0, 10, 10)));
+            () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()));
     }
 
     @Override protected ContractHarness newHarness() {

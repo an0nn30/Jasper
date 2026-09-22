@@ -50,7 +50,7 @@ class PluginManagerTest {
     private void start(boolean safeMode, boolean standaloneNotice) throws Exception {
         edt(() -> {
             windows = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { },
-                title -> { }, () -> new java.awt.Rectangle(0, 0, 10, 10)));
+                title -> { }, () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()));
             runtime = new PluginRuntime(new PluginRuntime.Options(null, user(), null, safeMode, root.resolve("plugins.toml"),
                 root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> { }),
                 (key, message) -> { }, new Contributions(), windows, new dev.jasper.app.terminals.TerminalRegistry());

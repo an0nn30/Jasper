@@ -36,7 +36,7 @@ class HostedUiTest {
     private final dev.jasper.app.persistence.UiState uiState = dev.jasper.app.persistence.UiState.inMemory();
     private final dev.jasper.app.windows.AuxiliaryWindows auxiliary = new dev.jasper.app.windows.AuxiliaryWindows(uiState,
         surface -> new dev.jasper.app.windows.AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
-            () -> new java.awt.Rectangle(0, 0, 10, 10)));
+            () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()));
     private final TerminalFixture terminalFixture = new TerminalFixture();
     private final HostedTerminals terminals = new HostedTerminals("dev.x.tool", new CapabilityGate("dev.x.tool", java.util.Set.of()),
         terminalFixture.registry, Runnable::run, () -> true, () -> true,
@@ -44,6 +44,19 @@ class HostedUiTest {
     private final HostedUi ui = new HostedUi("dev.x.tool", model, containment, Runnable::run, () -> true, open::get,
         HostedUiTest.class.getClassLoader(), () -> variant,
         handler -> { themeHandlers.add(handler); return () -> themeHandlers.remove(handler); }, auxiliary, terminals);
+
+    @Test void fileChooserIsAvailableOnBothSurfacesAndStopsWithThePlugin() {
+        var window = ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.x.tool.manager", "Manager", new java.awt.Dimension(640, 480), true));
+        var dialog = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Edit", window, true));
+        for (var surface : List.<dev.jasper.sdk.ui.WindowSurface>of(window, dialog)) {
+            assertThatIllegalStateException().isThrownBy(() -> surface.chooseFile("Choose key", Optional.empty()));
+            surface.show();
+            assertThat(surface.chooseFile("Choose key", Optional.empty())).isEmpty();
+        }
+        open.set(false);
+        assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", Optional.empty()));
+        ui.closeAll();
+    }
 
     @Test void actionsReachTheModelWithContainedHandlersAndVerifiedContext() {
         List<ActionContext> seen = new ArrayList<>();

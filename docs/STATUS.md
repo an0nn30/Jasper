@@ -72,6 +72,21 @@ vault, one prompt per request kind, and cancellation that withdraws a request. U
 unlock, grant and picker dialogs, `Open Vault...` (F8) and `Lock Vault`. Plan 6b adds the manager
 window, status item, rail action, key generator dialog and the Vault palette scope.
 
+### Native file browsing — 2026-09-22
+
+Follow-up to vault 6b in `.worktrees/vault-6b`: all editable key-path fields now have inline
+**Browse...** buttons (SSH private/public files and login private keys). The native chooser is
+owned by the editor dialog, starts from the current path, and preserves text on cancellation.
+Closing or locking the vault while choosing discards any late result. Manual entry stays available.
+
+SDK 0.7.1 adds `WindowSurface.chooseFile(title, initialPath)` for windows and dialogs; the vault
+requires that version. The app owns native selection and disposal; the fake host queues responses.
+The existing plugin ZIP picker shares the same native implementation. This is an additive extension
+to the 6b plan; no vault format or consumer API change. `./gradlew check :jasper-app:installDist -q`
+passed: **1,542 tests, 1,539 passed, three expected skips, no failures/errors**. Independent
+review found only Windows test path assumptions, corrected before the final check. Headless
+form rendering and source hygiene passed; native chooser acceptance remains user-run.
+
 ### Credential Vault plan 6b continuation — 2026-09-22
 
 Implemented in `.worktrees/vault-6b` on `claude/vault-6b`, from `c8141b6`; not merged or pushed.

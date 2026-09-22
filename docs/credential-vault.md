@@ -7,7 +7,9 @@ and an optional device binding. Later use unlocks the vault and opens its manage
 The manager lists logins, SSH keys, secure notes and saved plugin grants. Select an entry to
 inspect its details, edit it or delete it. Add a login with a password, a key path and optional
 passphrase, or both. Add an existing SSH key by choosing its private and public paths; its public
-key supplies the algorithm and SHA-256 fingerprint. Secure notes are available only in the manager.
+key supplies the algorithm and SHA-256 fingerprint. Every path field has a **Browse...** button
+that opens the native file chooser; you can still type or paste a path. Cancelling keeps the current
+value. Secure notes are available only in the manager.
 
 **Generate Key...** supports Ed25519, ECDSA P-256/P-384 and RSA 3072/4096. Generated files live in
 `plugins/dev.jasper.vault/data/keys/` unless `keys_directory` selects another directory.
@@ -60,6 +62,8 @@ clipboard timing. The following checks need a user-run Jasper window:
 1. Open F8 and create a throwaway vault. Verify native keychain access, then lock and unlock it.
 2. Add/edit a login and a multiline note; generate/import an SSH key and copy its public key.
    Generate a passphrase-protected key, confirm the optional login retains its passphrase, and
+   Use Browse beside both SSH key paths and the login key path; verify the chooser opens above
+   the editor, starts from its current path, and cancellation keeps the value. Then
    verify the key works with your SSH client. Leave both passphrase fields empty to test that path.
 3. Open F8 repeatedly; verify only one manager window opens. Lock with an editor open; verify
    its secret fields disappear and the manager offers inline unlock.

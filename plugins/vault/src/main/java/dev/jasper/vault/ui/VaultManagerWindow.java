@@ -92,6 +92,7 @@ public final class VaultManagerWindow implements AutoCloseable {
         EditorForm form;
         try { form = factory.apply(dialog::close); }
         catch (RuntimeException failure) { dialog.close(); context.notices().error(EditorForm.message(failure)); return; }
+        form.setFileChooser(dialog::chooseFile);
         dialogs.put(dialog, form); dialog.setContent(form);
         dialog.onClosed(() -> { form.close(); dialogs.remove(dialog); });
         dialog.show();

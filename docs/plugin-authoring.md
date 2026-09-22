@@ -174,6 +174,12 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
 - `WindowSurface.onClosing` guards run when the user closes the window; returning false keeps
   it open. Quitting Jasper does not consult them. `close()` closes at once.
 - A modal dialog's `show()` returns after the dialog has closed.
+- In SDK 0.7.1+, call `window.chooseFile("Choose file", Optional.of(currentPath))` (or
+  `dialog.chooseFile`) from a Browse button on the UI thread. Pass `Optional.empty()` when there
+  is no initial path. The owner must already be shown. The native chooser returns an absolute
+  normalized `Path`, or empty on cancellation or owner closure. It does not read the file.
+  Keep the current text when the result is empty, and ignore results after your form closes.
+  Set your manifest's minimum SDK to `>=0.7.1` when using this method.
 - The application closes a plugin's panels, windows and dialogs when the plugin stops.
 - Jasper stays running while any plugin window is open, even with no terminal window.
 

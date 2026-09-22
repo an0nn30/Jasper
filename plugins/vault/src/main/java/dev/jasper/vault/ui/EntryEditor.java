@@ -42,7 +42,7 @@ public final class EntryEditor extends EditorForm {
             }
         }
         form.field("Username", form.username); form.field("Authentication", form.auth);
-        form.field("Password", form.passwordField(form.password)); form.field("Private key path", form.privatePath);
+        form.field("Password", form.passwordField(form.password)); form.fileField("Private key path", form.privatePath);
         form.field("Key passphrase (optional)", form.passwordField(form.passphrase));
         form.submit(() -> {
             requireName(form.name.getText());
@@ -86,7 +86,7 @@ public final class EntryEditor extends EditorForm {
             form.name.setText(initial.name()); form.privatePath.setText(initial.privatePath().toString());
             form.publicPath.setText(initial.publicPath().toString()); form.comment.setText(initial.comment());
         }
-        form.field("Private key path", form.privatePath); form.field("Public key path", form.publicPath); form.field("Comment", form.comment);
+        form.fileField("Private key path", form.privatePath); form.fileField("Public key path", form.publicPath); form.field("Comment", form.comment);
         form.submit(() -> {
             requireName(form.name.getText());
             return save.apply(new SshKey(id, form.name.getText().strip(), "", "", form.comment.getText(),

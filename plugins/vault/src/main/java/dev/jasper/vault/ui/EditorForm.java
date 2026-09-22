@@ -8,6 +8,12 @@ import java.awt.GridBagConstraints;
 import java.awt.Insets;
 import java.util.ArrayList;
 import java.util.List;
+import java.nio.file.Path;
+import java.nio.file.InvalidPathException;
+import java.util.Optional;
+import java.util.Objects;
+import java.util.function.BiFunction;
+import javax.swing.JTextField;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import javax.swing.BorderFactory;
@@ -27,6 +33,31 @@ public class EditorForm extends JPanel implements AutoCloseable {
     private final List<SecretDocument> secrets = new ArrayList<>();
     private boolean closed, busy;
     private final Runnable dismiss;
+    private BiFunction<String, Optional<Path>, Optional<Path>> fileChooser = (title, initial) -> Optional.empty();
+
+    final void setFileChooser(BiFunction<String, Optional<Path>, Optional<Path>> chooser) {
+        fileChooser = Objects.requireNonNull(chooser);
+    }
+
+    protected final void fileField(String label, JTextField path) {
+        var row = new JPanel(new BorderLayout(8, 0));
+        var browse = new JButton("Browse...");
+        browse.getAccessibleContext().setAccessibleName("Browse for " + label.toLowerCase(java.util.Locale.ROOT));
+        row.add(path, BorderLayout.CENTER); row.add(browse, BorderLayout.EAST);
+        field(label, row);
+        browse.addActionListener(event -> {
+            if (closed || busy) return;
+            Optional<Path> initial;
+            try { initial = path.getText().isBlank() ? Optional.empty() : Optional.of(Path.of(path.getText().strip())); }
+            catch (InvalidPathException invalid) { initial = Optional.empty(); }
+            try {
+                Optional<Path> selected = fileChooser.apply("Choose " + label.toLowerCase(java.util.Locale.ROOT), initial);
+                if (!closed) selected.ifPresent(file -> path.setText(file.toString()));
+            } catch (RuntimeException failure) {
+                if (!closed) error.setText(message(failure));
+            }
+        });
+    }
 
     protected EditorForm(Runnable dismiss) {
         super(new BorderLayout(8, 8)); this.dismiss = dismiss;

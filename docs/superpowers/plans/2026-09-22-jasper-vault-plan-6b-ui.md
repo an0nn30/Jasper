@@ -31,7 +31,11 @@
 > and the form explains that closing will not cancel; detached write failures are reported.
 > Native acceptance prompted app-provider chrome fixes: hide unused title tabs, use the same
 > chrome for SDK dialogs, match rail/toolbar/title colors and remove toolbar settings controls.
-> No SDK extension was needed; these fixes apply to all auxiliary surfaces.
+> No SDK extension was needed for chrome; those fixes apply to all auxiliary surfaces.
+> Follow-up: the user requested native Browse buttons for every path field. SDK 0.7.1 adds
+> `WindowSurface.chooseFile` over the shown window/dialog, with owner-close cancellation and
+> fake selection responses. Shared editor path rows now browse private/public SSH keys and
+> login key paths; manual entry remains available and cancellation preserves the field.
 > No public consumer API or vault file-format change. The key-generation choice is resolved; native acceptance remains user-run.
 
 **Goal:** The user-facing side of the Credential Vault: a Vault palette scope, a padlock status item and rail action, the manager window (accounts, keys, notes, grants, change password, lock), the editors, the key generator dialog, and the documentation.

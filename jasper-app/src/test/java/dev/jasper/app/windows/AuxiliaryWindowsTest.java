@@ -19,8 +19,31 @@ class AuxiliaryWindowsTest {
     private final AuxiliaryWindows windows = new AuxiliaryWindows(state, surface -> {
         shellEvents.add("create:" + surface.title());
         return new AuxiliarySurface.Shell(() -> shellEvents.add("show"), () -> shellEvents.add("front"),
-            () -> shellEvents.add("dispose"), title -> shellEvents.add("title:" + title), () -> new Rectangle(10, 20, 640, 480));
+            () -> shellEvents.add("dispose"), title -> shellEvents.add("title:" + title), () -> new Rectangle(10, 20, 640, 480), (title, initial) -> java.util.Optional.empty());
     });
+
+    @Test void chooserUsesItsSurfaceAndDiscardsResultsWhenTheOwnerCloses() {
+        var chosen = java.nio.file.Path.of("selected").toAbsolutePath();
+        var initial = java.util.Optional.of(java.nio.file.Path.of("original").toAbsolutePath());
+        boolean[] closeDuringChoice = {false};
+        var hosted = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(
+            () -> { }, () -> { }, () -> { }, title -> { }, Rectangle::new, (title, path) -> {
+                assertThat(title).isEqualTo("Choose key");
+                assertThat(path).isEqualTo(initial);
+                if (closeDuringChoice[0]) surface.close();
+                return java.util.Optional.of(chosen);
+            }));
+        var window = hosted.window("test", "Manager", new Dimension(100, 100), false);
+        assertThatIllegalStateException().isThrownBy(() -> window.chooseFile("Choose key", initial));
+        window.show();
+        var dialog = hosted.dialog("Editor", true, window);
+        dialog.show();
+        assertThat(dialog.chooseFile("Choose key", initial)).contains(chosen);
+        closeDuringChoice[0] = true;
+        assertThat(dialog.chooseFile("Choose key", initial)).isEmpty();
+        assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", initial));
+        hosted.close();
+    }
 
     @Test void theShellIsCreatedOnFirstShowAndFollowsTheSurface() {
         AuxiliarySurface manager = windows.window("dev.x.manager", "Manager", new Dimension(640, 480), true);

@@ -91,6 +91,11 @@ use `MacTitleBar`; dialogs retain their modal ownership, close guards and normal
 Title-only surfaces hide the unused tab component so the entire header uses `Jasper.titleBackground`.
 The rail and toolbar use that same semantic color in both themes. Dialogs are parented through
 `WindowOwner`, so an SDK type never exposes a frame or needs its own chrome API.
+SDK 0.7.1 adds `WindowSurface.chooseFile(title, initialPath)`: a synchronous native existing-file
+chooser over the shown window or dialog. `HostedUi` checks the plugin lifetime and UI thread;
+`AuxiliarySurface` checks the owner is shown and discards a selection if it closes. `NativeShells`
+parents `FileDialog` to the actual frame or dialog and always disposes it. The testkit queues
+selections through `FakePluginHost.queueFileSelection`; an empty queue models cancellation.
 
 `persistence.UiState` (`ui-state.toml`) holds panel region, visibility and size, rail
 visibility and auxiliary window bounds. It is application state, not configuration: strict

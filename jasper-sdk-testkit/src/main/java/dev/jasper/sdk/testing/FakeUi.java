@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -217,6 +218,13 @@ final class FakeUi {
         FakeWindow(String id, String title, FakeWindow owner) { this.id = id; this.title = title; this.owner = owner; }
         @Override public void setContent(JComponent content) { }
         @Override public void show() { if (!closed) shown = true; }
+        @Override public Optional<Path> chooseFile(String title, Optional<Path> initialPath) {
+            context.requireOpen();
+            if (title == null || title.isBlank()) throw new IllegalArgumentException("A file chooser needs a title");
+            java.util.Objects.requireNonNull(initialPath, "initialPath");
+            if (!shown || closed) throw new IllegalStateException("File selection needs a shown, open window");
+            return host.takeFileSelection();
+        }
         @Override public void toFront() { }
         @Override public void setTitle(String value) {
             if (value == null || value.isBlank()) throw new IllegalArgumentException("A window needs a title");

@@ -19,6 +19,28 @@ import static org.assertj.core.api.Assertions.*;
 
 class VaultManagerWindowTest {
     @TempDir Path directory;
+    @Test void editorBrowseUsesTheSdkDialogChooser() {
+        try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
+            var context = host.start(new PluginInfo("dev.jasper.vault", "Vault", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
+            host.addTerminalWindow();
+            var owner = context.terminals().windows().getFirst();
+            var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, text -> { });
+            var window = new VaultManagerWindow(context, f.lock, f.manager, service,
+                new SecretClipboard(text -> { }, Optional::empty, clear -> { }), () -> "test", () -> { });
+            window.show(owner, Optional.empty());
+            var editor = new AtomicReference<EntryEditor>();
+            window.dialog("Add SSH Key", dismiss -> {
+                var form = EntryEditor.key(null, value -> java.util.concurrent.CompletableFuture.completedFuture(null), dismiss);
+                editor.set(form); return form;
+            });
+            Path selected = directory.resolve("key with spaces");
+            host.queueFileSelection(Optional.of(selected));
+            ((javax.swing.JButton) editor.get().privatePath.getParent().getComponent(1)).doClick();
+            assertThat(editor.get().privatePath.getText()).isEqualTo(selected.toString());
+            window.close();
+        }
+    }
+
     @Test void singletonSelectionDetailsAndCloseAreHeadless() {
         try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
             PluginContext context = host.start(new PluginInfo("dev.jasper.vault", "Vault", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });

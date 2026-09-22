@@ -513,6 +513,21 @@ public final class FakePluginHost implements AutoCloseable {
         return lines;
     }
 
+    private final java.util.ArrayDeque<Optional<Path>> fileSelections = new java.util.ArrayDeque<>();
+
+    /**
+     * Queues a response for the next native file chooser. With no queued response, it cancels.
+     *
+     * @param selection chosen file or empty for cancellation
+     */
+    public void queueFileSelection(Optional<Path> selection) {
+        fileSelections.addLast(java.util.Objects.requireNonNull(selection).map(path -> path.toAbsolutePath().normalize()));
+    }
+
+    Optional<Path> takeFileSelection() {
+        return fileSelections.isEmpty() ? Optional.empty() : fileSelections.removeFirst();
+    }
+
     /**
      * Every open plugin window and dialog, creation order.
      *

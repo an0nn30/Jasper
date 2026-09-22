@@ -4,6 +4,9 @@ import dev.jasper.app.lifecycle.Subscription;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Rectangle;
+import java.nio.file.Path;
+import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -21,7 +24,8 @@ import javax.swing.JPanel;
  */
 public final class AuxiliarySurface {
     /** The native side, as plain functions so tests can stand in for a frame. */
-    public record Shell(Runnable show, Runnable toFront, Runnable dispose, Consumer<String> title, Supplier<Rectangle> bounds) { }
+    public record Shell(Runnable show, Runnable toFront, Runnable dispose, Consumer<String> title, Supplier<Rectangle> bounds,
+                        BiFunction<String, Optional<Path>, Optional<Path>> chooseFile) { }
 
     /** Whether this is a top-level window or a dialog over another window. */
     public enum Kind { WINDOW, DIALOG }
@@ -86,6 +90,15 @@ public final class AuxiliarySurface {
         if (shell == null) shell = shells.apply(this);
         shown = true;
         shell.show().run();
+    }
+
+    /** Opens a native existing-file picker owned by this shown surface. */
+    public Optional<Path> chooseFile(String title, Optional<Path> initialPath) {
+        requireTitle(title);
+        Objects.requireNonNull(initialPath, "initialPath");
+        if (!shown()) throw new IllegalStateException("File selection needs a shown, open window");
+        Optional<Path> selected = shell.chooseFile().apply(title, initialPath);
+        return closed ? Optional.empty() : selected.map(path -> path.toAbsolutePath().normalize());
     }
 
     public void toFront() {

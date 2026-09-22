@@ -20,6 +20,25 @@ import static org.assertj.core.api.Assertions.*;
 class FakePanelsAndWindowsTest {
     private static final PluginInfo INFO = new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of());
 
+    @Test void fileSelectionWorksForWindowsAndDialogsAndRequiresALiveShownOwner(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });
+            var window = context.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(640, 480), true));
+            var dialog = context.windows().dialog(new DialogSpec("Edit", window, true));
+            var initial = java.util.Optional.of(directory.resolve("original"));
+            for (var surface : java.util.List.<dev.jasper.sdk.ui.WindowSurface>of(window, dialog)) {
+                assertThatIllegalStateException().isThrownBy(() -> surface.chooseFile("Choose key", initial));
+                surface.show();
+                host.queueFileSelection(java.util.Optional.of(directory.resolve("selected")));
+                assertThat(surface.chooseFile("Choose key", initial)).contains(directory.resolve("selected"));
+                assertThat(surface.chooseFile("Choose key", initial)).isEmpty();
+                assertThatIllegalArgumentException().isThrownBy(() -> surface.chooseFile(" ", initial));
+            }
+            window.close();
+            assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", initial));
+        }
+    }
+
     @Test void recordsPanelsRailAndWindows() {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });

@@ -17,6 +17,48 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 class EntryEditorTest {
+    @Test void everyKeyPathHasAnInlineChooserAndCancelPreservesManualInput(@TempDir Path directory) {
+        Path typed = directory.resolve("typed"), chosen = directory.resolve("chosen key"), recovered = directory.resolve("recovered");
+        var key = EntryEditor.key(null, value -> CompletableFuture.completedFuture(null), () -> { });
+        var login = EntryEditor.login(null, value -> CompletableFuture.completedFuture(null), () -> { });
+        for (var form : java.util.List.of(key, login)) {
+            var paths = form == key ? java.util.List.of(form.privatePath, form.publicPath) : java.util.List.of(form.privatePath);
+            for (var path : paths) {
+                var browse = (javax.swing.JButton) path.getParent().getComponent(1);
+                assertThat(browse.getText()).isEqualTo("Browse...");
+                path.setText(typed.toString());
+                form.setFileChooser((title, initial) -> {
+                    assertThat(initial).contains(typed);
+                    return java.util.Optional.of(chosen);
+                });
+                browse.doClick();
+                assertThat(path.getText()).isEqualTo(chosen.toString());
+                form.setFileChooser((title, initial) -> java.util.Optional.empty());
+                browse.doClick();
+                assertThat(path.getText()).isEqualTo(chosen.toString());
+                path.setText("invalid\0path");
+                form.setFileChooser((title, initial) -> {
+                    assertThat(initial).isEmpty();
+                    return java.util.Optional.of(recovered);
+                });
+                browse.doClick();
+                assertThat(path.getText()).isEqualTo(recovered.toString());
+            }
+            form.close();
+        }
+    }
+
+    @Test void aPickerResultAfterFormClosureIsIgnored() {
+        var form = EntryEditor.key(null, value -> CompletableFuture.completedFuture(null), () -> { });
+        form.privatePath.setText("/keys/original");
+        form.setFileChooser((title, initial) -> {
+            form.close();
+            return java.util.Optional.of(Path.of("/keys/late"));
+        });
+        ((javax.swing.JButton) form.privatePath.getParent().getComponent(1)).doClick();
+        assertThat(form.privatePath.getText()).isEqualTo("/keys/original");
+    }
+
     @Test void noteEditingPreservesMultilineUnicodeAndClearsOnClose() {
         var received = new AtomicReference<Note>();
         char[] original = "first\nsecond \u03bb".toCharArray();
