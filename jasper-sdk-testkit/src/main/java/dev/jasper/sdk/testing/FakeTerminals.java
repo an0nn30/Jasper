@@ -185,18 +185,18 @@ final class FakeTerminals implements Terminals {
     private static PaneInfo openedInfo(OpenRequest.Local local) {
         PaneInfo blank = PaneInfo.unknown();
         return new PaneInfo("", local.spec().workingDirectory(), Optional.empty(), 80, 24, false, blank.kind(), Optional.empty(),
-            SessionState.RUNNING, blank.exitStatus());
+            SessionState.RUNNING, blank.exitStatus(), "sh");
     }
 
     private PaneInfo sessionInfo(OpenRequest.Session session) {
         return new PaneInfo(session.spec().title(), Optional.empty(), Optional.empty(), 80, 24, false, SessionKind.PLUGIN,
-            Optional.of(context.plugin().id()), SessionState.CONNECTING, OptionalInt.empty());
+            Optional.of(context.plugin().id()), SessionState.CONNECTING, OptionalInt.empty(), session.spec().title());
     }
 
     /** A copy of a snapshot in another session state; an exit status is kept only for an exited session. */
     static PaneInfo withState(PaneInfo info, SessionState state, OptionalInt exitStatus) {
         return new PaneInfo(info.title(), info.workingDirectory(), info.remoteDirectory(), info.columns(), info.rows(), info.shellIntegration(),
-            info.kind(), info.providerPluginId(), state, state == SessionState.EXITED ? exitStatus : OptionalInt.empty());
+            info.kind(), info.providerPluginId(), state, state == SessionState.EXITED ? exitStatus : OptionalInt.empty(), info.shell());
     }
 
     /** Every request kind names its capability here, before anything else happens. */

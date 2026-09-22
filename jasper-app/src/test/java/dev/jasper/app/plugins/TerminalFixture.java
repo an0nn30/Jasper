@@ -26,7 +26,7 @@ import dev.jasper.terminal.session.AttachedConnection;
 /** A scripted workspace behind a real {@link TerminalRegistry}: what windows do, without windows. EDT only. */
 final class TerminalFixture {
     private static final class Pane { UUID id = UUID.randomUUID(); Tab tab; String title; Path directory; String selection; List<String> sent = new ArrayList<>(); dev.jasper.app.terminals.RemoteLocation remote;
-        SessionRequest request; SessionAttempt attempt; AttachedConnection connection; boolean everAttached; String status = ""; String state = ""; }
+        SessionRequest request; SessionAttempt attempt; AttachedConnection connection; boolean everAttached; String status = ""; String state = ""; String shell = "zsh"; }
     private static final class Tab { UUID id = UUID.randomUUID(); Window window; String title; List<Pane> panes = new ArrayList<>(); Pane focused; }
     private static final class Window { UUID id = UUID.randomUUID(); List<Tab> tabs = new ArrayList<>(); Tab selected; Subscription registration; }
 
@@ -42,7 +42,7 @@ final class TerminalFixture {
         return new PaneEntry(pane.id, pane.tab.id,
             () -> new PaneSnapshot(pane.title, pane.remote == null ? Optional.ofNullable(pane.directory) : Optional.empty(), 80, 24, true,
                 pane.state.equals("CONNECTING") ? PaneSnapshot.State.STARTING : pane.state.equals("EXITED") ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING,
-                OptionalInt.empty(), Optional.ofNullable(pane.request).map(SessionRequest::providerId), Optional.ofNullable(pane.remote)),
+                OptionalInt.empty(), Optional.ofNullable(pane.request).map(SessionRequest::providerId), Optional.ofNullable(pane.remote), pane.shell),
             () -> CompletableFuture.completedFuture(Optional.of("vim")),
             bytes -> pane.sent.add("write:" + new String(bytes, StandardCharsets.UTF_8)), text -> pane.sent.add("paste:" + text),
             () -> Optional.ofNullable(pane.selection), () -> focusPane(pane.id),

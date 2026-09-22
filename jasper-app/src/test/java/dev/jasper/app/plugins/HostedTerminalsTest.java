@@ -57,7 +57,7 @@ class HostedTerminalsTest {
         assertThat(pane).isEqualTo(terminals.pane(left).orElseThrow()).isEqualTo(tabHandle.activePane().orElseThrow());
         assertThat(pane.tab()).isEqualTo(tabHandle);
         assertThat(pane.info()).isEqualTo(new PaneInfo("make", Optional.of(Path.of("/src")), Optional.empty(), 80, 24, true, SessionKind.LOCAL,
-            Optional.empty(), SessionState.RUNNING, java.util.OptionalInt.empty()));
+            Optional.empty(), SessionState.RUNNING, java.util.OptionalInt.empty(), "zsh"));
         assertThat(pane.foregroundJob()).isCompletedWithValue(Optional.of("vim"));
         assertThat(terminals.tab(tab)).contains(tabHandle);
         assertThat(terminals.window(window)).contains(handle);

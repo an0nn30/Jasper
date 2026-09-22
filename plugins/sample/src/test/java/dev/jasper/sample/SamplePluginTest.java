@@ -110,7 +110,7 @@ class SamplePluginTest {
         try (var host = new FakePluginHost()) {
             UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "build");
             UUID pane = host.addTerminalPane(tab, new PaneInfo("zsh", Optional.of(Path.of("/src")), Optional.empty(), 80, 24, true,
-                SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty()));
+                SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh"));
             host.activateTerminalWindow(window);
             host.setConfig("dev.jasper.sample", Map.of("demo_terminal", true));
             host.start(OBSERVING, Set.of(), Set.of(), new SamplePlugin());

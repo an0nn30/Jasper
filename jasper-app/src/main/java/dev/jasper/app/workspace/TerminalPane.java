@@ -384,13 +384,13 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         if (session == null || connecting) {
             boolean failedBeforeAnySession = request != null && !connecting;
             return new PaneSnapshot(title(), request == null ? Optional.of(launchDirectory) : Optional.empty(), 0, 0, false,
-                failedBeforeAnySession ? PaneSnapshot.State.EXITED : PaneSnapshot.State.STARTING, OptionalInt.empty(), provider, Optional.empty());
+                failedBeforeAnySession ? PaneSnapshot.State.EXITED : PaneSnapshot.State.STARTING, OptionalInt.empty(), provider, Optional.empty(), shellLabel);
         }
         CompletableFuture<Integer> exit = session.exitFuture();
         boolean exited = exit.isDone();
         Integer code = exited && !exit.isCompletedExceptionally() ? exit.getNow(null) : null;
         return new PaneSnapshot(title(), session.workingDirectory(), session.columns(), session.rows(), session.shellIntegrationDetected(),
-            exited ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING, code == null ? OptionalInt.empty() : OptionalInt.of(code), provider, remoteOf(session));
+            exited ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING, code == null ? OptionalInt.empty() : OptionalInt.of(code), provider, remoteOf(session), shellLabel);
     }
 
     /** The foreground job, asked off the EDT like the pane's own poll; empty when nothing runs here. */

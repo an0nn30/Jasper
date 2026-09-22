@@ -18,11 +18,15 @@ class TerminalValuesTest {
         assertThat(unknown.state()).isEqualTo(SessionState.EXITED);
         assertThat(unknown.kind()).isEqualTo(SessionKind.LOCAL);
         assertThatIllegalArgumentException().isThrownBy(() -> new PaneInfo("t", Optional.empty(), Optional.empty(), -1, 24, false,
-            SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty()));
+            SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh"));
         assertThatIllegalArgumentException().as("an exit status belongs to an exited session").isThrownBy(() -> new PaneInfo("t",
-            Optional.empty(), Optional.empty(), 80, 24, false, SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.of(0)));
+            Optional.empty(), Optional.empty(), 80, 24, false, SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.of(0), "zsh"));
         assertThatNullPointerException().isThrownBy(() -> new PaneInfo(null, Optional.empty(), Optional.empty(), 80, 24, false,
-            SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty()));
+            SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh"));
+        assertThatNullPointerException().as("the shell label is required; use \"\" when unknown").isThrownBy(() -> new PaneInfo("t",
+            Optional.empty(), Optional.empty(), 80, 24, false, SessionKind.LOCAL, Optional.empty(),
+            SessionState.RUNNING, OptionalInt.empty(), null));
+        assertThat(PaneInfo.unknown().shell()).isEmpty();
         assertThatIllegalArgumentException().isThrownBy(() -> new RemoteDirectory(" ", "/srv"));
         assertThat(new RemoteDirectory("", "/srv").host()).as("the program named no host").isEmpty();
     }

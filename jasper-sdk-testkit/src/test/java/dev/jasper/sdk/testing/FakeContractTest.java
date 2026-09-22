@@ -36,7 +36,7 @@ class FakeContractTest extends PluginContractTest {
             @Override public java.util.UUID addTerminalTab(java.util.UUID windowId, String title) { return host.addTerminalTab(windowId, title); }
             @Override public java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory) {
                 return host.addTerminalPane(tabId, new dev.jasper.sdk.terminal.PaneInfo(title, java.util.Optional.ofNullable(directory), java.util.Optional.empty(), 80, 24,
-                    true, dev.jasper.sdk.terminal.SessionKind.LOCAL, java.util.Optional.empty(), dev.jasper.sdk.terminal.SessionState.RUNNING, java.util.OptionalInt.empty()));
+                    true, dev.jasper.sdk.terminal.SessionKind.LOCAL, java.util.Optional.empty(), dev.jasper.sdk.terminal.SessionState.RUNNING, java.util.OptionalInt.empty(), "zsh"));
             }
             @Override public void activateTerminalWindow(java.util.UUID windowId) { host.activateTerminalWindow(windowId); }
             @Override public void focusTerminalPane(java.util.UUID paneId) { host.focusTerminalPane(paneId); }

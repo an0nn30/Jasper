@@ -16,9 +16,9 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class FakeTerminalsTest {
-    private static PaneInfo info(String title) {
+    static PaneInfo info(String title) {
         return new PaneInfo(title, Optional.of(Path.of("/src")), Optional.empty(), 80, 24, true, SessionKind.LOCAL, Optional.empty(),
-            SessionState.RUNNING, OptionalInt.empty());
+            SessionState.RUNNING, OptionalInt.empty(), "zsh");
     }
 
     @Test void theHostScriptsAWorkspaceThatActionContextsSee() {

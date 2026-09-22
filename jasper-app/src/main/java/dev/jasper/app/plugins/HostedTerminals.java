@@ -62,7 +62,7 @@ final class HostedTerminals implements Terminals {
         return new PaneInfo(snapshot.title(), snapshot.workingDirectory(),
             snapshot.remoteDirectory().map(location -> new RemoteDirectory(location.host(), location.path())), snapshot.columns(), snapshot.rows(),
             snapshot.shellIntegration(), snapshot.providerId().isPresent() ? SessionKind.PLUGIN : SessionKind.LOCAL, snapshot.providerId(), state,
-            snapshot.exitStatus());
+            snapshot.exitStatus(), snapshot.shell());
     }
 
     private final class Window implements WindowHandle {

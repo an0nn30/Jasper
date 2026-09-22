@@ -18,13 +18,15 @@ import java.util.OptionalInt;
  * @param providerPluginId the providing plugin, for a plugin session
  * @param state where the session is in its life
  * @param exitStatus the exit status; present only when the session exited with a known status
+ * @param shell the shell or program label, such as {@code zsh}, or a provided session's title; empty when unknown
  */
 public record PaneInfo(String title, Optional<Path> workingDirectory, Optional<RemoteDirectory> remoteDirectory, int columns, int rows,
                        boolean shellIntegration, SessionKind kind, Optional<String> providerPluginId, SessionState state,
-                       OptionalInt exitStatus) {
+                       OptionalInt exitStatus, String shell) {
     /** Rejects nulls, a negative grid, and an exit status on a session that has not exited. */
     public PaneInfo {
         Objects.requireNonNull(title, "title");
+        Objects.requireNonNull(shell, "shell");
         Objects.requireNonNull(workingDirectory, "workingDirectory");
         Objects.requireNonNull(remoteDirectory, "remoteDirectory");
         Objects.requireNonNull(kind, "kind");
@@ -42,6 +44,6 @@ public record PaneInfo(String title, Optional<Path> workingDirectory, Optional<R
      */
     public static PaneInfo unknown() {
         return new PaneInfo("", Optional.empty(), Optional.empty(), 0, 0, false, SessionKind.LOCAL, Optional.empty(),
-            SessionState.EXITED, OptionalInt.empty());
+            SessionState.EXITED, OptionalInt.empty(), "");
     }
 }

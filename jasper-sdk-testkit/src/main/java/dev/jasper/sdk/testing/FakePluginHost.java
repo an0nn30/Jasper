@@ -605,7 +605,7 @@ public final class FakePluginHost implements AutoCloseable {
     private static dev.jasper.sdk.terminal.PaneInfo with(dev.jasper.sdk.terminal.PaneInfo info, String title, Optional<Path> directory,
             dev.jasper.sdk.terminal.SessionState state, OptionalInt exitStatus) {
         return new dev.jasper.sdk.terminal.PaneInfo(title, directory, info.remoteDirectory(), info.columns(), info.rows(), info.shellIntegration(),
-            info.kind(), info.providerPluginId(), state, exitStatus);
+            info.kind(), info.providerPluginId(), state, exitStatus, info.shell());
     }
 
     /**
@@ -654,7 +654,7 @@ public final class FakePluginHost implements AutoCloseable {
         workspace.pane(paneId).ifPresent(pane -> {
             // A local report replaces a remote one: at most one of the two directories is present.
             pane.info = new dev.jasper.sdk.terminal.PaneInfo(pane.info.title(), Optional.ofNullable(directory), Optional.empty(), pane.info.columns(),
-                pane.info.rows(), pane.info.shellIntegration(), pane.info.kind(), pane.info.providerPluginId(), pane.info.state(), pane.info.exitStatus());
+                pane.info.rows(), pane.info.shellIntegration(), pane.info.kind(), pane.info.providerPluginId(), pane.info.state(), pane.info.exitStatus(), pane.info.shell());
             publishApp(TerminalEvents.CWD_CHANGED, new TerminalEvents.CwdChanged(paneId, Optional.ofNullable(directory), Optional.empty()));
         });
     }
@@ -741,7 +741,7 @@ public final class FakePluginHost implements AutoCloseable {
         workspace.pane(paneId).ifPresent(pane -> {
             var remote = Optional.of(new dev.jasper.sdk.terminal.RemoteDirectory(host, path));
             pane.info = new dev.jasper.sdk.terminal.PaneInfo(pane.info.title(), Optional.empty(), remote, pane.info.columns(), pane.info.rows(),
-                pane.info.shellIntegration(), pane.info.kind(), pane.info.providerPluginId(), pane.info.state(), pane.info.exitStatus());
+                pane.info.shellIntegration(), pane.info.kind(), pane.info.providerPluginId(), pane.info.state(), pane.info.exitStatus(), pane.info.shell());
             publishApp(TerminalEvents.CWD_CHANGED, new TerminalEvents.CwdChanged(paneId, Optional.empty(), remote));
         });
     }
