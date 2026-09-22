@@ -72,7 +72,19 @@ public final class FakePluginHost implements AutoCloseable {
     private final List<String> failures = new CopyOnWriteArrayList<>();
     final List<String> reports = new CopyOnWriteArrayList<>();
     private Path dataRoot;
+    private final boolean ownsRoot;
     private volatile Variant variant = Variant.DARK;
+
+    /** A host whose plugins' data directories live in a temporary directory this host deletes on close. */
+    public FakePluginHost() { this.ownsRoot = true; }
+
+    /**
+     * A host whose plugins' data directories live under {@code dataRoot}, which the caller owns and this
+     * host never deletes.
+     *
+     * @param dataRoot the parent of each plugin's data directory
+     */
+    public FakePluginHost(Path dataRoot) { this.dataRoot = java.util.Objects.requireNonNull(dataRoot, "dataRoot"); this.ownsRoot = false; }
 
     /**
      * Starts a plugin the way the application would. A plugin whose hard requirement is not active is
@@ -210,7 +222,7 @@ public final class FakePluginHost implements AutoCloseable {
     @Override public void close() {
         stopAll();
         flush();
-        if (dataRoot == null) return;
+        if (dataRoot == null || !ownsRoot) return;
         try (var files = Files.walk(dataRoot)) {
             files.sorted(Comparator.reverseOrder()).forEach(path -> path.toFile().delete());
         } catch (IOException ignored) {
