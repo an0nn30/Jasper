@@ -23,11 +23,9 @@ class ConfigTemplateTest {
 
     @Test void paletteAndClearCommentsShowTheirLiteralPlatformDefaults() {
         assertThat(ConfigTemplate.text(true)).contains("# command_palette = \"cmd+k\"", "# clear_scrollback = \"cmd+shift+k\"");
-        assertThat(ConfigTemplate.text(true)).contains("# history_palette = \"cmd+r\"", "# snippets_palette = \"cmd+j\"");
+        assertThat(ConfigTemplate.text(true)).doesNotContain("history_palette", "snippets_palette");
         assertThat(ConfigTemplate.text(false)).contains("# command_palette = \"ctrl+k\"", "# clear_scrollback = \"ctrl+shift+k\"",
             "Command Palette uses plain Ctrl+K");
-        assertThat(ConfigTemplate.text(false)).contains("# history_palette = \"ctrl+shift+r\"", "Search Shell History uses Ctrl+Shift+R",
-            "# snippets_palette = \"ctrl+shift+j\"", "Snippets uses Ctrl+Shift+J");
     }
 
     @Test void commentedTemplatesParseCleanlyWithBuiltInDefaultsOnBothPlatforms() {
@@ -35,6 +33,7 @@ class ConfigTemplateTest {
             var result = ConfigLoader.parse(directory.resolve("config.toml"), ConfigTemplate.text(macOs), macOs);
             assertThat(result.rejected()).isFalse();
             assertThat(result.diagnostics()).isEmpty();
+
             assertThat(result.snapshot()).isEqualTo(ConfigSnapshot.defaults());
         }
     }
@@ -47,8 +46,8 @@ class ConfigTemplateTest {
         assertThat(toml.errors()).isEmpty();
         assertThat(toml.getTable("buddy").keySet()).containsExactly("enabled");
         assertThat(toml.getTable("notifications").keySet()).containsExactly("long_command_seconds");
-        assertThat(toml.getTable("palette.scopes.history").keySet()).containsExactlyInAnyOrder("enabled", "trivial_commands");
-        assertThat(toml.getTable("palette").keySet()).containsExactlyInAnyOrder("max_results", "scopes");
+        assertThat(toml.getTable("plugins.\"dev.jasper.history\"").keySet()).containsExactlyInAnyOrder("trivial_commands", "deprioritize_trivial");
+        assertThat(toml.getTable("palette").keySet()).containsExactly("max_results");
         assertThat(toml.getTable("window").keySet())
             .containsExactlyInAnyOrder("tab_height", "toolbar", "status_bar", "columns", "lines");
         assertThat(toml.getTable("font").keySet())
@@ -66,7 +65,8 @@ class ConfigTemplateTest {
             var result = ConfigLoader.parse(example, text, macOs);
             assertThat(result.rejected()).isFalse();
             assertThat(result.diagnostics()).isEmpty();
-            assertThat(result.snapshot()).isEqualTo(ConfigSnapshot.defaults());
+            // The example's plugin table is the History plugin's defaults; the application's own defaults have none.
+            assertThat(result.snapshot().toBuilder().plugins(java.util.Map.of()).build()).isEqualTo(ConfigSnapshot.defaults());
         }
     }
 
@@ -82,7 +82,6 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().toolbar()).isEqualTo(ToolbarMode.ICONS_AND_LABELS);
             assertThat(all.snapshot().statusBar()).isTrue();
             assertThat(all.snapshot().buddyEnabled()).isTrue();
-            assertThat(all.snapshot().historyEnabled()).isTrue();
             assertThat(all.snapshot().maxResults()).isEqualTo(5);
             assertThat(all.snapshot().fontSize()).isEqualTo(16f);
             assertThat(all.snapshot().columns()).isEqualTo(150);

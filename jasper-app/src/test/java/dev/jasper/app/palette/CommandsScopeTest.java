@@ -1,13 +1,8 @@
-package dev.jasper.app.palette.builtin;
+package dev.jasper.app.palette;
 
-import dev.jasper.app.palette.PaletteTestSupport;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.commands.CommandRegistry;
-import dev.jasper.app.history.CommandHistory;
-import dev.jasper.app.palette.PaletteContext;
-import dev.jasper.app.palette.PaletteRow;
-import dev.jasper.app.palette.PaletteScope;
-import dev.jasper.app.palette.PaletteTarget;
+import dev.jasper.app.commands.CommandHistory;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;

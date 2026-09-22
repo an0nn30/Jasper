@@ -1,6 +1,6 @@
 package dev.jasper.app.application;
 
-import dev.jasper.app.history.CommandHistory;
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.workspace.DesktopTestSupport;
 import dev.jasper.terminal.session.TerminalSession;
 import java.util.ArrayDeque;

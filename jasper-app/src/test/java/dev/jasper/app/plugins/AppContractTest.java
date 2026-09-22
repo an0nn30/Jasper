@@ -210,7 +210,7 @@ class AppContractTest extends PluginContractTest {
                                 .orElseThrow(() -> new IllegalArgumentException("No such scope: " + scopeId));
                         }
                         private dev.jasper.app.palette.PaletteContext context(UUID windowId, UUID paneIdOrNull) {
-                            var target = new dev.jasper.app.palette.PaletteTarget(text -> { }, () -> { }, Optional::empty, () -> "", () -> true,
+                            var target = new dev.jasper.app.palette.PaletteTarget(text -> { }, () -> { }, Optional::empty, () -> true,
                                 Optional.of(windowId), Optional.ofNullable(paneIdOrNull));
                             return new dev.jasper.app.palette.PaletteContext(true, target, 5);
                         }

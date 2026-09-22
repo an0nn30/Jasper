@@ -32,7 +32,7 @@ final class WorkspaceActions {
 
     void invoke(ActionId id) {
         if (owner.commandPalette() != null && owner.commandPalette().isOpen()
-            && id != ActionId.COMMAND_PALETTE && id != ActionId.HISTORY_PALETTE && id != ActionId.SNIPPETS_PALETTE) return;
+            && id != ActionId.COMMAND_PALETTE) return;
         update();
         if (!action(id).isEnabled()) return;
         TerminalTab tab = owner.currentTab();
@@ -40,8 +40,6 @@ final class WorkspaceActions {
         TerminalView view = pane == null ? null : pane.view();
         switch (id) {
             case COMMAND_PALETTE -> owner.commandPalette().open(PaletteScope.COMMANDS_ID);
-            case HISTORY_PALETTE -> owner.commandPalette().open(PaletteScope.HISTORY_ID);
-            case SNIPPETS_PALETTE -> owner.commandPalette().open(PaletteScope.SNIPPETS_ID);
             case NEW_TAB -> owner.newTab(owner.directory());
             case NEW_WINDOW -> owner.requestNewWindow();
             case QUIT -> owner.requestQuit();
@@ -98,8 +96,6 @@ final class WorkspaceActions {
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
                     case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT -> true;
-                    case HISTORY_PALETTE -> owner.scopes().find(PaletteScope.HISTORY_ID).isPresent();
-                    case SNIPPETS_PALETTE -> owner.scopes().find(PaletteScope.SNIPPETS_ID).isPresent();
                     case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
                     case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,

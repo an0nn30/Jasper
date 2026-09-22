@@ -131,13 +131,13 @@ class PaletteKeyRouterTest {
                     null, 0, null, null);
                 for (var listener : card.queryField().getInputMethodListeners()) listener.inputMethodTextChanged(committed);
                 owner.commandPalette().toggle(); registration.close();
-                PaletteTestSupport.setResults(card, dev.jasper.app.palette.builtin.ScopeTestSupport.rows(owner.commandsScope(), List.of(first)), null, null);
+                PaletteTestSupport.setResults(card, PaletteTestSupport.rows(owner.commandsScope(), List.of(first)), null, null);
                 assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(count.get()).isZero();
                 router.dispatch(release(card.queryField(), KeyEvent.VK_ENTER));
                 owner.commandPalette().toggle(); second.action().setEnabled(false);
-                PaletteTestSupport.setResults(card, dev.jasper.app.palette.builtin.ScopeTestSupport.rows(owner.commandsScope(), List.of(second)), null, null);
+                PaletteTestSupport.setResults(card, PaletteTestSupport.rows(owner.commandsScope(), List.of(second)), null, null);
                 router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0));
                 assertThat(count.get()).isZero();
             }

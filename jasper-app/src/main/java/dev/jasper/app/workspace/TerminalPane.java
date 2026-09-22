@@ -1,7 +1,6 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.ShellExitBehavior;
-import dev.jasper.app.history.ShellHistoryEntry;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.terminal.config.Palette;
 import dev.jasper.terminal.config.TerminalOptions;
@@ -56,7 +55,6 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     Runnable onClose = () -> {};
     Consumer<String> onFailure = message -> {};
     Consumer<TerminalView> onReady = terminal -> {};
-    Consumer<ShellHistoryEntry> onCommandExecuted = entry -> {};
 
     /** A command finished: its text, exit status, how long it ran and where, locally or remotely. Delivered on the EDT. */
     interface CommandFinished {
@@ -146,13 +144,6 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
                 java.util.Optional<Path> workingDirectory, java.time.Duration duration) {
             // Read on the reader thread, in step with the tracker, before hopping to the EDT.
             var remote = remoteOf(session);
-            try {
-                onCommandExecuted.accept(new ShellHistoryEntry(command, java.time.Instant.now().getEpochSecond(),
-                    java.util.Set.of(shellLabel), workingDirectory.orElse(null),
-                    exitStatus.isPresent() ? exitStatus.getAsInt() : null));
-            } catch (RuntimeException failure) {
-                LOG.log(System.Logger.Level.WARNING, "History listener failed for a captured command", failure);
-            }
             // commandExecuted arrives on the reader thread; everything downstream is Swing.
             SwingUtilities.invokeLater(() -> {
                 if (closed) return;
@@ -465,7 +456,6 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         onConnecting = () -> {};
         allowLaunchFocus = () -> false;
         onReady = terminal -> {}; onFailure = message -> {};
-        onCommandExecuted = entry -> {};
         removeAll();
     }
 }

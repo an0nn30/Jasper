@@ -1,6 +1,6 @@
 package dev.jasper.app.application;
 
-import dev.jasper.app.history.CommandHistory;
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.testsupport.PluginJars;
 import java.nio.file.Path;

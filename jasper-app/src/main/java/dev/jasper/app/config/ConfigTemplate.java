@@ -57,16 +57,6 @@ public final class ConfigTemplate {
             # Rows the command palette shows in every scope, 1-20; updates live. Cmd/Ctrl+1-5 still number the first five.
             # max_results = 5
 
-            [palette.scopes.history]
-            # Search shell history from the palette (Cmd+R on macOS, Ctrl+Shift+R elsewhere); updates live.
-            # Reads zsh, bash, fish, nushell and PowerShell history files; the live shell-history index is not persisted.
-            # enabled = true
-            # On an empty History query, these commands rank below more substantial ones. Each entry is a
-            # single word matched against a command's first word, so "cd .." is trivial but
-            # "cd path && build" is not. A nonempty search uses match quality, directory and recency.
-            # An empty list turns this off; setting the key replaces the default list entirely.
-            # trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
-
             [font]
             # Font family and ordered fallbacks update live. Missing fonts use JBR/system fallback.
             # family = "JetBrains Mono"
@@ -134,7 +124,7 @@ public final class ConfigTemplate {
             """);
         text.append(macOs
             ? "# cmd is the Command key on macOS.\n"
-            : "# cmd means Ctrl+Shift; some defaults add Alt to keep actions distinct.\n# Command Palette uses plain Ctrl+K; Clear Scrollback uses Ctrl+Shift+K; Search Shell History uses Ctrl+Shift+R; Snippets uses Ctrl+Shift+J.\n");
+            : "# cmd means Ctrl+Shift; some defaults add Alt to keep actions distinct.\n# Command Palette uses plain Ctrl+K; Clear Scrollback uses Ctrl+Shift+K.\n");
         for (ActionId action : ActionId.values()) {
             text.append("# ").append(action.label()).append('\n');
             text.append("# ").append(action.id()).append(" = \"")

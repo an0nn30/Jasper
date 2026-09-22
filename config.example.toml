@@ -35,16 +35,14 @@ enabled = false
 # Cmd/Ctrl+1-5 still act on the first five rows.
 max_results = 5
 
-[palette.scopes.history]
-# Live. Search shell history from the palette with Cmd+R (macOS) or Ctrl+Shift+R.
+[plugins."dev.jasper.history"]
+# The Shell History plugin (Cmd+R on macOS, Ctrl+Shift+R elsewhere); disable it in File > Manage Plugins.
 # Jasper reads zsh, bash, fish, nushell and PowerShell history files without rewriting them.
-# Live shell history stays in memory; command-palette usage is stored separately.
-enabled = true
-# Live. On an empty History query, these commands rank below more substantial ones. Each entry is a single
+# On an empty History query, these commands rank below more substantial ones. Each entry is a single
 # word matched against a command's first word, so "cd .." is trivial but "cd path && build" is not.
-# Nonempty queries rank match quality, directory and recency instead. An empty list turns this off;
-# setting the key replaces the default list entirely rather than adding to it.
+# Setting the key replaces the default list entirely; deprioritize_trivial = false turns the rule off.
 trivial_commands = ["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]
+deprioritize_trivial = true
 
 [font]
 # Live across existing and new panes. Missing fonts use JBR/system fallback.

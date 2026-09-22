@@ -7,8 +7,7 @@ import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.FontConfig;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.ActionEntry;
-import dev.jasper.app.history.CommandHistory;
-import dev.jasper.app.history.ShellHistoryIndex;
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.LaunchSettings;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.lifecycle.Subscription;
@@ -20,7 +19,6 @@ import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.NativeNotifier;
 import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.platform.SystemFonts;
-import dev.jasper.app.snippets.SnippetStore;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.windows.NativeShells;
 import dev.jasper.app.workspace.TerminalWindow;
@@ -74,8 +72,6 @@ public final class JasperApplication {
     private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
     private final ApplicationShutdown shutdown;
-    private final ShellHistoryIndex shellHistory;
-    private final SnippetStore snippets;
     private final Path shellIntegrationDir;
     private final BuddyIntegration buddy;
     private final dev.jasper.app.lifecycle.Subscription buddyAppearance;
@@ -130,17 +126,7 @@ public final class JasperApplication {
 
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate) {
-        this(service, suppliedLauncher, history, buddyStateFile, terminate, new ShellHistoryIndex(List.of()));
-    }
-
-    public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
-                      Runnable terminate, ShellHistoryIndex shellHistory) {
-        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellHistory, null);
-    }
-
-    public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
-                      Runnable terminate, ShellHistoryIndex shellHistory, SnippetStore snippets) {
-        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellHistory, snippets, null);
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, null);
     }
 
     /**
@@ -149,13 +135,11 @@ public final class JasperApplication {
      * {@code shellIntegrationDir} is the extracted script directory, or null when extraction failed or tests want none.
      */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
-                      Runnable terminate, ShellHistoryIndex shellHistory, SnippetStore snippets, Path shellIntegrationDir) {
+                      Runnable terminate, Path shellIntegrationDir) {
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.
         this.shutdown = new ApplicationShutdown(() -> { relaunchIfRequested(); terminate.run(); });
-        this.shellHistory = shellHistory;
-        this.snippets = snippets;
         this.shellIntegrationDir = shellIntegrationDir;
         buddy = new BuddyIntegration(buddyStateFile, SystemFonts.system(java.awt.Font.PLAIN, 13f),
             themes.current().chrome() == BuiltinTheme.DARK, this::raiseTerminal, this::toggleBuddy, this::owns);
@@ -165,7 +149,6 @@ public final class JasperApplication {
         configuration = service == null ? null : new ConfigurationController(themes, service);
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
-            if (snippets != null) snippets.reload();
             loginItems.accept(snapshot.backgroundEnabled());
             if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
         });
@@ -202,7 +185,7 @@ public final class JasperApplication {
         TerminalWindow window = new TerminalWindow(new WindowCallbacks(this::newWindow, this::quit,
             this::windowActivated, this::windowClosed,
             state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
-            launcher, directory, themes, configuration == null ? null : configuration.snapshot(), history, shellHistory, snippets);
+            launcher, directory, themes, configuration == null ? null : configuration.snapshot(), history);
         if (configuration != null) configuration.register(window.content());
         window.content().connectContributions(contributions, uiState);
         window.content().connectTerminals(terminals, window::toFront);
@@ -228,8 +211,6 @@ public final class JasperApplication {
             }
         });
         windows.add(window); window.show();
-        if (first) shellHistory.refresh();
-        if (first && configuration == null && snippets != null) snippets.reload();
         return window;
     }
 
@@ -289,7 +270,6 @@ public final class JasperApplication {
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "Font warm-up failed; the first window will pay for it", failure);
         }
-        shellHistory.refresh();
     }
 
     /** Launch housekeeping for plugins: pending removals and installs. Off the EDT, before {@link #startPlugins}. */
@@ -389,9 +369,9 @@ public final class JasperApplication {
         windows.remove(window);
         buddy.removeWindow(window);
         if (lastActive == window) lastActive = null;
-        // Residency keeps the warm process: the command history, the shell-history index, the
-        // snippets and the configuration watcher are precisely what makes the next window fast,
-        // and shutdown would close all of them. Quit still terminates.
+        // Residency keeps the warm process: the command history, the plugins and the configuration
+        // watcher are precisely what makes the next window fast, and shutdown would close all of them.
+        // Quit still terminates.
         boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
         if (windows.isEmpty() && !resident && !pluginWindowsOpen) requestShutdown();
         else updateBuddyActions();
@@ -522,8 +502,6 @@ public final class JasperApplication {
         launches.close();
         // Application-owned state first, so none of it depends on plugins behaving.
         history.close();
-        shellHistory.close();
-        if (snippets != null) snippets.close();
         List<CompletableFuture<?>> pluginWork = plugins == null ? List.of() : plugins.stop();
         // Plugins closed their own windows while stopping; this is the safety net, and the state's last write.
         if (auxiliary != null) auxiliary.close();

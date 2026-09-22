@@ -111,8 +111,6 @@ public final class PaletteKeyRouter implements AutoCloseable {
         if (id == null) return null;
         return switch (id) {
             case COMMAND_PALETTE -> PaletteScope.COMMANDS_ID;
-            case HISTORY_PALETTE -> PaletteScope.HISTORY_ID;
-            case SNIPPETS_PALETTE -> PaletteScope.SNIPPETS_ID;
             default -> null;
         };
     }

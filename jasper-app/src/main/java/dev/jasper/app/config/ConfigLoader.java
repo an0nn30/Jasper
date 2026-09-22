@@ -1,7 +1,6 @@
 package dev.jasper.app.config;
 
 import dev.jasper.app.commands.ActionId;
-import dev.jasper.app.config.HistorySettings;
 import dev.jasper.app.config.PaletteSettings;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -42,10 +41,9 @@ public final class ConfigLoader {
         Map.entry(List.of("buddy"), Set.of("enabled")),
         Map.entry(List.of("notifications"), Set.of("long_command_seconds")),
         Map.entry(List.of("palette"), Set.of("max_results", "scopes")),
-        // Per-scope settings live under palette.scopes.<scope>, so a new scope adds a table here
-        // rather than another top-level one.
-        Map.entry(List.of("palette", "scopes"), Set.of("history")),
-        Map.entry(List.of("palette", "scopes", "history"), Set.of("enabled", "trivial_commands")),
+        // palette.scopes once held the History scope's settings; the table is kept known so the
+        // moved-to-a-plugin report below replaces the generic unknown-key warning.
+        Map.entry(List.of("palette", "scopes"), Set.of()),
         Map.entry(List.of("window"), Set.of("tab_height", "toolbar", "status_bar", "columns", "lines")),
         Map.entry(List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height")),
         Map.entry(List.of("ui"), Set.of("theme")),
@@ -65,9 +63,7 @@ public final class ConfigLoader {
     private boolean statusBar = true;
     private boolean buddyEnabled = true;
     private boolean backgroundEnabled;
-    private boolean historyEnabled = true;
     private int longCommandSeconds = 10;
-    private List<String> trivialCommands = HistorySettings.defaults().trivialCommands();
     private int maxResults = PaletteSettings.DEFAULT_MAX_RESULTS;
     private int columns = 150;
     private int lines = 45;
@@ -116,7 +112,7 @@ public final class ConfigLoader {
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, historyEnabled, maxResults, trivialCommands, longCommandSeconds, backgroundEnabled, plugins);
+                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -125,7 +121,10 @@ public final class ConfigLoader {
             var path = new ArrayList<>(parent);
             path.add(key);
             if (!FIELDS.get(parent).contains(key)) {
-                warning(path, "Unknown setting or table; ignored.");
+                if (parent.equals(List.of("palette", "scopes")) && key.equals("history"))
+                    warning(path, "History moved to the Shell History plugin: use [plugins.\"dev.jasper.history\"] with "
+                        + "trivial_commands and deprioritize_trivial, or disable the plugin in Manage Plugins.");
+                else warning(path, "Unknown setting or table; ignored.");
                 continue;
             }
             Object value = table.get(List.of(key));
@@ -196,9 +195,6 @@ public final class ConfigLoader {
             case "background.enabled" -> backgroundEnabled = bool(path, value, backgroundEnabled);
             case "notifications.long_command_seconds" ->
                 longCommandSeconds = integer(path, value, 0, 3600, longCommandSeconds);
-            case "palette.scopes.history.enabled" -> historyEnabled = bool(path, value, historyEnabled);
-            case "palette.scopes.history.trivial_commands" -> trivialCommands = lowercased(strings(path, value,
-                ConfigLoader::trivialName, trivialCommands));
             case "palette.max_results" -> maxResults = integer(path, value, PaletteSettings.MIN_MAX_RESULTS, PaletteSettings.MAX_MAX_RESULTS, maxResults);
             case "font.family" -> fontFamily = string(path, value, ConfigLoader::fontName,
                 "Use a nonblank font name without NUL; using the default.", fontFamily);
@@ -306,14 +302,6 @@ public final class ConfigLoader {
     }
 
     /** Only a command's first word is ever compared, so an entry with whitespace could never match. */
-    private static boolean trivialName(String text) {
-        return !text.isBlank() && noNul(text) && text.strip().split("\\s+").length == 1;
-    }
-
-    private static List<String> lowercased(List<String> values) {
-        return values.stream().map(value -> value.strip().toLowerCase(Locale.ROOT)).distinct().toList();
-    }
-
     private static boolean noNul(String text) {
         return text.indexOf('\0') < 0;
     }

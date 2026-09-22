@@ -83,7 +83,7 @@ final class WindowCommandPalette implements AutoCloseable {
             text -> { if (pane.view() != null) pane.view().paste(text); },
             () -> { if (pane.session() != null) pane.session().write("\r"); },
             () -> pane.session() == null ? java.util.Optional.empty() : pane.session().workingDirectory(),
-            pane::shellLabel, pane::running, java.util.Optional.of(owner.id()), java.util.Optional.of(pane.id()));
+            pane::running, java.util.Optional.of(owner.id()), java.util.Optional.of(pane.id()));
     }
 
     private boolean validOrigin() {
@@ -103,8 +103,6 @@ final class WindowCommandPalette implements AutoCloseable {
 
     void setMaxResults(int value) { controller.setMaxResults(value); }
     int maxResults() { return controller.maxResults(); }
-    void setTrivialCommands(java.util.List<String> value) { controller.setTrivialCommands(value); }
-    java.util.List<String> trivialCommands() { return controller.trivialCommands(); }
     void dismiss() { controller.dismiss(); }
     void openPicker() { controller.openPicker(); }
     boolean isOpen() { return controller.isOpen(); }

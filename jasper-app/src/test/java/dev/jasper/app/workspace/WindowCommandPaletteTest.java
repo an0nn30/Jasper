@@ -1,7 +1,6 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.application.ApplicationTestSupport;
-import dev.jasper.app.history.HistoryTestSupport;
 import dev.jasper.app.palette.PaletteTestSupport;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.app.appearance.ThemeController;
@@ -10,7 +9,7 @@ import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.KeyBindings;
-import dev.jasper.app.history.CommandHistory;
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.palette.PaletteController;
 import dev.jasper.app.palette.PaletteRow;
 import java.awt.*;
@@ -118,11 +117,11 @@ class WindowCommandPaletteTest {
                 owner.commandPalette().toggle(); owner.commandPalette().component().queryField().setText("custom");
                 registration.close(); owner.commands().register(command("custom", count::incrementAndGet));
                 // Simulate a row already selected by a queued mouse/key event.
-                PaletteTestSupport.setResults(owner.commandPalette().component(), dev.jasper.app.palette.builtin.ScopeTestSupport.rows(owner.commandsScope(), List.of(stale)), null, null);
+                PaletteTestSupport.setResults(owner.commandPalette().component(), PaletteTestSupport.rows(owner.commandsScope(), List.of(stale)), null, null);
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(owner.commandPalette().component()); assertThat(count.get()).isZero();
                 owner.commandPalette().toggle(); stale = command("disabled", count::incrementAndGet);
                 owner.commands().register(stale); stale.action().setEnabled(false);
-                PaletteTestSupport.setResults(owner.commandPalette().component(), dev.jasper.app.palette.builtin.ScopeTestSupport.rows(owner.commandsScope(), List.of(stale)), null, null);
+                PaletteTestSupport.setResults(owner.commandPalette().component(), PaletteTestSupport.rows(owner.commandsScope(), List.of(stale)), null, null);
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(owner.commandPalette().component()); assertThat(count.get()).isZero();
             }
         });
@@ -197,7 +196,7 @@ class WindowCommandPaletteTest {
                 application.quit(); // Repeated shutdown requests retain the accepted dispatch.
             });
             history[0].closedFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);
-            assertThat(HistoryTestSupport.readCommands(file)).containsExactly(quit ? "quit" : "close_tab");
+            assertThat(readCommands(file)).containsExactly(quit ? "quit" : "close_tab");
         }
     }
 
@@ -412,4 +411,9 @@ class WindowCommandPaletteTest {
         }
     }
 
+
+    /** The saved recents, decoded the way the app writes them (a small TOML array of ids). */
+    static java.util.List<String> readCommands(java.nio.file.Path file) throws java.io.IOException {
+        return dev.jasper.app.commands.CommandHistoryFile.read(file);
+    }
 }

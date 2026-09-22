@@ -1,6 +1,5 @@
 package dev.jasper.app.config;
 
-import dev.jasper.app.config.HistorySettings;
 import dev.jasper.app.config.PaletteSettings;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -15,8 +14,7 @@ import java.util.Objects;
 public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                       FontConfig font, Appearance variant, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                      boolean historyEnabled, int maxResults, List<String> trivialCommands,
-                      int longCommandSeconds, boolean backgroundEnabled,
+                      int maxResults, int longCommandSeconds, boolean backgroundEnabled,
                       Map<String, Map<String, Object>> plugins) {
     public ConfigSnapshot {
         if (longCommandSeconds < 0 || longCommandSeconds > 3600)
@@ -31,7 +29,6 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         Objects.requireNonNull(toolbar, "toolbar");
         Objects.requireNonNull(variant, "variant");
         keybindings = Map.copyOf(keybindings);
-        trivialCommands = List.copyOf(trivialCommands);
         // Plugin tables arrive deeply immutable from the loader; only the outer map is copied here.
         plugins = Map.copyOf(plugins);
         // A snapshot has no platform. At least one platform must accept its complete map;
@@ -51,10 +48,9 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, Appearance variant, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                   boolean historyEnabled, int maxResults, List<String> trivialCommands,
-                   int longCommandSeconds, boolean backgroundEnabled) {
+                   int maxResults, int longCommandSeconds, boolean backgroundEnabled) {
         this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled,
-            historyEnabled, maxResults, trivialCommands, longCommandSeconds, backgroundEnabled, Map.of());
+            maxResults, longCommandSeconds, backgroundEnabled, Map.of());
     }
 
     /**
@@ -63,37 +59,22 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
      */
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, Appearance variant, Map<String, String> keybindings,
-                   int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                   boolean historyEnabled, int maxResults, List<String> trivialCommands) {
+                   int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, int maxResults) {
         this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal,
-            buddyEnabled, historyEnabled, maxResults, trivialCommands, 10, false);
+            buddyEnabled, maxResults, 10, false);
     }
 
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, Appearance variant, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal) {
-        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, true, true);
+        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, true);
     }
 
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, Appearance variant, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal, boolean buddyEnabled) {
-        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, true);
-    }
-
-    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
-                   FontConfig font, Appearance variant, Map<String, String> keybindings,
-                   int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, boolean historyEnabled) {
         this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled,
-            historyEnabled, PaletteSettings.DEFAULT_MAX_RESULTS);
-    }
-
-    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
-                   FontConfig font, Appearance variant, Map<String, String> keybindings,
-                   int columns, int lines, TerminalConfig terminal, boolean buddyEnabled, boolean historyEnabled,
-                   int maxResults) {
-        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled,
-            historyEnabled, maxResults, HistorySettings.defaults().trivialCommands());
+            PaletteSettings.DEFAULT_MAX_RESULTS);
     }
 
     public float fontSize() {
@@ -130,9 +111,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private int lines;
         private TerminalConfig terminal;
         private boolean buddyEnabled;
-        private boolean historyEnabled;
         private int maxResults;
-        private List<String> trivialCommands;
         private int longCommandSeconds;
         private boolean backgroundEnabled;
         private Map<String, Map<String, Object>> plugins;
@@ -147,9 +126,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             lines = source.lines();
             terminal = source.terminal();
             buddyEnabled = source.buddyEnabled();
-            historyEnabled = source.historyEnabled();
             maxResults = source.maxResults();
-            trivialCommands = source.trivialCommands();
             longCommandSeconds = source.longCommandSeconds();
             backgroundEnabled = source.backgroundEnabled();
             plugins = source.plugins();
@@ -164,14 +141,12 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder lines(int value) { lines = value; return this; }
         public Builder terminal(TerminalConfig value) { terminal = value; return this; }
         public Builder buddyEnabled(boolean value) { buddyEnabled = value; return this; }
-        public Builder historyEnabled(boolean value) { historyEnabled = value; return this; }
         public Builder maxResults(int value) { maxResults = value; return this; }
-        public Builder trivialCommands(List<String> value) { trivialCommands = List.copyOf(value); return this; }
         public Builder longCommandSeconds(int value) { longCommandSeconds = value; return this; }
         public Builder backgroundEnabled(boolean value) { backgroundEnabled = value; return this; }
         public Builder plugins(Map<String, Map<String, Object>> value) { plugins = Map.copyOf(value); return this; }
         public ConfigSnapshot build() {
-            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, historyEnabled, maxResults, trivialCommands, longCommandSeconds, backgroundEnabled, plugins);
+            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins);
         }
     }
 }

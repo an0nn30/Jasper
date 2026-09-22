@@ -3,12 +3,10 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.KeyBindings;
-import dev.jasper.app.history.CommandHistory;
-import dev.jasper.app.history.ShellHistoryIndex;
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.MacTitleBar;
-import dev.jasper.app.snippets.SnippetStore;
 import com.formdev.flatlaf.util.SystemInfo;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -37,11 +35,11 @@ public final class TerminalWindow implements AutoCloseable {
     };
 
     public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, ThemeController themes,
-                   ConfigSnapshot initial, CommandHistory history, ShellHistoryIndex shellHistory, SnippetStore snippets) {
+                   ConfigSnapshot initial, CommandHistory history) {
         this.callbacks = callbacks;
         frame.setIconImages(ApplicationIcon.images(SystemInfo.isMacOS));
         content = new WindowContent(launcher, directory, callbacks.newWindow(), callbacks.quit(), this::close, themes,
-            KeyBindings.defaults(SystemInfo.isMacOS), System::nanoTime, history, SystemInfo.isMacOS, shellHistory, snippets);
+            KeyBindings.defaults(SystemInfo.isMacOS), System::nanoTime, history, SystemInfo.isMacOS);
         if (initial != null) {
             content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(initial));
             content.applyConfiguration(initial, SystemInfo.isMacOS);

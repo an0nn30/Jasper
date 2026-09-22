@@ -74,7 +74,6 @@ class PaletteScopeModelTest {
         var none = PaletteTarget.none();
         none.paste().accept("ignored"); none.sendReturn().run();
         assertThat(none.workingDirectory().get()).isEqualTo(Optional.empty());
-        assertThat(none.shellName().get()).isEmpty();
         assertThat(none.live().getAsBoolean()).isFalse();
         assertThat(new PaletteContext(true, none).macOs()).isTrue();
     }

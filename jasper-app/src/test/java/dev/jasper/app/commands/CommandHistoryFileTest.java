@@ -1,4 +1,4 @@
-package dev.jasper.app.history;
+package dev.jasper.app.commands;
 
 import java.io.IOException;
 import java.nio.file.Files;

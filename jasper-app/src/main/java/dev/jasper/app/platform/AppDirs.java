@@ -22,10 +22,6 @@ public record AppDirs(Path root, Path configFile, Path logs, boolean overridden)
         return root.resolve("buddy.toml");
     }
 
-    public Path snippets() {
-        return root.resolve("snippets.toml");
-    }
-
     public Path shellIntegration() {
         return root.resolve("shell-integration");
     }

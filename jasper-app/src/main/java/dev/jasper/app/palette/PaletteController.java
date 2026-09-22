@@ -2,7 +2,6 @@ package dev.jasper.app.palette;
 
 import dev.jasper.app.commands.CommandSearch;
 import dev.jasper.app.lifecycle.Subscription;
-import dev.jasper.app.config.HistorySettings;
 import dev.jasper.app.config.PaletteSettings;
 import java.util.ArrayList;
 import java.util.function.BooleanSupplier;
@@ -30,7 +29,6 @@ public final class PaletteController implements AutoCloseable {
     private boolean picker, open, closed, completing, dirty = true;
     private long generation;
     private int maxResults = PaletteSettings.DEFAULT_MAX_RESULTS;
-    private java.util.List<String> trivialCommands = HistorySettings.defaults().trivialCommands();
 
     public PaletteController(ScopeRegistry scopes, boolean macOs, Runnable layout, Runnable dismissed,
                       Function<String, String> shortcut, BooleanSupplier batching, Runnable updateActions,
@@ -68,7 +66,7 @@ public final class PaletteController implements AutoCloseable {
             } else {
                 generation++;
                 originValid = valid;
-                context = new PaletteContext(macOs, target, maxResults, trivialCommands);
+                context = new PaletteContext(macOs, target, maxResults);
                 open = true; palette.setVisible(true);
                 activate(scope, false);
             }
@@ -94,7 +92,7 @@ public final class PaletteController implements AutoCloseable {
     public void setMaxResults(int value) {
         if (value == maxResults) return;
         maxResults = value;
-        context = new PaletteContext(macOs, context.target(), maxResults, trivialCommands);
+        context = new PaletteContext(macOs, context.target(), maxResults);
         if (open && active != null) {
             palette.setScope(active.label(), active.icon(), active.placeholder(), active.verbs(), maxResults, active.monospaceRows());
             rebuild(true);
@@ -103,15 +101,7 @@ public final class PaletteController implements AutoCloseable {
 
     public int maxResults() { return maxResults; }
 
-    /** Live: the next query uses the new list, and an open palette re-runs its search. */
-    public void setTrivialCommands(java.util.List<String> value) {
-        if (value.equals(trivialCommands)) return;
-        trivialCommands = java.util.List.copyOf(value);
-        context = new PaletteContext(macOs, context.target(), maxResults, trivialCommands);
-        changed();
-    }
 
-    public java.util.List<String> trivialCommands() { return trivialCommands; }
 
     public void dismiss() { if (open) restoreAndHide(); }
     public void openPicker() { if (open && step == null && !picker) palette.queryField().setText(">"); }
@@ -285,7 +275,7 @@ public final class PaletteController implements AutoCloseable {
         palette.hideStep(); palette.setVisible(false);
         if (scopeListener != null) { scopeListener.close(); scopeListener = null; }
         active = null;
-        context = new PaletteContext(macOs, PaletteTarget.none(), maxResults, trivialCommands);
+        context = new PaletteContext(macOs, PaletteTarget.none(), maxResults);
         originValid = () -> false;
         dismissed.run();
     }

@@ -13,18 +13,14 @@ import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.persistence.UiState;
-import dev.jasper.app.history.CommandHistory;
-import dev.jasper.app.history.ShellHistoryIndex;
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.palette.PaletteKeyRouter;
 import dev.jasper.app.palette.PaletteScope;
 import dev.jasper.app.palette.ScopeRegistry;
-import dev.jasper.app.palette.builtin.CommandsScope;
-import dev.jasper.app.palette.builtin.ShellHistoryScope;
-import dev.jasper.app.palette.builtin.SnippetsScope;
+import dev.jasper.app.palette.CommandsScope;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.MacTitleBar;
-import dev.jasper.app.snippets.SnippetStore;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -97,7 +93,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Application-owned buddy toggle; the window only forwards and displays state. */
     public Runnable onToggleBuddy = () -> {};
     public java.util.function.BooleanSupplier buddyEnabled = () -> false;
-    private boolean historyEnabled = true;
     private final java.util.List<Consumer<WorkspaceActivity.Event>> activityListeners = new ArrayList<>();
     /** Whether any Jasper window has focus; application-supplied, EDT-only. */
     public java.util.function.BooleanSupplier anyWindowActive = () -> true;
@@ -119,10 +114,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         for (var listener : java.util.List.copyOf(activityListeners)) listener.accept(event);
     }
 
-    private ShellHistoryIndex shellHistory;
-    private Subscription historyRegistration;
-    private SnippetStore snippets;
-    private Subscription snippetsRegistration;
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty) {
         this(launcher, directory, newWindow, quit, onEmpty, new ThemeController());
@@ -148,19 +139,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock,
                   CommandHistory history, boolean macOs) {
-        this(launcher, directory, newWindow, quit, onEmpty, themes, bindings, animationClock, history, macOs, null);
-    }
-
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock,
-                  CommandHistory history, boolean macOs, ShellHistoryIndex shellHistory) {
-        this(launcher, directory, newWindow, quit, onEmpty, themes, bindings, animationClock, history, macOs,
-            shellHistory, null);
-    }
-
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock,
-                  CommandHistory history, boolean macOs, ShellHistoryIndex shellHistory, SnippetStore snippets) {
         super(new BorderLayout());
         this.baseBindings = bindings;
         this.bindings = bindings;
@@ -173,10 +151,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
         scopes.register(commandsScope);
         commandPalette = new WindowCommandPalette(this, scopes, PaletteScope.COMMANDS_ID, macOs);
-        this.shellHistory = shellHistory;
-        this.snippets = snippets;
-        syncHistoryScope();
-        if (snippets != null) snippetsRegistration = scopes.register(new SnippetsScope(snippets, message -> onError.accept(message)));
         paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
             source -> !closed && active && bindingRoot != null && source != null
                 && SwingUtilities.isDescendingFrom(this, bindingRoot)
@@ -356,8 +330,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     String scopeShortcut(String scopeId) {
         ActionId id = switch (scopeId) {
             case PaletteScope.COMMANDS_ID -> ActionId.COMMAND_PALETTE;
-            case PaletteScope.HISTORY_ID -> ActionId.HISTORY_PALETTE;
-            case PaletteScope.SNIPPETS_ID -> ActionId.SNIPPETS_PALETTE;
             default -> null;
         };
         return id == null ? null : CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
@@ -367,7 +339,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         ActionId id = ActionId.valueOf("SELECT_TAB_" + (index + 1));
         return CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
     }
-    SnippetStore snippets() { return snippets; }
     WindowCommandPalette commandPalette() { return commandPalette; }
     WindowChrome chrome() { return chrome; }
     WindowCommands windowCommands() { return windowCommands; }
@@ -497,7 +468,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
         pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
-        pane.onCommandExecuted = entry -> { if (shellHistory != null) shellHistory.record(entry); };
         pane.applyTheme(themes.current().palette());
         ConfigSnapshot configured = workspaceConfiguration.snapshot();
         float configuredFontSize = workspaceConfiguration.configuredFontSize();
@@ -651,23 +621,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void setStatusVisible(boolean visible) {
         chrome.setStatusVisible(visible); updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
-    public void setHistoryEnabled(boolean value) { historyEnabled = value; syncHistoryScope(); updateActions(); }
-    boolean historyEnabled() { return historyEnabled; }
-
-    private void syncHistoryScope() {
-        boolean wanted = shellHistory != null && historyEnabled && !closed;
-        if (wanted && historyRegistration == null)
-            historyRegistration = scopes.register(new ShellHistoryScope(shellHistory, snippets, AppIcons.icon("history")));
-        else if (!wanted && historyRegistration != null) { historyRegistration.close(); historyRegistration = null; }
-    }
 
     @Override public void close() {
         if (closed) return;
         paletteKeys.close();
         if (contributed != null) { contributed.close(); contributed = null; }
         commandPalette.close(); windowCommands.close(); commands.close();
-        if (historyRegistration != null) { historyRegistration.close(); historyRegistration = null; }
-        if (snippetsRegistration != null) { snippetsRegistration.close(); snippetsRegistration = null; }
         scopes.close();
         closed = true;
         syncPaletteDispatcher();

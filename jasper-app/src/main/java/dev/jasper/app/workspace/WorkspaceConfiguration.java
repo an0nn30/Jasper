@@ -43,10 +43,7 @@ final class WorkspaceConfiguration {
             }
         }
         if (previous == null || !previous.keybindings().equals(next.keybindings())) owner.setBindings(next.bindings(macOs));
-        if (previous == null || previous.historyEnabled() != next.historyEnabled()) owner.setHistoryEnabled(next.historyEnabled());
         if (previous == null || previous.maxResults() != next.maxResults()) owner.commandPalette().setMaxResults(next.maxResults());
-        if (previous == null || !previous.trivialCommands().equals(next.trivialCommands()))
-            owner.commandPalette().setTrivialCommands(next.trivialCommands());
     }
 
     private static boolean liveBehaviorChanged(TerminalConfig previous, TerminalConfig next) {

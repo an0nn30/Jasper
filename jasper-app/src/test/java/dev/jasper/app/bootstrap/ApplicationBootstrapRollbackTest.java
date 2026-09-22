@@ -2,7 +2,7 @@ package dev.jasper.app.bootstrap;
 
 import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.config.ConfigService;
-import dev.jasper.app.history.CommandHistory;
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
 import dev.jasper.app.workspace.DesktopTestSupport;

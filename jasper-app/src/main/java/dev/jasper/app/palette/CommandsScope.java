@@ -1,14 +1,9 @@
-package dev.jasper.app.palette.builtin;
+package dev.jasper.app.palette;
 
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.commands.CommandRegistry;
 import dev.jasper.app.commands.CommandSearch;
-import dev.jasper.app.history.CommandHistory;
-import dev.jasper.app.palette.PaletteContext;
-import dev.jasper.app.palette.PaletteResults;
-import dev.jasper.app.palette.PaletteRow;
-import dev.jasper.app.palette.PaletteScope;
-import dev.jasper.app.palette.PaletteVerb;
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.lifecycle.Subscription;
 

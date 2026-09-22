@@ -1,4 +1,4 @@
-package dev.jasper.app.history;
+package dev.jasper.app.commands;
 
 import dev.jasper.app.lifecycle.Subscription;
 

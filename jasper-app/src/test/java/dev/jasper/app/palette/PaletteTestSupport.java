@@ -35,4 +35,6 @@ public final class PaletteTestSupport {
                 @Override public Subscription onChanged(Runnable listener) { return new Subscription(() -> { }); }
             };
         }
+    /** Rows the Commands scope builds for {@code commands}, for tests that seed the list directly. */
+    public static List<PaletteRow> rows(CommandsScope scope, List<dev.jasper.app.commands.Command> commands) { return scope.rows(commands); }
 }

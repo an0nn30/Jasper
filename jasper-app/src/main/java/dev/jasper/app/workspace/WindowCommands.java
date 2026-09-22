@@ -27,7 +27,7 @@ final class WindowCommands implements AutoCloseable {
         owner.action(ActionId.SPLIT_RIGHT).putValue(Command.TITLE, "Split Right \u00b7 Vertical");
         owner.action(ActionId.SPLIT_DOWN).putValue(Command.TITLE, "Split Down \u00b7 Horizontal");
         for (ActionId id : ActionId.values()) {
-            if (id == ActionId.COMMAND_PALETTE || id == ActionId.HISTORY_PALETTE || id == ActionId.SNIPPETS_PALETTE) continue;
+            if (id == ActionId.COMMAND_PALETTE) continue;
             String icon = switch (id) {
                 case NEW_TAB -> "square-plus"; case NEW_WINDOW -> "app-window";
                 case SPLIT_RIGHT, SPLIT_DOWN -> "columns-2"; case ZOOM_PANE -> "maximize";

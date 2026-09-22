@@ -5,13 +5,9 @@ import dev.jasper.app.appearance.BuiltinTheme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.config.KeyBindings;
-import dev.jasper.app.history.CommandHistory;
-import dev.jasper.app.history.ShellHistoryEntry;
-import dev.jasper.app.history.ShellHistoryIndex;
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
-import dev.jasper.app.palette.builtin.SnippetsScope;
 import dev.jasper.app.platform.MacTitleBar;
-import dev.jasper.app.snippets.SnippetStore;
 import dev.jasper.app.workspace.DesktopTestSupport;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.app.workspace.WindowContent;
@@ -100,12 +96,7 @@ public final class CommandPalettePreview {
         PANE_QUERY("pane-query", "pane", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID),
         NO_MATCH("no-match", "quasar never", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID),
         LONG_LABELS("long-labels-narrow", "preview fixture", NARROW_WIDTH, NARROW_HEIGHT, PaletteScope.COMMANDS_ID),
-        HISTORY_RECENT("history-recent", "", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.HISTORY_ID),
-        HISTORY_QUERY("history-query", "git", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.HISTORY_ID),
-        SCOPE_PICKER("scope-picker", ">", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID),
-        SNIPPETS("snippets", "", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.SNIPPETS_ID),
-        SNIPPET_FILL_IN("snippet-fill-in", "", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.SNIPPETS_ID),
-        HISTORY_SAVE_NAME("history-save-name", "", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.HISTORY_ID);
+        SCOPE_PICKER("scope-picker", ">", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID);
 
         final String slug;
         final String query;
@@ -127,44 +118,24 @@ public final class CommandPalettePreview {
         private final List<TerminalSession> sessions;
         private final ThemeController themes;
         private final CommandHistory history;
-        private final ShellHistoryIndex shellHistory;
-        private final SnippetStore snippets;
-        private final Path snippetsDirectory;
         private final WindowContent owner;
         private final JRootPane root;
         private final MacTitleBar titleBar;
 
         private Fixture(Queue<Runnable> pending, List<TerminalSession> sessions,
-                        ThemeController themes, CommandHistory history, ShellHistoryIndex shellHistory,
-                        SnippetStore snippets, Path snippetsDirectory,
+                        ThemeController themes, CommandHistory history,
                         WindowContent owner, JRootPane root, MacTitleBar titleBar) {
             this.pending = pending;
             this.sessions = sessions;
             this.themes = themes;
             this.history = history;
-            this.shellHistory = shellHistory;
-            this.snippets = snippets;
-            this.snippetsDirectory = snippetsDirectory;
             this.owner = owner;
             this.root = root;
             this.titleBar = titleBar;
         }
 
-        /** Worker and delivery run inline so the fixture's synthetic entries are recorded before the palette opens. */
-        private static java.util.concurrent.ExecutorService inlineWorker() {
-            return new java.util.concurrent.AbstractExecutorService() {
-                @Override public void execute(Runnable task) { task.run(); }
-                @Override public void shutdown() {}
-                @Override public List<Runnable> shutdownNow() { return List.of(); }
-                @Override public boolean isShutdown() { return false; }
-                @Override public boolean isTerminated() { return false; }
-                @Override public boolean awaitTermination(long t, TimeUnit u) { return true; }
-            };
-        }
-
         static Fixture create() throws Exception {
             Fixture[] result = new Fixture[1];
-            Path snippetsDirectory = Files.createTempDirectory("jasper-preview-snippets");
             SwingUtilities.invokeAndWait(() -> {
                 Queue<Runnable> pending = new ArrayDeque<>();
                 List<TerminalSession> sessions = new ArrayList<>();
@@ -175,54 +146,12 @@ public final class CommandPalettePreview {
                 }, "sh");
                 var themes = new ThemeController();
                 var history = new CommandHistory();
-                var index = new ShellHistoryIndex(List.of(), inlineWorker(), Runnable::run);
-                String[] commands = {"git status", "git commit -m \"Tidy palette scopes\"", "./gradlew check",
-                    "ls -la", "cd ~/projects/moray", "rg TODO jasper-app/src", "cargo build --release",
-                    "docker compose up -d", "kubectl get pods -n jasper", "make test", "python3 -m http.server 8000",
-                    "tail -f /var/log/system.log", "brew upgrade", "ssh build@ci.example.com", "npm run dev"};
-                for (int i = 0; i < commands.length; i++)
-                    index.record(new ShellHistoryEntry(commands[i], 1_700_000_000L + i, java.util.Set.of(i % 3 == 0 ? "bash" : "zsh"),
-                        i == 12 ? java.nio.file.Path.of("/Users/preview/projects/moray") : null, null));
-                Path snippetsFile = snippetsDirectory.resolve("snippets.toml");
-                try {
-                    Files.writeString(snippetsFile, """
-                        [[snippet]]
-                        name = "Rebase onto main"
-                        command = "git fetch origin && git rebase origin/{{branch}}"
-                        keywords = ["git"]
-
-                        [[snippet]]
-                        name = "Deploy"
-                        command = "make deploy ENV={{env}} TAG={{tag}}"
-
-                        [[snippet]]
-                        name = "Disk usage here"
-                        command = "du -sh * | sort -h"
-
-                        [[snippet]]
-                        name = "Serve this directory"
-                        command = "python3 -m http.server 8000"
-
-                        [[snippet]]
-                        name = "Kill port 3000"
-                        command = "lsof -ti:3000 | xargs kill"
-
-                        [[snippet]]
-                        name = "Compose logs"
-                        command = "docker compose logs -f --tail=100"
-                        """);
-                } catch (IOException failure) {
-                    throw new UncheckedIOException(failure);
-                }
-                var snippets = new SnippetStore(snippetsFile, path -> {}, inlineWorker(), Runnable::run);
-                snippets.reload();
                 var owner = new WindowContent(launcher, DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
-                    themes, KeyBindings.defaults(true), System::nanoTime, history, true, index, snippets);
+                    themes, KeyBindings.defaults(true), System::nanoTime, history, true);
                 var root = new JRootPane();
                 var titleBar = WindowContent.installTitleBar(root, owner, true, title -> {});
                 owner.installRootBindings(root);
-                var fixture = new Fixture(pending, sessions, themes, history, index, snippets, snippetsDirectory,
-                    owner, root, titleBar);
+                var fixture = new Fixture(pending, sessions, themes, history, owner, root, titleBar);
                 fixture.addLongLabelCommands();
                 history.record("find");
                 history.record("split_right");
@@ -284,12 +213,6 @@ public final class CommandPalettePreview {
                 while (owner.commandPalette().stepOpen()) owner.commandPalette().escape();
                 if (!scenario.scope.equals(owner.commandPalette().activeScopeId())) owner.commandPalette().open(scenario.scope);
                 owner.commandPalette().component().queryField().setText(scenario.query);
-                if (scenario == Scenario.SNIPPET_FILL_IN) {
-                    dev.jasper.app.palette.PaletteTestSupport.selectRow(owner.commandPalette().component(), dev.jasper.app.palette.builtin.ScopeTestSupport.rowId("Deploy"));
-                    owner.commandPalette().enterPressed(0);
-                } else if (scenario == Scenario.HISTORY_SAVE_NAME) {
-                    owner.commandPalette().enterPressed(2);
-                }
             });
         }
 
@@ -301,11 +224,8 @@ public final class CommandPalettePreview {
                     case RECENTS -> 3;
                     case PANE_QUERY, LONG_LABELS -> 5;
                     case NO_MATCH -> 0;
-                    case HISTORY_RECENT -> 5;
-                    case HISTORY_QUERY -> 2;
-                    // The scope picker now also lists Snippets alongside Commands and History.
-                    case SCOPE_PICKER -> 3;
-                    case SNIPPETS, SNIPPET_FILL_IN, HISTORY_SAVE_NAME -> 5;
+                    // The application alone contributes Commands; History and Snippets are plugins.
+                    case SCOPE_PICKER -> 1;
                 };
                 if (count != expected) {
                     throw new AssertionError(scenario.slug + " expected " + expected + " rows, got " + count);
@@ -315,30 +235,6 @@ public final class CommandPalettePreview {
                         String id = dev.jasper.app.palette.PaletteTestSupport.resultList(palette).getModel().getElementAt(i).id();
                         if (id.startsWith("preview.")) throw new AssertionError("Pane query used synthetic command " + id);
                     }
-                }
-                if (scenario == Scenario.HISTORY_RECENT) {
-                    // Fifteen entries are recorded; the hard cap keeps only the newest five.
-                    for (int i = 0; i < count; i++) {
-                        PaletteRow row = dev.jasper.app.palette.PaletteTestSupport.resultList(palette).getModel().getElementAt(i);
-                        if (row.tag() == null) throw new AssertionError("history-recent row missing tag: " + row.id());
-                    }
-                }
-                if (scenario == Scenario.HISTORY_QUERY) {
-                    String title = dev.jasper.app.palette.PaletteTestSupport.resultList(palette).getModel().getElementAt(0).title();
-                    if (!title.startsWith("git")) throw new AssertionError("history-query first title does not start with git: " + title);
-                }
-                if (scenario == Scenario.SNIPPET_FILL_IN) {
-                    if (!owner.commandPalette().stepOpen()) throw new AssertionError("snippet-fill-in expected an open step");
-                    if (dev.jasper.app.palette.PaletteTestSupport.stepFields(palette).size() != 2)
-                        throw new AssertionError("snippet-fill-in expected 2 fields, got " + dev.jasper.app.palette.PaletteTestSupport.stepFields(palette).size());
-                }
-                if (scenario == Scenario.HISTORY_SAVE_NAME) {
-                    if (!owner.commandPalette().stepOpen()) throw new AssertionError("history-save-name expected an open step");
-                    if (dev.jasper.app.palette.PaletteTestSupport.stepFields(palette).size() != 1)
-                        throw new AssertionError("history-save-name expected 1 field, got " + dev.jasper.app.palette.PaletteTestSupport.stepFields(palette).size());
-                    String prefill = dev.jasper.app.palette.PaletteTestSupport.stepFields(palette).get(0).getText();
-                    if (!"npm run".equals(prefill))
-                        throw new AssertionError("history-save-name expected prefill 'npm run', got " + prefill);
                 }
             });
         }
@@ -403,11 +299,8 @@ public final class CommandPalettePreview {
                     if (titleBar != null) titleBar.close();
                     owner.close();
                     history.close();
-                    shellHistory.close();
-                    snippets.close();
                 });
                 for (TerminalSession session : sessions) session.exitFuture().get(5, TimeUnit.SECONDS);
-                deleteRecursively(snippetsDirectory);
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Interrupted while closing preview fixture", interrupted);
@@ -416,11 +309,5 @@ public final class CommandPalettePreview {
             }
         }
 
-        private static void deleteRecursively(Path directory) throws IOException {
-            if (!Files.exists(directory)) return;
-            try (var paths = Files.walk(directory)) {
-                for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.delete(path);
-            }
-        }
     }
 }

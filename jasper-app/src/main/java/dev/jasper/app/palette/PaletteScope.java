@@ -12,8 +12,6 @@ import java.util.Optional;
  */
 public interface PaletteScope {
     String COMMANDS_ID = "jasper.commands";
-    String HISTORY_ID = "jasper.history";
-    String SNIPPETS_ID = "jasper.snippets";
 
     String id();
     String label();

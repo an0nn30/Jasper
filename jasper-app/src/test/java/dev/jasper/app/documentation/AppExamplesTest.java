@@ -4,7 +4,6 @@ import dev.jasper.app.commands.*;
 import dev.jasper.app.config.*;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.palette.*;
-import dev.jasper.app.snippets.Snippet;
 import dev.jasper.app.bootstrap.StartupResources;
 import dev.jasper.buddy.config.BuddyOptions;
 import dev.jasper.buddy.notice.*;
@@ -71,13 +70,6 @@ class AppExamplesTest {
         assertThat(updated.terminal()).isEqualTo(original.terminal());
         assertThat(updated.keybindings()).isEqualTo(original.keybindings());
         // example:settings:end
-    }
-    @Test void provider() {
-        // example:provider:start
-        var snippet = new Snippet("Inspect branch", "git log {{branch}}", List.of("history"));
-        assertThat(snippet.placeholders()).containsExactly("branch");
-        assertThat(snippet.fill(Map.of("branch", "main"))).isEqualTo("git log main");
-        // example:provider:end
     }
     @Test void producer() throws Exception {
         SwingUtilities.invokeAndWait(() -> {

@@ -1,7 +1,5 @@
-package dev.jasper.app.history;
+package dev.jasper.app.commands;
 
-import dev.jasper.app.commands.Command;
-import dev.jasper.app.commands.CommandRegistry;
 import dev.jasper.app.lifecycle.Subscription;
 
 import java.nio.file.Path;

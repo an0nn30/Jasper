@@ -5,13 +5,6 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 
 class SettingsValuesTest {
-@Test void historyDefensivelyCopiesAndPreservesAnExplicitEmptyList() {
-    var input = new java.util.ArrayList<>(java.util.List.of("ls"));
-    var value = new HistorySettings(true, input);
-    input.clear();
-    assertThat(value.trivialCommands()).containsExactly("ls");
-    assertThat(new HistorySettings(true, java.util.List.of()).trivialCommands()).isEmpty();
-}
 @Test void paletteBoundsIncludeBothEndpoints() {
     assertThat(new PaletteSettings(1).maxResults()).isEqualTo(1);
     assertThat(new PaletteSettings(20).maxResults()).isEqualTo(20);

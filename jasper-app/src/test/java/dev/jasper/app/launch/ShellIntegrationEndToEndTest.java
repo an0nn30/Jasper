@@ -82,7 +82,7 @@ class ShellIntegrationEndToEndTest {
             ShellIntegrationMode.AUTO);
         return new ConfigSnapshot(defaults.tabHeight(), defaults.toolbar(), defaults.statusBar(), defaults.font(),
             defaults.variant(), Map.of(), defaults.columns(), defaults.lines(), configured, defaults.buddyEnabled(),
-            defaults.historyEnabled(), defaults.maxResults());
+            defaults.maxResults());
     }
 
     /** A deliberately bare environment, so the developer's own dotfiles cannot change the result. */

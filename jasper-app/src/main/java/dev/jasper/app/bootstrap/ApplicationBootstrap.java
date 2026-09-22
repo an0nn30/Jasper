@@ -2,17 +2,14 @@ package dev.jasper.app.bootstrap;
 
 import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.config.ConfigService;
-import dev.jasper.app.history.CommandHistory;
-import dev.jasper.app.history.ShellHistoryIndex;
+import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellIntegrationScripts;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.platform.AppLog;
 import dev.jasper.app.platform.ApplicationIcon;
-import dev.jasper.app.platform.ConfigEditor;
 import dev.jasper.app.platform.LoginItem;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
-import dev.jasper.app.snippets.SnippetStore;
 import dev.jasper.app.bootstrap.StartupResources;
 import java.nio.file.Path;
 import java.util.function.Consumer;
@@ -111,10 +108,8 @@ public final class ApplicationBootstrap {
                 LOG.log(System.Logger.Level.WARNING,
                     "Shell integration scripts could not be installed; integration is off", failure);
             }
-            var shellHistory = acquired.own(ShellHistoryIndex.discovered());
-            var snippets = acquired.own(new SnippetStore(dirs.snippets(), new ConfigEditor()::open));
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
-                () -> System.exit(0), shellHistory, snippets, integrationDir);
+                () -> System.exit(0), integrationDir);
             Path source = HandoffSocket.codeSource();
             application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),

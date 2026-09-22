@@ -61,7 +61,7 @@ class PaletteScopesTest {
                 q.isEmpty() ? "Most recent" : null, null);
         }
         @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {
-            executed.add(row.id() + ":" + verb.id() + ":" + context.target().shellName().get());
+            executed.add(row.id() + ":" + verb.id());
         }
         @Override public Subscription onChanged(Runnable listener) {
             listeners.add(listener);
@@ -153,7 +153,7 @@ class PaletteScopesTest {
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(card, 1);
                 palette.open("test.fake");
                 PaletteTestSupport.executeNumber(card, 2);
-                assertThat(fake.executed).containsExactly("alpha:one:sh", "alpha:two:sh", "beta:one:sh");
+                assertThat(fake.executed).containsExactly("alpha:one", "alpha:two", "beta:one");
                 palette.toggle();
                 card.queryField().setText("new tab");
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(card, 1);
@@ -253,7 +253,7 @@ class PaletteScopesTest {
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_TAB, 0))).isTrue();
                 assertThat(owner.commandPalette().activeScopeId()).isEqualTo("test.fake");
                 assertThat(router.dispatch(PaletteKeyRouterTest.press(owner, KeyEvent.VK_ENTER, mod))).isTrue();
-                assertThat(fake.executed).containsExactly("alpha:two:sh");
+                assertThat(fake.executed).containsExactly("alpha:two");
                 assertThat(owner.commandPalette().isOpen()).isFalse();
             }
         });

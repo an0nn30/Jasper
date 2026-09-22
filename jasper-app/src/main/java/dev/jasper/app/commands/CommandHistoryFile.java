@@ -1,6 +1,5 @@
-package dev.jasper.app.history;
+package dev.jasper.app.commands;
 
-import dev.jasper.app.commands.Command;
 import dev.jasper.app.persistence.TomlStateFile;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,10 +10,10 @@ import java.util.Set;
 import org.tomlj.Toml;
 
 /** Bounded command-history file codec. Callers select the I/O thread; each operation owns and closes its own file handles. */
-final class CommandHistoryFile {
+public final class CommandHistoryFile {
     private CommandHistoryFile() {}
 
-    static List<String> read(Path file) throws IOException {
+    public static List<String> read(Path file) throws IOException {
         var textOpt = TomlStateFile.readBounded(file, 16384, "Command history");
         if (textOpt.isEmpty()) return List.of();
         var parsed = Toml.parse(textOpt.get());

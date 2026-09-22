@@ -39,8 +39,10 @@ class BundledSamplePluginTest {
             assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about");
             assertThat(contributions.status()).singleElement().satisfies(item -> assertThat(item.text()).startsWith("Sample:"));
         });
-        assertThat(runtime.get().statusLines()).singleElement().asString()
-            .contains("dev.jasper.sample", "0.1.0", "BUNDLED", "ACTIVE");
+        assertThat(runtime.get().statusLines()).as("the sample and the two bundled feature plugins").hasSize(3)
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.1.0", "BUNDLED", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.history", "BUNDLED", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.snippets", "BUNDLED", "ACTIVE"));
         var state = new AtomicReference<BuddyNotice.State>();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (state.get() != BuddyNotice.State.DONE && System.nanoTime() < deadline) {

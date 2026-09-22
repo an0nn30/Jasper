@@ -35,7 +35,7 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 
 ## Palette scope
 
-Implement the existing [PaletteScope](../jasper-app/src/main/java/dev/jasper/app/palette/PaletteScope.java) contract, following [ShellHistoryScope](../jasper-app/src/main/java/dev/jasper/app/palette/builtin/ShellHistoryScope.java). Register it when WindowContent composes scopes; use WindowCommandPalette for overlay/focus/target integration; return bounded rows using context.maxResults. Keep search/availability free of I/O, refresh provider data on its worker, and notify via a closeable subscription. PaletteController owns queued completion generations; never bypass its stale-origin checks. Those checks protect UI publication, not cancellation of already-submitted provider work. Providers own cancellation and side-effect lifetime checks. Return dev.jasper.app.lifecycle.Subscription from onChanged.
+Implement the existing [PaletteScope](../jasper-app/src/main/java/dev/jasper/app/palette/PaletteScope.java) contract, following `CommandsScope` in the same package (the History and Snippets scopes are plugins now; see below). Register it when WindowContent composes scopes; use WindowCommandPalette for overlay/focus/target integration; return bounded rows using context.maxResults. Keep search/availability free of I/O, refresh provider data on its worker, and notify via a closeable subscription. PaletteController owns queued completion generations; never bypass its stale-origin checks. Those checks protect UI publication, not cancellation of already-submitted provider work. Providers own cancellation and side-effect lifetime checks. Return dev.jasper.app.lifecycle.Subscription from onChanged.
 
 <!-- example:scope -->
 ```java
@@ -63,7 +63,7 @@ assertThat(copied).containsExactly("Welcome");
 Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`, then the feature checks:
 
 ```sh
-./gradlew :jasper-app:test --tests "*PaletteScopesTest" --tests "*PaletteKeyRouterTest" --tests "*ShellHistoryScopeTest"
+./gradlew :jasper-app:test --tests "*PaletteScopesTest" --tests "*PaletteKeyRouterTest" --tests "*CommandsScopeTest"
 ```
 
 ## Saved, live and session-only settings
@@ -85,21 +85,18 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*ConfigSnapshotBuilderTest" --tests "*ExpandedConfigTest" --tests "*ConfigTemplateTest" --tests "*ConfigurationControllerTest" --tests "*ShellLauncherTest"
 ```
 
-## History or snippet provider behavior
+## History and Snippets live in plugins
 
-For a shell format begin with [ShellHistoryParser](../jasper-app/src/main/java/dev/jasper/app/history/ShellHistoryParser.java) and ShellHistorySource; for snippet syntax begin with [Snippet](../jasper-app/src/main/java/dev/jasper/app/snippets/Snippet.java) and SnippetFile. Keep parsing pure and bounded. Index/store owners own workers, publish immutable snapshots on EDT and preserve last-good data on read failure. Palette adapters consume snapshots; they do not open files while typing. File format changes require compatibility and malformed-input tests.
-
-<!-- example:provider -->
-```java
-var snippet = new Snippet("Inspect branch", "git log {{branch}}", List.of("history"));
-assertThat(snippet.placeholders()).containsExactly("branch");
-assertThat(snippet.fill(Map.of("branch", "main"))).isEqualTo("git log main");
-```
-
-Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`, then the feature checks:
+Shell history and snippets are no longer application code: the bundled plugins under
+`plugins/history` (`dev.jasper.history`: the shell-format parsers, the polling index and the History
+scope) and `plugins/snippets` (`dev.jasper.snippets`: `snippets.toml`, the Snippets scope and the
+`SnippetService` other plugins use) own them, compiled against the SDK only. Change a shell format
+in `plugins/history/src/main/java/dev/jasper/history/ShellHistoryParser.java` and its test; change
+snippet syntax in `plugins/snippets/src/main/java/dev/jasper/snippets/Snippet.java`. Their tests run
+with the plugin modules:
 
 ```sh
-./gradlew :jasper-app:test --tests "*ShellHistoryParserTest" --tests "*SnippetFileTest" --tests "*SnippetStoreTest" --tests "*SnippetsIntegrationTest"
+./gradlew :jasper-plugin-history:test :jasper-plugin-snippets:test
 ```
 
 ## New Buddy notice producer

@@ -2,7 +2,6 @@ package dev.jasper.app.config;
 
 import dev.jasper.app.appearance.BuiltinTheme;
 import dev.jasper.app.commands.ActionId;
-import dev.jasper.app.config.HistorySettings;
 import dev.jasper.app.config.ToolbarMode;
 
 import org.junit.jupiter.api.Test;
@@ -273,20 +272,6 @@ class ConfigLoaderTest {
         assertDiagnostic(unknown, "palette.rows", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
 
-    @Test void historyEnabledParsesAndRejectsNonBooleans() {
-        var off = parse("[palette.scopes.history]\nenabled = false\n");
-        assertThat(off.rejected()).isFalse();
-        assertThat(off.diagnostics()).isEmpty();
-        assertThat(off.snapshot().historyEnabled()).isFalse();
-        assertThat(ConfigSnapshot.defaults().historyEnabled()).isTrue();
-        var bad = parse("[palette.scopes.history]\nenabled = \"yes\"\n");
-        assertThat(bad.rejected()).isTrue();
-        assertThat(bad.snapshot().historyEnabled()).isTrue();
-        assertDiagnostic(bad, "palette.scopes.history.enabled", 2, 1, ConfigDiagnostic.Severity.ERROR);
-        var unknown = parse("[palette.scopes.history]\nshells = [\"zsh\"]\n");
-        assertDiagnostic(unknown, "palette.scopes.history.shells", 2, 1, ConfigDiagnostic.Severity.WARNING);
-    }
-
     @Test void shellIntegrationParsesItsThreeChoicesAndRejectsOthers() {
         assertThat(parse("[terminal]\nshell_integration = \"manual\"\n").snapshot().terminal().shellIntegration())
             .isEqualTo(ShellIntegrationMode.MANUAL);
@@ -309,35 +294,16 @@ class ConfigLoaderTest {
         });
     }
 
-    @Test void trivialCommandsParsesValidatesAndDefaultsToTheBuiltInList() {
-        assertThat(parse("").snapshot().trivialCommands())
-            .isEqualTo(HistorySettings.defaults().trivialCommands())
-            .contains("exit", "clear", "cd");
-
-        assertThat(parse("[palette.scopes.history]\ntrivial_commands=['foo','BAR']\n").snapshot().trivialCommands())
-            .as("the user's list replaces the default, normalized to lower case")
-            .containsExactly("foo", "bar");
-
-        assertThat(parse("[palette.scopes.history]\ntrivial_commands=[]\n").snapshot().trivialCommands())
-            .as("an empty list turns de-ranking off").isEmpty();
-
-        // An entry with whitespace could never match: only a command's first word is compared.
-        var spaced = parse("[palette.scopes.history]\ntrivial_commands=['git status']\n");
-        assertThat(spaced.snapshot().trivialCommands()).isEqualTo(HistorySettings.defaults().trivialCommands());
-        assertThat(spaced.diagnostics()).isNotEmpty();
-
-        var wrongType = parse("[palette.scopes.history]\ntrivial_commands='exit'\n");
-        assertThat(wrongType.snapshot().trivialCommands()).isEqualTo(HistorySettings.defaults().trivialCommands());
-        assertThat(wrongType.diagnostics()).isNotEmpty();
-    }
-
-    /** The scope settings moved under palette.scopes so other scopes can gain their own. */
-    @Test void historyScopeSettingsLiveUnderPaletteScopes() {
-        assertThat(parse("[palette.scopes.history]\nenabled=false\n").snapshot().historyEnabled()).isFalse();
-        // The old top-level table is no longer part of the schema and is reported, not silently kept.
-        var old = parse("[history]\nenabled=false\n");
-        assertThat(old.snapshot().historyEnabled()).as("the old key no longer applies").isTrue();
-        assertThat(old.diagnostics()).isNotEmpty();
+    /** History left the application for a plugin; its old table is reported as moved, not silently kept. */
+    @Test void theOldHistoryTableIsReportedAsMoved() {
+        var old = parse("[palette.scopes.history]\nenabled=false\ntrivial_commands=['ls']\n");
+        assertThat(old.rejected()).isFalse();
+        assertThat(old.diagnostics()).singleElement().satisfies(d -> {
+            assertThat(d.key()).isEqualTo("palette.scopes.history");
+            assertThat(d.message()).contains("dev.jasper.history");
+            assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
+        });
+        assertThat(parse("[history]\nenabled=false\n").diagnostics()).as("the older top-level table stays unknown").isNotEmpty();
     }
 
     @Test void longCommandSecondsParsesItsRangeAndDefaultsToTen() {
