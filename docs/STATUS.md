@@ -74,18 +74,18 @@ window, status item, rail action, key generator dialog and the Vault palette sco
 
 ### Shared button branding — 2026-09-22
 
-Follow-up in `.worktrees/vault-6b`: ordinary plugin and app `JButton` controls inherit the
-toolbar's rounded shape, 30-logical-pixel minimum height, 11.5-point text and shared state colors.
-`BrandedButtonUI` retains FlatLaf painting and interaction, respects explicit custom fonts and
-leaves small custom rail/status controls compact. Toolbar sizing uses the same constants and arc.
-Plugins retain arbitrary layouts; no SDK extension, version bump or button migration is needed.
+Follow-up in `.worktrees/vault-6b`: ordinary plugin and app `JButton` controls inherit Jasper's
+form styling. After user feedback, form buttons now use a **26-pixel minimum height and 4-pixel
+corner arc**, with flatter, subtler fills. Text/password/formatted fields, multiline text areas
+and dropdowns share their colors and padding. The toolbar keeps its existing 30-pixel height,
+12-pixel arc and emphasized New tab button. `BrandedButtonUI` retains FlatLaf interaction,
+respects custom fonts and leaves small custom rail/status controls compact. No SDK API change.
 [Authoring guidance](plugin-authoring.md#consistent-buttons-flexible-layouts).
 
-`./gradlew check :jasper-app:installDist -q` passed: **1,543 tests, 1,540 passed, three expected
-skips, no failures/errors**. Ordinary Swing button tests exercise both themes and normal/hover/
-pressed/disabled states, default-button behavior and long labels. Headless Vault manager/editor
-renders show aligned, unclipped buttons; independent scoped review found no actionable issues.
-Native focus appearance remains user acceptance. No merge or push.
+The initial button-branding change passed the full suite (1,543 tests, 1,540 passed, three skips).
+This visual refinement passed **12 focused theme/control/chrome tests** and `:jasper-app:installDist`.
+Headless dark/light Vault editor and manager renders were inspected. Native focus appearance
+remains user acceptance. No merge or push.
 
 ### Native file browsing — 2026-09-22
 

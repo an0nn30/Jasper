@@ -37,7 +37,8 @@
 > fake selection responses. Shared editor path rows now browse private/public SSH keys and
 > login key paths; manual entry remains available and cancellation preserves the field.
 > Button branding follow-up: the app look and feel now styles ordinary plugin JButtons with
-> the toolbar's shape, height, font and state colors; layouts remain plugin-owned. No SDK API
+> compact flat form controls (26-pixel button height, 4-pixel arc) after user refinement.
+> Text inputs and dropdowns match; toolbar geometry stays independent. Layouts remain plugin-owned. No SDK API
 > extension or plugin-specific migration is needed for buttons.
 > No public consumer API or vault file-format change. The key-generation choice is resolved; native acceptance remains user-run.
 

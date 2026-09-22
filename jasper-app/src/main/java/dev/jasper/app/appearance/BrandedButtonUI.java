@@ -11,13 +11,13 @@ import javax.swing.plaf.ComponentUI;
 import javax.swing.plaf.FontUIResource;
 import javax.swing.plaf.UIResource;
 
-/** Jasper's ordinary Swing buttons retain FlatLaf behavior with the toolbar's sizing and text. */
+/** Jasper's ordinary Swing buttons retain FlatLaf behavior with compact form sizing and branded text. */
 public final class BrandedButtonUI extends FlatButtonUI {
     private BrandedButtonUI() { super(false); }
 
-    /** Shared logical height, scaled by the application look and feel. */
-    public static final int HEIGHT = 30;
-    /** Shared logical label size. */
+    /** Form-control logical height, scaled by the application look and feel. */
+    public static final int HEIGHT = 26;
+    /** Form-control logical label size. */
     public static final float FONT_SIZE = 11.5f;
 
     /** Called by Swing when installing or refreshing the application theme. */

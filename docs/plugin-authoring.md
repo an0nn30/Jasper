@@ -115,8 +115,10 @@ private static void installUi(PluginContext context, long stepMillis) {
 ## Consistent buttons, flexible layouts
 
 Use ordinary `JButton` components inside plugin content. Jasper's look and feel supplies the
-same rounded shape, 30-logical-pixel minimum height and 11.5-point label size as the toolbar,
-with shared normal, hover and pressed colors. Buttons update with the app's light/dark theme;
+compact form styling: a 26-logical-pixel minimum button height, subtle 4-pixel corner arcs,
+11.5-point button labels and flat fills. Text/password/formatted fields, multiline text areas
+and dropdowns share the form colors and padding. Toolbar buttons retain their separate
+30-pixel height and rounder shape. Buttons update with the app's light/dark theme;
 Swing actions, mnemonics, default buttons, focus and disabled states keep their normal behavior.
 Widths follow the label and icon, and longer or custom-font content can grow without clipping.
 
