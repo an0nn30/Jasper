@@ -1,0 +1,4 @@
+# Settings for Credential Vault. Jasper reads this file live.
+# auto_lock_minutes = 15            # lock after this many minutes without keyboard or mouse activity; 0 never locks automatically
+# keys_directory = ""               # where generated SSH keys go; empty means plugins/dev.jasper.vault/data/keys
+# bind_new_vaults_to_device = true  # the default state of "Bind to this device" when creating a vault
