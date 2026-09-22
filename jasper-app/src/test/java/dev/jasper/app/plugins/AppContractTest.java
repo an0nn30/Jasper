@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import dev.jasper.app.terminals.TerminalRegistry;
 import java.util.UUID;
+import java.util.Optional;
 
 /** The application's runtime must pass the same contract as the testkit fake, on the real EDT. */
 class AppContractTest extends PluginContractTest {
@@ -52,15 +53,16 @@ class AppContractTest extends PluginContractTest {
 
     static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark) {
-        return host(data, tables, drainGrace, contributions, dark, onEdtValue(AppContractTest::headlessWindows), onEdtValue(TerminalRegistry::new));
+        return host(data, tables, drainGrace, contributions, dark, onEdtValue(AppContractTest::headlessWindows), onEdtValue(TerminalRegistry::new),
+            new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>());
     }
 
     static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals) {
+                           TerminalRegistry terminals, List<String> notices, List<Path> edited) {
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()),
-            (key, message) -> { }, drainGrace, contributions, dark::get, auxiliary, terminals, message -> { }, path -> { })));
+            (key, message) -> { }, drainGrace, contributions, dark::get, auxiliary, terminals, notices::add, edited::add)));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
@@ -80,9 +82,15 @@ class AppContractTest extends PluginContractTest {
         var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
         AuxiliaryWindows auxiliary = onEdtValue(AppContractTest::headlessWindows);
         TerminalFixture terminalFixture = onEdtValue(TerminalFixture::new);
-        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry);
+        List<String> notices = new CopyOnWriteArrayList<>();
+        List<Path> edited = new CopyOnWriteArrayList<>();
+        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited);
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
+        List<String> opens = new CopyOnWriteArrayList<>();
+        onEdt(() -> contributions.onPaletteRequest(request -> opens.add(request.windowId() + " " + request.scopeId() + " "
+            + request.query().orElse("-") + " " + request.rowId().orElse("-"))));
+        Map<String, Map<String, dev.jasper.app.palette.PaletteRow>> lastRows = new java.util.HashMap<>();
         return new ContractHarness() {
             @Override public void start(PluginInfo info, Set<String> requires, Set<String> optional, Plugin plugin) {
                 onEdt(() -> host.start(new HostedPlugin(info, requires, optional,
@@ -197,6 +205,64 @@ class AppContractTest extends PluginContractTest {
                 onEdt(() -> pending.set(host.stop()));
                 CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).join();
             }
+                        private dev.jasper.app.palette.PaletteScope scope(String scopeId) {
+                            return contributions.scopes().stream().filter(scope -> scope.id().equals(scopeId)).findFirst()
+                                .orElseThrow(() -> new IllegalArgumentException("No such scope: " + scopeId));
+                        }
+                        private dev.jasper.app.palette.PaletteContext context(UUID windowId, UUID paneIdOrNull) {
+                            var target = new dev.jasper.app.palette.PaletteTarget(text -> { }, () -> { }, Optional::empty, () -> "", () -> true,
+                                Optional.of(windowId), Optional.ofNullable(paneIdOrNull));
+                            return new dev.jasper.app.palette.PaletteContext(true, target, 5);
+                        }
+                        private dev.jasper.app.palette.PaletteRow row(String scopeId, String rowId) {
+                            var row = lastRows.getOrDefault(scopeId, Map.of()).get(rowId);
+                            if (row == null) throw new IllegalArgumentException("Search the scope first; no such row: " + rowId);
+                            return row;
+                        }
+                        private static dev.jasper.app.palette.PaletteVerb verb(dev.jasper.app.palette.PaletteScope scope, String verbId) {
+                            return scope.verbs().stream().filter(verb -> verb.id().equals(verbId)).findFirst()
+                                .orElseThrow(() -> new IllegalArgumentException("No such verb: " + verbId));
+                        }
+                        @Override public List<String> scopes() {
+                            return onEdtValue(() -> contributions.scopes().stream().map(scope -> scope.id() + "|" + scope.label() + "|"
+                                + String.join(",", scope.verbs().stream().map(dev.jasper.app.palette.PaletteVerb::id).toList())).toList());
+                        }
+                        @Override public List<String> searchScope(String scopeId, String query, UUID windowId, UUID paneIdOrNull) {
+                            return onEdtValue(() -> {
+                                var results = scope(scopeId).search(query, context(windowId, paneIdOrNull));
+                                var rows = new java.util.LinkedHashMap<String, dev.jasper.app.palette.PaletteRow>();
+                                for (var row : results.rows()) rows.put(row.id(), row);
+                                lastRows.put(scopeId, rows);
+                                return results.rows().stream().map(row -> row.id() + "|" + row.title() + "|" + row.enabled()).toList();
+                            });
+                        }
+                        @Override public boolean availableInScope(String scopeId, String rowId, String verbId, UUID windowId, UUID paneIdOrNull) {
+                            return onEdtValue(() -> { var scope = scope(scopeId); return scope.available(row(scopeId, rowId), verb(scope, verbId), context(windowId, paneIdOrNull)); });
+                        }
+                        @Override public Optional<String> stepInScope(String scopeId, String rowId, String verbId, UUID windowId, UUID paneIdOrNull) {
+                            return onEdtValue(() -> { var scope = scope(scopeId);
+                                return Optional.ofNullable(scope.step(row(scopeId, rowId), verb(scope, verbId), context(windowId, paneIdOrNull))).map(dev.jasper.app.palette.PaletteStep::title); });
+                        }
+                        @Override public String completeStep(String scopeId, String rowId, String verbId, UUID windowId, UUID paneIdOrNull, Map<String, String> values) {
+                            return onEdtValue(() -> {
+                                var scope = scope(scopeId);
+                                var step = scope.step(row(scopeId, rowId), verb(scope, verbId), context(windowId, paneIdOrNull));
+                                if (step == null) throw new IllegalArgumentException("That verb shows no step");
+                                var answer = new AtomicReference<String>();
+                                step.complete().accept(Map.copyOf(values), result -> answer.set(
+                                    result.error() != null ? "error:" + result.error()
+                                        : result.reopenScopeId() != null ? "reopen:" + result.reopenScopeId() + ":" + (result.reopenRowId() == null ? "-" : result.reopenRowId())
+                                            + ":" + (result.reopenQuery() == null ? "-" : result.reopenQuery())
+                                        : "done"));
+                                return java.util.Objects.requireNonNull(answer.get(), "the step did not answer");
+                            });
+                        }
+                        @Override public void executeInScope(String scopeId, String rowId, String verbId, UUID windowId, UUID paneIdOrNull) {
+                            onEdt(() -> { var scope = scope(scopeId); scope.execute(row(scopeId, rowId), verb(scope, verbId), context(windowId, paneIdOrNull)); });
+                        }
+                        @Override public List<String> paletteOpens() { return List.copyOf(opens); }
+                        @Override public List<String> notices() { return List.copyOf(notices); }
+                        @Override public List<Path> openedInEditor() { return List.copyOf(edited); }
             @Override public void close() { stopAll(); flush(); }
         };
     }

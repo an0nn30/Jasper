@@ -59,6 +59,14 @@ import java.io.ByteArrayOutputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import dev.jasper.sdk.terminal.RemoteDirectory;
+import dev.jasper.sdk.palette.PaletteQuery;
+import dev.jasper.sdk.palette.PaletteResults;
+import dev.jasper.sdk.palette.PaletteRow;
+import dev.jasper.sdk.palette.PaletteScope;
+import dev.jasper.sdk.palette.PaletteStep;
+import dev.jasper.sdk.palette.PaletteVerb;
+import dev.jasper.sdk.palette.ScopeSpec;
+import java.util.Map;
 
 import static dev.jasper.sdk.activity.ActivityEvent.State.FAILED;
 import static dev.jasper.sdk.activity.ActivityEvent.State.PROGRESS;
@@ -833,4 +841,121 @@ public abstract class PluginContractTest {
         });
         assertThat(heard.get(2)).isEqualTo(new TerminalEvents.CwdChanged(only, Optional.of(Path.of("/tmp")), Optional.empty()));
     }
+
+        static final PaletteVerb PASTE = new PaletteVerb("paste", "Paste"), NAME = new PaletteVerb("name", "Name it");
+
+        /** Two rows; "paste" pastes the title into the target pane, "name" asks for a name and reopens elsewhere. */
+        static final class Things implements PaletteScope {
+            final String id; final List<String> log = new ArrayList<>();
+            Things(String id) { this.id = id; }
+            @Override public ScopeSpec spec() { return ScopeSpec.of(id, "Things", "Search things", List.of(PASTE, NAME)); }
+            @Override public PaletteResults search(String query, PaletteQuery context) {
+                log.add("search:" + query + ":" + context.window().id() + ":" + context.target().map(pane -> pane.id().toString()).orElse("-"));
+                return PaletteResults.of(List.of(PaletteRow.of("one", "One").withToken("t1"), PaletteRow.of("two", "Two").withEnabled(false)));
+            }
+            @Override public Optional<PaletteStep> step(PaletteRow row, PaletteVerb verb, PaletteQuery context) {
+                if (!verb.equals(NAME)) return Optional.empty();
+                return Optional.of(new PaletteStep("Name " + row.title(), List.of(new PaletteStep.Field("name", "Name", row.title())),
+                    (values, done) -> done.accept(values.get("name").isBlank() ? PaletteStep.Result.error("Give it a name")
+                        : PaletteStep.Result.reopen("test.b.other", Optional.of("row-" + values.get("name")), Optional.of(values.get("name"))))));
+            }
+            @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context) {
+                log.add("execute:" + row.id() + ":" + verb.id() + ":" + row.token());
+                context.target().ifPresent(pane -> pane.paste(row.title()));
+            }
+            @Override public Subscription onChanged(Runnable listener) { return () -> { }; }
+        }
+
+        @Test void aPaletteScopeNeedsTheCapabilityAndThePluginsNamespace() {
+            var failure = new AtomicReference<Throwable>();
+            h.start(info("test.bare"), Set.of(), Set.of(), context -> {
+                try { context.palette().register(new Things("test.bare.things")); } catch (RuntimeException caught) { failure.set(caught); }
+            });
+            assertThat(failure.get()).isInstanceOfSatisfying(MissingCapabilityException.class,
+                missing -> assertThat(missing.capability()).isEqualTo(Capabilities.PALETTE_CONTRIBUTE));
+            var a = new AtomicReference<PluginContext>();
+            h.start(info("test.a", Capabilities.PALETTE_CONTRIBUTE), Set.of(), Set.of(), a::set);
+            h.ui(() -> assertThatIllegalArgumentException().isThrownBy(() -> a.get().palette().register(new Things("test.b.things"))));
+            h.ui(() -> assertThatIllegalArgumentException().as("the shortcut action must be the plugin's own")
+                .isThrownBy(() -> a.get().palette().register(new PaletteScope() {
+                    @Override public ScopeSpec spec() { return ScopeSpec.of("test.a.s", "S", "Search", List.of(PASTE)).withShortcutActionId("test.a.open"); }
+                    @Override public PaletteResults search(String query, PaletteQuery context) { return PaletteResults.none(); }
+                    @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context) { }
+                    @Override public Subscription onChanged(Runnable listener) { return () -> { }; }
+                })));
+            h.ui(() -> a.get().palette().register(new Things("test.a.things")));
+            assertThat(h.scopes()).containsExactly("test.a.things|Things|paste,name");
+            assertThat(h.active("test.bare")).as("a contained registration failure does not fail the plugin").isTrue();
+        }
+
+        @Test void aScopeGetsItsOwnRowsAndHandlesBackAndAStepCanReopenAnotherScope() {
+            UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "t");
+            UUID pane = h.addTerminalPane(tab, "zsh", Path.of("/src"));
+            var things = new Things("test.a.things");
+            h.start(info("test.a", Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT), Set.of(), Set.of(),
+                context -> context.palette().register(things));
+            assertThat(h.searchScope("test.a.things", "on", window, pane)).containsExactly("one|One|true", "two|Two|false");
+            assertThat(things.log).containsExactly("search:on:" + window + ":" + pane);
+            assertThat(h.availableInScope("test.a.things", "one", "paste", window, pane)).isTrue();
+            assertThat(h.availableInScope("test.a.things", "two", "paste", window, pane)).as("the default follows enabled").isFalse();
+            assertThat(h.stepInScope("test.a.things", "one", "paste", window, pane)).isEmpty();
+            assertThat(h.stepInScope("test.a.things", "one", "name", window, pane)).contains("Name One");
+            assertThat(h.completeStep("test.a.things", "one", "name", window, pane, Map.of("name", " "))).isEqualTo("error:Give it a name");
+            assertThat(h.completeStep("test.a.things", "one", "name", window, pane, Map.of("name", "x"))).isEqualTo("reopen:test.b.other:row-x:x");
+            h.executeInScope("test.a.things", "one", "paste", window, pane);
+            assertThat(things.log).contains("execute:one:paste:t1");
+            assertThat(h.sentToPane(pane)).containsExactly("paste:One");
+            assertThat(h.searchScope("test.a.things", "", window, null)).hasSize(2);
+            assertThat(things.log.getLast()).isEqualTo("search::" + window + ":-");
+        }
+
+        @Test void duplicateScopeIdsFailEachRegistrationRemovesOnlyItselfAndAStoppedPluginsScopesVanish() {
+            var a = new AtomicReference<PluginContext>();
+            h.start(info("test.a", Capabilities.PALETTE_CONTRIBUTE), Set.of(), Set.of(), a::set);
+            var first = new AtomicReference<Subscription>();
+            h.ui(() -> {
+                first.set(a.get().palette().register(new Things("test.a.things")));
+                assertThatIllegalArgumentException().isThrownBy(() -> a.get().palette().register(new Things("test.a.things")));
+                a.get().palette().register(new Things("test.a.more"));
+            });
+            assertThat(h.scopes()).containsExactly("test.a.things|Things|paste,name", "test.a.more|Things|paste,name");
+            h.ui(() -> { first.get().close(); first.get().close(); });
+            assertThat(h.scopes()).containsExactly("test.a.more|Things|paste,name");
+            h.stopAll();
+            assertThat(h.scopes()).isEmpty();
+        }
+
+        @Test void openingThePaletteNeedsTheCapabilityAndCarriesTheQueryAndRow() {
+            UUID window = h.addTerminalWindow();
+            var bare = new AtomicReference<PluginContext>();
+            var a = new AtomicReference<PluginContext>();
+            h.start(info("test.bare", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), bare::set);
+            h.start(info("test.a", Capabilities.PALETTE_CONTRIBUTE), Set.of(), Set.of(), context -> {
+                a.set(context);
+                context.actions().register(ActionSpec.of("test.a.open", "Things…"),
+                    invoked -> context.palette().open(invoked.window(), "test.a.things", Optional.empty(), Optional.empty()));
+                context.palette().register(new Things("test.a.things"));
+            });
+            h.ui(() -> assertThatThrownBy(() -> bare.get().palette().open(bare.get().terminals().window(window).orElseThrow(), "jasper.commands", Optional.empty(), Optional.empty()))
+                .isInstanceOf(MissingCapabilityException.class));
+            assertThat(h.invoke("test.a.open", window, null)).isTrue();
+            h.ui(() -> a.get().palette().open(a.get().terminals().window(window).orElseThrow(), "jasper.commands", Optional.of("new"), Optional.of("new_tab")));
+            assertThat(h.paletteOpens()).containsExactly(window + " test.a.things - -", window + " jasper.commands new new_tab");
+        }
+
+        @Test void noticesAndTheEditorReachTheHostAndAPaneKnowsItsShell() {
+            UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "t");
+            UUID pane = h.addTerminalPane(tab, "zsh", Path.of("/src"));
+            var a = new AtomicReference<PluginContext>();
+            h.start(info("test.a", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), a::set);
+            h.ui(() -> {
+                a.get().notices().error("It broke");
+                a.get().platform().openInEditor(Path.of("/tmp/x.toml"));
+                assertThat(a.get().terminals().pane(pane).orElseThrow().info().shell()).isEqualTo("zsh");
+            });
+            h.flush();
+            for (int i = 0; i < 100 && h.openedInEditor().isEmpty(); i++) { try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }
+            assertThat(h.notices()).containsExactly("test.a: It broke");
+            assertThat(h.openedInEditor()).containsExactly(Path.of("/tmp/x.toml"));
+        }
 }

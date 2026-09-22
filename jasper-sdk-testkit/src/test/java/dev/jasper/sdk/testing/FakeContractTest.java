@@ -34,6 +34,15 @@ class FakeContractTest extends PluginContractTest {
             @Override public boolean requestClose(String windowId) { return host.requestClose(windowId); }
             @Override public java.util.UUID addTerminalWindow() { return host.addTerminalWindow(); }
             @Override public java.util.UUID addTerminalTab(java.util.UUID windowId, String title) { return host.addTerminalTab(windowId, title); }
+            @Override public List<String> scopes() { return host.scopes(); }
+            @Override public List<String> searchScope(String scopeId, String query, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.searchScope(scopeId, query, windowId, paneIdOrNull); }
+            @Override public boolean availableInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.availableInScope(scopeId, rowId, verbId, windowId, paneIdOrNull); }
+            @Override public java.util.Optional<String> stepInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.stepInScope(scopeId, rowId, verbId, windowId, paneIdOrNull); }
+            @Override public String completeStep(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull, java.util.Map<String, String> values) { return host.completeStep(scopeId, rowId, verbId, windowId, paneIdOrNull, values); }
+            @Override public void executeInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { host.executeInScope(scopeId, rowId, verbId, windowId, paneIdOrNull); }
+            @Override public List<String> paletteOpens() { return host.paletteOpens(); }
+            @Override public List<String> notices() { return host.notices(); }
+            @Override public List<java.nio.file.Path> openedInEditor() { return host.openedInEditor(); }
             @Override public java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory) {
                 return host.addTerminalPane(tabId, new dev.jasper.sdk.terminal.PaneInfo(title, java.util.Optional.ofNullable(directory), java.util.Optional.empty(), 80, 24,
                     true, dev.jasper.sdk.terminal.SessionKind.LOCAL, java.util.Optional.empty(), dev.jasper.sdk.terminal.SessionState.RUNNING, java.util.OptionalInt.empty(), "zsh"));

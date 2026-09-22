@@ -121,4 +121,20 @@ public interface ContractHarness extends AutoCloseable {
     void stopAll();
 
     @Override void close();
+
+        /** Contributed scopes as {@code id|label|verbIds}, in registration order. */
+        List<String> scopes();
+        /** Searches a scope from a window and optional pane, as {@code rowId|title|enabled}; later row lookups use this answer. */
+        List<String> searchScope(String scopeId, String query, java.util.UUID windowId, java.util.UUID paneIdOrNull);
+        boolean availableInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull);
+        /** The step's title, or empty when the verb runs at once. */
+        java.util.Optional<String> stepInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull);
+        /** {@code done}, {@code error:<message>} or {@code reopen:<scopeId>:<rowId or ->:<query or ->}. */
+        String completeStep(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull, java.util.Map<String, String> values);
+        void executeInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull);
+        /** Every palette open request as {@code windowId scopeId query rowId}, {@code -} for an absent value. */
+        List<String> paletteOpens();
+        /** Every error notice as {@code <plugin name>: <message>}. */
+        List<String> notices();
+        List<java.nio.file.Path> openedInEditor();
 }
