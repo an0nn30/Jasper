@@ -15,6 +15,9 @@ import dev.jasper.sdk.ui.Windows;
 import java.nio.file.Path;
 import java.util.concurrent.Executor;
 import dev.jasper.sdk.terminal.Terminals;
+import dev.jasper.sdk.palette.Palette;
+import dev.jasper.sdk.ui.Notices;
+import dev.jasper.sdk.ui.Platform;
 
 /**
  * Everything the application offers one plugin. Each plugin has its own context, so every
@@ -142,4 +145,13 @@ public interface PluginContext {
      * @return the terminals service
      */
     Terminals terminals();
+
+        /** @return the command palette; registering needs {@code palette.contribute} */
+        Palette palette();
+
+        /** @return error notices shown to the user */
+        Notices notices();
+
+        /** @return desktop integration such as opening a file in the editor */
+        Platform platform();
 }

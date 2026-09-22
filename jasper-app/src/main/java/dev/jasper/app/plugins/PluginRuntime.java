@@ -135,6 +135,8 @@ public final class PluginRuntime {
     private final Contributions contributions;
     private final AuxiliaryWindows windows;
     private final TerminalRegistry terminals;
+    private final Consumer<String> notice;
+    private final Consumer<Path> editor;
     private volatile boolean dark = true;
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
@@ -157,6 +159,27 @@ public final class PluginRuntime {
      */
     public PluginRuntime(Options options, ActivityNotifier notifier, BiConsumer<String, String> configReport,
                          Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals) {
+        this(options, notifier, configReport, contributions, windows, terminals,
+            message -> LOG.log(System.Logger.Level.WARNING, "Plugin notice: " + message), new dev.jasper.app.platform.ConfigEditor()::open);
+    }
+
+    /**
+     * As the six-argument constructor, plus where plugin notices and editor requests go.
+     *
+     * @param options locations and mode
+     * @param notifier receives plugin activities for Buddy
+     * @param configReport receives plugin complaints about their settings as key and message
+     * @param contributions the application-wide model that plugin chrome contributions are written to
+     * @param windows builds plugin windows and dialogs
+     * @param terminals the application-wide directory of terminal windows, tabs and panes
+     * @param notice shows a plugin's error notice to the user, on the UI thread
+     * @param editor opens a file in the user's editor, off the UI thread; may throw
+     */
+    public PluginRuntime(Options options, ActivityNotifier notifier, BiConsumer<String, String> configReport,
+                         Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals,
+                         Consumer<String> notice, Consumer<Path> editor) {
+        this.notice = Objects.requireNonNull(notice);
+        this.editor = Objects.requireNonNull(editor);
         this.options = Objects.requireNonNull(options);
         this.notifier = Objects.requireNonNull(notifier);
         this.configReport = Objects.requireNonNull(configReport);
@@ -219,7 +242,7 @@ public final class PluginRuntime {
         statuses.addAll(resolution.rejected());
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.dataRoot().resolve(id),
-            id -> tables.getOrDefault(id, Map.of()), configReport, DRAIN_GRACE, contributions, () -> this.dark, windows, terminals));
+            id -> tables.getOrDefault(id, Map.of()), configReport, DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
         Map<String, PluginLoader.Loaded> loaded = new LinkedHashMap<>();

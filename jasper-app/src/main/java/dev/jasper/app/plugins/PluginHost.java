@@ -28,7 +28,7 @@ final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Function<String, Map<String, Object>> settings, BiConsumer<String, String> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
-                       AuxiliaryWindows windows, TerminalRegistry terminals) { }
+                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor) { }
 
     record Outcome(PluginStatus.State state, String reason) { }
 

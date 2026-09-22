@@ -36,6 +36,11 @@ import dev.jasper.sdk.terminal.TerminalEvents;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalInt;
+import dev.jasper.sdk.palette.PaletteQuery;
+import dev.jasper.sdk.palette.PaletteResults;
+import dev.jasper.sdk.palette.PaletteRow;
+import dev.jasper.sdk.palette.PaletteStep;
+import dev.jasper.sdk.palette.PaletteVerb;
 
 /**
  * A single-threaded plugin runtime for tests. It follows the same rules as the application: queued
@@ -58,6 +63,11 @@ public final class FakePluginHost implements AutoCloseable {
     private final Map<String, Map<Class<?>, Provider>> staged = new HashMap<>();
     final FakeWorkspace workspace = new FakeWorkspace(this);
     private final Map<String, FakePluginContext> contexts = new LinkedHashMap<>();
+        final Map<String, FakePalette.Registered> scopes = new LinkedHashMap<>();
+        final List<String> paletteOpens = new ArrayList<>();
+        final List<String> notices = new ArrayList<>();
+        final List<Path> openedInEditor = new ArrayList<>();
+        private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
     private final Map<String, Map<String, Object>> presets = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
     final List<String> reports = new CopyOnWriteArrayList<>();
@@ -323,6 +333,7 @@ public final class FakePluginHost implements AutoCloseable {
         workspace.sessions.stopping(context);
         context.closeOwned();
         context.ui.closeAll();
+        context.palette.closeAll();
         String id = context.plugin().id();
         for (var list : subscribers.values()) list.removeIf(entry -> entry.pluginId().equals(id));
         for (ActivityEvent open : List.copyOf(running.values())) {
@@ -745,4 +756,89 @@ public final class FakePluginHost implements AutoCloseable {
             publishApp(TerminalEvents.CWD_CHANGED, new TerminalEvents.CwdChanged(paneId, Optional.empty(), remote));
         });
     }
+
+        /** Registered scopes as {@code id|label|verbIds}, in registration order. */
+        public List<String> scopes() {
+            return scopes.values().stream().map(registered -> registered.spec().id() + "|" + registered.spec().label() + "|"
+                + String.join(",", registered.spec().verbs().stream().map(PaletteVerb::id).toList())).toList();
+        }
+
+        private FakePalette.Registered scope(String scopeId) {
+            FakePalette.Registered registered = scopes.get(scopeId);
+            if (registered == null) throw new IllegalArgumentException("No such scope: " + scopeId);
+            return registered;
+        }
+
+        private PaletteQuery query(FakePalette.Registered registered, UUID windowId, UUID paneIdOrNull) {
+            return new PaletteQuery(registered.context().terminals.windowHandle(windowId),
+                Optional.ofNullable(paneIdOrNull).map(registered.context().terminals::paneHandle), 5, true);
+        }
+
+        private PaletteRow row(String scopeId, String rowId) {
+            PaletteRow row = lastRows.getOrDefault(scopeId, Map.of()).get(rowId);
+            if (row == null) throw new IllegalArgumentException("Search the scope first; no such row: " + rowId);
+            return row;
+        }
+
+        private static PaletteVerb verb(FakePalette.Registered registered, String verbId) {
+            return registered.spec().verbs().stream().filter(verb -> verb.id().equals(verbId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No such verb: " + verbId));
+        }
+
+        /** Searches a scope as the palette would, as {@code rowId|title|enabled} lines; later row lookups use this answer. */
+        public List<String> searchScope(String scopeId, String query, UUID windowId, UUID paneIdOrNull) {
+            var registered = scope(scopeId);
+            PaletteResults results = registered.scope().search(query, query(registered, windowId, paneIdOrNull));
+            var rows = new LinkedHashMap<String, PaletteRow>();
+            for (PaletteRow row : results.rows()) rows.put(row.id(), row);
+            lastRows.put(scopeId, rows);
+            return results.rows().stream().map(row -> row.id() + "|" + row.title() + "|" + row.enabled()).toList();
+        }
+
+        /** {@code available} for a row of the last search. */
+        public boolean availableInScope(String scopeId, String rowId, String verbId, UUID windowId, UUID paneIdOrNull) {
+            var registered = scope(scopeId);
+            return registered.scope().available(row(scopeId, rowId), verb(registered, verbId), query(registered, windowId, paneIdOrNull));
+        }
+
+        /** The title of the step a verb would show first, if any. */
+        public Optional<String> stepInScope(String scopeId, String rowId, String verbId, UUID windowId, UUID paneIdOrNull) {
+            var registered = scope(scopeId);
+            return registered.scope().step(row(scopeId, rowId), verb(registered, verbId), query(registered, windowId, paneIdOrNull)).map(PaletteStep::title);
+        }
+
+        /**
+         * Completes the step a verb shows with {@code values}: {@code done}, {@code error:<message>} or
+         * {@code reopen:<scopeId>:<rowId or ->:<query or ->}.
+         */
+        public String completeStep(String scopeId, String rowId, String verbId, UUID windowId, UUID paneIdOrNull, Map<String, String> values) {
+            var registered = scope(scopeId);
+            PaletteStep step = registered.scope().step(row(scopeId, rowId), verb(registered, verbId), query(registered, windowId, paneIdOrNull))
+                .orElseThrow(() -> new IllegalArgumentException("That verb shows no step"));
+            var answer = new java.util.concurrent.atomic.AtomicReference<String>();
+            step.complete().accept(Map.copyOf(values), result -> answer.set(describe(result)));
+            return Objects.requireNonNull(answer.get(), "the step did not answer");
+        }
+
+        static String describe(PaletteStep.Result result) {
+            if (result.error().isPresent()) return "error:" + result.error().get();
+            if (result.reopenScopeId().isPresent())
+                return "reopen:" + result.reopenScopeId().get() + ":" + result.reopenRowId().orElse("-") + ":" + result.reopenQuery().orElse("-");
+            return "done";
+        }
+
+        /** Runs a verb on a row of the last search, without the availability recheck. */
+        public void executeInScope(String scopeId, String rowId, String verbId, UUID windowId, UUID paneIdOrNull) {
+            var registered = scope(scopeId);
+            registered.scope().execute(row(scopeId, rowId), verb(registered, verbId), query(registered, windowId, paneIdOrNull));
+        }
+
+        /** Every {@code Palette.open} call as {@code windowId scopeId query rowId}, with {@code -} for an absent value. */
+        public List<String> paletteOpens() { return List.copyOf(paletteOpens); }
+
+        /** Every error notice as {@code pluginId: message}. */
+        public List<String> notices() { return List.copyOf(notices); }
+
+        /** Every file a plugin asked to open in the editor. */
+        public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }
 }

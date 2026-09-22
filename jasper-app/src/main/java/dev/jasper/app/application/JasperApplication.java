@@ -312,7 +312,8 @@ public final class JasperApplication {
         auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock(), dirs.pluginData()), activityNotifier,
-            (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions, auxiliary, terminals);
+            (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions, auxiliary, terminals,
+            this::notice, new dev.jasper.app.platform.ConfigEditor()::open);
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
             Optional.empty(), invocation -> managePlugins());
@@ -326,6 +327,13 @@ public final class JasperApplication {
         });
         reportBindingProblems();
     }
+
+        /** A plugin's error notice: the window the user used last, or the log when there is none. */
+        void notice(String message) {
+            TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
+            if (target == null) LOG.log(System.Logger.Level.WARNING, "Plugin notice with no window: " + message);
+            else target.content().onError.accept(message);
+        }
 
     /** What resolving the saved shortcuts against the contributed actions could not honor, right now. */
     List<KeyBindings.Problem> bindingProblems() {

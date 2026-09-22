@@ -11,6 +11,7 @@ final class Capabilities {
             case "terminal.inject" -> "Type into your terminals";
             case "terminal.open" -> "Open terminal tabs, splits and windows";
             case "session.provide" -> "Run its own terminal sessions, such as remote connections";
+            case "palette.contribute" -> "Add scopes to the command palette and open it";
             default -> null;
         };
         return meaning == null ? capability : meaning + " (" + capability + ")";

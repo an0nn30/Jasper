@@ -43,6 +43,9 @@ import java.util.function.Function;
 import dev.jasper.sdk.Capabilities;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import dev.jasper.sdk.terminal.Terminals;
+import dev.jasper.sdk.palette.Palette;
+import dev.jasper.sdk.ui.Notices;
+import dev.jasper.sdk.ui.Platform;
 
 /** One plugin's view of the host. Closed after a failed start and after stop: nothing can be contributed through it. */
 final class HostedContext implements PluginContext {
@@ -58,6 +61,7 @@ final class HostedContext implements PluginContext {
     private final HostedUi ui;
     final CapabilityGate gate;
     final HostedTerminals terminals;
+    final HostedPalette palette;
     private boolean observing;
     Plugin plugin;
 
@@ -76,6 +80,7 @@ final class HostedContext implements PluginContext {
             () -> host.environment.dark().getAsBoolean() ? Variant.DARK : Variant.LIGHT,
             handler -> events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant())),
             host.environment.windows(), terminals);
+        this.palette = new HostedPalette(id, gate, host.environment.contributions(), host.containment, ui, terminals);
     }
 
     private void requireOpen() {
@@ -135,6 +140,30 @@ final class HostedContext implements PluginContext {
     @Override public Rail rail() { return ui.rail(); }
     @Override public Windows windows() { return ui.windows(); }
     @Override public Terminals terminals() { return terminals; }
+        @Override public Palette palette() { return palette; }
+
+        @Override public Notices notices() {
+            return message -> {
+                requireOpen();
+                Objects.requireNonNull(message, "message");
+                String shown = hosted.info().name() + ": " + message;
+                host.environment.ui().accept(() -> host.environment.notice().accept(shown));
+            };
+        }
+
+        @Override public Platform platform() {
+            return file -> {
+                requireOpen();
+                Objects.requireNonNull(file, "file");
+                background().execute(() -> {
+                    try { host.environment.editor().accept(file); }
+                    catch (RuntimeException failure) {
+                        log().log(System.Logger.Level.WARNING, "Could not open " + file + " in an editor", failure);
+                        notices().error("Could not open " + file.getFileName() + " in an editor.");
+                    }
+                });
+            };
+        }
 
     @Override public Executor background() {
         return task -> {

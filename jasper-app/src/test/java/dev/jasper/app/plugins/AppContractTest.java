@@ -60,7 +60,7 @@ class AppContractTest extends PluginContractTest {
                            TerminalRegistry terminals) {
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()),
-            (key, message) -> { }, drainGrace, contributions, dark::get, auxiliary, terminals)));
+            (key, message) -> { }, drainGrace, contributions, dark::get, auxiliary, terminals, message -> { }, path -> { })));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */

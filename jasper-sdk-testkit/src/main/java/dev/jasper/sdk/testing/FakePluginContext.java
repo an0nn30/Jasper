@@ -38,6 +38,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.Objects;
 
 /** One fake plugin's context. Obtain it from {@link FakePluginHost#start}. */
 public final class FakePluginContext implements PluginContext {
@@ -54,11 +55,13 @@ public final class FakePluginContext implements PluginContext {
     private final List<Subscription> owned = new ArrayList<>();
     final FakeTerminals terminals;
     final FakeUi ui;
+    final FakePalette palette;
 
     FakePluginContext(FakePluginHost host, PluginInfo info, Set<String> requires, Plugin plugin) {
         this.host = host; this.info = info; this.requires = requires; this.plugin = plugin;
         this.terminals = new FakeTerminals(this, host.workspace);
         this.ui = new FakeUi(host, this);
+        this.palette = new FakePalette(host, this);
     }
 
     void requireOpen() {
@@ -93,6 +96,9 @@ public final class FakePluginContext implements PluginContext {
 
     /** The scripted windows, tabs and panes. */
     @Override public dev.jasper.sdk.terminal.Terminals terminals() { return terminals; }
+        @Override public dev.jasper.sdk.palette.Palette palette() { return palette; }
+        @Override public dev.jasper.sdk.ui.Notices notices() { return message -> { requireOpen(); host.notices.add(info.id() + ": " + Objects.requireNonNull(message, "message")); }; }
+        @Override public dev.jasper.sdk.ui.Platform platform() { return file -> { requireOpen(); host.openedInEditor.add(Objects.requireNonNull(file, "file")); }; }
 
     @Override public Events events() {
         return new Events() {
