@@ -6,6 +6,9 @@ import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Path2D;
+import java.awt.geom.RoundRectangle2D;
 import javax.swing.Icon;
 import javax.swing.UIManager;
 
@@ -29,7 +32,17 @@ final class VaultIcons implements Icon {
                 case DELETE -> g.fillRect(2, 7, 12, 2);
                 case EDIT -> { g.rotate(-Math.PI / 4, 8, 8); g.fillRect(6, 2, 4, 11); g.fillPolygon(new int[]{6, 10, 8}, new int[]{14, 14, 16}, 3); }
                 case COPY -> { g.drawRect(2, 2, 9, 10); g.fillRect(5, 5, 9, 10); g.setColor(UIManager.getColor("Panel.background")); g.drawLine(7, 8, 12, 8); g.drawLine(7, 11, 12, 11); }
-                case LOCK -> { g.drawArc(5, 1, 6, 9, 0, 180); g.fillRect(4, 6, 8, 9); }
+                case LOCK -> {
+                    g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    var shackle = new Path2D.Float();
+                    shackle.moveTo(5, 7);
+                    shackle.lineTo(5, 5);
+                    shackle.curveTo(5, 1, 11, 1, 11, 5);
+                    shackle.lineTo(11, 7);
+                    g.draw(shackle);
+                    g.draw(new RoundRectangle2D.Float(3, 7, 10, 7, 2, 2));
+                    g.fill(new Ellipse2D.Float(7, 9.5f, 2, 2));
+                }
                 case MORE -> { for (int at : new int[]{2, 7, 12}) g.fillOval(at, 7, 2, 2); }
             }
         } finally { g.dispose(); }

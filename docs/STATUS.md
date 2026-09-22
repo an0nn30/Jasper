@@ -74,6 +74,10 @@ window, status item, rail action, key generator dialog and the Vault palette sco
 
 ### Vault layout and TermLab theme — 2026-09-22
 
+The manager lock action now uses an outlined padlock with a rounded body and centered
+keyhole, matching the rail icon's visual language. Verified with a headless manager render,
+the manager panel tests and `:jasper-app:installDist`.
+
 Latest follow-up in `.worktrees/vault-6b`: the user's reference screenshots and local TermLab
 source supersede the earlier split-pane manager and button-style iterations. The manager now has
 one searchable, type-filtered list with two-line names/details and trailing type labels; compact
