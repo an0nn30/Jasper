@@ -16,8 +16,8 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.5, <0.6"
-capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide
+sdk = ">=0.6, <0.7"
+capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute
 exports = []                       # packages other plugins may use
 
 [[requires]]
@@ -414,10 +414,31 @@ and closes inline where Jasper uses its cleanup thread.
 drive a contributed scope as the palette would; `paletteOpens()`, `notices()` and `openedInEditor()`
 record what the plugin asked for.
 
+## Building the in-repo plugins
+
+Each plugin under `plugins/` is a Gradle module named `:jasper-plugin-<directory>`; the same
+tasks appear in IntelliJ's Gradle tool window under that name, and the modules compile with the
+rest of the project.
+
+```sh
+./gradlew :jasper-plugin-snippets:build          # compile, test and jar one plugin
+./gradlew :jasper-plugin-snippets:stagePlugin    # plugins/snippets/build/plugin/dev.jasper.snippets/, a --plugin-dir directory
+./gradlew :jasper-plugin-snippets:pluginZip      # plugins/snippets/build/distributions/dev.jasper.snippets-0.1.0.zip
+./gradlew pluginZips                             # every plugin's zip
+```
+
+`stagePlugin` and `pluginZip` carry the plugin jar plus its runtime classpath (Snippets bundles
+tomlj this way), which is exactly what `stagePlugins` copies into the application image and what
+`PluginInstaller` expects; a plain `build/libs` jar is missing the bundled libraries. The id and
+version come from `plugin.toml`. A new in-repo plugin joins `settings.gradle.kts`, the `pluginImports`
+map in `gradle/plugin-architecture.gradle.kts`, the `pluginPaths` list in
+`gradle/plugin-packaging.gradle.kts`, and the `stagePlugins` task in `jasper-app/build.gradle.kts`
+if it is bundled; `PluginZipsTest` stages every zip through the installer.
+
 ## Running a plugin in Jasper
 
 ```sh
-jasper --plugin-dir /path/to/build/plugin-directory
+jasper --plugin-dir /path/to/build/plugin/dev.example.tool
 ```
 
 `--plugin-dir` loads one plugin directory with consent pre-granted. Like `--safe-mode`
@@ -426,9 +447,13 @@ Installed plugins live in `~/.config/jasper/plugins/<id>/` and stay inert until 
 them in File → Manage Plugins…, which records the consent in `~/.config/jasper/plugins.toml`.
 
 While developing Jasper itself, `./gradlew :jasper-app:run` and the IntelliJ configuration "Jasper
-(dev home)" run with `-Djasper.home=jasper-app/build/dev-home` and the bundled plugins staged by
-`stagePlugins`, so your installed plugins, their consent and data stay untouched; install into that
-home, or drop a plugin directory under `jasper-app/build/dev-home/plugins/`, to test installation.
+(dev home)" run with `-Djasper.home=jasper-app/build/dev-home` and the bundled plugins (sample,
+Snippets, Shell History) staged by `stagePlugins`, so your installed plugins, their consent and
+data stay untouched. To run a plugin that is not bundled from IntelliJ, run its `stagePlugin` task
+and add `--plugin-dir <its build/plugin/<id> directory>` to that configuration's program arguments
+(or `--args='--plugin-dir …'` to the Gradle `run`); it loads with consent pre-granted. To try the
+user-plugin path itself, unzip or copy a plugin directory into `jasper-app/build/dev-home/plugins/`
+and review it in File → Manage Plugins… as a user would, still without touching your system Jasper.
 
 ## Distributing a plugin
 
@@ -439,9 +464,12 @@ the jars into a staging folder, checks the descriptor exactly as it does at laun
 with your name, version, vendor and capabilities. The plugin is installed and loaded at the next
 restart; an update never replaces jars that a running Jasper has open.
 
-```bash
-cd plugins/sample/build/libs && zip sample.zip *.jar
-```
+For an in-repo plugin the zip is `./gradlew :jasper-plugin-<name>:pluginZip` (see "Building the
+in-repo plugins"); for your own build, zip the plugin jar together with every library jar it bundles.
+To install into the Jasper you use day to day, start that Jasper (not a dev-home launch), open
+File → Manage Plugins… → Install from Zip…, pick the zip, review the consent dialog, and restart
+when asked; the plugin lands in `<Jasper home>/plugins/<id>/`. The bundled plugins are already in
+the application image, so installing their zip only matters for a Jasper built without them.
 
 - Declare only the capabilities you use: the list is what the user is asked to allow, and a later
   version that adds one is held back until the user reviews it again.

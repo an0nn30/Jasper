@@ -52,6 +52,10 @@ tasks.test {
     systemProperty("jasper.repoRoot", rootProject.projectDir.absolutePath)
     dependsOn(stagePlugins)
     systemProperty("jasper.stagedPlugins", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
+    // The installable zips, so a test can stage them through the real installer.
+    dependsOn(rootProject.tasks.named("pluginZips"))
+    systemProperty("jasper.pluginZips", listOf("sample", "snippets", "history")
+        .joinToString(File.pathSeparator) { rootProject.layout.projectDirectory.dir("plugins/$it/build/distributions").asFile.absolutePath })
     dependsOn(tasks.jar, ":jasper-buddy:jar", ":jasper-terminal:jar")
     systemProperty("jasper.appJar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
     systemProperty("jasper.buddyJar", project(":jasper-buddy").layout.buildDirectory.file("libs/jasper-buddy.jar").get().asFile.absolutePath)
