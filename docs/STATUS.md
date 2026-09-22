@@ -124,6 +124,28 @@ keychain skip). The scoped independent review found no actionable issues. The ge
 rendered headlessly and inspected; source hygiene, diff checks and installed encrypted-encoder
 packaging passed. The design decision is fully implemented; no merge/push or native launch.
 
+### Vault native acceptance: shared chrome corrections — 2026-09-22
+
+The user's native screenshots exposed three app-provider issues during vault acceptance. An
+opaque unused tab panel covered auxiliary title bars outside the traffic-light region; title-only
+mode now hides it. SDK dialogs already use `NativeShells`, but that path had skipped the app title
+bar; frames and dialogs now share title setup, and JBR's Frame/Dialog overloads provide the same
+custom chrome. Dialog ownership/modality, close guards, dynamic titles, activation, theme updates
+and disposal remain app-owned. The SDK contract already supplies this surface; no API extension
+was needed. This also fixes the Plugins manager and all other app-provided auxiliary surfaces.
+
+The toolbar and rail now use `Jasper.titleBackground` in light and dark themes. Settings and Reload
+config were removed from the toolbar; Settings remains in the rail, and both commands remain in
+menus/palette. Regression tests reproduce the title-bar pixel boundary, verify both auxiliary
+surface kinds, and cover theme colors, toolbar contents and plugin contributions. Full-check
+failures identified two older screenshot/layout expectations, updated to the new color and five
+buttons. Headless dark/light renders were inspected. Final `./gradlew check :jasper-app:installDist -q`
+passed with **1,536 tests: 1,533 passed, three expected skips, no failures/errors**. The independent
+review found no production-code regression; its two stale-test findings are resolved. Source
+hygiene and diff checks passed. Native macOS rendering/dragging/modality remain a user-run visual
+check; no GUI, merge or push was performed. Changes remain on `claude/vault-6b`.
+
+
 ### macOS 26 window controls in the packaged app — 2026-09-22
 
 The user's screenshots showed Jasper's stoplights in the pre-macOS-26 flat style while TermLab

@@ -115,7 +115,7 @@ final class WindowRail extends JPanel {
     }
 
     void refreshTheme() {
-        setBackground(UIManager.getColor("Panel.background"));
+        setBackground(UIManager.getColor("Jasper.titleBackground"));
         setBorder(BorderFactory.createMatteBorder(0, 0, 0, UIScale.scale(1), UIManager.getColor("Separator.foreground")));
         repaint();
     }

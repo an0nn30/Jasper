@@ -55,7 +55,7 @@ class WindowChromeTest {
                 .filter(JButton.class::isInstance).map(JButton.class::cast).toList();
 
             assertThat(buttons).extracting(JButton::getText)
-                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find", "Settings", "Reload config");
+                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find");
             assertThat(buttons).allSatisfy(button -> {
                 assertThat(button.getIcon().getIconWidth()).isEqualTo(16);
                 assertThat(button.getIcon().getIconHeight()).isEqualTo(16);
@@ -63,8 +63,7 @@ class WindowChromeTest {
                 assertThat(button.getToolTipText()).isNotBlank();
             });
             assertThat(buttons.get(2).getAccessibleContext().getAccessibleName()).isEqualTo("Split pane");
-            assertThat(buttons.get(5).isEnabled()).isFalse();
-            assertThat(buttons.get(6).isEnabled()).isFalse();
+
             List<Icon> icons = buttons.stream().map(AbstractButton::getIcon).toList();
 
             owner.setToolbarMode(ToolbarMode.ICONS);
@@ -75,7 +74,7 @@ class WindowChromeTest {
             owner.setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
             assertThat(owner.toolbar().isVisible()).isTrue();
             assertThat(buttons).extracting(JButton::getText)
-                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find", "Settings", "Reload config");
+                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find");
         });
     }
 

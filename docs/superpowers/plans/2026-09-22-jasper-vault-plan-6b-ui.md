@@ -6,7 +6,7 @@
 > `c8141b6` (6a already on local main). Task 8 documentation and repository
 > verification and the independent whole-branch review are complete. Two review findings
 > were fixed in `a06dcb8`, with failing-before/passing-after regressions and green full checks.
-> Latest `check :jasper-app:installDist -q` passed: 1,534 tests, 1,531 passed, three expected skips. No merge/push or GUI launch.
+> Latest `check :jasper-app:installDist -q` passed: 1,536 tests, 1,533 passed, three expected skips. No merge/push or GUI launch.
 > **Resolved decision (2026-09-22):** user chose passphrase-encrypted key generation.
 > Optional matching passphrase fields now encrypt all five algorithms in OpenSSH v1 format
 > (bcrypt_pbkdf with 24 rounds and a fresh 16-byte salt, AES-256-CTR). Empty fields retain legacy
@@ -29,6 +29,9 @@
 > Review fixes preserve old keys on failed password writes, serialize queued saves behind rekey,
 > and cancel closed password forms before commit. After commit starts the button says Close
 > and the form explains that closing will not cancel; detached write failures are reported.
+> Native acceptance prompted app-provider chrome fixes: hide unused title tabs, use the same
+> chrome for SDK dialogs, match rail/toolbar/title colors and remove toolbar settings controls.
+> No SDK extension was needed; these fixes apply to all auxiliary surfaces.
 > No public consumer API or vault file-format change. The key-generation choice is resolved; native acceptance remains user-run.
 
 **Goal:** The user-facing side of the Credential Vault: a Vault palette scope, a padlock status item and rail action, the manager window (accounts, keys, notes, grants, change password, lock), the editors, the key generator dialog, and the documentation.
@@ -2867,3 +2870,32 @@ prior baseline/native review limits remain unchanged. Source hygiene and `git di
 passed, the installed jar contains `EncryptedOpenSsh`, and the updated generator form was rendered
 headlessly and inspected. The optional-passphrase requirement is now complete. No native window,
 real keychain, merge or push was performed. Keep the branch for user-run native acceptance.
+
+
+## Native acceptance chrome corrections — 2026-09-22
+
+User screenshots identified a boundary at the end of the native traffic-light region, gray native
+headers on plugin editors, and terminal-colored toolbar with duplicate Settings/Reload controls.
+Root causes were reproduced headlessly: the unused tab JPanel was opaque, the dialog native-shell
+path never installed MacTitleBar, and toolbar/rail used different semantic backgrounds. Fix at the
+app provider: title-only bars hide their tab component; NativeShells uses the same title setup for
+frames/dialogs; MacTitleBar binds and releases JBR decorations through the Frame/Dialog overloads;
+dialogs receive theme, activation and dynamic title updates. Existing SDK Windows/WindowSurface
+already express ownership, modality and lifetime, so no SDK API change or plugin workaround.
+Toolbar/rail now use Jasper.titleBackground; only the duplicate toolbar buttons were removed.
+
+Observed RED: three regressions failed with the exact old boundary color, toolbar background and
+seven-button list. Shared auxiliary title setup was absent in the additional test. GREEN: focused
+36 tests passed after implementation and correcting the new test's EDT fixture (parameterized
+methods are not intercepted by EdtTestExtension). The first full check caught two pre-existing
+MockUiTest expectations for the old toolbar color/button count; those were updated. Headless
+renders show uniform title/toolbar/rail colors in both themes. No native desktop window launched.
+
+
+Final chrome verification: `./gradlew check :jasper-app:installDist -q` passed with **1,536 tests,
+1,533 passed, three expected skips, no failures/errors**. Scoped independent review found no
+production-code regression; its two stale MockUiTest findings were corrected and the green full
+run verifies them. Source hygiene and diff checks passed. Native rendering/dragging/modal controls
+still belong to the user's acceptance; changes are preserved on the existing branch, not merged
+or pushed. Recheck the Vault/Plugins manager title bars, editor/generator dialog title bars, theme
+switches and main toolbar/rail after relaunching the updated app.

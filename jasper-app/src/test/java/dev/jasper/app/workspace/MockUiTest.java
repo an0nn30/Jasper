@@ -33,7 +33,7 @@ class MockUiTest {
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
                 assertThat(image.getRGB(650, 37) & 0xffffff).isEqualTo(0x313439);
-                assertThat(image.getRGB(650, 80) & 0xffffff).isEqualTo(0x282a36);
+                assertThat(image.getRGB(650, 80) & 0xffffff).isEqualTo(0x23262c);
                 assertThat(image.getRGB(500, 700)).isEqualTo(image.getRGB(500, 940));
             }
         });
@@ -114,7 +114,7 @@ class MockUiTest {
             var owner = content(launcher(pending)); owner.setSize(400, 500); layoutTree(owner);
             var buttons = java.util.Arrays.stream(owner.toolbar().getComponents()).filter(JButton.class::isInstance)
                 .map(JButton.class::cast).toList();
-            assertThat(buttons).hasSize(7);
+            assertThat(buttons).hasSize(5);
             assertThat(buttons).allSatisfy(button -> {
                 assertThat(button.getWidth()).isGreaterThanOrEqualTo(16);
                 assertThat(button.getX() + button.getWidth()).isLessThanOrEqualTo(400);

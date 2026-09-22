@@ -18,7 +18,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     private final Runnable minimumSizeChanged;
     private final JLabel title = new JLabel("Jasper", SwingConstants.CENTER);
     private final PropertyChangeListener boundsChanged;
-    private JFrame frame;
+    private Window window;
     private WindowDecorations decorations;
     private WindowDecorations.CustomTitleBar nativeTitle;
     private int nativeLeft, nativeRight;
@@ -64,21 +64,28 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     public void setTitle(String value, boolean singleTab) {
         if (closed) return;
         if (!value.equals(title.getText())) title.setText(value);
-        title.setVisible(singleTab); revalidate(); repaint();
+        title.setVisible(singleTab); tabs.setVisible(!singleTab); revalidate(); repaint();
     }
 
     /** Public JBR API only. Root properties above remain the fallback on other runtimes. */
-    public void attach(JFrame frame) {
-        if (closed || this.frame != null || !JBR.isWindowDecorationsSupported()) return;
+    public void attach(Window window) {
+        if (!(window instanceof Frame) && !(window instanceof Dialog))
+            throw new IllegalArgumentException("A title bar needs a frame or dialog");
+        if (closed || this.window != null || !JBR.isWindowDecorationsSupported()) return;
         decorations = JBR.getWindowDecorations();
         nativeTitle = decorations.createCustomTitleBar();
         nativeTitle.setHeight(titleHeight());
-        decorations.setCustomTitleBar(frame, nativeTitle);
-        this.frame = frame;
-        frame.addComponentListener(frameBounds);
-        frame.addWindowStateListener(stateChanged);
-        frame.addHierarchyListener(peerChanged);
+        this.window = window;
+        applyNativeTitle(nativeTitle);
+        window.addComponentListener(frameBounds);
+        window.addWindowStateListener(stateChanged);
+        window.addHierarchyListener(peerChanged);
         refreshNativeGeometry();
+    }
+
+    private void applyNativeTitle(WindowDecorations.CustomTitleBar value) {
+        if (window instanceof Frame frame) decorations.setCustomTitleBar(frame, value);
+        else if (window instanceof Dialog dialog) decorations.setCustomTitleBar(dialog, value);
     }
 
     private void refreshNativeGeometry() {
@@ -149,12 +156,12 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         if (closed) return;
         closed = true;
         root.removePropertyChangeListener(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, boundsChanged);
-        if (frame != null) {
-            frame.removeComponentListener(frameBounds);
-            frame.removeWindowStateListener(stateChanged);
-            frame.removeHierarchyListener(peerChanged);
-            decorations.setCustomTitleBar(frame, null);
-            frame = null; nativeTitle = null; decorations = null;
+        if (window != null) {
+            window.removeComponentListener(frameBounds);
+            window.removeWindowStateListener(stateChanged);
+            window.removeHierarchyListener(peerChanged);
+            applyNativeTitle(null);
+            window = null; nativeTitle = null; decorations = null;
         }
     }
 }

@@ -275,7 +275,9 @@ class ThemeControllerTest {
             for (BuiltinTheme theme : BuiltinTheme.values()) {
                 themes.select(theme);
                 assertThat(owner.getBackground()).isEqualTo(theme.palette().background());
-                assertThat(owner.toolbar().getBackground()).isEqualTo(theme.palette().background());
+                assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                assertThat(owner.rail().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                assertThat(UIManager.getColor("ToolBar.background")).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
                 assertThat(UIManager.getColor("TabbedPane.selectedBackground")).isEqualTo(theme.palette().background());
                 for (String prefix : new String[]{"Panel", "TextField", "MenuItem", "PopupMenu", "Button"}) {
                     assertThat(contrast(UIManager.getColor(prefix + ".foreground"), UIManager.getColor(prefix + ".background")))

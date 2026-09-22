@@ -44,7 +44,7 @@ class WindowChromeContributionsTest {
         return null;
     }
 
-    @Test void toolbarControlsSitBeforeTheRightAlignedGroupAndFollowModeAndRemoval() throws Exception {
+    @Test void toolbarControlsFollowBuiltinsAndFollowModeAndRemoval() throws Exception {
         edt(() -> {
             var model = new Contributions();
             List<Contributions.Invocation> seen = new ArrayList<>();
@@ -58,7 +58,7 @@ class WindowChromeContributionsTest {
             model.addToolbar(new ToolbarEntry.Button("dev.x.never-registered"));
 
             List<String> after = buttons(owner);
-            assertThat(after).containsSubsequence("Find", "Run Tool", "Tool", "Settings");
+            assertThat(after).containsSubsequence("Find", "Run Tool", "Tool");
             assertThat(after).hasSize(before.size() + 2);
             JButton button = null;
             for (Component child : owner.toolbar().getComponents())

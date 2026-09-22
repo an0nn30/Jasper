@@ -86,8 +86,11 @@ Panels entry.
 Plugin windows follow the `TerminalWindow`/`WindowContent` split: `AuxiliarySurface` holds the
 content, title, closing guards and lifetime and is fully tested headlessly; `NativeShells`
 is the only code that constructs a frame or dialog, and adds the icon, the macOS title bar,
-a minimal menu bar, theme tracking and remembered bounds. Dialogs are parented through
-`WindowOwner`, so an SDK type never exposes a frame.
+a minimal window menu bar, theme tracking and remembered window bounds. Both frames and dialogs
+use `MacTitleBar`; dialogs retain their modal ownership, close guards and normal disposal.
+Title-only surfaces hide the unused tab component so the entire header uses `Jasper.titleBackground`.
+The rail and toolbar use that same semantic color in both themes. Dialogs are parented through
+`WindowOwner`, so an SDK type never exposes a frame or needs its own chrome API.
 
 `persistence.UiState` (`ui-state.toml`) holds panel region, visibility and size, rail
 visibility and auxiliary window bounds. It is application state, not configuration: strict

@@ -26,6 +26,7 @@ import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JRootPane;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
@@ -78,9 +79,7 @@ public final class NativeShells {
     private AuxiliarySurface.Shell frame(AuxiliarySurface surface) {
         var frame = new JFrame(surface.title());
         frame.setIconImages(ApplicationIcon.images());
-        MacTitleBar bar = MacTitleBar.install(frame.getRootPane(), surface.holder(), new JPanel(), () -> TITLE_HEIGHT,
-            () -> { }, SystemInfo.isMacFullWindowContentSupported);
-        if (bar != null) bar.setTitle(surface.title(), true);
+        MacTitleBar bar = installTitleBar(frame.getRootPane(), surface, SystemInfo.isMacFullWindowContentSupported);
         frame.setJMenuBar(menuBar(surface));
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new WindowAdapter() {
@@ -114,17 +113,35 @@ public final class NativeShells {
         Window owner = surface.ownerSurface().map(natives::get)
             .orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null));
         var dialog = new JDialog(owner, surface.title(), surface.modal() ? Dialog.ModalityType.DOCUMENT_MODAL : Dialog.ModalityType.MODELESS);
-        dialog.setContentPane(surface.holder());
+        dialog.setIconImages(ApplicationIcon.images());
+        MacTitleBar bar = installTitleBar(dialog.getRootPane(), surface, SystemInfo.isMacFullWindowContentSupported);
         dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         dialog.addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
+            @Override public void windowActivated(WindowEvent event) { if (bar != null) bar.setActive(true); surface.notifyActivated(); }
+            @Override public void windowDeactivated(WindowEvent event) { if (bar != null) bar.setActive(false); }
         });
+        if (bar != null) bar.attach(dialog);
         dialog.pack();
         dialog.setLocationRelativeTo(owner);
-        Subscription theme = themes.subscribe((resolved, chromeChanged) -> { if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog); });
+        Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
+            if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
+            if (bar != null) bar.setLight(resolved.chrome() == BuiltinTheme.LIGHT);
+        });
         natives.put(surface, dialog);
         return new AuxiliarySurface.Shell(() -> { dialog.pack(); dialog.setLocationRelativeTo(owner); dialog.setVisible(true); },
-            dialog::toFront, () -> { theme.close(); natives.remove(surface); dialog.dispose(); }, dialog::setTitle, dialog::getBounds);
+            dialog::toFront, () -> {
+                theme.close();
+                if (bar != null) bar.close();
+                natives.remove(surface); dialog.dispose();
+            }, title -> { dialog.setTitle(title); if (bar != null) bar.setTitle(title, true); }, dialog::getBounds);
+    }
+
+    /** Shared, headless-testable title setup for both kinds of SDK/application auxiliary surface. */
+    static MacTitleBar installTitleBar(JRootPane root, AuxiliarySurface surface, boolean supported) {
+        MacTitleBar bar = MacTitleBar.install(root, surface.holder(), new JPanel(), () -> TITLE_HEIGHT, () -> { }, supported);
+        if (bar != null) bar.setTitle(surface.title(), true);
+        return bar;
     }
 
     /**

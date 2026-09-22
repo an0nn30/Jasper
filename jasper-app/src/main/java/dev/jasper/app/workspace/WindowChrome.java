@@ -101,7 +101,6 @@ final class WindowChrome {
         addButton(ActionId.ZOOM_PANE, "maximize"); addButton(ActionId.FIND, "search");
         toolbar.add(new ToolbarSeparator());
         toolbar.add(toolbarGlue);
-        addButton(ActionId.OPEN_SETTINGS, "settings"); addButton(ActionId.RELOAD_CONFIG, "refresh");
     }
 
     void connect(WindowContributions source) {
@@ -124,7 +123,7 @@ final class WindowChrome {
         return button;
     }
 
-    /** Rebuilds the plugin section, which sits between the built-in group and the right-aligned group. */
+    /** Rebuilds the plugin section after the built-in controls. */
     void renderContributedToolbar() {
         contributedToolbar.forEach(toolbar::remove);
         contributedToolbar.clear();
@@ -413,7 +412,7 @@ final class WindowChrome {
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
-        toolbar.setBackground(owner.theme().chrome().palette().background());
+        toolbar.setBackground(UIManager.getColor("Jasper.titleBackground"));
         for (Component child : toolbar.getComponents()) if (child instanceof JButton button)
             button.setFont(((ReferenceButton) button).chromeFont());
         status.setBackground(owner.theme().palette().background());

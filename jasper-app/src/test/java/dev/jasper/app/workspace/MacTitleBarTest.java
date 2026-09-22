@@ -142,6 +142,27 @@ class MacTitleBarTest {
         });
     }
 
+    @Test void titleOnlyHeaderDoesNotPaintThePlaceholderOverItsBackground() throws Exception {
+        edt(() -> {
+            var themes = new dev.jasper.app.appearance.ThemeController();
+            var root = new JRootPane();
+            var placeholder = new JPanel();
+            try (var bar = MacTitleBar.install(root, new JPanel(), placeholder, () -> 38, () -> { }, true)) {
+                bar.setTitle("Credential Vault", true);
+                for (BuiltinTheme theme : BuiltinTheme.values()) {
+                    themes.select(theme); SwingUtilities.updateComponentTreeUI(root);
+                    bar.setLight(theme == BuiltinTheme.LIGHT); bar.setSize(800, 38); bar.doLayout();
+                    var image = new BufferedImage(800, 38, BufferedImage.TYPE_INT_RGB);
+                    var graphics = image.createGraphics();
+                    try { bar.paint(graphics); } finally { graphics.dispose(); }
+                    for (int x : new int[] {5, 119, 121, 350, 795})
+                        assertThat(new Color(image.getRGB(x, 2))).as("header pixel %s in %s", x, theme)
+                            .isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                }
+            }
+        });
+    }
+
     private static JLabel label(MacTitleBar bar) { return (JLabel) bar.getComponent(0); }
     private static Color pixel(MacTitleBar bar) {
         var image = new BufferedImage(bar.getWidth(), bar.getHeight(), BufferedImage.TYPE_INT_RGB);
