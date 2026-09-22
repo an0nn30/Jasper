@@ -72,6 +72,26 @@ vault, one prompt per request kind, and cancellation that withdraws a request. U
 unlock, grant and picker dialogs, `Open Vault...` (F8) and `Lock Vault`. Plan 6b adds the manager
 window, status item, rail action, key generator dialog and the Vault palette scope.
 
+### macOS 26 window controls in the packaged app — 2026-09-22
+
+The user's screenshots showed Jasper's stoplights in the pre-macOS-26 flat style while TermLab
+(Tauri) had the new controls. Cause, proven by a spike with a plain Swing frame and no shell: AppKit
+draws the macOS 26 controls only for a process whose main executable records a macOS 26 or later SDK
+in its `LC_BUILD_VERSION`; JBR 25.0.4.1's `java` and jpackage's launcher stub both record SDK 13.3.
+Rewriting that load command on a copy of `java` with `xcrun vtool -set-build-version macos 11.0 27.0
+-replace` and re-signing gave the new controls with no other change. The jpackage launcher is
+self-contained (links only Cocoa, libc++ and libSystem; parses `Jasper.cfg` itself), so no C stub is
+needed. `packageApp` now runs that rewrite on `Jasper.app/Contents/MacOS/Jasper` after jpackage and
+re-signs the bundle ad hoc with preserved metadata; `verifyPackage` asserts the launcher records the
+installed SDK and warns below 26. Without `xcrun` both steps log and skip. `./gradlew :jasper-app:run`
+keeps the legacy controls because it runs the stock `java`. See [packaging](packaging.md#macos-26-window-controls).
+Branch `claude/termlab-tabs`, worktree `.worktrees/termlab-tabs`.
+
+The wider design this came out of, TermLab-style tabs under native title bars on every platform
+(`superpowers/specs/2026-09-22-jasper-termlab-tabs-native-titlebar-design.md`), is approved but
+deferred: the user chose the launcher fix alone once it was clear the controls do not depend on the
+tab rework. The spec's banner records the narrowing; no plan was written for sections 3 to 5.
+
 ### Terminal dark palette — 2026-09-22
 
 `Palette.jasperDark()` now carries the TermLab Dark palette ported from the conch project's

@@ -44,6 +44,19 @@ and use the official Ember Jasper icon. Distribution signing and notarization re
 outstanding. See [icon sources, platform framing and regeneration](../packaging/icons/README.md)
 for the macOS ICNS, Windows ICO, Linux PNG/hicolor and runtime PNG assets.
 
+## macOS 26 window controls
+
+AppKit draws the macOS 26 window controls only for a process whose main executable was
+built against the macOS 26 SDK or later. The JetBrains Runtime's jpackage launcher stub
+records SDK 13.3, so a plain jpackage image shows the pre-26 flat controls. `packageApp`
+therefore rewrites the launcher's build-version load command with Apple's `vtool` to the
+SDK version `xcrun --show-sdk-version` reports, then re-signs the bundle with the same
+ad-hoc identity; nothing else in the launcher changes. This needs the Xcode command line
+tools with a macOS 26 or later SDK. Without `xcrun` the step logs that it was skipped and
+the image keeps the legacy controls; with an older SDK `verifyPackage` warns. Only the
+packaged app benefits: `./gradlew :jasper-app:run` and `installDist` launch the runtime's
+own `java` binary, which keeps the legacy controls.
+
 ## Linux icon assets
 
 Linux windows and taskbar integration use the dedicated Linux PNG set. Portable
@@ -69,6 +82,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm the Ember Jasper icon in Finder, Dock and Cmd+Tab at normal and Retina sizes; compare its apparent size with neighboring app icons.
 - [ ] With a minimal launcher environment, confirm the shell starts and UTF-8 text renders correctly.
 - [ ] Confirm native title controls and switching between the bundled Light and Dark themes.
+- [ ] Confirm the window controls are the macOS 26 style (larger, glass) in the packaged app, unlike `./gradlew :jasper-app:run`.
 - [ ] Confirm multiple windows and shell-exit cleanup.
 - [ ] Confirm tmux mouse input including right-click and pane drag resizing.
 - [ ] Confirm vim and htop behavior.
