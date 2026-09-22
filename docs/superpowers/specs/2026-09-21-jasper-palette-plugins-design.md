@@ -183,8 +183,9 @@ facades). The sample plugin's range becomes `>=0.6, <0.7`.
 - Contract cases (both harnesses): registering needs `palette.contribute` and the plugin's
   namespace; a duplicate id fails and each registration removes only itself; a stopped plugin's
   scopes disappear; `search`, `available`, `step` and `execute` receive the same token they returned;
-  a step's `reopen` opens the named scope with the row selected; `open` on the showing scope
-  dismisses; a `shortcutActionId` must be the plugin's own action; `notices().error` reaches the
+  a step's `reopen` names the scope, row and query to reopen with; `open` requests carry the
+  window, scope, query and row (the showing-scope toggle is the window's and is tested there,
+  because neither harness drives a real window); a `shortcutActionId` must be the plugin's own action; `notices().error` reaches the
   host; `PaneInfo.shell` round-trips; an optional `requires` resolves with the dependency present and
   absent (the History → Snippets shape).
 
