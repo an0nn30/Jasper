@@ -115,12 +115,17 @@ private static void installUi(PluginContext context, long stepMillis) {
 ## Consistent buttons, flexible layouts
 
 Use ordinary `JButton` components inside plugin content. Jasper's look and feel supplies the
-compact form styling: a 26-logical-pixel minimum button height, subtle 4-pixel corner arcs,
-11.5-point button labels and flat fills. Text/password/formatted fields, multiline text areas
-and dropdowns share the form colors and padding. Toolbar buttons retain their separate
-30-pixel height and rounder shape. Buttons update with the app's light/dark theme;
-Swing actions, mnemonics, default buttons, focus and disabled states keep their normal behavior.
-Widths follow the label and icon, and longer or custom-font content can grow without clipping.
+TermLab reference styling: 24-logical-pixel minimum height, 72-pixel minimum text-button width,
+12-point labels, subtly rounded gray secondary buttons and blue default buttons. Text fields
+use square borders; dropdowns and lists use the reference selection colors. Dark and light
+palettes come from TermLab's theme definitions. The dark secondary text is slightly lighter
+than the source (#A7AEBB instead of #A0A7B4) to preserve the existing 4.5:1 contrast check;
+disabled button text retains Jasper's contrast-tested defaults.
+
+Swing actions, mnemonics, focus and disabled states retain their behavior. Set the hosting
+`JRootPane`'s default button when a form attaches and release it when the form detaches, so a
+removed form cannot retain Enter-key ownership. Layout remains plugin-owned, and long labels
+or custom fonts can grow without clipping. The terminal toolbar keeps its independent geometry.
 
 Plugins own their layout managers and spacing. Let buttons use their preferred sizes, avoid
 hard-coded colors or replacement UI delegates, and use `JRootPane.setDefaultButton` for a dialog's

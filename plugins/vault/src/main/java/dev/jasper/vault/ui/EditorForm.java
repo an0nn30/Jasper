@@ -61,20 +61,20 @@ public class EditorForm extends JPanel implements AutoCloseable {
 
     protected EditorForm(Runnable dismiss) {
         super(new BorderLayout(8, 8)); this.dismiss = dismiss;
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        setBorder(BorderFactory.createEmptyBorder(20, 20, 10, 20));
         add(fields, BorderLayout.CENTER);
         var footer = new JPanel(new BorderLayout(8, 8));
         footer.add(error, BorderLayout.NORTH);
-        var buttons = new JPanel(); buttons.add(cancel); buttons.add(save);
+        var buttons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 12, 0)); buttons.add(cancel); buttons.add(save);
         footer.add(buttons, BorderLayout.SOUTH); add(footer, BorderLayout.SOUTH);
         cancel.addActionListener(event -> { close(); dismiss.run(); });
     }
     protected final void field(String label, JComponent component) {
         var at = new GridBagConstraints();
         at.gridy = fieldRow++; at.gridx = 0; at.anchor = GridBagConstraints.NORTHWEST;
-        at.insets = new Insets(4, 0, 4, 12);
+        at.insets = new Insets(7, 0, 7, 12);
         fields.add(new JLabel(label), at);
-        at.gridx = 1; at.weightx = 1; at.insets = new Insets(4, 0, 4, 0);
+        at.gridx = 1; at.weightx = 1; at.insets = new Insets(7, 0, 7, 0);
         at.fill = GridBagConstraints.HORIZONTAL;
         if (component instanceof javax.swing.JScrollPane) { at.weighty = 1; at.fill = GridBagConstraints.BOTH; }
         fields.add(component, at);
@@ -108,6 +108,15 @@ public class EditorForm extends JPanel implements AutoCloseable {
         for (Component child : container.getComponents()) {
             child.setEnabled(value); if (child instanceof Container nested) enabled(nested, value);
         }
+    }
+    @Override public void removeNotify() {
+        if (getRootPane() != null && getRootPane().getDefaultButton() == save)
+            getRootPane().setDefaultButton(null);
+        super.removeNotify();
+    }
+    @Override public void addNotify() {
+        super.addNotify();
+        if (getRootPane() != null) getRootPane().setDefaultButton(save);
     }
     @Override public void close() { closed = true; secrets.forEach(SecretDocument::clear); }
 }

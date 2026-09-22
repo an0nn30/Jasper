@@ -36,10 +36,15 @@
 > `WindowSurface.chooseFile` over the shown window/dialog, with owner-close cancellation and
 > fake selection responses. Shared editor path rows now browse private/public SSH keys and
 > login key paths; manual entry remains available and cancellation preserves the field.
-> Button branding follow-up: the app look and feel now styles ordinary plugin JButtons with
-> compact flat form controls (26-pixel button height, 4-pixel arc) after user refinement.
-> Text inputs and dropdowns match; toolbar geometry stays independent. Layouts remain plugin-owned. No SDK API
-> extension or plugin-specific migration is needed for buttons.
+> Latest UI revision follows the user's TermLab screenshots and local source: one searchable,
+> type-filtered list with two-line rows, compact icon actions, + menu, More menu for grants and
+> password changes, and right-aligned Cancel/Okay. Both close the manager; editor saves remain
+> immediate. Removed the split detail/secret-note preview; double-click/Enter opens the editor.
+> Device source, auto-lock and path stay visible in the footer. Form controls use TermLab's
+> dark/light palettes, 24-pixel buttons and 12-point text; dark secondary text is slightly
+> lighter to retain the existing contrast check. Terminal toolbar geometry remains independent.
+> Sources: TermLab/core/resources/themes/TermLab{Dark,Light}.theme.json and its VaultDialog.java.
+> No SDK API extension, plugin-specific button migration, or new credential type is needed.
 > No public consumer API or vault file-format change. The key-generation choice is resolved; native acceptance remains user-run.
 
 **Goal:** The user-facing side of the Credential Vault: a Vault palette scope, a padlock status item and rail action, the manager window (accounts, keys, notes, grants, change password, lock), the editors, the key generator dialog, and the documentation.

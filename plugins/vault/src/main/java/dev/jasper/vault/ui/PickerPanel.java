@@ -56,4 +56,14 @@ public final class PickerPanel extends JPanel {
     static String label(CredentialDescriptor descriptor) {
         return descriptor.subtitle().isBlank() ? descriptor.name() : descriptor.name() + "  —  " + descriptor.subtitle();
     }
+    @Override public void removeNotify() {
+        if (getRootPane() != null && getRootPane().getDefaultButton() == primary)
+            getRootPane().setDefaultButton(null);
+        super.removeNotify();
+    }
+    @Override public void addNotify() {
+        super.addNotify();
+        if (getRootPane() != null) getRootPane().setDefaultButton(primary);
+    }
+
 }

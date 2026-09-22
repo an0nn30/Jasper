@@ -51,10 +51,12 @@ public final class VaultManagerWindow implements AutoCloseable {
     public void show(WindowHandle owner, Optional<UUID> selection) {
         this.owner = owner;
         if (window == null) {
-            window = context.windows().create(new WindowSpec(ID, "Credential Vault", new Dimension(900, 620), true));
+            window = context.windows().create(new WindowSpec(ID, "Credential Vault", new Dimension(800, 600), true));
             panel = new ManagerPanel(manager::entry, this::add, this::edit, this::delete, this::copyPublic,
                 grant -> report(manager.revoke(grant)), generate, this::changePassword, lock::lock,
                 () -> service.requestUnlock(this.owner));
+            panel.closeButton.addActionListener(event -> close());
+            panel.cancelButton.addActionListener(event -> close());
             window.setContent(panel);
             window.onClosed(() -> {
                 window = null; closeDialogs(); panel.close();

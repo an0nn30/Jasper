@@ -4,14 +4,25 @@ Credential Vault is bundled with Jasper. Press **F8**, click the vault button in
 choose **Open Vault...** in the command palette. First use creates a vault with a master password
 and an optional device binding. Later use unlocks the vault and opens its manager window.
 
-The manager lists logins, SSH keys, secure notes and saved plugin grants. Select an entry to
-inspect its details, edit it or delete it. Add a login with a password, a key path and optional
-passphrase, or both. Add an existing SSH key by choosing its private and public paths; its public
-key supplies the algorithm and SHA-256 fingerprint. Every path field has a **Browse...** button
-that opens the native file chooser; you can still type or paste a path. Cancelling keeps the current
-value. Secure notes are available only in the manager.
+The manager uses a single list of logins, SSH keys and secure notes. Search names, usernames or
+fingerprints and narrow the list with **All Types**. Each row shows its name, secondary details
+and type. Double-click a row or press Enter to edit it. The icon actions add, edit, delete, copy a
+public key and lock the vault; each has a tooltip and accessible name.
 
-**Generate Key...** supports Ed25519, ECDSA P-256/P-384 and RSA 3072/4096. Generated files live in
+The **+** menu adds a login, imports an SSH key, adds a secure note, or generates a new SSH key.
+The **More (...)** menu opens saved plugin grants or changes the master password. Grant revocation
+has a **Back to entries** button. **Cancel** and **Okay** both close the manager; changes made in
+individual editors are saved immediately and are not rolled back by closing the manager.
+The footer retains device-secret source, auto-lock setting and vault path, with full text in its
+tooltip when the window is narrow.
+
+Add a login with a password, a key path and optional passphrase, or both. Import an existing SSH
+key by choosing its private and public paths; its public key supplies the algorithm and SHA-256
+fingerprint. Every path field has a **Browse...** button that opens the native file chooser; you
+can still type or paste a path. Cancelling keeps the current value. Secure note contents appear
+only in their editor and are cleared when that form closes.
+
+**Generate SSH Key...** in the + menu supports Ed25519, ECDSA P-256/P-384 and RSA 3072/4096. Generated files live in
 `plugins/dev.jasper.vault/data/keys/` unless `keys_directory` selects another directory.
 The generator can also create a login account for a supplied username. Generated private keys
 are encrypted when you enter and confirm a passphrase. Leave both fields empty to create an
@@ -20,7 +31,7 @@ vault. For a standalone key, keep the passphrase yourself; the key entry stores 
 metadata. Key files remain separate, and locking the vault does not change their encryption. **Copy public key** copies the selected public key. Deleting a key
 entry offers a separate choice to delete its two files; the default keeps them.
 
-**Change Password...** requires the old password and matching new passwords. Cancel or close
+**Change Master Password...** in the More menu requires the old password and matching new passwords. Cancel or close
 during password derivation to abandon the change. Once writing starts, the button becomes
 **Close** and the form says closing will not cancel. A failed write keeps the old password and
 can be retried; failures are reported even if the form was closed. **Lock** removes
@@ -36,7 +47,7 @@ is left alone. The vault never types clipboard contents into a terminal.
 
 Other plugins request credentials through `dev.jasper.vault.api.VaultApi`. The first use asks
 whether to allow the named plugin once, always for that credential, or deny access. Choosing a
-credential through the picker grants one use. Saved grants appear in the manager's Grants tab;
+credential through the picker grants one use. Saved grants appear under **More (...) → Saved plugin grants...**;
 **Revoke** removes one. Deleting an entry removes all its saved grants. Notes are not exposed
 through the consumer API.
 
@@ -77,3 +88,7 @@ clipboard timing. The following checks need a user-run Jasper window:
 
 7. Change the master password on the throwaway vault. Verify Cancel during derivation keeps the
    old password; verify a completed change unlocks with the new password after locking.
+
+8. Search and filter the manager; verify two-line rows, empty results, double-click/Enter editing,
+   and palette navigation revealing a row hidden by a prior filter. Open each + and More action.
+   Compare buttons, inputs and list colors to the TermLab reference in light and dark themes.

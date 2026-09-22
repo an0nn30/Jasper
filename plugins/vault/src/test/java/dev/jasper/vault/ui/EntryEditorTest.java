@@ -17,6 +17,16 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 class EntryEditorTest {
+    @Test void formInstallsAndReleasesItsPrimaryButtonWithTheHost() {
+        var form = EntryEditor.key(null, value -> CompletableFuture.completedFuture(null), () -> { });
+        var root = new javax.swing.JRootPane(); root.setContentPane(form);
+        form.addNotify();
+        assertThat(root.getDefaultButton()).isSameAs(form.save);
+        form.removeNotify();
+        assertThat(root.getDefaultButton()).isNull();
+        form.close();
+    }
+
     @Test void everyKeyPathHasAnInlineChooserAndCancelPreservesManualInput(@TempDir Path directory) {
         Path typed = directory.resolve("typed"), chosen = directory.resolve("chosen key"), recovered = directory.resolve("recovered");
         var key = EntryEditor.key(null, value -> CompletableFuture.completedFuture(null), () -> { });

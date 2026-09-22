@@ -287,8 +287,9 @@ public class VaultPlugin implements Plugin {
     }
 
     private String managerStatus() {
-        return "Device secret: " + lock.deviceSecretSource() + " | " + context.dataDirectory().resolve("vault.jv")
-            + " | Auto-lock: " + (settings.autoLock().isZero() ? "off" : settings.autoLock().toMinutes() + " min");
+        return "Device secret: " + lock.deviceSecretSource()
+            + " | Auto-lock: " + (settings.autoLock().isZero() ? "off" : settings.autoLock().toMinutes() + " min")
+            + " | " + context.dataDirectory().resolve("vault.jv");
     }
 
     private void showGenerator() {

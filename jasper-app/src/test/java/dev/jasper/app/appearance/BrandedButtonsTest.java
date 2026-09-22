@@ -30,23 +30,23 @@ class BrandedButtonsTest {
             for (var theme : BuiltinTheme.values()) {
                 themes.select(theme);
                 SwingUtilities.updateComponentTreeUI(parent);
-                assertThat(button.getPreferredSize().height).isEqualTo(26);
+                assertThat(button.getPreferredSize().height).isEqualTo(24);
                 assertThat(UIManager.getInt("Button.arc")).isEqualTo(4);
-                assertThat(button.getMargin().left).isEqualTo(10);
+                assertThat(button.getMargin().left).isEqualTo(14);
                 assertThat(button.isFocusable()).isTrue();
-                assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(UIManager.getInt("Button.arc"));
+                assertThat(UIManager.getInt("TextComponent.arc")).isZero();
                 for (var input : java.util.List.of(field, password, formatted)) {
                     // Native font metrics vary slightly by platform; controls share the same compact row size.
-                    assertThat(input.getPreferredSize().height).isBetween(24, 28);
-                    assertThat(input.getBackground()).isEqualTo(button.getBackground());
+                    assertThat(input.getPreferredSize().height).isBetween(22, 26);
+                    assertThat(input.getBackground()).isEqualTo(UIManager.getColor("Jasper.controlBackground"));
                     assertThat(input.isEditable()).isTrue();
                 }
                 assertThat(field.getText()).isEqualTo("Existing text");
-                assertThat(choices.getPreferredSize().height).isBetween(24, 28);
-                assertThat(choices.getBackground()).isEqualTo(button.getBackground());
-                assertThat(note.getBackground()).isEqualTo(button.getBackground());
+                assertThat(choices.getPreferredSize().height).isBetween(22, 26);
+                assertThat(choices.getBackground()).isEqualTo(UIManager.getColor("Jasper.comboBackground"));
+                assertThat(note.getBackground()).isEqualTo(UIManager.getColor("Jasper.controlBackground"));
                 assertThat(note.getText()).isEqualTo("First line\nSecond line");
-                assertThat(fill(button)).isEqualTo(UIManager.getColor("Jasper.controlBackground"));
+                assertThat(fill(button)).isEqualTo(UIManager.getColor("Jasper.buttonBackground"));
                 button.getModel().setRollover(true);
                 assertThat(fill(button)).isEqualTo(UIManager.getColor("Button.toolbar.hoverBackground"));
                 button.getModel().setArmed(true); button.getModel().setPressed(true);
@@ -58,7 +58,8 @@ class BrandedButtonsTest {
             button.doClick(); assertThat(clicks[0]).isEqualTo(1);
             var root = new JRootPane(); root.setContentPane(parent); root.setDefaultButton(button);
             assertThat(button.isDefaultButton()).isTrue();
-            assertThat(button.getPreferredSize().height).isEqualTo(26);
+            assertThat(fill(button)).isEqualTo(UIManager.getColor("Jasper.accentBackground"));
+            assertThat(button.getPreferredSize().height).isEqualTo(24);
             button.setText("Always allow for an unusually long plugin name");
             assertThat(button.getPreferredSize().width).isGreaterThan(200);
         } finally { UIManager.setLookAndFeel(original); }

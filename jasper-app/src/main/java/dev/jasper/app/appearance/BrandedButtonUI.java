@@ -16,9 +16,9 @@ public final class BrandedButtonUI extends FlatButtonUI {
     private BrandedButtonUI() { super(false); }
 
     /** Form-control logical height, scaled by the application look and feel. */
-    public static final int HEIGHT = 26;
+    public static final int HEIGHT = 24;
     /** Form-control logical label size. */
-    public static final float FONT_SIZE = 11.5f;
+    public static final float FONT_SIZE = 12f;
 
     /** Called by Swing when installing or refreshing the application theme. */
     public static ComponentUI createUI(JComponent component) { return new BrandedButtonUI(); }

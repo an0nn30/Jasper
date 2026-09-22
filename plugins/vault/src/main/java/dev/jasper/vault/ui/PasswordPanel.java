@@ -95,4 +95,14 @@ public final class PasswordPanel extends JPanel {
 
     /** Prevents duplicate submits while a background create is running. */
     public void setBusy(boolean busy) { primary.setEnabled(!busy); password.setEnabled(!busy); confirm.setEnabled(!busy); bind.setEnabled(!busy); }
+    @Override public void removeNotify() {
+        if (getRootPane() != null && getRootPane().getDefaultButton() == primary)
+            getRootPane().setDefaultButton(null);
+        super.removeNotify();
+    }
+    @Override public void addNotify() {
+        super.addNotify();
+        if (getRootPane() != null) getRootPane().setDefaultButton(primary);
+    }
+
 }

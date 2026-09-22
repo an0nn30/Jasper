@@ -54,10 +54,10 @@ class VaultManagerWindowTest {
             window.show(owner, Optional.of(id)); window.show(owner, Optional.of(id));
             assertThat(host.windows()).containsExactly("dev.jasper.vault.manager|Credential Vault|true");
             assertThat(window.panel.rows.getSelectedValue().id()).isEqualTo(id);
-            assertThat(window.panel.note.snapshot()).isEqualTo("line one\nline two".toCharArray());
+            assertThat(window.panel.rows.getSelectedValue().name()).isEqualTo("Recovery");
             assertThat(host.requestClose("dev.jasper.vault.manager")).isTrue();
             assertThat(window.isOpen()).isFalse();
-            assertThat(window.panel.note.snapshot()).isEmpty();
+            assertThat(window.panel.rows.getModel().getSize()).isZero();
         }
     }
 
@@ -82,7 +82,7 @@ class VaultManagerWindowTest {
                 editor.set(form); return form;
             });
             f.manager.invalidate(); f.lock.lock(); window.changed();
-            assertThat(window.panel.note.snapshot()).isEmpty();
+            assertThat(window.panel.rows.getModel().getSize()).isZero();
             assertThat(editor.get().noteText.snapshot()).isEmpty();
             assertThat(host.windows()).containsExactly("dev.jasper.vault.manager|Credential Vault|true");
             assertThat(prompts[0]).isZero();

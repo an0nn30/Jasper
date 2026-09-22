@@ -47,7 +47,7 @@ class ThemeControllerTest {
         edt(() -> {
             appearance(owners[0]).getItem(0).doClick();
             assertThat(owners[0].currentPane().view().getBackground()).isEqualTo(new Color(0xfafafa));
-            assertThat(owners[0].currentPane().findBar().queryField().getForeground()).isEqualTo(new Color(0x383a42));
+            assertThat(owners[0].currentPane().findBar().queryField().getForeground()).isEqualTo(UIManager.getColor("TextField.foreground"));
         });
     }
 
@@ -85,7 +85,7 @@ class ThemeControllerTest {
             assertThat(themes[0].current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
             for (TerminalPane pane : retained[0].panes()) {
                 assertThat(pane.view().palette().background()).isEqualTo(new Color(0xfafafa));
-                assertThat(pane.findBar().queryField().getBackground()).isEqualTo(new Color(0xfafafa));
+                assertThat(pane.findBar().queryField().getBackground()).isEqualTo(UIManager.getColor("TextField.background"));
             }
             assertThat(first[0].session()).isSameAs(session[0]);
             assertThat(first[0].view().fontSize()).isEqualTo(23);

@@ -72,20 +72,31 @@ vault, one prompt per request kind, and cancellation that withdraws a request. U
 unlock, grant and picker dialogs, `Open Vault...` (F8) and `Lock Vault`. Plan 6b adds the manager
 window, status item, rail action, key generator dialog and the Vault palette scope.
 
-### Shared button branding — 2026-09-22
+### Vault layout and TermLab theme — 2026-09-22
 
-Follow-up in `.worktrees/vault-6b`: ordinary plugin and app `JButton` controls inherit Jasper's
-form styling. After user feedback, form buttons now use a **26-pixel minimum height and 4-pixel
-corner arc**, with flatter, subtler fills. Text/password/formatted fields, multiline text areas
-and dropdowns share their colors and padding. The toolbar keeps its existing 30-pixel height,
-12-pixel arc and emphasized New tab button. `BrandedButtonUI` retains FlatLaf interaction,
-respects custom fonts and leaves small custom rail/status controls compact. No SDK API change.
-[Authoring guidance](plugin-authoring.md#consistent-buttons-flexible-layouts).
+Latest follow-up in `.worktrees/vault-6b`: the user's reference screenshots and local TermLab
+source supersede the earlier split-pane manager and button-style iterations. The manager now has
+one searchable, type-filtered list with two-line names/details and trailing type labels; compact
+icons provide add/edit/delete/copy-public-key/lock. The + menu includes import and generation;
+More includes grants and master-password changes. Double-click/Enter edits, palette navigation
+reveals filtered-out entries, and lock clears the list and dialogs. Cancel/Okay close the manager;
+individual editor saves remain immediate. Device storage source, auto-lock and file path stay in
+the footer. Secret notes are displayed only in their editor, not a retained manager preview.
 
-The initial button-branding change passed the full suite (1,543 tests, 1,540 passed, three skips).
-This visual refinement passed **12 focused theme/control/chrome tests** and `:jasper-app:installDist`.
-Headless dark/light Vault editor and manager renders were inspected. Native focus appearance
-remains user acceptance. No merge or push.
+`TermLab/core/resources/themes/TermLabDark.theme.json`, `TermLabLight.theme.json` and its
+`plugins/vault/.../VaultDialog.java` supplied the palette and row layout. Ordinary Swing buttons
+use 24-pixel minimum height, 72-pixel minimum text-button width, 12-point labels, gray secondary
+fills and blue default buttons. Editors align actions right and attach/release their default
+button with the form lifetime. The terminal toolbar keeps its independent geometry. The dark
+secondary button text is slightly lighter (#A7AEBB instead of #A0A7B4), preserving Jasper's existing
+4.5:1 contrast guard; disabled text keeps its tested defaults. No JetBrains platform dependency,
+SDK change, credential-type addition or vault format change. [Authoring guidance](plugin-authoring.md#consistent-buttons-flexible-layouts).
+
+`./gradlew check :jasper-app:installDist -q` passed: **1,546 tests, 1,543 passed, three expected
+skips, no failures/errors**. Independent review found two P2 issues (visible security status and
+row accessible names), both fixed. Tests cover filtering, selection, palette reveal, menu actions,
+lock cleanup, default-button lifetime and theme state. Headless dark/light manager, empty-state,
+login and generator renders inspected; native appearance remains user acceptance. Not merged or pushed.
 
 ### Native file browsing — 2026-09-22
 
