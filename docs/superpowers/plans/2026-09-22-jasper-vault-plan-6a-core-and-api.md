@@ -444,7 +444,7 @@ public final class VaultFileFormat {
     }
 
     public static Parsed parse(byte[] file) {
-        if (file.length < HEADER_LENGTH + 16) throw new CorruptVaultException("The vault file is truncated");
+        if (file.length < HEADER_LENGTH) throw new CorruptVaultException("The vault file is truncated");
         if (!Arrays.equals(file, 0, MAGIC.length, MAGIC, 0, MAGIC.length)) throw new CorruptVaultException("The file is not a Jasper vault");
         ByteBuffer in = ByteBuffer.wrap(file, MAGIC.length, HEADER_LENGTH - MAGIC.length).order(ByteOrder.LITTLE_ENDIAN);
         int version = Short.toUnsignedInt(in.getShort());
