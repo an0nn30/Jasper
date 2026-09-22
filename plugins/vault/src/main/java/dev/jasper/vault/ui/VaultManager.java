@@ -1,6 +1,11 @@
 package dev.jasper.vault.ui;
 
 import dev.jasper.vault.api.LockState;
+import dev.jasper.vault.keygen.KeyAlgorithm;
+import dev.jasper.vault.keygen.KeyGenerator;
+import dev.jasper.vault.model.Auth;
+import java.nio.file.Path;
+import java.time.Instant;
 import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Grant;
 import dev.jasper.vault.model.Note;
@@ -163,6 +168,51 @@ public final class VaultManager {
             if (expected != generation || lock.state() != LockState.UNLOCKED)
                 return CompletableFuture.failedFuture(new IllegalStateException("The vault was locked meanwhile"));
             return saveKey(key);
+        });
+    }
+
+    public CompletableFuture<Void> generate(Path directory, KeyAlgorithm algorithm, String name, String comment, Optional<String> username) {
+        if (!editable()) return rejected();
+        if (name.isBlank() || username.filter(String::isBlank).isPresent())
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Enter a key name and, when selected, an account username"));
+        long expected = generation;
+        busy = true;
+        CompletableFuture<Void> operation = io(() -> new KeyGenerator(directory).generate(algorithm, name, comment)).thenCompose(key -> {
+            CompletableFuture<Void> save;
+            if (generation != expected || lock.state() != LockState.UNLOCKED) {
+                save = CompletableFuture.failedFuture(new IllegalStateException("The vault was locked during key generation"));
+            } else {
+                Vault original = lock.vault();
+                Account account = username.map(user -> new Account(UUID.randomUUID(), name + " (" + user + ")", user,
+                    new Auth.Key(key.privatePath(), null), Instant.now(), Instant.now())).orElse(null);
+                save = edit(v -> { v.keys().add(key); if (account != null) v.accounts().add(account); },
+                    () -> { original.keys().remove(key); if (account != null) original.accounts().remove(account); },
+                    () -> { }, () -> { if (account != null) account.auth().zero(); });
+            }
+            return save.handle((ignored, failure) -> failure).thenCompose(failure -> {
+                if (failure == null) return CompletableFuture.completedFuture(null);
+                return removeGeneratedFiles(key).handle((ignored, cleanupFailure) -> {
+                    if (cleanupFailure != null) {
+                        var combined = new IOException("Could not save generated key; file cleanup also failed. Check "
+                            + key.privatePath() + " and " + key.publicPath(), failure);
+                        combined.addSuppressed(cleanupFailure);
+                        throw new java.util.concurrent.CompletionException(combined);
+                    }
+                    throw new java.util.concurrent.CompletionException(failure);
+                });
+            });
+        });
+        return operation.whenComplete((ignored, failure) -> { busy = false; changed.run(); });
+    }
+    private CompletableFuture<Void> removeGeneratedFiles(SshKey key) {
+        return io(() -> {
+            IOException failure = null;
+            for (Path path : List.of(key.privatePath(), key.publicPath())) {
+                try { Files.deleteIfExists(path); }
+                catch (IOException problem) { if (failure == null) failure = problem; else failure.addSuppressed(problem); }
+            }
+            if (failure != null) throw failure;
+            return null;
         });
     }
 

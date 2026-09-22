@@ -46,12 +46,22 @@ public final class KeyGenerator {
         AsymmetricCipherKeyPair pair = pair(algorithm);
         Files.createDirectories(directory);
         permissions(directory, "rwx------");
-        Files.writeString(privatePath, pem(algorithm, OpenSSHPrivateKeyUtil.encodePrivateKey(pair.getPrivate())), StandardCharsets.US_ASCII);
-        permissions(privatePath, "rw-------");
-        byte[] publicBlob = OpenSSHPublicKeyUtil.encodePublicKey(pair.getPublic());
-        String line = algorithm.sshType() + " " + Base64.getEncoder().encodeToString(publicBlob) + (comment == null || comment.isBlank() ? "" : " " + comment.strip());
-        Files.writeString(publicPath, line + "\n", StandardCharsets.US_ASCII);
-        return new SshKey(id, name, algorithm.id(), fingerprint(publicBlob), comment == null ? "" : comment.strip(), privatePath.toAbsolutePath(), publicPath.toAbsolutePath(), Instant.now());
+        try {
+            Files.writeString(privatePath, pem(algorithm, OpenSSHPrivateKeyUtil.encodePrivateKey(pair.getPrivate())), StandardCharsets.US_ASCII);
+            permissions(privatePath, "rw-------");
+            byte[] publicBlob = OpenSSHPublicKeyUtil.encodePublicKey(pair.getPublic());
+            String line = algorithm.sshType() + " " + Base64.getEncoder().encodeToString(publicBlob)
+                + (comment == null || comment.isBlank() ? "" : " " + comment.strip());
+            Files.writeString(publicPath, line + "\n", StandardCharsets.US_ASCII);
+            return new SshKey(id, name, algorithm.id(), fingerprint(publicBlob), comment == null ? "" : comment.strip(),
+                privatePath.toAbsolutePath(), publicPath.toAbsolutePath(), Instant.now());
+        } catch (IOException | RuntimeException failure) {
+            for (Path path : java.util.List.of(privatePath, publicPath)) {
+                try { Files.deleteIfExists(path); }
+                catch (IOException cleanup) { failure.addSuppressed(cleanup); }
+            }
+            throw failure;
+        }
     }
 
     public void delete(SshKey key) throws IOException {

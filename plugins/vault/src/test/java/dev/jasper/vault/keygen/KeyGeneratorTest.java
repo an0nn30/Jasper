@@ -70,4 +70,11 @@ class KeyGeneratorTest {
         assertThat(process.waitFor()).as(output).isZero();
         assertThat(output).contains(key.fingerprint());
     }
+    @org.junit.jupiter.api.Test void failedGenerationRemovesWrittenFiles(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new KeyGenerator(dir).generate(KeyAlgorithm.ED25519, "", "test"))
+            .isInstanceOf(IllegalArgumentException.class);
+        try (var files = java.nio.file.Files.list(dir)) {
+            org.assertj.core.api.Assertions.assertThat(files.toList()).isEmpty();
+        }
+    }
 }
