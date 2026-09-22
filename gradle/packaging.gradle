@@ -96,6 +96,48 @@ def executeNative = { List<String> command, String purpose ->
     [stdout: standardOutput, stderr: errorOutput]
 }
 
+// AppKit draws the macOS 26 window controls only for a main executable whose LC_BUILD_VERSION
+// records a macOS 26 or later SDK. jpackage's launcher stub records the SDK JetBrains built the
+// runtime with (13.3 for JBR 25), so every Swing window would get the pre-26 controls. Rewriting
+// that one load command with Apple's vtool and re-signing the bundle is enough; the stub's code is
+// untouched. Needs the Xcode command line tools; without them the image keeps the legacy controls.
+def installedMacSdkVersion = {
+    try {
+        String reported = executeNative(['/usr/bin/xcrun', '--show-sdk-version'], 'xcrun --show-sdk-version').stdout.trim()
+        return reported.matches('[0-9]+([.][0-9]+)*') ? reported : null
+    } catch (Exception unavailable) {
+        return null
+    }
+}
+
+def launcherBuildVersion = { File stub ->
+    String output = executeNative(['/usr/bin/xcrun', 'vtool', '-show-build', stub.absolutePath], 'vtool -show-build').stdout
+    def minos = output =~ /(?m)^\s*minos\s+(\S+)/
+    def sdk = output =~ /(?m)^\s*sdk\s+(\S+)/
+    [minos: minos.find() ? minos.group(1) : null, sdk: sdk.find() ? sdk.group(1) : null]
+}
+
+def refreshLauncherSdk = { File image ->
+    File stub = new File(image, 'Contents/MacOS/Jasper')
+    String sdk = installedMacSdkVersion()
+    if (sdk == null) {
+        logger.lifecycle('Launcher SDK version not updated: Xcode command line tools not found; the app keeps the pre-macOS-26 window controls')
+        return
+    }
+    def current = launcherBuildVersion(stub)
+    if (current.minos == null || current.sdk == null) throw new GradleException("Could not read the build version of ${stub}")
+    if (current.sdk == sdk) return
+    File patched = new File(stub.parentFile, 'Jasper.sdk-patched')
+    executeNative(['/usr/bin/xcrun', 'vtool', '-set-build-version', 'macos', current.minos, sdk, '-replace',
+        '-output', patched.absolutePath, stub.absolutePath], 'vtool -set-build-version')
+    Files.move(patched.toPath(), stub.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+    stub.setExecutable(true, false)
+    // The same ad-hoc identity jpackage used; the nested runtime keeps its own signature.
+    executeNative(['/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements,requirements,flags',
+        image.absolutePath], 'codesign after vtool')
+    logger.lifecycle("Launcher build version: SDK ${current.sdk} -> ${sdk} (minos ${current.minos})")
+}
+
 def stage = tasks.register('stagePackage', Sync) {
     group = 'distribution'
     description = 'Stages the application JAR, runtime dependencies, configuration example and package guide.'
@@ -121,6 +163,7 @@ def packageApp = tasks.register('packageApp') {
     inputs.property('host', providers.provider { normalizedHost().toString() })
     inputs.property('toolchainHome', launcher.map { it.metadata.installationPath.asFile.absolutePath })
     inputs.file(launcher.map { it.metadata.installationPath.file('release') })
+    inputs.property('macosSdk', providers.provider { normalizedHost().os == 'macos' ? (installedMacSdkVersion() ?: 'none') : 'n/a' })
     outputs.dir(imageDirectory)
     outputs.file(markerFile)
     doLast {
@@ -143,6 +186,7 @@ def packageApp = tasks.register('packageApp') {
         }
         try {
             executeNative(args, 'jpackage app-image')
+            if (context.host.os == 'macos') refreshLauncherSdk(new File(imageDir, 'Jasper.app'))
             marker.text = "${context.version} ${context.host.os} ${context.host.architecture}\n"
         } catch (Exception failure) {
             delete(imageDir, marker)
@@ -229,6 +273,16 @@ def verifyPackage = tasks.register('verifyPackage') {
             String architectureNeedle = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
             if (!fileOutput.contains(architectureNeedle)) throw new GradleException("Package verification failed: native binaries are not ${architectureNeedle}\n${fileOutput}")
             executeNative(['/usr/bin/codesign', '--verify', '--deep', '--strict', image.absolutePath], 'codesign verification')
+            String sdk = installedMacSdkVersion()
+            if (sdk == null) {
+                logger.lifecycle('Launcher SDK check skipped: Xcode command line tools not found')
+            } else {
+                def build = launcherBuildVersion(nativeLauncher)
+                if (build.sdk != sdk) throw new GradleException("Package verification failed: the launcher records SDK ${build.sdk}, not the installed SDK ${sdk}")
+                if ((build.sdk.tokenize('.')[0] as int) < 26) {
+                    logger.warn("Launcher SDK ${build.sdk} predates macOS 26: the app shows the pre-26 window controls; install Xcode 26 or later")
+                }
+            }
         }
         if (context.host.os == 'windows') {
             // jpackage embeds the ICO's PNG frames in the executable's native resources.
