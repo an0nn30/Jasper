@@ -90,10 +90,16 @@ Native acceptance and the opt-in real-keychain test remain user-run.
 
 Execution: Task 1 used a subagent and independent reviewer, with one RED/GREEN fix round for
 clipboard failure preventing shutdown locking. Tasks 2 onward ran inline; final whole-branch
-review is pending. Each task has its own commit and failing-before-passing tests. Baseline
-`check` was 1,483 tests (1,480 passed, three expected skips). Current vault tests: 87 tests,
-86 passed and the opt-in keychain test skipped; no failures/errors. Full repository verification
-and installDist are in progress.
+review found two password-change issues; both are fixed in `a06dcb8` with RED/GREEN
+regressions. Failed rekey writes retain the old key; queued saves use the resulting key. Closing
+before commit cancels; after commit starts, the form says closing will not cancel and reports
+write failures even after closure. Each task has its own commit and failing-before-passing tests. Baseline
+`check` was 1,483 tests (1,480 passed, three expected skips). Verification on `a06dcb8`: `./gradlew check :jasper-app:installDist -q` passed with
+**1,526 tests: 1,523 passed, three expected skips, no failures/errors**. Vault: 93 tests,
+92 passed and the opt-in keychain test skipped. The installed vault jar contains the manager,
+generator, scope and icons beside its BouncyCastle dependency. Source hygiene and diff checks pass.
+Initial full checks caught eager clipboard access at plugin startup and old sample-only rail/status
+assertions; a RED/GREEN default-start regression and updated bundled-plugin expectations cover them.
 
 Deviations/rulings: both username and password copies expire per the spec; locked palette rows
 remain enabled for Enter; the inherited branch/worktree was retained. A small 6a prerequisite
@@ -102,6 +108,10 @@ also invalidates in-flight derivation. Wipeable Swing documents clear editable b
 secret Strings in persistence; Swing's required Content.getString is the explicit UI boundary.
 Generation failures remove created files. Headless dark-theme renders prompted GridBag forms,
 readable kind labels and hiding the unused note area. No SDK, consumer API or storage-format change.
+The independent review found no other actionable issues. Native behavior and a fresh audit of
+unchanged 6a cryptography/platform storage remain outside this headless UI review; the two new
+UI-reachable core failures were fixed. No deferred minor findings. Full integration waits on the
+key-generation decision and user acceptance; this branch and its execution ledger are retained.
 
 ### macOS 26 window controls in the packaged app — 2026-09-22
 

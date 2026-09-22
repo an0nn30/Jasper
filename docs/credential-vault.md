@@ -16,7 +16,10 @@ are currently unencrypted. The encrypted vault stores SSH key paths; key files r
 delete or encrypt those files. **Copy public key** copies the selected public key. Deleting a key
 entry offers a separate choice to delete its two files; the default keeps them.
 
-**Change Password...** requires the old password and matching new passwords. **Lock** removes
+**Change Password...** requires the old password and matching new passwords. Cancel or close
+during password derivation to abandon the change. Once writing starts, the button becomes
+**Close** and the form says closing will not cancel. A failed write keeps the old password and
+can be retried; failures are reported even if the form was closed. **Lock** removes
 secrets from the open vault and clears its editor forms. The window stays open with an Unlock button that shows the shared unlock form in place.
 The padlock in the status bar unlocks/opens a locked vault and locks an unlocked vault; its tooltip
 shows the remaining inactivity time. Already connected SSH sessions are unaffected by locking.
@@ -63,3 +66,6 @@ clipboard timing. The following checks need a user-run Jasper window:
 6. With a consumer plugin, exercise Allow once, Always and Deny; revoke its saved grant in the
    manager and verify the next fetch asks again.
 
+
+7. Change the master password on the throwaway vault. Verify Cancel during derivation keeps the
+   old password; verify a completed change unlocks with the new password after locking.

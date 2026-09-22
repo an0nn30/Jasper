@@ -3,8 +3,10 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 > **Status (2026-09-22):** Tasks 1–7 implemented on `claude/vault-6b`, based on
-> `c8141b6` (6a already on local main). Task 8 documentation is written; repository
-> verification and the final whole-branch review are in progress. No merge/push or GUI launch.
+> `c8141b6` (6a already on local main). Task 8 documentation and repository
+> verification and the independent whole-branch review are complete. Two review findings
+> were fixed in `a06dcb8`, with failing-before/passing-after regressions and green full checks.
+> `check :jasper-app:installDist -q` passed: 1,526 tests, 1,523 passed, three expected skips. No merge/push or GUI launch.
 > **Open decision:** the spec simultaneously requires unencrypted generated keys and an
 > optional generation passphrase. The user has been asked to choose. The runnable generator
 > retains 6a's unencrypted format and clearly says so; full 6b acceptance awaits that answer.
@@ -20,7 +22,12 @@
 > `Content.getString` only as a required Swing compatibility boundary, never model/codec/I/O.
 > Generated-file failures clean up their files. UI rendering prompted GridBag forms, readable
 > entry-kind labels and hiding the unused note area. Actual code is authoritative for these
-> refinements over the initial code blocks below; no public consumer API or file-format change.
+> refinements over the initial code blocks below; system clipboard acquisition is lazy so
+> bundled-plugin startup also works headlessly, and the app integration fixture expects its rail/status.
+> Review fixes preserve old keys on failed password writes, serialize queued saves behind rekey,
+> and cancel closed password forms before commit. After commit starts the button says Close
+> and the form explains that closing will not cancel; detached write failures are reported.
+> No public consumer API or file-format change. Native acceptance and the key-generation choice remain pending.
 
 **Goal:** The user-facing side of the Credential Vault: a Vault palette scope, a padlock status item and rail action, the manager window (accounts, keys, notes, grants, change password, lock), the editors, the key generator dialog, and the documentation.
 
@@ -2646,7 +2653,7 @@ public class VaultPlugin implements Plugin {
 
 **Interfaces:** The guide describes the implemented actions, manager, key files, grants, clipboard, paths and live settings. It makes no unsupported claim that vault encryption also encrypts SSH private-key files. Native acceptance belongs to the user and is never replaced with an unattended GUI launch.
 
-- [ ] **Step 1: Write the complete user guide**
+- [x] **Step 1: Write the complete user guide**
 
 `docs/credential-vault.md`:
 
@@ -2718,7 +2725,7 @@ clipboard timing. The following checks need a user-run Jasper window:
 
 ````
 
-- [ ] **Step 2: Add the guide to the documentation index**
+- [x] **Step 2: Add the guide to the documentation index**
 
 In `docs/README.md`, insert this exact bullet after the Command palette bullet:
 
@@ -2726,12 +2733,12 @@ In `docs/README.md`, insert this exact bullet after the Command palette bullet:
 - [Credential Vault](credential-vault.md): accounts, SSH keys, secure notes, grants, locking and clipboard handling.
 ```
 
-- [ ] **Step 3: Run the complete headless verification and distribution build**
+- [x] **Step 3: Run the complete headless verification and distribution build**
 
 Run:
 
 ```bash
-./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks
+./gradlew check :jasper-app:installDist -q
 ```
 
 Expected: all tasks succeed. Do not run `:jasper-app:run` or `:jasper-app:bench`.
@@ -2757,7 +2764,7 @@ PYTESTS
 
 Run the source-hygiene check from `AGENTS.md`, then `git diff --check`. Fix any reported source control/private-use characters with Java escapes before continuing.
 
-- [ ] **Step 4: Record execution evidence and the explicit scope ruling**
+- [x] **Step 4: Record execution evidence and the explicit scope ruling**
 
 Insert this new section immediately before `### Credential Vault plan 6a` in `docs/STATUS.md`; retain the verified output from the preceding command in the plan's execution record. Update the passphrase sentence only after the user answers it and the chosen behavior is implemented and verified.
 
@@ -2783,14 +2790,14 @@ baseline is runnable, but the whole 6b spec is not yet claimed complete. Native 
 pending and belongs to the user. No GUI or benchmark was launched by the agent.
 ```
 
-- [ ] **Step 5: Commit documentation and verified integration**
+- [x] **Step 5: Commit documentation and verified integration**
 
 ```bash
 git add docs/credential-vault.md docs/README.md docs/STATUS.md docs/superpowers/plans/2026-09-22-jasper-vault-plan-6b-ui.md
 git commit -m "docs(vault): document manager workflows and acceptance" -m "Co-Authored-By: Codex <noreply@openai.com>"
 ```
 
-- [ ] **Step 6: Hand the native checklist to the user and perform the independent whole-branch review**
+- [x] **Step 6: Hand the native checklist to the user and perform the independent whole-branch review**
 
 The review examines late unlock/generation completion after lock/stop, failed saves, grant revocation,
 notes omitted from API/palette, stale palette actions, clipboard replacement and timer identity,
@@ -2798,3 +2805,24 @@ secret document cleanup, modal owner closure, custom key directories and generat
 Follow the session's approved execution method for the review. Record any findings/fixes and rerun
 only affected tests plus the required final checks when code changes. Do not merge or push until
 already authorized or the user agrees.
+
+
+## Final review and handoff record
+
+Independent whole-branch review of `c8141b6..f451c36` found P1 failed rekey retaining the
+replacement key and P2 form cancellation still committing a password change. Both grades were
+accepted and fixed inline in one pass (`a06dcb8`), per the execution skill; no second review was
+needed. Four targeted tests failed on the old code and passed after the changes. A fifth regression
+covers reporting a write failure after the form closes. `./gradlew check :jasper-app:installDist -q`
+then passed: 1,526 tests, 1,523 passed, three expected skips, zero failures/errors. Source hygiene
+and `git diff --check` passed. The installed vault includes its manager, generator, scope, icons and
+BouncyCastle dependency.
+
+Reviewer exclusions were adjudicated explicitly: the contradictory key-generation requirement
+remains a user decision; native focus/modality, clipboard, auto-lock and real keychain acceptance
+remain user-run; a fresh audit of unchanged 6a crypto/storage, adversarial external file edits and
+future SSH consumers is outside this UI deliverable. UI-reachable rekey defects were nevertheless
+fixed. The Swing String boundary remains necessary for normal editing, with wipeable backing
+storage and no new persistence strings. Packaging was independently verified by the coordinator.
+No deferred minor findings. The branch/worktree and execution ledger are retained while the key
+choice and native acceptance remain pending. Nothing was merged, pushed or launched natively.
