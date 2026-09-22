@@ -146,6 +146,12 @@ hygiene and diff checks passed. Native macOS rendering/dragging/modality remain 
 check; no GUI, merge or push was performed. Changes remain on `claude/vault-6b`.
 
 
+Toolbar spacing follow-up: reduced the row from 53 to 42 logical pixels, leaving the 30-pixel
+buttons and horizontal spacing intact. This gives 6 pixels of top/bottom padding and 11 more pixels
+of terminal height. Updated existing geometry/pixel expectations; 15 relevant layout/chrome tests
+and `:jasper-app:installDist` passed. No full-suite rerun for this isolated spacing change.
+
+
 ### macOS 26 window controls in the packaged app — 2026-09-22
 
 The user's screenshots showed Jasper's stoplights in the pre-macOS-26 flat style while TermLab

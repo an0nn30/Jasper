@@ -345,8 +345,8 @@ final class WindowChrome {
 
     /** Shrinks to icon controls before any action can disappear at ordinary narrow widths. */
     private static final class ReferenceToolbar extends JToolBar {
-        @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(53)); }
-        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(53)); }
+        @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(42)); }
+        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(42)); }
         @Override public void doLayout() {
             int available = Math.max(0, getWidth() - UIScale.scale(30));
             int preferred = 0;

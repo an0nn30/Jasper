@@ -2899,3 +2899,11 @@ run verifies them. Source hygiene and diff checks passed. Native rendering/dragg
 still belong to the user's acceptance; changes are preserved on the existing branch, not merged
 or pushed. Recheck the Vault/Plugins manager title bars, editor/generator dialog title bars, theme
 switches and main toolbar/rail after relaunching the updated app.
+
+
+Toolbar-spacing follow-up requested by the user: height 53 → 42 logical pixels, with 30-pixel
+buttons retained (6-pixel vertical padding). Two existing geometry regressions were updated and
+observed RED before the height change, then passed. All 15 tests in MockUiTest, WindowChromeTest,
+WindowChromeContributionsTest and MacTitleBarTest passed with `:jasper-app:installDist`; headless
+previews were regenerated. This isolated visual refinement used focused verification rather than
+repeating the previous full suite. No GUI/merge/push.
