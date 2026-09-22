@@ -68,4 +68,31 @@ class AppDirsTest {
         assertThat(dirs.daemonLock()).isEqualTo(daemon.resolve("lock"));
         assertThat(daemon).doesNotExist();
     }
+
+
+    @Test void aHomeOverrideMovesTheWholeRootPropertyFirstThenEnvironmentThenTheOsDefault() {
+        var byProperty = AppDirs.resolve("Mac OS X", Map.of("JASPER_HOME", home.resolve("env-home").toString()), home,
+            home.resolve("prop-home").toString());
+        assertThat(byProperty.root()).isEqualTo(home.resolve("prop-home"));
+        assertThat(byProperty.overridden()).isTrue();
+        assertThat(byProperty.configFile()).isEqualTo(home.resolve("prop-home/config.toml"));
+        assertThat(byProperty.plugins()).isEqualTo(home.resolve("prop-home/plugins"));
+        assertThat(byProperty.pluginState()).isEqualTo(home.resolve("prop-home/plugins.toml"));
+        assertThat(byProperty.pluginData()).isEqualTo(home.resolve("prop-home/plugin-data"));
+        assertThat(byProperty.daemonSocket()).isEqualTo(home.resolve("prop-home/daemon/socket"));
+        assertThat(byProperty.logs()).isEqualTo(home.resolve("prop-home/logs"));
+
+        var byEnvironment = AppDirs.resolve("Mac OS X", Map.of("JASPER_HOME", home.resolve("env-home").toString()), home, " ");
+        assertThat(byEnvironment.root()).isEqualTo(home.resolve("env-home"));
+        assertThat(byEnvironment.overridden()).isTrue();
+
+        var plain = AppDirs.resolve("Mac OS X", Map.of("JASPER_HOME", ""), home, null);
+        assertThat(plain.root()).isEqualTo(home.resolve(".config/jasper"));
+        assertThat(plain.overridden()).isFalse();
+        assertThat(AppDirs.resolve("Mac OS X", Map.of(), home).overridden()).isFalse();
+
+        var relative = AppDirs.resolve("Linux", Map.of(), home, "build/dev-home");
+        assertThat(relative.root()).as("a relative override resolves from the working directory").isAbsolute()
+            .isEqualTo(Path.of("build/dev-home").toAbsolutePath().normalize());
+    }
 }

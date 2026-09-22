@@ -418,6 +418,11 @@ jasper --plugin-dir /path/to/build/plugin-directory
 Installed plugins live in `~/.config/jasper/plugins/<id>/` and stay inert until the user reviews
 them in File → Manage Plugins…, which records the consent in `~/.config/jasper/plugins.toml`.
 
+While developing Jasper itself, `./gradlew :jasper-app:run` and the IntelliJ configuration "Jasper
+(dev home)" run with `-Djasper.home=jasper-app/build/dev-home` and the bundled plugins staged by
+`stagePlugins`, so your installed plugins, their consent and data stay untouched; install into that
+home, or drop a plugin directory under `jasper-app/build/dev-home/plugins/`, to test installation.
+
 ## Distributing a plugin
 
 Zip your plugin's jars, either at the root of the zip or inside one folder; everything else in the

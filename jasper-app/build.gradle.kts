@@ -31,9 +31,14 @@ val stagePlugins = tasks.register<Sync>("stagePlugins") {
 }
 // installDist and the distribution archives carry them beside the application jar, where the runtime looks.
 distributions { main { contents { from(stagePlugins) { into("lib/plugins") } } } }
+// A development launch keeps its own home (plugins, consent, data, history, snippets, logs, socket)
+// under build/, apart from the installed app's ~/.config/jasper. The IntelliJ run configuration in
+// .run/ sets the same two properties. Override with -Pjasper.home=<dir> or the JASPER_HOME variable.
 tasks.named<JavaExec>("run") {
     dependsOn(stagePlugins)
     systemProperty("jasper.plugins.bundled", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
+    systemProperty("jasper.home", (project.findProperty("jasper.home") as String?)
+        ?: layout.buildDirectory.dir("dev-home").get().asFile.absolutePath)
 }
 
 tasks.test {

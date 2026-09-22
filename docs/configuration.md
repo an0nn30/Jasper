@@ -12,6 +12,8 @@ For a copyable starting point, use the root [config.example.toml](../config.exam
 | Linux | `$XDG_CONFIG_HOME/jasper/config.toml`, or `~/.config/jasper/config.toml` when unset or relative |
 | Windows | `%APPDATA%/jasper/config.toml`, or `~/AppData/Roaming/jasper/config.toml` when unavailable |
 
+The directory holding that file is Jasper's home: it also holds installed plugins, plugin consent and data, command history, snippets, layout state, logs and the resident process's socket. The `jasper.home` system property, or else the `JASPER_HOME` environment variable, moves the whole home somewhere else; a launch with either is standalone, exactly like `--config`, so it never hands off to or becomes the installed app's resident process. `./gradlew :jasper-app:run` and the committed IntelliJ configuration "Jasper (dev home)" both point it at `jasper-app/build/dev-home`, so a development launch never touches the installed app's files; pass `-Pjasper.home=<dir>` to Gradle to use another.
+
 Use `--config <path>` to select a different file. Relative paths resolve from the process's working directory. The override changes the configuration file location and makes the launch standalone (no residency or login-item changes; see [background residency](#background-residency)). Other data, including logs, snippets, command-usage history and Buddy position, still uses the default Jasper application directory. Settings creates only the selected config file's parent directories when needed.
 
 ```bash

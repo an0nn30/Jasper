@@ -58,6 +58,14 @@ class AppArgumentsTest {
         assertThat(dev.safeMode()).isTrue();
         assertThat(dev.standaloneLaunch()).isTrue();
 
+        AppArguments overridden = plain.withHomeOverride(true);
+        assertThat(overridden.homeOverride()).isTrue();
+        assertThat(overridden.standaloneLaunch()).as("another home is another Jasper").isTrue();
+        assertThat(overridden.standalone()).as("not a --standalone replacement").isFalse();
+        assertThat(ApplicationBootstrap.replacementHandsOff(overridden)).isFalse();
+        assertThat(ApplicationBootstrap.standaloneNotice(overridden)).isFalse();
+        assertThat(plain.withHomeOverride(false)).isEqualTo(plain);
+
         for (String[] args : new String[][]{{"--safe-mode", "--safe-mode"}, {"--standalone", "--standalone"},
                 {"--plugin-dir"}, {"--plugin-dir", "--help"}, {"--plugin-dir", ""}, {"--plugin-dir", "a", "--plugin-dir", "b"}}) {
             assertThatIllegalArgumentException().as(java.util.Arrays.toString(args))

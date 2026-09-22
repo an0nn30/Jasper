@@ -5,8 +5,15 @@ import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Map;
 
-/** Resolves application locations without touching the filesystem. */
-public record AppDirs(Path root, Path configFile, Path logs) {
+/**
+ * Resolves application locations without touching the filesystem. {@code overridden} is true when the
+ * root came from the {@code jasper.home} system property or the {@code JASPER_HOME} variable rather
+ * than the OS default: a development or test home that must stay apart from the installed app's.
+ */
+public record AppDirs(Path root, Path configFile, Path logs, boolean overridden) {
+    /** The OS-default form. */
+    public AppDirs(Path root, Path configFile, Path logs) { this(root, configFile, logs, false); }
+
     public Path commandHistory() {
         return root.resolve("command-history.toml");
     }
@@ -68,7 +75,26 @@ public record AppDirs(Path root, Path configFile, Path logs) {
         return daemonDir().resolve("lock");
     }
 
+    /** As {@link #resolve(String, Map, Path, String)} with only the environment override. */
     public static AppDirs resolve(String osName, Map<String, String> env, Path home) {
+        return resolve(osName, env, home, null);
+    }
+
+    /**
+     * The root is {@code homeProperty} ({@code jasper.home}) when set, else {@code JASPER_HOME} from the
+     * environment, else the OS default under the user's configuration directory. A relative override
+     * resolves from the working directory; a blank one is ignored.
+     */
+    public static AppDirs resolve(String osName, Map<String, String> env, Path home, String homeProperty) {
+        for (String override : new String[]{homeProperty, env.get("JASPER_HOME")}) {
+            if (override == null || override.isBlank()) continue;
+            try {
+                Path root = Path.of(override.strip()).toAbsolutePath().normalize();
+                return new AppDirs(root, root.resolve("config.toml"), root.resolve("logs"), true);
+            } catch (InvalidPathException ignored) {
+                // An unusable override falls through to the next source, as an unusable XDG root does.
+            }
+        }
         String os = osName.toLowerCase(Locale.ROOT);
         Path base;
         if (os.startsWith("windows")) {
