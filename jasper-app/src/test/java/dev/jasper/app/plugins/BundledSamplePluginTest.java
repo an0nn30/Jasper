@@ -36,8 +36,10 @@ class BundledSamplePluginTest {
                 .satisfies(action -> assertThat(action.icon()).as("an SVG from the plugin's own jar").isNotNull());
             assertThat(contributions.toolbar()).hasSize(1);
             assertThat(contributions.panels()).singleElement().satisfies(panel -> assertThat(panel.id()).isEqualTo("dev.jasper.sample.panel"));
-            assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about");
-            assertThat(contributions.status()).singleElement().satisfies(item -> assertThat(item.text()).startsWith("Sample:"));
+            assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about", "dev.jasper.vault.open");
+            assertThat(contributions.status()).hasSize(2)
+                .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
+                .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
         assertThat(runtime.get().statusLines()).as("the sample and the three bundled feature plugins").hasSize(4)
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.1.0", "BUNDLED", "ACTIVE"))

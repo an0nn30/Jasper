@@ -24,11 +24,11 @@ public final class SecretClipboard implements AutoCloseable {
 
     /** Uses the system clipboard and a one-shot Swing timer. */
     public static SecretClipboard system() {
-        Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+        Supplier<Clipboard> clipboard = () -> Toolkit.getDefaultToolkit().getSystemClipboard();
         var timer = new Timer(CLEAR_MILLIS, null);
         timer.setRepeats(false);
-        return new SecretClipboard(text -> clipboard.setContents(new StringSelection(text), null), () -> {
-            try { return Optional.ofNullable((String) clipboard.getData(DataFlavor.stringFlavor)); }
+        return new SecretClipboard(text -> clipboard.get().setContents(new StringSelection(text), null), () -> {
+            try { return Optional.ofNullable((String) clipboard.get().getData(DataFlavor.stringFlavor)); }
             catch (Exception unavailable) { return Optional.empty(); }
         }, clear -> {
             for (var listener : timer.getActionListeners()) timer.removeActionListener(listener);

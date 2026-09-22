@@ -237,4 +237,11 @@ class VaultPluginTest {
         }
     }
 
+    @Test void defaultPluginStartsWithoutTouchingTheDesktopClipboard() {
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), new VaultPlugin());
+            assertThat(host.failures()).isEmpty();
+            assertThat(host.scopes()).hasSize(1);
+        }
+    }
 }
