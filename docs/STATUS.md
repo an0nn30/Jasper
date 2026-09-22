@@ -72,6 +72,21 @@ vault, one prompt per request kind, and cancellation that withdraws a request. U
 unlock, grant and picker dialogs, `Open Vault...` (F8) and `Lock Vault`. Plan 6b adds the manager
 window, status item, rail action, key generator dialog and the Vault palette scope.
 
+### Shared button branding — 2026-09-22
+
+Follow-up in `.worktrees/vault-6b`: ordinary plugin and app `JButton` controls inherit the
+toolbar's rounded shape, 30-logical-pixel minimum height, 11.5-point text and shared state colors.
+`BrandedButtonUI` retains FlatLaf painting and interaction, respects explicit custom fonts and
+leaves small custom rail/status controls compact. Toolbar sizing uses the same constants and arc.
+Plugins retain arbitrary layouts; no SDK extension, version bump or button migration is needed.
+[Authoring guidance](plugin-authoring.md#consistent-buttons-flexible-layouts).
+
+`./gradlew check :jasper-app:installDist -q` passed: **1,543 tests, 1,540 passed, three expected
+skips, no failures/errors**. Ordinary Swing button tests exercise both themes and normal/hover/
+pressed/disabled states, default-button behavior and long labels. Headless Vault manager/editor
+renders show aligned, unclipped buttons; independent scoped review found no actionable issues.
+Native focus appearance remains user acceptance. No merge or push.
+
 ### Native file browsing — 2026-09-22
 
 Follow-up to vault 6b in `.worktrees/vault-6b`: all editable key-path fields now have inline

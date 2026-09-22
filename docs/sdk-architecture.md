@@ -91,6 +91,12 @@ use `MacTitleBar`; dialogs retain their modal ownership, close guards and normal
 Title-only surfaces hide the unused tab component so the entire header uses `Jasper.titleBackground`.
 The rail and toolbar use that same semantic color in both themes. Dialogs are parented through
 `WindowOwner`, so an SDK type never exposes a frame or needs its own chrome API.
+The application's look and feel supplies `BrandedButtonUI` for ordinary Swing buttons in any
+plugin layout, including content added later. It retains FlatLaf interaction and border painting,
+uses the toolbar's shared height/font constants and theme arc/colors, and follows UI refreshes.
+Small app-owned toolbar/rail/status controls keep their existing geometry. The SDK's ordinary-Swing
+component contract remains unchanged; plugin authors do not need a button factory.
+
 SDK 0.7.1 adds `WindowSurface.chooseFile(title, initialPath)`: a synchronous native existing-file
 chooser over the shown window or dialog. `HostedUi` checks the plugin lifetime and UI thread;
 `AuxiliarySurface` checks the owner is shown and discards a selection if it closes. `NativeShells`

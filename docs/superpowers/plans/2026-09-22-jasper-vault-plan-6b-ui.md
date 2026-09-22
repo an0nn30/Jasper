@@ -36,6 +36,9 @@
 > `WindowSurface.chooseFile` over the shown window/dialog, with owner-close cancellation and
 > fake selection responses. Shared editor path rows now browse private/public SSH keys and
 > login key paths; manual entry remains available and cancellation preserves the field.
+> Button branding follow-up: the app look and feel now styles ordinary plugin JButtons with
+> the toolbar's shape, height, font and state colors; layouts remain plugin-owned. No SDK API
+> extension or plugin-specific migration is needed for buttons.
 > No public consumer API or vault file-format change. The key-generation choice is resolved; native acceptance remains user-run.
 
 **Goal:** The user-facing side of the Credential Vault: a Vault palette scope, a padlock status item and rail action, the manager window (accounts, keys, notes, grants, change password, lock), the editors, the key generator dialog, and the documentation.

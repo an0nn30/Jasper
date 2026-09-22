@@ -1,5 +1,7 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.BrandedButtonUI;
+
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.contributions.MenuEntry;
@@ -284,7 +286,7 @@ final class WindowChrome {
             return prefix.isEmpty() ? key : prefix + "+" + key;
         }
         private Font chromeFont() {
-            Font font = UIManager.getFont("Label.font").deriveFont(Font.PLAIN, UIScale.scale(11.5f));
+            Font font = UIManager.getFont("Label.font").deriveFont(Font.PLAIN, UIScale.scale(BrandedButtonUI.FONT_SIZE));
             return id == ActionId.NEW_TAB ? font.deriveFont(java.util.Map.of(java.awt.font.TextAttribute.WEIGHT,
                 java.awt.font.TextAttribute.WEIGHT_SEMIBOLD)) : font;
         }
@@ -297,14 +299,14 @@ final class WindowChrome {
             int trim = labels() && id != null ? switch (id) { case NEW_TAB -> 6; case NEW_WINDOW -> 3; case FIND -> 4; default -> 0; } : 0;
             int measuredWidth = width - UIScale.scale(trim);
             if (id == ActionId.NEW_TAB && labels()) measuredWidth = Math.max(UIScale.scale(104), measuredWidth);
-            return new Dimension(measuredWidth, UIScale.scale(30));
+            return new Dimension(measuredWidth, UIScale.scale(BrandedButtonUI.HEIGHT));
         }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D) graphics.create();
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                int arc = UIScale.scale(12);
+                int arc = UIScale.scale(UIManager.getInt("Button.arc"));
                 if (id == ActionId.NEW_TAB || getModel().isRollover() && isEnabled() || getModel().isPressed()) {
                     g.setColor(UIManager.getColor(getModel().isPressed() ? "Button.toolbar.pressedBackground" :
                         id == ActionId.NEW_TAB ? "Jasper.primaryBackground" : "Button.toolbar.hoverBackground"));
@@ -364,12 +366,12 @@ final class WindowChrome {
             }
             // At extreme widths compress spacing/buttons together; menus retain the same actions.
             double ratio = Math.min(1, available / (double) Math.max(1, fixed));
-            int x = UIScale.scale(15), y = (getHeight() - UIScale.scale(30)) / 2;
+            int x = UIScale.scale(15), y = (getHeight() - UIScale.scale(BrandedButtonUI.HEIGHT)) / 2;
             for (Component child : getComponents()) {
                 int width;
                 if (child instanceof JButton) {
                     width = (int) Math.floor(child.getPreferredSize().width * ratio);
-                    child.setBounds(x, y, width, UIScale.scale(30));
+                    child.setBounds(x, y, width, UIScale.scale(BrandedButtonUI.HEIGHT));
                 } else if (child instanceof JSeparator) {
                     width = (int) Math.floor(UIScale.scale(16) * ratio);
                     child.setBounds(x + width / 2, (getHeight() - UIScale.scale(16)) / 2, UIScale.scale(1), UIScale.scale(16));

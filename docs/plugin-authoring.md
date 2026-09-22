@@ -112,6 +112,19 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Threads.** Register and mutate on the event thread. Event handlers already run there, so
   updating a status item from a handler, as the sample does, needs no marshaling.
 
+## Consistent buttons, flexible layouts
+
+Use ordinary `JButton` components inside plugin content. Jasper's look and feel supplies the
+same rounded shape, 30-logical-pixel minimum height and 11.5-point label size as the toolbar,
+with shared normal, hover and pressed colors. Buttons update with the app's light/dark theme;
+Swing actions, mnemonics, default buttons, focus and disabled states keep their normal behavior.
+Widths follow the label and icon, and longer or custom-font content can grow without clipping.
+
+Plugins own their layout managers and spacing. Let buttons use their preferred sizes, avoid
+hard-coded colors or replacement UI delegates, and use `JRootPane.setDefaultButton` for a dialog's
+primary action where appropriate. Custom-painted controls and explicit appearance overrides are
+outside automatic branding. No additional SDK factory or dependency is required.
+
 ## Panels, the rail and windows
 
 A panel is a Swing component in the left, right or bottom region of every terminal window.
