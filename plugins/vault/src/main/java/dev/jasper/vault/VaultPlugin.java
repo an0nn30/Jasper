@@ -106,8 +106,13 @@ public class VaultPlugin implements Plugin {
     @Override public void stop() {
         if (ticker != null) ticker.stop();
         if (activity != null) Toolkit.getDefaultToolkit().removeAWTEventListener(activity);
-        if (clipboard != null) clipboard.close();
-        if (lock != null) lock.lock();
+        try {
+            if (clipboard != null) clipboard.close();
+        } catch (RuntimeException ignored) {
+            // The host may already be shutting down; locking must still zero vault state.
+        } finally {
+            if (lock != null) lock.lock();
+        }
     }
 
     /** Open Vault…: create when there is no vault, unlock when locked; unlocked does nothing until 6b opens the manager. */
