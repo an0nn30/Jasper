@@ -21,7 +21,7 @@ class SnippetsPluginTest {
     @TempDir Path home;
 
     @Test void theServiceLooksUpAppendsAndReportsDuplicatesAndTheActionOpensTheScope() throws Exception {
-        try (var host = new FakePluginHost(home.resolve("plugin-data"))) {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
             var consumer = new AtomicReference<PluginContext>();
             host.start(SnippetsScopeTest.INFO, Set.of(), Set.of(), new SnippetsPlugin());
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.snippets"), Set.of(), consumer::set);
@@ -33,7 +33,7 @@ class SnippetsPluginTest {
             assertThat(error.get()).isEmpty();
             assertThat(saved.get()).contains(new SnippetView("Deploy", "make deploy", java.util.List.of()));
             assertThat(service.byName("DEPLOY")).as("case-insensitive").contains(saved.get().get());
-            assertThat(Files.readString(home.resolve("plugin-data/dev.jasper.snippets/snippets.toml"))).startsWith(SnippetFile.HEADER).contains("name = \"Deploy\"");
+            assertThat(Files.readString(home.resolve("plugins/dev.jasper.snippets/data/snippets.toml"))).startsWith(SnippetFile.HEADER).contains("name = \"Deploy\"");
             error.set(null);
             service.append("deploy", "again", (view, message) -> { saved.set(view); error.set(message); });
             SnippetsScopeTest.await(() -> error.get() != null);
@@ -48,11 +48,11 @@ class SnippetsPluginTest {
     @Test void thePrePluginFileIsMovedOnceAndAConfigReloadRereadsTheFile() throws Exception {
         Path legacy = home.resolve("snippets.toml");
         Files.writeString(legacy, "[[snippet]]\nname = \"Old\"\ncommand = \"ls\"\n");
-        try (var host = new FakePluginHost(home.resolve("plugin-data"))) {
+        try (var host = new FakePluginHost(home.resolve("plugins"))) {
             var consumer = new AtomicReference<PluginContext>();
             host.start(SnippetsScopeTest.INFO, Set.of(), Set.of(), new SnippetsPlugin());
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.snippets"), Set.of(), consumer::set);
-            Path moved = home.resolve("plugin-data/dev.jasper.snippets/snippets.toml");
+            Path moved = home.resolve("plugins/dev.jasper.snippets/data/snippets.toml");
             assertThat(moved).exists();
             assertThat(legacy).doesNotExist();
             SnippetService service = consumer.get().services().require(SnippetService.class);

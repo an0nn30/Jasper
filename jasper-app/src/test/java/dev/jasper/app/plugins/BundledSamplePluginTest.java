@@ -26,7 +26,7 @@ class BundledSamplePluginTest {
         dev.jasper.app.contributions.Contributions contributions = AppContractTest.onEdtValue(dev.jasper.app.contributions.Contributions::new);
         onEdt(() -> {
             runtime.set(new PluginRuntime(new PluginRuntime.Options(staged, root.resolve("user"), null, false,
-                root.resolve("plugins.toml"), root.resolve("plugins.lock"), root.resolve("plugin-data")),
+                root.resolve("plugins.toml"), root.resolve("plugins.lock")),
                 new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> { }, contributions,
                 AppContractTest.headlessWindows(), new dev.jasper.app.terminals.TerminalRegistry()));
             runtime.get().start(Map.of("dev.jasper.sample", Map.<String, Object>of("demo_activity", true, "demo_ui", true, "demo_step_millis", 0L)), true);

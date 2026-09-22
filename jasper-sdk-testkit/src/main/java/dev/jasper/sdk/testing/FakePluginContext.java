@@ -78,7 +78,8 @@ public final class FakePluginContext implements PluginContext {
     @Override public System.Logger log() { return System.getLogger("dev.jasper.plugins." + info.id()); }
 
     @Override public Path dataDirectory() {
-        try { return Files.createDirectories(host.dataRoot().resolve(info.id())); }
+        // The application's layout: <plugins>/<id>/data.
+        try { return Files.createDirectories(host.dataRoot().resolve(info.id()).resolve("data")); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
     }
 

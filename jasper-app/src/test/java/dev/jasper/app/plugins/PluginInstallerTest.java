@@ -118,7 +118,7 @@ class PluginInstallerTest {
         assertThat(store().read().get("dev.example.tool")).isEqualTo(new PluginStateStore.Entry(true, Set.of("terminal.inject"), false));
         assertThat(user().resolve("dev.example.tool")).as("not installed until the next launch").doesNotExist();
         PluginMaintenance.apply(user(), store());
-        assertThat(user().resolve("dev.example.tool").resolve("main.jar")).exists();
+        assertThat(user().resolve("dev.example.tool/jars/main.jar")).exists();
     }
 
     @Test void discardingAPendingInstallForgetsAConsentThatHasNothingInstalledBehindIt() throws Exception {

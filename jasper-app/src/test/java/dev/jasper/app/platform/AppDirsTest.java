@@ -78,7 +78,6 @@ class AppDirsTest {
         assertThat(byProperty.configFile()).isEqualTo(home.resolve("prop-home/config.toml"));
         assertThat(byProperty.plugins()).isEqualTo(home.resolve("prop-home/plugins"));
         assertThat(byProperty.pluginState()).isEqualTo(home.resolve("prop-home/plugins.toml"));
-        assertThat(byProperty.pluginData()).isEqualTo(home.resolve("prop-home/plugin-data"));
         assertThat(byProperty.daemonSocket()).isEqualTo(home.resolve("prop-home/daemon/socket"));
         assertThat(byProperty.logs()).isEqualTo(home.resolve("prop-home/logs"));
 

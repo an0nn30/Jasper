@@ -111,7 +111,10 @@ final class PluginInstaller {
     }
 
     /** One transaction: the staged plugin becomes the pending install and its capabilities become the consent. */
-    static void commit(Staged staged, Path userDirectory, PluginStateStore store) throws IOException {
+    static void commit(Staged staged, Path userDirectory, PluginStateStore store) throws IOException { commit(staged, userDirectory, store, true); }
+
+    /** {@code consent}: whether the user reviewed the capabilities (a manager install) or not (a zip dropped into the directory). */
+    static void commit(Staged staged, Path userDirectory, PluginStateStore store, boolean consent) throws IOException {
         String id = staged.candidate().id();
         Path pending = userDirectory.resolve(PluginMaintenance.PENDING).resolve(id);
         try {
@@ -121,7 +124,7 @@ final class PluginInstaller {
                     Files.createDirectories(pending.getParent());
                     PluginMaintenance.move(staged.directory(), pending);
                 } catch (IOException failure) { throw new UncheckedIOException(failure); }
-                return PluginStateStore.consenting(id, staged.candidate().descriptor().capabilities()).apply(state);
+                return consent ? PluginStateStore.consenting(id, staged.candidate().descriptor().capabilities()).apply(state) : state;
             });
         } catch (UncheckedIOException failure) { throw failure.getCause(); }
     }

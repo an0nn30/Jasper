@@ -52,7 +52,7 @@ class PluginRuntimeTest {
     private PluginRuntime runtime(Path bundled, Path user, Path dev, boolean safeMode, List<String> reports) {
         var created = new AtomicReference<PluginRuntime>();
         onEdt(() -> created.set(new PluginRuntime(new PluginRuntime.Options(bundled, user, dev, safeMode,
-            root.resolve("plugins.toml"), root.resolve("plugins.lock"), root.resolve("plugin-data")),
+            root.resolve("plugins.toml"), root.resolve("plugins.lock")),
             new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> reports.add(key + ": " + message),
             new dev.jasper.app.contributions.Contributions(),
             AppContractTest.headlessWindows(), new dev.jasper.app.terminals.TerminalRegistry())));
@@ -73,7 +73,7 @@ class PluginRuntimeTest {
         PluginRuntime runtime = runtime(null, root.resolve("absent"), dev, false, new ArrayList<>());
         onEdt(() -> runtime.start(Map.of("dev.example.probe", Map.<String, Object>of("greeting", "hello")), true));
         settle();
-        Path data = root.resolve("plugin-data/dev.example.probe");
+        Path data = root.resolve("absent/dev.example.probe/data");
         assertThat(data.resolve("started")).hasContent("hello");
         assertThat(runtime.statusLines()).singleElement().asString().contains("dev.example.probe", "DEV", "ACTIVE");
         onEdt(() -> assertThat(deck.notices()).singleElement().satisfies(notice -> {
@@ -105,7 +105,7 @@ class PluginRuntimeTest {
         PluginRuntime unreviewed = runtime(null, user, null, false, new ArrayList<>());
         onEdt(() -> unreviewed.start(Map.of(), true));
         assertThat(unreviewed.statusLines()).singleElement().asString().contains("NEEDS_CONSENT");
-        assertThat(root.resolve("plugin-data/dev.example.probe/started")).doesNotExist();
+        assertThat(root.resolve("user/dev.example.probe/data/started")).doesNotExist();
 
         Files.writeString(root.resolve("plugins.toml"), "version = 1\n[plugins.\"dev.example.probe\"]\nenabled = true\nconsented = []\n");
         PluginRuntime consented = runtime(null, user, null, false, new ArrayList<>());

@@ -67,4 +67,24 @@ class PluginDiscoveryTest {
         assertThat(PluginDiscovery.scan(root, PluginCandidate.Origin.USER, problems)).isEmpty();
         assertThat(problems).isEmpty();
     }
+
+        @Test void anInstalledPluginKeepsItsJarsInAJarsSubdirectoryAndOtherFilesAreIgnored() throws Exception {
+            Path directory = root.resolve("dev.example.tool");
+            PluginJars.build(directory.resolve("jars"), "main.jar", PluginJars.descriptor("dev.example.tool", "1.0.0", "fix.Main"), Map.of(), List.of());
+            Files.writeString(directory.resolve("dev.example.tool.toml"), "# settings\n");
+            Files.createDirectories(directory.resolve("data"));
+            Files.writeString(root.resolve("dev.example.other-1.0.0.zip"), "not read by discovery");
+            List<String> problems = new ArrayList<>();
+            List<PluginCandidate> found = PluginDiscovery.scan(root, PluginCandidate.Origin.USER, problems);
+            assertThat(problems).isEmpty();
+            assertThat(found).singleElement().satisfies(candidate -> {
+                assertThat(candidate.id()).isEqualTo("dev.example.tool");
+                assertThat(candidate.directory()).as("the plugin folder, not its jars directory").isEqualTo(directory);
+                assertThat(candidate.jars()).containsExactly(directory.resolve("jars/main.jar"));
+            });
+            Path flat = root.resolve("flat");
+            PluginJars.build(flat, "main.jar", PluginJars.descriptor("dev.example.flat", "1.0.0", "fix.Main"), Map.of(), List.of());
+            assertThat(PluginDiscovery.single(flat, PluginCandidate.Origin.DEV, problems)).as("a --plugin-dir directory stays flat")
+                .hasValueSatisfying(candidate -> assertThat(candidate.jars()).containsExactly(flat.resolve("main.jar")));
+        }
 }

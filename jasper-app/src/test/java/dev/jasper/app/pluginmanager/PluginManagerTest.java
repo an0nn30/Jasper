@@ -50,7 +50,7 @@ class PluginManagerTest {
             windows = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { },
                 title -> { }, () -> new java.awt.Rectangle(0, 0, 10, 10)));
             runtime = new PluginRuntime(new PluginRuntime.Options(null, user(), null, safeMode, root.resolve("plugins.toml"),
-                root.resolve("plugins.lock"), root.resolve("plugin-data")), new ActivityNotifier(deck.companion(), () -> { }),
+                root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> { }),
                 (key, message) -> { }, new Contributions(), windows, new dev.jasper.app.terminals.TerminalRegistry());
             runtime.start(Map.of(), true);
             var control = new ResidentControl(() -> residentLive, () -> false);

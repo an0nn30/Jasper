@@ -40,7 +40,8 @@ class FakePluginHostTest {
             assertThat(ran).isEmpty();
             assertThat(host.runBackground()).isEqualTo(1);
             assertThat(ran).containsExactly("task");
-            assertThat(context.dataDirectory()).isDirectory().hasFileName("test.alpha");
+            assertThat(context.dataDirectory()).isDirectory().hasFileName("data");
+            assertThat(context.dataDirectory().getParent()).as("the application layout, <plugins>/<id>/data").hasFileName("test.alpha");
             assertThat(Files.isDirectory(context.dataDirectory())).isTrue();
         }
     }

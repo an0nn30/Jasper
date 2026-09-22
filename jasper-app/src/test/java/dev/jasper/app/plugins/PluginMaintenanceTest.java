@@ -39,7 +39,7 @@ class PluginMaintenanceTest {
         plugin(user().resolve("dev.example.kept"), "dev.example.kept", "1.0.0");
         store().transact(PluginStateStore.consenting("dev.example.kept", Set.of()));
         store().transact(PluginStateStore.removing("dev.example.gone", true));
-        PluginMaintenance.apply(user(), store());
+        apply();
         assertThat(installed()).extracting(PluginCandidate::id).containsExactly("dev.example.kept");
         assertThat(user().resolve(".pending").resolve("dev.example.gone")).doesNotExist();
         assertThat(store().read()).containsOnlyKeys("dev.example.kept");
@@ -50,7 +50,7 @@ class PluginMaintenanceTest {
         plugin(user().resolve(".pending").resolve("dev.example.tool"), "dev.example.tool", "2.0.0");
         plugin(user().resolve(".pending").resolve("dev.example.fresh"), "dev.example.fresh", "0.1.0");
         store().transact(PluginStateStore.consenting("dev.example.tool", Set.of("terminal.observe")));
-        PluginMaintenance.apply(user(), store());
+        apply();
         assertThat(installed()).extracting(candidate -> candidate.id() + " " + candidate.descriptor().version())
             .containsExactly("dev.example.fresh 0.1.0", "dev.example.tool 2.0.0");
         try (var left = Files.list(user().resolve(".pending"))) { assertThat(left).isEmpty(); }
@@ -61,7 +61,7 @@ class PluginMaintenanceTest {
     }
 
     @Test void nothingPendingWritesNothing() {
-        PluginMaintenance.apply(user(), store());
+        apply();
         assertThat(root.resolve("plugins.toml")).doesNotExist();
         assertThat(root.resolve("plugins.lock")).doesNotExist();
     }
@@ -69,7 +69,7 @@ class PluginMaintenanceTest {
     @Test void anUnusablePendingInstallIsDiscardedAndTheInstalledPluginSurvives() throws Exception {
         plugin(user().resolve("dev.example.tool"), "dev.example.tool", "1.0.0");
         plugin(user().resolve(".pending").resolve("dev.example.tool"), "dev.example.other", "2.0.0");
-        PluginMaintenance.apply(user(), store());
+        apply();
         assertThat(installed()).extracting(candidate -> candidate.descriptor().version().toString()).containsExactly("1.0.0");
         assertThat(user().resolve(".pending").resolve("dev.example.tool")).doesNotExist();
     }
@@ -86,4 +86,58 @@ class PluginMaintenanceTest {
         assertThat(trash).doesNotExist();
         assertThat(fresh).exists();
     }
+
+        private static final Version SDK = Version.parse(dev.jasper.sdk.JasperSdk.VERSION);
+
+        private void apply() { PluginMaintenance.apply(user(), store(), root.resolve("plugin-data"), SDK); }
+
+        @Test void theOldLayoutMigratesOnceJarsIntoJarsAndPluginDataIntoData() throws Exception {
+            plugin(user().resolve("dev.example.old"), "dev.example.old", "1.0.0");
+            Files.createDirectories(root.resolve("plugin-data/dev.example.old"));
+            Files.writeString(root.resolve("plugin-data/dev.example.old/state"), "kept");
+            Files.createDirectories(root.resolve("plugin-data/dev.example.orphan"));
+            apply();
+            assertThat(user().resolve("dev.example.old/jars/main.jar")).isRegularFile();
+            assertThat(user().resolve("dev.example.old/main.jar")).doesNotExist();
+            assertThat(user().resolve("dev.example.old/data/state")).hasContent("kept");
+            assertThat(user().resolve("dev.example.orphan/data")).as("data of a plugin no longer installed still moves").isDirectory();
+            assertThat(root.resolve("plugin-data")).as("removed once empty").doesNotExist();
+            assertThat(installed()).as("a folder with settings or data but no jars is not a plugin and not a problem")
+                .extracting(PluginCandidate::id).containsExactly("dev.example.old");
+        }
+
+        @Test void aZipDroppedIntoPluginsIsStagedForInstallWithoutConsentAndABadOneIsSetAside() throws Exception {
+            Path build = root.resolve("build");
+            plugin(build, "dev.example.drop", "1.0.0");
+            Path zip = user().resolve("dev.example.drop-1.0.0.zip");
+            Files.createDirectories(user());
+            try (var out = new java.util.zip.ZipOutputStream(Files.newOutputStream(zip))) {
+                out.putNextEntry(new java.util.zip.ZipEntry("main.jar")); Files.copy(build.resolve("main.jar"), out); out.closeEntry();
+            }
+            Files.writeString(user().resolve("junk.zip"), "not a zip");
+            apply();
+            assertThat(zip).as("consumed").doesNotExist();
+            assertThat(user().resolve("junk.zip")).doesNotExist();
+            assertThat(user().resolve("junk.zip.rejected")).isRegularFile();
+            assertThat(user().resolve("dev.example.drop/jars/main.jar")).as("installed in the same launch, from .pending").isRegularFile();
+            assertThat(store().read()).as("no consent was recorded").doesNotContainKey("dev.example.drop");
+            assertThat(installed()).extracting(PluginCandidate::id).containsExactly("dev.example.drop");
+        }
+
+        @Test void anUpdateReplacesOnlyTheJarsAndARemovalTakesTheWholeFolder() throws Exception {
+            plugin(user().resolve("dev.example.up/jars"), "dev.example.up", "1.0.0");
+            Files.writeString(user().resolve("dev.example.up/dev.example.up.toml"), "greeting = 'hi'\n");
+            Files.createDirectories(user().resolve("dev.example.up/data"));
+            Files.writeString(user().resolve("dev.example.up/data/state"), "kept");
+            plugin(user().resolve(".pending/dev.example.up"), "dev.example.up", "2.0.0");
+            apply();
+            assertThat(installed()).singleElement().satisfies(candidate -> assertThat(candidate.descriptor().version().toString()).isEqualTo("2.0.0"));
+            assertThat(user().resolve("dev.example.up/dev.example.up.toml")).hasContent("greeting = 'hi'\n");
+            assertThat(user().resolve("dev.example.up/data/state")).hasContent("kept");
+            store().transact(PluginStateStore.consenting("dev.example.up", Set.of()));
+            store().transact(PluginStateStore.removing("dev.example.up", true));
+            apply();
+            assertThat(user().resolve("dev.example.up")).as("jars, settings and data go together").doesNotExist();
+            assertThat(store().read()).doesNotContainKey("dev.example.up");
+        }
 }

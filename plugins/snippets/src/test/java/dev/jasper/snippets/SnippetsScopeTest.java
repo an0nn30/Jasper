@@ -37,10 +37,10 @@ class SnippetsScopeTest {
         assertThat(condition.getAsBoolean()).as("settled").isTrue();
     }
 
-    /** A host whose data root is {@code home/plugin-data}, with the plugin started over a snippets file holding {@code toml}. */
+    /** A host whose data root is {@code home/plugins}, with the plugin started over a snippets file holding {@code toml}. */
     FakePluginHost started(String toml) throws Exception {
-        var host = new FakePluginHost(home.resolve("plugin-data"));
-        Path file = home.resolve("plugin-data/dev.jasper.snippets/snippets.toml");
+        var host = new FakePluginHost(home.resolve("plugins"));
+        Path file = home.resolve("plugins/dev.jasper.snippets/data/snippets.toml");
         Files.createDirectories(file.getParent());
         Files.writeString(file, toml);
         host.start(INFO, Set.of(), Set.of(), new SnippetsPlugin());
@@ -106,7 +106,7 @@ class SnippetsScopeTest {
             assertThat(host.availableInScope(SCOPE, "snippets.file-error", "paste", window, pane)).isFalse();
             host.executeInScope(SCOPE, "snippets.file-error", "edit", window, pane);
             await(() -> !host.openedInEditor().isEmpty());
-            assertThat(host.openedInEditor()).containsExactly(home.resolve("plugin-data/dev.jasper.snippets/snippets.toml"));
+            assertThat(host.openedInEditor()).containsExactly(home.resolve("plugins/dev.jasper.snippets/data/snippets.toml"));
         }
     }
 }

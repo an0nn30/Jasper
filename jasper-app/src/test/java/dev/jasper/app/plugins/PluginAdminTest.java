@@ -31,8 +31,7 @@ class PluginAdminTest {
 
     /** An admin for a process that launched with the disk and state as they are right now. */
     private PluginAdmin admin() throws Exception {
-        var options = new PluginRuntime.Options(null, user(), null, false, root.resolve("plugins.toml"), root.resolve("plugins.lock"),
-            root.resolve("plugin-data"));
+        var options = new PluginRuntime.Options(null, user(), null, false, root.resolve("plugins.toml"), root.resolve("plugins.lock"));
         List<PluginCandidate> candidates = PluginDiscovery.scan(user(), PluginCandidate.Origin.USER, new ArrayList<>());
         var resolution = PluginResolver.resolve(candidates, store().read(), SDK, false);
         List<PluginStatus> statuses = new ArrayList<>(resolution.rejected());

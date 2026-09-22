@@ -274,7 +274,8 @@ public final class JasperApplication {
 
     /** Launch housekeeping for plugins: pending removals and installs. Off the EDT, before {@link #startPlugins}. */
     public static void preparePlugins(AppDirs dirs) {
-        PluginRuntime.maintain(dirs.plugins(), dirs.pluginState(), dirs.pluginLock());
+        // The pre-2026-09-22 data directory, migrated into plugins/<id>/data once.
+        PluginRuntime.maintain(dirs.plugins(), dirs.pluginState(), dirs.pluginLock(), dirs.root().resolve("plugin-data"));
     }
 
     /**
@@ -291,7 +292,7 @@ public final class JasperApplication {
         auxiliary = new AuxiliaryWindows(uiState, shells::create);
         auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
-            developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock(), dirs.pluginData()), activityNotifier,
+            developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
             (key, message) -> { if (configuration != null) configuration.report(key, message); }, contributions, auxiliary, terminals,
             this::notice, new dev.jasper.app.platform.ConfigEditor()::open);
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.

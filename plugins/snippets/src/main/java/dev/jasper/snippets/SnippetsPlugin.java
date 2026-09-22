@@ -20,7 +20,7 @@ import javax.swing.SwingUtilities;
 /**
  * Saved commands: {@code snippets.toml} in this plugin's data directory, a palette scope over it and
  * {@link SnippetService} for other plugins. Moves the pre-plugin file, {@code <home>/snippets.toml},
- * into place once; the home is the grandparent of the data directory ({@code <home>/plugin-data/<id>}).
+ * into place once; the home is three levels above the data directory ({@code <home>/plugins/<id>/data}).
  */
 public class SnippetsPlugin implements Plugin {
     static final String OPEN = "dev.jasper.snippets.open";
@@ -60,8 +60,8 @@ public class SnippetsPlugin implements Plugin {
 
     /** Moves the pre-plugin file into place when the plugin has none yet; both present is left alone and logged. */
     static void migrate(PluginContext context, Path file) {
-        Path home = context.dataDirectory().toAbsolutePath().getParent() == null ? null
-            : context.dataDirectory().toAbsolutePath().getParent().getParent();
+                Path data = context.dataDirectory().toAbsolutePath();
+                Path home = data.getParent() == null || data.getParent().getParent() == null ? null : data.getParent().getParent().getParent();
         if (home == null) return;
         Path legacy = home.resolve("snippets.toml");
         if (!Files.isRegularFile(legacy)) return;

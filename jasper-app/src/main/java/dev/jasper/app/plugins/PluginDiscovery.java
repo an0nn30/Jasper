@@ -9,8 +9,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.jar.JarFile;
 
-/** Finds plugin directories and reads their descriptors. Opens jars briefly; loads no classes. */
+/**
+ * Finds plugin directories and reads their descriptors. Opens jars briefly; loads no classes. An installed
+ * plugin keeps its jars in {@code jars/}; a bundled or development directory holds them directly; a folder
+ * with no jars is a plugin's settings and data, not a plugin.
+ */
 final class PluginDiscovery {
+    static final String JARS = "jars";
     private static final int MAX_DESCRIPTOR_BYTES = 64 * 1024;
 
     private PluginDiscovery() { }
@@ -26,7 +31,7 @@ final class PluginDiscovery {
         }
         catch (IOException failure) { problems.add(root + ": cannot be listed: " + failure.getMessage()); return found; }
         for (Path directory : directories) {
-            Optional<PluginCandidate> candidate = single(directory, origin, problems);
+            Optional<PluginCandidate> candidate = single(directory, origin, problems, true);
             if (candidate.isEmpty()) continue;
             String name = directory.getFileName().toString();
             if (!candidate.get().id().equals(name)) {
@@ -40,10 +45,17 @@ final class PluginDiscovery {
 
     /** One plugin directory; used directly for {@code --plugin-dir}, where the directory name is free. */
     static Optional<PluginCandidate> single(Path directory, PluginCandidate.Origin origin, List<String> problems) {
+        return single(directory, origin, problems, false);
+    }
+
+    /** {@code quietWhenNoJars}: a folder without any jar is skipped without a problem (settings and data of another plugin). */
+    static Optional<PluginCandidate> single(Path directory, PluginCandidate.Origin origin, List<String> problems, boolean quietWhenNoJars) {
+        Path jarDirectory = Files.isDirectory(directory.resolve(JARS)) ? directory.resolve(JARS) : directory;
         List<Path> jars;
-        try (var children = Files.list(directory)) {
+        try (var children = Files.list(jarDirectory)) {
             jars = children.filter(path -> path.getFileName().toString().endsWith(".jar") && Files.isRegularFile(path)).sorted().toList();
         } catch (IOException failure) { problems.add(directory + ": cannot be listed: " + failure.getMessage()); return Optional.empty(); }
+        if (jars.isEmpty() && quietWhenNoJars) return Optional.empty();
         String descriptor = null;
         for (Path jar : jars) {
             try (var file = new JarFile(jar.toFile())) {

@@ -52,7 +52,7 @@ class JasperApplicationPluginsTest {
             Map.of("fix.life.Main", FIXTURE), List.of());
         var stoppedBeforeExit = new boolean[1];
         var terminated = new CountDownLatch(1);
-        Path data = dirs.pluginData().resolve("dev.example.life");
+        Path data = dirs.plugins().resolve("dev.example.life/data");
         JasperApplication[] application = new JasperApplication[1];
         edt(() -> {
             application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> {
@@ -223,7 +223,7 @@ class JasperApplicationPluginsTest {
             application[0].startPlugins(null, dev, false, dirs);
             assertThat(application[0].terminals().windows()).isEmpty();
         });
-        assertThat(dirs.pluginData().resolve("dev.example.terms").resolve("windows")).hasContent("0 false");
+        assertThat(dirs.plugins().resolve("dev.example.terms/data").resolve("windows")).hasContent("0 false");
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }

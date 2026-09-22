@@ -45,10 +45,9 @@ public final class PluginRuntime {
      * @param safeMode skip user plugins
      * @param stateFile {@code plugins.toml}
      * @param lockFile cross-process lock for the state file
-     * @param dataRoot parent of each plugin's data directory
      */
     public record Options(Path bundledDirectory, Path userDirectory, Path developmentDirectory, boolean safeMode,
-                          Path stateFile, Path lockFile, Path dataRoot) { }
+                          Path stateFile, Path lockFile) { }
 
     /**
      * One plugin as the Plugins manager shows it: what is running, what the next launch would run,
@@ -210,8 +209,20 @@ public final class PluginRuntime {
      * @param stateFile {@code plugins.toml}
      * @param lockFile cross-process lock for the state file
      */
-    public static void maintain(Path userDirectory, Path stateFile, Path lockFile) {
-        PluginMaintenance.apply(userDirectory, new PluginStateStore(stateFile, lockFile, LOCK_WAIT));
+    public static void maintain(Path userDirectory, Path stateFile, Path lockFile) { maintain(userDirectory, stateFile, lockFile, null); }
+
+    /**
+     * As {@link #maintain(Path, Path, Path)}, migrating the pre-2026-09-22 {@code plugin-data/} directory into
+     * {@code plugins/<id>/data/} once.
+     *
+     * @param userDirectory plugins the user installed
+     * @param stateFile {@code plugins.toml}
+     * @param lockFile cross-process lock for the state file
+     * @param legacyDataRootOrNull the old data root, or null
+     */
+    public static void maintain(Path userDirectory, Path stateFile, Path lockFile, Path legacyDataRootOrNull) {
+        PluginMaintenance.apply(userDirectory, new PluginStateStore(stateFile, lockFile, LOCK_WAIT), legacyDataRootOrNull,
+            Version.parse(JasperSdk.VERSION));
     }
 
     /**
@@ -241,7 +252,7 @@ public final class PluginRuntime {
         var resolution = PluginResolver.resolve(candidates, state, Version.parse(JasperSdk.VERSION), options.safeMode());
         statuses.addAll(resolution.rejected());
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
-            SwingUtilities::isEventDispatchThread, id -> options.dataRoot().resolve(id),
+            SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
             id -> tables.getOrDefault(id, Map.of()), configReport, DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
