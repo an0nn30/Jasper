@@ -157,9 +157,20 @@ worker thread, and stages installs: `PluginInstaller` unpacks only jars from a z
 limits and with names that cannot leave the staging directory, validates the descriptor with
 `PluginDiscovery`, and on consent moves the result to `plugins/.pending/<id>/` inside the same
 transaction that records the consent. `PluginMaintenance` runs once per launch, on the main thread
-before the desktop starts: inside the lock it deletes plugins marked `remove` and moves pending
-installs into place, renaming the old directory away first so nothing is ever half replaced.
-What cannot be done stays pending. An entry in `plugins.toml` means the user reviewed the plugin.
+before the desktop starts: it migrates the pre-2026-09-22 layout once (flat jars into `jars/`,
+`plugin-data/<id>/` into `plugins/<id>/data/`), stages every zip dropped into `plugins/` without
+consent (an unusable one becomes `.rejected`), then inside the lock deletes the whole folder of a
+plugin marked `remove` and moves pending installs into `plugins/<id>/jars/`, renaming the old jars
+away first so nothing is ever half replaced and settings and data survive an update. What cannot be
+done stays pending. An entry in `plugins.toml` means the user reviewed the plugin.
+
+`PluginSettingsFiles` owns each plugin's `plugins/<id>/<id>.toml`: `PluginRuntime.start` prepares
+every discovered plugin's folder, data directory and settings file (seeded from an old
+`[plugins."<id>"]` table, else the jar's `settings.toml`, else a header) before loading, and a
+one-second poller re-reads changed files into `PluginSettings`, which fires `PluginConfig.onChanged`;
+a broken file keeps its last good values and is reported under `plugins.<id>`. `PluginRuntime.Row`
+carries the folder, settings file and data directory, which the manager's context menu opens
+through `ConfigEditor`.
 
 `PluginCatalog` is pure: it resolves the disk as it would be after maintenance and compares the
 result with what this process selected at launch. The difference is the "Restart to apply"

@@ -275,8 +275,8 @@ exposing each tmux pane as a separate Jasper tab.
 
 ### Shell history
 
-Shell history is the bundled `dev.jasper.history` plugin; its settings live in its own table,
-`[plugins."dev.jasper.history"]`. `trivial_commands` lists the commands ranked below more substantial
+Shell history is the bundled `dev.jasper.history` plugin; its settings live in its own file,
+`plugins/dev.jasper.history/dev.jasper.history.toml` (see [Plugins](#plugins)), which starts out with these keys commented. `trivial_commands` lists the commands ranked below more substantial
 ones when the History palette query is empty. It defaults to `["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]` —
 often the most recent thing you typed, so strict recency pushed the work you came back for off the
 first page.
@@ -303,7 +303,7 @@ configuration is reported as moved and ignored.
 
 The Snippets scope (Cmd+J on macOS, Ctrl+Shift+J elsewhere; `>snip` from the picker) is the
 bundled `dev.jasper.snippets` plugin. It reads and appends `snippets.toml` in the plugin's data
-directory, `<Jasper home>/plugin-data/dev.jasper.snippets/`; a `snippets.toml` in the Jasper home
+directory, `<Jasper home>/plugins/dev.jasper.snippets/data/`; a `snippets.toml` in the Jasper home
 from before the plugin is moved there on first launch. It is a separate file: it is not part of the
 configuration file and is never read or written by the configuration loader. An empty or missing
 file is an empty scope; disable the plugin in File → Manage Plugins… to remove the scope. Its
@@ -402,25 +402,34 @@ A window captures its grid defaults once. Later reloads do not resize or repack 
 
 ### Plugins
 
-Each plugin reads its own table, keyed by its quoted id. Jasper does not validate the
-contents; a plugin reports problems with its settings through the same diagnostics as the
-rest of the file. A table for a plugin that is not installed is ignored without a warning.
-Values may be strings, integers, floats, booleans, arrays of strings and nested tables.
+Each plugin has its own settings file, `plugins/<id>/<id>.toml` under Jasper's home, created the
+first time the plugin loads: from the plugin's own example (a `settings.toml` it ships), or from a
+`[plugins."<id>"]` table still in `config.toml` (kept for that one seeding and reported as moved
+until you delete it), or as a two-line header. Jasper reads the file live, once a second, without a
+Reload Config; a file that fails to parse keeps its last good values and is reported in the
+Configuration status under `plugins.<id>`. Jasper never rewrites the file once it exists. Values may
+be strings, integers, floats, booleans, arrays of strings and nested tables; a plugin reports
+problems with its settings through the same diagnostics. Right-click a plugin in File → Manage
+Plugins… and choose Open Settings to edit the file. The sample plugin's example, for instance:
 
 ```toml
-[plugins."dev.jasper.sample"]
-demo_activity = true      # show a short demonstration activity on Buddy at startup
-demo_step_millis = 300    # 0 to 5000
-demo_ui = true            # add the sample's action to the toolbar, menus and status bar
-demo_terminal = true      # add "Insert Sample Greeting" and show the last command's exit status
-demo_session = true       # add "Open Sample Echo Session", a pane whose session the plugin provides
+# Settings for the sample plugin. Jasper reads this file live. Every demo is off until you set it.
+# demo_activity = true      # a short demonstration activity on Buddy at startup
+# demo_step_millis = 300    # 0 to 5000
+# demo_ui = true            # the sample's action on the toolbar, in the menus and the status bar
+# demo_terminal = true      # "Insert Sample Greeting" and the last command's exit status
+# demo_session = true       # "Open Sample Echo Session", a pane whose session the plugin provides
+# demo_scope = true         # a "Greetings" scope in the command palette
 ```
 
-Installed plugins live in `plugins/<id>/` beside `config.toml`; their enabled state and
-consented capabilities are in `plugins.toml`, and their private data under `plugin-data/<id>/`.
-`ui-state.toml` beside `config.toml` remembers panel placement, rail visibility and plugin window
-bounds; it is written by Jasper and is not meant to be edited. Pending plugin installs wait in
-`plugins/.pending/`; Jasper applies them, and removals, when it next starts.
+Everything about a plugin lives under `plugins/<id>/` beside `config.toml`: an installed plugin's
+jars in `jars/`, its settings file, and its private data in `data/` (bundled plugins have the
+settings file and data there too; their jars are in the application image). A zip dropped into
+`plugins/` is unpacked at the next launch and then waits for your review in Manage Plugins; an
+unusable one is renamed `.rejected`. Enabled state and consented capabilities are in `plugins.toml`;
+pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whole folder at the next
+launch. `ui-state.toml` beside `config.toml` remembers panel placement, rail visibility and plugin
+window bounds; it is written by Jasper and is not meant to be edited.
 
 ## Shortcuts
 

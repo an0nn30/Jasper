@@ -17,12 +17,50 @@ inject, open) and 4b (plugin-provided sessions); 4a and 4b are merged too. Worki
 merged too. With it the plugin SDK plans are complete. The palette-plugins design
 (`superpowers/specs/2026-09-21-jasper-palette-plugins-design.md`) is approved; plan 5a (the
 contribution surface) is merged at `3eb143a`, plan 5b (the History and Snippets plugins) is
-implemented on `claude/palette-plugins-5b`, then come the Vault and SSH plugin specs. A development
+merged at `0550bad`. The plugin-home design (`superpowers/specs/2026-09-22-jasper-plugin-home-design.md`)
+is implemented on `claude/plugin-home`; then come the Vault and SSH plugin specs. A development
 launch keeps its own home under `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
+
+### Plugin home — 2026-09-22
+
+Implemented on `claude/plugin-home` (not merged, not pushed). The work implements the
+[plugin-home plan](superpowers/plans/2026-09-22-jasper-plugin-home-plan.md) of the
+[plugin-home design](superpowers/specs/2026-09-22-jasper-plugin-home-design.md): everything about a
+plugin lives under `<home>/plugins/<id>/` (`jars/` for an installed plugin, `<id>.toml` settings,
+`data/`), for bundled and development plugins too; `plugin-data/` is gone and migrated once, as are
+flat `plugins/<id>/*.jar` layouts. A zip dropped into `plugins/` is staged at the next launch without
+consent (an unusable one becomes `.rejected`); an update replaces `jars/` only; Remove… takes the
+whole folder after a confirmation. Each plugin's settings file is the only source of its settings:
+seeded from an old `[plugins."<id>"]` table (kept for that and reported as moved), else the jar's
+`settings.toml` (History and the sample ship one), else a header; `PluginSettingsFiles` polls the
+files once a second and a broken file keeps its last good values, reported under `plugins.<id>`.
+The SDK's `PluginConfig` gained `file()` (0.7.0); the testkit mirrors the layout. The manager's
+rows carry the three paths; its list has a context menu (the row's actions, then Open Settings, Open
+Plugin Folder, Open Data Folder) whose openers go through `ConfigEditor`.
+
+Scope decisions, as recorded at the top of the plan: `start(tables, dark)` and
+`configurationChanged(tables)` keep their signatures (tables seed only); `plugins.toml` and
+`plugins.lock` stay files beside `config.toml`; a drop-in zip records no consent; folders are
+prepared in `PluginRuntime.start`; settings files are polled, not watched; a parse failure's report
+is sticky until the next configuration snapshot (`ConfigurationController.report` keeps reports until
+then); `ConfirmView` is its own small view; the fake's data layout is `<root>/<id>/data`.
+
+Deviations from the plan text: `PluginDiscovery.scan` skips jar-less folders quietly (bundled and
+development plugins' settings-and-data folders) rather than reporting them, an addition the plan's
+migration test needed; `PluginSettings`' nested `View` also implements `file()`; the plugin-tables
+tests and `PluginInstallerTest` were extended for the moved warning and the `jars/` path; the
+manager test seeds `plugins.toml` as text because `PluginStateStore` is package-private. No
+behaviour deviations.
+
+Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks`
+passed with **1,433 tests: 1,431 passed, two expected environment skips, no failures or
+errors** (app 766, Buddy 163, terminal 377, SDK 21, testkit 45, sample plugin 10, History plugin
+40, Snippets plugin 11). Native acceptance (the five steps at the end of the plan) is pending and is
+the user's.
 
 ### Palette plugins plan 5b — 2026-09-21
 
-Implemented on `claude/palette-plugins-5b` (not merged, not pushed). The work implements
+Merged into local `main` by fast-forward on 2026-09-22 at `0550bad` (not pushed). The work implements
 [plan 5b](superpowers/plans/2026-09-21-jasper-palette-plugins-plan-5b-history-snippets-plugins.md):
 the History and Snippets palette scopes are now two bundled plugins. `plugins/snippets`
 (`dev.jasper.snippets`, bundling tomlj) carries the snippet value, `snippets.toml` format and store

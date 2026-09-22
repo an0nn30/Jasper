@@ -128,18 +128,20 @@ Jasper loads plugins written against `jasper-sdk`. Shell History, Snippets and a
 
 | Path | Contents |
 |---|---|
-| `plugins/<id>/` | An installed plugin: its jar and the libraries it bundles |
+| `plugins/<id>/jars/` | An installed plugin's jar and the libraries it bundles |
+| `plugins/<id>/<id>.toml` | The plugin's settings; created by Jasper, read live |
+| `plugins/<id>/data/` | The plugin's private data |
+| `plugins/<name>.zip` | A plugin to install: unpacked at the next launch, then reviewed in Manage Plugins |
 | `plugins/.pending/<id>/` | Installs waiting for the next launch |
 | `plugins.toml` | Enabled state and consented capabilities; an entry means you reviewed the plugin |
-| `plugin-data/<id>/` | The plugin's private data; left alone when the plugin is removed |
 
-Per-plugin settings go in `config.toml` under `[plugins."<id>"]`, for example `[plugins."dev.jasper.history"]`; see [plugin settings](docs/configuration.md#plugins).
+Every plugin, bundled ones too, has its own folder there with its settings file and data. A plugin's settings are that file, `plugins/<id>/<id>.toml`, seeded the first time from the plugin's own example or from an old `[plugins."<id>"]` table in `config.toml`, which is then reported as moved; see [plugin settings](docs/configuration.md#plugins).
 
 **Managing plugins.** File → Manage Plugins… (also in the command palette) lists every plugin with its state:
 
 - **Install from Zip…** picks a zip containing the plugin's jars, validates its `plugin.toml` and SDK range, and shows a consent dialog with the plugin's name, version, vendor and capabilities. Allow and Enable stages it; it loads after Restart Now. Consent is not a sandbox: an allowed plugin runs with everything Jasper can reach.
 - **Review…** is shown for a plugin that is installed but not yet allowed, or whose new version declares a capability you have not approved.
-- **Enable**, **Disable** and **Remove** change `plugins.toml`; removal deletes `plugins/<id>/` at the next launch. A "Restart Jasper to apply your changes" banner with Restart Now appears whenever the files on disk differ from what this process loaded, including changes made by another Jasper process.
+- **Enable** and **Disable** change `plugins.toml`; **Remove…** asks first, then deletes the whole `plugins/<id>/` (jars, settings and data) at the next launch; Keep undoes it until then. Bundled plugins are disabled, not removed. Right-click a plugin for **Open Settings**, **Open Plugin Folder** and **Open Data Folder**. A "Restart Jasper to apply your changes" banner with Restart Now appears whenever the files on disk differ from what this process loaded, including changes made by another Jasper process.
 - `jasper --safe-mode` starts without user-installed plugins so a plugin that breaks startup can be disabled or removed; the manager then offers Restart Normally. Bundled plugins still load in safe mode.
 
 **Developing a plugin.** `jasper --plugin-dir <dir>` loads one plugin directory with consent pre-granted; `./gradlew pluginZips` builds and zips every in-repo plugin into `plugins/build/zips/`. A source launch uses its own home (`jasper-app/build/dev-home`), so your installed plugins are untouched. Details, including the plugin manifest and the test kit, are in [plugin authoring](docs/plugin-authoring.md).

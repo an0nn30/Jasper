@@ -58,7 +58,7 @@ app only inside `dev.jasper.app.plugins`. The bundled plugins under the reposito
 directory are staged by `stagePlugins` into `build/plugins/` and shipped as `lib/plugins/<id>/`
 in the application image, never on the application classpath. `run` and the IntelliJ "Jasper
 (dev home)" configuration use `build/dev-home` as the home, so the installed app's plugins,
-consent (`plugins.toml`) and `plugin-data/` stay untouched; `--plugin-dir <dir>` loads one more
+consent (`plugins.toml`), settings and data (`plugins/<id>/`) stay untouched; `--plugin-dir <dir>` loads one more
 plugin with consent pre-granted, and `--safe-mode` loads no user plugins. The user-facing manager
 is `pluginmanager/PluginManager` (File → Manage Plugins…); installs, removals and restarts are
 described in the root [README](../README.md#plugins) and [plugin authoring](../docs/plugin-authoring.md).

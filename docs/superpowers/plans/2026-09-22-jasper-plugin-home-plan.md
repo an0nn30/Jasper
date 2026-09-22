@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Record every deviation from this text here and in `docs/STATUS.md`.
+**Status:** Implemented on `claude/plugin-home`; native acceptance pending. Deviations: `PluginDiscovery.scan` skips jar-less folders quietly; `PluginSettings.View` also implements `file()`; the plugin-tables and installer tests were extended for the moved warning and the `jars/` path; the manager test seeds `plugins.toml` as text. No behaviour deviations. Final verification: 1,433 tests, two expected skips, no failures (see `docs/STATUS.md`).
 
 **Goal:** Put everything about a plugin under `<home>/plugins/<id>/` (jars, its own settings file, its data), install zips dropped into `plugins/`, back `PluginConfig` by the per-plugin file, make Remove a real uninstall, and give the Plugins manager a context menu that opens a plugin's settings, folder and data.
 

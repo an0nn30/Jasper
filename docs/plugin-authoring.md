@@ -26,6 +26,9 @@ version = ">=1.0"
 optional = false
 ```
 
+A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
+file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with
+their meaning; `context.config()` reads that file live and `config().file()` names it.
 Compile against `jasper-sdk` as `compileOnly`; ship any other library as a jar in the same
 directory. A plugin cannot see the application's classes or libraries, and may not define
 classes in `dev.jasper.*` platform packages or in a package a dependency exports.
@@ -444,8 +447,9 @@ jasper --plugin-dir /path/to/build/plugin/dev.example.tool
 
 `--plugin-dir` loads one plugin directory with consent pre-granted. Like `--safe-mode`
 (no user plugins) and `--standalone`, it never hands off to or becomes a resident process.
-Installed plugins live in `~/.config/jasper/plugins/<id>/` and stay inert until the user reviews
-them in File → Manage Plugins…, which records the consent in `~/.config/jasper/plugins.toml`.
+Installed plugins live in `~/.config/jasper/plugins/<id>/jars/` and stay inert until the user reviews
+them in File → Manage Plugins…, which records the consent in `~/.config/jasper/plugins.toml`. Every
+plugin, a `--plugin-dir` one included, gets `plugins/<id>/` with its settings file and `data/`.
 
 While developing Jasper itself, `./gradlew :jasper-app:run` and the IntelliJ configuration "Jasper
 (dev home)" run with `-Djasper.home=jasper-app/build/dev-home` and the bundled plugins (sample,
@@ -469,13 +473,15 @@ For an in-repo plugin the zip is `./gradlew :jasper-plugin-<name>:pluginZip` (se
 in-repo plugins"); for your own build, zip the plugin jar together with every library jar it bundles.
 To install into the Jasper you use day to day, start that Jasper (not a dev-home launch), open
 File → Manage Plugins… → Install from Zip…, pick the zip, review the consent dialog, and restart
-when asked; the plugin lands in `<Jasper home>/plugins/<id>/`. The bundled plugins are already in
-the application image, so installing their zip only matters for a Jasper built without them.
+when asked; the plugin lands in `<Jasper home>/plugins/<id>/jars/`. Dropping the zip into
+`<Jasper home>/plugins/` does the same at the next launch, minus the dialog: the plugin then waits
+for Review… in the manager. The bundled plugins are already in the application image, so installing
+their zip only matters for a Jasper built without them.
 
 - Declare only the capabilities you use: the list is what the user is asked to allow, and a later
   version that adds one is held back until the user reviews it again.
 - Consent is not a sandbox, and the dialog says so. Your plugin runs with everything Jasper can reach.
-- Users disable, review and remove plugins in the same window. Removal deletes `plugins/<id>/` at the
-  next launch; your `plugin-data/<id>/` directory is left alone.
+- Users disable, review and remove plugins in the same window. Removal deletes the whole
+  `plugins/<id>/` (jars, settings and data) at the next launch, after a confirmation.
 - `jasper --safe-mode` starts without installed plugins, so a plugin that breaks startup can be
   disabled or removed; the manager then offers Restart Normally.
