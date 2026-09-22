@@ -18,12 +18,14 @@ merged too. With it the plugin SDK plans are complete. The palette-plugins desig
 (`superpowers/specs/2026-09-21-jasper-palette-plugins-design.md`) is approved; plan 5a (the
 contribution surface) is merged at `3eb143a`, plan 5b (the History and Snippets plugins) is
 merged at `0550bad`. The plugin-home design (`superpowers/specs/2026-09-22-jasper-plugin-home-design.md`)
-is implemented on `claude/plugin-home`; then come the Vault and SSH plugin specs. A development
-launch keeps its own home under `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
+is merged at `17c0476`. The Credential Vault design
+(`superpowers/specs/2026-09-22-jasper-vault-design.md`) is approved and awaits its plans 6a (core
+and API) and 6b (UI); the SSH plugin spec follows. A development launch keeps its own home under
+`jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
 ### Plugin home — 2026-09-22
 
-Implemented on `claude/plugin-home` (not merged, not pushed). The work implements the
+Merged at `17c0476` (not pushed). The work implements the
 [plugin-home plan](superpowers/plans/2026-09-22-jasper-plugin-home-plan.md) of the
 [plugin-home design](superpowers/specs/2026-09-22-jasper-plugin-home-design.md): everything about a
 plugin lives under `<home>/plugins/<id>/` (`jars/` for an installed plugin, `<id>.toml` settings,
