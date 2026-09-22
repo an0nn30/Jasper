@@ -58,6 +58,14 @@ errors** (app 766, Buddy 163, terminal 377, SDK 21, testkit 45, sample plugin 10
 40, Snippets plugin 11). Native acceptance (the five steps at the end of the plan) is pending and is
 the user's.
 
+### Terminal dark palette — 2026-09-22
+
+`Palette.jasperDark()` now carries the TermLab Dark palette ported from the conch project's
+xterm.js theme (Dracula-derived: background `#282a36`, foreground `#f8f8f2`, selection `#44475a`).
+Only the terminal palette changed; the dark FlatLaf chrome keeps its own values, and
+`TabbedPane.selectedBackground` in `FlatDarkLaf.properties` is pinned to the new terminal
+background so selected tabs still match the terminal. Branch `claude/termlab-dark-palette`.
+
 ### Palette plugins plan 5b — 2026-09-21
 
 Merged into local `main` by fast-forward on 2026-09-22 at `0550bad` (not pushed). The work implements

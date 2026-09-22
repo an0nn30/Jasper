@@ -33,7 +33,7 @@ class MockUiTest {
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
                 assertThat(image.getRGB(650, 37) & 0xffffff).isEqualTo(0x313439);
-                assertThat(image.getRGB(650, 80) & 0xffffff).isEqualTo(0x292c34);
+                assertThat(image.getRGB(650, 80) & 0xffffff).isEqualTo(0x282a36);
                 assertThat(image.getRGB(500, 700)).isEqualTo(image.getRGB(500, 940));
             }
         });
