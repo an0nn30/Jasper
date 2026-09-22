@@ -1,6 +1,6 @@
 # Jasper
 
-A cross-platform terminal workstation written in Java Swing, with macOS as the immediate daily-use target and a MobaXterm-style layout. Phase 1 builds the terminal before SSH sessions, credential vault, SFTP, tunnels and plugins.
+A cross-platform terminal workstation written in Java Swing, with macOS as the immediate daily-use target and a MobaXterm-style layout. Phase 1 builds the terminal before SSH sessions, credential vault, SFTP and tunnels; a plugin SDK already hosts bundled and user-installed plugins.
 
 Formerly Moray. The app and Java packages are now Jasper; the Git repository
 remains [an0nn30/moray](https://github.com/an0nn30/moray). Existing settings can be
@@ -16,7 +16,9 @@ Use the [documentation index](docs/README.md) to choose an entry point:
 [application](jasper-app/README.md), [terminal library](jasper-terminal/README.md),
 or [Buddy library](jasper-buddy/README.md). All three modules have documented
 ownership, threading and extension routes. Builders, command registries and
-concrete lifecycle owners support the current features; a plugin SDK remains future work.
+concrete lifecycle owners support the current features. Plugins are written against the
+[SDK](jasper-sdk/README.md); see [plugin authoring](docs/plugin-authoring.md) and
+[SDK architecture](docs/sdk-architecture.md).
 
 ## Requirements
 
@@ -118,11 +120,37 @@ On Linux/Windows, Ctrl+1–9 selects an existing tab and Ctrl+Shift+[ / Ctrl+Shi
 
 Working-directory inheritance and prompt navigation use OSC 7 and OSC 133 emitted by your shell. Without those sequences, a pane retains its launch-directory fallback. Search currently matches each physical row, so matches do not span a soft wrap.
 
+## Plugins
+
+Jasper loads plugins written against `jasper-sdk`. Shell History, Snippets and a sample plugin are bundled with the application image (`lib/plugins/<id>/` in the packaged app); other plugins are installed by the user. Nothing loads or unloads in a running process: installs, removals and enable/disable changes take effect at the next launch.
+
+**Where plugins live.** Everything is under Jasper's home, the directory holding `config.toml` (on macOS `~/.config/jasper`; see [configuration](docs/configuration.md#location-and-startup-options) for Linux and Windows):
+
+| Path | Contents |
+|---|---|
+| `plugins/<id>/` | An installed plugin: its jar and the libraries it bundles |
+| `plugins/.pending/<id>/` | Installs waiting for the next launch |
+| `plugins.toml` | Enabled state and consented capabilities; an entry means you reviewed the plugin |
+| `plugin-data/<id>/` | The plugin's private data; left alone when the plugin is removed |
+
+Per-plugin settings go in `config.toml` under `[plugins."<id>"]`, for example `[plugins."dev.jasper.history"]`; see [plugin settings](docs/configuration.md#plugins).
+
+**Managing plugins.** File → Manage Plugins… (also in the command palette) lists every plugin with its state:
+
+- **Install from Zip…** picks a zip containing the plugin's jars, validates its `plugin.toml` and SDK range, and shows a consent dialog with the plugin's name, version, vendor and capabilities. Allow and Enable stages it; it loads after Restart Now. Consent is not a sandbox: an allowed plugin runs with everything Jasper can reach.
+- **Review…** is shown for a plugin that is installed but not yet allowed, or whose new version declares a capability you have not approved.
+- **Enable**, **Disable** and **Remove** change `plugins.toml`; removal deletes `plugins/<id>/` at the next launch. A "Restart Jasper to apply your changes" banner with Restart Now appears whenever the files on disk differ from what this process loaded, including changes made by another Jasper process.
+- `jasper --safe-mode` starts without user-installed plugins so a plugin that breaks startup can be disabled or removed; the manager then offers Restart Normally. Bundled plugins still load in safe mode.
+
+**Developing a plugin.** `jasper --plugin-dir <dir>` loads one plugin directory with consent pre-granted; `./gradlew pluginZips` builds and zips every in-repo plugin into `plugins/build/zips/`. A source launch uses its own home (`jasper-app/build/dev-home`), so your installed plugins are untouched. Details, including the plugin manifest and the test kit, are in [plugin authoring](docs/plugin-authoring.md).
+
 ## Layout
 
 - `jasper-terminal/`: sessions, emulator integration, terminal rendering/input, selection, search and shell integration.
 - `jasper-app/`: packaged application composition, workspace, palette, providers and platform integration.
 - `jasper-buddy/`: independent JDK-only companion facade, notice model, animation and presentation.
+- `jasper-sdk/` and `jasper-sdk-testkit/`: the JDK-only plugin API and its fake host and contract suite.
+- `plugins/`: the bundled History, Snippets and sample plugins; each directory is a Gradle module.
 - `docs/STATUS.md`: completed work, open items and deferred findings.
 - `docs/superpowers/specs/` and `docs/superpowers/plans/`: specifications and implementation plans.
 

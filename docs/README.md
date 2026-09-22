@@ -30,6 +30,7 @@ then assembles the application distribution. It opens no native window. Native
 
 - [Configuration](configuration.md): defaults, saved/live settings, data paths and shell integration.
 - [Command palette](command-palette.md): commands, the bundled History and Snippets plugins, and scope registration.
+- [Plugins](../README.md#plugins): where installed plugins live, File → Manage Plugins…, safe mode and `--plugin-dir`.
 - [Diagnostics](diagnostics.md): log storage, bounds and privacy.
 - [Packaging](packaging.md): native builds and user-run acceptance checklists.
 - [Benchmarks](benchmarks.md): reproducible native measurement commands and interpretation.

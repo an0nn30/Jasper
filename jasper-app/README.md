@@ -34,6 +34,8 @@ a GUI or native benchmark without the user's request. Building the distribution 
   scope, setting, notice producer, platform hook or lifecycle change.
 - [Terminal onboarding](../jasper-terminal/README.md): sessions, view options and emulator rules.
 - [Buddy embedding](../jasper-buddy/README.md): the five supported facade/value types.
+- [SDK architecture](../docs/sdk-architecture.md) and [plugin authoring](../docs/plugin-authoring.md):
+  how `plugins/` loads, consents to and hosts plugins, and how to write, test and package one.
 - [Current handoff](../docs/STATUS.md) and [verification](../docs/app-refactor-verification.md):
   actual checkpoints, decisions, independent review and pending native acceptance.
 
@@ -47,6 +49,19 @@ fixtures live in the workspace test package. Pure fixtures live in `testsupport`
 Small owner-package `*TestSupport` bridges let integration tests inspect private UI
 without exposing test hooks in production. Buddy's separate test-fixtures artifact
 is a test dependency only. No preview or fixture is shipped.
+
+## Plugins
+
+Plugins compile against `jasper-sdk` only and are loaded by `plugins/` (`PluginRuntime`,
+discovery, resolver, loader and host) with their own class loaders; SDK types appear in the
+app only inside `dev.jasper.app.plugins`. The bundled plugins under the repository's `plugins/`
+directory are staged by `stagePlugins` into `build/plugins/` and shipped as `lib/plugins/<id>/`
+in the application image, never on the application classpath. `run` and the IntelliJ "Jasper
+(dev home)" configuration use `build/dev-home` as the home, so the installed app's plugins,
+consent (`plugins.toml`) and `plugin-data/` stay untouched; `--plugin-dir <dir>` loads one more
+plugin with consent pre-granted, and `--safe-mode` loads no user plugins. The user-facing manager
+is `pluginmanager/PluginManager` (File → Manage Plugins…); installs, removals and restarts are
+described in the root [README](../README.md#plugins) and [plugin authoring](../docs/plugin-authoring.md).
 
 ## Change workflow
 
