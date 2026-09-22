@@ -12,16 +12,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class PluginManagerPanelTest {
     private final List<String> events = new ArrayList<>();
+    private final List<String> opened = new ArrayList<>();
     private final PluginManagerPanel panel = new PluginManagerPanel(new PluginManagerPanel.Handlers(
         row -> events.add("toggle:" + row.id()), row -> events.add("review:" + row.id()), row -> events.add("remove:" + row.id()),
-        row -> events.add("discard:" + row.id()), () -> events.add("install")));
+        row -> events.add("discard:" + row.id()), () -> events.add("install"),
+        row -> opened.add("settings:" + row.id()), row -> opened.add("folder:" + row.id()), row -> opened.add("data:" + row.id())));
 
     static PluginRuntime.Row row(String id, String state, boolean enabled, boolean needsConsent, boolean canToggle, boolean canRemove,
                                  boolean pendingRemoval, boolean pendingInstall, String pending) {
         return new PluginRuntime.Row(id, "<html><b>" + id, "1.0.0", "Does things", "Example", canRemove ? "Installed" : "Bundled", state,
             state.equals("SKIPPED") ? "requires dev.example.base, which is not available" : "", List.of("terminal.inject", "made.up"),
             needsConsent ? List.of("terminal.inject") : List.of(), List.of("dev.example.base >=1.0.0"), 2, enabled, needsConsent, canToggle,
-            canRemove, pendingRemoval, pendingInstall, pending);
+            canRemove, pendingRemoval, pendingInstall, pending,
+            java.nio.file.Path.of("/plugins/" + id), java.nio.file.Path.of("/plugins/" + id + "/" + id + ".toml"), java.nio.file.Path.of("/plugins/" + id + "/data"));
     }
 
     @Test void listsPluginsAndOffersOnlyWhatTheSelectedRowAllows() {
@@ -38,7 +41,7 @@ class PluginManagerPanelTest {
             "<html><b>dev.example.doomed  1.0.0 — Disabled (restart to apply)",
             "<html><b>dev.example.staged  1.0.0 — Not loaded yet (restart to apply)");
         assertThat(panel.selected()).as("the first row is selected").isEqualTo("dev.example.active");
-        assertThat(visible()).containsExactly("Disable", "Remove");
+        assertThat(visible()).containsExactly("Disable", "Remove\u2026");
         assertThat(panel.details()).contains("Example", "Installed", "Does things", "Type into your terminals (terminal.inject)",
             "made.up", "dev.example.base >=1.0.0", "2 errors");
 
@@ -46,7 +49,7 @@ class PluginManagerPanelTest {
         assertThat(visible()).containsExactly("Disable");
         assertThat(panel.details()).contains("requires dev.example.base, which is not available");
         panel.select("dev.example.found");
-        assertThat(visible()).containsExactly("Review…", "Remove");
+        assertThat(visible()).containsExactly("Review…", "Remove\u2026");
         panel.select("dev.example.doomed");
         assertThat(visible()).containsExactly("Keep");
         assertThat(panel.details()).contains("Will be removed at restart");
@@ -116,4 +119,18 @@ class PluginManagerPanelTest {
         assertThat(new ConsentView("Quiet", "1.0.0", "", List.of(), false, "Allow and Enable", () -> { }, () -> { }).text())
             .contains("asks for no access to your terminals").doesNotContain("replaces");
     }
+
+        @Test void theContextMenuHoldsTheRowsActionsAndTheThreeOpeners() {
+            panel.show(new PluginRuntime.Snapshot(List.of(
+                row("dev.example.active", "ACTIVE", true, false, true, true, false, false, ""),
+                row("dev.example.bundled", "SKIPPED", true, false, true, false, false, false, "")), true, false));
+            panel.select("dev.example.active");
+            assertThat(panel.menuLabels()).containsExactly("Disable", "Remove\u2026", "-", "Open Settings", "Open Plugin Folder", "Open Data Folder");
+            panel.clickMenu("Open Settings"); panel.clickMenu("Open Plugin Folder"); panel.clickMenu("Open Data Folder");
+            assertThat(opened).containsExactly("settings:dev.example.active", "folder:dev.example.active", "data:dev.example.active");
+            panel.select("dev.example.bundled");
+            assertThat(panel.menuLabels()).containsExactly("Disable", "-", "Open Settings", "Open Plugin Folder", "Open Data Folder");
+            assertThat(panel.details()).contains("Bundled with Jasper; disable it here, or remove it from the application image");
+            assertThat(panel.remove.getText()).as("the button says what the menu says").isNotEqualTo("Remove");
+        }
 }

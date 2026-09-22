@@ -26,14 +26,15 @@ import javax.swing.UIManager;
 final class PluginManagerPanel extends JPanel {
     /** What the user can ask for. */
     record Handlers(Consumer<PluginRuntime.Row> toggle, Consumer<PluginRuntime.Row> review, Consumer<PluginRuntime.Row> remove,
-                    Consumer<PluginRuntime.Row> discard, Runnable install) { }
+                    Consumer<PluginRuntime.Row> discard, Runnable install, Consumer<PluginRuntime.Row> openSettings,
+                    Consumer<PluginRuntime.Row> openFolder, Consumer<PluginRuntime.Row> openData) { }
 
     /** One button of the banner. */
     record BannerAction(String label, Runnable run) { }
 
     final JButton toggle = new JButton("Disable");
     final JButton review = new JButton("Review…");
-    final JButton remove = new JButton("Remove");
+    final JButton remove = new JButton("Remove\u2026");
     final JButton discard = new JButton("Discard Install");
     final JButton install = new JButton("Install from Zip…");
     private final DefaultListModel<PluginRuntime.Row> model = new DefaultListModel<>();
@@ -47,6 +48,7 @@ final class PluginManagerPanel extends JPanel {
     private final JLabel message = plain(new JLabel(" "));
     private boolean busy;
     private boolean refreshing;
+    private final Handlers handlers;
 
     /** Swing renders label text that starts with an html tag; plugin-supplied text must never be markup. */
     private static <T extends javax.swing.JComponent> T plain(T component) {
@@ -120,7 +122,64 @@ final class PluginManagerPanel extends JPanel {
         remove.addActionListener(event -> { if (current() != null) handlers.remove().accept(current()); });
         discard.addActionListener(event -> { if (current() != null) handlers.discard().accept(current()); });
         install.addActionListener(event -> handlers.install().run());
+        this.handlers = handlers;
+        list.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mousePressed(java.awt.event.MouseEvent event) { maybeShowMenu(event); }
+            @Override public void mouseReleased(java.awt.event.MouseEvent event) { maybeShowMenu(event); }
+        });
+        list.getInputMap(javax.swing.JComponent.WHEN_FOCUSED).put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_CONTEXT_MENU, 0), "jasper.menu");
+        list.getInputMap(javax.swing.JComponent.WHEN_FOCUSED).put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F10, java.awt.event.InputEvent.SHIFT_DOWN_MASK), "jasper.menu");
+        list.getActionMap().put("jasper.menu", new javax.swing.AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                int index = list.getSelectedIndex();
+                if (index < 0) return;
+                var cell = list.getCellBounds(index, index);
+                showMenu(list, cell.x + 8, cell.y + cell.height / 2);
+            }
+        });
         render();
+    }
+
+    private void maybeShowMenu(java.awt.event.MouseEvent event) {
+        if (!event.isPopupTrigger() || busy) return;
+        int index = list.locationToIndex(event.getPoint());
+        if (index >= 0 && list.getCellBounds(index, index).contains(event.getPoint())) list.setSelectedIndex(index);
+        if (current() != null) showMenu(event.getComponent(), event.getX(), event.getY());
+    }
+
+    /** The selected row's actions, as the buttons offer them, then the three openers. */
+    private javax.swing.JPopupMenu menu() {
+        var menu = new javax.swing.JPopupMenu();
+        PluginRuntime.Row row = current();
+        if (row == null) return menu;
+        for (JButton button : List.of(toggle, review, remove, discard)) {
+            if (!button.isVisible()) continue;
+            var item = new javax.swing.JMenuItem(button.getText());
+            item.addActionListener(event -> button.doClick());
+            menu.add(item);
+        }
+        if (menu.getComponentCount() > 0) menu.addSeparator();
+        var settings = new javax.swing.JMenuItem("Open Settings"); settings.addActionListener(event -> handlers.openSettings().accept(row)); menu.add(settings);
+        var folder = new javax.swing.JMenuItem("Open Plugin Folder"); folder.addActionListener(event -> handlers.openFolder().accept(row)); menu.add(folder);
+        var data = new javax.swing.JMenuItem("Open Data Folder"); data.addActionListener(event -> handlers.openData().accept(row)); menu.add(data);
+        return menu;
+    }
+
+    private void showMenu(Component at, int x, int y) { menu().show(at, x, y); }
+
+    /** Test seam: the menu's item texts for the selected row, {@code -} for a separator. */
+    List<String> menuLabels() {
+        List<String> labels = new ArrayList<>();
+        for (Component component : menu().getComponents())
+            labels.add(component instanceof javax.swing.JMenuItem item ? item.getText() : "-");
+        return labels;
+    }
+
+    /** Test seam: clicks the menu item with that text. */
+    void clickMenu(String label) {
+        for (Component component : menu().getComponents())
+            if (component instanceof javax.swing.JMenuItem item && item.getText().equals(label)) { item.doClick(); return; }
+        throw new IllegalArgumentException("No menu item " + label);
     }
 
     private PluginRuntime.Row current() { return list.getSelectedValue(); }
@@ -148,7 +207,7 @@ final class PluginManagerPanel extends JPanel {
         remove.setVisible(row != null && row.canRemove() && !row.pendingInstall());
         if (row != null) {
             toggle.setText(row.enabled() ? "Disable" : "Enable");
-            remove.setText(row.pendingRemoval() ? "Keep" : "Remove");
+            remove.setText(row.pendingRemoval() ? "Keep" : "Remove\u2026");
         }
         title.setText(row == null ? " " : row.name() + " " + row.version());
         body.setText(row == null ? "No plugins are installed." : describe(row));
@@ -164,6 +223,8 @@ final class PluginManagerPanel extends JPanel {
         if (!row.pending().isEmpty()) text.append('\n').append(row.pending());
         if (row.errors() > 0) text.append('\n').append(row.errors()).append(row.errors() == 1 ? " error" : " errors").append(" since Jasper started; see the log");
         if (!row.description().isBlank()) text.append("\n\n").append(row.description());
+        if (row.origin().equals("Bundled")) text.append("\n\nBundled with Jasper; disable it here, or remove it from the application image.");
+        if (row.origin().equals("Development")) text.append("\n\nLoaded from --plugin-dir; its settings and data are in ").append(row.directory()).append('.');
         text.append("\n\nCapabilities");
         if (row.capabilities().isEmpty()) text.append("\n  None");
         for (String capability : row.capabilities())

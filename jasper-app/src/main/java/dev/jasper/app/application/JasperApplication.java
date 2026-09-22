@@ -473,8 +473,10 @@ public final class JasperApplication {
             // Only a plain replacement can be swallowed by a resident; any other is standalone and needs no conversation.
             var flow = new RestartFlow(replacementHandsOff ? residentControl : ResidentControl.NONE, this::restart, worker,
                 SwingUtilities::invokeLater, Duration.ofSeconds(30), Duration.ofMillis(250));
+            var editor = new dev.jasper.app.platform.ConfigEditor();
             pluginManager = new PluginManager(plugins, auxiliary, new PluginManager.Hooks(
-                surface -> shells.chooseFile(surface, "Install Plugin", ".zip"), flow, this::quit, residentControl, standaloneNotice, worker));
+                surface -> shells.chooseFile(surface, "Install Plugin", ".zip"), flow, this::quit, residentControl, standaloneNotice, worker,
+                editor::open, editor::reveal));
         }
         pluginManager.open();
     }

@@ -37,6 +37,8 @@ class PluginManagerTest {
     private final BuddyTestSupport deck = new BuddyTestSupport();
     private final List<RestartMode> restarts = new CopyOnWriteArrayList<>();
     private final List<String> quits = new CopyOnWriteArrayList<>();
+    private final List<Path> edited = new CopyOnWriteArrayList<>();
+    private final List<Path> revealed = new CopyOnWriteArrayList<>();
     private PluginRuntime runtime;
     private AuxiliaryWindows windows;
     private PluginManager manager;
@@ -57,7 +59,7 @@ class PluginManagerTest {
             var flow = new RestartFlow(control, mode -> { restarts.add(mode); return true; }, Runnable::run, Runnable::run,
                 Duration.ofMillis(20), Duration.ofMillis(1));
             manager = new PluginManager(runtime, windows, new PluginManager.Hooks(surface -> Optional.ofNullable(chosenZip), flow,
-                () -> quits.add("quit"), control, standaloneNotice, Runnable::run));
+                () -> quits.add("quit"), control, standaloneNotice, Runnable::run, edited::add, revealed::add));
         });
     }
 
@@ -190,4 +192,29 @@ class PluginManagerTest {
         edt(() -> windows.open().get(0).notifyActivated());
         until(() -> manager.panel().noticeText().isEmpty());
     }
+
+        @Test void removingAsksFirstAndTheOpenersGoThroughTheHooks() throws Exception {
+            PluginJars.build(user().resolve("dev.example.gone/jars"), "main.jar", PluginJars.descriptor("dev.example.gone", "1.0.0", "fix.Main"), Map.of(), List.of());
+            Files.writeString(root.resolve("plugins.toml"), "version = 1\n[plugins.\"dev.example.gone\"]\nenabled = true\nconsented = []\n");
+            start(false, false);
+            // Built before start so the launch discovers it; consented so Remove is offered.
+            edt(manager::open);
+            until(() -> manager.panel().listed().stream().anyMatch(line -> line.contains("dev.example.gone")));
+            edt(() -> manager.panel().select("dev.example.gone"));
+            edt(() -> manager.panel().remove.doClick());
+            until(() -> manager.confirm() != null);
+            edt(() -> assertThat(manager.confirm().text()).contains("dev.example.gone", "jars, settings and data"));
+            edt(() -> manager.confirm().cancel.doClick());
+            edt(() -> assertThat(manager.panel().remove.getText()).isEqualTo("Remove\u2026"));
+            edt(() -> manager.panel().remove.doClick());
+            until(() -> manager.confirm() != null);
+            edt(() -> manager.confirm().ok.doClick());
+            until(() -> manager.panel().remove.getText().equals("Keep"));
+            edt(() -> { manager.panel().clickMenu("Open Settings"); manager.panel().clickMenu("Open Plugin Folder"); manager.panel().clickMenu("Open Data Folder"); });
+            until(() -> edited.size() == 1 && revealed.size() == 2);
+            assertThat(edited).containsExactly(user().resolve("dev.example.gone/dev.example.gone.toml"));
+            assertThat(user().resolve("dev.example.gone/dev.example.gone.toml")).as("seeded before opening").isRegularFile();
+            assertThat(revealed).containsExactly(user().resolve("dev.example.gone"), user().resolve("dev.example.gone/data"));
+            assertThat(user().resolve("dev.example.gone/data")).isDirectory();
+        }
 }

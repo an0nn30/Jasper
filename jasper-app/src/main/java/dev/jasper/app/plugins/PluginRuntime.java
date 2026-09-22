@@ -72,16 +72,21 @@ public final class PluginRuntime {
      * @param pendingRemoval whether it is marked for removal
      * @param pendingInstall whether a staged version waits for the next launch
      * @param pending what a restart changes for this plugin, or empty
+     * @param directory the plugin's folder under {@code plugins/}
+     * @param settingsFile its settings file
+     * @param dataDirectory its data directory
      */
     public record Row(String id, String name, String version, String description, String vendor, String origin,
                       String state, String reason, List<String> capabilities, List<String> unconsented,
                       List<String> requires, int errors, boolean enabled, boolean needsConsent, boolean canToggle,
-                      boolean canRemove, boolean pendingRemoval, boolean pendingInstall, String pending) {
+                      boolean canRemove, boolean pendingRemoval, boolean pendingInstall, String pending,
+                      Path directory, Path settingsFile, Path dataDirectory) {
         /** Copies the lists. */
         public Row {
             capabilities = List.copyOf(capabilities);
             unconsented = List.copyOf(unconsented);
             requires = List.copyOf(requires);
+            Objects.requireNonNull(directory, "directory"); Objects.requireNonNull(settingsFile, "settingsFile"); Objects.requireNonNull(dataDirectory, "dataDirectory");
         }
     }
 
@@ -480,4 +485,16 @@ public final class PluginRuntime {
 
     /** Test seam: what the settings poller does, now. */
     void pollSettingsNow() { if (!settingsFiles.refresh(false).isEmpty()) applySettings(); }
+
+        /**
+         * Seeds the settings file and creates the data directory of a plugin the launch found, if they are missing;
+         * for the manager's openers. Off the EDT.
+         *
+         * @param id the plugin
+         */
+        public void prepareSettings(String id) throws IOException {
+            PluginCandidate candidate = launched.get(id);
+            if (candidate == null) throw new IOException("No such plugin: " + id);
+            PluginSettingsFiles.prepare(options.userDirectory(), candidate, null);
+        }
 }

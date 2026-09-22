@@ -55,7 +55,7 @@ final class PluginCatalog {
 
     static Optional<PluginCandidate> subject(Disk disk, String id) { return winner(afterMaintenance(disk), id); }
 
-    static PluginRuntime.Snapshot compute(Launch launch, Disk disk, Version sdk, ToIntFunction<String> errors) {
+    static PluginRuntime.Snapshot compute(Launch launch, Disk disk, Version sdk, ToIntFunction<String> errors, java.nio.file.Path userDirectory) {
         List<PluginCandidate> next = afterMaintenance(disk);
         Map<String, PluginStateStore.Entry> nextState = new TreeMap<>(disk.state());
         nextState.values().removeIf(PluginStateStore.Entry::remove);
@@ -93,7 +93,8 @@ final class PluginCatalog {
                 state, reason, capabilities, unconsented, requires(descriptor), errors.applyAsInt(id),
                 entry == null || entry.enabled(), needsConsent,
                 !pendingRemoval && !(user && entry == null), user, pendingRemoval, pendingInstall,
-                pending(id, launch, willRun, rejectedNext, pendingRemoval, pendingInstall, descriptor)));
+                pending(id, launch, willRun, rejectedNext, pendingRemoval, pendingInstall, descriptor),
+                PluginSettingsFiles.folder(userDirectory, id), PluginSettingsFiles.file(userDirectory, id), PluginSettingsFiles.data(userDirectory, id)));
         }
         boolean restartNeeded = !launch.safeMode()
             && (!willRun.equals(launch.selected()) || disk.pending().keySet().stream().anyMatch(id -> !removed(disk, id)));

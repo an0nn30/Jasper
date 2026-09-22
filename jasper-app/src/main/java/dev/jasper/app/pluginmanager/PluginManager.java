@@ -34,11 +34,13 @@ public final class PluginManager {
      * @param worker runs the blocking resident probe
      */
     public record Hooks(Function<AuxiliarySurface, Optional<Path>> chooseZip, RestartFlow restarts, Runnable quit,
-                        ResidentControl resident, boolean standaloneNotice, Executor worker) {
+                        ResidentControl resident, boolean standaloneNotice, Executor worker,
+                        java.util.function.Consumer<Path> openInEditor, java.util.function.Consumer<Path> reveal) {
         /** Rejects nulls. */
         public Hooks {
             Objects.requireNonNull(chooseZip); Objects.requireNonNull(restarts); Objects.requireNonNull(quit);
             Objects.requireNonNull(resident); Objects.requireNonNull(worker);
+            Objects.requireNonNull(openInEditor); Objects.requireNonNull(reveal);
         }
     }
 
@@ -50,6 +52,8 @@ public final class PluginManager {
     private PluginRuntime.Snapshot snapshot = new PluginRuntime.Snapshot(List.of(), false, false);
     private AuxiliarySurface consentDialog;
     private ConsentView consent;
+    private ConfirmView confirm;
+    private AuxiliarySurface confirmDialog;
 
     /**
      * Creates the manager; nothing is shown until {@link #open}.
@@ -66,13 +70,15 @@ public final class PluginManager {
 
     PluginManagerPanel panel() { return panel; }
     ConsentView consent() { return consent; }
+    ConfirmView confirm() { return confirm; }
 
     /** Shows the manager, or brings it forward, and lists the plugins afresh. */
     public void open() {
         AuxiliarySurface window = windows.window(WINDOW_ID, "Plugins", new Dimension(760, 520), true);
         if (window != surface) {
             surface = window;
-            panel = new PluginManagerPanel(new PluginManagerPanel.Handlers(this::toggle, this::review, this::remove, this::discardInstall, this::install));
+            panel = new PluginManagerPanel(new PluginManagerPanel.Handlers(this::toggle, this::review, this::remove, this::discardInstall, this::install,
+                this::openSettings, this::openFolder, this::openData));
             window.setContent(panel);
             // Another process may have changed plugins.toml while this window was in the background.
             window.onActivated(this::refresh);
@@ -138,8 +144,38 @@ public final class PluginManager {
     }
 
     private void remove(PluginRuntime.Row row) {
-        panel.busy(true);
-        runtime.remove(row.id(), !row.pendingRemoval(), this::accept);
+        if (row.pendingRemoval()) { panel.busy(true); runtime.remove(row.id(), false, this::accept); return; }
+        AuxiliarySurface dialog = windows.dialog("Remove " + row.name(), true, surface);
+        var view = new ConfirmView("Remove " + row.name() + " " + row.version() + "?\n\nIts jars, settings and data in " + row.directory()
+            + " are deleted the next time Jasper starts. Keep undoes this until then.", "Remove",
+            () -> { dialog.close(); panel.busy(true); runtime.remove(row.id(), true, this::accept); }, dialog::close);
+        dialog.onClosed(() -> { if (confirmDialog == dialog) { confirmDialog = null; confirm = null; } });
+        dialog.setContent(view);
+        confirmDialog = dialog;
+        confirm = view;
+        dialog.show();
+    }
+
+    /** Off the EDT: seeds the file if needed, then hands it to the editor; a failure is shown in the window. */
+    private void openSettings(PluginRuntime.Row row) {
+        hooks.worker().execute(() -> {
+            try { runtime.prepareSettings(row.id()); hooks.openInEditor().accept(row.settingsFile()); }
+            catch (java.io.IOException | RuntimeException failure) { failed(failure); }
+        });
+    }
+
+    private void openFolder(PluginRuntime.Row row) { reveal(row.directory()); }
+    private void openData(PluginRuntime.Row row) { reveal(row.dataDirectory()); }
+
+    private void reveal(Path directory) {
+        hooks.worker().execute(() -> {
+            try { java.nio.file.Files.createDirectories(directory); hooks.reveal().accept(directory); }
+            catch (java.io.IOException | RuntimeException failure) { failed(failure); }
+        });
+    }
+
+    private void failed(Exception failure) {
+        javax.swing.SwingUtilities.invokeLater(() -> { if (surface != null) panel.message(failure.getMessage() == null ? failure.toString() : failure.getMessage(), true); });
     }
 
     private void discardInstall(PluginRuntime.Row row) {

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PluginCatalogTest {
+    private static final Path USER = Path.of("/plugins");
     private static final Version SDK = Version.parse("0.3.0");
 
     private static PluginCandidate plugin(String id, String version, PluginCandidate.Origin origin, String... capabilities) {
@@ -35,9 +36,12 @@ class PluginCatalogTest {
             plugin("dev.example.tool", "1.2.0", PluginCandidate.Origin.USER, "terminal.observe"));
         var state = Map.of("dev.example.tool", REVIEWED);
         var snapshot = PluginCatalog.compute(launch(candidates, state, false), new PluginCatalog.Disk(candidates, Map.of(), state), SDK,
-            id -> id.equals("dev.example.tool") ? 3 : 0);
+            id -> id.equals("dev.example.tool") ? 3 : 0, USER);
         assertThat(snapshot.restartNeeded()).isFalse();
         assertThat(snapshot.safeMode()).isFalse();
+        assertThat(row(snapshot, "dev.example.tool").directory()).isEqualTo(USER.resolve("dev.example.tool"));
+        assertThat(row(snapshot, "dev.example.tool").settingsFile()).isEqualTo(USER.resolve("dev.example.tool/dev.example.tool.toml"));
+        assertThat(row(snapshot, "dev.example.tool").dataDirectory()).isEqualTo(USER.resolve("dev.example.tool/data"));
         assertThat(snapshot.rows()).extracting(PluginRuntime.Row::id).containsExactly("dev.example.bundled", "dev.example.tool");
         var tool = row(snapshot, "dev.example.tool");
         assertThat(tool.name()).isEqualTo("tool");
@@ -62,7 +66,7 @@ class PluginCatalogTest {
         var candidates = List.of(plugin("dev.example.tool", "1.2.0", PluginCandidate.Origin.USER, "terminal.observe"));
         var atLaunch = launch(candidates, Map.of("dev.example.tool", REVIEWED), false);
         var now = Map.of("dev.example.tool", new PluginStateStore.Entry(false, Set.of("terminal.observe"), false));
-        var snapshot = PluginCatalog.compute(atLaunch, new PluginCatalog.Disk(candidates, Map.of(), now), SDK, id -> 0);
+        var snapshot = PluginCatalog.compute(atLaunch, new PluginCatalog.Disk(candidates, Map.of(), now), SDK, id -> 0, USER);
         assertThat(snapshot.restartNeeded()).isTrue();
         var tool = row(snapshot, "dev.example.tool");
         assertThat(tool.state()).as("still running").isEqualTo("ACTIVE");
@@ -75,7 +79,7 @@ class PluginCatalogTest {
         var grown = plugin("dev.example.tool", "2.0.0", PluginCandidate.Origin.USER, "terminal.inject", "terminal.observe");
         var candidates = List.of(found, grown);
         var state = Map.of("dev.example.tool", REVIEWED);
-        var snapshot = PluginCatalog.compute(launch(candidates, state, false), new PluginCatalog.Disk(candidates, Map.of(), state), SDK, id -> 0);
+        var snapshot = PluginCatalog.compute(launch(candidates, state, false), new PluginCatalog.Disk(candidates, Map.of(), state), SDK, id -> 0, USER);
         assertThat(snapshot.restartNeeded()).isFalse();
         var unreviewed = row(snapshot, "dev.example.found");
         assertThat(unreviewed.state()).isEqualTo("NEEDS_CONSENT");
@@ -99,7 +103,7 @@ class PluginCatalogTest {
                 "dev.example.fresh", plugin("dev.example.fresh", "1.0.0", PluginCandidate.Origin.USER)),
             Map.of("dev.example.tool", reviewed, "dev.example.fresh", reviewed, "dev.example.dropped", reviewed,
                 "dev.example.doomed", new PluginStateStore.Entry(true, Set.of(), true)));
-        var snapshot = PluginCatalog.compute(atLaunch, disk, SDK, id -> 0);
+        var snapshot = PluginCatalog.compute(atLaunch, disk, SDK, id -> 0, USER);
         assertThat(snapshot.restartNeeded()).isTrue();
         assertThat(row(snapshot, "dev.example.tool").version()).as("the row is about what the next launch runs").isEqualTo("2.0.0");
         assertThat(row(snapshot, "dev.example.tool").pendingInstall()).isTrue();
@@ -118,7 +122,7 @@ class PluginCatalogTest {
         var reviewed = new PluginStateStore.Entry(true, Set.of(), false);
         var atLaunch = launch(candidates, Map.of("dev.example.tool", reviewed), true);
         var disabled = Map.of("dev.example.tool", new PluginStateStore.Entry(false, Set.of(), false));
-        var snapshot = PluginCatalog.compute(atLaunch, new PluginCatalog.Disk(candidates, Map.of(), disabled), SDK, id -> 0);
+        var snapshot = PluginCatalog.compute(atLaunch, new PluginCatalog.Disk(candidates, Map.of(), disabled), SDK, id -> 0, USER);
         assertThat(snapshot.safeMode()).isTrue();
         assertThat(snapshot.restartNeeded()).as("the safe-mode banner offers Restart normally instead").isFalse();
         assertThat(row(snapshot, "dev.example.tool").state()).isEqualTo("DISABLED");

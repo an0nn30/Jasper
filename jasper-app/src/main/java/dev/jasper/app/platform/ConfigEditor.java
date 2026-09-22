@@ -43,4 +43,15 @@ public final class ConfigEditor {
             }
         } catch (IOException exception) { throw new UncheckedIOException(exception); }
     }
+
+        /** Reveals a directory in the file manager, else opens it. Never on the EDT. */
+        public void reveal(Path path) {
+            if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor operations require a worker thread");
+            var failure = new IllegalStateException("Could not reveal: " + path);
+            for (Consumer<Path> attempt : List.of(attempts.get(2), attempts.get(1))) {
+                try { attempt.accept(path); return; }
+                catch (RuntimeException exception) { failure.addSuppressed(exception); }
+            }
+            throw failure;
+        }
 }

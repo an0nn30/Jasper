@@ -45,7 +45,7 @@ final class PluginAdmin {
     }
 
     PluginRuntime.Snapshot snapshot() throws IOException {
-        return PluginCatalog.compute(launch.get(), disk(), sdk, errors);
+        return PluginCatalog.compute(launch.get(), disk(), sdk, errors, options.userDirectory());
     }
 
     PluginRuntime.Snapshot setEnabled(String id, boolean enabled) throws IOException {
