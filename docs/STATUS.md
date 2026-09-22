@@ -19,8 +19,8 @@ merged too. With it the plugin SDK plans are complete. The palette-plugins desig
 contribution surface) is merged at `3eb143a`, plan 5b (the History and Snippets plugins) is
 merged at `0550bad`. The plugin-home design (`superpowers/specs/2026-09-22-jasper-plugin-home-design.md`)
 is merged at `17c0476`. The Credential Vault design
-(`superpowers/specs/2026-09-22-jasper-vault-design.md`) has plan 6a (core and API) implemented on
-`claude/vault-6a`; plan 6b (UI) is next, then the SSH plugin spec. A development launch keeps its own home under
+(`superpowers/specs/2026-09-22-jasper-vault-design.md`) has plan 6a (core and API) integrated into local `main` at `c8141b6`; plan 6b (UI)
+is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
 ### Plugin home — 2026-09-22
@@ -62,7 +62,7 @@ the user's.
 
 ### Credential Vault plan 6a — 2026-09-22
 
-Implemented on `claude/vault-6a` (not merged, not pushed): the bundled `dev.jasper.vault` plugin's
+Integrated into local `main` at `c8141b6` (not pushed): the bundled `dev.jasper.vault` plugin's
 core and API from the [vault design](superpowers/specs/2026-09-22-jasper-vault-design.md) per the
 [6a plan](superpowers/plans/2026-09-22-jasper-vault-plan-6a-core-and-api.md). A device-bound
 Argon2id/AES-256-GCM file with a binary plaintext that never becomes a `String`; the device secret in
@@ -71,6 +71,20 @@ OpenSSH key generator; `VaultApi` published per consumer with once/always/deny g
 vault, one prompt per request kind, and cancellation that withdraws a request. UI so far: the create,
 unlock, grant and picker dialogs, `Open Vault...` (F8) and `Lock Vault`. Plan 6b adds the manager
 window, status item, rail action, key generator dialog and the Vault palette scope.
+
+### Credential Vault plan 6b continuation — 2026-09-22
+
+Resumed the existing `.worktrees/vault-6b` / `claude/vault-6b` handoff. It contained an
+uncommitted draft with only the palette and status tasks; no UI implementation had started.
+The remaining manager/editor/generator plan is being completed against the approved design.
+Baseline `./gradlew check -q`: 1,483 tests, 1,480 passed, three expected skips, no failures/errors;
+existing compiler and JavaDoc warnings remain.
+
+Prerequisite found by two failing lifecycle regressions: a background create/unlock could install
+its result after `lock()`, including plugin stop. `LockManager` now invalidates pending installs
+and password changes by generation and zeroes rejected results. Both tests failed with UNLOCKED
+before the fix and pass afterwards; the full vault test suite passes. This is a deliberate small
+6a correction required for the manager's asynchronous lifecycle, not a storage-format change.
 
 ### macOS 26 window controls in the packaged app — 2026-09-22
 

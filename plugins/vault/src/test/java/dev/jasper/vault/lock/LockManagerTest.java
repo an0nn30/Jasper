@@ -130,6 +130,27 @@ class LockManagerTest {
         assertThat(fresh).isCompleted();
     }
 
+    @Test void lockingWhileUnlockIsPendingDiscardsItsResult(@TempDir Path dir) {
+        LockManager manager = manager(dir);
+        manager.create("pw".toCharArray(), false);
+        runBackground();
+        manager.lock();
+        CompletableFuture<Void> pending = manager.unlock("pw".toCharArray());
+        manager.lock();
+        runBackground();
+        assertThat(manager.state()).isEqualTo(LockState.LOCKED);
+        assertThat(pending).isCompletedExceptionally();
+    }
+
+    @Test void lockingDuringCreationDoesNotInstallOrWriteTheVault(@TempDir Path dir) {
+        LockManager manager = manager(dir);
+        CompletableFuture<Void> pending = manager.create("pw".toCharArray(), false);
+        manager.lock();
+        runBackground();
+        assertThat(manager.state()).isEqualTo(LockState.NO_VAULT);
+        assertThat(pending).isCompletedExceptionally();
+    }
+
     @Test void guardsTheStateMachine(@TempDir Path dir) {
         LockManager manager = manager(dir);
         assertThat(cause(manager.unlock("pw".toCharArray()))).isInstanceOf(IllegalStateException.class);

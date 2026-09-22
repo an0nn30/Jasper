@@ -29,6 +29,7 @@ public final class LockManager {
     private Vault vault;
     private byte[] key, salt;
     private boolean bound;
+    private long generation;
     private CompletableFuture<Void> lastWrite = CompletableFuture.completedFuture(null);
 
     private record Opened(Vault vault, byte[] key, byte[] salt, boolean bound) { }
@@ -52,19 +53,21 @@ public final class LockManager {
         byte[] material = SecureBytes.utf8(password);
         SecureBytes.zero(password);
         if (state() != LockState.NO_VAULT) { SecureBytes.zero(material); return CompletableFuture.failedFuture(new IllegalStateException("A vault already exists")); }
+        long attempt = ++generation;
         return onBackground(() -> {
             byte[] device = bind ? secrets.getOrCreate() : null;
             try {
                 byte[] fresh = VaultCipher.randomSalt();
                 return new Opened(new Vault(), KeyDerivation.derive(material, device, fresh), fresh, bind);
             } finally { SecureBytes.zero(device); SecureBytes.zero(material); }
-        }).thenCompose(opened -> { install(opened); return save(); });
+        }).thenCompose(opened -> { install(opened, attempt); return save(); });
     }
 
     public CompletableFuture<Void> unlock(char[] password) {
         byte[] material = SecureBytes.utf8(password);
         SecureBytes.zero(password);
         if (state() != LockState.LOCKED) { SecureBytes.zero(material); return CompletableFuture.failedFuture(new IllegalStateException("No locked vault to unlock")); }
+        long attempt = ++generation;
         return onBackground(() -> {
             VaultFileFormat.Parsed parsed = VaultFileFormat.parse(file.read());
             byte[] device = parsed.header().bound() ? secrets.existing().orElseThrow(ForeignDeviceException::new) : null;
@@ -78,11 +81,12 @@ public final class LockManager {
                 SecureBytes.zero(derived);
                 throw failure;
             } finally { SecureBytes.zero(device); SecureBytes.zero(material); }
-        }).thenAccept(this::install);
+        }).thenAccept(opened -> install(opened, attempt));
     }
 
     /** Zeroes everything and publishes {@link LockState#LOCKED}; a no-op when already locked. */
     public void lock() {
+        generation++;
         if (vault == null) return;
         vault.zero();
         SecureBytes.zero(key); SecureBytes.zero(salt);
@@ -106,6 +110,7 @@ public final class LockManager {
         if (vault == null) { SecureBytes.zero(old); SecureBytes.zero(fresh); return CompletableFuture.failedFuture(new IllegalStateException("The vault is locked")); }
         byte[] currentKey = key.clone(), currentSalt = salt.clone();
         boolean isBound = bound;
+        long attempt = generation;
         return onBackground(() -> {
             byte[] device = isBound ? secrets.existing().orElseThrow(ForeignDeviceException::new) : null;
             try {
@@ -117,14 +122,18 @@ public final class LockManager {
                 return new Rekey(KeyDerivation.derive(fresh, device, newSalt), newSalt);
             } finally { SecureBytes.zero(device); SecureBytes.zero(old); SecureBytes.zero(fresh); SecureBytes.zero(currentKey); }
         }).thenCompose(rekey -> {
-            if (vault == null) { SecureBytes.zero(rekey.key()); return CompletableFuture.failedFuture(new IllegalStateException("The vault was locked meanwhile")); }
+            if (vault == null || attempt != generation) { SecureBytes.zero(rekey.key()); SecureBytes.zero(rekey.salt()); return CompletableFuture.failedFuture(new IllegalStateException("The vault was locked meanwhile")); }
             SecureBytes.zero(key); SecureBytes.zero(salt);
             key = rekey.key(); salt = rekey.salt();
             return save();
         });
     }
 
-    private void install(Opened opened) {
+    private void install(Opened opened, long attempt) {
+        if (attempt != generation) {
+            opened.vault().zero(); SecureBytes.zero(opened.key()); SecureBytes.zero(opened.salt());
+            throw new IllegalStateException("The vault operation was cancelled");
+        }
         vault = opened.vault(); key = opened.key(); salt = opened.salt(); bound = opened.bound();
         listener.accept(LockState.UNLOCKED);
     }
