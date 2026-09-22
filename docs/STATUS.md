@@ -66,9 +66,9 @@ the user's.
 
 ### Official Ember application icon — 2026-09-21
 
-Prepared on `codex/ember-app-icon` in a dedicated worktree from current `main`;
-not merged or pushed. The user chose the approved Ember pack (faceted white turtle,
-warm gradient, no prompt) as the official icon for all platforms. macOS ICNS,
+Implemented on `codex/ember-app-icon` in a dedicated worktree; local integration
+was authorized by the user. No push was performed. The approved Ember pack (faceted white turtle,
+warm gradient, no prompt) is the official icon for all platforms. macOS ICNS,
 Windows ICO, all runtime PNGs, and Linux PNG/hicolor assets use that artwork.
 Linux windows now select their own resource set and portable distributions carry
 the hicolor hierarchy. Existing native installer support remains macOS/Windows.
@@ -77,8 +77,9 @@ The approved raster source and a reproducible Core Graphics generator replace th
 old SVG app-icon pipeline. Buddy retains its silver character reference and sprites.
 See [the icon guide](../packaging/icons/README.md) for provenance, sizes and generation.
 Verification: `./gradlew check :jasper-app:installDist :jasper-app:packageDist`
-passed with **1,436 tests: 1,434 passed, two expected skips, no failures or errors**
-(app 820, Buddy 163, terminal 377, SDK 21, testkit 45, sample plugin 10). The macOS
+passed after integrating main's development-home change with **1,437 tests: 1,435
+passed, two expected skips, no failures or errors** (app 821, Buddy 163, terminal
+377, SDK 21, testkit 45, sample plugin 10). The macOS
 app/DMG passed native verification, including exact ICNS bytes in the bundle.
 All runtime PNGs and ICNS/ICO containers match the approved Ember preview pack
 byte-for-byte. All ten Linux hicolor sizes match their portable-distribution

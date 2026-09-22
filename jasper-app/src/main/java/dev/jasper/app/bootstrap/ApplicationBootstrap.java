@@ -37,7 +37,7 @@ public final class ApplicationBootstrap {
         acquired.own(service);
         try {
             AppDirs dirs = AppDirs.resolve(System.getProperty("os.name"), System.getenv(),
-                Path.of(System.getProperty("user.home")));
+                Path.of(System.getProperty("user.home")), System.getProperty("jasper.home"));
             AppLog log = acquired.own(AppLog.open(dirs.logs()));
             UnexpectedExceptions exceptions = acquired.own(installUnexpectedExceptionHandler());
             var endpoint = new AtomicReference<HandoffSocket>();
@@ -204,7 +204,8 @@ public final class ApplicationBootstrap {
         if (options.help()) { out.println(AppArguments.USAGE); return 0; }
         String os = System.getProperty("os.name");
         Path home = Path.of(System.getProperty("user.home"));
-        AppDirs dirs = AppDirs.resolve(os, System.getenv(), home);
+        AppDirs dirs = AppDirs.resolve(os, System.getenv(), home, System.getProperty("jasper.home"));
+        options = options.withHomeOverride(dirs.overridden());
         // Before any toolkit initialization: a handed-off launch must cost almost nothing and must
         // not settle a second icon into the Dock on its way out.
         if (handsOff(options, dirs)) return 0;
@@ -220,8 +221,8 @@ public final class ApplicationBootstrap {
 
     /**
      * True when a resident process accepted this launch and there is nothing left to do. A standalone
-     * launch ({@code --config}, {@code --safe-mode}, {@code --plugin-dir}, {@code --standalone}) never hands
-     * off, because the resident process holds a different configuration or plugin set, or is the very
+     * launch ({@code --config}, {@code --safe-mode}, {@code --plugin-dir}, {@code --standalone}, an overridden
+     * home) never hands off, because the resident process holds a different configuration or plugin set, or is the very
      * process a recovery launch is escaping; neither does a resident process starting up.
      */
     static boolean handsOff(AppArguments options, AppDirs dirs) {
@@ -243,7 +244,7 @@ public final class ApplicationBootstrap {
      * resident to ask, and a resident with another configuration must not be retired on its account.
      */
     static boolean replacementHandsOff(AppArguments options) {
-        return options.configOverride() == null && options.pluginDir() == null && !options.standalone();
+        return options.configOverride() == null && options.pluginDir() == null && !options.standalone() && !options.homeOverride();
     }
 
     /** A launch that is standalone only because of {@code --standalone} is a "Launch anyway" replacement. */

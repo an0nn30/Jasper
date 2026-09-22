@@ -5,7 +5,7 @@ import java.nio.file.Path;
 
 /** Startup options parsed before any desktop initialization. */
 record AppArguments(Path configOverride, boolean help, boolean background, boolean safeMode, Path pluginDir,
-                    boolean standalone) {
+                    boolean standalone, boolean homeOverride) {
     static final String USAGE = "Usage: jasper [--config <path>] [--background] [--safe-mode] "
         + "[--plugin-dir <path>] [--standalone] [--help]";
 
@@ -19,13 +19,23 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
         this(configOverride, help, background, false, null, false);
     }
 
+    /** The form that predates the home override: the OS-default home. */
+    AppArguments(Path configOverride, boolean help, boolean background, boolean safeMode, Path pluginDir, boolean standalone) {
+        this(configOverride, help, background, safeMode, pluginDir, standalone, false);
+    }
+
+    /** Records whether the application home was overridden ({@code jasper.home} or {@code JASPER_HOME}). */
+    AppArguments withHomeOverride(boolean value) {
+        return new AppArguments(configOverride, help, background, safeMode, pluginDir, standalone, value);
+    }
+
     /**
      * A standalone launch never hands off to a resident process, never binds the shared endpoint and
-     * is never resident: it is a different Jasper (another config, another plugin set) or a recovery
+     * is never resident: it is a different Jasper (another home, config or plugin set) or a recovery
      * launch that must not reopen the process it is escaping.
      */
     boolean standaloneLaunch() {
-        return configOverride != null || safeMode || pluginDir != null || standalone;
+        return configOverride != null || safeMode || pluginDir != null || standalone || homeOverride;
     }
 
     static AppArguments parse(String[] args, Path workingDirectory) {

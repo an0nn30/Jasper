@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Jasper (dev home)" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="dev.jasper.app.Main" />
+    <module name="jasper.jasper-app.main" />
+    <option name="VM_PARAMETERS" value="-Djasper.home=$PROJECT_DIR$/jasper-app/build/dev-home -Djasper.plugins.bundled=$PROJECT_DIR$/jasper-app/build/plugins" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <method v="2">
+      <option name="Gradle.BeforeRunTask" enabled="true" tasks=":jasper-app:stagePlugins" externalProjectPath="$PROJECT_DIR$" vmOptions="" scriptParameters="" />
+    </method>
+  </configuration>
+</component>
