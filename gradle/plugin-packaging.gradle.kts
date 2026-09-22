@@ -3,8 +3,9 @@
 //   :jasper-plugin-<name>:stagePlugin  -> plugins/<name>/build/plugin/<id>/     (a --plugin-dir directory)
 //   :jasper-plugin-<name>:pluginZip    -> plugins/<name>/build/distributions/<id>-<version>.zip
 //                                         (File > Manage Plugins... > Install from Zip...)
-//   pluginZips                          -> every plugin's zip
-val pluginPaths = listOf(":jasper-plugin-sample", ":jasper-plugin-snippets", ":jasper-plugin-history")
+//   pluginZips                          -> every plugin's zip, collected in plugins/build/zips/
+// Every plugins/<name>/ module takes part; settings.gradle.kts discovers them.
+val pluginProjects = subprojects.filter { it.projectDir.parentFile == file("plugins") }.sortedBy { it.name }
 
 /** id and version from the plugin's own descriptor, so the build has no second copy of either. */
 fun descriptor(project: Project): Pair<String, String> {
@@ -14,13 +15,13 @@ fun descriptor(project: Project): Pair<String, String> {
     return field("id") to field("version")
 }
 
-val pluginZips = tasks.register("pluginZips") {
-    description = "Builds every in-repo plugin's installable zip."
+val pluginZips = tasks.register<Sync>("pluginZips") {
+    description = "Builds every in-repo plugin's installable zip and collects them in plugins/build/zips/."
     group = "distribution"
+    into(file("plugins/build/zips"))
 }
 
-pluginPaths.forEach { path ->
-    val plugin = project(path)
+pluginProjects.forEach { plugin ->
     val (id, version) = descriptor(plugin)
     val contents = plugin.files(plugin.tasks.named("jar"), plugin.configurations.named("runtimeClasspath"))
     plugin.tasks.register<Sync>("stagePlugin") {
@@ -36,5 +37,5 @@ pluginPaths.forEach { path ->
         archiveFileName.set("$id-$version.zip")
         destinationDirectory.set(plugin.layout.buildDirectory.dir("distributions"))
     }
-    pluginZips.configure { dependsOn(zip) }
+    pluginZips.configure { from(zip) }
 }

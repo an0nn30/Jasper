@@ -1,7 +1,6 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.sdk.JasperSdk;
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -15,10 +14,9 @@ class PluginZipsTest {
     @TempDir Path userDirectory;
 
     @Test void everyInRepoPluginZipStagesWithItsDescriptorAndBundledLibraries() throws Exception {
-        List<Path> zips = new ArrayList<>();
-        for (String directory : System.getProperty("jasper.pluginZips").split(File.pathSeparator))
-            try (var files = Files.list(Path.of(directory))) { zips.addAll(files.filter(file -> file.toString().endsWith(".zip")).toList()); }
-        assertThat(zips).as("one zip per in-repo plugin").hasSize(3);
+        List<Path> zips;
+        try (var files = Files.list(Path.of(System.getProperty("jasper.pluginZips")))) { zips = files.filter(file -> file.toString().endsWith(".zip")).toList(); }
+        assertThat(zips).as("one zip per plugins/ directory").hasSize(3);
         var ids = new ArrayList<String>();
         for (Path zip : zips) {
             PluginInstaller.Staged staged = PluginInstaller.stage(zip, userDirectory, Version.parse(JasperSdk.VERSION));

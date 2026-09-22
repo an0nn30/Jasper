@@ -5,10 +5,11 @@ import org.gradle.jvm.toolchain.JvmVendorSpec
 
 // The build-time twin of PluginClassLoader: an in-repo plugin may reference only the JDK, the SDK,
 // its own packages, libraries it bundles, and the exported packages of plugins it requires.
-// Map each plugin project to the exported packages of its declared dependencies.
-val pluginImports = mapOf(":jasper-plugin-sample" to listOf<String>(), ":jasper-plugin-snippets" to listOf<String>(),
-    ":jasper-plugin-history" to listOf("dev.jasper.snippets.api"))
-val pluginProjects = pluginImports.keys.associateWith { project(it) }
+// Every plugins/<name>/ module (settings.gradle.kts discovers them) is checked; a plugin that requires
+// another plugin lists that plugin's exported packages here, and nothing else may be imported.
+val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"))
+val pluginProjects = subprojects.filter { it.projectDir.parentFile == file("plugins") }.associateBy { it.path }
+val pluginImports = pluginProjects.keys.associateWith { declaredImports[it] ?: listOf<String>() }
 val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
     pluginImports.keys.forEach { dependsOn("$it:classes") }
     doLast {

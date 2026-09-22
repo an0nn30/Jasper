@@ -416,24 +416,25 @@ record what the plugin asked for.
 
 ## Building the in-repo plugins
 
-Each plugin under `plugins/` is a Gradle module named `:jasper-plugin-<directory>`; the same
-tasks appear in IntelliJ's Gradle tool window under that name, and the modules compile with the
-rest of the project.
+Every `plugins/<name>/` directory with a `build.gradle.kts` is discovered by `settings.gradle.kts`
+as the Gradle module `:jasper-plugin-<name>`; the same tasks appear in IntelliJ's Gradle tool
+window under that name, and the modules compile with the rest of the project.
 
 ```sh
 ./gradlew :jasper-plugin-snippets:build          # compile, test and jar one plugin
 ./gradlew :jasper-plugin-snippets:stagePlugin    # plugins/snippets/build/plugin/dev.jasper.snippets/, a --plugin-dir directory
 ./gradlew :jasper-plugin-snippets:pluginZip      # plugins/snippets/build/distributions/dev.jasper.snippets-0.1.0.zip
-./gradlew pluginZips                             # every plugin's zip
+./gradlew pluginZips                             # every plugin, built and zipped, collected in plugins/build/zips/
 ```
 
 `stagePlugin` and `pluginZip` carry the plugin jar plus its runtime classpath (Snippets bundles
 tomlj this way), which is exactly what `stagePlugins` copies into the application image and what
 `PluginInstaller` expects; a plain `build/libs` jar is missing the bundled libraries. The id and
-version come from `plugin.toml`. A new in-repo plugin joins `settings.gradle.kts`, the `pluginImports`
-map in `gradle/plugin-architecture.gradle.kts`, the `pluginPaths` list in
-`gradle/plugin-packaging.gradle.kts`, and the `stagePlugins` task in `jasper-app/build.gradle.kts`
-if it is bundled; `PluginZipsTest` stages every zip through the installer.
+version come from `plugin.toml`. A new `plugins/<name>/` directory is built, checked by
+`verifyPluginArchitecture` and zipped with nothing to register; it only needs an entry in
+`declaredImports` (`gradle/plugin-architecture.gradle.kts`) when it requires another plugin, and in
+the `stagePlugins` task (`jasper-app/build.gradle.kts`) when it ships in the application image.
+`PluginZipsTest` stages every collected zip through the installer.
 
 ## Running a plugin in Jasper
 
