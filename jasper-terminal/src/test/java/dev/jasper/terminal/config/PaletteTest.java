@@ -56,6 +56,6 @@ class PaletteTest {
 
     @Test
     void theThemeHasASelectionColor() {
-        assertThat(palette.selection()).isEqualTo(new Color(0x3e4451));
+        assertThat(palette.selection()).isEqualTo(new Color(0x44475a));
     }
 }
