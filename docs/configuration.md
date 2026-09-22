@@ -275,8 +275,9 @@ exposing each tmux pane as a separate Jasper tab.
 
 ### Shell history
 
-`palette.scopes.history.trivial_commands` lists the commands ranked below more substantial ones when the History
-palette query is empty. It defaults to `["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]` —
+Shell history is the bundled `dev.jasper.history` plugin; its settings live in its own table,
+`[plugins."dev.jasper.history"]`. `trivial_commands` lists the commands ranked below more substantial
+ones when the History palette query is empty. It defaults to `["exit", "clear", "ls", "ll", "la", "cd", "pwd", "c", "q", "logout"]` —
 often the most recent thing you typed, so strict recency pushed the work you came back for off the
 first page.
 
@@ -286,26 +287,27 @@ is real work, and `clearcache --all` is not caught by `clear`. An entry containi
 never match and is rejected with a diagnostic.
 
 Setting the key **replaces** the default list rather than adding to it, so include any defaults you
-want to keep. An empty list (`trivial_commands = []`) turns trivial-command de-ranking off;
+want to keep. `deprioritize_trivial = false` turns trivial-command de-ranking off;
 other ordering rules, including timestamps and query match quality, still apply. De-ranked commands remain listed and searchable. A nonempty query ranks match
 quality first, then working-directory affinity and recency; it does not apply this
 trivial-command partition.
 
-`palette.scopes.history.enabled` adds the History scope to the [command palette](command-palette.md): Cmd+R on
-macOS or Ctrl+Shift+R elsewhere searches every shell history file Jasper can find plus commands
-it saw run through shell integration. Disabling it removes the scope and its shortcut does
-nothing. If you already bound Cmd+R (macOS) or Ctrl+Shift+R (elsewhere) to something else, that
-override now collides with the new `history_palette` default and is rejected, reverting all of
-your keybinding overrides to their defaults until you either set `history_palette = "none"` or
-rebind the colliding action.
+The plugin adds the History scope to the [command palette](command-palette.md): Cmd+R on macOS or
+Ctrl+Shift+R elsewhere searches every shell history file Jasper can find plus commands it saw run
+through shell integration. Disable the plugin in File → Manage Plugins… to remove the scope and its
+shortcut. The shortcut is the plugin's action, `"dev.jasper.history.open"`, rebindable under
+`[keybindings]` like any contributed action. A `[palette.scopes.history]` table from an older
+configuration is reported as moved and ignored.
 
 ### Snippets
 
-The Snippets scope (Cmd+J on macOS, Ctrl+Shift+J elsewhere; `>snip` from the picker) reads
-and appends `snippets.toml`, which sits beside `config.toml` in Jasper's application
-directory. It is a separate file: it is not part of the configuration file, is never read or
-written by the configuration loader, and has no enable flag — an empty or missing file is an
-empty scope. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
+The Snippets scope (Cmd+J on macOS, Ctrl+Shift+J elsewhere; `>snip` from the picker) is the
+bundled `dev.jasper.snippets` plugin. It reads and appends `snippets.toml` in the plugin's data
+directory, `<Jasper home>/plugin-data/dev.jasper.snippets/`; a `snippets.toml` in the Jasper home
+from before the plugin is moved there on first launch. It is a separate file: it is not part of the
+configuration file and is never read or written by the configuration loader. An empty or missing
+file is an empty scope; disable the plugin in File → Manage Plugins… to remove the scope. Its
+shortcut is the action `"dev.jasper.snippets.open"`. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
 name steps.
 
 ### Live settings and temporary choices
@@ -466,8 +468,9 @@ bind the same way. `"plugins.manage"` opens the Plugins manager and has no defau
 
 The [command palette](command-palette.md) opens with Cmd+K on macOS and Ctrl+K on
 Windows/Linux. Clear Scrollback uses Cmd+Shift+K on macOS and Ctrl+Shift+K
-elsewhere. Search Shell History uses Cmd+R on macOS and Ctrl+Shift+R elsewhere.
-Snippets uses Cmd+J on macOS and Ctrl+Shift+J elsewhere. While
+elsewhere. The bundled plugins add Search Shell History (`"dev.jasper.history.open"`, Cmd+R on
+macOS and Ctrl+Shift+R elsewhere) and Snippets (`"dev.jasper.snippets.open"`, Cmd+J and
+Ctrl+Shift+J), rebindable by their quoted ids. While
 the palette is open, Cmd/Ctrl+1–5 runs the corresponding visible result; plain digits
 continue to edit the search field.
 

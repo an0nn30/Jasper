@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Record every deviation from this text here and in `docs/STATUS.md`.
+**Status:** Implemented on `claude/palette-plugins-5b`; native acceptance pending. Deviations: `FakePluginHost(Path)` added as anticipated; View menu separator index followed the removed items; `CommandHistoryFile` made public for one app test; `config.example.toml` carries the plugin table; the Snippets error-row test uses a TOML syntax error and the migration test a consumer plugin. No behaviour deviations. Final verification: 1,420 tests, two expected skips, no failures (see `docs/STATUS.md`).
 
 **Goal:** Move the History and Snippets palette scopes out of `jasper-app` into two bundled plugins that depend on each other through `Services`, delete the application code they leave behind, tidy what stays, and migrate the user's `snippets.toml` into the Snippets plugin's data directory.
 

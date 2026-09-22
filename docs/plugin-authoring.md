@@ -311,6 +311,13 @@ on the scope that is already showing it dismisses instead. A scope that names on
 Cmd+P/R/J behave. The host contains every call: a scope that throws shows no rows, an unavailable
 row, no step or nothing done, and the palette keeps working.
 
+The bundled History and Snippets plugins (`plugins/history`, `plugins/snippets`) are the worked
+example: Snippets publishes `dev.jasper.snippets.api.SnippetService` and exports that package;
+History declares `requires = [{ id = "dev.jasper.snippets", optional = true }]`, looks the service up
+once at start with `services().find`, and shows its Save as snippet… verb only when it is there. A
+plugin may bundle a library (Snippets bundles tomlj): declare it as `implementation`, and the
+application loads every jar beside the plugin's own.
+
 <!-- example:pluginpalette -->
 ```java
 private static void installPaletteDemo(PluginContext context) {

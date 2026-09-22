@@ -1,8 +1,8 @@
 # Jasper application — contributor start
 
 Jasper is a Swing terminal workstation. This module composes independent terminal
-and desktop-companion libraries; it owns windows, commands, configuration, history,
-snippets, residency and native desktop integration.
+and desktop-companion libraries; it owns windows, commands, configuration, command
+recents, residency and native desktop integration; shell history and snippets are bundled plugins.
 
 ## First checkout
 
@@ -31,7 +31,7 @@ a GUI or native benchmark without the user's request. Building the distribution 
 - [Architecture and lifecycle](../docs/app-architecture.md): module/package graph,
   startup rollback, EDT ownership, shutdown, supported library boundaries.
 - [Maintenance recipes](../docs/app-maintenance.md): add a command or shortcut, palette
-  scope, setting, history/snippet behavior, notice producer, platform hook or lifecycle change.
+  scope, setting, notice producer, platform hook or lifecycle change.
 - [Terminal onboarding](../jasper-terminal/README.md): sessions, view options and emulator rules.
 - [Buddy embedding](../jasper-buddy/README.md): the five supported facade/value types.
 - [Current handoff](../docs/STATUS.md) and [verification](../docs/app-refactor-verification.md):

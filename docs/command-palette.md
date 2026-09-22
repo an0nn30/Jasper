@@ -67,7 +67,9 @@ command_palette = "ctrl+p"
 
 ## Shell history
 
-The History scope searches every command Jasper can find, from two places:
+The History scope is the bundled **Shell History plugin** (`dev.jasper.history`); disable it in
+File → Manage Plugins… and the scope and its shortcut go with it. It searches every command Jasper
+can find, from two places:
 
 | Shell | File | Format |
 |---|---|---|
@@ -112,17 +114,20 @@ without timestamps use the file's modification time with offsets preserving file
 order. For an empty query, configured trivial commands move behind other entries;
 each group retains recency order.
 
-Set `enabled = false` under `[palette.scopes.history]` to remove the History scope
-entirely: it disappears from the scope picker and its shortcut does nothing.
-See [configuration](configuration.md#shell-history).
+The trivial-command list and its on/off switch live in the plugin's own configuration table,
+`[plugins."dev.jasper.history"]`; see [configuration](configuration.md#shell-history). The old
+`[palette.scopes.history]` table is reported as moved.
 
 ## Snippets
 
 Snippets are named commands you save yourself: shell aliases the traditional way don't fit,
-since each shell spells aliases differently.
-`snippets.toml` lives in Jasper's application directory, beside `command-history.toml`,
-independent of `--config`; it is never read or written by the configuration loader. Jasper
-only ever appends new `[[snippet]]` tables, so hand edits and comments survive:
+since each shell spells aliases differently. The scope is the bundled **Snippets plugin**
+(`dev.jasper.snippets`). `snippets.toml` lives in the plugin's data directory,
+`<Jasper home>/plugin-data/dev.jasper.snippets/snippets.toml`, independent of `--config`; it is
+never read or written by the configuration loader. A `snippets.toml` from before the plugin, in the
+Jasper home itself, is moved there on the first launch (with both present, both are left alone and
+the log says so). Jasper only ever appends new `[[snippet]]` tables, so hand edits and comments
+survive:
 
 ```toml
 # Jasper snippets. Edit freely; Jasper only ever appends new [[snippet]] tables.
@@ -169,8 +174,10 @@ you fix the file and Reload Config.
 
 ## Scopes for features
 
-`PaletteScope` is the internal seam behind every scope; it is not a public
-plugin SDK. A scope supplies data rows and verbs.
+`PaletteScope` is the seam behind every scope. The application implements it for Commands;
+plugins implement the SDK's `dev.jasper.sdk.palette.PaletteScope`, which the plugin runtime adapts
+onto this one, and the History → Snippets "Save as snippet…" hop is a service dependency between
+two plugins. A scope supplies data rows and verbs.
 One shared renderer paints every scope's rows, and a scope's `search` and
 `execute` methods see only a `PaletteContext`, never a window or pane. Two more
 hooks are optional: `available` is rechecked right before a verb runs (a scope

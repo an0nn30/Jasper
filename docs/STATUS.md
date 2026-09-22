@@ -16,12 +16,60 @@ install and restart) is merged too. The spec's plan 4 is split into 4a (terminal
 inject, open) and 4b (plugin-provided sessions); 4a and 4b are merged too. Working-directory provenance moved from 4b to a small plan 4c, which is
 merged too. With it the plugin SDK plans are complete. The palette-plugins design
 (`superpowers/specs/2026-09-21-jasper-palette-plugins-design.md`) is approved; plan 5a (the
-contribution surface) is implemented on `claude/palette-plugins`, plan 5b (the History and Snippets
-plugins) is next, then the Vault and SSH plugin specs.
+contribution surface) is merged at `3eb143a`, plan 5b (the History and Snippets plugins) is
+implemented on `claude/palette-plugins-5b`, then come the Vault and SSH plugin specs. A development
+launch keeps its own home under `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
+
+### Palette plugins plan 5b — 2026-09-21
+
+Implemented on `claude/palette-plugins-5b` (not merged, not pushed). The work implements
+[plan 5b](superpowers/plans/2026-09-21-jasper-palette-plugins-plan-5b-history-snippets-plugins.md):
+the History and Snippets palette scopes are now two bundled plugins. `plugins/snippets`
+(`dev.jasper.snippets`, bundling tomlj) carries the snippet value, `snippets.toml` format and store
+and the Snippets scope, publishes `dev.jasper.snippets.api.SnippetService`, and moves a pre-plugin
+`<home>/snippets.toml` into its data directory once. `plugins/history` (`dev.jasper.history`) carries
+the five shell-history parsers, the polling index, discovery and the History scope; it captures live
+commands from `COMMAND_FINISHED` with `PaneInfo.shell`, reads `trivial_commands` and
+`deprioritize_trivial` from `[plugins."dev.jasper.history"]`, and shows "Save as snippet…" only when
+the service is present (`requires … optional = true`, the Vault/SSH shape). The application lost
+`palette.builtin.{ShellHistoryScope,SnippetsScope}`, the `snippets` and shell-history code,
+`HistorySettings`, `ConfigSnapshot.historyEnabled/trivialCommands`, `ActionId.HISTORY_PALETTE/SNIPPETS_PALETTE`
+and every wiring arm (3,473 lines); `CommandsScope` moved into `palette`, `CommandHistory` into
+`commands`, `PaletteContext` lost `trivialCommands` and `PaletteTarget` lost `shellName`.
+`ConfigLoader` reports `[palette.scopes.history]` as moved. See
+[command palette](command-palette.md), [configuration](configuration.md#shell-history) and
+[plugin authoring](plugin-authoring.md#palette-scopes).
+
+Scope decisions, as recorded at the top of the plan:
+
+1. The legacy snippets file is found relative to the plugin's data directory (the home is its
+   grandparent), not passed through configuration.
+2. The Snippets plugin bundles tomlj; `stagePlugins` copies each plugin's runtime classpath.
+3. `ConfigSnapshot` loses `historyEnabled` and `trivialCommands`; the old table is reported as moved.
+4. The two scope tests were rewritten against `FakePluginHost`; the rest moved with their code.
+5. `CommandPalettePreview` lost its History and Snippets scenarios.
+6. "Edit file" goes through `platform().openInEditor`.
+7. `KeyBindings` keeps only `COMMAND_PALETTE` and `CLEAR_SCROLLBACK` special.
+8. `PluginConfig.stringList` cannot tell absent from empty, so `deprioritize_trivial = false` replaces
+   `trivial_commands = []`.
+
+Deviations from the plan text: `FakePluginHost(Path dataRoot)` was added to the testkit (the plan
+anticipated it); the View menu separator index moved with the two removed items;
+`CommandHistoryFile` became public for one app test; `config.example.toml` gained the plugin's
+table in place of `[palette.scopes.history]`; the plan's test for the Snippets error row needed a
+TOML syntax error rather than a missing key, and its migration test uses a consumer plugin to reach
+the service (a plugin cannot `find` its own publication). No behaviour deviations.
+
+Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks`
+passed with **1,420 tests: 1,418 passed, two expected environment skips, no failures or
+errors** (app 753, Buddy 163, terminal 377, SDK 21, testkit 45, sample plugin 10, History plugin
+40, Snippets plugin 11). The installed image's `lib/plugins/` holds all three bundled plugins, the
+Snippets one with tomlj and its antlr runtime. Native acceptance (the five steps at the end of the
+plan) is pending and is the user's.
 
 ### Palette plugins plan 5a — 2026-09-21
 
-Implemented on `claude/palette-plugins` (not merged, not pushed). The work implements
+Merged into local `main` by fast-forward on 2026-09-21 at `3eb143a` (not pushed). The work implements
 [plan 5a](superpowers/plans/2026-09-21-jasper-palette-plugins-plan-5a-contribution-surface.md) of
 the [palette-plugins design](superpowers/specs/2026-09-21-jasper-palette-plugins-design.md): a plugin
 can contribute a command-palette scope, open the palette, see a pane's shell label, show an error

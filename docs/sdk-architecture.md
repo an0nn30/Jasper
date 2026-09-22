@@ -146,7 +146,8 @@ and calls `Palette.open`. `plugins.HostedPalette` adapts an SDK scope: contained
 the plugin's row kept as the app row's token so it comes back unchanged. `HostedContext.notices()`
 reaches the last active window's error handler; `platform().openInEditor` runs the application's
 `ConfigEditor` on the plugin's executor and reports failure as a notice. `PaneInfo.shell` is
-`PaneSnapshot.shell`, the pane's launcher label.
+`PaneSnapshot.shell`, the pane's launcher label. The bundled History and Snippets plugins are the first
+contributors; `stagePlugins` copies each plugin's jar and runtime classpath into `lib/plugins/<id>/`.
 
 ## Plugins manager, install and restart
 
@@ -191,6 +192,5 @@ disagree, the implementation is wrong, not the contract.
 
 ## Not yet implemented
 
-Explicit commands in `LocalSpec`; a stronger locality signal than the host name, such as a
-per-session token from Jasper's own shell integration; the History and Snippets scopes as bundled
-plugins (plan 5b).
+Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
+per-session token from Jasper's own shell integration.
