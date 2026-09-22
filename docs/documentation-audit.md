@@ -22,7 +22,7 @@ The [documentation index](README.md) explains that distinction and source preced
   animation and presentation owners; 20-frame sprite and current module resource paths.
 - Shared guides: current shortcut defaults and tab presentation, startup filesystem
   effects, standalone `--config` semantics and default data paths, implemented logging,
-  current Silver Desk Buddy icon, dark/light themes and moved preview commands.
+  then-current Silver Desk Buddy icon, dark/light themes and moved preview commands.
 - Handoff: merged refactor status and completed review markers; resolved both terminal
   documentation follow-ups. Older STATUS entries and superseded render instructions
   are explicitly historical. Six broken local references were repaired or identified

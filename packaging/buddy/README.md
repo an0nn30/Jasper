@@ -47,7 +47,8 @@ the body while he fades in at spawn, so they never replace a pose.
 
 ## Palette
 
-Character colors follow [the application artwork](../icons/jasper.svg); laptop colors
+Character colors follow [the preserved silver character artwork](jasper-character-reference.svg),
+independent of the newer Ember application icon; laptop colors
 are explicit constants in `generate.py`.
 
 | Role | Hex |

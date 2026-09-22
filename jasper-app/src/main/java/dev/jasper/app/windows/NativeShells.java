@@ -77,7 +77,7 @@ public final class NativeShells {
 
     private AuxiliarySurface.Shell frame(AuxiliarySurface surface) {
         var frame = new JFrame(surface.title());
-        frame.setIconImages(ApplicationIcon.images(SystemInfo.isMacOS));
+        frame.setIconImages(ApplicationIcon.images());
         MacTitleBar bar = MacTitleBar.install(frame.getRootPane(), surface.holder(), new JPanel(), () -> TITLE_HEIGHT,
             () -> { }, SystemInfo.isMacFullWindowContentSupported);
         if (bar != null) bar.setTitle(surface.title(), true);

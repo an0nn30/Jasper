@@ -35,7 +35,12 @@ def normalizedHost = {
 
 // Keep icon inputs lazy so non-native builds remain usable on other hosts.
 def nativeIcon = providers.provider {
-    rootProject.file("packaging/icons/Jasper.${normalizedHost().os == 'macos' ? 'icns' : 'ico'}")
+    String extension = switch (normalizedHost().os) {
+        case 'macos' -> 'icns'
+        case 'windows' -> 'ico'
+        default -> 'png'
+    }
+    rootProject.file("packaging/icons/Jasper.${extension}")
 }
 
 def validatedVersion = {

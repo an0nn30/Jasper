@@ -112,6 +112,28 @@ errors** (app 819, Buddy 163, terminal 377, SDK 21, testkit 45, sample plugin 10
 (the five steps at the end of the plan, driven by the sample plugin's `demo_scope`) is pending and is
 the user's.
 
+### Official Ember application icon — 2026-09-21
+
+Implemented on `codex/ember-app-icon` in a dedicated worktree; local integration
+was authorized by the user. No push was performed. The approved Ember pack (faceted white turtle,
+warm gradient, no prompt) is the official icon for all platforms. macOS ICNS,
+Windows ICO, all runtime PNGs, and Linux PNG/hicolor assets use that artwork.
+Linux windows now select their own resource set and portable distributions carry
+the hicolor hierarchy. Existing native installer support remains macOS/Windows.
+
+The approved raster source and a reproducible Core Graphics generator replace the
+old SVG app-icon pipeline. Buddy retains its silver character reference and sprites.
+See [the icon guide](../packaging/icons/README.md) for provenance, sizes and generation.
+Verification: `./gradlew check :jasper-app:installDist :jasper-app:packageDist`
+passed after integrating main's development-home change with **1,437 tests: 1,435
+passed, two expected skips, no failures or errors** (app 821, Buddy 163, terminal
+377, SDK 21, testkit 45, sample plugin 10). The macOS
+app/DMG passed native verification, including exact ICNS bytes in the bundle.
+All runtime PNGs and ICNS/ICO containers match the approved Ember preview pack
+byte-for-byte. All ten Linux hicolor sizes match their portable-distribution
+copies. Windows and Linux native desktop checks remain unrun. No Jasper GUI or
+benchmark was launched.
+
 ### Plugin SDK plan 4c — 2026-09-21
 
 Merged into local `main` by fast-forward on 2026-09-21 at `9fbdc49` (not pushed). The work implements

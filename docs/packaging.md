@@ -40,9 +40,22 @@ The package includes `jasper-app.jar`, `jasper-terminal.jar`, `jasper-buddy.jar`
 their runtime dependencies and a JBR runtime; it needs no external Java.
 The Buddy test-fixtures artifact is excluded from the production distribution. Current development
 packages have only jpackage's local ad-hoc signature, not a Developer ID signature,
-and use the official Silver Desk Buddy Jasper icon. Distribution signing and notarization remain
+and use the official Ember Jasper icon. Distribution signing and notarization remain
 outstanding. See [icon sources, platform framing and regeneration](../packaging/icons/README.md)
-for the macOS ICNS, Windows ICO and runtime PNG assets.
+for the macOS ICNS, Windows ICO, Linux PNG/hicolor and runtime PNG assets.
+
+## Linux icon assets
+
+Linux windows and taskbar integration use the dedicated Linux PNG set. Portable
+`installDist`, `distTar`, and `distZip` outputs carry the approved Ember icons at
+`share/icons/hicolor/<size>x<size>/apps/jasper.png`; desktop launchers can refer to
+`Icon=jasper` after that hierarchy is installed into a standard icon search path.
+`packaging/icons/Jasper.png` is a 512px package input for downstream packaging.
+The generator and tests verify it against the runtime image.
+
+Native Linux installers are not implemented by the current `packageDist` task;
+this icon update does not imply a new Linux installer. Validate launcher/window
+appearance on the target desktop environment when integrating a Linux package.
 
 ## Native acceptance checklist
 
@@ -53,7 +66,7 @@ acceptance remain unexecuted on macOS.
 ### macOS
 
 - [ ] Open the DMG, drag Jasper to Applications, and launch it from Finder and from the Dock.
-- [ ] Confirm the Silver Desk Buddy Jasper icon in Finder, Dock and Cmd+Tab at normal and Retina sizes; compare its apparent size with neighboring app icons.
+- [ ] Confirm the Ember Jasper icon in Finder, Dock and Cmd+Tab at normal and Retina sizes; compare its apparent size with neighboring app icons.
 - [ ] With a minimal launcher environment, confirm the shell starts and UTF-8 text renders correctly.
 - [ ] Confirm native title controls and switching between the bundled Light and Dark themes.
 - [ ] Confirm multiple windows and shell-exit cleanup.
@@ -75,7 +88,7 @@ acceptance remain unexecuted on macOS.
 ### Windows
 
 - [ ] Build on Windows with a JBR 25 x64 SDK, extract the entire ZIP to a path containing spaces, and launch `Jasper.exe` from Explorer.
-- [ ] Confirm the Silver Desk Buddy Jasper icon in Explorer, the taskbar, Alt+Tab and titlebar at 100%, 150% and 200% display scale.
+- [ ] Confirm the Ember Jasper icon in Explorer, the taskbar, Alt+Tab and titlebar at 100%, 150% and 200% display scale.
 - [ ] Confirm PowerShell/PTY input and resize behavior, including Unicode text.
 - [ ] Confirm clipboard operations and tab shortcuts.
 - [ ] Confirm the Settings location and live reload.
