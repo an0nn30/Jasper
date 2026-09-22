@@ -122,8 +122,10 @@ Rules:
 MAGIC "JASPERVLT" (9) | VERSION u16 LE = 1 | FLAGS u8 (bit 0: device-bound) | SALT (16) | NONCE (12) | CIPHERTEXT
 ```
 
-AES-256-GCM with a 128-bit tag; a fresh random salt and nonce on every write; the header is the
-GCM additional authenticated data, so flags cannot be flipped. Saves write a temp file beside the
+AES-256-GCM with a 128-bit tag; a fresh random nonce on every write; a fresh salt whenever the
+password is set (create, change password), because a new salt needs the password again and the
+vault keeps only the derived key while unlocked (zeroed at lock); the header is the GCM additional
+authenticated data, so flags cannot be flipped. Saves write a temp file beside the
 target and rename it into place. A wrong password and a foreign device secret both fail the tag;
 the plugin distinguishes them by the flags: a bound file whose device secret is missing or freshly
 created reports "created on another machine".
@@ -242,9 +244,10 @@ Open Vault and none for Lock and Generate Key.
 - **6a — core and API**: module and bundling, crypto, format, codec, device secret, lock manager,
   timer, key generator, `VaultApi` with grants and cancellation, `VaultPlugin.start` publishing the
   service, actions and `LOCK_STATE_CHANGED`, settings file, tests. Ships a plugin that works end to
-  end from another plugin's point of view, with create/unlock dialogs as the only UI.
-- **6b — UI**: manager window, picker, grant dialog, key generator dialog, status item, rail
-  action, palette scope, documentation and native acceptance.
+  end from another plugin's point of view: the create, unlock, grant and picker dialogs are its only
+  UI, and Open Vault… while unlocked does nothing until 6b adds the manager.
+- **6b — UI**: manager window (which Open Vault… then opens), key generator dialog, status item,
+  rail action, palette scope, documentation and native acceptance.
 
 ## 12. Self-review record
 
