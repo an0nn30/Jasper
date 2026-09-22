@@ -1,6 +1,9 @@
 # Jasper TermLab Tabs and Native Title Bar — Design
 
-**Status:** Approved 2026-09-22 (user decisions recorded in section 2). Supersedes the
+**Status:** Approved 2026-09-22 (user decisions recorded in section 2), then **narrowed the same day**: only
+section 6 (the packaged macOS launcher's SDK version) is implemented, on `claude/termlab-tabs`. Sections 3 to 5
+(native title bars, the TermLab tab strip, TermLab titles) are deferred and not scheduled; the user chose
+the launcher fix alone once it was clear the window controls do not depend on the tab rework. Supersedes the
 presentation half of `docs/design/iterm-title-bar-reference.md`, the macOS window-integration
 section of `2026-09-11-jasper-plan-3-5-titlebar-themes-design.md`, the tab-strip architecture of
 `2026-09-11-jasper-mock-ui-design.md` and all of `2026-09-11-jasper-tab-motion-design.md`. The
