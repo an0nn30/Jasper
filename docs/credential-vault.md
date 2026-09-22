@@ -1,0 +1,65 @@
+# Credential Vault
+
+Credential Vault is bundled with Jasper. Press **F8**, click the vault button in the rail, or
+choose **Open Vault...** in the command palette. First use creates a vault with a master password
+and an optional device binding. Later use unlocks the vault and opens its manager window.
+
+The manager lists logins, SSH keys, secure notes and saved plugin grants. Select an entry to
+inspect its details, edit it or delete it. Add a login with a password, a key path and optional
+passphrase, or both. Add an existing SSH key by choosing its private and public paths; its public
+key supplies the algorithm and SHA-256 fingerprint. Secure notes are available only in the manager.
+
+**Generate Key...** supports Ed25519, ECDSA P-256/P-384 and RSA 3072/4096. Generated files live in
+`plugins/dev.jasper.vault/data/keys/` unless `keys_directory` selects another directory.
+The generator can also create a login account for a supplied username. Generated private keys
+are currently unencrypted. The encrypted vault stores SSH key paths; key files remain separate. Locking the vault does not
+delete or encrypt those files. **Copy public key** copies the selected public key. Deleting a key
+entry offers a separate choice to delete its two files; the default keeps them.
+
+**Change Password...** requires the old password and matching new passwords. **Lock** removes
+secrets from the open vault and clears its editor forms. The window stays open with an Unlock button that shows the shared unlock form in place.
+The padlock in the status bar unlocks/opens a locked vault and locks an unlocked vault; its tooltip
+shows the remaining inactivity time. Already connected SSH sessions are unaffected by locking.
+
+In the command palette, select **Vault**, or enter `>vault` / `>cred`. Search by entry name,
+username or key fingerprint. Enter copies an account's password, Cmd/Ctrl+Enter copies its
+username, and Shift+Enter opens the selected entry in the manager. Both password and username
+copies are cleared after 30 seconds if the clipboard still contains that copy. A later user copy
+is left alone. The vault never types clipboard contents into a terminal.
+
+Other plugins request credentials through `dev.jasper.vault.api.VaultApi`. The first use asks
+whether to allow the named plugin once, always for that credential, or deny access. Choosing a
+credential through the picker grants one use. Saved grants appear in the manager's Grants tab;
+**Revoke** removes one. Deleting an entry removes all its saved grants. Notes are not exposed
+through the consumer API.
+
+The encrypted file is `plugins/dev.jasper.vault/data/vault.jv`. A device-bound vault uses the
+platform keychain tool, with a file fallback shown in the manager's status line. An unbound vault
+uses the master password alone. The master password cannot be recovered. Change the live plugin
+settings through the Plugins manager's **Open Settings** action:
+
+```toml
+auto_lock_minutes = 15            # 0 disables inactivity locking
+keys_directory = ""              # empty uses this plugin's data/keys directory
+bind_new_vaults_to_device = true  # initial state of the create checkbox
+```
+
+The three actions are `dev.jasper.vault.open` (F8), `dev.jasper.vault.lock` and
+`dev.jasper.vault.generate_key`. Configure their shortcuts like other contributed actions.
+
+## Native acceptance
+
+Headless tests cover the forms, persistence failures, lock transitions, service requests and
+clipboard timing. The following checks need a user-run Jasper window:
+
+1. Open F8 and create a throwaway vault. Verify native keychain access, then lock and unlock it.
+2. Add/edit a login and a multiline note; generate/import an SSH key and copy its public key.
+3. Open F8 repeatedly; verify only one manager window opens. Lock with an editor open; verify
+   its secret fields disappear and the manager offers inline unlock.
+4. Copy a password and username through the Vault scope. Check 30-second clearing, then copy
+   ordinary text before expiry and verify it survives.
+5. Set `auto_lock_minutes = 1`, leave Jasper inactive and verify the padlock locks. Set it to 0
+   and confirm the countdown disappears. Restore the desired timeout.
+6. With a consumer plugin, exercise Allow once, Always and Deny; revoke its saved grant in the
+   manager and verify the next fetch asks again.
+

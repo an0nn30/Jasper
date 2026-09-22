@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status (2026-09-22):** implemented on `claude/vault-6a`, every task green under `./gradlew check`.
+> **Status (2026-09-22):** integrated into local `main` at `c8141b6`, every task green under `./gradlew check`.
+> The 6b continuation adds generation guards for pending opens, cancellation during unlock,
+> wipeable Swing password documents and generated-file failure cleanup; see its plan/status.
 > Deviations from the text as first written, all folded back into the code blocks: `VaultFileFormat.parse`
 > requires only the header (the cipher rejects a short body); the scripted macOS keychain test answers
 > exit 44 for "not found" and 0 for `add-generic-password`; the fake host renders actions as

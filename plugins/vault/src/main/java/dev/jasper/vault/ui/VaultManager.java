@@ -26,7 +26,12 @@ import dev.jasper.vault.lock.LockManager;
 
 /** UI-thread editing operations; asynchronous I/O completes on the supplied UI executor. */
 public final class VaultManager {
-    public enum Type { LOGIN, SSH_KEY, NOTE }
+    public enum Type {
+        LOGIN("Login"), SSH_KEY("SSH Key"), NOTE("Secure Note");
+        private final String label;
+        Type(String label) { this.label = label; }
+        @Override public String toString() { return label; }
+    }
     public record Row(UUID id, String name, String subtitle, Type type) {
         @Override public String toString() { return name + " (" + type + ")"; }
     }

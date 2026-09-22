@@ -43,6 +43,7 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
     private final JPanel cards = new JPanel(new CardLayout()), locked = new JPanel(new BorderLayout());
     private final JPanel passiveUnlock = new JPanel();
     private final Function<UUID, Optional<Object>> entry;
+    private final JScrollPane noteScroll;
 
     ManagerPanel(Function<UUID, Optional<Object>> entry, Consumer<VaultManager.Type> onAdd,
                  Consumer<UUID> onEdit, Consumer<UUID> onDelete, Consumer<UUID> onCopy,
@@ -54,7 +55,8 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
         metadata.setEditable(false); metadata.setLineWrap(true); metadata.setWrapStyleWord(true);
         var noteArea = new JTextArea(note, null, 8, 35); noteArea.setEditable(false); noteArea.setLineWrap(true);
         var details = new JPanel(new BorderLayout(8, 8)); details.add(new JScrollPane(metadata), BorderLayout.NORTH);
-        details.add(new JScrollPane(noteArea), BorderLayout.CENTER);
+        noteScroll = new JScrollPane(noteArea);
+        details.add(noteScroll, BorderLayout.CENTER);
         var entries = new JPanel(new BorderLayout(8, 8));
         var split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(rows), details); split.setResizeWeight(.35);
         entries.add(split, BorderLayout.CENTER);
@@ -109,6 +111,7 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
     private void details() {
         note.clear(); metadata.setText("");
         Optional<Object> selected = selected().flatMap(entry);
+        noteScroll.setVisible(selected.filter(Note.class::isInstance).isPresent());
         edit.setEnabled(selected.isPresent()); delete.setEnabled(selected.isPresent());
         copyPublic.setEnabled(selected.filter(SshKey.class::isInstance).isPresent());
         selected.ifPresent(value -> {

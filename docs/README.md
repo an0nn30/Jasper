@@ -57,3 +57,5 @@ platform CI run or benchmark number does not establish acceptance of the current
 refactored build. The [terminal](terminal-refactor-verification.md) and
 [app/Buddy](app-refactor-verification.md) verification reports retain their original
 counts and review findings, with later integration/follow-up sections explicitly dated.
+
+- [Credential Vault](credential-vault.md): manager, credentials, grants, key generation and native acceptance.

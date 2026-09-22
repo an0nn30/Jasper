@@ -15,7 +15,7 @@ public final class KeyGeneratorForm extends EditorForm {
     final JTextField name = new JTextField(28), comment = new JTextField(28), username = new JTextField(28);
     final JComboBox<KeyAlgorithm> algorithm = new JComboBox<>(KeyAlgorithm.values());
     final JCheckBox alsoAccount = new JCheckBox("Also add a login account", false);
-    final JLabel description = new JLabel("Generated private key files are unencrypted; the vault stores their paths.");
+    final JLabel description = new JLabel("<html>Generated private key files are unencrypted.<br>The vault stores their paths.</html>");
     public KeyGeneratorForm(Function<Request, CompletableFuture<Void>> generate, Runnable close) {
         super(close); save.setText("Generate Key");
         field("Name", name); field("Algorithm", algorithm); field("Comment", comment);

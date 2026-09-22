@@ -3,7 +3,9 @@ package dev.jasper.vault.ui;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
-import java.awt.GridLayout;
+import java.awt.GridBagLayout;
+import java.awt.GridBagConstraints;
+import java.awt.Insets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -16,8 +18,10 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 
 /** Shared modal form behavior, including failure recovery and deterministic secret cleanup. */
+@SuppressWarnings("this-escape") // Swing layout setup; subclasses do not override construction-time methods.
 public class EditorForm extends JPanel implements AutoCloseable {
-    final JPanel fields = new JPanel(new GridLayout(0, 2, 8, 8));
+    final JPanel fields = new JPanel(new GridBagLayout());
+    private int fieldRow;
     final JButton save = new JButton("Save"), cancel = new JButton("Cancel");
     final JLabel error = new JLabel(" ");
     private final List<SecretDocument> secrets = new ArrayList<>();
@@ -34,7 +38,16 @@ public class EditorForm extends JPanel implements AutoCloseable {
         footer.add(buttons, BorderLayout.SOUTH); add(footer, BorderLayout.SOUTH);
         cancel.addActionListener(event -> { close(); dismiss.run(); });
     }
-    protected final void field(String label, JComponent component) { fields.add(new JLabel(label)); fields.add(component); }
+    protected final void field(String label, JComponent component) {
+        var at = new GridBagConstraints();
+        at.gridy = fieldRow++; at.gridx = 0; at.anchor = GridBagConstraints.NORTHWEST;
+        at.insets = new Insets(4, 0, 4, 12);
+        fields.add(new JLabel(label), at);
+        at.gridx = 1; at.weightx = 1; at.insets = new Insets(4, 0, 4, 0);
+        at.fill = GridBagConstraints.HORIZONTAL;
+        if (component instanceof javax.swing.JScrollPane) { at.weighty = 1; at.fill = GridBagConstraints.BOTH; }
+        fields.add(component, at);
+    }
     protected final SecretDocument secret() { var document = new SecretDocument(); secrets.add(document); return document; }
     protected final JPasswordField passwordField(SecretDocument document) {
         var field = new JPasswordField(24); field.setDocument(document); return field;

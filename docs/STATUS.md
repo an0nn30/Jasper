@@ -74,17 +74,34 @@ window, status item, rail action, key generator dialog and the Vault palette sco
 
 ### Credential Vault plan 6b continuation — 2026-09-22
 
-Resumed the existing `.worktrees/vault-6b` / `claude/vault-6b` handoff. It contained an
-uncommitted draft with only the palette and status tasks; no UI implementation had started.
-The remaining manager/editor/generator plan is being completed against the approved design.
-Baseline `./gradlew check -q`: 1,483 tests, 1,480 passed, three expected skips, no failures/errors;
-existing compiler and JavaDoc warnings remain.
+Implemented in `.worktrees/vault-6b` on `claude/vault-6b`, from `c8141b6`; not merged or pushed.
+The resumed handoff held an uncommitted draft with only palette/status tasks. The completed
+[6b plan](superpowers/plans/2026-09-22-jasper-vault-plan-6b-ui.md) now covers the palette,
+self-clearing clipboard, padlock/rail, persisted manager operations, account/key/note editors,
+master-password change, singleton manager, grant revocation and key generation with an optional
+login account. [User guide and native acceptance](credential-vault.md).
 
-Prerequisite found by two failing lifecycle regressions: a background create/unlock could install
-its result after `lock()`, including plugin stop. `LockManager` now invalidates pending installs
-and password changes by generation and zeroes rejected results. Both tests failed with UNLOCKED
-before the fix and pass afterwards; the full vault test suite passes. This is a deliberate small
-6a correction required for the manager's asynchronous lifecycle, not a storage-format change.
+**Pending user decision:** generated private keys are currently unencrypted, matching 6a and
+the storage spec, and the generator labels this explicitly. The spec also lists an optional
+passphrase field. The user has been asked to choose encrypted generation when a passphrase is
+supplied versus retaining unencrypted generation and omitting that field. Full 6b acceptance
+awaits this decision; do not silently claim the optional-passphrase requirement complete.
+Native acceptance and the opt-in real-keychain test remain user-run.
+
+Execution: Task 1 used a subagent and independent reviewer, with one RED/GREEN fix round for
+clipboard failure preventing shutdown locking. Tasks 2 onward ran inline; final whole-branch
+review is pending. Each task has its own commit and failing-before-passing tests. Baseline
+`check` was 1,483 tests (1,480 passed, three expected skips). Current vault tests: 87 tests,
+86 passed and the opt-in keychain test skipped; no failures/errors. Full repository verification
+and installDist are in progress.
+
+Deviations/rulings: both username and password copies expire per the spec; locked palette rows
+remain enabled for Enter; the inherited branch/worktree was retained. A small 6a prerequisite
+(`737f90c`) rejects/zeroes late create/unlock results after lock, including stop; prompt cancellation
+also invalidates in-flight derivation. Wipeable Swing documents clear editable buffers and avoid
+secret Strings in persistence; Swing's required Content.getString is the explicit UI boundary.
+Generation failures remove created files. Headless dark-theme renders prompted GridBag forms,
+readable kind labels and hiding the unused note area. No SDK, consumer API or storage-format change.
 
 ### macOS 26 window controls in the packaged app — 2026-09-22
 
