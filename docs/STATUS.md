@@ -25,8 +25,7 @@ is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH p
 
 ### macOS default shell refresh — 2026-09-22
 
-Fix in `codex/macos-default-shell`, isolated worktree
-`/Users/dustin/.codex/worktrees/macos-default-shell/moray`; not merged or pushed.
+Fix `dddfc57` merged into local `main` by fast-forward with user approval; not pushed.
 The account reported `/bin/zsh` while the application inherited
 `SHELL=/opt/homebrew/bin/bash`. Launch selection trusted that stale environment;
 Bash integration was a consequence, not the selector. Each macOS launch now queries
@@ -43,7 +42,9 @@ GUI launch or system account edits. Real-account regression reproduced Bash inst
 of zsh before the fix and passed after it. `./gradlew check :jasper-app:installDist -q` passed: 1554 tests,
 1551 passed, 3 expected skips, no failures/errors. Independent review
 found no actionable issues. Source hygiene and diff checks passed; installed
-distribution built, with native GUI acceptance left to the user.
+distribution built, with native GUI acceptance left to the user. The same command
+passed again on the merged `main`: 1,554 tests, 1,551 passed, three expected skips.
+The running installed app has not been replaced.
 
 ### Plugin home — 2026-09-22
 
