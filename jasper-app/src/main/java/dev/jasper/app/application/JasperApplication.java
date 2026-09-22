@@ -343,8 +343,8 @@ public final class JasperApplication {
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
                                         BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir) {
         ConfigSnapshot initial = snapshots.get();
-        return new ShellLauncher(executor, () -> LaunchSettings.resolve(snapshots.get(),
-            System.getProperty("os.name"), System.getenv(), initial.columns(), initial.lines(), integrationDir), start);
+        return ShellLauncher.configured(executor, snapshots, System.getProperty("os.name"), System.getenv(),
+            initial.columns(), initial.lines(), integrationDir, start);
     }
 
     private static TerminalSession startSession(Path directory, LaunchSettings settings) {

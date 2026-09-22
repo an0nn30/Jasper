@@ -23,6 +23,28 @@ is merged at `17c0476`. The Credential Vault design
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
+### macOS default shell refresh — 2026-09-22
+
+Fix in `codex/macos-default-shell`, isolated worktree
+`/Users/dustin/.codex/worktrees/macos-default-shell/moray`; not merged or pushed.
+The account reported `/bin/zsh` while the application inherited
+`SHELL=/opt/homebrew/bin/bash`. Launch selection trusted that stale environment;
+Bash integration was a consequence, not the selector. Each macOS launch now queries
+`dscl /Search` for the current account's `UserShell` on the launch worker, with a
+two-second timeout and inherited/default fallback. The child `SHELL` is refreshed
+before configured overrides and integration. Explicit programs and arguments remain
+captured at request time; the resolved label is delivered with launch completion.
+New tabs, splits and windows share this path. Linux/Windows behavior is unchanged.
+
+This corrects the old inherited-shell behavior documented in the phase-4 plan;
+per the user's request, macOS account selection happens at actual start while
+configuration still freezes before dispatch. No integration script changes, native
+GUI launch or system account edits. Real-account regression reproduced Bash instead
+of zsh before the fix and passed after it. `./gradlew check :jasper-app:installDist -q` passed: 1554 tests,
+1551 passed, 3 expected skips, no failures/errors. Independent review
+found no actionable issues. Source hygiene and diff checks passed; installed
+distribution built, with native GUI acceptance left to the user.
+
 ### Plugin home — 2026-09-22
 
 Merged at `17c0476` (not pushed). The work implements the
