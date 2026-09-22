@@ -3039,7 +3039,7 @@ class VaultPluginTest {
                 context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, seen::add);
             });
             assertThat(host.failures()).isEmpty();
-            assertThat(host.actions()).contains("dev.jasper.vault.open|Open Vault...|F8|true", "dev.jasper.vault.lock|Lock Vault|-|false");
+            assertThat(host.actions()).contains("dev.jasper.vault.open|Open Vault...|true", "dev.jasper.vault.lock|Lock Vault|false");
             UUID window = host.addTerminalWindow();
             assertThat(api.get().lockState()).isEqualTo(LockState.NO_VAULT);
             assertThat(host.invoke(VaultPlugin.OPEN, window, null)).isTrue();
@@ -3049,7 +3049,7 @@ class VaultPluginTest {
             host.flush();
             assertThat(api.get().lockState()).isEqualTo(LockState.UNLOCKED);
             assertThat(seen).containsExactly(LockState.UNLOCKED);
-            assertThat(host.actions()).contains("dev.jasper.vault.lock|Lock Vault|-|true");
+            assertThat(host.actions()).contains("dev.jasper.vault.lock|Lock Vault|true");
             assertThat(host.invoke(VaultPlugin.LOCK, window, null)).isTrue();
             host.flush();
             assertThat(seen).containsExactly(LockState.UNLOCKED, LockState.LOCKED);
