@@ -29,6 +29,7 @@ val stagePlugins = tasks.register<Sync>("stagePlugins") {
     from(project(":jasper-plugin-sample").tasks.named("jar")) { into("dev.jasper.sample") }
         from(project(":jasper-plugin-snippets").tasks.named("jar")) { into("dev.jasper.snippets") }
         from(project(":jasper-plugin-snippets").configurations.named("runtimeClasspath")) { into("dev.jasper.snippets") }
+    from(project(":jasper-plugin-history").tasks.named("jar")) { into("dev.jasper.history") }
     into(layout.buildDirectory.dir("plugins"))
 }
 // installDist and the distribution archives carry them beside the application jar, where the runtime looks.
