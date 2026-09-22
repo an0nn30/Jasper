@@ -29,6 +29,8 @@ public final class PasswordPanel extends JPanel {
     private PasswordPanel(String primaryTitle, boolean creating, boolean bindDefault, String intro) {
         super(new BorderLayout(0, 8));
         setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
+        password.setDocument(new SecretDocument());
+        confirm.setDocument(new SecretDocument());
         primary = new JButton(primaryTitle);
         var form = new JPanel(new GridBagLayout());
         var at = new GridBagConstraints();
@@ -88,4 +90,9 @@ public final class PasswordPanel extends JPanel {
         panel.cancel.addActionListener(event -> onCancel.run());
         return panel;
     }
+    /** Erases editable copies when the containing surface closes or locks. */
+    public void clear() { password.setText(""); confirm.setText(""); }
+
+    /** Prevents duplicate submits while a background create is running. */
+    public void setBusy(boolean busy) { primary.setEnabled(!busy); }
 }
