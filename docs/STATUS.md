@@ -19,8 +19,8 @@ merged too. With it the plugin SDK plans are complete. The palette-plugins desig
 contribution surface) is merged at `3eb143a`, plan 5b (the History and Snippets plugins) is
 merged at `0550bad`. The plugin-home design (`superpowers/specs/2026-09-22-jasper-plugin-home-design.md`)
 is merged at `17c0476`. The Credential Vault design
-(`superpowers/specs/2026-09-22-jasper-vault-design.md`) is approved and awaits its plans 6a (core
-and API) and 6b (UI); the SSH plugin spec follows. A development launch keeps its own home under
+(`superpowers/specs/2026-09-22-jasper-vault-design.md`) has plan 6a (core and API) implemented on
+`claude/vault-6a`; plan 6b (UI) is next, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
 ### Plugin home — 2026-09-22
@@ -59,6 +59,18 @@ passed with **1,433 tests: 1,431 passed, two expected environment skips, no fail
 errors** (app 766, Buddy 163, terminal 377, SDK 21, testkit 45, sample plugin 10, History plugin
 40, Snippets plugin 11). Native acceptance (the five steps at the end of the plan) is pending and is
 the user's.
+
+### Credential Vault plan 6a — 2026-09-22
+
+Implemented on `claude/vault-6a` (not merged, not pushed): the bundled `dev.jasper.vault` plugin's
+core and API from the [vault design](superpowers/specs/2026-09-22-jasper-vault-design.md) per the
+[6a plan](superpowers/plans/2026-09-22-jasper-vault-plan-6a-core-and-api.md). A device-bound
+Argon2id/AES-256-GCM file with a binary plaintext that never becomes a `String`; the device secret in
+the platform keychain tool with a 0600-file fallback; a lock manager with inactivity auto-lock; an
+OpenSSH key generator; `VaultApi` published per consumer with once/always/deny grants stored in the
+vault, one prompt per request kind, and cancellation that withdraws a request. UI so far: the create,
+unlock, grant and picker dialogs, `Open Vault...` (F8) and `Lock Vault`. Plan 6b adds the manager
+window, status item, rail action, key generator dialog and the Vault palette scope.
 
 ### Terminal dark palette — 2026-09-22
 

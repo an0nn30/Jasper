@@ -99,6 +99,21 @@ with the plugin modules:
 ./gradlew :jasper-plugin-history:test :jasper-plugin-snippets:test
 ```
 
+## Credential Vault lives in a plugin
+
+Accounts, SSH keys and secure notes are the bundled `dev.jasper.vault` plugin (`plugins/vault`), a
+pure core under a thin SDK wiring: `crypto` (Argon2id, the authenticated file format, AES-GCM),
+`model` (the vault and its binary codec; secrets are arrays, zeroed at lock), `store` (atomic file
+writes; the device secret in the macOS/Linux/Windows keychain tool or a 0600 file), `lock` (the
+single owner of the open vault and derived key; the inactivity clock), `keygen` (OpenSSH keys via
+BouncyCastle), `service` (the request queue behind `VaultApi`: one prompt per unlock, per
+(plugin, credential) grant and per pick; the last cancelled waiter dismisses it) and `ui` (the dialog
+panels). Other plugins compile `compileOnly` against `dev.jasper.vault.api` and declare
+`requires = [{ id = "dev.jasper.vault", version = ">=0.1" }]`. The file is
+`plugins/dev.jasper.vault/data/vault.jv`; the settings file is `dev.jasper.vault.toml` beside it.
+Run its tests with `./gradlew :jasper-plugin-vault:test`; `-Djasper.vault.keychainTest=true` also
+touches the real keychain under a throwaway item.
+
 ## New Buddy notice producer
 
 Follow [CommandNotifier](../jasper-app/src/main/java/dev/jasper/app/notifications/CommandNotifier.java) and the app translation of [WorkspaceActivity](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActivity.java). Allocate a source-qualified stable opaque ID. Pair opened and closed registration; remove the active identity before cancelling delayed work. Every delayed callback and event checks the current producer lifetime. Suppliers and activation callbacks run on EDT and must not block. At producer close, orphan and freeze only unfinished details; preserve completed outcomes. At app shutdown cancel producer work before closing the companion. Workspace reports events and never imports notice policy.

@@ -2,6 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status (2026-09-22):** implemented on `claude/vault-6a`, every task green under `./gradlew check`.
+> Deviations from the text as first written, all folded back into the code blocks: `VaultFileFormat.parse`
+> requires only the header (the cipher rejects a short body); the scripted macOS keychain test answers
+> exit 44 for "not found" and 0 for `add-generic-password`; the fake host renders actions as
+> `id|title|enabled`. The opt-in real-keychain test was not run.
+
 **Goal:** A bundled `dev.jasper.vault` plugin that stores accounts, SSH keys and notes in one Argon2id/AES-GCM file bound to the device, locks and unlocks, generates SSH keys, and serves other plugins through a per-consumer `VaultApi` with grants — with the create, unlock, grant and picker dialogs as its only UI.
 
 **Architecture:** Pure layers with no UI dependency (`crypto`, `model`, `store`, `lock`, `keygen`) under a `service` layer that owns the request queue (one prompt serves every waiter; cancelling the last waiter dismisses it) and hands each consumer a `VaultApi` view. `VaultPlugin` wires those layers to the SDK: background executor for Argon2 and file I/O, UI executor for completion, dialogs for the prompts, actions and a lock-state topic. Every secret is a `byte[]`/`char[]` that is zeroed after use.

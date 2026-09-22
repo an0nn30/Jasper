@@ -321,6 +321,10 @@ once at start with `services().find`, and shows its Save as snippet… verb only
 plugin may bundle a library (Snippets bundles tomlj): declare it as `implementation`, and the
 application loads every jar beside the plugin's own.
 
+Credential Vault (`plugins/vault`) is the worked example for `publishPerConsumer`: every plugin that
+requires it gets its own `VaultApi` whose `credential(id)` asks the user to allow *that* plugin once or
+always, and whose futures can be cancelled to withdraw the request.
+
 <!-- example:pluginpalette -->
 ```java
 private static void installPaletteDemo(PluginContext context) {
