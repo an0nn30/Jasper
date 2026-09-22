@@ -74,7 +74,9 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
         cards.add(entries, "entries"); cards.add(grantPanel, "grants"); cards.add(locked, "locked"); add(cards, BorderLayout.CENTER);
         var footer = new JPanel(new BorderLayout(12, 0)); status.setForeground(mutedColor());
         status.setPreferredSize(new Dimension(0, 24)); footer.add(status, BorderLayout.CENTER);
-        var closing = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0)); closing.add(cancelButton); closing.add(closeButton); footer.add(closing, BorderLayout.EAST); add(footer, BorderLayout.SOUTH);
+        var closing = new JPanel(new BorderLayout(12, 0));
+        closing.add(cancelButton, BorderLayout.CENTER); closing.add(closeButton, BorderLayout.EAST);
+        footer.add(closing, BorderLayout.EAST); add(footer, BorderLayout.SOUTH);
         for (var type : VaultManager.Type.values()) menu(addMenu, type.toString(), () -> onAdd.accept(type));
         addMenu.addSeparator(); menu(addMenu, "Generate SSH Key...", onGenerate);
         menu(moreMenu, "Saved plugin grants...", () -> { if (unlocked) ((CardLayout) cards.getLayout()).show(cards, "grants"); });
