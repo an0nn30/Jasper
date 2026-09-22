@@ -1019,9 +1019,11 @@ class KeychainStoreTest {
     @Test void macOsUsesSecurityGenericPasswords(@TempDir Path dir) throws Exception {
         var tool = new Tool();
         var store = new KeychainStore("Mac OS X", tool, dir.resolve("device.dpapi"));
+        tool.answers.put("security find-generic-password", new KeychainStore.Output(44, "security: SecKeychainSearchCopyNext: The specified item could not be found in the keychain."));
         assertThat(store.read()).as("exit 44 = not found").isEmpty();
         tool.answers.put("security find-generic-password", new KeychainStore.Output(0, B64 + "\n"));
         assertThat(store.read()).contains(SECRET);
+        tool.answers.put("security add-generic-password", new KeychainStore.Output(0, ""));
         store.write(SECRET);
         store.delete();
         assertThat(tool.calls.get(0).arguments()).containsExactly("security", "find-generic-password", "-s", KeychainStore.SERVICE, "-a", KeychainStore.ACCOUNT, "-w");
