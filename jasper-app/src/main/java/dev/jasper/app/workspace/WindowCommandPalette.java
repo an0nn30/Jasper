@@ -57,30 +57,33 @@ final class WindowCommandPalette implements AutoCloseable {
     PaletteController controller() { return controller; }
     void toggle() { open(defaultScopeId); }
     boolean hasScope(String id) { return controller.hasScope(id); }
-    void open(String id) {
-        if (closed || !hasScope(id)) return;
-        boolean wasOpen = controller.isOpen();
-        if (!wasOpen) {
-            if (root == null || !owner.isActiveAndOpen()
-                    || !SwingUtilities.isDescendingFrom(owner, root.getLayeredPane())) return;
-            owner.updateActions();
-            originTab = owner.currentTab(); originPane = owner.currentPane();
-            priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+        void open(String id) { open(id, null, null); }
+
+        /** {@code queryOrNull} replaces the query text and {@code rowIdOrNull} selects a row; neither applies when this call dismisses. */
+        void open(String id, String queryOrNull, String rowIdOrNull) {
+            if (closed || !hasScope(id)) return;
+            boolean wasOpen = controller.isOpen();
+            if (!wasOpen) {
+                if (root == null || !owner.isActiveAndOpen()
+                        || !SwingUtilities.isDescendingFrom(owner, root.getLayeredPane())) return;
+                owner.updateActions();
+                originTab = owner.currentTab(); originPane = owner.currentPane();
+                priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+            }
+            if (controller.open(id, originPane == null ? PaletteTarget.window(owner.id()) : target(originPane), this::validOrigin, queryOrNull, rowIdOrNull)) {
+                if (!wasOpen) overlay.swallowing = false;
+                overlay.setVisible(true); layoutOverlay();
+                palette.queryField().requestFocusInWindow();
+            }
         }
-        if (controller.open(id, originPane == null ? PaletteTarget.none() : target(originPane), this::validOrigin)) {
-            if (!wasOpen) overlay.swallowing = false;
-            overlay.setVisible(true); layoutOverlay();
-            palette.queryField().requestFocusInWindow();
-        }
-    }
 
     /** The terminal adapter stays here; providers see only narrow captured capabilities. */
-    private static PaletteTarget target(TerminalPane pane) {
+    private PaletteTarget target(TerminalPane pane) {
         return new PaletteTarget(
             text -> { if (pane.view() != null) pane.view().paste(text); },
             () -> { if (pane.session() != null) pane.session().write("\r"); },
             () -> pane.session() == null ? java.util.Optional.empty() : pane.session().workingDirectory(),
-            pane::shellLabel, pane::running);
+            pane::shellLabel, pane::running, java.util.Optional.of(owner.id()), java.util.Optional.of(pane.id()));
     }
 
     private boolean validOrigin() {

@@ -21,6 +21,7 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import dev.jasper.app.palette.PaletteScope;
 
 /**
  * This window's Swing side of the application-wide contributions model: one {@link Action} per
@@ -33,6 +34,9 @@ final class WindowContributions implements AutoCloseable {
     private final Map<String, Action> actions = new LinkedHashMap<>();
     private final Map<String, Subscription> commands = new LinkedHashMap<>();
     private Subscription listening;
+        private static final System.Logger LOG = System.getLogger(WindowContributions.class.getName());
+        private final Map<PaletteScope, Subscription> scopes = new LinkedHashMap<>();
+        private Subscription paletteRequests;
 
     private static final class PanelInstance {
         final PanelEntry entry;
@@ -58,6 +62,8 @@ final class WindowContributions implements AutoCloseable {
         owner.rail().onToggle = this::togglePanel;
         owner.rail().onMove = this::movePanel;
         panelRequests = model.onPanelRequest(this::requested);
+        paletteRequests = model.onPaletteRequest(this::requestedPalette);
+        syncScopes();
         syncPanels();
         renderRail();
         listening = model.onChanged(this::changed);
@@ -88,6 +94,25 @@ final class WindowContributions implements AutoCloseable {
     }
 
     private void renderStatus() { owner.status().setContributed(model.status(), this::action); }
+
+        private void requestedPalette(Contributions.PaletteRequest request) {
+            if (!request.windowId().equals(owner.id()) || owner.commandPalette() == null) return;
+            owner.commandPalette().open(request.scopeId(), request.query().orElse(null), request.rowId().orElse(null));
+        }
+
+        /** Registers contributed scopes this window does not have yet and drops the ones that left the model. */
+        private void syncScopes() {
+            List<PaletteScope> current = model.scopes();
+            for (PaletteScope scope : List.copyOf(scopes.keySet()))
+                if (!current.contains(scope)) scopes.remove(scope).close();
+            for (PaletteScope scope : current) {
+                if (scopes.containsKey(scope)) continue;
+                try { scopes.put(scope, owner.scopes().register(scope)); }
+                catch (IllegalArgumentException clash) {
+                    LOG.log(System.Logger.Level.WARNING, "A contributed scope is not shown in this window: " + clash.getMessage());
+                }
+            }
+        }
 
     private void requested(Contributions.PanelRequest request) {
         if (!request.windowId().equals(owner.id())) return;
@@ -208,6 +233,7 @@ final class WindowContributions implements AutoCloseable {
             }
             case PANELS -> { syncPanels(); renderRail(); }
             case RAIL -> renderRail();
+            case SCOPES -> syncScopes();
             case TOOLBAR -> owner.chrome().renderContributedToolbar();
             case MENUS -> owner.chrome().renderContributedMenus();
             case STATUS -> renderStatus();
@@ -253,6 +279,9 @@ final class WindowContributions implements AutoCloseable {
         listening = null;
         commands.values().forEach(Subscription::close);
         commands.clear();
+        scopes.values().forEach(Subscription::close);
+        scopes.clear();
+        if (paletteRequests != null) { paletteRequests.close(); paletteRequests = null; }
         actions.values().forEach(action -> action.setEnabled(false));
         if (panelRequests != null) { panelRequests.close(); panelRequests = null; }
         for (PanelInstance panel : panels.values()) {

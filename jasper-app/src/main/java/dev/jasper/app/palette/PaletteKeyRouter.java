@@ -62,6 +62,10 @@ public final class PaletteKeyRouter implements AutoCloseable {
         int code = stroke.getKeyCode();
         var action = bindings.get().actionFor(stroke);
         String scope = scopeFor(action.orElse(null));
+                // A contributed scope's shortcut is intercepted only while the palette is open; closed, the
+                // plugin's own action handler runs through the ordinary shortcut path and opens the palette itself.
+                if (scope == null && palette.isOpen())
+                    scope = bindings.get().idFor(stroke).filter(KeyBindings::extensionId).flatMap(palette::scopeForShortcutAction).orElse(null);
         if (scope != null) {
             // An unregistered scope's shortcut is inert: it does not hold the physical key,
             // so it cannot swallow a later, differently-modified press of the same key.

@@ -41,7 +41,7 @@ public final class ShellHistorySearchMeasurement {
         }, Runnable::run);
         for (ShellHistoryEntry entry : snapshot.entries()) index.record(entry);
         var scope = new ShellHistoryScope(index, null);
-        var context = new PaletteContext(true, new PaletteTarget(text -> {}, () -> {}, Optional::empty, () -> "zsh", () -> true));
+        var context = new PaletteContext(true, new PaletteTarget(text -> {}, () -> {}, Optional::empty, () -> "zsh", () -> true, Optional.empty(), Optional.empty()));
         var report = new StringBuilder("# Shell history search measurement\n\nEntries: ").append(ENTRIES).append("\n\n| Query | Median µs |\n|---|---|\n");
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             for (String query : List.of("", "git commit", "module 7", "change 04999", "no such text")) {

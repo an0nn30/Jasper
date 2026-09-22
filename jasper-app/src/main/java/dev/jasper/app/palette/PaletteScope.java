@@ -4,6 +4,7 @@ import dev.jasper.app.lifecycle.Subscription;
 
 import java.util.List;
 import javax.swing.Icon;
+import java.util.Optional;
 
 /**
  * One kind of searchable thing. The palette shows exactly one scope at a time; a scope sees only its own
@@ -23,6 +24,12 @@ public interface PaletteScope {
     /** One to three verbs, bound in order to Enter, Cmd/Ctrl+Enter and Shift+Enter. */
     List<PaletteVerb> verbs();
     default boolean monospaceRows() { return false; }
+
+        /**
+         * A contributed action whose shortcut, while the palette is open, switches to or dismisses this
+         * scope instead of being swallowed; the built-in scopes are routed by {@code ActionId} instead.
+         */
+        default Optional<String> shortcutActionId() { return Optional.empty(); }
     /** The scope became active in an open palette; a scope may ask its index for a background refresh here. */
     default void activated(PaletteContext context) {}
     /** At most {@code context.maxResults()} rows; the palette is a hard-capped list, never a scrolling one. */

@@ -14,6 +14,7 @@ import java.util.function.Function;
 import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
+import dev.jasper.app.palette.PaletteScope;
 
 /**
  * What extensions have contributed, in registration order. Windows subscribe and re-render the part
@@ -21,7 +22,7 @@ import javax.swing.SwingUtilities;
  */
 public final class Contributions {
     /** Which part changed. */
-    public enum Kind { ACTIONS, TOOLBAR, MENUS, STATUS, PANELS, RAIL }
+    public enum Kind { ACTIONS, TOOLBAR, MENUS, STATUS, PANELS, RAIL, SCOPES }
 
     /** Where an action was invoked: the window, and the pane it concerns if the window has one. */
     public record Invocation(UUID windowId, Optional<UUID> paneId) {
@@ -143,6 +144,48 @@ public final class Contributions {
     }
 
     public List<String> railActions() { return railActions.stream().map(placed -> placed[0]).toList(); }
+
+        /** Asks one window to open its palette. */
+        public record PaletteRequest(UUID windowId, String scopeId, Optional<String> query, Optional<String> rowId) {
+            public PaletteRequest {
+                Objects.requireNonNull(windowId, "windowId"); Objects.requireNonNull(scopeId, "scopeId");
+                Objects.requireNonNull(query, "query"); Objects.requireNonNull(rowId, "rowId");
+            }
+        }
+
+        private final List<PaletteScope> scopes = new ArrayList<>();
+        private final List<Consumer<PaletteRequest>> paletteListeners = new ArrayList<>();
+
+        /**
+         * A scope every window registers in its palette, one instance shared by all of them. Ids are
+         * unique among contributed scopes; a window also refuses a clash with one of its built-in ids.
+         */
+        public Subscription addScope(PaletteScope scope) {
+            requireEdt();
+            String id = PaletteScope.requireValidId(Objects.requireNonNull(scope, "scope").id());
+            if (scope.verbs().isEmpty()) throw new IllegalArgumentException("Scope needs at least one verb: " + id);
+            for (PaletteScope existing : scopes)
+                if (existing.id().equals(id)) throw new IllegalArgumentException("Scope already contributed: " + id);
+            scopes.add(scope);
+            changed(Kind.SCOPES);
+            return new Subscription(() -> { if (scopes.remove(scope)) changed(Kind.SCOPES); });
+        }
+
+        public List<PaletteScope> scopes() { return List.copyOf(scopes); }
+
+        public Subscription onPaletteRequest(Consumer<PaletteRequest> listener) {
+            requireEdt();
+            paletteListeners.add(Objects.requireNonNull(listener, "listener"));
+            return new Subscription(() -> paletteListeners.remove(listener));
+        }
+
+        public void requestPalette(PaletteRequest request) {
+            requireEdt();
+            for (Consumer<PaletteRequest> listener : List.copyOf(paletteListeners)) {
+                try { listener.accept(request); }
+                catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A palette request listener failed", failure); }
+            }
+        }
 
     public Subscription onPanelRequest(Consumer<PanelRequest> listener) {
         requireEdt();

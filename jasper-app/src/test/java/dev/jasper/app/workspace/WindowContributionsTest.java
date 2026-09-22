@@ -15,6 +15,9 @@ import javax.swing.JRootPane;
 import javax.swing.KeyStroke;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import dev.jasper.app.palette.PaletteScope;
+import dev.jasper.app.palette.PaletteTestSupport;
+import java.util.UUID;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -97,4 +100,45 @@ class WindowContributionsTest {
             assertThat(owner.commands().find("dev.x.late")).isEmpty();
         });
     }
+
+        @Test void aContributedScopeIsInThisWindowsPaletteItsShortcutSwitchesWhileOpenAndRequestsAreRouted() throws Exception {
+            edt(() -> {
+                try (WindowContent owner = CommandPaletteShortcutsTest.owner(true)) {
+                var model = new Contributions();
+                CommandPaletteShortcutsTest.install(owner);
+                model.addAction("dev.x.open", "Open X", null, List.of(), Optional.of("cmd+alt+h"),
+                    invocation -> owner.commandPalette().open("dev.x.scope"));
+                var registration = model.addScope(PaletteTestSupport.scope("dev.x.scope", "dev.x.open"));
+                owner.connectContributions(model);
+                var palette = owner.commandPalette();
+                assertThat(owner.scopes().find("dev.x.scope")).as("registered in the window on connect").isPresent();
+
+                assertThat(owner.dispatchShortcut(stroke("cmd+alt+h"), null)).as("closed: the plugin's handler runs").isTrue();
+                assertThat(palette.isOpen()).isTrue();
+                assertThat(palette.activeScopeId()).isEqualTo("dev.x.scope");
+                palette.open(PaletteScope.COMMANDS_ID);
+                assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
+                assertThat(owner.dispatchShortcut(stroke("cmd+alt+h"), null)).as("open: the router switches scope").isTrue();
+                assertThat(palette.activeScopeId()).isEqualTo("dev.x.scope");
+                assertThat(owner.dispatchShortcut(stroke("cmd+alt+h"), null)).as("again: dismisses").isTrue();
+                assertThat(palette.isOpen()).isFalse();
+
+                model.requestPalette(new Contributions.PaletteRequest(UUID.randomUUID(), "dev.x.scope", Optional.empty(), Optional.empty()));
+                assertThat(palette.isOpen()).as("another window's request").isFalse();
+                model.requestPalette(new Contributions.PaletteRequest(owner.id(), "dev.x.scope", Optional.of("al"), Optional.of("beta")));
+                assertThat(palette.isOpen()).isTrue();
+                assertThat(palette.activeScopeId()).isEqualTo("dev.x.scope");
+                assertThat(palette.component().queryField().getText()).isEqualTo("al");
+                assertThat(PaletteTestSupport.resultList(palette.component()).getSelectedValue().id()).isEqualTo("beta");
+                model.requestPalette(new Contributions.PaletteRequest(owner.id(), "dev.x.scope", Optional.of("x"), Optional.empty()));
+                assertThat(palette.isOpen()).as("a request for the showing scope dismisses").isFalse();
+
+                var scope = model.addScope(PaletteTestSupport.scope("dev.x.late", null));
+                assertThat(owner.scopes().find("dev.x.late")).as("added after connect").isPresent();
+                scope.close(); registration.close();
+                assertThat(owner.scopes().find("dev.x.late")).isEmpty();
+                assertThat(owner.scopes().find("dev.x.scope")).isEmpty();
+                }
+            });
+        }
 }

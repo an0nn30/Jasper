@@ -31,11 +31,11 @@ class SnippetsScopeTest {
     }
 
     private static PaletteTarget target(List<String> pasted, AtomicInteger returns) {
-        return new PaletteTarget(pasted::add, returns::incrementAndGet, Optional::empty, () -> "zsh", () -> true);
+        return new PaletteTarget(pasted::add, returns::incrementAndGet, Optional::empty, () -> "zsh", () -> true, Optional.empty(), Optional.empty());
     }
 
     private static PaletteTarget deadTarget(List<String> pasted, AtomicInteger returns) {
-        return new PaletteTarget(pasted::add, returns::incrementAndGet, Optional::empty, () -> "zsh", () -> false);
+        return new PaletteTarget(pasted::add, returns::incrementAndGet, Optional::empty, () -> "zsh", () -> false, Optional.empty(), Optional.empty());
     }
 
     private static final String FILE = """

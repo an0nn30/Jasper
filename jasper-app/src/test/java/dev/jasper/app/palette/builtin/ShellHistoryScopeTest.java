@@ -43,7 +43,7 @@ class ShellHistoryScopeTest {
     }
 
     private static PaletteTarget target(List<String> pasted, AtomicInteger returns, Path cwd, boolean live) {
-        return new PaletteTarget(pasted::add, returns::incrementAndGet, () -> Optional.ofNullable(cwd), () -> "zsh", () -> live);
+        return new PaletteTarget(pasted::add, returns::incrementAndGet, () -> Optional.ofNullable(cwd), () -> "zsh", () -> live, Optional.empty(), Optional.empty());
     }
 
     @Test void emptyQueryShowsMostRecentAndTiersOrderPrefixWordThenSubstringWithADirectoryBoost() throws Exception {
@@ -179,7 +179,7 @@ class ShellHistoryScopeTest {
 
     private static PaletteContext context(List<String> trivial) {
         return new PaletteContext(true,
-            new PaletteTarget(s -> {}, () -> {}, Optional::empty, () -> "zsh", () -> true),
+            new PaletteTarget(s -> {}, () -> {}, Optional::empty, () -> "zsh", () -> true, Optional.empty(), Optional.empty()),
             PaletteSettings.DEFAULT_MAX_RESULTS, trivial);
     }
 

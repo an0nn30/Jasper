@@ -7,6 +7,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import dev.jasper.app.palette.PaletteScope;
+import dev.jasper.app.lifecycle.Subscription;
+import static dev.jasper.app.palette.PaletteTestSupport.scope;
 import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
@@ -80,4 +83,30 @@ class ContributionsTest {
         model.addToolbar(new ToolbarEntry.Button("dev.x.a"));
         assertThat(changes).hasSize(3);
     }
+
+        @Test void scopesAreContributedOnceEachRemovalIsItsOwnAndPaletteRequestsReachListeners() {
+            {
+                var model = new Contributions();
+                List<Contributions.Kind> kinds = new ArrayList<>();
+                model.onChanged(kinds::add);
+                List<Contributions.PaletteRequest> requests = new ArrayList<>();
+                model.onPaletteRequest(requests::add);
+                PaletteScope first = scope("dev.x.first", null), second = scope("dev.x.second", "dev.x.open");
+                Subscription one = model.addScope(first);
+                model.addScope(second);
+                assertThat(model.scopes()).containsExactly(first, second);
+                assertThat(kinds).containsExactly(Contributions.Kind.SCOPES, Contributions.Kind.SCOPES);
+                assertThatIllegalArgumentException().isThrownBy(() -> model.addScope(scope("dev.x.first", null)));
+                assertThatIllegalArgumentException().isThrownBy(() -> model.addScope(scope("Bad Id", null)));
+                one.close(); one.close();
+                assertThat(model.scopes()).containsExactly(second);
+                assertThat(kinds).hasSize(3);
+                UUID window = UUID.randomUUID();
+                model.requestPalette(new Contributions.PaletteRequest(window, "dev.x.second", Optional.of("be"), Optional.of("beta")));
+                assertThat(requests).singleElement().satisfies(request -> {
+                    assertThat(request.windowId()).isEqualTo(window);
+                    assertThat(request.query()).contains("be");
+                });
+            }
+        }
 }

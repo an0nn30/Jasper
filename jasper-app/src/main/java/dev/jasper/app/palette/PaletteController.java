@@ -9,6 +9,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.swing.SwingUtilities;
+import java.util.Optional;
 
 /** EDT-owned palette interaction state; host callbacks contain all workspace integration. */
 public final class PaletteController implements AutoCloseable {
@@ -44,22 +45,37 @@ public final class PaletteController implements AutoCloseable {
 
     public boolean hasScope(String id) { return scopes.find(id).isPresent(); }
 
-    /** Captures the origin only on first open; changing scopes retains that captured target. */
-    public boolean open(String scopeId, PaletteTarget target, BooleanSupplier valid) {
-        if (closed) return false;
-        PaletteScope scope = scopes.find(scopeId).orElse(null);
-        if (scope == null) return false;
-        if (open) {
-            if (scope == active) { dismiss(); return false; }
-            activate(scope, !picker); return true;
+        /** The registered scope whose shortcut action is {@code actionId}. */
+        public Optional<String> scopeForShortcutAction(String actionId) {
+            return scopes.byShortcutAction(actionId).map(PaletteScope::id);
         }
-        generation++;
-        originValid = valid;
-        context = new PaletteContext(macOs, target, maxResults, trivialCommands);
-        open = true; palette.setVisible(true);
-        activate(scope, false);
-        return true;
-    }
+
+        /** Captures the origin only on first open; changing scopes retains that captured target. */
+        public boolean open(String scopeId, PaletteTarget target, BooleanSupplier valid) { return open(scopeId, target, valid, null, null); }
+
+        /**
+         * As {@link #open(String, PaletteTarget, BooleanSupplier)}; afterwards {@code queryOrNull} replaces
+         * the query text and {@code rowIdOrNull} selects a row of the resulting list. Neither is applied
+         * when the call dismisses an already showing scope.
+         */
+        public boolean open(String scopeId, PaletteTarget target, BooleanSupplier valid, String queryOrNull, String rowIdOrNull) {
+            if (closed) return false;
+            PaletteScope scope = scopes.find(scopeId).orElse(null);
+            if (scope == null) return false;
+            if (open) {
+                if (scope == active) { dismiss(); return false; }
+                activate(scope, !picker);
+            } else {
+                generation++;
+                originValid = valid;
+                context = new PaletteContext(macOs, target, maxResults, trivialCommands);
+                open = true; palette.setVisible(true);
+                activate(scope, false);
+            }
+            if (queryOrNull != null) palette.queryField().setText(queryOrNull);
+            if (rowIdOrNull != null) palette.selectRow(rowIdOrNull);
+            return true;
+        }
 
     private void activate(PaletteScope scope, boolean keepQuery) {
         generation++;

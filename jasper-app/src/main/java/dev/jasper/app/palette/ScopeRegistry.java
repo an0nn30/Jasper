@@ -37,6 +37,14 @@ public final class ScopeRegistry implements AutoCloseable {
     }
 
     List<PaletteScope> scopes() { CommandRegistry.requireEdt(); return List.copyOf(scopes.values()); }
+        /** The scope naming {@code actionId} as its shortcut action, if any. */
+        public Optional<PaletteScope> byShortcutAction(String actionId) {
+            CommandRegistry.requireEdt();
+            for (PaletteScope scope : scopes.values())
+                if (scope.shortcutActionId().filter(actionId::equals).isPresent()) return Optional.of(scope);
+            return Optional.empty();
+        }
+
     public Optional<PaletteScope> find(String id) { CommandRegistry.requireEdt(); return Optional.ofNullable(scopes.get(id)); }
     boolean contains(PaletteScope scope) { CommandRegistry.requireEdt(); return scope != null && scopes.get(scope.id()) == scope; }
 
