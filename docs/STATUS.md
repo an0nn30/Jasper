@@ -23,28 +23,24 @@ is merged at `17c0476`. The Credential Vault design
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
-### macOS default shell refresh — 2026-09-22
+### macOS default shell refresh reverted — 2026-09-22
 
-Fix `dddfc57` merged into local `main` by fast-forward with user approval; not pushed.
-The account reported `/bin/zsh` while the application inherited
-`SHELL=/opt/homebrew/bin/bash`. Launch selection trusted that stale environment;
-Bash integration was a consequence, not the selector. Each macOS launch now queries
-`dscl /Search` for the current account's `UserShell` on the launch worker, with a
-two-second timeout and inherited/default fallback. The child `SHELL` is refreshed
-before configured overrides and integration. Explicit programs and arguments remain
-captured at request time; the resolved label is delivered with launch completion.
-New tabs, splits and windows share this path. Linux/Windows behavior is unchanged.
+At the user's request, reverted `dddfc57` and its integration note `238769f`:
+per-launch macOS account lookup caused noticeable shell-start latency in native use.
+Shell selection again uses inherited `SHELL`, with the existing platform fallbacks;
+there is no per-launch `dscl` query. Shell integration and launch scheduling are
+restored to their previous behavior. The account reports `/bin/zsh`, while the
+running apps inherited `/opt/homebrew/bin/bash`; the user plans to refresh the login
+environment by rebooting. No system settings changed and no GUI launched.
 
-This corrects the old inherited-shell behavior documented in the phase-4 plan;
-per the user's request, macOS account selection happens at actual start while
-configuration still freezes before dispatch. No integration script changes, native
-GUI launch or system account edits. Real-account regression reproduced Bash instead
-of zsh before the fix and passed after it. `./gradlew check :jasper-app:installDist -q` passed: 1554 tests,
-1551 passed, 3 expected skips, no failures/errors. Independent review
-found no actionable issues. Source hygiene and diff checks passed; installed
-distribution built, with native GUI acceptance left to the user. The same command
-passed again on the merged `main`: 1,554 tests, 1,551 passed, three expected skips.
-The running installed app has not been replaced.
+Verification: code and tests match `75dd8a3` exactly; only this status note differs.
+`./gradlew check :jasper-app:installDist -q` passed on retry: 1,546 tests,
+1,543 passed and three expected skips. The first run hit an unchanged test race in
+`AttachedSessionTest.shellIntegrationWorksButNeverReportsALocalDirectory` at line 74:
+streaming a synchronized list during concurrent writes throws
+`ConcurrentModificationException`. No terminal code/test changes were made; that
+intermittent test issue remains deferred. The revert is integrated into local `main`;
+no push or replacement of the running installed application.
 
 ### Plugin home — 2026-09-22
 

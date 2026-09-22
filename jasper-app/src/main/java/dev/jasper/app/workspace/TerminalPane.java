@@ -205,7 +205,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
                 return;
             }
             adopt(created);
-        }, label -> { if (!closed) shellLabel = label; });
+        });
     }
 
     /** Shows a running session here: the local shell, a provider's connection, or a reconnect replacing the last one. */
