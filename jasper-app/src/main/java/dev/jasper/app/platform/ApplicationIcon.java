@@ -16,8 +16,18 @@ public final class ApplicationIcon {
 
     private ApplicationIcon() {}
 
-    public static List<Image> images(boolean macos) {
-        return macos ? Mac.IMAGES : Windows.IMAGES;
+    /** Returns the icon sizes and framing appropriate to the current desktop. */
+    public static List<Image> images() {
+        return images(SystemInfo.isMacOS ? "macos" : SystemInfo.isWindows ? "windows" : "linux");
+    }
+
+    static List<Image> images(String platform) {
+        return switch (platform) {
+            case "macos" -> Mac.IMAGES;
+            case "windows" -> Windows.IMAGES;
+            case "linux" -> Linux.IMAGES;
+            default -> throw new IllegalArgumentException("Unknown icon platform: " + platform);
+        };
     }
 
     /** Also gives development launches the correct Dock icon; call on the EDT. */
@@ -26,7 +36,7 @@ public final class ApplicationIcon {
         try {
             Taskbar taskbar = Taskbar.getTaskbar();
             if (taskbar.isSupported(Taskbar.Feature.ICON_IMAGE)) {
-                taskbar.setIconImage(images(SystemInfo.isMacOS).getLast());
+                taskbar.setIconImage(images().getLast());
             }
         } catch (UnsupportedOperationException | SecurityException failure) {
             LOG.log(System.Logger.Level.WARNING, "Desktop does not allow setting the application icon", failure);
@@ -56,5 +66,9 @@ public final class ApplicationIcon {
     private static final class Windows {
         static final List<Image> IMAGES = load("windows", 16, 20, 24, 30, 32, 36, 40, 48,
             60, 64, 72, 80, 96, 128, 256);
+    }
+
+    private static final class Linux {
+        static final List<Image> IMAGES = load("linux", 16, 24, 32, 48, 64, 96, 128, 256, 512, 1024);
     }
 }

@@ -30,7 +30,11 @@ val stagePlugins = tasks.register<Sync>("stagePlugins") {
     into(layout.buildDirectory.dir("plugins"))
 }
 // installDist and the distribution archives carry them beside the application jar, where the runtime looks.
-distributions { main { contents { from(stagePlugins) { into("lib/plugins") } } } }
+distributions { main { contents {
+    from(stagePlugins) { into("lib/plugins") }
+    // Portable distributions expose the same desktop icon set used by Linux windows.
+    from(rootProject.file("packaging/icons/linux/hicolor")) { into("share/icons/hicolor") }
+} } }
 tasks.named<JavaExec>("run") {
     dependsOn(stagePlugins)
     systemProperty("jasper.plugins.bundled", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
@@ -46,7 +50,8 @@ tasks.test {
     systemProperty("jasper.terminalJar", project(":jasper-terminal").layout.buildDirectory.file("libs/jasper-terminal.jar").get().asFile.absolutePath)
     val configExample = rootProject.layout.projectDirectory.file("config.example.toml")
     inputs.file(configExample).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(rootProject.file("packaging/icons/Jasper.icns"), rootProject.file("packaging/icons/Jasper.ico"))
+    inputs.files(rootProject.file("packaging/icons/Jasper.icns"), rootProject.file("packaging/icons/Jasper.ico"),
+        rootProject.file("packaging/icons/Jasper.png"), rootProject.fileTree("packaging/icons/linux") { include("**/*.png") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("jasper.projectDir", rootProject.layout.projectDirectory.asFile.absolutePath)
 }

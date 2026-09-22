@@ -73,12 +73,31 @@ class ApplicationIconTest {
         assertThat(windows.getRGB(0, 0) >>> 24).isZero();
     }
 
-    @Test void loadsBothPlatformImageSetsWithoutInitializingTheDesktop() {
-        assertThat(ApplicationIcon.images(true)).extracting(image -> image.getWidth(null))
+    @Test void loadsAllPlatformImageSetsWithoutInitializingTheDesktop() {
+        assertThat(ApplicationIcon.images("macos")).extracting(image -> image.getWidth(null))
             .contains(16, 32, 64, 128, 256, 512, 1024);
-        assertThat(ApplicationIcon.images(false)).extracting(image -> image.getWidth(null))
+        assertThat(ApplicationIcon.images("windows")).extracting(image -> image.getWidth(null))
             .contains(16, 20, 24, 32, 40, 48, 64, 128, 256);
+        assertThat(ApplicationIcon.images("linux")).extracting(image -> image.getWidth(null))
+            .containsExactly(16, 24, 32, 48, 64, 96, 128, 256, 512, 1024);
+        assertThat(ApplicationIcon.images()).isNotEmpty();
         ApplicationIcon.installTaskbarIcon(); // No native calls in headless test mode.
+    }
+
+    @Test void linuxPackageAndDesktopIconsMatchTheRuntimeArtwork() throws Exception {
+        for (int size : new int[] {16, 24, 32, 48, 64, 96, 128, 256, 512, 1024}) {
+            Path installed = ICONS.resolve("linux/hicolor/" + size + "x" + size + "/apps/jasper.png");
+            try (var runtime = getClass().getResourceAsStream("/dev/jasper/app/icons/app/linux/icon-" + size + ".png")) {
+                assertThat(runtime).isNotNull();
+                assertThat(Files.readAllBytes(installed)).isEqualTo(runtime.readAllBytes());
+            }
+        }
+        assertThat(Files.readAllBytes(ICONS.resolve("Jasper.png")))
+            .isEqualTo(Files.readAllBytes(ICONS.resolve("linux/hicolor/512x512/apps/jasper.png")));
+        BufferedImage linux = read("linux", 256);
+        assertThat(linux.getColorModel().hasAlpha()).isTrue();
+        assertThat(linux.getRGB(0, 0) >>> 24).isZero();
+        assertThat(firstOpaquePixel(linux, 128)).isBetween(12, 15);
     }
 
     private static BufferedImage read(String platform, int size) throws Exception {

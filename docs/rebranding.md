@@ -1,6 +1,6 @@
 # Moving from Moray to Jasper
 
-The app is now **Jasper**, with the Silver Desk Buddy turtle icon. Java packages
+The app is now **Jasper**, with the [Ember turtle icon](../packaging/icons/README.md). Java packages
 are `dev.jasper.app`, `dev.jasper.terminal` and `dev.jasper.buddy`; Gradle modules
 are `jasper-app`, `jasper-terminal` and `jasper-buddy`. Use `./gradlew :jasper-app:run` for development and
 `./gradlew check :jasper-app:packageDist` to verify and package it.

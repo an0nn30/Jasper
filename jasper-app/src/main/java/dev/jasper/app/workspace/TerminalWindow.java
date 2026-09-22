@@ -39,7 +39,7 @@ public final class TerminalWindow implements AutoCloseable {
     public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, ThemeController themes,
                    ConfigSnapshot initial, CommandHistory history, ShellHistoryIndex shellHistory, SnippetStore snippets) {
         this.callbacks = callbacks;
-        frame.setIconImages(ApplicationIcon.images(SystemInfo.isMacOS));
+        frame.setIconImages(ApplicationIcon.images());
         content = new WindowContent(launcher, directory, callbacks.newWindow(), callbacks.quit(), this::close, themes,
             KeyBindings.defaults(SystemInfo.isMacOS), System::nanoTime, history, SystemInfo.isMacOS, shellHistory, snippets);
         if (initial != null) {
