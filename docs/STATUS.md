@@ -14,12 +14,59 @@ local `main`, as is plan 2 (actions and chrome placements). Plan 3a (rail, panel
 windows) is merged too; the spec's plan 3 was split into 3a and 3b. Plan 3b (Plugins manager,
 install and restart) is merged too. The spec's plan 4 is split into 4a (terminal API: observe,
 inject, open) and 4b (plugin-provided sessions); 4a and 4b are merged too. Working-directory provenance moved from 4b to a small plan 4c, which is
-implemented on `claude/plugin-sdk-plan-4c`. With it the plugin SDK plans are complete; the Vault
-and SSH plugin specs come next.
+merged too. With it the plugin SDK plans are complete. The palette-plugins design
+(`superpowers/specs/2026-09-21-jasper-palette-plugins-design.md`) is approved; plan 5a (the
+contribution surface) is implemented on `claude/palette-plugins`, plan 5b (the History and Snippets
+plugins) is next, then the Vault and SSH plugin specs.
+
+### Palette plugins plan 5a — 2026-09-21
+
+Implemented on `claude/palette-plugins` (not merged, not pushed). The work implements
+[plan 5a](superpowers/plans/2026-09-21-jasper-palette-plugins-plan-5a-contribution-surface.md) of
+the [palette-plugins design](superpowers/specs/2026-09-21-jasper-palette-plugins-design.md): a plugin
+can contribute a command-palette scope, open the palette, see a pane's shell label, show an error
+notice and open a file in the user's editor. The SDK is 0.6.0: new package `dev.jasper.sdk.palette`
+(`Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`,
+`PaletteStep`, `PaletteQuery`), `ui.Notices`, `ui.Platform`, `PaneInfo.shell`, capability
+`palette.contribute`, and `PluginContext.palette()/notices()/platform()`. The app's `Contributions`
+model carries scopes and palette requests; `WindowContributions` registers every contributed scope in
+its window and routes requests; `PaletteKeyRouter` treats a contributed scope's shortcut like a
+built-in one while the palette is open; `plugins.HostedPalette` adapts a scope with contained calls
+and hands the plugin its own rows back; `PaneSnapshot.shell` feeds `PaneInfo.shell`. The testkit
+gained `FakePalette` and nine host accessors; the contract suite is 35 cases. The sample plugin
+contributes a "Greetings" scope behind `demo_scope`. The application's own History and Snippets
+scopes are untouched. See [SDK architecture](sdk-architecture.md#palette-scopes) and
+[plugin authoring](plugin-authoring.md#palette-scopes).
+
+Scope decisions, as recorded at the top of the plan:
+
+1. `PaneInfo.shell` and `PaneSnapshot.shell` are last components, so existing constructor calls
+   grew by one appended argument.
+2. `PaletteTarget` carries the window and pane ids; a windowless target (fixtures only) yields no
+   rows from a contributed scope.
+3. A contributed scope's shortcut is intercepted only while the palette is open; closed, the plugin's
+   own action handler runs and calls `Palette.open`.
+4. The adapter keeps the plugin's row as the app row's token.
+5. `Palette.open` on the showing scope dismisses and applies neither query nor row.
+6. `Notices.error` goes to the last active window's `onError` (a dialog today), or the log;
+   `Platform.openInEditor` runs the app's `ConfigEditor` on the plugin's executor and reports
+   failure as a notice.
+7. The contract's `addTerminalPane` keeps its signature; both harnesses create `zsh` panes.
+
+Deviations from the plan text: three existing tests pinned the capability list
+(`TerminalValuesTest`, `DescriptorParserTest`) or built a `PaneInfo` the plan's grep missed
+(`FakeContractTest`); each expectation was extended. The SDK's one-line Javadocs were rewritten as
+multi-line comments to satisfy doclint. No code deviations.
+
+Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks`
+passed with **1,435 tests: 1,433 passed, two expected environment skips, no failures or
+errors** (app 819, Buddy 163, terminal 377, SDK 21, testkit 45, sample plugin 10). Native acceptance
+(the five steps at the end of the plan, driven by the sample plugin's `demo_scope`) is pending and is
+the user's.
 
 ### Plugin SDK plan 4c — 2026-09-21
 
-Implemented on `claude/plugin-sdk-plan-4c` (not merged, not pushed). The work implements
+Merged into local `main` by fast-forward on 2026-09-21 at `9fbdc49` (not pushed). The work implements
 [plan 4c](superpowers/plans/2026-09-21-jasper-plugin-sdk-plan-4c-directory-provenance.md): a
 directory reported under another host name is no longer treated as a local path.
 `internal.shell.DirectoryProvenance` classifies every OSC 7 report; `ShellCommandTracker` keeps one

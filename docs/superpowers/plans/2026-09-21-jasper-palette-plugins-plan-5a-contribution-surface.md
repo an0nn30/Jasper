@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Record every deviation from this text here and in `docs/STATUS.md`.
+**Status:** Implemented on `claude/palette-plugins`; native acceptance pending. Deviations: three existing tests pinned the capability list or built a `PaneInfo` the plan's grep missed and were extended (`TerminalValuesTest`, `DescriptorParserTest`, `FakeContractTest`); the SDK's one-line Javadocs were rewritten as multi-line comments for doclint. No code deviations. Final verification: 1,435 tests, two expected skips, no failures (see `docs/STATUS.md`).
 
 **Goal:** Let a plugin contribute a command-palette scope, open the palette, tag panes with their shell, show an error notice and open a file in the user's editor, with the host adapter, testkit fake and contract cases behind each, while the application's own History and Snippets scopes stay exactly where they are.
 

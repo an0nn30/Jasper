@@ -161,4 +161,24 @@ class SamplePluginTest {
             assertThat(host.failures()).isEmpty();
         }
     }
+
+        @Test void thePaletteDemoContributesAGreetingsScopeThatPastesIntoTheOriginPane() {
+            try (var host = new FakePluginHost()) {
+                UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "build");
+                UUID pane = host.addTerminalPane(tab, new PaneInfo("zsh", Optional.of(Path.of("/src")), Optional.empty(), 80, 24, true,
+                    SessionKind.LOCAL, Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh"));
+                host.setConfig("dev.jasper.sample", Map.of("demo_scope", true));
+                host.start(new PluginInfo("dev.jasper.sample", "Sample", "0.1.0", Set.of(Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT)),
+                    Set.of(), Set.of(), new SamplePlugin());
+                assertThat(host.failures()).isEmpty();
+                assertThat(host.scopes()).containsExactly("dev.jasper.sample.greetings|Greetings|paste,paste_run");
+                assertThat(host.searchScope("dev.jasper.sample.greetings", "", window, pane)).hasSize(3);
+                assertThat(host.searchScope("dev.jasper.sample.greetings", "morn", window, pane)).containsExactly("greeting.0|good morning|true");
+                assertThat(host.availableInScope("dev.jasper.sample.greetings", "greeting.0", "paste", window, null)).as("needs an origin pane").isFalse();
+                host.executeInScope("dev.jasper.sample.greetings", "greeting.0", "paste_run", window, pane);
+                assertThat(host.sent(pane)).as("the fake records paste: and write: lines").containsExactly("paste:echo 'good morning'", "write:\r");
+                assertThat(host.invoke("dev.jasper.sample.greetings.open", window, pane)).isTrue();
+                assertThat(host.paletteOpens()).containsExactly(window + " dev.jasper.sample.greetings - -");
+            }
+        }
 }

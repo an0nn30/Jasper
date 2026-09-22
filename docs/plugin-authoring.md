@@ -47,6 +47,7 @@ classes in `dev.jasper.*` platform packages or in a package a dependency exports
     if (context.config().bool("demo_ui").orElse(false)) installUi(context, stepMillis);
     if (context.config().bool("demo_terminal").orElse(false)) installTerminalDemo(context);
     if (context.config().bool("demo_session").orElse(false)) installSessionDemo(context, stepMillis);
+            if (context.config().bool("demo_scope").orElse(false)) installPaletteDemo(context);
     if (context.config().bool("demo_activity").orElse(false))
         context.background().execute(() -> demo(context, stepMillis));
 }
@@ -232,6 +233,7 @@ private static void installTerminalDemo(PluginContext context) {
   another machine, for example after the user ran `ssh`, or in a provided session. At most one is
   present. Both are whatever the shell last reported, unauthenticated: never open a remote path as
   a local file, and expect a local one not to exist.
+- `PaneInfo.shell` is the launcher's label (`zsh`, `fish`) or a provided session's title.
 - To run a command in a new tab, open one with `OpenRequest.local()` or `localIn(directory)` and
   `sendText` to the pane you get back; the tab runs the user's configured shell.
 
@@ -293,6 +295,69 @@ private static void connectEcho(PendingSession pending, long stepMillis) {
   The directory it reports appears as the pane's `remoteDirectory`, never as a local one.
 - `PipedInputStream` fails once the thread that wrote last has ended. The sample uses a queue.
 
+## Palette scopes
+
+A scope is one kind of searchable thing in the command palette, beside Commands. Declare
+`palette.contribute`, register a `PaletteScope` through `context.palette()`, and the scope appears in
+every window's scope picker under its label and `>alias`. The spec is read once; its id must start
+with your plugin id. Search, `available`, `step` and `execute` run on the UI thread and must do no
+I/O: keep an index, refresh it in the background and tell the palette through the `onChanged`
+listener. The palette shows at most `maxResults` rows and never scrolls. A verb may return a
+`PaletteStep` (a small form) instead of running at once; its completion answers `done()`,
+`error(message)` (keeps the form open) or `reopen(scopeId, rowId, query)`, which dismisses and
+reopens the palette elsewhere, in any registered scope. `Palette.open` does the same from an action;
+on the scope that is already showing it dismisses instead. A scope that names one of your actions as
+`shortcutActionId` gets that action's shortcut while the palette is open, exactly as the built-in
+Cmd+P/R/J behave. The host contains every call: a scope that throws shows no rows, an unavailable
+row, no step or nothing done, and the palette keeps working.
+
+<!-- example:pluginpalette -->
+```java
+private static void installPaletteDemo(PluginContext context) {
+    if (!context.plugin().capabilities().containsAll(List.of(Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT))) {
+        context.log().log(System.Logger.Level.INFO, "The palette demo needs palette.contribute and terminal.inject");
+        return;
+    }
+    // Register the action first: the scope names it, and its shortcut then reaches the scope both ways.
+    // Closed, this handler opens the palette on the scope; open, the palette switches to it or dismisses.
+    context.actions().register(ActionSpec.of(GREETINGS_OPEN, "Sample Greetings…").withDefaultBinding("cmd+alt+g"), invoked ->
+        context.palette().open(invoked.window(), GREETINGS, Optional.empty(), Optional.empty()));
+    List<String> greetings = List.of("good morning", "hello", "hi there");
+    context.palette().register(new PaletteScope() {
+        @Override public ScopeSpec spec() {
+            return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings, or > to switch scope",
+                    List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run")))
+                .withAliases(List.of("greet")).withShortcutActionId(GREETINGS_OPEN);
+        }
+        // Search runs on the UI thread for every keystroke: rank what is already in memory, never read files here.
+        @Override public PaletteResults search(String query, PaletteQuery palette) {
+            String needle = query.strip().toLowerCase(Locale.ROOT);
+            var rows = new ArrayList<PaletteRow>();
+            for (String greeting : greetings)
+                if (greeting.contains(needle)) rows.add(PaletteRow.of("greeting." + rows.size(), greeting).withToken(greeting));
+            return new PaletteResults(rows, needle.isEmpty() ? Optional.of("Greetings") : Optional.empty(), Optional.empty());
+        }
+        // The row comes back exactly as returned, token included. The target is the pane the palette was opened
+        // from; pasting into it needs terminal.inject, like any other pane.
+        @Override public boolean available(PaletteRow row, PaletteVerb verb, PaletteQuery palette) { return palette.target().isPresent(); }
+        @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery palette) {
+            palette.target().ifPresent(pane -> {
+                pane.paste("echo '" + row.token() + "'");
+                if (verb.id().equals("paste_run")) pane.sendText("\r");
+            });
+        }
+        @Override public Subscription onChanged(Runnable listener) { return () -> { }; }
+    });
+}
+```
+
+## Notices and the editor
+
+`context.notices().error(message)` shows an error the way the application shows its own, in the
+window the user is using. `context.platform().openInEditor(file)` opens a file with the user's
+editor (configured editor, then the desktop, then revealing the file), in the background; a failure
+is reported as a notice.
+
 ## Rules that matter
 
 - **Threads.** Subscribe and publish services on the event thread. `publish`, activity
@@ -338,6 +403,9 @@ try (var host = new FakePluginHost()) {
 A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`, `sessionOutput`,
 `cancelSession` and `reconnectSession`; `flush()` notices exits. The fake runs cancellation handlers
 and closes inline where Jasper uses its cleanup thread.
+`host.scopes()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep` and `executeInScope`
+drive a contributed scope as the palette would; `paletteOpens()`, `notices()` and `openedInEditor()`
+record what the plugin asked for.
 
 ## Running a plugin in Jasper
 

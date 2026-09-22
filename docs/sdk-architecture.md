@@ -133,6 +133,20 @@ cancels what it is still connecting; attached sessions belong to their panes and
 line, Cancel), running, and disconnected (how it ended, Reconnect or Retry, Close). Cancelling an
 attempt in a pane that never showed a session closes the pane.
 
+## Palette scopes
+
+`Contributions.addScope` carries an application `PaletteScope` the way it carries actions;
+`WindowContributions` registers each one in its window's `ScopeRegistry` on connect and on change,
+and routes a `PaletteRequest` for its window to `WindowCommandPalette.open(scopeId, query, rowId)`.
+`PaletteKeyRouter` resolves a stroke bound to a contributed action to the scope naming it as
+`shortcutActionId`, only while the palette is open; closed, the plugin's own action handler runs
+and calls `Palette.open`. `plugins.HostedPalette` adapts an SDK scope: contained calls, a
+`PaletteQuery` built from the target's window and pane ids through the plugin's own handles, and
+the plugin's row kept as the app row's token so it comes back unchanged. `HostedContext.notices()`
+reaches the last active window's error handler; `platform().openInEditor` runs the application's
+`ConfigEditor` on the plugin's executor and reports failure as a notice. `PaneInfo.shell` is
+`PaneSnapshot.shell`, the pane's launcher label.
+
 ## Plugins manager, install and restart
 
 Nothing is loaded or unloaded in a running process. The manager edits `plugins.toml` through
@@ -176,5 +190,6 @@ disagree, the implementation is wrong, not the contract.
 
 ## Not yet implemented
 
-Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
-per-session token from Jasper's own shell integration.
+Explicit commands in `LocalSpec`; a stronger locality signal than the host name, such as a
+per-session token from Jasper's own shell integration; the History and Snippets scopes as bundled
+plugins (plan 5b).

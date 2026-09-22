@@ -76,6 +76,6 @@ class DescriptorParserTest {
         }
         assertThatThrownBy(() -> DescriptorParser.parse("id = ")).isInstanceOf(DescriptorParser.InvalidDescriptor.class);
         assertThat(DescriptorParser.CAPABILITIES).isEqualTo(Set.of("terminal.observe", "terminal.selection",
-            "terminal.inject", "terminal.open", "session.provide"));
+            "terminal.inject", "terminal.open", "session.provide", "palette.contribute"));
     }
 }

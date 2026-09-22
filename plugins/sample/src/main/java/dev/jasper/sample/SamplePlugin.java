@@ -32,6 +32,15 @@ import dev.jasper.sdk.terminal.TerminalEvents;
 import dev.jasper.sdk.terminal.OpenRequest;
 import dev.jasper.sdk.terminal.PendingSession;
 import dev.jasper.sdk.terminal.SessionSpec;
+import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.palette.PaletteQuery;
+import dev.jasper.sdk.palette.PaletteResults;
+import dev.jasper.sdk.palette.PaletteRow;
+import dev.jasper.sdk.palette.PaletteScope;
+import dev.jasper.sdk.palette.PaletteVerb;
+import dev.jasper.sdk.palette.ScopeSpec;
+import java.util.ArrayList;
+import java.util.Locale;
 
 /**
  * Logs, listens for theme changes and, when configured, shows a short activity on Buddy
@@ -42,6 +51,8 @@ public final class SamplePlugin implements Plugin {
     private static final String DEMO = "dev.jasper.sample.demo";
     private static final String GREET = "dev.jasper.sample.greet";
     private static final String ECHO = "dev.jasper.sample.echo";
+    private static final String GREETINGS = "dev.jasper.sample.greetings";
+    private static final String GREETINGS_OPEN = "dev.jasper.sample.greetings.open";
 
     /** Created by the runtime. */
     public SamplePlugin() { }
@@ -60,6 +71,7 @@ public final class SamplePlugin implements Plugin {
         if (context.config().bool("demo_ui").orElse(false)) installUi(context, stepMillis);
         if (context.config().bool("demo_terminal").orElse(false)) installTerminalDemo(context);
         if (context.config().bool("demo_session").orElse(false)) installSessionDemo(context, stepMillis);
+                if (context.config().bool("demo_scope").orElse(false)) installPaletteDemo(context);
         if (context.config().bool("demo_activity").orElse(false))
             context.background().execute(() -> demo(context, stepMillis));
     }
@@ -187,6 +199,45 @@ public final class SamplePlugin implements Plugin {
         pending.attach(new EchoSession().connection());
     }
     // example:pluginsession:end
+
+    // example:pluginpalette:start
+    private static void installPaletteDemo(PluginContext context) {
+        if (!context.plugin().capabilities().containsAll(List.of(Capabilities.PALETTE_CONTRIBUTE, Capabilities.TERMINAL_INJECT))) {
+            context.log().log(System.Logger.Level.INFO, "The palette demo needs palette.contribute and terminal.inject");
+            return;
+        }
+        // Register the action first: the scope names it, and its shortcut then reaches the scope both ways.
+        // Closed, this handler opens the palette on the scope; open, the palette switches to it or dismisses.
+        context.actions().register(ActionSpec.of(GREETINGS_OPEN, "Sample Greetings…").withDefaultBinding("cmd+alt+g"), invoked ->
+            context.palette().open(invoked.window(), GREETINGS, Optional.empty(), Optional.empty()));
+        List<String> greetings = List.of("good morning", "hello", "hi there");
+        context.palette().register(new PaletteScope() {
+            @Override public ScopeSpec spec() {
+                return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings, or > to switch scope",
+                        List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run")))
+                    .withAliases(List.of("greet")).withShortcutActionId(GREETINGS_OPEN);
+            }
+            // Search runs on the UI thread for every keystroke: rank what is already in memory, never read files here.
+            @Override public PaletteResults search(String query, PaletteQuery palette) {
+                String needle = query.strip().toLowerCase(Locale.ROOT);
+                var rows = new ArrayList<PaletteRow>();
+                for (String greeting : greetings)
+                    if (greeting.contains(needle)) rows.add(PaletteRow.of("greeting." + rows.size(), greeting).withToken(greeting));
+                return new PaletteResults(rows, needle.isEmpty() ? Optional.of("Greetings") : Optional.empty(), Optional.empty());
+            }
+            // The row comes back exactly as returned, token included. The target is the pane the palette was opened
+            // from; pasting into it needs terminal.inject, like any other pane.
+            @Override public boolean available(PaletteRow row, PaletteVerb verb, PaletteQuery palette) { return palette.target().isPresent(); }
+            @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery palette) {
+                palette.target().ifPresent(pane -> {
+                    pane.paste("echo '" + row.token() + "'");
+                    if (verb.id().equals("paste_run")) pane.sendText("\r");
+                });
+            }
+            @Override public Subscription onChanged(Runnable listener) { return () -> { }; }
+        });
+    }
+    // example:pluginpalette:end
 
     private static void demo(PluginContext context, long stepMillis) {
         ActivityHandle activity = context.activities().begin(

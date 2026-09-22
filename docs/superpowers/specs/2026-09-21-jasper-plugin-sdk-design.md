@@ -1118,8 +1118,8 @@ sessions' panes; broadcast/multi-exec; provider-driven split duplication; worksp
 restore and session descriptors; per-window status item content; plugin-supplied
 chrome components; a settings-page extension point; a storage abstraction; a
 general notice API; automatic disabling of misbehaving plugins; palette scopes
-contributed by plugins (the `PaletteScope` seam stays internal until a plugin needs
-it).
+contributed by plugins were out of scope here and added on 2026-09-21 by the palette-plugins
+design, `2026-09-21-jasper-palette-plugins-design.md`.
 
 ## 15. Review record
 
