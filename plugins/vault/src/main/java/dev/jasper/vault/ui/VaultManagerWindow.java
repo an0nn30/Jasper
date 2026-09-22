@@ -127,7 +127,11 @@ public final class VaultManagerWindow implements AutoCloseable {
             form.save.setText("Delete"); form.submit(() -> manager.delete(id, deleteFiles.isSelected())); return form;
         }));
     }
-    private void changePassword() { dialog("Change Master Password", close -> new ChangePasswordForm(lock, close)); }
+    private void changePassword() {
+        dialog("Change Master Password", close -> new ChangePasswordForm(lock, close, failure -> {
+            if (failure != null) context.notices().error("Master password was not changed: " + EditorForm.message(failure));
+        }));
+    }
     private void copyPublic(UUID id) {
         CompletableFuture<Void> copied = manager.publicKey(id).thenAccept(clipboard::copy);
         report(copied);

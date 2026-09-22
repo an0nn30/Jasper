@@ -142,6 +142,22 @@ class LockManagerTest {
         assertThat(pending).isCompletedExceptionally();
     }
 
+    @Test void failedPasswordChangeDoesNotRekeyAnOrdinaryQueuedSave(@TempDir Path dir) throws Exception {
+        LockManager manager = manager(dir);
+        manager.create("old-password".toCharArray(), false); runBackground();
+        Path obstruction = java.nio.file.Files.createDirectory(dir.resolve("vault.jv.tmp"));
+        var changed = manager.changePassword("old-password".toCharArray(), "new-password".toCharArray());
+        background.removeFirst().run(); // Derive and queue the rekey write.
+        var saved = manager.save(); // Must use the final key, including rollback on failure.
+        background.removeFirst().run(); // Fail the rekey write, leaving the original vault intact.
+        assertThat(changed).isCompletedExceptionally();
+        java.nio.file.Files.delete(obstruction);
+        runBackground(); saved.join();
+        manager.lock();
+        var reopened = manager.unlock("old-password".toCharArray()); runBackground();
+        assertThat(reopened).isCompletedWithValue(null);
+    }
+
     @Test void lockingDuringCreationDoesNotInstallOrWriteTheVault(@TempDir Path dir) {
         LockManager manager = manager(dir);
         CompletableFuture<Void> pending = manager.create("pw".toCharArray(), false);

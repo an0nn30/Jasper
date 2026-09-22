@@ -100,4 +100,74 @@ class EntryEditorTest {
             Arrays.fill(before, (byte) 0);
         }
     }
+
+    private static ChangePasswordForm passwordChange(VaultUiFixture f) {
+        var form = new ChangePasswordForm(f.lock, () -> { });
+        form.current.replace("test-password".toCharArray());
+        form.replacement.replace("new-password".toCharArray());
+        form.confirm.replace("new-password".toCharArray());
+        return form;
+    }
+
+    @Test void passwordChangeCanRetryTheSameOldPasswordAfterWriteFailure(@TempDir Path directory) throws Exception {
+        try (var f = new VaultUiFixture(directory)) {
+            var form = passwordChange(f);
+            Path obstruction = java.nio.file.Files.createDirectory(directory.resolve("vault.jv.tmp"));
+            form.save.doClick(); f.drain();
+            assertThat(form.save.isEnabled()).isTrue();
+            java.nio.file.Files.delete(obstruction);
+            form.save.doClick(); f.drain();
+            assertThat(form.current.snapshot()).as("successful retry closes and wipes the form").isEmpty();
+            f.lock.lock();
+            var opened = f.lock.unlock("new-password".toCharArray()); f.drain();
+            assertThat(opened).isCompletedWithValue(null);
+        }
+    }
+
+    @Test void cancellingOrClosingBeforePasswordCommitKeepsTheOldPassword(@TempDir Path directory) {
+        for (int mode = 0; mode < 3; mode++) {
+            try (var f = new VaultUiFixture(directory.resolve("case-" + mode))) {
+                var form = passwordChange(f); form.save.doClick();
+                assertThat(f.queue).hasSize(1);
+                if (mode == 0) form.cancel.doClick(); else form.close();
+                if (mode == 2) f.lock.lock(); // Plugin shutdown closes forms, then locks.
+                f.drain();
+                assertThat(form.current.snapshot()).isEmpty();
+                assertThat(form.replacement.snapshot()).isEmpty();
+                f.lock.lock();
+                var opened = f.lock.unlock("test-password".toCharArray()); f.drain();
+                assertThat(opened).as("close mode %s", mode).isCompletedWithValue(null);
+            }
+        }
+    }
+
+    @Test void closingAfterPasswordCommitStartsIsClearlyDifferentFromCancel(@TempDir Path directory) {
+        try (var f = new VaultUiFixture(directory)) {
+            var form = passwordChange(f); form.save.doClick();
+            f.queue.removeFirst().run(); // Derivation completes; the file write is now committed to run.
+            assertThat(form.cancel.getText()).isEqualTo("Close");
+            assertThat(form.error.getText()).contains("closing will not cancel");
+            form.close(); f.lock.lock(); f.drain();
+            assertThat(f.lock.state()).isEqualTo(dev.jasper.vault.api.LockState.LOCKED);
+            var opened = f.lock.unlock("new-password".toCharArray()); f.drain();
+            assertThat(opened).isCompletedWithValue(null);
+        }
+    }
+
+    @Test void passwordWriteFailureIsReportedEvenIfTheFormWasClosed(@TempDir Path directory) throws Exception {
+        try (var f = new VaultUiFixture(directory)) {
+            var reported = new AtomicReference<Throwable>();
+            var form = new ChangePasswordForm(f.lock, () -> { }, reported::set);
+            form.current.replace("test-password".toCharArray());
+            form.replacement.replace("new-password".toCharArray());
+            form.confirm.replace("new-password".toCharArray());
+            java.nio.file.Files.createDirectory(directory.resolve("vault.jv.tmp"));
+            form.save.doClick(); f.queue.removeFirst().run();
+            form.close(); f.drain();
+            assertThat(reported.get()).isNotNull();
+            f.lock.lock();
+            var opened = f.lock.unlock("test-password".toCharArray()); f.drain();
+            assertThat(opened).isCompletedWithValue(null);
+        }
+    }
 }

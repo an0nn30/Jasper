@@ -15,6 +15,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 
 /**
  * Owns the open {@link Vault}, the derived key and the salt for one unlock session. Key derivation and
@@ -30,6 +31,7 @@ public final class LockManager {
     private byte[] key, salt;
     private boolean bound;
     private long generation;
+    private boolean changingPassword;
     private CompletableFuture<Void> lastWrite = CompletableFuture.completedFuture(null);
 
     private record Opened(Vault vault, byte[] key, byte[] salt, boolean bound) { }
@@ -94,10 +96,23 @@ public final class LockManager {
         listener.accept(state());
     }
 
-    /** Encrypts the open vault now (on the UI thread) and writes it in the background, writes in order. */
+    /** Snapshots on the UI thread and writes in order; encryption waits for any pending password change. */
     public CompletableFuture<Void> save() {
         if (vault == null) return CompletableFuture.failedFuture(new IllegalStateException("The vault is locked"));
         byte[] plain = VaultCodec.encode(vault);
+        if (changingPassword) {
+            long session = generation;
+            // Rekey commits first. Seal this snapshot with whichever key actually survived it.
+            lastWrite = lastWrite.handle((ignored, failure) -> null).thenCompose(ignored -> {
+                try {
+                    if (vault == null || generation != session)
+                        return CompletableFuture.failedFuture(new IllegalStateException("The vault was locked meanwhile"));
+                    byte[] bytes = VaultCipher.seal(key, salt, bound, plain);
+                    return onBackground(() -> { file.write(bytes); return null; });
+                } finally { SecureBytes.zero(plain); }
+            });
+            return lastWrite;
+        }
         byte[] bytes;
         try { bytes = VaultCipher.seal(key, salt, bound, plain); } finally { SecureBytes.zero(plain); }
         lastWrite = lastWrite.handle((ignored, failure) -> null).thenCompose(ignored -> onBackground(() -> { file.write(bytes); return null; }));
@@ -105,28 +120,52 @@ public final class LockManager {
     }
 
     public CompletableFuture<Void> changePassword(char[] current, char[] replacement) {
+        return changePassword(current, replacement, () -> false, () -> { });
+    }
+
+    /** Cancels before the commit callback; once called, the ordered file write finishes even if the UI closes. */
+    public CompletableFuture<Void> changePassword(char[] current, char[] replacement,
+                                                   BooleanSupplier cancelled, Runnable committing) {
         byte[] old = SecureBytes.utf8(current), fresh = SecureBytes.utf8(replacement);
         SecureBytes.zero(current); SecureBytes.zero(replacement);
         if (vault == null) { SecureBytes.zero(old); SecureBytes.zero(fresh); return CompletableFuture.failedFuture(new IllegalStateException("The vault is locked")); }
+        if (changingPassword) { SecureBytes.zero(old); SecureBytes.zero(fresh); return CompletableFuture.failedFuture(new IllegalStateException("A password change is already running")); }
+        changingPassword = true;
         byte[] currentKey = key.clone(), currentSalt = salt.clone();
         boolean isBound = bound;
         long attempt = generation;
-        return onBackground(() -> {
-            byte[] device = isBound ? secrets.existing().orElseThrow(ForeignDeviceException::new) : null;
+        CompletableFuture<Rekey> derived = onBackground(() -> {
+            byte[] device = null;
             try {
+                device = isBound ? secrets.existing().orElseThrow(ForeignDeviceException::new) : null;
                 byte[] check = KeyDerivation.derive(old, device, currentSalt);
                 boolean matches = MessageDigest.isEqual(check, currentKey);
                 SecureBytes.zero(check);
                 if (!matches) throw new WrongPasswordException();
                 byte[] newSalt = VaultCipher.randomSalt();
                 return new Rekey(KeyDerivation.derive(fresh, device, newSalt), newSalt);
-            } finally { SecureBytes.zero(device); SecureBytes.zero(old); SecureBytes.zero(fresh); SecureBytes.zero(currentKey); }
-        }).thenCompose(rekey -> {
-            if (vault == null || attempt != generation) { SecureBytes.zero(rekey.key()); SecureBytes.zero(rekey.salt()); return CompletableFuture.failedFuture(new IllegalStateException("The vault was locked meanwhile")); }
-            SecureBytes.zero(key); SecureBytes.zero(salt);
-            key = rekey.key(); salt = rekey.salt();
-            return save();
+            } finally { SecureBytes.zero(device); SecureBytes.zero(old); SecureBytes.zero(fresh); SecureBytes.zero(currentKey); SecureBytes.zero(currentSalt); }
         });
+        lastWrite = lastWrite.handle((ignored, failure) -> null).thenCompose(ignored -> derived).thenCompose(rekey -> {
+            CompletableFuture<Void> written;
+            try {
+                if (vault == null || attempt != generation || cancelled.getAsBoolean())
+                    throw new IllegalStateException("The password change was cancelled");
+                byte[] plain = VaultCodec.encode(vault);
+                byte[] bytes;
+                try { bytes = VaultCipher.seal(rekey.key(), rekey.salt(), bound, plain); }
+                finally { SecureBytes.zero(plain); }
+                committing.run();
+                written = onBackground(() -> { file.write(bytes); return null; });
+            } catch (RuntimeException failure) { written = CompletableFuture.failedFuture(failure); }
+            return written.whenComplete((ignored, failure) -> {
+                if (failure == null && vault != null && attempt == generation) {
+                    SecureBytes.zero(key); SecureBytes.zero(salt);
+                    key = rekey.key(); salt = rekey.salt();
+                } else { SecureBytes.zero(rekey.key()); SecureBytes.zero(rekey.salt()); }
+            });
+        }).whenComplete((ignored, failure) -> changingPassword = false);
+        return lastWrite;
     }
 
     private void install(Opened opened, long attempt) {
