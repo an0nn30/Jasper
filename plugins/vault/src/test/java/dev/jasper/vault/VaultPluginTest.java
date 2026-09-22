@@ -159,4 +159,26 @@ class VaultPluginTest {
             assertThat(VaultSettings.read(context.config(), context.dataDirectory()).keysDirectory()).isEqualTo(context.dataDirectory().resolve("keys"));
         }
     }
+    @Test void thePadlockFollowsTheLockStateAndTheRailOpensTheVault() {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            assertThat(host.rail()).containsExactly(VaultPlugin.OPEN);
+            assertThat(host.status()).containsExactly("dev.jasper.vault.status|RIGHT|Vault|No vault — click to create one|dev.jasper.vault.open");
+            plugin.lockManager().create("hunter2!".toCharArray(), false);
+            host.runBackground();
+            plugin.clock = 0;
+            plugin.timer().touch();
+            plugin.tick();
+            assertThat(host.status()).containsExactly("dev.jasper.vault.status|RIGHT|Vault|Vault unlocked · locks in 15 min|dev.jasper.vault.lock");
+            plugin.clock = Duration.ofMinutes(14).toMillis() + 1;
+            plugin.tick();
+            assertThat(host.status().getFirst()).contains("locks in 1 min");
+            plugin.lockManager().lock();
+            assertThat(host.status()).containsExactly("dev.jasper.vault.status|RIGHT|Vault|Vault locked|dev.jasper.vault.open");
+            assertThat(VaultPlugin.tooltip(LockState.UNLOCKED, Duration.ZERO)).isEqualTo("Vault unlocked");
+            assertThat(VaultPlugin.tooltip(LockState.UNLOCKED, Duration.ofSeconds(30))).isEqualTo("Vault unlocked · locks in 1 min");
+        }
+    }
+
 }

@@ -4,6 +4,11 @@ import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.Side;
+import dev.jasper.sdk.ui.StatusItem;
+import dev.jasper.sdk.ui.StatusItemSpec;
+import java.time.Duration;
+import javax.swing.Icon;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
@@ -45,6 +50,9 @@ import javax.swing.Timer;
 public class VaultPlugin implements Plugin {
     public static final String OPEN = "dev.jasper.vault.open";
     public static final String LOCK = "dev.jasper.vault.lock";
+    public static final String STATUS = "dev.jasper.vault.status";
+    private StatusItem status;
+    private Icon locked, unlocked;
     private static final int TICK_MILLIS = 5_000;
 
     private final Function<PluginContext, DeviceSecrets> secretsFactory;
@@ -89,13 +97,19 @@ public class VaultPlugin implements Plugin {
         service = new VaultService(lock, () -> context.terminals().activeWindow().or(() -> context.terminals().windows().stream().findFirst()),
             this::showUnlock, this::showGrant, this::showPick, context.notices()::error);
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
-        context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("F8"),
+        locked = context.appearance().icon("dev/jasper/vault/lock.svg");
+        unlocked = context.appearance().icon("dev/jasper/vault/lock-open.svg");
+        context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withIcon(locked).withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("F8"),
             invoked -> open(invoked.window(), Optional.empty()));
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock")), invoked -> lock.lock());
         lockAction.setEnabled(false);
         clipboard = clipboardFactory.get();
         scope = new VaultScope(lock, service, clipboard, this::open, context.notices()::error);
         context.palette().register(scope);
+        status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 50));
+        status.setText("Vault");
+        context.rail().add(OPEN);
+        refreshStatus();
         context.config().onChanged(() -> { settings = VaultSettings.read(context.config(), context.dataDirectory()); timer.setTimeout(settings.autoLock()); });
         activity = event -> timer.touch();
         Toolkit.getDefaultToolkit().addAWTEventListener(activity, AWTEvent.KEY_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK);
@@ -125,7 +139,10 @@ public class VaultPlugin implements Plugin {
     }
 
     /** Locks when the inactivity timeout has passed; the Swing ticker calls this every few seconds. */
-    void tick() { if (lock.state() == LockState.UNLOCKED && timer.expired()) lock.lock(); }
+    void tick() {
+        if (lock.state() == LockState.UNLOCKED && timer.expired()) lock.lock();
+        else refreshStatus();
+    }
 
     private void lockStateChanged(LockState state) {
         if (state == LockState.UNLOCKED) timer.touch();
@@ -133,6 +150,7 @@ public class VaultPlugin implements Plugin {
         if (lockAction != null) lockAction.setEnabled(state == LockState.UNLOCKED);
         context.events().publish(VaultApi.LOCK_STATE_CHANGED, state);
         if (scope != null) scope.changed();
+        refreshStatus();
     }
 
     void showCreate(WindowHandle owner) {
@@ -186,4 +204,21 @@ public class VaultPlugin implements Plugin {
     UnlockPrompt currentUnlock() { return currentUnlock; }
     GrantPrompt currentGrant() { return currentGrant; }
     VaultScope scope() { return scope; }
+    private void refreshStatus() {
+        if (status == null) return;
+        LockState state = lock.state();
+        status.setIcon(state == LockState.UNLOCKED ? unlocked : locked);
+        status.setTooltip(tooltip(state, timer.remaining()));
+        status.setAction(state == LockState.UNLOCKED ? LOCK : OPEN);
+    }
+
+    /** "Vault locked", "No vault — click to create one", or "Vault unlocked · locks in N min" (omitted when auto-lock is off). */
+    static String tooltip(LockState state, Duration remaining) {
+        return switch (state) {
+            case NO_VAULT -> "No vault — click to create one";
+            case LOCKED -> "Vault locked";
+            case UNLOCKED -> remaining.isZero() ? "Vault unlocked" : "Vault unlocked · locks in " + Math.max(1, (remaining.toSeconds() + 59) / 60) + " min";
+        };
+    }
+
 }
