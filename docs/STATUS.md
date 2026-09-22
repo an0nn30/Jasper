@@ -20,6 +20,14 @@ contribution surface) is merged at `3eb143a`, plan 5b (the History and Snippets 
 implemented on `claude/palette-plugins-5b`, then come the Vault and SSH plugin specs. A development
 launch keeps its own home under `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
+### Terminal dark palette — 2026-09-22
+
+`Palette.jasperDark()` now carries the TermLab Dark palette ported from the conch project's
+xterm.js theme (Dracula-derived: background `#282a36`, foreground `#f8f8f2`, selection `#44475a`).
+Only the terminal palette changed; the dark FlatLaf chrome keeps its own values, and
+`TabbedPane.selectedBackground` in `FlatDarkLaf.properties` is pinned to the new terminal
+background so selected tabs still match the terminal. Branch `claude/termlab-dark-palette`.
+
 ### Palette plugins plan 5b — 2026-09-21
 
 Implemented on `claude/palette-plugins-5b` (not merged, not pushed). The work implements
