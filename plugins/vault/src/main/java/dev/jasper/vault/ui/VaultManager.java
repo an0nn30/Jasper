@@ -4,6 +4,7 @@ import dev.jasper.vault.api.LockState;
 import dev.jasper.vault.keygen.KeyAlgorithm;
 import dev.jasper.vault.keygen.KeyGenerator;
 import dev.jasper.vault.model.Auth;
+import dev.jasper.vault.crypto.SecureBytes;
 import java.nio.file.Path;
 import java.time.Instant;
 import dev.jasper.vault.model.Account;
@@ -177,19 +178,28 @@ public final class VaultManager {
     }
 
     public CompletableFuture<Void> generate(Path directory, KeyAlgorithm algorithm, String name, String comment, Optional<String> username) {
-        if (!editable()) return rejected();
-        if (name.isBlank() || username.filter(String::isBlank).isPresent())
+        return generate(directory, algorithm, name, comment, username, null);
+    }
+
+    /** Consumes passphrase; only a successful optional account retains its own copy. */
+    public CompletableFuture<Void> generate(Path directory, KeyAlgorithm algorithm, String name, String comment, Optional<String> username, char[] passphrase) {
+        if (!editable()) { SecureBytes.zero(passphrase); return rejected(); }
+        if (name.isBlank() || username.filter(String::isBlank).isPresent()) {
+            SecureBytes.zero(passphrase);
             return CompletableFuture.failedFuture(new IllegalArgumentException("Enter a key name and, when selected, an account username"));
+        }
+        char[] phrase = passphrase == null || passphrase.length == 0 ? null : passphrase.clone();
+        SecureBytes.zero(passphrase);
         long expected = generation;
         busy = true;
-        CompletableFuture<Void> operation = io(() -> new KeyGenerator(directory).generate(algorithm, name, comment)).thenCompose(key -> {
+        CompletableFuture<Void> operation = io(() -> new KeyGenerator(directory).generate(algorithm, name, comment, phrase)).thenCompose(key -> {
             CompletableFuture<Void> save;
             if (generation != expected || lock.state() != LockState.UNLOCKED) {
                 save = CompletableFuture.failedFuture(new IllegalStateException("The vault was locked during key generation"));
             } else {
                 Vault original = lock.vault();
                 Account account = username.map(user -> new Account(UUID.randomUUID(), name + " (" + user + ")", user,
-                    new Auth.Key(key.privatePath(), null), Instant.now(), Instant.now())).orElse(null);
+                    new Auth.Key(key.privatePath(), phrase == null ? null : phrase.clone()), Instant.now(), Instant.now())).orElse(null);
                 save = edit(v -> { v.keys().add(key); if (account != null) v.accounts().add(account); },
                     () -> { original.keys().remove(key); if (account != null) original.accounts().remove(account); },
                     () -> { }, () -> { if (account != null) account.auth().zero(); });
@@ -207,7 +217,7 @@ public final class VaultManager {
                 });
             });
         });
-        return operation.whenComplete((ignored, failure) -> { busy = false; changed.run(); });
+        return operation.whenComplete((ignored, failure) -> { SecureBytes.zero(phrase); busy = false; changed.run(); });
     }
     private CompletableFuture<Void> removeGeneratedFiles(SshKey key) {
         return io(() -> {

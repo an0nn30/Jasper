@@ -152,8 +152,13 @@ Grant(String pluginId, UUID credentialId)
 ```
 
 **Keys on disk.** Generated keys go to `keys_directory` (default `<plugin data>/keys/`, created
-0700) as `id_<algo>_<8 hex>` in OpenSSH private-key format (unencrypted; the vault is the
-protection, and a passphrase may still be set and stored in the account) with `.pub` beside it.
+0700) as `id_<algo>_<8 hex>` with `.pub` beside it. **User-approved clarification (2026-09-22):**
+a nonempty optional passphrase encrypts the private file in OpenSSH v1 format (bcrypt_pbkdf,
+fresh 16-byte salt, 24 rounds, AES-256-CTR). An empty passphrase retains unencrypted generation
+(Ed25519 OpenSSH format; ECDSA/RSA traditional PEM, as implemented in 6a). The form confirms the
+passphrase without trimming it. When an account is also created, it stores the passphrase inside
+the encrypted vault; a standalone key entry stores only its paths and metadata. Locking the vault
+does not change key-file encryption. This replaces the original contradictory unencrypted-only text.
 Algorithms: Ed25519 (recommended), ECDSA P-256, ECDSA P-384, RSA 3072, RSA 4096. The fingerprint is
 the SHA-256 form OpenSSH prints. A key referenced by an account may live anywhere; the vault stores
 the path, never the private key bytes of an imported key.

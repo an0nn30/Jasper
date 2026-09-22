@@ -293,7 +293,7 @@ public class VaultPlugin implements Plugin {
 
     private void showGenerator() {
         managerWindow.dialog("Generate SSH Key", close -> new KeyGeneratorForm(request ->
-            manager.generate(settings.keysDirectory(), request.algorithm(), request.name(), request.comment(), request.username()), close));
+            manager.generate(settings.keysDirectory(), request.algorithm(), request.name(), request.comment(), request.username(), request.passphrase()), close));
     }
 
     private static String message(Throwable failure) {

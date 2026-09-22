@@ -1,6 +1,7 @@
 package dev.jasper.vault.keygen;
 
 import dev.jasper.vault.model.SshKey;
+import dev.jasper.vault.crypto.SecureBytes;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +32,7 @@ import org.bouncycastle.crypto.util.OpenSSHPublicKeyUtil;
 /**
  * Writes {@code id_<algorithm>_<8 hex>} and its {@code .pub} into a 0700 directory. Ed25519 private keys are
  * in OpenSSH's own format; ECDSA and RSA in the traditional PEM forms OpenSSH reads. Private keys are
- * unencrypted: the vault is the protection, and an account may still record a passphrase set later.
+ * encrypted in OpenSSH format when a nonempty passphrase is supplied.
  */
 public final class KeyGenerator {
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -40,6 +41,11 @@ public final class KeyGenerator {
     public KeyGenerator(Path directory) { this.directory = directory; }
 
     public SshKey generate(KeyAlgorithm algorithm, String name, String comment) throws IOException {
+        return generate(algorithm, name, comment, null);
+    }
+
+    /** Borrows {@code passphrase}; null or empty creates an unencrypted key. */
+    public SshKey generate(KeyAlgorithm algorithm, String name, String comment, char[] passphrase) throws IOException {
         UUID id = UUID.randomUUID();
         String base = "id_" + algorithm.id().replace('-', '_') + "_" + id.toString().substring(0, 8);
         Path privatePath = directory.resolve(base), publicPath = directory.resolve(base + ".pub");
@@ -47,7 +53,14 @@ public final class KeyGenerator {
         Files.createDirectories(directory);
         permissions(directory, "rwx------");
         try {
-            Files.writeString(privatePath, pem(algorithm, OpenSSHPrivateKeyUtil.encodePrivateKey(pair.getPrivate())), StandardCharsets.US_ASCII);
+            boolean encrypted = passphrase != null && passphrase.length > 0;
+            byte[] encoded = encrypted ? EncryptedOpenSsh.encode(pair, algorithm, comment, passphrase, RANDOM)
+                : OpenSSHPrivateKeyUtil.encodePrivateKey(pair.getPrivate());
+            byte[] armored = null;
+            try {
+                armored = pem(encrypted ? "OPENSSH PRIVATE KEY" : label(algorithm), encoded);
+                Files.write(privatePath, armored);
+            } finally { SecureBytes.zero(encoded); SecureBytes.zero(armored); }
             permissions(privatePath, "rw-------");
             byte[] publicBlob = OpenSSHPublicKeyUtil.encodePublicKey(pair.getPublic());
             String line = algorithm.sshType() + " " + Base64.getEncoder().encodeToString(publicBlob)
@@ -97,10 +110,21 @@ public final class KeyGenerator {
         return generator.generateKeyPair();
     }
 
-    private static String pem(KeyAlgorithm algorithm, byte[] der) {
-        String label = switch (algorithm) { case ED25519 -> "OPENSSH PRIVATE KEY"; case ECDSA_P256, ECDSA_P384 -> "EC PRIVATE KEY"; case RSA_3072, RSA_4096 -> "RSA PRIVATE KEY"; };
-        String body = Base64.getMimeEncoder(70, new byte[] {'\n'}).encodeToString(der);
-        return "-----BEGIN " + label + "-----\n" + body + "\n-----END " + label + "-----\n";
+    private static String label(KeyAlgorithm algorithm) {
+        return switch (algorithm) { case ED25519 -> "OPENSSH PRIVATE KEY"; case ECDSA_P256, ECDSA_P384 -> "EC PRIVATE KEY"; case RSA_3072, RSA_4096 -> "RSA PRIVATE KEY"; };
+    }
+
+    private static byte[] pem(String label, byte[] der) {
+        byte[] body = Base64.getMimeEncoder(70, new byte[] {'\n'}).encode(der);
+        byte[] header = ("-----BEGIN " + label + "-----\n").getBytes(StandardCharsets.US_ASCII);
+        byte[] footer = ("\n-----END " + label + "-----\n").getBytes(StandardCharsets.US_ASCII);
+        try {
+            byte[] pem = new byte[header.length + body.length + footer.length];
+            System.arraycopy(header, 0, pem, 0, header.length);
+            System.arraycopy(body, 0, pem, header.length, body.length);
+            System.arraycopy(footer, 0, pem, header.length + body.length, footer.length);
+            return pem;
+        } finally { SecureBytes.zero(body); }
     }
 
     private static void permissions(Path path, String posix) throws IOException {

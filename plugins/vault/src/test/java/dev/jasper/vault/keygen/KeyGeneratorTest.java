@@ -77,4 +77,33 @@ class KeyGeneratorTest {
             org.assertj.core.api.Assertions.assertThat(files.toList()).isEmpty();
         }
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(KeyAlgorithm.class)
+    void encryptedKeysRequireTheExactPassphraseAndWorkWithOpenSsh(KeyAlgorithm algorithm, @TempDir Path dir) throws Exception {
+        char[] phrase = "  test-passphrase-\u03bb  ".toCharArray();
+        SshKey key = new KeyGenerator(dir).generate(algorithm, "encrypted", "interop", phrase);
+        String pem = Files.readString(key.privatePath());
+        assertThat(pem).startsWith("-----BEGIN OPENSSH PRIVATE KEY-----");
+        byte[] blob = Base64.getDecoder().decode(pem.lines().filter(line -> !line.startsWith("-----")).reduce("", String::concat));
+        assertThatThrownBy(() -> OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(blob)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(blob, "wrong".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+            .isInstanceOf(RuntimeException.class);
+        byte[] material = dev.jasper.vault.crypto.SecureBytes.utf8(phrase);
+        try { assertThat(OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(blob, material)).isNotNull(); }
+        finally { dev.jasper.vault.crypto.SecureBytes.zero(material); }
+        Path executable = java.util.stream.Stream.of(System.getenv().getOrDefault("PATH", "").split(java.io.File.pathSeparator))
+            .map(entry -> Path.of(entry, "ssh-keygen")).filter(Files::isExecutable).findFirst().orElse(null);
+        assumeTrue(executable != null, "ssh-keygen not on PATH");
+        // Only this synthetic test passphrase is passed on the command line; production never invokes ssh-keygen.
+        Process process = new ProcessBuilder(executable.toString(), "-y", "-P", "  test-passphrase-\u03bb  ", "-f", key.privatePath().toString())
+            .redirectErrorStream(true).start();
+        boolean finished = process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS);
+        if (!finished) process.destroyForcibly();
+        assertThat(finished).isTrue();
+        String actual = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).strip();
+        assertThat(process.exitValue()).as(actual).isZero();
+        assertThat(actual.split(" ")[1]).isEqualTo(Files.readString(key.publicPath()).split(" ")[1]);
+        dev.jasper.vault.crypto.SecureBytes.zero(phrase);
+    }
+
 }

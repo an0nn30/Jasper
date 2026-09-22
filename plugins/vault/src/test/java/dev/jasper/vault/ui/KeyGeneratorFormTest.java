@@ -44,7 +44,9 @@ class KeyGeneratorFormTest {
     @Test void lockingDuringGenerationDiscardsTheResultAndRemovesItsFiles() throws Exception {
         try (var f = new VaultUiFixture(directory)) {
             Path keys = directory.resolve("keys");
-            var generated = f.manager.generate(keys, KeyAlgorithm.ED25519, "Laptop", "", Optional.empty());
+            char[] phrase = "cancelled-phrase".toCharArray();
+            var generated = f.manager.generate(keys, KeyAlgorithm.ED25519, "Laptop", "", Optional.empty(), phrase);
+            assertThat(phrase).containsOnly((char) 0);
             f.manager.invalidate(); f.lock.lock(); f.drain();
             assertThat(generated).isCompletedExceptionally();
             assertThat(f.manager.rows()).isEmpty();
@@ -57,10 +59,53 @@ class KeyGeneratorFormTest {
             Files.delete(directory.resolve("vault.jv")); Files.createDirectory(directory.resolve("vault.jv"));
             Files.writeString(directory.resolve("vault.jv/block"), "block replacement");
             Path keys = directory.resolve("keys");
-            var generated = f.manager.generate(keys, KeyAlgorithm.ED25519, "Laptop", "", Optional.of("deploy")); f.drain();
+            char[] phrase = "failed-save-phrase".toCharArray();
+            var generated = f.manager.generate(keys, KeyAlgorithm.ED25519, "Laptop", "", Optional.of("deploy"), phrase); f.drain();
+            assertThat(phrase).containsOnly((char) 0);
             assertThat(generated).isCompletedExceptionally();
             assertThat(f.manager.rows()).isEmpty();
             try (var files = Files.list(keys)) { assertThat(files.toList()).isEmpty(); }
         }
     }
+    @Test void passphraseConfirmationAndRequestBuffersAreWiped() {
+        var held = new AtomicReference<char[]>();
+        var completion = new CompletableFuture<Void>();
+        var form = new KeyGeneratorForm(request -> {
+            assertThat(request.passphrase()).isEqualTo(" phrase ".toCharArray());
+            held.set(request.passphrase()); return completion;
+        }, () -> { });
+        form.name.setText("Encrypted");
+        form.passphrase.replace(" phrase ".toCharArray()); form.confirm.replace("different".toCharArray());
+        form.save.doClick();
+        assertThat(held.get()).isNull(); assertThat(form.error.getText()).contains("do not match");
+        form.confirm.replace(" phrase ".toCharArray()); form.save.doClick();
+        assertThat(held.get()).containsOnly((char) 0);
+        form.close();
+        assertThat(form.passphrase.snapshot()).isEmpty(); assertThat(form.confirm.snapshot()).isEmpty();
+        completion.complete(null);
+    }
+
+    @Test void encryptedGenerationStoresThePassphraseOnlyInTheOptionalVaultAccount() throws Exception {
+        try (var f = new VaultUiFixture(directory)) {
+            char[] phrase = "stored-phrase".toCharArray();
+            var generated = f.manager.generate(directory.resolve("keys"), KeyAlgorithm.ED25519, "Laptop", "", Optional.of("deploy"), phrase);
+            assertThat(phrase).containsOnly((char) 0);
+            f.drain(); generated.join();
+            char[] saved = ((Auth.Key) f.lock.vault().accounts().getFirst().auth()).passphrase();
+            assertThat(saved).isEqualTo("stored-phrase".toCharArray());
+            f.lock.lock(); assertThat(saved).containsOnly((char) 0);
+            var unlock = f.lock.unlock("test-password".toCharArray()); f.drain(); unlock.join();
+            assertThat(((Auth.Key) f.lock.vault().accounts().getFirst().auth()).passphrase()).isEqualTo("stored-phrase".toCharArray());
+        }
+    }
+
+    @Test void rejectedGenerationStillClearsItsPassphrase() {
+        try (var f = new VaultUiFixture(directory)) {
+            char[] phrase = "discard-me".toCharArray(); f.lock.lock();
+            assertThat(f.manager.generate(directory.resolve("keys"), KeyAlgorithm.ED25519, "Laptop", "", Optional.empty(), phrase))
+                .isCompletedExceptionally();
+            assertThat(phrase).containsOnly((char) 0);
+        }
+    }
+
 }

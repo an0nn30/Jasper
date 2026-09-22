@@ -12,8 +12,10 @@ key supplies the algorithm and SHA-256 fingerprint. Secure notes are available o
 **Generate Key...** supports Ed25519, ECDSA P-256/P-384 and RSA 3072/4096. Generated files live in
 `plugins/dev.jasper.vault/data/keys/` unless `keys_directory` selects another directory.
 The generator can also create a login account for a supplied username. Generated private keys
-are currently unencrypted. The encrypted vault stores SSH key paths; key files remain separate. Locking the vault does not
-delete or encrypt those files. **Copy public key** copies the selected public key. Deleting a key
+are encrypted when you enter and confirm a passphrase. Leave both fields empty to create an
+unencrypted key. If you also create a login account, its passphrase is saved inside the encrypted
+vault. For a standalone key, keep the passphrase yourself; the key entry stores only paths and
+metadata. Key files remain separate, and locking the vault does not change their encryption. **Copy public key** copies the selected public key. Deleting a key
 entry offers a separate choice to delete its two files; the default keeps them.
 
 **Change Password...** requires the old password and matching new passwords. Cancel or close
@@ -57,6 +59,8 @@ clipboard timing. The following checks need a user-run Jasper window:
 
 1. Open F8 and create a throwaway vault. Verify native keychain access, then lock and unlock it.
 2. Add/edit a login and a multiline note; generate/import an SSH key and copy its public key.
+   Generate a passphrase-protected key, confirm the optional login retains its passphrase, and
+   verify the key works with your SSH client. Leave both passphrase fields empty to test that path.
 3. Open F8 repeatedly; verify only one manager window opens. Lock with an editor open; verify
    its secret fields disappear and the manager offers inline unlock.
 4. Copy a password and username through the Vault scope. Check 30-second clearing, then copy

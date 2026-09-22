@@ -6,10 +6,12 @@
 > `c8141b6` (6a already on local main). Task 8 documentation and repository
 > verification and the independent whole-branch review are complete. Two review findings
 > were fixed in `a06dcb8`, with failing-before/passing-after regressions and green full checks.
-> `check :jasper-app:installDist -q` passed: 1,526 tests, 1,523 passed, three expected skips. No merge/push or GUI launch.
-> **Open decision:** the spec simultaneously requires unencrypted generated keys and an
-> optional generation passphrase. The user has been asked to choose. The runnable generator
-> retains 6a's unencrypted format and clearly says so; full 6b acceptance awaits that answer.
+> Latest `check :jasper-app:installDist -q` passed: 1,534 tests, 1,531 passed, three expected skips. No merge/push or GUI launch.
+> **Resolved decision (2026-09-22):** user chose passphrase-encrypted key generation.
+> Optional matching passphrase fields now encrypt all five algorithms in OpenSSH v1 format
+> (bcrypt_pbkdf with 24 rounds and a fresh 16-byte salt, AES-256-CTR). Empty fields retain legacy
+> unencrypted output. An optional login stores its own passphrase copy in the encrypted vault.
+> The original unencrypted-only code blocks below are historical; this extension supersedes them.
 >
 > **Execution/deviations:** Existing worktree/branch and approved scope were resumed; the
 > unfinished two-task draft was completed while settled tasks executed. Task 1 used an
@@ -27,7 +29,7 @@
 > Review fixes preserve old keys on failed password writes, serialize queued saves behind rekey,
 > and cancel closed password forms before commit. After commit starts the button says Close
 > and the form explains that closing will not cancel; detached write failures are reported.
-> No public consumer API or file-format change. Native acceptance and the key-generation choice remain pending.
+> No public consumer API or vault file-format change. The key-generation choice is resolved; native acceptance remains user-run.
 
 **Goal:** The user-facing side of the Credential Vault: a Vault palette scope, a padlock status item and rail action, the manager window (accounts, keys, notes, grants, change password, lock), the editors, the key generator dialog, and the documentation.
 
@@ -2826,3 +2828,42 @@ fixed. The Swing String boundary remains necessary for normal editing, with wipe
 storage and no new persistence strings. Packaging was independently verified by the coordinator.
 No deferred minor findings. The branch/worktree and execution ledger are retained while the key
 choice and native acceptance remain pending. Nothing was merged, pushed or launched natively.
+
+
+## User-approved passphrase extension — 2026-09-22
+
+The user chose encrypted generation after the preceding handoff. This resolves the last design
+conflict and updates the binding spec's keys-on-disk paragraph. The bounded implementation extends
+`KeyGenerator.generate` and `VaultManager.generate` with a char-array passphrase, introduces the
+package-private `EncryptedOpenSsh` framing encoder using existing BouncyCastle crypto, and adds
+passphrase/confirmation fields to the existing form and plugin wiring. No new dependency or
+production executable is required. Unencrypted generation keeps its existing output formats.
+PEM assembly now uses wipeable byte arrays, so private-key encoding also avoids immutable Strings.
+
+The manager consumes the submitted passphrase, owns its asynchronous copy, and gives an optional
+account a separate copy before clearing its own on completion/failure. The form's temporary request
+arrays are cleared immediately after the callback returns; background consumers must copy them.
+An account's passphrase remains covered by vault encryption and normal lock-time zeroing.
+
+Verification covers all five algorithms with exact Unicode/whitespace passphrases, no/wrong
+passphrase rejection through BouncyCastle, and independent `ssh-keygen -y` public-key agreement.
+Form confirmation and wiping, persisted account copies after lock/reopen, rejected operations,
+lock-during-generation and failed-vault-save cleanup are covered. The new surfaces were absent in
+the observed RED run; the complete vault suite then passed. The first full extension check passed
+1,534 tests, 1,531 passed and three expected skips. A final parameter adjustment uses the current
+OpenSSH default of 24 bcrypt rounds (verified from upstream source), superseding the historical 16
+initial choice; final check/review evidence follows.
+
+References: [OpenSSH key format](https://raw.githubusercontent.com/openssh/openssh-portable/master/PROTOCOL.key),
+[current cipher/KDF defaults](https://raw.githubusercontent.com/openssh/openssh-portable/master/sshkey.c),
+[BouncyCastle bcrypt_pbkdf](https://downloads.bouncycastle.org/java/docs/bcprov-jdk14-javadoc/org/bouncycastle/crypto/generators/BCrypt.html).
+
+
+Final extension evidence: `./gradlew check :jasper-app:installDist -q` passed after the 24-round
+adjustment: **1,534 tests, 1,531 passed, three expected skips, zero failures/errors**; vault 101
+tests, 100 passed and the opt-in real-keychain skip. The scoped independent review returned a
+clean verdict with no actionable findings. It reviewed the encryption/ownership/cleanup changes;
+prior baseline/native review limits remain unchanged. Source hygiene and `git diff --check`
+passed, the installed jar contains `EncryptedOpenSsh`, and the updated generator form was rendered
+headlessly and inspected. The optional-passphrase requirement is now complete. No native window,
+real keychain, merge or push was performed. Keep the branch for user-run native acceptance.

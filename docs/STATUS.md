@@ -81,11 +81,13 @@ self-clearing clipboard, padlock/rail, persisted manager operations, account/key
 master-password change, singleton manager, grant revocation and key generation with an optional
 login account. [User guide and native acceptance](credential-vault.md).
 
-**Pending user decision:** generated private keys are currently unencrypted, matching 6a and
-the storage spec, and the generator labels this explicitly. The spec also lists an optional
-passphrase field. The user has been asked to choose encrypted generation when a passphrase is
-supplied versus retaining unencrypted generation and omitting that field. Full 6b acceptance
-awaits this decision; do not silently claim the optional-passphrase requirement complete.
+**Resolved user decision:** the user chose passphrase encryption on 2026-09-22. The generator
+now accepts and confirms an optional passphrase. Nonempty values encrypt every supported algorithm
+in OpenSSH v1 format using bcrypt_pbkdf (24 rounds, fresh 16-byte salt) and AES-256-CTR; empty
+fields retain the existing unencrypted output. An optional generated login stores its own
+passphrase copy in the encrypted vault; standalone key records retain only paths/metadata.
+Owned request, UTF-8, private-key encoding and derived-key arrays are cleared. No new dependency,
+production process invocation, SDK/consumer API change or vault storage-format change.
 Native acceptance and the opt-in real-keychain test remain user-run.
 
 Execution: Task 1 used a subagent and independent reviewer, with one RED/GREEN fix round for
@@ -107,11 +109,20 @@ remain enabled for Enter; the inherited branch/worktree was retained. A small 6a
 also invalidates in-flight derivation. Wipeable Swing documents clear editable buffers and avoid
 secret Strings in persistence; Swing's required Content.getString is the explicit UI boundary.
 Generation failures remove created files. Headless dark-theme renders prompted GridBag forms,
-readable kind labels and hiding the unused note area. No SDK, consumer API or storage-format change.
+readable kind labels and hiding the unused note area. No SDK, consumer API or vault storage-format change.
 The independent review found no other actionable issues. Native behavior and a fresh audit of
 unchanged 6a cryptography/platform storage remain outside this headless UI review; the two new
-UI-reachable core failures were fixed. No deferred minor findings. Full integration waits on the
-key-generation decision and user acceptance; this branch and its execution ledger are retained.
+UI-reachable core failures were fixed. No deferred minor findings. The key-generation decision is implemented; native acceptance remains user-run; this branch and its execution ledger are retained.
+
+Passphrase-extension verification: all five encrypted algorithms are independently readable by
+`ssh-keygen -y` with the exact synthetic Unicode/whitespace passphrase and match their generated
+public keys. BouncyCastle rejects absent/wrong passphrases. Tests also cover confirmation, UI/request
+wiping, stored account ownership after lock/reopen, rejection, failed-save cleanup and lock-time
+cleanup. Final `./gradlew check :jasper-app:installDist -q` passed with **1,534 tests: 1,531
+passed, three expected skips, zero failures/errors** (vault: 101 total, 100 passed, one opt-in
+keychain skip). The scoped independent review found no actionable issues. The generator was
+rendered headlessly and inspected; source hygiene, diff checks and installed encrypted-encoder
+packaging passed. The design decision is fully implemented; no merge/push or native launch.
 
 ### macOS 26 window controls in the packaged app — 2026-09-22
 
