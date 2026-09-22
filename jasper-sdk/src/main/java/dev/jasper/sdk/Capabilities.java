@@ -17,8 +17,10 @@ public final class Capabilities {
     public static final String TERMINAL_OPEN = "terminal.open";
     /** Providing a pane's session, such as a remote connection. */
     public static final String SESSION_PROVIDE = "session.provide";
+    /** Contribute command-palette scopes and open the palette. */
+    public static final String PALETTE_CONTRIBUTE = "palette.contribute";
     /** Every capability this SDK version knows. */
-    public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE);
+    public static final List<String> ALL = List.of(TERMINAL_OBSERVE, TERMINAL_SELECTION, TERMINAL_INJECT, TERMINAL_OPEN, SESSION_PROVIDE, PALETTE_CONTRIBUTE);
 
     private Capabilities() { }
 }

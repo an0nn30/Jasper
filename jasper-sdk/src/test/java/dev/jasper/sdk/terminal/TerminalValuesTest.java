@@ -52,6 +52,6 @@ class TerminalValuesTest {
         assertThat(failure.pluginId()).isEqualTo("dev.example.tool");
         assertThat(failure.capability()).isEqualTo("terminal.inject");
         assertThat(failure).hasMessageContaining("dev.example.tool").hasMessageContaining("terminal.inject");
-        assertThat(Capabilities.ALL).containsExactly("terminal.observe", "terminal.selection", "terminal.inject", "terminal.open", "session.provide");
+        assertThat(Capabilities.ALL).containsExactly("terminal.observe", "terminal.selection", "terminal.inject", "terminal.open", "session.provide", "palette.contribute");
     }
 }
