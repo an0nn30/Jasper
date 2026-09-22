@@ -43,7 +43,7 @@ public final class UnlockPrompt {
 
     private void detach(CompletableFuture<Boolean> waiter) {
         waiters.remove(waiter);
-        if (waiters.isEmpty() && !settled && !busy) finish(false);
+        if (waiters.isEmpty() && !settled) cancel();
     }
 
     /** Tries {@code password} (zeroed by the lock manager); on success every waiter gets {@code true}. */
@@ -67,7 +67,11 @@ public final class UnlockPrompt {
     }
 
     /** The user closed the dialog: every waiter gets {@code false}. */
-    public void cancel() { if (!settled) finish(false); }
+    public void cancel() {
+        if (settled) return;
+        if (busy) lock.lock();
+        finish(false);
+    }
 
     private void finish(boolean unlocked) {
         settled = true;

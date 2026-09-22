@@ -181,4 +181,60 @@ class VaultPluginTest {
         }
     }
 
+    @Test void openingTheVaultAndGeneratorUsesOneManagerAndInlineUnlock() {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            plugin.lockManager().create("test-password".toCharArray(), false);
+            host.runBackground();
+            host.invoke(VaultPlugin.OPEN, window, null);
+            host.invoke(VaultPlugin.OPEN, window, null);
+            assertThat(host.windows()).containsExactly("dev.jasper.vault.manager|Credential Vault|true");
+            host.invoke("dev.jasper.vault.generate_key", window, null);
+            assertThat(host.windows()).contains("dialog|Generate SSH Key|true");
+            host.requestClose("dialog");
+            host.invoke(VaultPlugin.LOCK, window, null);
+            host.invoke(VaultPlugin.OPEN, window, null);
+            assertThat(host.windows()).as("the existing manager hosts the shared unlock form").containsExactly("dev.jasper.vault.manager|Credential Vault|true");
+            assertThat(plugin.currentUnlock()).isNotNull();
+            plugin.currentUnlock().submit("test-password".toCharArray());
+            host.runBackground();
+            assertThat(plugin.lockManager().state()).isEqualTo(LockState.UNLOCKED);
+            assertThat(host.windows()).hasSize(1);
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void stoppingDuringUnlockClosesThePromptAndRejectsLateOpen() {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            plugin.lockManager().create("test-password".toCharArray(), false);
+            host.runBackground();
+            plugin.lockManager().lock();
+            host.invoke(VaultPlugin.OPEN, window, null);
+            plugin.currentUnlock().submit("test-password".toCharArray());
+            host.stopAll();
+            host.runBackground();
+            assertThat(plugin.lockManager().state()).isEqualTo(LockState.LOCKED);
+            assertThat(host.windows()).isEmpty();
+        }
+    }
+
+    @Test void createPromptIsSingletonAndCanBeCancelled() {
+        VaultPlugin plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            host.invoke(VaultPlugin.OPEN, window, null);
+            host.invoke(VaultPlugin.OPEN, window, null);
+            assertThat(host.windows()).containsExactly("dialog|Create Vault|true");
+            host.requestClose("dialog");
+            assertThat(plugin.lockManager().state()).isEqualTo(LockState.NO_VAULT);
+            assertThat(host.windows()).isEmpty();
+        }
+    }
+
 }

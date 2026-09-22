@@ -94,5 +94,5 @@ public final class PasswordPanel extends JPanel {
     public void clear() { password.setText(""); confirm.setText(""); }
 
     /** Prevents duplicate submits while a background create is running. */
-    public void setBusy(boolean busy) { primary.setEnabled(!busy); }
+    public void setBusy(boolean busy) { primary.setEnabled(!busy); password.setEnabled(!busy); confirm.setEnabled(!busy); bind.setEnabled(!busy); }
 }

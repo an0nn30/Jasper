@@ -29,6 +29,10 @@ import dev.jasper.vault.ui.PasswordPanel;
 import dev.jasper.vault.ui.PickerPanel;
 import dev.jasper.vault.ui.SecretClipboard;
 import dev.jasper.vault.ui.VaultScope;
+import dev.jasper.vault.ui.VaultManager;
+import dev.jasper.vault.ui.VaultManagerWindow;
+import dev.jasper.vault.ui.KeyGeneratorForm;
+import java.util.concurrent.CompletableFuture;
 import java.awt.AWTEvent;
 import java.awt.Toolkit;
 import java.awt.event.AWTEventListener;
@@ -45,7 +49,7 @@ import javax.swing.Timer;
 /**
  * Wires the vault to Jasper: the lock manager on the plugin's executors, the service published per
  * consumer, the Open and Lock actions, the lock-state topic, the settings file and the inactivity lock.
- * Plan 6b adds the manager window, status item, rail action and palette scope.
+ * Owns the manager window, clipboard, status item, rail action and palette scope.
  */
 public class VaultPlugin implements Plugin {
     public static final String OPEN = "dev.jasper.vault.open";
@@ -70,6 +74,12 @@ public class VaultPlugin implements Plugin {
     private VaultScope scope;
     private SecretClipboard clipboard;
     private VaultSettings settings;
+    public static final String GENERATE = "dev.jasper.vault.generate_key";
+    private VaultManager manager;
+    private VaultManagerWindow managerWindow;
+    private PluginDialog createDialog;
+    private CompletableFuture<Boolean> creating;
+    private boolean stopped;
     /** Milliseconds for the inactivity clock; tests set it, production reads the wall clock. */
     long clock = -1;
 
@@ -89,6 +99,7 @@ public class VaultPlugin implements Plugin {
 
     @Override public void start(PluginContext context) throws Exception {
         this.context = context;
+        stopped = false;
         Files.createDirectories(context.dataDirectory());
         settings = VaultSettings.read(context.config(), context.dataDirectory());
         timer = new InactivityTimer(() -> clock >= 0 ? clock : System.currentTimeMillis());
@@ -106,11 +117,16 @@ public class VaultPlugin implements Plugin {
         clipboard = clipboardFactory.get();
         scope = new VaultScope(lock, service, clipboard, this::open, context.notices()::error);
         context.palette().register(scope);
+        manager = new VaultManager(lock, context.background(), ui, this::vaultChanged);
+        managerWindow = new VaultManagerWindow(context, lock, manager, service, clipboard, this::managerStatus, this::showGenerator);
+        context.actions().register(ActionSpec.of(GENERATE, "Generate SSH Key...")
+            .withKeywords(List.of("vault", "ssh", "key", "generate")),
+            invoked -> openThen(invoked.window(), Optional.empty(), this::showGenerator));
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 50));
         status.setText("Vault");
         context.rail().add(OPEN);
         refreshStatus();
-        context.config().onChanged(() -> { settings = VaultSettings.read(context.config(), context.dataDirectory()); timer.setTimeout(settings.autoLock()); });
+        context.config().onChanged(() -> { settings = VaultSettings.read(context.config(), context.dataDirectory()); timer.setTimeout(settings.autoLock()); refreshStatus(); vaultChanged(); });
         activity = event -> timer.touch();
         Toolkit.getDefaultToolkit().addAWTEventListener(activity, AWTEvent.KEY_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK);
         ticker = new Timer(TICK_MILLIS, event -> tick());
@@ -118,24 +134,44 @@ public class VaultPlugin implements Plugin {
     }
 
     @Override public void stop() {
+        stopped = true;
         if (ticker != null) ticker.stop();
         if (activity != null) Toolkit.getDefaultToolkit().removeAWTEventListener(activity);
         try {
-            if (clipboard != null) clipboard.close();
-        } catch (RuntimeException ignored) {
-            // The host may already be shutting down; locking must still zero vault state.
+            if (managerWindow != null) managerWindow.close();
+            if (createDialog != null) createDialog.close();
+            if (currentUnlock != null) currentUnlock.cancel();
         } finally {
-            if (lock != null) lock.lock();
+            if (manager != null) manager.invalidate();
+            try {
+                if (clipboard != null) clipboard.close();
+            } catch (RuntimeException ignored) {
+                // Clipboard ownership may already have gone away during shutdown.
+            } finally {
+                if (lock != null) lock.lock();
+            }
         }
     }
 
-    /** Open Vault…: create when there is no vault, unlock when locked; unlocked does nothing until 6b opens the manager. */
-    void open(WindowHandle window, Optional<UUID> select) {
-        switch (lock.state()) {
-            case NO_VAULT -> showCreate(window);
-            case LOCKED -> service.requestUnlock(window);
-            case UNLOCKED -> { }
-        }
+    /** Explicit Open creates/unlocks when needed, then selects the requested manager row. */
+    void open(WindowHandle window, Optional<UUID> select) { openThen(window, select, () -> { }); }
+
+    private void openThen(WindowHandle window, Optional<UUID> select, Runnable after) {
+        if (stopped) return;
+        WindowHandle named = owner(window);
+        CompletableFuture<Boolean> ready = switch (lock.state()) {
+            case NO_VAULT -> createVault(named);
+            case LOCKED -> service.requestUnlock(named);
+            case UNLOCKED -> CompletableFuture.completedFuture(true);
+        };
+        ready.thenAccept(ok -> {
+            if (!ok || stopped || lock.state() != LockState.UNLOCKED) return;
+            managerWindow.show(named, select);
+            after.run();
+        }).exceptionally(failure -> {
+            if (!stopped) context.notices().error("Could not open Credential Vault: " + message(failure));
+            return null;
+        });
     }
 
     /** Locks when the inactivity timeout has passed; the Swing ticker calls this every few seconds. */
@@ -146,31 +182,55 @@ public class VaultPlugin implements Plugin {
 
     private void lockStateChanged(LockState state) {
         if (state == LockState.UNLOCKED) timer.touch();
+        else if (manager != null) manager.invalidate();
         service.lockStateChanged(state);
         if (lockAction != null) lockAction.setEnabled(state == LockState.UNLOCKED);
         context.events().publish(VaultApi.LOCK_STATE_CHANGED, state);
-        if (scope != null) scope.changed();
+        vaultChanged();
         refreshStatus();
     }
 
-    void showCreate(WindowHandle owner) {
+    private CompletableFuture<Boolean> createVault(WindowHandle owner) {
+        if (creating != null) { createDialog.toFront(); return creating; }
+        var result = new CompletableFuture<Boolean>();
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Create Vault", owner, true));
-        PasswordPanel panel = PasswordPanel.create(settings.bindByDefault(), (password, bind) ->
+        creating = result; createDialog = dialog;
+        boolean[] success = {false}, submitted = {false};
+        PasswordPanel[] form = new PasswordPanel[1];
+        form[0] = PasswordPanel.create(settings.bindByDefault(), (password, bind) -> {
+            submitted[0] = true; form[0].setBusy(true);
             lock.create(password, bind).whenComplete((ignored, failure) -> {
-                if (failure == null) { dialog.close(); return; }
-                Throwable cause = failure.getCause() != null ? failure.getCause() : failure;
-                context.notices().error("Could not create the vault: " + cause.getMessage());
-            }), dialog::close);
-        dialog.setContent(panel);
+                if (createDialog != dialog || stopped) return;
+                if (failure == null) {
+                    success[0] = true; dialog.close(); result.complete(true);
+                } else {
+                    form[0].setBusy(false);
+                    context.notices().error("Could not create the vault: " + message(failure));
+                }
+            });
+        }, dialog::close);
+        dialog.setContent(form[0]);
+        dialog.onClosed(() -> {
+            form[0].clear();
+            if (createDialog == dialog) { createDialog = null; creating = null; }
+            if (!success[0]) {
+                if (submitted[0]) lock.lock();
+                result.complete(false);
+            }
+        });
         dialog.show();
+        return result;
     }
 
     private void showUnlock(UnlockPrompt prompt) {
         currentUnlock = prompt;
+        prompt.onDismiss(() -> { if (currentUnlock == prompt) currentUnlock = null; });
+        if (managerWindow != null && managerWindow.showUnlock(prompt)) return;
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Unlock Vault", owner(prompt.owner()), true));
-        dialog.setContent(PasswordPanel.unlock(prompt));
-        prompt.onDismiss(() -> { currentUnlock = null; dialog.close(); });
-        dialog.onClosed(prompt::cancel);
+        PasswordPanel panel = PasswordPanel.unlock(prompt);
+        dialog.setContent(panel);
+        prompt.onDismiss(() -> { panel.clear(); dialog.close(); });
+        dialog.onClosed(() -> { panel.clear(); prompt.cancel(); });
         dialog.show();
     }
 
@@ -178,7 +238,7 @@ public class VaultPlugin implements Plugin {
         currentGrant = prompt;
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Allow " + prompt.consumerName() + " to use " + prompt.descriptor().name() + "?", owner(prompt.owner()), true));
         dialog.setContent(new GrantPanel(prompt));
-        prompt.onDismiss(() -> { currentGrant = null; dialog.close(); });
+        prompt.onDismiss(() -> { currentGrant = null; dialog.close(); vaultChanged(); });
         dialog.onClosed(prompt::cancel);
         dialog.show();
     }
@@ -221,4 +281,23 @@ public class VaultPlugin implements Plugin {
         };
     }
 
+    private void vaultChanged() {
+        if (scope != null) scope.changed();
+        if (!stopped && managerWindow != null) managerWindow.changed();
+    }
+
+    private String managerStatus() {
+        return "Device secret: " + lock.deviceSecretSource() + " | " + context.dataDirectory().resolve("vault.jv")
+            + " | Auto-lock: " + (settings.autoLock().isZero() ? "off" : settings.autoLock().toMinutes() + " min");
+    }
+
+    private void showGenerator() {
+        managerWindow.dialog("Generate SSH Key", close -> new KeyGeneratorForm(request ->
+            manager.generate(settings.keysDirectory(), request.algorithm(), request.name(), request.comment(), request.username()), close));
+    }
+
+    private static String message(Throwable failure) {
+        while (failure.getCause() != null && failure instanceof java.util.concurrent.CompletionException) failure = failure.getCause();
+        return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+    }
 }
