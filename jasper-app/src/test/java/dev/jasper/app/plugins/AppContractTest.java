@@ -61,7 +61,7 @@ class AppContractTest extends PluginContractTest {
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
                            TerminalRegistry terminals, List<String> notices, List<Path> edited) {
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
-            SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()),
+            SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()), id -> data.resolve(id + ".toml"),
             (key, message) -> { }, drainGrace, contributions, dark::get, auxiliary, terminals, notices::add, edited::add)));
     }
 

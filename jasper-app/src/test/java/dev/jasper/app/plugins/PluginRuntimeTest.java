@@ -83,7 +83,9 @@ class PluginRuntimeTest {
             assertThat(notice.detail().get()).isEqualTo("50% · half way");
         }));
 
-        onEdt(() -> runtime.configurationChanged(Map.of("dev.example.probe", Map.<String, Object>of("greeting", "again"))));
+        assertThat(root.resolve("absent/dev.example.probe/dev.example.probe.toml")).content().contains("greeting = \"hello\"");
+        Files.writeString(root.resolve("absent/dev.example.probe/dev.example.probe.toml"), "greeting = \"again\"\n");
+        onEdt(() -> runtime.configurationChanged(Map.of()));
         onEdt(() -> runtime.themeChanged(false));
         settle();
         assertThat(data.resolve("changed")).hasContent("again");
@@ -174,4 +176,29 @@ class PluginRuntimeTest {
         onEdt(() -> pending.set(runtime.stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
     }
+
+        @Test void aChangedSettingsFileReachesThePluginWithoutAConfigReload() throws Exception {
+            // Reuse the probe fixture of the test above: it writes context.config().string("greeting") to data/started at start
+            // and, on config change, to data/changed. Read that fixture's source before writing this test and adapt the file names.
+            Path dev = root.resolve("dev-plugin");
+            PluginJars.build(dev, "probe.jar", PluginJars.descriptor("dev.example.probe", "1.0.0", "fix.probe.Main"), Map.of("fix.probe.Main", FIXTURE), List.of());
+            List<String> reports = new ArrayList<>();
+            PluginRuntime runtime = runtime(null, root.resolve("plugins"), dev, false, reports);
+            onEdt(() -> runtime.start(Map.of(), true));
+            settle();
+            Path file = root.resolve("plugins/dev.example.probe/dev.example.probe.toml");
+            Files.writeString(file, "greeting = \"later\"\n");
+            Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 5000));
+            onEdt(runtime::pollSettingsNow);
+            settle();
+            assertThat(root.resolve("plugins/dev.example.probe/data/changed")).hasContent("later");
+            Files.writeString(file, "greeting = [\n");
+            Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 10000));
+            onEdt(runtime::pollSettingsNow);
+            settle();
+            assertThat(reports).singleElement().asString().startsWith("plugins.dev.example.probe: ");
+            var pending = new AtomicReference<List<CompletableFuture<?>>>();
+            onEdt(() -> pending.set(runtime.stop()));
+            CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        }
 }

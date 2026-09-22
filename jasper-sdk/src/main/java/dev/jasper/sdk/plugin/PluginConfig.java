@@ -4,6 +4,7 @@ import dev.jasper.sdk.Subscription;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.nio.file.Path;
 
 /**
  * Read-only view of the plugin's {@code [plugins."<id>"]} table in the user's configuration file.
@@ -16,6 +17,14 @@ public interface PluginConfig {
      * @param key key within this table
      * @return the value, or empty
      */
+        /**
+         * The settings file this configuration is read from, {@code plugins/<id>/<id>.toml} under Jasper's home.
+         * A plugin may open it with {@code platform().openInEditor} or point the user at it.
+         *
+         * @return the file, which exists once the plugin has started
+         */
+        Path file();
+
     Optional<String> string(String key);
 
     /**

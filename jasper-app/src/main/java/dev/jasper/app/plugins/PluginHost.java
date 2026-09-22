@@ -26,7 +26,7 @@ import dev.jasper.app.terminals.TerminalRegistry;
  */
 final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
-                       Function<String, Map<String, Object>> settings, BiConsumer<String, String> configReport,
+                       Function<String, Map<String, Object>> settings, Function<String, Path> settingsFile, BiConsumer<String, String> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
                        AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor) { }
 
@@ -66,7 +66,7 @@ final class PluginHost {
             return new Outcome(PluginStatus.State.SKIPPED, "requires " + required + ", which "
                 + (why == PluginStatus.State.FAILED ? "failed to start" : why == PluginStatus.State.SKIPPED ? "was skipped" : "is not running"));
         }
-        var context = new HostedContext(this, hosted, new PluginSettings(id, environment.settings().apply(id),
+        var context = new HostedContext(this, hosted, new PluginSettings(id, environment.settingsFile().apply(id), environment.settings().apply(id),
             containment, environment.configReport()));
         contexts.put(id, context);
         Set<String> providers = new HashSet<>(hosted.requires());

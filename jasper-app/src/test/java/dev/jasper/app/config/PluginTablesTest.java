@@ -24,7 +24,8 @@ class PluginTablesTest {
             [plugins."dev.example.absent"]
             anything = "goes"
             """);
-        assertThat(result.diagnostics()).isEmpty();
+        assertThat(result.diagnostics()).as("only the moved-to-a-file warning, one per table")
+            .allSatisfy(d -> assertThat(d.message()).contains("moved to plugins/")).hasSize(2);
         assertThat(result.rejected()).isFalse();
         Map<String, Object> ssh = result.snapshot().plugins().get("dev.jasper.ssh");
         assertThat(ssh).containsEntry("default_user", "dustin").containsEntry("port", 22L)
@@ -47,7 +48,7 @@ class PluginTablesTest {
         assertThat(result.snapshot().plugins()).containsOnlyKeys("dev.example.tool");
         assertThat(result.snapshot().plugins().get("dev.example.tool")).containsOnlyKeys("fine");
         assertThat(result.diagnostics()).extracting(ConfigDiagnostic::key)
-            .containsExactlyInAnyOrder("plugins.\"Not An Id\"", "plugins.\"dev.example.tool\".mixed",
+            .containsExactlyInAnyOrder("plugins.\"Not An Id\"", "plugins.\"dev.example.tool\"", "plugins.\"dev.example.tool\".mixed",
                 "plugins.\"dev.example.tool\".when");
     }
 

@@ -11,8 +11,9 @@ class PluginSettingsTest {
         List<String> reports = new ArrayList<>();
         List<String> changes = new ArrayList<>();
         var containment = new Containment(() -> true);
-        var settings = new PluginSettings("dev.example.tool", Map.of("name", "x", "count", 3L, "on", true,
+        var settings = new PluginSettings("dev.example.tool", java.nio.file.Path.of("/tmp/dev.example.tool.toml"), Map.of("name", "x", "count", 3L, "on", true,
             "hosts", List.of("a"), "proxy", Map.of("port", 22L)), containment, (key, message) -> reports.add(key + "=" + message));
+        assertThat(settings.file()).isEqualTo(java.nio.file.Path.of("/tmp/dev.example.tool.toml"));
         assertThat(settings.string("name")).hasValue("x");
         assertThat(settings.string("count")).isEmpty();
         assertThat(settings.integer("count")).hasValue(3L);
@@ -35,7 +36,7 @@ class PluginSettingsTest {
         assertThat(changes).hasSize(1);
 
         settings.report("name", "too short");
-        new PluginSettings("dev.example.tool", Map.of("proxy", Map.of()), containment, (key, message) -> reports.add(key + "=" + message))
+        new PluginSettings("dev.example.tool", java.nio.file.Path.of("/tmp/dev.example.tool.toml"), Map.of("proxy", Map.of()), containment, (key, message) -> reports.add(key + "=" + message))
             .table("proxy").orElseThrow().report("port", "missing");
         assertThat(reports).containsExactly("plugins.\"dev.example.tool\".name=too short",
             "plugins.\"dev.example.tool\".proxy.port=missing");

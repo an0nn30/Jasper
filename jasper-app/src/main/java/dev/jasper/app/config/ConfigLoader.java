@@ -154,11 +154,23 @@ public final class ConfigLoader {
             if (!PLUGIN_ID.matcher(id).matches()) { warning(path, "Not a plugin id; ignored."); continue; }
             if (!(value instanceof TomlTable nested)) { typeError(path, "a table"); continue; }
             staged.put(id, freeze(path, nested));
+            warning(path, "Plugin settings moved to plugins/" + id + "/" + id + ".toml; this table only seeds that file when it is missing.");
         }
         plugins = Map.copyOf(staged);
     }
 
-    private Map<String, Object> freeze(List<String> parent, TomlTable table) {
+    private Map<String, Object> freeze(List<String> parent, TomlTable table) { return freeze(parent, table, this::warning); }
+
+    /**
+     * The value kinds plugin settings may hold, as an immutable map: strings, integers, floats, booleans, arrays of
+     * strings and nested tables; anything else is dropped silently.
+     *
+     * @param table a parsed TOML table
+     * @return the frozen values
+     */
+    public static Map<String, Object> freeze(TomlTable table) { return freeze(List.of(), table, (path, message) -> { }); }
+
+    private static Map<String, Object> freeze(List<String> parent, TomlTable table, java.util.function.BiConsumer<List<String>, String> problem) {
         var result = new LinkedHashMap<String, Object>();
         for (String key : table.keySet()) {
             var path = new ArrayList<>(parent);
@@ -169,14 +181,14 @@ public final class ConfigLoader {
                 case Long number -> result.put(key, number);
                 case Double number -> result.put(key, number);
                 case Boolean flag -> result.put(key, flag);
-                case TomlTable nested -> result.put(key, freeze(path, nested));
+                case TomlTable nested -> result.put(key, freeze(path, nested, problem));
                 case TomlArray array -> {
                     List<String> items = new ArrayList<>();
                     for (int i = 0; i < array.size(); i++) if (array.get(i) instanceof String text) items.add(text);
                     if (items.size() == array.size()) result.put(key, List.copyOf(items));
-                    else warning(path, "Only arrays of strings are supported in plugin settings; ignored.");
+                    else problem.accept(path, "Only arrays of strings are supported in plugin settings; ignored.");
                 }
-                default -> warning(path, "Unsupported value type in plugin settings; ignored.");
+                default -> problem.accept(path, "Unsupported value type in plugin settings; ignored.");
             }
         }
         return Collections.unmodifiableMap(result);

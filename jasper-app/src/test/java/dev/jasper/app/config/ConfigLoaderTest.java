@@ -314,4 +314,15 @@ class ConfigLoaderTest {
         assertThat(high.snapshot().longCommandSeconds()).as("out of range keeps the default").isEqualTo(10);
         assertThat(high.diagnostics()).isNotEmpty();
     }
+
+        @Test void aPluginTableIsKeptForSeedingAndReportedAsMoved() {
+            var result = parse("[plugins.\"dev.example.tool\"]\ngreeting = \"hi\"\n");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().plugins()).containsEntry("dev.example.tool", Map.of("greeting", "hi"));
+            assertThat(result.diagnostics()).singleElement().satisfies(d -> {
+                assertThat(d.key()).isEqualTo("plugins.\"dev.example.tool\"");
+                assertThat(d.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
+                assertThat(d.message()).contains("plugins/dev.example.tool/dev.example.tool.toml");
+            });
+        }
 }

@@ -43,7 +43,7 @@ class HostedPaletteTest {
     PluginHost host() throws Exception {
         Path data = Files.createTempDirectory("jasper-palette");
         host = onEdtValue(() -> new PluginHost(new PluginHost.Environment(javax.swing.SwingUtilities::invokeLater,
-            javax.swing.SwingUtilities::isEventDispatchThread, data::resolve, id -> Map.of(), (key, message) -> { },
+            javax.swing.SwingUtilities::isEventDispatchThread, data::resolve, id -> Map.of(), id -> data.resolve(id + ".toml"), (key, message) -> { },
             Duration.ofMillis(200), contributions, () -> true, AppContractTest.headlessWindows(), fixture.registry,
             notices::add, edited::add)));
         return host;

@@ -10,7 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
-/** One plugin's {@code [plugins."<id>"]} table. Getters are safe from any thread; {@link #update} is UI-thread only. */
+/** One plugin's settings, read from its own file. Getters are safe from any thread; {@link #update} is UI-thread only. */
 final class PluginSettings implements PluginConfig {
     private final String pluginId;
     private final Containment containment;
@@ -19,8 +19,10 @@ final class PluginSettings implements PluginConfig {
     private final View root;
     private volatile Map<String, Object> values;
 
-    PluginSettings(String pluginId, Map<String, Object> initial, Containment containment, BiConsumer<String, String> report) {
-        this.pluginId = pluginId; this.containment = containment; this.report = report;
+    private final java.nio.file.Path file;
+
+    PluginSettings(String pluginId, java.nio.file.Path file, Map<String, Object> initial, Containment containment, BiConsumer<String, String> report) {
+        this.pluginId = pluginId; this.file = file; this.containment = containment; this.report = report;
         this.values = Map.copyOf(initial);
         this.root = new View(() -> values, "");
     }
@@ -33,6 +35,7 @@ final class PluginSettings implements PluginConfig {
 
     void close() { listeners.clear(); }
 
+    @Override public java.nio.file.Path file() { return file; }
     @Override public Optional<String> string(String key) { return root.string(key); }
     @Override public OptionalLong integer(String key) { return root.integer(key); }
     @Override public Optional<Boolean> bool(String key) { return root.bool(key); }
@@ -46,6 +49,7 @@ final class PluginSettings implements PluginConfig {
         private final String prefix;
 
         View(Supplier<Map<String, Object>> table, String prefix) { this.table = table; this.prefix = prefix; }
+        @Override public java.nio.file.Path file() { return file; }
 
         @Override public Optional<String> string(String key) {
             return table.get().get(key) instanceof String text ? Optional.of(text) : Optional.empty();

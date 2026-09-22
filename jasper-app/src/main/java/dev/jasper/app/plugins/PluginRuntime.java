@@ -139,7 +139,9 @@ public final class PluginRuntime {
     private volatile boolean dark = true;
     private final List<PluginStatus> statuses = new ArrayList<>();
     private final List<PluginClassLoader> loaders = new ArrayList<>();
-    private volatile Map<String, Map<String, Object>> tables = Map.of();
+    private final PluginSettingsFiles settingsFiles;
+    private java.util.concurrent.ScheduledExecutorService settingsPoller;
+    private volatile Map<String, PluginCandidate> launched = Map.of();
     private volatile PluginHost host;
     private Subscription bridge;
     private volatile PluginCatalog.Launch launch;
@@ -182,6 +184,7 @@ public final class PluginRuntime {
         this.options = Objects.requireNonNull(options);
         this.notifier = Objects.requireNonNull(notifier);
         this.configReport = Objects.requireNonNull(configReport);
+        this.settingsFiles = new PluginSettingsFiles(options.userDirectory(), configReport);
         this.contributions = Objects.requireNonNull(contributions);
         this.windows = Objects.requireNonNull(windows);
         this.terminals = Objects.requireNonNull(terminals);
@@ -228,20 +231,26 @@ public final class PluginRuntime {
     /**
      * Discovers, resolves, loads and starts plugins in dependency order. Call once, before the first window.
      *
-     * @param pluginTables the {@code [plugins."<id>"]} tables of the current configuration
+     * @param pluginTables the {@code [plugins."<id>"]} tables of the configuration, used only to seed a missing settings file
      * @param dark whether the current look is dark
      */
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
         if (host != null) throw new IllegalStateException("Plugins already started");
         this.dark = dark;
         long began = System.nanoTime();
-        tables = Map.copyOf(pluginTables);
         List<String> problems = new ArrayList<>();
         List<PluginCandidate> candidates = new ArrayList<>(
             PluginDiscovery.scan(options.bundledDirectory(), PluginCandidate.Origin.BUNDLED, problems));
         candidates.addAll(PluginDiscovery.scan(options.userDirectory(), PluginCandidate.Origin.USER, problems));
         if (options.developmentDirectory() != null)
             PluginDiscovery.single(options.developmentDirectory(), PluginCandidate.Origin.DEV, problems).ifPresent(candidates::add);
+                for (PluginCandidate candidate : candidates) {
+                    try { PluginSettingsFiles.prepare(options.userDirectory(), candidate, pluginTables.get(candidate.id())); }
+                    catch (IOException failure) { LOG.log(System.Logger.Level.WARNING, "Could not prepare the settings of " + candidate.id(), failure); }
+                }
+        var byId = new LinkedHashMap<String, PluginCandidate>();
+        for (PluginCandidate candidate : candidates) byId.putIfAbsent(candidate.id(), candidate);
+        launched = Map.copyOf(byId);
         Map<String, PluginStateStore.Entry> state;
         try { state = new PluginStateStore(options.stateFile(), options.lockFile(), LOCK_WAIT).read(); }
         catch (IOException unreadable) {
@@ -253,9 +262,13 @@ public final class PluginRuntime {
         statuses.addAll(resolution.rejected());
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, id -> options.userDirectory().resolve(id).resolve("data"),
-            id -> tables.getOrDefault(id, Map.of()), configReport, DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor));
+            id -> settingsFiles.current(id), id -> PluginSettingsFiles.file(options.userDirectory(), id), configReport, DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notice, editor));
         host = created;
         bridge = created.bus.subscribe(EventBus.APP, Activities.TOPIC, this::forward);
+                settingsPoller = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
+                    Thread.ofPlatform().daemon().name("jasper-plugin-settings").factory());
+                settingsPoller.scheduleWithFixedDelay(() -> { if (!settingsFiles.refresh(false).isEmpty()) SwingUtilities.invokeLater(this::applySettings); },
+                    1, 1, java.util.concurrent.TimeUnit.SECONDS);
         Map<String, PluginLoader.Loaded> loaded = new LinkedHashMap<>();
         for (PluginCandidate candidate : resolution.load()) {
             PluginLoader.Loaded unit;
@@ -282,14 +295,14 @@ public final class PluginRuntime {
     }
 
     /**
-     * Applies reloaded plugin tables, then announces the reload.
+     * Re-reads every plugin's settings file, then announces the reload. The tables are no longer read.
      *
-     * @param pluginTables the new tables
+     * @param pluginTables ignored; kept for callers
      */
     public void configurationChanged(Map<String, Map<String, Object>> pluginTables) {
         PluginHost current = host;
         if (current == null) return;
-        tables = Map.copyOf(pluginTables);
+        settingsFiles.refresh(true);
         current.settingsChanged();
         current.bus.publish(EventBus.APP, AppEvents.CONFIG_RELOADED, new AppEvents.ConfigReloaded());
     }
@@ -332,6 +345,7 @@ public final class PluginRuntime {
      * @return asynchronous remainders of the shutdown
      */
     public List<CompletableFuture<?>> stop() {
+        if (settingsPoller != null) settingsPoller.shutdownNow();
         PluginHost current = host;
         if (current == null) return List.of();
         if (adminWorker != null) adminWorker.shutdown();
@@ -461,4 +475,9 @@ public final class PluginRuntime {
             case CANCELLED -> notifier.cancelled(event.sourcePluginId(), event.id());
         }
     }
+
+    private void applySettings() { PluginHost current = host; if (current != null) current.settingsChanged(); }
+
+    /** Test seam: what the settings poller does, now. */
+    void pollSettingsNow() { if (!settingsFiles.refresh(false).isEmpty()) applySettings(); }
 }

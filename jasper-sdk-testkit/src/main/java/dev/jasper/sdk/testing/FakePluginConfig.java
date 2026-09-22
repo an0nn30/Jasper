@@ -17,10 +17,14 @@ final class FakePluginConfig implements PluginConfig {
     private final CopyOnWriteArrayList<Runnable> listeners;
     private final BiConsumer<String, String> report;
 
+    private final java.nio.file.Path file;
+
     FakePluginConfig(Supplier<Map<String, Object>> values, String prefix,
-                     CopyOnWriteArrayList<Runnable> listeners, BiConsumer<String, String> report) {
-        this.values = values; this.prefix = prefix; this.listeners = listeners; this.report = report;
+                     CopyOnWriteArrayList<Runnable> listeners, BiConsumer<String, String> report, java.nio.file.Path file) {
+        this.values = values; this.prefix = prefix; this.listeners = listeners; this.report = report; this.file = file;
     }
+
+    @Override public java.nio.file.Path file() { return file; }
 
     @Override public Optional<String> string(String key) {
         return values.get().get(key) instanceof String text ? Optional.of(text) : Optional.empty();
@@ -38,7 +42,7 @@ final class FakePluginConfig implements PluginConfig {
     }
     @Override public Optional<PluginConfig> table(String key) {
         if (!(values.get().get(key) instanceof Map<?, ?>)) return Optional.empty();
-        return Optional.of(new FakePluginConfig(() -> nested(key), prefix + key + ".", listeners, report));
+        return Optional.of(new FakePluginConfig(() -> nested(key), prefix + key + ".", listeners, report, file));
     }
     @SuppressWarnings("unchecked")
     private Map<String, Object> nested(String key) {

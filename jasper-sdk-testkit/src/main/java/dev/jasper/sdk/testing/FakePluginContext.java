@@ -85,7 +85,8 @@ public final class FakePluginContext implements PluginContext {
 
     @Override public PluginConfig config() {
         return new FakePluginConfig(() -> table, "", configListeners,
-            (key, message) -> host.reports.add(info.id() + ": " + key + ": " + message));
+            (key, message) -> host.reports.add(info.id() + ": " + key + ": " + message),
+            host.dataRoot().resolve(info.id()).resolve(info.id() + ".toml"));
     }
 
     @Override public Executor background() {

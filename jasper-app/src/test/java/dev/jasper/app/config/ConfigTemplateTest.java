@@ -46,7 +46,6 @@ class ConfigTemplateTest {
         assertThat(toml.errors()).isEmpty();
         assertThat(toml.getTable("buddy").keySet()).containsExactly("enabled");
         assertThat(toml.getTable("notifications").keySet()).containsExactly("long_command_seconds");
-        assertThat(toml.getTable("plugins.\"dev.jasper.history\"").keySet()).containsExactlyInAnyOrder("trivial_commands", "deprioritize_trivial");
         assertThat(toml.getTable("palette").keySet()).containsExactly("max_results");
         assertThat(toml.getTable("window").keySet())
             .containsExactlyInAnyOrder("tab_height", "toolbar", "status_bar", "columns", "lines");
@@ -65,8 +64,7 @@ class ConfigTemplateTest {
             var result = ConfigLoader.parse(example, text, macOs);
             assertThat(result.rejected()).isFalse();
             assertThat(result.diagnostics()).isEmpty();
-            // The example's plugin table is the History plugin's defaults; the application's own defaults have none.
-            assertThat(result.snapshot().toBuilder().plugins(java.util.Map.of()).build()).isEqualTo(ConfigSnapshot.defaults());
+            assertThat(result.snapshot()).isEqualTo(ConfigSnapshot.defaults());
         }
     }
 
