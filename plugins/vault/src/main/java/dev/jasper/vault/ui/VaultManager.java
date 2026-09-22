@@ -156,4 +156,14 @@ public final class VaultManager {
         } catch (RuntimeException failure) { result.completeExceptionally(failure); }
         return result;
     }
+    public CompletableFuture<Void> importKey(SshKey selected) {
+        if (!editable()) return rejected();
+        long expected = generation;
+        return io(() -> KeyFiles.inspect(selected)).thenCompose(key -> {
+            if (expected != generation || lock.state() != LockState.UNLOCKED)
+                return CompletableFuture.failedFuture(new IllegalStateException("The vault was locked meanwhile"));
+            return saveKey(key);
+        });
+    }
+
 }
