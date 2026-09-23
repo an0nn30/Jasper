@@ -22,7 +22,9 @@ class RetroChromeTest {
             assertThat(button.getHorizontalTextPosition()).isEqualTo(javax.swing.SwingConstants.CENTER);
             assertThat(button.getVerticalTextPosition()).isEqualTo(javax.swing.SwingConstants.BOTTOM);
             assertThat(button.getPreferredSize().height).isGreaterThan(48).isLessThanOrEqualTo(64);
-            assertThat(button.getFont()).isEqualTo(javax.swing.UIManager.getFont("Button.font"));
+            assertThat(button.getFont().getStyle()).isEqualTo(java.awt.Font.PLAIN);
+            assertThat(button.getFont().getSize2D()).isEqualTo(javax.swing.UIManager.getFont("Button.font").getSize2D() - 1f);
+            assertThat(button.getInsets()).isEqualTo(new java.awt.Insets(3, 5, 3, 5));
         }
         owner.setToolbarMode(dev.jasper.app.config.ToolbarMode.ICONS);
         assertThat(((javax.swing.JButton) toolbar.getComponent(0)).getText()).isNull();

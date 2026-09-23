@@ -143,6 +143,15 @@ XML totals, installed modern hashes and original Vault artwork identity. Native 
 shell not launched; physical desktop acceptance remains user-run. Branch/worktree retained;
 local main is an ancestor, no merge back or push, no deferred findings.
 
+### Retro toolbar spacing refinement — 2026-09-23
+
+User screenshot feedback requested a tighter MobaXTerm-like toolbar. Reduced retro button
+padding from 8 to 5 logical pixels per side and from 4 to 3 vertically. Captions now use
+regular weight, one point smaller than the Metal button font, with a 3-pixel icon/text gap.
+Icons remain 28px; built-in and contributed buttons share the style. Modern toolbar styling
+is unchanged. Verified existing toolbar modes, minimum width, label restoration, contributed
+controls and headless previews; distribution rebuilt without launching the GUI.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

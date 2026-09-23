@@ -9,14 +9,16 @@ import javax.swing.JToolBar;
 final class RetroToolbar extends JToolBar {
     /** Flat classic launcher button, with captions centered below its artwork. */
     static void styleButton(JButton button) {
-        button.setMargin(new java.awt.Insets(4, 8, 4, 8));
-        button.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 8, 4, 8));
+        button.setMargin(new java.awt.Insets(3, 5, 3, 5));
+        button.setBorder(javax.swing.BorderFactory.createEmptyBorder(3, 5, 3, 5));
         button.setBorderPainted(false);
         button.setContentAreaFilled(false);
         button.setOpaque(false);
         button.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
         button.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
-        button.setIconTextGap(4);
+        button.setIconTextGap(3);
+        var font = javax.swing.UIManager.getFont("Button.font");
+        button.setFont(font.deriveFont(java.awt.Font.PLAIN, Math.max(1f, font.getSize2D() - 1f)));
     }
 
     private boolean layingOut;

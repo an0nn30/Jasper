@@ -553,4 +553,4 @@ The saved `variant` remains available for modern mode. Retro always uses light c
 
 Plugins need no changes to use ordinary Metal controls. Their custom icons and custom-painted content remain plugin-owned. Native OS title bars and file dialogs remain native; the Jasper logo and Buddy artwork are unchanged.
 
-Toolbar buttons stay flat with 28-pixel classic icons and centered labels beneath them. Icon-only and hidden toolbar modes remain available; tab close controls are icon-only, and status actions remain unboxed. Ordinary form buttons retain Metal styling.
+Toolbar buttons stay flat with 28-pixel classic icons and centered labels beneath them. Retro captions use regular weight at one point below the Metal button font, with compact five-pixel side padding. Icon-only and hidden toolbar modes remain available; tab close controls are icon-only, and status actions remain unboxed. Ordinary form buttons retain Metal styling.
