@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-23-jasper-remote-sftp-design.md` (approved, including section 9.3 named-icon correction).
 
-**Execution status:** Independent adversarial review completed; eight findings are resolved in the contracts and acceptance tests below. Tasks 1–4 are complete. Native execution is already selected and authorized after review findings are addressed. Baseline `1fcf9a8d`; design commits `68b7fb78`, `147a7629`.
+**Execution status:** Independent adversarial review completed; eight findings are resolved in the contracts and acceptance tests below. Tasks 1–5 are complete. Native execution is already selected and authorized after review findings are addressed. Baseline `1fcf9a8d`; design commits `68b7fb78`, `147a7629`.
 
 ## Global Constraints
 
@@ -242,7 +242,7 @@ public abstract class WriteHandle extends OutputStream {
 }
 ```
 
-- [ ] Write the same contract against a temporary local root and real loopback SFTP root:
+- [x] Write the same contract against a temporary local root and real loopback SFTP root:
   binary round trip from nonzero offset, no overwrite on exclusive create/publication,
   symlinks lstat, incremental directory listing, unsupported special types and permissions.
 
@@ -252,8 +252,8 @@ try (var in = endpoint.read(temp, 2)) { assertThat(in.readAllBytes()).containsEx
 assertThatThrownBy(() -> endpoint.write(temp, 0, true)).isInstanceOf(IOException.class);
 ```
 
-- [ ] Run endpoint tests; expect missing implementation.
-- [ ] Implement adapters. SFTP gets one subsystem per worker lease, offset streams with
+- [x] Run endpoint tests; expect missing implementation.
+- [x] Implement adapters. SFTP gets one subsystem per worker lease, offset streams with
   bounded pipeline and request timeout. Local uses channels/NOFOLLOW_LINKS; metadata rwx
   mask 0777. No shell commands. Implement bounded SFTP WRITE requests via RawSftpClient:
   track request ids/offsets, require successful STATUS for every write through each barrier.
@@ -262,14 +262,16 @@ assertThatThrownBy(() -> endpoint.write(temp, 0, true)).isInstanceOf(IOException
   Local checkpoint forces the channel. Abort force-closes only the owned subsystem using
   close(true), without needing a writer lock. Close drains and validates pending acknowledgements. Publication is no-replace or atomic replace only, verified
   against endpoint capabilities. Local no-replace uses same-filesystem hard-link publication
-  where supported then unlinks owned temp; never assumes ATOMIC_MOVE means no-replace.
+  where supported then unlinks owned temp; symbolic links use exclusive final symlink creation
+  from the temp link text (macOS hard-link creation follows symlinks). Never assume ATOMIC_MOVE
+  means no-replace.
   Directory listings ignore protocol dot entries and reject traversal names before consumer use.
-- [ ] Run contracts for SFTP v3/POSIX rename support and an endpoint rejecting atomic replace.
+- [x] Run contracts for SFTP v3/POSIX rename support and an endpoint rejecting atomic replace.
   Add chunked large-offset tests (>Integer.MAX_VALUE), backpressure and channel-close interruption.
   Withhold a WRITE STATUS but acknowledge CLOSE: checkpoint must fail and no confirmed offset
   may advance. Test dangling links and destination intermediate symlinks; use handle-relative
   local operations where supported and revalidate ancestry for every mutation.
-- [ ] Commit `feat(remote): add bounded local and SFTP file operations`.
+- [x] Commit `feat(remote): add bounded local and SFTP file operations`.
 
 ### Task 6: Add durable job storage and bounded discovery records
 

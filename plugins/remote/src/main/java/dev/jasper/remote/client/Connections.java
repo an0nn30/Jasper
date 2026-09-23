@@ -188,7 +188,7 @@ public final class Connections {
         var result = new CompletableFuture<Prepared>();
         var prepared = new Prepared();
         preparations.add(result);
-        result.whenComplete((value, failure) -> preparations.remove(result));
+        result.whenComplete((value, failure) -> ui.execute(() -> preparations.remove(result)));
         var active = new java.util.concurrent.atomic.AtomicReference<CompletableFuture<List<Credential>>>();
         result.whenComplete((value, failure) -> { if (failure != null) ui.execute(() -> {
             var pending = active.get(); if (pending != null) pending.cancel(true); prepared.close();

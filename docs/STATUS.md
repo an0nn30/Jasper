@@ -24,7 +24,9 @@ the latest native execution choice supersedes the earlier per-task-agent prefere
 The adversarial review found eight important contract/recovery issues; the plan now includes
 explicit resolutions and regression tests. Native implementation has completed semantic icons, status progress, and owner-based pickers;
 session leases, endpoint identity and prompt ownership changes also pass their regression suites.
-Next: bounded local/SFTP endpoints, durable queue, engine, browser and Transfers integration.
+Bounded local/SFTP endpoints also pass: explicit ACK/force barriers, safe publication, links,
+short reads, sparse offsets, cancellation, and SFTP through ProxyJump with a surviving shell.
+Next: durable queue, engine, browser and Transfers integration.
 Nothing merged or pushed.
 
 ### Latest completed work
