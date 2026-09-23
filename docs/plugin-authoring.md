@@ -369,7 +369,7 @@ SSH keys or password-only accounts can be selected as existing import credential
 A managed `Credential` exposes owned `keyBytes()` and no `keyPath()`; legacy path credentials
 keep their existing API. Always close credentials after use to clear their bytes and passphrases.
 The batch method has a default unsupported result for older API implementations. This extension
-belongs to Vault's exported API; Jasper SDK remains 0.7.4.
+belongs to Vault's exported API; it does not expose Vault internals through the Jasper SDK.
 
 <!-- example:pluginpalette -->
 ```java

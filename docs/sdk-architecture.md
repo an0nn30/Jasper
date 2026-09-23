@@ -260,3 +260,20 @@ focus/input, centers and bounds content, and removes its listeners on close. Nat
 the owner root and file-picker ownership; workspace shortcut dispatch honors the shared root marker.
 Owner removal closes even unshown overlays; plugin stop closes all its surfaces. Escape/outside clicks
 never request closure. Host-owned fonts refresh overlay content with the rest of the root.
+
+## File workflow additions (SDK 0.7.5)
+
+Host-owned semantic icons now cover file/link navigation, upload/download, new folder and
+pause/resume. Plugins carry no skin artwork. Owner-scoped `Windows.chooseFiles` and
+`chooseDirectory` bridge through native `PathChoice`/`PathChooser` values; `HostedUi` tracks
+owner cancellation before entering the modal picker and rejects late results after teardown.
+
+`StatusProgress`/`StatusProgressState` cross into app-native `ProgressState` at `HostedUi`.
+The workspace caches each progress component by contribution id, so a 5-Hz update does not
+rebuild the status bar. Values contain plain text, an optional validated fraction and plugin
+action ids. App lifecycle tracking and the fake host both reject use after closure.
+
+Remote owns its SFTP endpoints and persistent SQLite transfer store. Its accepted worker
+loops start while the plugin context is live; stop signals them synchronously, and they
+quiesce endpoints and close the queue/lock without submitting new shutdown tasks. The app
+knows only the SDK contributions, not transfer state or SFTP classes.

@@ -10,7 +10,7 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
-| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `Appearance`, `IconName`, `OldGnomeIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `Notices`, `Platform` |
+| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `OldGnomeIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `Notices`, `Platform` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
 
@@ -35,3 +35,17 @@ retro host toolbars use an independent 28px variant. Declare SDK `>=0.7.4, <0.8`
 The existing custom SVG and SVG/OldGnomeIcon overloads remain supported. Custom older hosts
 inherit UnsupportedOperationException for named requests until they implement the new catalog.
 See the [catalog, size rules and testkit example](../docs/sdk-icons.md).
+
+## File workflows and progress (0.7.5)
+
+`Windows.chooseFiles(WindowOwner, title, initialPath)` and `chooseDirectory` attach local
+pickers to a live terminal window or plugin surface. Owner closure or plugin stop cancels
+the picker and discards late results. They return paths only; perform file I/O off the UI thread.
+
+`StatusBar.addProgress(StatusItemSpec)` provides a stable native progress control, updated on
+the UI thread with `StatusProgressState`. A missing fraction is indeterminate; a present
+fraction must be finite and within 0..1. Primary and optional secondary actions must belong
+to the plugin. Close the handle when finished.
+
+`FILE`, `LINK`, `UPLOAD`, `DOWNLOAD`, `UP`, `NEW_FOLDER`, `PAUSE` and `RESUME` extend the
+semantic icon catalog for both skins. All these additions require SDK `>=0.7.5, <0.8`.
