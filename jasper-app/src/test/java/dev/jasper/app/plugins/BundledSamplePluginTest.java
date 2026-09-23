@@ -34,22 +34,30 @@ class BundledSamplePluginTest {
         onEdt(() -> {
             assertThat(contributions.action("dev.jasper.sample.demo")).get()
                 .satisfies(action -> assertThat(action.icon()).as("an SVG from the plugin's own jar").isNotNull());
-            assertThat(contributions.toolbar()).hasSize(1);
-            assertThat(contributions.panels()).singleElement().satisfies(panel -> assertThat(panel.id()).isEqualTo("dev.jasper.sample.panel"));
+            assertThat(contributions.toolbar()).hasSize(2)
+                .contains(new dev.jasper.app.contributions.ToolbarEntry.Button("dev.jasper.sample.demo"))
+                .anySatisfy(entry -> assertThat(entry).isInstanceOfSatisfying(
+                    dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, dropdown -> {
+                        assertThat(dropdown.title()).isEqualTo("Sessions");
+                        assertThat(dropdown.actionIds()).containsExactly("dev.jasper.remote.sessions.manage");
+                    }));
+            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel");
             assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about");
-            assertThat(contributions.menus().stream()
-                .filter(section -> section.target().equals(dev.jasper.app.contributions.MenuTarget.standard(dev.jasper.app.contributions.MenuTarget.Slot.FILE)))
-                .flatMap(section -> section.entries().stream()).toList())
-                .contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.vault.open"));
-            assertThat(contributions.status()).hasSize(2)
+            assertThat(contributions.menus()).anySatisfy(menu -> {
+                assertThat(menu.target()).isEqualTo(dev.jasper.app.contributions.MenuTarget.standard(
+                    dev.jasper.app.contributions.MenuTarget.Slot.FILE));
+                assertThat(menu.entries()).contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.vault.open"));
+            });
+            assertThat(contributions.status()).hasSize(3)
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
-        assertThat(runtime.get().statusLines()).as("the sample and the three bundled feature plugins").hasSize(4)
+        assertThat(runtime.get().statusLines()).as("the sample and the four bundled feature plugins").hasSize(5)
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.1.0", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.history", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.snippets", "BUNDLED", "ACTIVE"))
-            .anySatisfy(line -> assertThat(line).contains("dev.jasper.vault", "BUNDLED", "ACTIVE"));
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.vault", "BUNDLED", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.remote", "BUNDLED", "ACTIVE"));
         var state = new AtomicReference<BuddyNotice.State>();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (state.get() != BuddyNotice.State.DONE && System.nanoTime() < deadline) {
@@ -66,4 +74,26 @@ class BundledSamplePluginTest {
         onEdt(() -> pending.set(runtime.get().stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
     }
+    @Test void remoteLoadsWithoutTheOptionalVaultPlugin() throws Exception {
+        Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
+        Path remoteOnly = java.nio.file.Files.createDirectories(root.resolve("remote-only"));
+        java.nio.file.Files.createSymbolicLink(remoteOnly.resolve("dev.jasper.remote"), staged.resolve("dev.jasper.remote").toAbsolutePath());
+        var runtime = new AtomicReference<PluginRuntime>();
+        var deck = new BuddyTestSupport();
+        onEdt(() -> {
+            runtime.set(new PluginRuntime(new PluginRuntime.Options(remoteOnly, root.resolve("user"), null, false,
+                root.resolve("plugins.toml"), root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> {}),
+                (key, message) -> {}, new dev.jasper.app.contributions.Contributions(), AppContractTest.headlessWindows(),
+                new dev.jasper.app.terminals.TerminalRegistry()));
+            runtime.get().start(Map.of(), true);
+        });
+        try {
+            assertThat(runtime.get().statusLines()).singleElement().asString().contains("dev.jasper.remote", "ACTIVE");
+        } finally {
+            var pending = new AtomicReference<List<CompletableFuture<?>>>();
+            onEdt(() -> pending.set(runtime.get().stop()));
+            CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        }
+    }
+
 }

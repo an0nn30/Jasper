@@ -122,6 +122,11 @@ sequenceDiagram
     View->>View: RunBuilder, FontSet and painter outside lock
 ```
 
+Window layout resizes settle for 120 ms in `TerminalView` before changing both the emulator
+and the shell grid. This prevents redraws for intermediate widths from interleaving with later
+reflows during a drag. Zero-sized layout is ignored; removing a view cancels pending resize work,
+and reattaching fits the current area. Explicit session resizes and font changes remain immediate.
+
 ## Search and shell events
 
 ```mermaid

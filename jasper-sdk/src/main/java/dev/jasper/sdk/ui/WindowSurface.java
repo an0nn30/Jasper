@@ -8,7 +8,7 @@ import javax.swing.JComponent;
 
 /**
  * What plugin windows and dialogs share. The application owns the frame, title bar, icon, menu bar,
- * theme tracking and saved bounds; the plugin fills the content. UI thread only. {@link #close()}
+ * theme tracking and saved bounds (overlays use their owner’s chrome); the plugin fills the content. UI thread only. {@link #close()}
  * closes at once, without consulting {@link #onClosing} guards, and is idempotent.
  */
 public interface WindowSurface extends Subscription {
@@ -19,10 +19,10 @@ public interface WindowSurface extends Subscription {
      */
     void setContent(JComponent content);
 
-    /** Shows the window. For a modal dialog this returns after the dialog has closed. */
+    /** Shows the surface; overlays return immediately. For a modal dialog this returns after the dialog has closed. */
     void show();
 
-    /** Brings the window to the front, restoring it if minimized. */
+    /** Brings the window to the front, restoring it if minimized; overlays focus their content. */
     void toFront();
 
     /**
@@ -46,7 +46,7 @@ public interface WindowSurface extends Subscription {
     Optional<Path> chooseFile(String title, Optional<Path> initialPath);
 
     /**
-     * Adds a guard consulted when the user tries to close the window. Any guard returning false keeps
+     * Adds a guard consulted when the user tries to close the window. Overlays have no implicit user-close action. Any guard returning false keeps
      * it open; a guard that throws is treated as allowing the close. Quit does not consult guards.
      *
      * @param guard returns whether the window may close

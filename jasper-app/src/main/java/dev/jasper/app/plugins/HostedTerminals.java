@@ -67,6 +67,7 @@ final class HostedTerminals implements Terminals {
 
     private final class Window implements WindowHandle {
         private final UUID id;
+        TerminalRegistry hostRegistry() { return registry; }
         Window(UUID id) { this.id = id; }
         @Override public UUID id() { return id; }
         @Override public List<TabHandle> tabs() {
@@ -176,6 +177,16 @@ final class HostedTerminals implements Terminals {
         @Override public boolean equals(Object other) { return other instanceof PaneHandle handle && handle.id().equals(id); }
         @Override public int hashCode() { return id.hashCode(); }
         @Override public String toString() { return "pane " + id; }
+    }
+
+    boolean ownsOpenWindow(WindowHandle handle) {
+        return handle instanceof Window window && window.hostRegistry() == registry && registry.window(window.id()).isPresent();
+    }
+
+    dev.jasper.app.lifecycle.Subscription onWindowClosed(UUID id, Runnable closed) {
+        return registry.onEvent(event -> {
+            if (event instanceof dev.jasper.app.terminals.TerminalEvent.WindowClosed gone && gone.windowId().equals(id)) closed.run();
+        });
     }
 
     /** A handle for an id an action or a panel was given; the window may already be gone. */

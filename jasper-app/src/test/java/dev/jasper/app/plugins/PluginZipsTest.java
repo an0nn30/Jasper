@@ -16,7 +16,7 @@ class PluginZipsTest {
     @Test void everyInRepoPluginZipStagesWithItsDescriptorAndBundledLibraries() throws Exception {
         List<Path> zips;
         try (var files = Files.list(Path.of(System.getProperty("jasper.pluginZips")))) { zips = files.filter(file -> file.toString().endsWith(".zip")).toList(); }
-        assertThat(zips).as("one zip per plugins/ directory").hasSize(4);
+        assertThat(zips).as("one zip per plugins/ directory").hasSize(5);
         var ids = new ArrayList<String>();
         for (Path zip : zips) {
             PluginInstaller.Staged staged = PluginInstaller.stage(zip, userDirectory, Version.parse(JasperSdk.VERSION));
@@ -28,8 +28,10 @@ class PluginZipsTest {
                 assertThat(jars).as("bundled libraries travel with the plugin").contains("tomlj-1.1.1.jar", "antlr4-runtime-4.11.1.jar");
             else if (descriptor.id().equals("dev.jasper.vault"))
                 assertThat(jars).as("BouncyCastle travels with the vault").contains("bcprov-jdk18on-1.85.2.jar");
+            else if (descriptor.id().equals("dev.jasper.remote"))
+                assertThat(jars).anySatisfy(jar -> assertThat(jar).startsWith("sshd-core-"));
             else assertThat(jars).as(descriptor.id() + " bundles nothing").hasSize(1);
         }
-        assertThat(ids).containsExactlyInAnyOrder("dev.jasper.sample", "dev.jasper.snippets", "dev.jasper.history", "dev.jasper.vault");
+        assertThat(ids).containsExactlyInAnyOrder("dev.jasper.sample", "dev.jasper.snippets", "dev.jasper.history", "dev.jasper.vault", "dev.jasper.remote");
     }
 }

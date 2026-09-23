@@ -58,6 +58,16 @@ final class MetalDefaults {
         }
     }
 
+    static void configureFonts(Font font, float defaultSize) {
+        UIDefaults defaults = UIManager.getLookAndFeelDefaults();
+        for (Object key : defaults.keySet().toArray()) {
+            if (defaults.get(key) instanceof Font original) {
+                float size = Math.max(1f, font.getSize2D() + original.getSize2D() - defaultSize);
+                defaults.put(key, new FontUIResource(font.deriveFont(Font.PLAIN, size)));
+            }
+        }
+    }
+
     static String fontFamily(String osName, Set<String> available) {
         String os = osName.toLowerCase(Locale.ROOT);
         List<String> preferred = os.startsWith("mac")

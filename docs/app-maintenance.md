@@ -212,3 +212,12 @@ then selects the existing OldGNOME2 catalog in retro. Keep both catalogs complet
 an IconName, with standard SVG source hashes/notices. LOCK/UNLOCK match Vault's original
 modern SVG bytes. NamedIconsTest and HostedUiTest verify all meanings, resource ownership,
 foreground changes and source integrity. Keep custom SVG overloads working for branded icons.
+
+## Remote lives in a plugin
+
+SSH is bundled as `dev.jasper.remote` (`plugins/remote`): `hosts` owns the saved model, polling
+and config import; `trust` owns host-key matching; `agent` adapts the agent protocol to MINA;
+`client` owns shared sessions, cancellation, ProxyJump and shell channels; `ui` owns passive Swing
+panels and the palette scope. The plugin consumes only `dev.jasper.vault.api`.
+Run `./gradlew :jasper-plugin-remote:test` for unit and embedded loopback-server tests.
+See [Remote](remote.md) for settings and native acceptance.

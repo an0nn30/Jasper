@@ -36,6 +36,22 @@ public final class AuxiliaryWindows implements AutoCloseable {
         return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.DIALOG, modal, new Dimension(1, 1), null, owner, shells));
     }
 
+    /** Reserves one overlay per terminal owner, including surfaces not shown yet. */
+    public AuxiliarySurface overlay(String title, UUID ownerWindow) {
+        Objects.requireNonNull(ownerWindow);
+        if (open.stream().anyMatch(surface -> surface.kind() == AuxiliarySurface.Kind.OVERLAY
+                && surface.ownerWindow().filter(ownerWindow::equals).isPresent()))
+            throw new IllegalStateException("This window already has an overlay");
+        return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.OVERLAY, false,
+            new Dimension(1, 1), ownerWindow, null, shells));
+    }
+
+    /** Removes terminal-owned surfaces even if they have never been shown. */
+    public void closeOwned(UUID ownerWindow) {
+        for (AuxiliarySurface surface : List.copyOf(open))
+            if (surface.ownerWindow().filter(ownerWindow::equals).isPresent()) surface.close();
+    }
+
     /** Run after a close leaves no surface open; the application uses it to decide whether to exit. */
     public Runnable onAllClosed = () -> { };
     private boolean emptyReported = true;

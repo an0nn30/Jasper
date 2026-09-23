@@ -217,6 +217,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     private boolean paletteKeysDispatch(KeyEvent event) {
+        if (dev.jasper.app.platform.WindowInput.blocked(event.getComponent())) return false;
         boolean tail = false;
         for (WindowContent owner : java.util.List.copyOf(PALETTE_KEY_OWNERS)) {
             tail |= owner.paletteKeys.dispatchTail(event);
@@ -523,6 +524,7 @@ private void refreshTabs() {
     }
 
     boolean dispatchShortcut(KeyStroke stroke, Component source) {
+        if (dev.jasper.app.platform.WindowInput.blocked(source == null ? this : source)) return true;
         if (paletteKeys.dispatchShortcut(stroke, source == null ? this : source)) return true;
         Optional<String> found = bindings.idFor(stroke);
         if (found.isEmpty()) return false;

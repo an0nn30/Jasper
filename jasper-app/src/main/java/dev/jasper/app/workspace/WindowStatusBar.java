@@ -113,7 +113,7 @@ final class WindowStatusBar extends JPanel {
     void applyPalette(Palette next) { palette = java.util.Objects.requireNonNull(next); refreshTheme(); }
     private static java.awt.Font statusFont() {
         var font = UIManager.getFont("Label.font");
-        return dev.jasper.app.platform.SwingAppearance.retro() ? font : font.deriveFont(UIScale.scale(10f));
+        return dev.jasper.app.platform.SwingAppearance.retro() ? font : font.deriveFont(font.getSize2D() - UIScale.scale(2f));
     }
 
     private Color muted() { return UIManager.getColor("Jasper.mutedForeground"); }

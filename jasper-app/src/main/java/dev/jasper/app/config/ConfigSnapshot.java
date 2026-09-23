@@ -15,7 +15,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                       FontConfig font, Appearance variant, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
                       int maxResults, int longCommandSeconds, boolean backgroundEnabled,
-                      Map<String, Map<String, Object>> plugins, ThemeStyle style) {
+                      Map<String, Map<String, Object>> plugins, ThemeStyle style, UiFontConfig uiFont) {
     public ConfigSnapshot {
         if (longCommandSeconds < 0 || longCommandSeconds > 3600)
             throw new IllegalArgumentException("Long-command seconds must be 0\u20133600.");
@@ -25,6 +25,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         if (columns < 5 || columns > 500) throw new IllegalArgumentException("Columns must be 5–500.");
         if (lines < 2 || lines > 200) throw new IllegalArgumentException("Lines must be 2–200.");
         Objects.requireNonNull(font, "font");
+        Objects.requireNonNull(uiFont, "uiFont");
         Objects.requireNonNull(terminal, "terminal");
         Objects.requireNonNull(toolbar, "toolbar");
         Objects.requireNonNull(variant, "variant");
@@ -52,9 +53,31 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                           Map<String, Map<String, Object>> plugins) {
         this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines,
             terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled,
-            plugins, ThemeStyle.MODERN);
+            plugins, ThemeStyle.MODERN, UiFontConfig.defaults());
     }
 
+
+    /** Compatibility constructor for independently introduced appearance settings. */
+    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
+                          FontConfig font, Appearance variant, Map<String, String> keybindings,
+                          int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
+                          int maxResults, int longCommandSeconds, boolean backgroundEnabled,
+                          Map<String, Map<String, Object>> plugins, ThemeStyle style) {
+        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines,
+            terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled,
+            plugins, style, UiFontConfig.defaults());
+    }
+
+    /** Compatibility constructor for independently introduced appearance settings. */
+    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
+                          FontConfig font, Appearance variant, Map<String, String> keybindings,
+                          int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
+                          int maxResults, int longCommandSeconds, boolean backgroundEnabled,
+                          Map<String, Map<String, Object>> plugins, UiFontConfig uiFont) {
+        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines,
+            terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled,
+            plugins, ThemeStyle.MODERN, uiFont);
+    }
 
     /** Every constructor that predates plugin tables: no plugin settings. */
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
@@ -117,6 +140,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private ToolbarMode toolbar;
         private boolean statusBar;
         private FontConfig font;
+        private UiFontConfig uiFont;
         private Appearance variant;
         private ThemeStyle style;
         private Map<String, String> keybindings;
@@ -133,6 +157,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             toolbar = source.toolbar();
             statusBar = source.statusBar();
             font = source.font();
+            uiFont = source.uiFont();
             variant = source.variant();
             style = source.style();
             keybindings = source.keybindings();
@@ -148,6 +173,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder tabHeight(int value) { tabHeight = value; return this; }
         public Builder toolbar(ToolbarMode value) { toolbar = value; return this; }
         public Builder statusBar(boolean value) { statusBar = value; return this; }
+        public Builder uiFont(UiFontConfig value) { uiFont = value; return this; }
         public Builder font(FontConfig value) { font = value; return this; }
         public Builder style(ThemeStyle value) { style = value; return this; }
         public Builder variant(Appearance value) { variant = value; return this; }
@@ -161,7 +187,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder backgroundEnabled(boolean value) { backgroundEnabled = value; return this; }
         public Builder plugins(Map<String, Map<String, Object>> value) { plugins = Map.copyOf(value); return this; }
         public ConfigSnapshot build() {
-            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, style);
+            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, style, uiFont);
         }
     }
 }

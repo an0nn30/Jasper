@@ -1,0 +1,358 @@
+package dev.jasper.remote.client;
+
+import dev.jasper.remote.RemoteSettings;
+import dev.jasper.remote.agent.AgentClient;
+import dev.jasper.remote.agent.FakeAgent;
+import dev.jasper.remote.hosts.Auth;
+import dev.jasper.remote.hosts.RemoteHost;
+import dev.jasper.remote.trust.KnownHosts;
+import dev.jasper.sdk.terminal.TerminalConnection;
+import dev.jasper.vault.api.Credential;
+import dev.jasper.vault.api.Kind;
+import dev.jasper.vault.keygen.KeyAlgorithm;
+import dev.jasper.vault.keygen.KeyGenerator;
+import dev.jasper.vault.model.SshKey;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import org.apache.sshd.common.config.keys.PublicKeyEntry;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+
+class ConnectionsTest {
+    final ExecutorService background = Executors.newCachedThreadPool(Thread.ofPlatform().daemon().name("bg-", 0).factory());
+    final ExecutorService ui = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("ui").factory());
+    final Map<UUID, RemoteHost> hosts = new HashMap<>();
+    final Map<UUID, Credential> credentials = new HashMap<>();
+    final List<HostKeyVerifier.Question> questions = new ArrayList<>();
+    final List<Runnable> scheduled = new ArrayList<>();
+    HostKeyVerifier.Decision decision = HostKeyVerifier.Decision.TRUST;
+    RemoteSettings settings = new RemoteSettings(Duration.ofSeconds(5), Duration.ofSeconds(10), Duration.ZERO, Duration.ZERO, false, true);
+    Connections connections;
+    KnownHosts trust;
+
+    @AfterEach void stop() { if (connections != null) onUi(connections::close); background.shutdownNow(); ui.shutdownNow(); }
+
+    /** Runs on the fake UI thread and waits: the registry is UI-thread-only. */
+    <T> T onUi(java.util.function.Supplier<T> work) { try { return ui.submit(work::get).get(10, TimeUnit.SECONDS); } catch (Exception failure) { throw new IllegalStateException(failure); } }
+    void onUi(Runnable work) { onUi(() -> { work.run(); return null; }); }
+
+    Connections connections(Path dir, Optional<AgentClient> agent) {
+        trust = new KnownHosts(dir.resolve("known_hosts"), Optional.empty());
+        Function<UUID, CompletableFuture<Optional<Credential>>> vault = id -> CompletableFuture.completedFuture(Optional.ofNullable(credentials.get(id)));
+        connections = new Connections(() -> settings, trust, agent, id -> Optional.ofNullable(hosts.get(id)), Optional.of(vault),
+            question -> { questions.add(question); return CompletableFuture.completedFuture(decision); }, background, ui,
+            (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); });
+        return connections;
+    }
+
+    RemoteHost host(String name, int port, String username, Auth auth, Optional<UUID> jump) {
+        RemoteHost host = RemoteHost.create(name, "127.0.0.1", port, username, auth, "", jump);
+        hosts.put(host.id(), host);
+        return host;
+    }
+
+    UUID passwordCredential() {
+        UUID id = UUID.randomUUID();
+        credentials.put(id, new Credential(id, "deploy login", Kind.ACCOUNT_PASSWORD, "deploy", "s3cret".toCharArray(), null, null));
+        return id;
+    }
+
+    Connections.Shell shell(RemoteHost host) { return onUi(() -> connections.shell(host.id(), 100, 30, status -> { })).join(); }
+
+    static String readUntil(TerminalConnection connection, String marker) throws IOException {
+        var out = new StringBuilder();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!out.toString().contains(marker)) {
+            if (System.nanoTime() > deadline) throw new IOException("Timed out waiting for " + marker + " in: " + out);
+            int b = connection.output().read();
+            if (b < 0) throw new IOException("EOF before " + marker + " in: " + out);
+            out.append((char) b);
+        }
+        return out.toString();
+    }
+
+    static void type(TerminalConnection connection, String text) throws IOException { connection.input().write(text.getBytes(StandardCharsets.UTF_8)); connection.input().flush(); }
+
+    static String failure(CompletableFuture<?> future) {
+        try { future.get(15, TimeUnit.SECONDS); return "no failure"; }
+        catch (java.util.concurrent.ExecutionException failure) { return failure.getCause().getMessage(); }
+        catch (Exception other) { return other.toString(); }
+    }
+
+    @Test void passwordAuthOpensAShellThatEchoesResizesAndExits(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            RemoteHost host = host("prod", server.port(), "", new Auth.Vault(passwordCredential()), Optional.empty());
+            List<String> statuses = new ArrayList<>();
+            CompletableFuture<Connections.Shell> future = onUi(() -> connections.shell(host.id(), 100, 30, statuses::add));
+            Connections.Shell shell = future.get(15, TimeUnit.SECONDS);
+            TerminalConnection connection = shell.connection();
+            assertThat(readUntil(connection, "\r\n")).isEqualTo("READY xterm-256color 100x30\r\n");
+            assertThat(statuses).containsSubsequence("Connecting…", "Authenticating…", "Opening shell…");
+            assertThat(questions).as("an unknown host key was trusted").hasSize(1);
+            assertThat(questions.getFirst().fingerprint()).isEqualTo(KnownHosts.fingerprint(server.hostPublicKey()));
+            assertThat(Files.readString(dir.resolve("known_hosts"))).contains("[127.0.0.1]:" + server.port() + " ");
+            type(connection, "hi");
+            assertThat(readUntil(connection, "hi")).endsWith("hi");
+            connection.resize().accept(120, 40);
+            assertThat(readUntil(connection, "\r\n")).contains("WINCH 120x40");
+            assertThat(onUi(connections::channelCount)).isEqualTo(1);
+            assertThat(onUi(() -> connections.connected(host.id()))).isTrue();
+            type(connection, "q");
+            assertThat(connection.exited().get(10, TimeUnit.SECONDS)).isEqualTo(7);
+            assertThat(onUi(connections::channelCount)).as("remote exit releases its channel").isZero();
+            connection.close().run();
+            assertThat(onUi(connections::channelCount)).isZero();
+            assertThat(scheduled).as("linger scheduled after the last channel").hasSize(1);
+            onUi(scheduled.getFirst());
+            Thread.sleep(200);
+            assertThat(onUi(() -> connections.connected(host.id()))).isFalse();
+            assertThat(credentials.values()).allSatisfy(credential -> assertThatThrownBy(credential::password).as("closed after use").isInstanceOf(IllegalStateException.class));
+        }
+    }
+
+    @Test void keyAuthUsesTheVaultKeyFileAndSharesOneSession(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            SshKey generated = new KeyGenerator(dir.resolve("keys")).generate(KeyAlgorithm.ED25519, "test", "t");
+            server.allow(PublicKeyEntry.parsePublicKeyEntry(Files.readString(generated.publicPath()).strip()).resolvePublicKey(null, null, null));
+            connections(dir, Optional.empty());
+            UUID id = UUID.randomUUID();
+            credentials.put(id, new Credential(id, "key", Kind.SSH_KEY, null, null, generated.privatePath(), null));
+            RemoteHost host = host("keyed", server.port(), "deploy", new Auth.Vault(id), Optional.empty());
+            Connections.Shell first = shell(host), second = shell(host);
+            assertThat(readUntil(first.connection(), "\r\n")).startsWith("READY");
+            assertThat(readUntil(second.connection(), "\r\n")).startsWith("READY");
+            assertThat(onUi(connections::channelCount)).isEqualTo(2);
+            assertThat(questions).as("the same host key is asked about once").hasSize(1);
+            first.connection().close().run();
+            assertThat(scheduled).as("no linger while a channel remains").isEmpty();
+            server.close();
+            assertThat(failure(second.connection().exited())).contains("connection lost");
+            Thread.sleep(200);
+            assertThat(onUi(() -> connections.connected(host.id()))).isFalse();
+        }
+    }
+
+    @Test void agentAuthSignsThroughTheAgent(@TempDir Path dir) throws Exception {
+        assumeFalse(System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win"));
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA"); generator.initialize(2048);
+        KeyPair pair = generator.generateKeyPair();
+        Path socket = Path.of("/tmp", "jasper-agent-" + UUID.randomUUID());
+        try (var server = new LoopbackServer(); var agent = new FakeAgent(pair)) {
+            agent.serveUnixSocket(socket);
+            server.allow(pair.getPublic());
+            connections(dir, AgentClient.forEnvironment(Map.of("SSH_AUTH_SOCK", socket.toString()), "Linux"));
+            RemoteHost host = host("agent", server.port(), "deploy", Auth.AGENT, Optional.empty());
+            assertThat(readUntil(shell(host).connection(), "\r\n")).startsWith("READY");
+            assertThat(agent.flagsSeen).isNotEmpty();
+        }
+        connections(dir, Optional.empty());
+        RemoteHost noAgent = host("noagent", 1, "deploy", Auth.AGENT, Optional.empty());
+        assertThat(failure(onUi(() -> connections.shell(noAgent.id(), 80, 24, s -> { })))).isEqualTo("SSH agent not available");
+    }
+
+    @Test void hostKeyDecisionsAndChangesAreEnforced(@TempDir Path dir) throws Exception {
+        int port;
+        try (var server = new LoopbackServer()) {
+            port = server.port();
+            connections(dir, Optional.empty());
+            RemoteHost host = host("prod", port, "", new Auth.Vault(passwordCredential()), Optional.empty());
+            decision = HostKeyVerifier.Decision.CANCEL;
+            assertThat(failure(onUi(() -> connections.shell(host.id(), 80, 24, s -> { })))).isEqualTo("Host key not trusted");
+            credentials.put(((Auth.Vault) host.auth()).credentialId(), new Credential(UUID.randomUUID(), "login", Kind.ACCOUNT_PASSWORD, "deploy", "s3cret".toCharArray(), null, null));
+            decision = HostKeyVerifier.Decision.ONCE;
+            assertThat(readUntil(shell(host).connection(), "\r\n")).startsWith("READY");
+            assertThat(dir.resolve("known_hosts")).doesNotExist();
+            onUi(connections::close);
+            connections(dir, Optional.empty());
+            credentials.put(((Auth.Vault) host.auth()).credentialId(), new Credential(UUID.randomUUID(), "login", Kind.ACCOUNT_PASSWORD, "deploy", "s3cret".toCharArray(), null, null));
+            decision = HostKeyVerifier.Decision.TRUST;
+            assertThat(readUntil(shell(host).connection(), "\r\n")).startsWith("READY");
+            assertThat(questions).hasSize(3);
+            onUi(connections::close);
+        }
+        try (var replaced = new LoopbackServer(port)) {
+            connections(dir, Optional.empty());
+            RemoteHost host = host("prod", port, "", new Auth.Vault(passwordCredential()), Optional.empty());
+            assertThat(failure(onUi(() -> connections.shell(host.id(), 80, 24, s -> { })))).startsWith("Host key rejected: fingerprint changed");
+            assertThat(questions).as("a changed key never prompts").hasSize(3);
+        }
+    }
+
+    @Test void failuresHaveTheSpecsMessages(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            UUID wrong = UUID.randomUUID();
+            credentials.put(wrong, new Credential(wrong, "bad", Kind.ACCOUNT_PASSWORD, "deploy", "nope".toCharArray(), null, null));
+            assertThat(failure(onUi(() -> connections.shell(host("bad", server.port(), "", new Auth.Vault(wrong), Optional.empty()).id(), 80, 24, s -> { })))).isEqualTo("Authentication failed (tried password)");
+            assertThat(failure(onUi(() -> connections.shell(host("denied", server.port(), "", new Auth.Vault(UUID.randomUUID()), Optional.empty()).id(), 80, 24, s -> { })))).isEqualTo("Credential denied");
+            RemoteHost unresolvable = RemoteHost.create("nowhere", "no-such-host.invalid", 22, "u", new Auth.Vault(passwordCredential()), "", Optional.empty());
+            hosts.put(unresolvable.id(), unresolvable);
+            assertThat(failure(onUi(() -> connections.shell(unresolvable.id(), 80, 24, s -> { })))).isEqualTo("Could not resolve host no-such-host.invalid");
+            int closed; try (var probe = new ServerSocket(0)) { closed = probe.getLocalPort(); }
+            assertThat(failure(onUi(() -> connections.shell(host("refused", closed, "deploy", new Auth.Vault(passwordCredential()), Optional.empty()).id(), 80, 24, s -> { })))).isEqualTo("Connection refused");
+            assertThat(failure(onUi(() -> connections.shell(UUID.randomUUID(), 80, 24, s -> { })))).isEqualTo("Host not found");
+        }
+    }
+
+    @Test void cancellingDuringConnectLeavesNothingBehind(@TempDir Path dir) throws Exception {
+        try (var silent = new ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress())) {
+            connections(dir, Optional.empty());
+            RemoteHost host = host("silent", silent.getLocalPort(), "", new Auth.Vault(passwordCredential()), Optional.empty());
+            CompletableFuture<Connections.Shell> future = onUi(() -> connections.shell(host.id(), 80, 24, s -> { }));
+            Thread.sleep(300);
+            future.cancel(true);
+            Thread.sleep(300);
+            assertThat(onUi(() -> connections.connected(host.id()))).isFalse();
+            assertThat(onUi(connections::channelCount)).isZero();
+        }
+    }
+
+    @Test void proxyJumpGoesThroughTheJumpHostsSharedSession(@TempDir Path dir) throws Exception {
+        try (var bastion = new LoopbackServer(); var target = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            RemoteHost jump = host("bastion", bastion.port(), "", new Auth.Vault(passwordCredential()), Optional.empty());
+            RemoteHost inner = host("inner", target.port(), "", new Auth.Vault(passwordCredential()), Optional.of(jump.id()));
+            assertThat(readUntil(shell(inner).connection(), "\r\n")).startsWith("READY");
+            assertThat(onUi(() -> connections.connected(jump.id()))).as("the jump session is shared and kept").isTrue();
+            assertThat(questions).extracting(HostKeyVerifier.Question::port).containsExactly(bastion.port(), target.port());
+            assertThat(readUntil(shell(jump).connection(), "\r\n")).startsWith("READY");
+            assertThat(questions).as("no new prompt for the shared jump session").hasSize(2);
+        }
+    }
+    @Test void cancellingWithdrawsVaultRequest(@TempDir Path dir) throws Exception {
+        var pending = new CompletableFuture<Optional<Credential>>();
+        connections = new Connections(() -> settings, new KnownHosts(dir.resolve("known_hosts"), Optional.empty()), Optional.empty(),
+            id -> Optional.ofNullable(hosts.get(id)), Optional.of(id -> pending), q -> CompletableFuture.completedFuture(decision), background, ui,
+            (delay, task) -> () -> {});
+        RemoteHost target = host("waiting", 22, "u", new Auth.Vault(UUID.randomUUID()), Optional.empty());
+        var future = onUi(() -> connections.shell(target.id(), 80, 24, status -> {}));
+        onUi(() -> future.cancel(true));
+        onUi(() -> {});
+        assertThat(pending).isCancelled();
+    }
+
+    @Test void callbacksUseUiAndJumpReleasesAfterLastShell(@TempDir Path dir) throws Exception {
+        try (var bastion = new LoopbackServer(); var target = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            RemoteHost jump = host("jump", bastion.port(), "", new Auth.Vault(passwordCredential()), Optional.empty());
+            RemoteHost inner = host("inner", target.port(), "", new Auth.Vault(passwordCredential()), Optional.of(jump.id()));
+            var threads = new java.util.concurrent.CopyOnWriteArrayList<String>();
+            var shell = onUi(() -> connections.shell(inner.id(), 80, 24, status -> threads.add(Thread.currentThread().getName()))).get(15, TimeUnit.SECONDS);
+            assertThat(threads).allMatch(name -> name.equals("ui"));
+            shell.connection().close().run();
+            onUi(() -> {});
+            onUi(scheduled.getFirst());
+            onUi(() -> {});
+            assertThat(scheduled).as("jump also becomes idle after its dependent closes").isNotEmpty();
+            onUi(() -> { for (Runnable task : List.copyOf(scheduled)) task.run(); });
+            onUi(() -> {});
+            assertThat(onUi(() -> connections.connected(jump.id()))).isFalse();
+        }
+    }
+
+    @Test void cyclicJumpFailsPromptly(@TempDir Path dir) {
+        connections(dir, Optional.empty());
+        RemoteHost a = host("a", 22, "u", new Auth.Vault(passwordCredential()), Optional.empty());
+        RemoteHost b = host("b", 22, "u", new Auth.Vault(passwordCredential()), Optional.of(a.id()));
+        hosts.put(a.id(), a.withEdited("a", "127.0.0.1", 22, "u", a.auth(), "", Optional.of(b.id())));
+        assertThat(failure(onUi(() -> connections.shell(a.id(), 80, 24, status -> {})))).contains("jump host");
+    }
+
+    @Test void passphraseProtectedVaultKeyAuthenticates(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            char[] passphrase = "test Unicode \u03c0 passphrase".toCharArray();
+            SshKey generated = new KeyGenerator(dir.resolve("keys")).generate(KeyAlgorithm.ED25519, "encrypted", "test", passphrase);
+            server.allow(PublicKeyEntry.parsePublicKeyEntry(Files.readString(generated.publicPath()).strip()).resolvePublicKey(null, null, null));
+            connections(dir, Optional.empty());
+            UUID id = UUID.randomUUID();
+            credentials.put(id, new Credential(id, "encrypted", Kind.SSH_KEY, null, null, generated.privatePath(), passphrase));
+            RemoteHost target = host("encrypted", server.port(), "deploy", new Auth.Vault(id), Optional.empty());
+            assertThat(readUntil(shell(target).connection(), "\r\n")).startsWith("READY");
+            assertThat(passphrase).containsOnly((char) 0);
+        }
+    }
+
+    @Test void inspectsOperatingSystemOnAnExistingSessionWithoutOpeningAnotherShell(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.execReplies(Map.of("uname -s", "Linux\n", "cat /etc/os-release", "NAME=Ubuntu\nPRETTY_NAME=\"Ubuntu 24.04 LTS\"\n"));
+            connections(dir, Optional.empty());
+            var host = host("linux", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = shell(host);
+            var info = onUi(() -> connections.inspect(shell)).get(5, TimeUnit.SECONDS);
+            assertThat(info.os()).isEqualTo("Ubuntu 24.04 LTS");
+            assertThat(info.address()).isEqualTo("127.0.0.1");
+            assertThat(onUi(connections::channelCount)).isEqualTo(1);
+            assertThat(server.execCommands).containsExactly("uname -s", "cat /etc/os-release");
+            onUi(() -> connections.inspect(shell)).get(5, TimeUnit.SECONDS);
+            assertThat(server.execCommands).hasSize(2);
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void unavailableHostInformationDoesNotBreakTheShell(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("unknown", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = shell(host);
+            var info = onUi(() -> connections.inspect(shell)).get(5, TimeUnit.SECONDS);
+            assertThat(info.os()).isEmpty();
+            assertThat(shell.connection().exited()).isNotDone();
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void silentMetadataCommandTimesOutWithoutBlockingOrClosingTheShell(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.execReplies(Map.of(), false);
+            connections(dir, Optional.empty());
+            var host = host("silent", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = shell(host);
+            var info = onUi(() -> connections.inspect(shell)).get(6, TimeUnit.SECONDS);
+            assertThat(info.os()).isEmpty();
+            assertThat(shell.connection().exited()).isNotDone();
+            assertThat(onUi(connections::channelCount)).isEqualTo(1);
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void inspectionKeepsTheAuthenticatedEndpointWhenSavedHostChanges(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.execReplies(Map.of("uname -s", "Darwin\n"));
+            connections(dir, Optional.empty());
+            var original = host("mac", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = shell(original);
+            var changed = original.withEdited("new", "different.example", 22, "deploy", original.auth(), "", Optional.empty());
+            onUi(() -> hosts.put(original.id(), changed));
+            assertThat(shell.host()).isEqualTo(original);
+            var info = onUi(() -> connections.inspect(shell)).get(5, TimeUnit.SECONDS);
+            var cache = new dev.jasper.remote.hosts.HostInfoCache(dir.resolve("facts.properties"));
+            cache.put(shell.host(), info);
+            assertThat(cache.get(original).os()).isEqualTo("macOS");
+            assertThat(cache.get(changed).os()).isEmpty();
+            shell.connection().close().run();
+        }
+    }
+
+}

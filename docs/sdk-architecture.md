@@ -247,3 +247,16 @@ OldGNOME2 raster using the running skin, never the plugin loader. The old custom
 remain supported. Vault uses semantic LOCK/UNLOCK in its status/menu and manager controls.
 The fake returns inspectable FakeNamedIcon(name, retro); older custom Appearance implementations
 inherit an explicit UnsupportedOperationException for this method until they implement it.
+
+SDK 0.7.2 adds `Panels.toggle(panelId, window)` for a plugin's own registered panel.
+It dispatches the same per-window lazy toggle as the rail; the app and testkit both
+reuse the panel instance after hiding it. Remote requires this version so its SSH
+Hosts menu/status action opens the panel even before its rail icon has been used.
+
+SDK 0.7.3 adds `Windows.overlay(OverlaySpec)`, returning a `PluginDialog` lifetime/content handle
+without creating a native dialog. HostedUi validates the terminal owner and AuxiliaryWindows reserves
+one overlay per window across plugins. WindowOverlay mounts in the root layered pane, contains
+focus/input, centers and bounds content, and removes its listeners on close. NativeShells supplies
+the owner root and file-picker ownership; workspace shortcut dispatch honors the shared root marker.
+Owner removal closes even unshown overlays; plugin stop closes all its surfaces. Escape/outside clicks
+never request closure. Host-owned fonts refresh overlay content with the rest of the root.

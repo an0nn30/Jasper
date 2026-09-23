@@ -46,7 +46,8 @@ public final class ConfigLoader {
         Map.entry(List.of("palette", "scopes"), Set.of()),
         Map.entry(List.of("window"), Set.of("tab_height", "toolbar", "status_bar", "columns", "lines")),
         Map.entry(List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height")),
-        Map.entry(List.of("ui"), Set.of("theme")),
+        Map.entry(List.of("ui"), Set.of("theme", "font")),
+        Map.entry(List.of("ui", "font"), Set.of("family", "size")),
         Map.entry(List.of("ui", "theme"), Set.of("variant", "style")),
         Map.entry(List.of("terminal"), Set.of("shell", "env", "scrollback", "option_as_meta", "cursor",
             "dim_inactive_panes", "copy_on_select", "bell", "on_exit", "shell_integration")),
@@ -69,6 +70,8 @@ public final class ConfigLoader {
     private int lines = 45;
     private String fontFamily = FontConfig.defaults().family();
     private float fontSize = 16f;
+    private String uiFontFamily = UiFontConfig.defaults().family();
+    private float uiFontSize;
     private List<String> fallback = FontConfig.defaults().fallback();
     private boolean ligatures = true;
     private float lineHeight = 1f;
@@ -113,7 +116,7 @@ public final class ConfigLoader {
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, style);
+                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, style, new UiFontConfig(uiFontFamily, uiFontSize));
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -209,6 +212,9 @@ public final class ConfigLoader {
             case "notifications.long_command_seconds" ->
                 longCommandSeconds = integer(path, value, 0, 3600, longCommandSeconds);
             case "palette.max_results" -> maxResults = integer(path, value, PaletteSettings.MIN_MAX_RESULTS, PaletteSettings.MAX_MAX_RESULTS, maxResults);
+            case "ui.font.family" -> uiFontFamily = string(path, value, ConfigLoader::fontName,
+                "Use a nonblank font name without NUL; using the default.", uiFontFamily);
+            case "ui.font.size" -> uiFontSize = number(path, value, 8, 32, uiFontSize);
             case "font.family" -> fontFamily = string(path, value, ConfigLoader::fontName,
                 "Use a nonblank font name without NUL; using the default.", fontFamily);
             case "font.size" -> fontSize = number(path, value, 6, 72, fontSize);

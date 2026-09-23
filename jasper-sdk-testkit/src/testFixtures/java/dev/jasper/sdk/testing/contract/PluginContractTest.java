@@ -105,6 +105,48 @@ public abstract class PluginContractTest {
         return context.get();
     }
 
+    @Test void pluginStopClosesOverlaysAndExplicitCloseReleasesTheirReservation() {
+        var context = started("test.overlay", Set.of());
+        UUID window = h.addTerminalWindow();
+        var closed = new AtomicInteger();
+        h.ui(() -> {
+            var owner = context.terminals().window(window).orElseThrow();
+            var first = context.windows().overlay(new dev.jasper.sdk.ui.OverlaySpec("First", owner));
+            first.onClosed(closed::incrementAndGet); first.show(); first.close(); first.close();
+            var second = context.windows().overlay(new dev.jasper.sdk.ui.OverlaySpec("Second", owner));
+            second.onClosed(closed::incrementAndGet); second.show();
+        });
+        assertThat(closed.get()).isEqualTo(1);
+        h.stopAll(); h.flush();
+        assertThat(closed.get()).isEqualTo(2);
+        assertThat(h.windows()).isEmpty();
+    }
+
+    @Test void overlaysReserveAnOwnerAcrossPluginsAndCloseWithTheOwner() {
+        var first = new AtomicReference<PluginContext>();
+        var second = new AtomicReference<PluginContext>();
+        h.start(new PluginInfo("test.overlay1", "First", "1.0.0", Set.of()), Set.of(), Set.of(), first::set);
+        h.start(new PluginInfo("test.overlay2", "Second", "1.0.0", Set.of()), Set.of(), Set.of(), second::set);
+        UUID window = h.addTerminalWindow();
+        UUID tab = h.addTerminalTab(window, "local");
+        UUID pane = h.addTerminalPane(tab, "shell", Path.of("/"));
+        var closed = new AtomicInteger();
+        var ownerRef = new AtomicReference<dev.jasper.sdk.terminal.WindowHandle>();
+        h.ui(() -> {
+            var owner = first.get().terminals().window(window).orElseThrow();
+            ownerRef.set(owner);
+            var overlay = first.get().windows().overlay(new dev.jasper.sdk.ui.OverlaySpec("Connecting", owner));
+            overlay.onClosed(closed::incrementAndGet);
+            assertThatIllegalStateException().isThrownBy(() -> second.get().windows().overlay(
+                new dev.jasper.sdk.ui.OverlaySpec("Other", second.get().terminals().window(window).orElseThrow())));
+        });
+        h.closeTerminalPane(pane); h.flush();
+        assertThat(closed.get()).isEqualTo(1);
+        assertThat(h.windows()).isEmpty();
+        h.ui(() -> assertThatIllegalArgumentException().isThrownBy(() -> first.get().windows().overlay(
+            new dev.jasper.sdk.ui.OverlaySpec("Closed", ownerRef.get()))));
+    }
+
     @Test void deliveryIsQueuedOrderedAndNeverReentrant() {
         List<String> seen = Collections.synchronizedList(new ArrayList<>());
         var alpha = new AtomicReference<PluginContext>();

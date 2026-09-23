@@ -20,6 +20,7 @@ import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.OverlaySpec;
 import dev.jasper.sdk.ui.Menus;
 import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.Panels;
@@ -227,7 +228,8 @@ final class HostedUi {
     private Subscription wrap(dev.jasper.app.lifecycle.Subscription registration) { return subscription(registration::close); }
 
     Panels panels() {
-        return (spec, factory) -> {
+        return new Panels() {
+          @Override public Subscription register(dev.jasper.sdk.ui.PanelSpec spec, dev.jasper.sdk.ui.PanelFactory factory) {
             guard("register");
             java.util.Objects.requireNonNull(factory, "factory");
             requireNamespace(spec.id(), "A panel");
@@ -237,6 +239,14 @@ final class HostedUi {
                 return built[0];
             });
             return tracked(entry::close);
+          }
+          @Override public void toggle(String panelId, WindowHandle window) {
+            guard("toggle");
+            requireNamespace(panelId, "A panel");
+            if (model.panels().stream().noneMatch(panel -> panel.id().equals(panelId)))
+                throw new IllegalArgumentException("Panel not registered: " + panelId);
+            model.requestPanel(new Contributions.PanelRequest(window.id(), panelId, Contributions.PanelRequest.Op.TOGGLE));
+          }
         };
     }
 
@@ -311,6 +321,16 @@ final class HostedUi {
                 surface.onClosed(() -> ownedWindows.remove(surface));
                 closers.add(surface::close);
                 return window;
+            }
+            @Override public PluginDialog overlay(OverlaySpec spec) {
+                guard("overlay");
+                if (!terminals.ownsOpenWindow(spec.owner()))
+                    throw new IllegalArgumentException("An overlay needs an open terminal window from this host");
+                AuxiliarySurface surface = windows.overlay(spec.title(), spec.owner().id());
+                var ownerClosed = terminals.onWindowClosed(spec.owner().id(), () -> windows.closeOwned(spec.owner().id()));
+                surface.onClosed(ownerClosed::close);
+                closers.add(surface::close);
+                return new OwnedDialog(surface);
             }
             @Override public PluginDialog dialog(DialogSpec spec) {
                 guard("dialog");

@@ -53,7 +53,7 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         this.themes = themes; this.service = service; this.editor = editor;
         state = service.initialState();
-        themes.configure(state.snapshot().variant());
+        themes.configure(state.snapshot().variant(), state.snapshot().uiFont());
         service.start(this::accept);
     }
 
@@ -97,7 +97,7 @@ final class ConfigurationController implements AutoCloseable {
     void accept(ConfigService.State next) {
         requireEdt();
         if (closed) return;
-        try { themes.configure(next.snapshot().variant()); }
+        try { themes.configure(next.snapshot().variant(), next.snapshot().uiFont()); }
         catch (ThemeController.InstallationFailure failure) {
             for (WindowContent owner : List.copyOf(owners)) owner.onError.accept(failure.getMessage());
         }

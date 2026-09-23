@@ -159,7 +159,7 @@ class VaultPluginTest {
             assertThat(VaultSettings.read(context.config(), context.dataDirectory()).keysDirectory()).isEqualTo(context.dataDirectory().resolve("keys"));
         }
     }
-    @Test void thePadlockFollowsTheLockStateAndTheRailOpensTheVault() {
+    @Test void thePadlockFollowsTheLockStateAndTheFileMenuOpensTheVault() {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin);

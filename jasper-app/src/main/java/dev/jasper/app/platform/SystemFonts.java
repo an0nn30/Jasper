@@ -26,6 +26,14 @@ public final class SystemFonts {
         return label != null ? label.deriveFont(style, size) : new Font(Font.SANS_SERIF, style, (int) size);
     }
 
+    /** App chrome follows UI typography while retaining the native title font by default. */
+    public static Font ui(int style, float logicalSize) {
+        Font label = UIManager.getFont("Label.font");
+        float size = label.getSize2D() + com.formdev.flatlaf.util.UIScale.scale(logicalSize - 12f);
+        return Boolean.TRUE.equals(UIManager.get("Jasper.uiFontFamilyOverride"))
+            ? label.deriveFont(style, size) : system(style, size);
+    }
+
     /**
      * Null unless the request actually resolved. Java never fails a font lookup — it answers with
      * Dialog — so the resolved family is the only honest evidence that the name exists.

@@ -72,4 +72,21 @@ class FakePanelsAndWindowsTest {
             assertThatIllegalArgumentException().isThrownBy(() -> context.windows().dialog(new DialogSpec("Late", manager, true)));
         }
     }
+    @Test void toggleCreatesLazilyThenReusesAndHidesTheWindowPanel() {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin -> {});
+            List<PanelHost> instances = new ArrayList<>();
+            context.panels().register(new PanelSpec("dev.x.tool.hosts", "Hosts", new ImageIcon(), Anchor.LEFT), panel -> { instances.add(panel); return new JLabel("Hosts"); });
+            UUID id = host.addTerminalWindow();
+            var window = context.terminals().windows().getFirst();
+            context.panels().toggle("dev.x.tool.hosts", window);
+            assertThat(instances).singleElement().satisfies(panel -> assertThat(panel.visible()).isTrue());
+            context.panels().toggle("dev.x.tool.hosts", window);
+            assertThat(instances).singleElement().satisfies(panel -> assertThat(panel.visible()).isFalse());
+            context.panels().toggle("dev.x.tool.hosts", window);
+            assertThat(instances).singleElement().satisfies(panel -> assertThat(panel.visible()).isTrue());
+            assertThatIllegalArgumentException().isThrownBy(() -> context.panels().toggle("dev.other.panel", window));
+        }
+    }
+
 }

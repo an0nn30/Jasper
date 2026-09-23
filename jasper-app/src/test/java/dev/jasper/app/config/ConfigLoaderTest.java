@@ -18,6 +18,19 @@ class ConfigLoaderTest {
     private static final Path FILE = Path.of("/fixture/config.toml");
     private ConfigLoader.Result parse(String text) { return ConfigLoader.parse(FILE, text, true); }
 
+    @Test void uiTypographyIsIndependentOfTerminalFontAndSurvivesBuilderCopies() {
+        var result = parse("ui.font.family='Serif'\nui.font.size=18.5\nfont.size=23");
+        assertThat(result.diagnostics()).isEmpty();
+        assertThat(result.snapshot().uiFont()).isEqualTo(new UiFontConfig("Serif", 18.5f));
+        assertThat(result.snapshot().fontSize()).isEqualTo(23);
+        assertThat(result.snapshot().toBuilder().columns(80).build().uiFont()).isEqualTo(result.snapshot().uiFont());
+        for (String invalid : new String[]{"ui.font.size=7", "ui.font.size=33", "ui.font.size=nan", "ui.font.family=' '"}) {
+            var bad = parse(invalid);
+            assertThat(bad.diagnostics()).hasSize(1);
+            assertThat(bad.snapshot().uiFont()).isEqualTo(UiFontConfig.defaults());
+        }
+    }
+
     @Test void themeVariantDefaultsToDarkAndAcceptsLight() {
         var path = Path.of("config.toml");
         assertThat(ConfigLoader.parse(path, "", true).snapshot().variant()).isEqualTo(Appearance.DARK);
