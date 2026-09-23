@@ -29,8 +29,10 @@ final class WindowStatusBar extends JPanel {
 
     WindowStatusBar() {
         super(null);
-        configButton.setBorder(BorderFactory.createEmptyBorder());
-        configButton.setContentAreaFilled(false); configButton.setOpaque(false);
+        if (!dev.jasper.app.platform.SwingAppearance.retro()) {
+            configButton.setBorder(BorderFactory.createEmptyBorder());
+            configButton.setContentAreaFilled(false); configButton.setOpaque(false);
+        }
         configButton.setEnabled(false); configButton.putClientProperty("html.disable", true);
         configButton.addActionListener(event -> onConfigurationDetails.run());
         add(left); add(leftItems); add(rightItems); add(right); refreshTheme();
@@ -82,7 +84,9 @@ final class WindowStatusBar extends JPanel {
         for (StatusEntry entry : entries) {
             if (!entry.visible()) continue;
             var item = new JButton(entry.text(), entry.icon());
-            item.setBorder(BorderFactory.createEmptyBorder()); item.setContentAreaFilled(false); item.setOpaque(false);
+            if (!dev.jasper.app.platform.SwingAppearance.retro()) {
+                item.setBorder(BorderFactory.createEmptyBorder()); item.setContentAreaFilled(false); item.setOpaque(false);
+            }
             item.setFocusable(false); item.putClientProperty("html.disable", true);
             item.setIconTextGap(UIScale.scale(5));
             item.setToolTipText(entry.tooltip());
@@ -111,14 +115,19 @@ final class WindowStatusBar extends JPanel {
     JButton configButton() { return configButton; }
     String getText() { return text; }
     void applyPalette(Palette next) { palette = java.util.Objects.requireNonNull(next); refreshTheme(); }
+    private static java.awt.Font statusFont() {
+    var font = UIManager.getFont("Label.font");
+    return dev.jasper.app.platform.SwingAppearance.retro() ? font : font.deriveFont(UIScale.scale(10f));
+}
+
     private Color muted() { return UIManager.getColor("Jasper.mutedForeground"); }
     void refreshTheme() {
-        setBackground(palette.background());
+        setBackground(dev.jasper.app.platform.SwingAppearance.retro() ? UIManager.getColor("Panel.background") : palette.background());
         left.refreshTheme(); right.refreshTheme();
         for (Box row : new Box[]{leftItems, rightItems})
             for (Component child : row.getComponents()) if (child instanceof JButton item) {
                 item.setForeground(muted());
-                item.setFont(UIManager.getFont("Label.font").deriveFont(UIScale.scale(10f)));
+                item.setFont(dev.jasper.app.platform.SwingAppearance.retro() ? UIManager.getFont("Button.font") : statusFont());
             }
         configButton.setForeground(UIManager.getColor(configColor));
     }
@@ -141,12 +150,12 @@ final class WindowStatusBar extends JPanel {
         void refreshTheme() {
             for (JComponent label : new JComponent[]{first, slash, last}) {
                 label.setForeground(label == slash ? UIManager.getColor("Separator.foreground") : muted());
-                label.setFont(UIManager.getFont("Label.font").deriveFont(UIScale.scale(10f)));
+                label.setFont(dev.jasper.app.platform.SwingAppearance.retro() && label instanceof JButton ? UIManager.getFont("Button.font") : statusFont());
             }
         }
         @Override public Dimension getPreferredSize() {
             return new Dimension(first.getPreferredSize().width + (slash.isVisible() ? UIScale.scale(28) : 0)
-                + last.getPreferredSize().width, UIScale.scale(30));
+                + last.getPreferredSize().width, Math.max(UIScale.scale(30), Math.max(first.getPreferredSize().height, last.getPreferredSize().height)));
         }
         @Override public void doLayout() {
             int firstWidth = Math.min(getWidth(), first.getPreferredSize().width);

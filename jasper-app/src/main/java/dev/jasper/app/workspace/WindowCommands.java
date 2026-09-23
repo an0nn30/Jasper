@@ -101,8 +101,13 @@ final class WindowCommands implements AutoCloseable {
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);
         for (var mode : ToolbarMode.values())
             view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)).putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
-        for (var appearance : Appearance.values())
-            view("view.appearance." + appearance.name().toLowerCase(java.util.Locale.ROOT)).putValue(Action.SELECTED_KEY, owner.appearance() == appearance);
+for (var appearance : Appearance.values()) {
+    var action = view("view.appearance." + appearance.name().toLowerCase(java.util.Locale.ROOT));
+    action.putValue(Action.SELECTED_KEY, owner.appearance() == appearance);
+    action.setEnabled(!owner.retro());
+}
+view("view.tab_height").setEnabled(!owner.retro());
+
     }
 
     @Override public void close() {
