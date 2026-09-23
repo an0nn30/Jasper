@@ -1,6 +1,6 @@
 # SDK icons for modern and retro appearance
 
-**Status:** API direction approved by the user on 2026-09-23. Written specification awaiting review. No implementation has started.
+**Status:** API direction approved by the user on 2026-09-23. Written specification approved; user requested implementation plan and native execution. See [plan](../plans/2026-09-23-jasper-sdk-skin-icons.md).
 
 ## Purpose and scope
 
