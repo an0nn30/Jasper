@@ -76,6 +76,19 @@ public domain. JDK multi-resolution ImageIcons retain stock Metal disabled rende
 Targeted icon/resource, disabled-state, toolbar/tab tests and installDist passed. Inspected
 the enabled toolbar preview and workspace render. No native GUI launch, merge or push.
 
+### Retro toolbar captions — 2026-09-23
+
+Following the user's MobaXTerm reference, retro toolbar icons are now 32 logical pixels
+with centered labels underneath and flat buttons. Standard Metal font/disabled behavior
+remain intact. Built-in controls and contributed buttons/dropdowns use the same caption
+placement; plugin-owned artwork remains unchanged. Icon-only mode is shorter, hidden mode
+still hides the bar, and narrow windows compact labels then restore them when widened.
+Modern toolbar presentation and tab-close controls are unchanged. No new assets/dependencies.
+
+Verified targeted toolbar actions/modes, minimum-width layout and widening, plugin toolbar
+contributions, 16/24/32-pixel disabled-icon rendering, and the rebuilt distribution. Inspected
+actual toolbar renders at 1x/2x, headlessly without starting any shells or native windows.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

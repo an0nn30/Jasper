@@ -18,7 +18,7 @@ public final class AppIcons {
 
     /** Application toolbar artwork: large classic icons in retro, regular modern icons otherwise. */
     public static javax.swing.Icon toolbarIcon(String name) {
-        return SwingAppearance.retro() ? GnomeIcons.icon(name, 24) : icon(name);
+        return SwingAppearance.retro() ? GnomeIcons.icon(name, 32) : icon(name);
     }
 
     /**

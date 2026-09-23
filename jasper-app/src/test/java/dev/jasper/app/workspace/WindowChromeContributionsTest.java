@@ -65,6 +65,11 @@ class WindowChromeContributionsTest {
             for (Component child : owner.toolbar().getComponents())
                 if (child instanceof JButton candidate && "Run Tool".equals(candidate.getClientProperty("label"))) button = candidate;
             assertThat(button.getIcon()).as("a fallback icon keeps the toolbar's icon-led layout").isNotNull();
+            if (retro) {
+                assertThat(button.getIcon().getIconWidth()).isEqualTo(32);
+                assertThat(button.getHorizontalTextPosition()).isEqualTo(javax.swing.SwingConstants.CENTER);
+                assertThat(button.getVerticalTextPosition()).isEqualTo(javax.swing.SwingConstants.BOTTOM);
+            }
             button.doClick();
             assertThat(seen).hasSize(1);
 

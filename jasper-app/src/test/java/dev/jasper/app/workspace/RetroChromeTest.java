@@ -18,12 +18,15 @@ class RetroChromeTest {
             assertThat(button.getBorder()).isNotNull();
             assertThat(button.isContentAreaFilled()).isFalse();
             assertThat(button.isBorderPainted()).isFalse();
-            assertThat(button.getIcon().getIconWidth()).isEqualTo(24);
-            assertThat(button.getPreferredSize().height).isLessThanOrEqualTo(28);
+            assertThat(button.getIcon().getIconWidth()).isEqualTo(32);
+            assertThat(button.getHorizontalTextPosition()).isEqualTo(javax.swing.SwingConstants.CENTER);
+            assertThat(button.getVerticalTextPosition()).isEqualTo(javax.swing.SwingConstants.BOTTOM);
+            assertThat(button.getPreferredSize().height).isGreaterThan(48).isLessThanOrEqualTo(64);
             assertThat(button.getFont()).isEqualTo(javax.swing.UIManager.getFont("Button.font"));
         }
         owner.setToolbarMode(dev.jasper.app.config.ToolbarMode.ICONS);
         assertThat(((javax.swing.JButton) toolbar.getComponent(0)).getText()).isNull();
+        assertThat(((javax.swing.JButton) toolbar.getComponent(0)).getPreferredSize().height).isLessThanOrEqualTo(40);
         owner.setToolbarMode(dev.jasper.app.config.ToolbarMode.HIDDEN);
         assertThat(toolbar.isVisible()).isFalse();
         owner.setToolbarMode(dev.jasper.app.config.ToolbarMode.ICONS_AND_LABELS);
@@ -49,6 +52,11 @@ class RetroChromeTest {
                 var insets = button.getInsets();
                 assertThat(button.getWidth()).isGreaterThanOrEqualTo(button.getIcon().getIconWidth() + insets.left + insets.right);
                 assertThat(button.getX() + button.getWidth()).isLessThanOrEqualTo(toolbar.getWidth());
+                assertThat(button.getHeight()).isGreaterThanOrEqualTo(button.getPreferredSize().height);
+            }
+            toolbar.setSize(960, 64); toolbar.doLayout();
+            for (var child : toolbar.getComponents()) if (child instanceof javax.swing.JButton button) {
+                assertThat(button.getText()).isEqualTo(button.getClientProperty("label"));
                 assertThat(button.getHeight()).isGreaterThanOrEqualTo(button.getPreferredSize().height);
             }
         });

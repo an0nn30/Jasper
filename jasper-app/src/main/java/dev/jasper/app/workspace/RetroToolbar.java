@@ -7,6 +7,18 @@ import javax.swing.JToolBar;
 
 /** Normal Metal toolbar painting/layout, with app label preferences and icon-only compaction. */
 final class RetroToolbar extends JToolBar {
+    /** Flat classic launcher button, with captions centered below its artwork. */
+    static void styleButton(JButton button) {
+        button.setMargin(new java.awt.Insets(4, 8, 4, 8));
+        button.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 8, 4, 8));
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(false);
+        button.setOpaque(false);
+        button.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        button.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        button.setIconTextGap(4);
+    }
+
     private boolean layingOut;
     private boolean labels = true;
     void labels(boolean value) { labels = value; revalidate(); }

@@ -21,17 +21,18 @@ final class GnomeIcons {
     static Icon icon(String name) { return icon(name, 16); }
     static Icon icon(String name, int size) {
         if (!NAMES.contains(name)) throw new IllegalArgumentException("Unknown application icon: " + name);
-        if (size != 16 && size != 24) throw new IllegalArgumentException("Unsupported icon size: " + size);
+        if (size != 16 && size != 24 && size != 32) throw new IllegalArgumentException("Unsupported icon size: " + size);
         // ImageIcon lets Metal generate its native disabled variant. Keep resolution selection in the JDK.
         return CACHE.computeIfAbsent(name + "/" + size, key -> {
             if (TANGO.contains(name)) {
                 var large = read("tango", name, 32);
+                if (size == 32) return new ImageIcon(large);
                 var base = size == 16 ? read("tango", name, 16) : sized(large, size);
                 return new ImageIcon(new BaseMultiResolutionImage(base, large));
             }
             return new ImageIcon(size == 16
                 ? new BaseMultiResolutionImage(read("gnome2", name, 16), read("gnome2", name, 24))
-                : read("gnome2", name, 24));
+                : size == 24 ? read("gnome2", name, 24) : sized(read("gnome2", name, 24), size));
         });
     }
     private static BufferedImage sized(BufferedImage source, int size) {

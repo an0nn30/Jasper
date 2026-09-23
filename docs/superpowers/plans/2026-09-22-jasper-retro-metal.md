@@ -8,6 +8,8 @@
 
 **2026-09-23 icon refinement:** Subsequent user feedback requested more colorful, recognizable toolbar icons. The five core glyphs now use bundled public-domain Tango 0.8.90 artwork (16/32-pixel originals rendered at 16/24 logical pixels), with source/hash/author/license notices. This supersedes their initial OldGNOME2 mappings; other icons and geometry remain intact.
 
+**2026-09-23 toolbar layout refinement:** The user's MobaXTerm reference supersedes the horizontal 24-pixel toolbar layout: 32-pixel icons now sit above centered captions, retaining flat buttons, icon-only/hidden modes, and plugin-owned artwork. Tab-close controls and modern presentation remain unchanged.
+
 **Goal:** Add a restart-required `ui.theme.style = "retro"` option that gives Jasper stock light Metal controls, GNOME 2 application icons, and a high-contrast terminal while preserving modern mode and existing SDK/plugin behavior.
 
 **Architecture:** Capture an app-only `ThemeStyle` before UI construction. Extend existing theme resolution and select presentation paths in the workspace, platform and auxiliary-window owners; retain the existing session, action, tab, contribution and palette models. Existing plugins see `Variant.LIGHT` and ordinary Swing controls inherit Metal without new SDK signatures.

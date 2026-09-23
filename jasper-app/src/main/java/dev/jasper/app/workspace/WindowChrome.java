@@ -125,11 +125,7 @@ final class WindowChrome {
         button.setIcon(icon != null ? icon : AppIcons.toolbarIcon("command"));
         button.setFocusable(false);
         if (owner.retro()) {
-            button.setMargin(new java.awt.Insets(2, 2, 2, 2));
-            button.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
-            button.setBorderPainted(false);
-            button.setContentAreaFilled(false);
-            button.setOpaque(false);
+            RetroToolbar.styleButton(button);
         } else {
             button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
             button.setIconTextGap(UIScale.scale(8));
@@ -269,11 +265,7 @@ final class WindowChrome {
         button.setText(label); button.putClientProperty("label", label);
         button.setIcon(AppIcons.toolbarIcon(icon)); button.setFocusable(false);
         if (owner.retro()) {
-            button.setMargin(new java.awt.Insets(2, 2, 2, 2));
-            button.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
-            button.setBorderPainted(false);
-            button.setContentAreaFilled(false);
-            button.setOpaque(false);
+            RetroToolbar.styleButton(button);
         } else {
             button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
             button.setIconTextGap(UIScale.scale(8));
