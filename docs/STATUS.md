@@ -22,7 +22,9 @@ an independent adversarial plan review, then native implementation. That sequenc
 the latest native execution choice supersedes the earlier per-task-agent preference. Baseline
 `./gradlew check` passed: 1,765 tests, 1,762 passed, three expected skips, no failures/errors.
 The adversarial review found eight important contract/recovery issues; the plan now includes
-explicit resolutions and regression tests. Native implementation starts from that reviewed plan.
+explicit resolutions and regression tests. Native implementation has completed semantic icons, status progress, and owner-based pickers;
+session leases, endpoint identity and prompt ownership changes also pass their regression suites.
+Next: bounded local/SFTP endpoints, durable queue, engine, browser and Transfers integration.
 Nothing merged or pushed.
 
 ### Latest completed work

@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-23-jasper-remote-sftp-design.md` (approved, including section 9.3 named-icon correction).
 
-**Execution status:** Independent adversarial review completed; eight findings are resolved in the contracts and acceptance tests below. No implementation task has started. Native execution is already selected and authorized after review findings are addressed. Baseline `1fcf9a8d`; design commits `68b7fb78`, `147a7629`.
+**Execution status:** Independent adversarial review completed; eight findings are resolved in the contracts and acceptance tests below. Tasks 1–4 are complete. Native execution is already selected and authorized after review findings are addressed. Baseline `1fcf9a8d`; design commits `68b7fb78`, `147a7629`.
 
 ## Global Constraints
 
@@ -60,14 +60,14 @@ tests `platform/NamedIconsTest.java`, `plugins/HostedUiTest.java` and testkit na
 **Interfaces:** Produce IconName FILE, LINK, UPLOAD, DOWNLOAD, UP, NEW_FOLDER, PAUSE, RESUME.
 Existing FOLDER, COPY, DELETE, REFRESH, CLOSE and NETWORK remain unchanged.
 
-- [ ] Add this assertion to the named catalog test before changing the enum/catalog:
+- [x] Add this assertion to the named catalog test before changing the enum/catalog:
 
 ```java
 assertThat(NamedIcons.NAMES).contains("FILE", "LINK", "UPLOAD", "DOWNLOAD", "UP", "NEW_FOLDER", "PAUSE", "RESUME");
 ```
 
-- [ ] Run `./gradlew :jasper-app:test --tests '*NamedIconsTest'`; expected missing-name failure.
-- [ ] Add semantic names and exact host mappings. Modern files: `file.svg`, `link.svg`,
+- [x] Run `./gradlew :jasper-app:test --tests '*NamedIconsTest'`; expected missing-name failure.
+- [x] Add semantic names and exact host mappings. Modern files: `file.svg`, `link.svg`,
   `upload.svg`, `download.svg`, `arrow-up.svg`, `folder-plus.svg`, `player-pause.svg`,
   `player-play.svg`. Retro mappings use existing file/link, arrow-up/down, new-folder and
   media pause/play art in the supplied tree; verify available source sizes before copying.
@@ -79,10 +79,10 @@ assertThat(NamedIcons.NAMES).contains("FILE", "LINK", "UPLOAD", "DOWNLOAD", "UP"
 Map.entry("FILE", "dev/jasper/app/icons/standard/FILE.svg")
 ```
 
-- [ ] Run named-icon, hosted-icon and testkit tests; assert all IconName values render 16px
+- [x] Run named-icon, hosted-icon and testkit tests; assert all IconName values render 16px
   compact and 28px retro-toolbar variants with a resource-empty plugin loader. Remove the
   old fixed count of 22 from catalog tests; compare catalog names to supported semantic names.
-- [ ] Commit `feat(sdk): add file and transfer semantic icons`.
+- [x] Commit `feat(sdk): add file and transfer semantic icons`.
 
 ### Task 2: Add the generic status-progress contract and stable host rendering
 
@@ -104,7 +104,7 @@ public interface StatusProgress extends Subscription {
 default StatusProgress addProgress(StatusItemSpec spec) { throw new UnsupportedOperationException("Progress is unavailable"); }
 ```
 
-- [ ] Write tests rejecting NaN/out-of-range fractions, foreign actions, duplicate status ids,
+- [x] Write tests rejecting NaN/out-of-range fractions, foreign actions, duplicate status ids,
   wrong-thread calls and stale updates; allow absent fraction and optional secondary action.
   Add a workspace regression holding a progress component reference across two updates:
 
@@ -115,16 +115,16 @@ status.setContributed(List.of(entry), actions);
 assertThat(findProgress(status)).isSameAs(findProgress(first));
 ```
 
-- [ ] Run `./gradlew :jasper-sdk:test :jasper-sdk-testkit:test :jasper-app:test --tests '*Progress*'`;
+- [x] Run `./gradlew :jasper-sdk:test :jasper-sdk-testkit:test :jasper-app:test --tests '*Progress*'`;
   expect missing contract/behavior failures. Use a test-only component finder; no production test hooks.
-- [ ] Implement record validation, host-owned progress handle, native translation and fake
+- [x] Implement record validation, host-owned progress handle, native translation and fake
   recording. Represent indeterminate native progress with an absent fraction too. Reuse
   views keyed by entry id; action bindings resolve current actions, with independent main
   and secondary clicks. Update value/text in place, rebuild structural layout only on actual
   entry visibility/order changes. Keep text-only item behavior and `contributedItems` tests.
-- [ ] Run affected SDK/app/testkit tests and doclint. Headless render at narrow widths and
+- [x] Run affected SDK/app/testkit tests and doclint. Headless render at narrow widths and
   UI font 12/18/32, both skins; ensure bounded controls and accessible progress description.
-- [ ] Set SDK version 0.7.5, document the API and commit `feat(sdk): support status bar progress controls`.
+- [x] Set SDK version 0.7.5, document the API and commit `feat(sdk): support status bar progress controls`.
 
 ### Task 3: Add owner-based file and folder pickers
 
@@ -146,7 +146,7 @@ public record PathChoice(UUID terminalOwner, AuxiliarySurface auxiliaryOwner, St
                          Optional<Path> initial, boolean directory) { }
 ```
 
-- [ ] Add tests for two selected files, directory selection, cancel, stale owner during the
+- [x] Add tests for two selected files, directory selection, cancel, stale owner during the
   pumped chooser, foreign/dead window rejection and plugin stop during selection.
 
 ```java
@@ -155,15 +155,15 @@ assertThat(context.windows().chooseFiles(window, "Upload", Optional.of(root)))
     .containsExactly(root.resolve("a"), root.resolve("b"));
 ```
 
-- [ ] Run `./gradlew :jasper-sdk-testkit:test :jasper-app:test --tests '*Chooser*'`; expect unavailable chooser.
-- [ ] Implement owner validation before and after the synchronous event-pumping call.
+- [x] Run `./gradlew :jasper-sdk-testkit:test :jasper-app:test --tests '*Chooser*'`; expect unavailable chooser.
+- [x] Implement owner validation before and after the synchronous event-pumping call.
   Provide a native Files picker with multiple selection and a themed directory chooser;
   no global system-property toggles. Inject `PathChooser` at AuxiliaryWindows construction
   (production native and headless/fake are two implementations). Dispose on owner close and
   plugin stop; empty results mean cancel. Normalize paths, do not read file contents.
-- [ ] Run chooser and existing auxiliary-window/overlay tests, SDK doclint/examples. Keep
+- [x] Run chooser and existing auxiliary-window/overlay tests, SDK doclint/examples. Keep
   `WindowSurface.chooseFile` unchanged and working.
-- [ ] Commit `feat(sdk): select local files and directories from plugin panels`.
+- [x] Commit `feat(sdk): select local files and directories from plugin panels`.
 
 ### Task 4: Extract cancellable SSH session leases with endpoint identity
 
@@ -174,8 +174,9 @@ modify `Connections.java`, `RemotePlugin.java`, Vault `api/VaultApi.java` and
 **Interfaces:** `ConnectionIdentity` is an immutable snapshot of the host plus resolved jump
 chain; equality excludes label/group/favorite/timestamps and includes address, port, username
 and authentication references. `SessionLease` exposes actual host/identity/session to Remote
-internals and idempotent `close()`. `Connections.identity(UUID)` resolves a snapshot (including effective Vault usernames for
-all hops); `lease(ConnectionIdentity, WindowHandle, Consumer<String>)` returns a cancellable
+internals and idempotent `close()`. `Connections.identity(UUID)` captures the configured route; async `resolveIdentity(UUID, owner)`
+resolves all effective Vault accounts without connecting. Lease acquisition resolves any empty
+accounts before sharing; `lease(ConnectionIdentity, WindowHandle, Consumer<String>)` returns a cancellable
 `CompletableFuture<SessionLease>` on the UI executor. Shell creation composes it. Live pane
 operations use their acquired identity; durable resume compares that snapshot with the current
 saved definition before acquiring. Resolve credential usernames before deciding reuse, including
@@ -183,7 +184,7 @@ jump credentials. Add compatible `VaultApi.credential(WindowHandle, UUID)` and h
 in VaultService. Shared acquisitions track individual waiters; a cancelled/dead prompt owner
 cannot choose the active window implicitly or cancel another surviving waiter's lease.
 
-- [ ] Add loopback tests acquiring two leases and one shell; close/cancel each independently.
+- [x] Add loopback tests acquiring two leases and one shell; close/cancel each independently.
   Edit host address/jump/username while old resources are live and acquire the new identity.
 
 ```java
@@ -195,16 +196,16 @@ assertThat(second.session().isOpen()).isTrue();
 second.close();
 ```
 
-- [ ] Run `./gradlew :jasper-plugin-remote:test --tests '*ConnectionsTest'`; expected missing lease API.
-- [ ] Factor acquire/release ownership into leases without moving registry state off UI.
+- [x] Run `./gradlew :jasper-plugin-remote:test --tests '*ConnectionsTest'`; expected missing lease API.
+- [x] Factor acquire/release ownership into leases without moving registry state off UI.
   Key sharing by connection-defining snapshot so old/new endpoints may coexist. Count only
   shells in SSH status. On late acquisition after cancellation close that lease once. Leases
   held by a transfer keep ProxyJump references alive; no foreign worker closes the whole client.
   Attach actual identity to Shell and retain it with pane associations; preserve host-id view APIs.
-- [ ] Run all Remote tests, including real loopback shared auth, cancellation, host probes and
+- [x] Run all Remote tests, including real loopback shared auth, cancellation, host probes and
   linger, SFTP through ProxyJump, two-window acquisition with one cancelled/dead owner,
   and edited address/user/jump/Vault usernames. Prompts use captured live request owners.
-- [ ] Commit `refactor(remote): share owned SSH leases with file operations`.
+- [x] Commit `refactor(remote): share owned SSH leases with file operations`.
 
 ### Task 5: Implement local and SFTP file endpoints
 

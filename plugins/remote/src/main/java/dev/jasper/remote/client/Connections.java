@@ -9,6 +9,7 @@ import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.trust.KnownHosts;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.TerminalConnection;
+import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.vault.api.Credential;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -53,7 +54,7 @@ public final class Connections {
         });
     }
 
-    public record Shell(RemoteHost host, TerminalConnection connection) {
+    public record Shell(RemoteHost host, ConnectionIdentity identity, TerminalConnection connection) {
         public UUID hostId() { return host.id(); }
     }
     private static final AttributeRepository.AttributeKey<HostKeyVerifier> VERIFY = new AttributeRepository.AttributeKey<>();
@@ -61,11 +62,12 @@ public final class Connections {
     private final KnownHosts trust;
     private final Optional<AgentClient> agent;
     private final Function<UUID, Optional<RemoteHost>> hosts;
-    private final Optional<Function<UUID, CompletableFuture<Optional<Credential>>>> credentials;
-    private final Function<HostKeyVerifier.Question, CompletableFuture<HostKeyVerifier.Decision>> prompt;
+    private final Optional<BiFunction<WindowHandle, UUID, CompletableFuture<Optional<Credential>>>> credentials;
+    private final BiFunction<WindowHandle, HostKeyVerifier.Question, CompletableFuture<HostKeyVerifier.Decision>> prompt;
     private final Executor background, ui;
     private final BiFunction<Duration, Runnable, Runnable> schedule;
-    private final Map<UUID, Shared> sessions = new HashMap<>();
+    private final Map<ConnectionIdentity, Shared> sessions = new HashMap<>();
+    private final java.util.Set<CompletableFuture<Prepared>> preparations = new java.util.HashSet<>();
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private SshClient plainClient, agentClient;
     private int channels;
@@ -88,6 +90,10 @@ public final class Connections {
     }
     private final class Shared {
         final RemoteHost host;
+        final ConnectionIdentity identity;
+        final Map<Object, WindowHandle> owners = new java.util.LinkedHashMap<>();
+        WindowHandle promptOwner;
+        CompletableFuture<HostKeyVerifier.Decision> promptFuture;
         final RemoteSettings settings = Connections.this.settings.get();
         final CompletableFuture<ClientSession> ready = new CompletableFuture<>();
         final Resources resources = new Resources();
@@ -98,17 +104,15 @@ public final class Connections {
         int refs;
         boolean evicted;
         Runnable cancelLinger;
-        Shared(RemoteHost host, Consumer<String> status) {
-            this.host = host;
+        Shared(ConnectionIdentity identity, Consumer<String> status) {
+            this.identity = identity; this.host = identity.host();
             verifier = new HostKeyVerifier(trust, question -> {
                 var answer = new CompletableFuture<HostKeyVerifier.Decision>();
                 resources.add(() -> answer.cancel(true));
                 ui.execute(() -> {
                     if (answer.isDone()) return;
                     status.accept("Verifying host key…");
-                    var actual = prompt.apply(question);
-                    answer.whenComplete((value, failure) -> { if (answer.isCancelled()) ui.execute(() -> actual.cancel(true)); });
-                    actual.whenComplete((value, failure) -> { if (failure == null) answer.complete(value); else answer.completeExceptionally(failure); });
+                    ask(this, question, answer);
                 });
                 return answer;
             }, settings::authTimeout);
@@ -118,17 +122,24 @@ public final class Connections {
                        Optional<Function<UUID, CompletableFuture<Optional<Credential>>>> credentials,
                        Function<HostKeyVerifier.Question, CompletableFuture<HostKeyVerifier.Decision>> prompt,
                        Executor background, Executor ui, BiFunction<Duration, Runnable, Runnable> schedule) {
+        this(settings, trust, agent, hosts, credentials.map(source -> (owner, id) -> source.apply(id)),
+            (owner, question) -> prompt.apply(question), background, ui, schedule);
+    }
+    public Connections(Supplier<RemoteSettings> settings, KnownHosts trust, Optional<AgentClient> agent, Function<UUID, Optional<RemoteHost>> hosts,
+                       Optional<BiFunction<WindowHandle, UUID, CompletableFuture<Optional<Credential>>>> credentials,
+                       BiFunction<WindowHandle, HostKeyVerifier.Question, CompletableFuture<HostKeyVerifier.Decision>> prompt,
+                       Executor background, Executor ui, BiFunction<Duration, Runnable, Runnable> schedule) {
         this.settings = settings; this.trust = trust; this.agent = agent; this.hosts = hosts; this.credentials = credentials;
         this.prompt = prompt; this.background = background; this.ui = ui; this.schedule = schedule;
     }
     public int channelCount() { return channels; }
-    public boolean connected(UUID id) { Shared s = sessions.get(id); return s != null && s.session != null && s.session.isOpen(); }
+    public boolean connected(UUID id) { return sessions.values().stream().anyMatch(s -> s.host.id().equals(id) && s.session != null && s.session.isOpen()); }
     public Subscription onChanged(Runnable listener) { listeners.add(listener); return () -> listeners.remove(listener); }
 
     /** Best-effort metadata on the existing transport, cached for its lifetime; never authenticates a new connection. */
     public CompletableFuture<HostInfo> inspect(Shell shell) {
-        Shared shared = sessions.get(shell.hostId());
-        if (closed || shared == null || shared.host != shell.host() || shared.session == null || !shared.session.isOpen()) return CompletableFuture.completedFuture(HostInfo.EMPTY);
+        Shared shared = sessions.get(shell.identity());
+        if (closed || shared == null || shared.session == null || !shared.session.isOpen()) return CompletableFuture.completedFuture(HostInfo.EMPTY);
         if (shared.info != null) return shared.info;
         shared.refs++;
         if (shared.cancelLinger != null) { shared.cancelLinger.run(); shared.cancelLinger = null; }
@@ -140,69 +151,203 @@ public final class Connections {
         return shared.info;
     }
 
+    /** Captures the configured route without prompting. Empty logins are resolved before lease sharing. */
+    public ConnectionIdentity identity(UUID id) {
+        var route = new ArrayList<ConnectionIdentity.Hop>();
+        var seen = new java.util.HashSet<UUID>();
+        UUID current = id;
+        while (current != null) {
+            if (!seen.add(current)) throw new Failures.Failure("jump host cycle");
+            var host = hosts.apply(current).orElseThrow(() -> new Failures.Failure(route.isEmpty() ? "Host not found" : "jump host missing"));
+            route.add(new ConnectionIdentity.Hop(host, host.username()));
+            current = host.jump().orElse(null);
+        }
+        return new ConnectionIdentity(route);
+    }
+
+    /** Resolves current effective accounts without connecting; used for durable resume validation. */
+    public CompletableFuture<ConnectionIdentity> resolveIdentity(UUID id, WindowHandle owner) {
+        var result = new CompletableFuture<ConnectionIdentity>();
+        var prepared = prepare(identity(id), owner);
+        result.whenComplete((v, e) -> { if (result.isCancelled()) prepared.cancel(true); });
+        prepared.whenComplete((value, failure) -> ui.execute(() -> {
+            if (failure != null) result.completeExceptionally(failure);
+            else { value.close(); result.complete(value.identity()); }
+        }));
+        return result;
+    }
+
+    private final class Prepared implements AutoCloseable {
+        final List<ConnectionIdentity.Hop> route = new ArrayList<>();
+        final Map<UUID, List<Credential>> secrets = new HashMap<>();
+        ConnectionIdentity identity() { return new ConnectionIdentity(route); }
+        @Override public void close() { secrets.values().forEach(list -> list.forEach(Credential::close)); secrets.clear(); }
+    }
+
+    private CompletableFuture<Prepared> prepare(ConnectionIdentity identity, WindowHandle owner) {
+        var result = new CompletableFuture<Prepared>();
+        var prepared = new Prepared();
+        preparations.add(result);
+        result.whenComplete((value, failure) -> preparations.remove(result));
+        var active = new java.util.concurrent.atomic.AtomicReference<CompletableFuture<List<Credential>>>();
+        result.whenComplete((value, failure) -> { if (failure != null) ui.execute(() -> {
+            var pending = active.get(); if (pending != null) pending.cancel(true); prepared.close();
+        }); });
+        prepareHop(identity, owner, 0, prepared, active, result);
+        return result;
+    }
+
+    private void prepareHop(ConnectionIdentity identity, WindowHandle owner, int index, Prepared prepared,
+            java.util.concurrent.atomic.AtomicReference<CompletableFuture<List<Credential>>> active, CompletableFuture<Prepared> result) {
+        if (result.isDone()) return;
+        if (closed || owner != null && !owner.isOpen()) { result.cancel(true); return; }
+        if (index == identity.hops().size()) { result.complete(prepared); return; }
+        var hop = identity.hops().get(index);
+        if (!hop.username().isBlank()) {
+            prepared.route.add(hop); prepareHop(identity, owner, index + 1, prepared, active, result); return;
+        }
+        var request = credentialFor(hop.host(), owner); active.set(request);
+        request.whenComplete((values, failure) -> ui.execute(() -> {
+            if (result.isDone()) { if (values != null) values.forEach(Credential::close); return; }
+            if (failure != null) { result.completeExceptionally(failure); return; }
+            String username = values.stream().flatMap(c -> c.username().stream()).findFirst().orElse("");
+            if (username.isBlank()) { values.forEach(Credential::close); result.completeExceptionally(new Failures.Failure("No username for " + hop.host().name())); return; }
+            prepared.secrets.put(hop.host().id(), values);
+            prepared.route.add(new ConnectionIdentity.Hop(hop.host(), username));
+            prepareHop(identity, owner, index + 1, prepared, active, result);
+        }));
+    }
+
+    public CompletableFuture<SessionLease> lease(ConnectionIdentity identity, WindowHandle owner, Consumer<String> status) {
+        var result = new CompletableFuture<SessionLease>();
+        if (closed) return CompletableFuture.failedFuture(new Failures.Failure("Remote is stopping"));
+        var prepared = prepare(identity, owner);
+        result.whenComplete((v, e) -> { if (result.isCancelled()) prepared.cancel(true); });
+        prepared.whenComplete((value, failure) -> ui.execute(() -> {
+            if (failure != null) { result.completeExceptionally(failure); return; }
+            if (result.isDone() || closed) { value.close(); if (closed) result.cancel(true); return; }
+            Shared shared;
+            try { shared = acquire(value.identity(), owner, status, value); }
+            catch (RuntimeException bad) { value.close(); result.completeExceptionally(bad); return; }
+            value.close();
+            Object token = new Object(); shared.owners.put(token, owner);
+            var released = new java.util.concurrent.atomic.AtomicBoolean();
+            Runnable release = () -> ui.execute(() -> {
+                if (!released.compareAndSet(false, true)) return;
+                shared.owners.remove(token); release(shared); refreshPrompts();
+            });
+            result.whenComplete((v, e) -> { if (result.isCancelled()) release.run(); });
+            shared.ready.whenComplete((session, problem) -> ui.execute(() -> {
+                if (result.isDone()) return;
+                if (problem != null) { release.run(); result.completeExceptionally(failure(shared, problem)); return; }
+                if (owner != null && !owner.isOpen()) { release.run(); result.cancel(true); return; }
+                var lease = new SessionLease(shared.identity, session, release);
+                if (!result.complete(lease)) lease.close();
+            }));
+        }));
+        return result;
+    }
+
     public CompletableFuture<Shell> shell(UUID id, int columns, int rows, Consumer<String> status) {
+        return shell(id, null, columns, rows, status);
+    }
+    public CompletableFuture<Shell> shell(UUID id, WindowHandle owner, int columns, int rows, Consumer<String> status) {
         var result = new CompletableFuture<Shell>();
-        RemoteHost host = hosts.apply(id).orElse(null);
-        if (closed || host == null) return CompletableFuture.failedFuture(new Failures.Failure(closed ? "Remote is stopping" : "Host not found"));
-        try { validateChain(host); } catch (RuntimeException failure) { return CompletableFuture.failedFuture(failure); }
-        Shared shared = acquire(host, status);
-        boolean[] released = {false}, counted = {false};
-        Runnable release = () -> ui.execute(() -> {
-            if (released[0]) return;
-            released[0] = true;
-            if (counted[0]) { channels--; notifyChanged(); }
-            release(shared);
-        });
-        result.whenComplete((ignored, failure) -> { if (result.isCancelled()) release.run(); });
-        shared.ready.whenComplete((session, failure) -> ui.execute(() -> {
-            if (result.isDone()) return;
-            if (failure != null) { release.run(); result.completeExceptionally(failure(shared, failure)); return; }
+        CompletableFuture<SessionLease> requested;
+        try { requested = lease(identity(id), owner, status); }
+        catch (RuntimeException bad) { return CompletableFuture.failedFuture(bad); }
+        result.whenComplete((v, e) -> { if (result.isCancelled()) requested.cancel(true); });
+        requested.whenComplete((lease, failure) -> ui.execute(() -> {
+            if (failure != null) { result.completeExceptionally(failure); return; }
+            if (result.isDone()) { lease.close(); return; }
+            boolean[] counted = {false}, released = {false};
+            Runnable release = () -> ui.execute(() -> {
+                if (released[0]) return; released[0] = true;
+                if (counted[0]) { channels--; notifyChanged(); } lease.close();
+            });
+            result.whenComplete((v, e) -> { if (result.isCancelled()) release.run(); });
             status.accept("Opening shell…");
-            onBackground(() -> ShellChannels.open(session, columns, rows, shared.settings.connectTimeout(), release))
-                .whenComplete((connection, openFailure) -> ui.execute(() -> {
-                    if (openFailure != null) { release.run(); result.completeExceptionally(failure(shared, openFailure)); return; }
+            onBackground(() -> ShellChannels.open(lease.session(), columns, rows, settings.get().connectTimeout(), release))
+                .whenComplete((connection, problem) -> ui.execute(() -> {
+                    if (problem != null) { release.run(); result.completeExceptionally(problem); return; }
                     if (result.isDone()) { connection.close().run(); return; }
                     if (!released[0]) { counted[0] = true; channels++; notifyChanged(); }
-                    if (!result.complete(new Shell(shared.host, connection))) connection.close().run();
+                    if (!result.complete(new Shell(lease.host(), lease.identity(), connection))) connection.close().run();
                 }));
         }));
         return result;
     }
+
+    private boolean uses(Shared candidate, Shared ancestor) {
+        for (Shared at = candidate; at != null; at = at.parent) if (at == ancestor) return true;
+        return false;
+    }
+    private WindowHandle promptOwner(Shared shared) {
+        for (var candidate : sessions.values()) if (uses(candidate, shared))
+            for (var owner : candidate.owners.values()) if (owner != null && owner.isOpen()) return owner;
+        return null;
+    }
+    private boolean stillRequested(Shared shared, WindowHandle owner) {
+        return sessions.values().stream().filter(s -> uses(s, shared)).anyMatch(s -> s.owners.containsValue(owner));
+    }
+    private void refreshPrompts() {
+        for (var shared : List.copyOf(sessions.values())) if (shared.promptFuture != null && shared.promptOwner != null
+                && (!shared.promptOwner.isOpen() || !stillRequested(shared, shared.promptOwner))) shared.promptFuture.cancel(true);
+    }
+    private void ask(Shared shared, HostKeyVerifier.Question question, CompletableFuture<HostKeyVerifier.Decision> answer) {
+        if (answer.isDone()) return;
+        WindowHandle owner = promptOwner(shared);
+        shared.promptOwner = owner;
+        var actual = prompt.apply(owner, question); shared.promptFuture = actual;
+        answer.whenComplete((v, e) -> { if (answer.isCancelled()) ui.execute(() -> actual.cancel(true)); });
+        actual.whenComplete((value, failure) -> ui.execute(() -> {
+            if (shared.promptFuture == actual) shared.promptFuture = null;
+            if (answer.isDone()) return;
+            if ((failure != null || value == HostKeyVerifier.Decision.CANCEL) && owner != null
+                    && (!owner.isOpen() || !stillRequested(shared, owner)) && promptOwner(shared) != null) {
+                ask(shared, question, answer); return;
+            }
+            if (failure == null) answer.complete(value); else answer.completeExceptionally(failure);
+        }));
+    }
     private Failures.Failure failure(Shared shared, Throwable failure) {
         return new Failures.Failure(Failures.message(failure, shared.settings.connectTimeout(), shared.host.hostname()), failure);
     }
-    private void validateChain(RemoteHost host) {
-        var seen = new java.util.HashSet<UUID>();
-        RemoteHost current = host;
-        while (true) {
-            if (!seen.add(current.id())) throw new Failures.Failure("jump host cycle");
-            if (current.jump().isEmpty()) return;
-            current = hosts.apply(current.jump().get()).orElseThrow(() -> new Failures.Failure("jump host missing"));
-        }
-    }
-    private Shared acquire(RemoteHost host, Consumer<String> status) {
-        Shared prior = sessions.get(host.id());
+    private Shared acquire(ConnectionIdentity identity, WindowHandle owner, Consumer<String> status, Prepared prepared) {
+        RemoteHost host = identity.host();
+        Shared prior = sessions.get(identity);
         if (prior != null && prior.session != null && !prior.session.isOpen()) { evict(prior); prior = null; }
         if (prior != null) {
             prior.refs++;
             if (prior.cancelLinger != null) { prior.cancelLinger.run(); prior.cancelLinger = null; }
             return prior;
         }
-        Shared fresh = new Shared(host, status); fresh.refs = 1; sessions.put(host.id(), fresh);
-        if (host.jump().isPresent()) fresh.parent = acquire(hosts.apply(host.jump().get()).orElseThrow(), status);
+        Shared fresh = new Shared(identity, status); fresh.refs = 1; sessions.put(identity, fresh);
+        List<Credential> captured = prepared.secrets.remove(host.id());
+        if (captured != null) fresh.resources.add(() -> captured.forEach(Credential::close));
+        if (identity.parent() != null) fresh.parent = acquire(identity.parent(), owner, status, prepared);
         CompletableFuture<ClientSession> via = fresh.parent == null ? CompletableFuture.completedFuture(null) : fresh.parent.ready;
         via.whenComplete((jump, failure) -> ui.execute(() -> {
             if (fresh.evicted) return;
             if (failure != null) { fail(fresh, failure); return; }
+            authenticate(fresh, jump, captured, owner, status);
+        }));
+        return fresh;
+    }
+    private void authenticate(Shared fresh, ClientSession jump, List<Credential> captured, WindowHandle owner, Consumer<String> status) {
             CompletableFuture<List<Credential>> credential;
-            try { credential = credentialFor(host); } catch (RuntimeException bad) { fail(fresh, bad); return; }
+            try { credential = captured == null ? credentialFor(fresh.host, owner) : CompletableFuture.completedFuture(captured); } catch (RuntimeException bad) { fail(fresh, bad); return; }
             fresh.resources.add(() -> ui.execute(() -> credential.cancel(true)));
             credential.whenComplete((secret, denied) -> ui.execute(() -> {
                 if (fresh.evicted) { if (secret != null) secret.forEach(Credential::close); return; }
-                if (denied != null) { fail(fresh, denied); return; }
-                if (!(host.auth() instanceof Auth.Agent) && secret.isEmpty()) { fail(fresh, new Failures.Failure("Credential denied")); return; }
+                if (denied != null) {
+                    WindowHandle surviving = promptOwner(fresh);
+                    if (owner != null && !owner.isOpen() && surviving != null) { authenticate(fresh, jump, null, surviving, status); return; }
+                    fail(fresh, denied); return;
+                }
+                if (!(fresh.host.auth() instanceof Auth.Agent) && secret.isEmpty()) { fail(fresh, new Failures.Failure("Credential denied")); return; }
                 status.accept("Connecting…");
-                onBackground(() -> connect(host, secret, Optional.ofNullable(jump), fresh, status)).whenComplete((session, problem) -> ui.execute(() -> {
+                onBackground(() -> connect(fresh.host, secret, Optional.ofNullable(jump), fresh, status)).whenComplete((session, problem) -> ui.execute(() -> {
                     if (problem != null) { fail(fresh, problem); return; }
                     if (fresh.evicted) { session.close(true); return; }
                     fresh.session = session;
@@ -211,10 +356,8 @@ public final class Connections {
                     fresh.ready.complete(session); notifyChanged();
                 }));
             }));
-        }));
-        return fresh;
     }
-    private CompletableFuture<List<Credential>> credentialFor(RemoteHost host) {
+    private CompletableFuture<List<Credential>> credentialFor(RemoteHost host, WindowHandle owner) {
         if (host.auth() instanceof Auth.Agent)
             return agent.isPresent() && settings.get().useAgent() ? CompletableFuture.completedFuture(List.of())
                 : CompletableFuture.failedFuture(new Failures.Failure("SSH agent not available"));
@@ -229,16 +372,16 @@ public final class Connections {
                 var pending = active.get(); if (pending != null) pending.cancel(false);
             });
         });
-        acquireCredential(ids, 0, acquired, active, result, host.auth() instanceof Auth.VaultKeys);
+        acquireCredential(owner, ids, 0, acquired, active, result, host.auth() instanceof Auth.VaultKeys);
         return result;
     }
-    private void acquireCredential(List<UUID> ids, int at, List<Credential> acquired,
+    private void acquireCredential(WindowHandle owner, List<UUID> ids, int at, List<Credential> acquired,
             java.util.concurrent.atomic.AtomicReference<CompletableFuture<Optional<Credential>>> active,
             CompletableFuture<List<Credential>> result, boolean managedOnly) {
         if (result.isDone()) return;
         if (at == ids.size()) { result.complete(List.copyOf(acquired)); return; }
         CompletableFuture<Optional<Credential>> request;
-        try { request = credentials.orElseThrow().apply(ids.get(at)); active.set(request); }
+        try { request = credentials.orElseThrow().apply(owner, ids.get(at)); active.set(request); }
         catch (RuntimeException failure) { result.completeExceptionally(failure); return; }
         request.whenComplete((value, failure) -> ui.execute(() -> {
             if (result.isDone()) { if (value != null) value.ifPresent(Credential::close); return; }
@@ -248,15 +391,17 @@ public final class Connections {
             if (managedOnly && (secret.kind() != dev.jasper.vault.api.Kind.SSH_KEY || secret.keyBytes().isEmpty() || secret.keyPath().isPresent())) {
                 secret.close(); result.completeExceptionally(new Failures.Failure("Import this key into Vault before connecting")); return;
             }
-            acquired.add(secret); acquireCredential(ids, at + 1, acquired, active, result, managedOnly);
+            acquired.add(secret); acquireCredential(owner, ids, at + 1, acquired, active, result, managedOnly);
         }));
     }
     /** Background: TCP (through the jump's forward when given), host key, authentication. Closes the credential. */
     private ClientSession connect(RemoteHost host, List<Credential> credential, Optional<ClientSession> jump, Shared shared, Consumer<String> status) throws Exception {
         RemoteSettings current = shared.settings;
-        String username = host.username().isEmpty() ? credential.stream().flatMap(c -> c.username().stream()).findFirst().orElse("") : host.username();
+        String username = shared.identity.username();
         try {
             if (username.isEmpty()) throw new Failures.Failure("No username for " + host.name());
+            if (host.username().isEmpty() && !credential.stream().flatMap(c -> c.username().stream()).findFirst().orElse("").equals(username))
+                throw new Failures.Failure("Vault username changed; reopen this host before connecting");
             if (host.auth() instanceof Auth.Agent) {
                 try (AgentClient probe = agent.orElseThrow().withTimeout(current.authTimeout())) {
                     shared.resources.add(probe::close);
@@ -355,7 +500,7 @@ public final class Connections {
     private void evict(Shared shared) {
         if (shared.evicted) return;
         shared.evicted = true;
-        sessions.remove(shared.host.id(), shared);
+        sessions.remove(shared.identity, shared);
         if (shared.cancelLinger != null) { shared.cancelLinger.run(); shared.cancelLinger = null; }
         shared.ready.completeExceptionally(new Failures.Failure("connection lost"));
         shared.resources.close();
@@ -364,6 +509,7 @@ public final class Connections {
     }
     public void close() {
         closed = true;
+        for (var preparing : List.copyOf(preparations)) preparing.cancel(true);
         for (Shared shared : List.copyOf(sessions.values())) evict(shared);
         background.execute(() -> { synchronized (this) {
             if (plainClient != null) plainClient.stop();

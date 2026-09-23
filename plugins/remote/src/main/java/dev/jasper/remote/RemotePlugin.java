@@ -94,6 +94,7 @@ public class RemotePlugin implements Plugin {
     private final Map<UUID, HostsPanel> panels = new HashMap<>();
     private final Map<UUID, PanelHost> panelHosts = new HashMap<>();
     private final Map<UUID, UUID> panes = new HashMap<>();
+    private final Map<UUID, dev.jasper.remote.client.ConnectionIdentity> paneIdentities = new HashMap<>();
     private HostKeyPanel currentHostKeyPanel;
     private HostEditor currentEditor;
     private ConfigImportController configImport;
@@ -124,8 +125,8 @@ public class RemotePlugin implements Plugin {
         context.background().execute(() -> { hostInfo.load(); ui.execute(() -> { if (!stopped) refreshPanels(); }); });
         trust = new KnownHosts(context.dataDirectory().resolve("known_hosts"), () -> settings.readUserKnownHosts() ? Optional.of(sshDir.resolve("known_hosts")) : Optional.empty());
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
-        Optional<java.util.function.Function<UUID, CompletableFuture<Optional<dev.jasper.vault.api.Credential>>>> credentialSource = Optional.empty();
-        if (vault.isPresent()) credentialSource = Optional.of(id -> vault.get().credential(id));
+        Optional<java.util.function.BiFunction<WindowHandle, UUID, CompletableFuture<Optional<dev.jasper.vault.api.Credential>>>> credentialSource = Optional.empty();
+        if (vault.isPresent()) credentialSource = Optional.of((owner, id) -> vault.get().credential(owner, id));
         connections = new Connections(() -> settings, trust, agentFactory.apply(context), store::host,
             credentialSource, this::askHostKey, context.background(), ui, schedule);
         connections.onChanged(this::refreshStatus);
@@ -157,7 +158,7 @@ public class RemotePlugin implements Plugin {
             event.paneId().ifPresent(this::rememberPane); refreshSplit();
         });
         context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> rememberPane(event.paneId()));
-        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { panes.remove(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
+        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { panes.remove(event.paneId()); paneIdentities.remove(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
         context.events().subscribe(TerminalEvents.WINDOW_CLOSED, event -> {
             for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
         });
@@ -269,9 +270,9 @@ public class RemotePlugin implements Plugin {
     private void attach(PendingSession pending, Connections.Shell shell) {
         if (stopped || pending.isCancelled()) { shell.connection().close().run(); return; }
         UUID paneId = pending.pane().id();
-        panes.put(paneId, shell.hostId()); rememberPane(paneId);
+        panes.put(paneId, shell.hostId()); paneIdentities.put(paneId, shell.identity()); rememberPane(paneId);
         shell.connection().exited().whenComplete((ignored, exit) -> ui.execute(() -> {
-            panes.remove(paneId); recentPanes.remove(paneId); refreshSplit(); if (!stopped) refreshPanels();
+            panes.remove(paneId); paneIdentities.remove(paneId); recentPanes.remove(paneId); refreshSplit(); if (!stopped) refreshPanels();
         }));
         pending.attach(shell.connection());
         RemoteHost authenticatedHost = shell.host();
@@ -311,7 +312,7 @@ public class RemotePlugin implements Plugin {
             var dimensions = window.activeTab().flatMap(tab -> tab.activePane()).map(PaneHandle::info);
             int cols = dimensions.map(info -> Math.max(1, info.columns())).orElse(80);
             int rows = dimensions.map(info -> Math.max(1, info.rows())).orElse(24);
-            future = connections.shell(host.id(), cols, rows, panel::status);
+            future = connections.shell(host.id(), window, cols, rows, panel::status);
             future.whenComplete((shell, failure) -> ui.execute(() -> {
                 if (closed || stopped || !window.isOpen()) { if (shell != null) shell.connection().close().run(); close(); return; }
                 if (failure != null) { panel.failed(message(failure)); return; }
@@ -352,13 +353,16 @@ public class RemotePlugin implements Plugin {
 
     /** The host-key question, answered through a window-modal dialog; closing it answers Cancel. */
     CompletableFuture<HostKeyVerifier.Decision> askHostKey(HostKeyVerifier.Question question) {
+        return askHostKey(owner().orElse(null), question);
+    }
+
+    CompletableFuture<HostKeyVerifier.Decision> askHostKey(WindowHandle owner, HostKeyVerifier.Question question) {
         var decision = new CompletableFuture<HostKeyVerifier.Decision>();
         ui.execute(() -> {
             if (decision.isDone() || stopped) { decision.cancel(true); return; }
             questions.add(decision);
-            Optional<WindowHandle> owner = owner();
-            if (owner.isEmpty()) { decision.complete(HostKeyVerifier.Decision.CANCEL); return; }
-            PluginDialog dialog = context.windows().dialog(new DialogSpec("Verify host key " + question.host(), owner.get(), true));
+            if (owner == null || !owner.isOpen()) { decision.complete(HostKeyVerifier.Decision.CANCEL); return; }
+            PluginDialog dialog = context.windows().dialog(new DialogSpec("Verify host key " + question.host(), owner, true));
             currentHostKeyPanel = new HostKeyPanel(question, answer -> { decision.complete(answer); dialog.close(); });
             dialog.setContent(currentHostKeyPanel);
             decision.whenComplete((answer, failure) -> ui.execute(() -> { questions.remove(decision); dialog.close(); }));

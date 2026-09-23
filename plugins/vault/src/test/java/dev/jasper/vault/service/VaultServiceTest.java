@@ -77,6 +77,43 @@ class VaultServiceTest {
         lock.save().join();
     }
 
+    @Test void survivingCredentialRequestReopensPromptOnItsOwnWindow(@TempDir Path dir) {
+        var api = service(dir).forConsumer(SSH); populate();
+        boolean[] firstOpen = {true};
+        var firstOwner = new WindowHandle() {
+            final UUID id = UUID.randomUUID();
+            public UUID id() { return id; }
+            public List<TabHandle> tabs() { return List.of(); }
+            public Optional<TabHandle> activeTab() { return Optional.empty(); }
+            public boolean isActive() { return false; }
+            public boolean isOpen() { return firstOpen[0]; }
+            public void toFront() {}
+        };
+        var secondOwner = window();
+        var first = api.credential(firstOwner, PROD);
+        var second = api.credential(secondOwner, PROD);
+        assertThat(grants).hasSize(1);
+        firstOpen[0] = false;
+        first.cancel(false);
+        grants.getFirst().cancel();
+        assertThat(grants).hasSize(2);
+        assertThat(grants.getLast().owner()).isSameAs(secondOwner);
+        grants.getLast().answer(GrantPrompt.Decision.ALLOW_ONCE);
+        try (var secret = second.join().orElseThrow()) { assertThat(secret.username()).contains("deploy"); }
+    }
+
+    @Test void explicitCredentialOwnerOverridesActiveWindow(@TempDir Path dir) {
+        var api = service(dir).forConsumer(SSH); populate();
+        var requestedOwner = window();
+        var requested = api.credential(requestedOwner, PROD);
+        assertThat(grants.getFirst().owner()).isSameAs(requestedOwner);
+        requested.cancel(false);
+        lock.lock();
+        var unlocking = api.credential(requestedOwner, PROD);
+        assertThat(unlocks.getFirst().owner()).isSameAs(requestedOwner);
+        unlocking.cancel(false);
+    }
+
     @Test void consentNamesSelectedPasswordCredentials(@TempDir Path dir) {
         var api = service(dir).forConsumer(SSH); populate();
         api.importSshKeys(window, List.of(), List.of(PROD));

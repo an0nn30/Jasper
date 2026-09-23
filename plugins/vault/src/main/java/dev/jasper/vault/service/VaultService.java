@@ -178,18 +178,51 @@ public final class VaultService {
         @Override public List<CredentialDescriptor> credentials() { return descriptors(); }
 
         @Override public CompletableFuture<Optional<Credential>> credential(UUID id) {
+            return credentialForOwner(ownerFor(consumer), id, ignored -> {});
+        }
+
+        @Override public CompletableFuture<Optional<Credential>> credential(WindowHandle owner, UUID id) {
+            if (owner == null || !owner.isOpen()) return CompletableFuture.completedFuture(Optional.empty());
+            lastOwner.put(consumer.id(), owner);
             var result = new CompletableFuture<Optional<Credential>>();
-            Optional<WindowHandle> owner = ownerFor(consumer);
+            var active = new java.util.concurrent.atomic.AtomicReference<CompletableFuture<Optional<Credential>>>();
+            result.whenComplete((v, failure) -> { if (result.isCancelled() && active.get() != null) active.get().cancel(false); });
+            requestOwned(owner, id, result, active);
+            return result;
+        }
+
+        private void requestOwned(WindowHandle owner, UUID id, CompletableFuture<Optional<Credential>> result,
+                java.util.concurrent.atomic.AtomicReference<CompletableFuture<Optional<Credential>>> active) {
+            if (result.isDone()) return;
+            if (!owner.isOpen()) { result.complete(Optional.empty()); return; }
+            WindowHandle[] promptOwner = {owner};
+            var request = credentialForOwner(Optional.of(owner), id, shown -> promptOwner[0] = shown);
+            active.set(request);
+            request.whenComplete((value, failure) -> {
+                if (result.isDone()) { if (value != null) value.ifPresent(Credential::close); return; }
+                if (failure == null && value.isEmpty() && owner.isOpen() && promptOwner[0] != null && !promptOwner[0].isOpen()) {
+                    requestOwned(owner, id, result, active); return;
+                }
+                if (failure != null) result.completeExceptionally(failure);
+                else if (!owner.isOpen()) { value.ifPresent(Credential::close); result.complete(Optional.empty()); }
+                else result.complete(value);
+            });
+        }
+
+        private CompletableFuture<Optional<Credential>> credentialForOwner(Optional<WindowHandle> owner, UUID id,
+                java.util.function.Consumer<WindowHandle> observedOwner) {
+            var result = new CompletableFuture<Optional<Credential>>();
             if (lock.state() != LockState.UNLOCKED && lock.state() != LockState.NO_VAULT && owner.isEmpty()) {
                 notice.accept(NO_WINDOW_NOTICE);
                 result.complete(Optional.empty());
                 return result;
             }
+            observedOwner.accept(unlock == null ? owner.orElse(null) : unlock.owner());
             CompletableFuture<Boolean> unlocked = requestUnlock(owner.orElse(null));
             result.whenComplete((ignored, failure) -> { if (result.isCancelled()) unlocked.cancel(false); });
             unlocked.thenAccept(ok -> {
                 if (result.isDone()) return;
-                if (!ok) { result.complete(Optional.empty()); return; }
+                if (!ok || owner.filter(window -> !window.isOpen()).isPresent()) { result.complete(Optional.empty()); return; }
                 Optional<CredentialDescriptor> described = descriptor(id);
                 if (described.isEmpty()) { result.complete(Optional.empty()); return; }
                 Grant grant = new Grant(consumer.id(), id);
@@ -198,9 +231,10 @@ public final class VaultService {
                 if (prompt == null) {
                     prompt = new GrantPrompt(grant, consumer.name(), described.get(), owner.orElse(null), VaultService.this::answered);
                     grantPrompts.put(grant, prompt);
+                    observedOwner.accept(prompt.owner());
                     prompt.attach(result);
                     showGrant.accept(prompt);
-                } else prompt.attach(result);
+                } else { observedOwner.accept(prompt.owner()); prompt.attach(result); }
             });
             return result;
         }
