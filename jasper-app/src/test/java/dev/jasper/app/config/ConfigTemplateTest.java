@@ -57,7 +57,8 @@ class ConfigTemplateTest {
         assertThat(toml.getTable("terminal.shell").keySet()).containsExactlyInAnyOrder("program", "args");
         assertThat(toml.getTable("terminal.cursor").keySet()).containsExactlyInAnyOrder("shape", "blink");
         assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
-        assertThat(toml.getTable("ui.theme").keySet()).containsExactly("variant");
+        assertThat(toml.getTable("ui.font").keySet()).containsExactly("family");
+        assertThat(toml.getTable("ui.theme").keySet()).containsExactlyInAnyOrder("style", "variant");
         assertThat(toml.getTable("keybindings").keySet()).isEmpty();
 
         for (boolean macOs : new boolean[]{true, false}) {

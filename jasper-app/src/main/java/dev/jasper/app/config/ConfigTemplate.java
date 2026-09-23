@@ -116,13 +116,17 @@ public final class ConfigTemplate {
 
             [ui.font]
             # UI font for app chrome and plugin controls; updates live, independently of [font].
-            # Omit size to retain the platform default. Use 8–32 points when set.
+            # "system" uses the current style's platform font on macOS, Linux and Windows.
+            # A missing named font falls back to that platform font.
+            # Omit size to retain platform sizing. Use 8-32 points, including fractions, when set.
             # family = "system"
             # size = 14
 
             [ui.theme]
             # Application style: "modern" or "retro" (stock light Java Metal).
-            # Changing style requires fully restarting Jasper; existing sessions keep their current style.
+            # Set style to "retro" for Metal controls, classic icons and a high-contrast terminal.
+            # Restart required: fully quit and relaunch, including with background residency enabled.
+            # Reload reports the pending style change; existing windows keep their current style.
             # style = "modern"
             # Variant applies only to modern; retro always uses light controls and a dark terminal.
             # Theme variant: "dark" or "light"; switches chrome and terminal colors live across windows.

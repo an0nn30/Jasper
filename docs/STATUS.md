@@ -2,6 +2,14 @@
 
 ## Current state — 2026-09-23
 
+Configuration documentation follow-up: the example and settings reference now include
+explicit `ui.theme.style = "modern"` and `ui.font.family = "system"`, with optional
+UI sizing, portable fallback, full-restart behavior and retro's retained-but-ignored
+variant documented. The generated Settings template matches this guidance. Removed
+obsolete History keys from the app-config overview; their plugin settings remain
+documented separately. Existing config loader/template tests pass, including example
+defaults under macOS and non-macOS parsing. No runtime behavior changed.
+
 The user approved merging all `codex/retro-metal` work through `adfc37cb` into
 `main` and pushing `main` to `origin`. The conflict-free merge preserves the newer
 keyboard-shortcut reference and includes Metal retro chrome, bundled OldGNOME2
