@@ -67,6 +67,8 @@ The command palette keeps its controller, query, result rows, plugin scopes, for
 
 ### Native windows
 
+User amendment (2026-09-23, custom retro title approved in conversation): supersedes the native-only title requirement below on supported macOS/JBR installations. Reuse `MacTitleBar` with a fixed 32-logical-pixel solid gray title surface, regular retro font, centered session/window title and thin divider. Keep OS-owned traffic lights and existing JBR native geometry/gesture integration. Menus sit below the title surface; Metal terminal tabs remain below the toolbar, including for multiple tabs. Apply the same treatment to auxiliary frames/dialogs. Windows, Linux and unsupported runtimes retain native decorations. Validate layout, metadata, menu actions, multi-tab ownership, disposal and fallback headlessly; native traffic lights, dragging and fullscreen remain user-run acceptance.
+
 Both terminal windows and `NativeShells` auxiliary windows bypass `MacTitleBar` customization in retro. Set the root content pane and keep normal decorated `JFrame`/`JDialog` behavior. Preserve title updates, ownership, modality, close guards, geometry persistence, focus restoration, menus, and disposal. No transparent/full-window-content properties or JBR custom title bar should be installed.
 
 User amendment (2026-09-23): retro application menus stay inside each window on macOS; modern retains the macOS screen menu bar. Select this through the startup JVM property before toolkit/LAF initialization; configuration reload cannot change it. OS-owned title bars and the existing native file chooser remain OS UI; Metal governs Swing client controls. Do not replace the file picker or change restart/packaging behavior to make native UI resemble Metal.

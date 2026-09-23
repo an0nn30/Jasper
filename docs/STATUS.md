@@ -1903,3 +1903,24 @@ missing preferred families, empty font inventories, and restoration of modern fo
 The targeted theme/chrome suite, architecture check and installDist passed locally on
 macOS. Existing CI runs check on macOS, Ubuntu and Windows; it has not been dispatched
 for this local branch, so native Linux/Windows rendering is not claimed as verified.
+
+### Custom retro macOS title bar — 2026-09-23
+
+Implemented the user-approved compact title treatment as a bounded extension of the
+existing MacTitleBar. Supported macOS/JBR windows keep OS traffic lights and native
+window gestures, with a 32-logical-pixel flat gray title strip, regular retro font,
+centered title and subtle divider. Title color is slightly darker than menu/toolbar.
+The menu sits below the native control region; Metal tabs stay below the toolbar with
+one or many sessions. Terminal and auxiliary frames/dialogs share the treatment.
+Windows, Linux and runtimes without the required custom-decoration support retain
+native title bars. Updated the original retro design with the approved amendment.
+
+A new layout/metadata/menu-action regression failed before enabling the custom retro
+header and passed afterward. Full application check, architecture gates and installDist
+passed: 824 tests, 823 passed, one expected skip, zero failures/errors. Inspected
+headless 1x/2x previews with one and two tabs; source hygiene and diff checks passed.
+No native GUI launched: traffic-light hover/actions, dragging, double-click and
+fullscreen on macOS remain user-run acceptance. No merge or push.
+
+Independent review found no actionable correctness issues in runtime fallback, native
+integration, menu placement/keyboard handling, tab ownership, auxiliary windows or disposal.

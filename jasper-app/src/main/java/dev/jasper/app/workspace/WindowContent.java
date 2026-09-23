@@ -186,7 +186,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
                                       Consumer<String> nativeTitle) {
         var bar = MacTitleBar.install(root, content, content.windowTabs(), content::tabHeight,
-            () -> content.onMinimumSizeChanged.run(), supported && !content.retro());
+            () -> content.onMinimumSizeChanged.run(), supported);
         content.onTitle = value -> {
             String display = TerminalTitle.windowTitle(value);
             nativeTitle.accept(display);

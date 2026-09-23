@@ -79,8 +79,9 @@ public final class NativeShells {
     private AuxiliarySurface.Shell frame(AuxiliarySurface surface) {
         var frame = new JFrame(surface.title());
         frame.setIconImages(ApplicationIcon.images());
-        MacTitleBar bar = installTitleBar(frame.getRootPane(), surface, SystemInfo.isMacFullWindowContentSupported);
-        frame.setJMenuBar(menuBar(surface));
+        MacTitleBar bar = installTitleBar(frame.getRootPane(), surface, MacTitleBar.isSupported());
+        if (bar != null) bar.setMenuBar(menuBar(surface));
+        else frame.setJMenuBar(menuBar(surface));
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
@@ -114,7 +115,7 @@ public final class NativeShells {
             .orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null));
         var dialog = new JDialog(owner, surface.title(), surface.modal() ? Dialog.ModalityType.DOCUMENT_MODAL : Dialog.ModalityType.MODELESS);
         dialog.setIconImages(ApplicationIcon.images());
-        MacTitleBar bar = installTitleBar(dialog.getRootPane(), surface, SystemInfo.isMacFullWindowContentSupported);
+        MacTitleBar bar = installTitleBar(dialog.getRootPane(), surface, MacTitleBar.isSupported());
         dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         dialog.addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
@@ -139,7 +140,7 @@ public final class NativeShells {
 
     /** Shared, headless-testable title setup for both kinds of SDK/application auxiliary surface. */
     static MacTitleBar installTitleBar(JRootPane root, AuxiliarySurface surface, boolean supported) {
-        MacTitleBar bar = MacTitleBar.install(root, surface.holder(), new JPanel(), () -> TITLE_HEIGHT, () -> { }, supported && !dev.jasper.app.platform.SwingAppearance.retro());
+        MacTitleBar bar = MacTitleBar.install(root, surface.holder(), new JPanel(), () -> TITLE_HEIGHT, () -> { }, supported);
         if (bar != null) bar.setTitle(surface.title(), true);
         return bar;
     }

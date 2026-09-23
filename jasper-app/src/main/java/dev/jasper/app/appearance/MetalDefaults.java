@@ -23,6 +23,7 @@ final class MetalDefaults {
         UIDefaults defaults = UIManager.getLookAndFeelDefaults();
         installFonts(defaults);
         defaults.put("Jasper.retro", true);
+        defaults.put("Jasper.retroTitleBackground", new Color(0xe2e2e2));
         alias(defaults, "Panel.background", "Jasper.titleBackground", "Jasper.paletteBackground");
         alias(defaults, "Label.foreground", "Jasper.titleForeground", "Jasper.chromeForeground",
             "Jasper.tabSelectedForeground", "Jasper.paletteForeground");
