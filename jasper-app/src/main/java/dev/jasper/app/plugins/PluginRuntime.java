@@ -324,6 +324,13 @@ public final class PluginRuntime {
             new AppEvents.ThemeChanged(dark ? Variant.DARK : Variant.LIGHT));
     }
 
+    /** Discovered plugin display names, without performing file I/O. */
+    public Map<String, String> pluginNames() {
+        var names = new java.util.LinkedHashMap<String, String>();
+        launched.forEach((id, candidate) -> names.put(id, candidate.descriptor().name()));
+        return Map.copyOf(names);
+    }
+
     /**
      * One line per discovered plugin: id, version, origin, state and reason.
      *

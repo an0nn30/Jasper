@@ -140,6 +140,11 @@ class JasperApplicationPluginsTest {
                 assertThat(section.target()).isEqualTo(MenuTarget.standard(MenuTarget.Slot.FILE));
                 assertThat(section.entries()).containsExactly(new MenuEntry.Item("plugins.manage"));
             });
+            assertThat(application[0].contributions().action("app.shortcuts")).isPresent();
+            assertThat(application[0].contributions().menus()).anySatisfy(section -> {
+                assertThat(section.target().title()).isEqualTo("Help");
+                assertThat(section.entries()).contains(new MenuEntry.Item("app.shortcuts"));
+            });
             assertThat(application[0].bindingProblems()).isEmpty();
         });
         edt(application[0]::quit);

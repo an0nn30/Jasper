@@ -2,6 +2,25 @@
 
 ## Current state — 2026-09-23
 
+The approved keyboard shortcut reference is implemented on `codex/keyboard-shortcuts`
+in `/Users/dustin/.codex/worktrees/keyboard-shortcuts/moray`, based on local `main`.
+**Help → Keyboard Shortcuts…** opens one reusable window with grouped app/plugin rows,
+text and exact-key capture search, effective overridden bindings, conflict explanations,
+contextual keys and live updates. [Guide and native acceptance](keyboard-shortcuts.md).
+No SDK changes. Third-party private UI listeners are not discoverable, and OS-reserved
+shortcuts remain OS-controlled.
+
+Bounded design approved in chat; native inline implementation and independent review.
+The review's held-key/focus-loss finding is fixed and re-reviewed. Tests cover catalog
+completeness, overrides/conflicts, contextual/plugin removal, capture/tails, singleton
+reuse/live refresh, native-recorder cleanup and larger UI typography. Headless dark/light
+previews at default/18-point typography were inspected; no native GUI was launched.
+`./gradlew check :jasper-app:installDist :jasper-app:shortcutHelpPreview` passed:
+**1,652 tests: 1,649 passed, three expected skips, zero failures/errors**. All architecture
+checks passed; the worktree distribution was rebuilt. GUI acceptance remains user-run.
+No merge or push; branch and worktree retained for integration.
+
+
 Remote plan 7a and its follow-ups are integrated into local `main` from
 `codex/remote-7a` through `22b0fd29`: SSH sessions and navigation, connection
 overlays, configurable UI typography and Remote shortcuts, keyboard-ready hosts

@@ -140,3 +140,13 @@ tasks.test {
         rootProject.fileTree("plugins/sample/src") { include("**/*.java") }, rootProject.fileTree("packaging") { include("**/*.md") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
+
+// The actual shortcut reference, rendered without creating a native window.
+tasks.register<JavaExec>("shortcutHelpPreview") {
+    group = "verification"
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.jasper.app.shortcuthelp.ShortcutHelpPreview"
+    jvmArgs("-Djava.awt.headless=true")
+    args(layout.buildDirectory.dir("reports/shortcut-help").get().asFile.absolutePath)
+}

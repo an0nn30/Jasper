@@ -82,6 +82,7 @@ public final class JasperApplication {
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
     private PluginManager pluginManager;
+    private dev.jasper.app.shortcuthelp.ShortcutHelp shortcutHelp;
     private ResidentControl residentControl = ResidentControl.NONE;
     private boolean replacementHandsOff;
     private boolean standaloneNotice;
@@ -151,10 +152,16 @@ public final class JasperApplication {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             loginItems.accept(snapshot.backgroundEnabled());
             if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
+            if (shortcutHelp != null) shortcutHelp.refresh();
         });
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
             Desktop.getDesktop().setQuitHandler((event, response) -> {
-                response.cancelQuit(); SwingUtilities.invokeLater(this::quit);
+                response.cancelQuit();
+                SwingUtilities.invokeLater(() -> {
+                    var focused = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow();
+                    var stroke = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.META_DOWN_MASK);
+                    if (!dev.jasper.app.platform.WindowInput.captureShortcut(focused, stroke)) quit();
+                });
             });
             quitHandlerInstalled = true;
         }
@@ -300,6 +307,13 @@ public final class JasperApplication {
             Optional.empty(), invocation -> managePlugins());
         contributions.addMenuSection(MenuTarget.standard(MenuTarget.Slot.FILE)).set(List.of(new MenuEntry.Item("plugins.manage")));
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome() == BuiltinTheme.DARK);
+        boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
+        shortcutHelp = new dev.jasper.app.shortcuthelp.ShortcutHelp(auxiliary, contributions,
+            () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).bindings(macOs),
+            plugins::pluginNames, macOs);
+        contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("help", "keys", "bindings"),
+            Optional.empty(), invocation -> { if (!quitting && !stopped) shortcutHelp.open(); });
+        contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(List.of(new MenuEntry.Item("app.shortcuts")));
         boolean[] replayed = new boolean[1];
         // subscribe replays the current theme at once; plugins read the look on demand, so only later changes are events.
         pluginTheme = themes.subscribe((theme, chromeChanged) -> {
