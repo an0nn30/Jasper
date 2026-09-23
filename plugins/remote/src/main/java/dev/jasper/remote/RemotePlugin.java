@@ -37,6 +37,7 @@ import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.Side;
+import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.vault.api.CredentialDescriptor;
@@ -137,6 +138,7 @@ public class RemotePlugin implements Plugin {
         context.actions().register(ActionSpec.of(IMPORT, "Import from ~/.ssh/config...").withKeywords(List.of("ssh", "import", "config")), invoked -> importConfig(invoked.window()));
         PluginMenu menu = context.menus().create(MENU, "SSH");
         menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(IMPORT);
+        context.menus().standard(StandardMenu.VIEW).add(HOSTS);
 
         scope = new RemoteScope(store::hosts, store::error, this::openHost, this::splitHost, (window, host) -> editHost(window, Optional.of(host)));
         context.palette().register(scope);

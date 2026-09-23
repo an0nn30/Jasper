@@ -146,6 +146,14 @@ found no actionable issues. `./gradlew check :jasper-app:installDist` passed: **
 1,633 passed, three expected skips, zero failures/errors**; Remote **71/71**. Distribution rebuilt.
 No GUI launched; native appearance remains user acceptance. No merge or push.
 
+### Remote View menu entry — 2026-09-23
+
+Registered the existing SSH Hosts toggle action under **View > SSH Hosts**, so it shows or hides
+the panel in the invoking window. The existing **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) binding
+already opens the palette directly in the SSH scope; no additional shortcut or action is needed.
+`./gradlew :jasper-plugin-remote:test --tests '*RemotePluginTest' :jasper-app:installDist` passed:
+ten plugin integration tests, zero failures. Distribution rebuilt; no GUI launched, merge or push.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:
