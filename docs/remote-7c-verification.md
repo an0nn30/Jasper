@@ -8,8 +8,11 @@ single Remote plugin; SSH remains available independently of the transfer queue.
 
 ## Automated evidence
 
-The full gate is `./gradlew check :jasper-app:installDist` on JBR 25. Final counts and independent
-review outcomes are recorded below after the final gate. Targeted regression suites passed for:
+The full gate `./gradlew check :jasper-app:installDist` passed after the review fixes on JBR 25 in 1m41s:
+**1,845 tests, 1,842 passed, three expected skips, zero failures/errors**, counted from
+JUnit XML. All accepted final-review findings have passing regression tests. The installed distribution contains
+`sshd-sftp-2.19.0.jar`, `sqlite-jdbc-3.53.4.0.jar` and Remote `0.3.0` declaring SDK
+`>=0.7.5, <0.8`; its plugin jar contains no image assets. Targeted regression suites passed for:
 
 - Local, SFTP and remote-to-remote copies through loopback SSH; ProxyJump and a surviving shell.
 - Explicit write acknowledgements, bounded pipelining, short reads, sparse offsets and request aborts.
@@ -74,3 +77,48 @@ preserved. SFTP cannot prove ownership of every interrupted partial; ambiguous e
 an attention/cleanup issue rather than authorizing deletion. Prefix validation reads the saved
 prefix at both endpoints and can take appreciable time. See [Remote](remote.md) for user-facing
 recovery, conflict, queue and cleanup behavior.
+
+## Final adversarial review
+
+The independent reviewer inspected `1fcf9a8d..a599f457` and confirmed two data-integrity
+issues and six recovery/control issues. The native fix pass addressed all eight:
+
+| Finding | Fix and regression |
+| --- | --- |
+| Emoji-named folder descendants escaped conflict blocking | SQLite substring offsets use code points; actual coordinator Merge/Skip/Rename cases preserve untouched children until a decision. |
+| Case/normalization aliases could overwrite a sibling | Indexed destination keys reject collisions before dispatch and on Rename. |
+| Failed replacement publication could not accept a new decision | Durable resolution intent keeps old paths/evidence until reconciliation; all three decisions are tested both before and after publication. |
+| Cancelling resume left credential resolution pending | Cancellation explicitly reaches the upstream identity/Vault future. |
+| Apply-remaining swept every conflict on the control lane | Policies apply lazily during bounded dispatch; a 100k-conflict set does not delay another stalled job's pause. |
+| Resuming a scan reopened finished directories | Only newly admitted directories create frontier rows; unfinished rows persist. |
+| Deliberate directory-link navigation failed | Browser-only resolution follows bounded link chains, while recursive mutation remains no-follow. |
+| Partial deletion results disappeared on refresh | A separate operation-result label retains cancellation and failed paths. |
+
+The author additionally fixed missing cleanup paths/reasons in Details and a clipped conflict
+scope checkbox, each with an observed failing regression followed by a passing test. Headless
+component renders were inspected. The final full suite, architecture checks, source-hygiene scan and diff check passed.
+There are no deferred review minors. Native desktop acceptance,
+an independent Gradle rerun, and atomic exclusion of unrelated external filesystem writers were
+the reviewer's explicitly unjudged items; their limits are recorded in the rulings below.
+
+## Execution rulings
+
+These are the execution ledger's decisions and their costs, retained here before scratch cleanup.
+- Task 2: Ruling: the brief sample ProgressState constructor omitted the accessible description and OptionalDouble wrapper — use its declared interface and the approved accessibility requirement — cost if wrong: call-site adjustment only.
+- Task 4: Ruling: identity(UUID) captures the configured route synchronously; lease resolves empty Vault accounts before reuse and resolveIdentity(UUID, owner) resolves without connecting — credential prompts require a captured owner and an async result — cost if wrong: callers must await resume validation.
+- Task 4: Ruling: SFTP-through-ProxyJump regression moves to Task 5 because SFTP is not linked until then; SSH-through-ProxyJump and changed jump-account identities are verified now — cost if wrong: integration issue detected one task later.
+- Task 5: Ruling: FileEntry additionally carries a nonsecret fileKey (empty when remote/unavailable), and FileEndpoint.id uses host-key fingerprint + effective account — temp ownership and alias reservations need this evidence — cost if wrong: conservative extra serialization across servers sharing a host key.
+- Task 5: Ruling: server directory responses use MINA's bounded wire packets (256 KiB), then consumer/SQL batches are capped at 256; the client cannot dictate the server's entry count per reply — avoids rejecting valid remote listings — cost if wrong: one bounded protocol page may exceed 256 records in memory.
+- Task 5: Ruling: local no-replace symbolic links publish via exclusive createSymbolicLink of the temp's exact link text, then unlink the temp — macOS createLink follows the source symlink (caught RED in shared contract), so hard-link publication would copy its referent — cost if wrong: recovery must reconcile two distinct symlink entries by link text, not inode equality. Regular files retain hard-link no-replace publication.
+- Task 6: Ruling: staged plugin-loader SQLite test moves to Task 10 with distribution/loader integration; direct driver deregistration and child-process native-library loading are tested now — no product integration exists yet — cost if wrong: classloader packaging problem discovered during final integration.
+- Task 7: Ruling: each running job retains up to two reusable endpoint pairs through its scan/copy/final-metadata phases — avoids a new SFTP subsystem for every file and pins the authenticated transport after pane closure — cost if wrong: up to four idle subsystem channels per admitted active job until pause/completion; scheduling limits active copies and scanner. Existing authenticated leases can be borrowed without prompts even when the initiating window closed; no new authentication is inferred.
+- Task 7: Ruling: local reservation names use conservative Unicode normalization/case folding — covers case-insensitive APFS/Windows alias collisions — cost if wrong: extra serialization on case-sensitive local filesystems. Destination-directory reservation is intentionally conservative and shared among that job's workers.
+- Task 7: Ruling: a remote partial without stable file identity must match persisted lstat evidence; an ambiguous uncheckpointed remote tail requires attention instead of blind truncate — SFTP v3 cannot prove its ownership — cost if wrong: more manual restarts after abrupt disconnects. Local owned tails validate all prefix digests and truncate safely.
+- Task 8: Ruling: SftpUi is an additional composition class for captured picker flows and per-window controllers — keeps RemotePlugin free of file-operation/dialog details — cost if wrong: one extra focused UI class. Its composition tests run with Task 9 plugin wiring. Browser caches and recursive-deletion stacks are separate disposable SQLite files, never the durable queue. Controllers admit their own worker loops while the panel/dialog is created; close signals them without submitting shutdown work.
+- Task 9: Ruling: synchronous FakePluginHost's runBackground cannot execute admitted lifetime loops — SSH test fixtures inject a real loop executor and join only in their test-only stop override; production uses HostedContext's scoped executor and never waits on EDT. The actual staged classloader/HostedContext test covers production executor admission, shutdown during read/checkpoint/publication, persisted pause and released queue lock.
+- Task 9: Ruling: unsupported/failed metadata application is a separately counted warning if content can still be safely published — preserves content while showing Completed with issues — cost if wrong: permissions/time need manual correction, never reported as fully successful. Live status counts durable confirmed bytes once; speculative submitted writes are excluded. File policies can apply to remaining conflicts of the same kind; type mismatches still require individual decisions.
+- Task 10: Ruling: fresh reviewer spawn was rejected by the agent thread limit — reused completed cards_review seat, independent of all SFTP implementation and plan review, with explicit new review context — cost if wrong: earlier SSH review context may bias judgments; no author review substituted.
+- Final: Ruling: reject case/normalization-equivalent destination names conservatively for remote as well as local jobs — SFTP does not advertise filesystem comparison rules, so silent sibling overwrites are unacceptable — cost if wrong: a case-sensitive destination may require renaming or splitting otherwise-valid selections into separate jobs.
+- Final: Ruling: native GUI/real-host acceptance remains user-run, as repository instructions require — no app window, login shell or saved-host connection was launched — cost if wrong: platform-specific desktop behavior remains unverified until acceptance.
+- Final: Ruling: the reviewer did not run Gradle because the native implementer owned verification — full check/installDist, actual XML and staged-distribution evidence are recorded by the author — cost if wrong: test interpretation lacks an independent rerun, not test execution.
+- Final: Ruling: fully atomic exclusion of external namespace changes remains the documented SFTP/local-provider limitation — revalidation, reservations and conservative ownership govern Jasper operations, not unrelated programs — cost if wrong: outside writers racing the same paths can still require manual review.

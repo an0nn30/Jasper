@@ -73,15 +73,37 @@ public final class TransferRecovery {
     static void readFully(InputStream stream,byte[] buffer,int count) throws IOException {
         int offset=0;while(offset<count) { int n=stream.read(buffer,offset,count-offset);if(n<0) throw new EOFException("File shortened during verification");if(n==0) throw new IOException("Read made no progress");offset+=n; }
     }
+    /** A new user decision never erases the old publication paths before reconciliation. */
+    public static boolean resolvePublication(TransferStore store,TransferEntry entry,FileEndpoint destination,TransferControl control) throws IOException {
+        var pending=store.publicationDecision(entry.id());
+        if(pending.isEmpty()) { reconcile(store,entry,destination,control);return false; }
+        var resolution=pending.orElseThrow();var target=optional(destination,entry.target());
+        if(published(entry,target,destination,control)) { reconcile(store,entry,destination,control);return false; }
+        if(resolution.decision()==ConflictDecision.SKIP) {
+            try { cleanup(store,entry,destination,control); }
+            catch(IOException failure) { store.cleanup(entry.id(),failure.getMessage()); }
+            store.outcome(entry.id(),TransferEntry.Outcome.SKIPPED,"Skipped");return false;
+        }
+        boolean original=entry.expectedTarget().isPresent()?target.isPresent() && sameSource(entry.expectedTarget().orElseThrow(),target.orElseThrow()):target.isEmpty();
+        var temporary=optional(destination,entry.temporary());
+        if(!original || temporary.isEmpty() || !owned(entry,temporary.orElseThrow()) || !digest(destination,entry.temporary(),control).equals(entry.digest()))
+            throw new Attention("Old publication is still uncertain; original paths retained for review");
+        if(resolution.decision()==ConflictDecision.REPLACE && (target.isEmpty() || target.orElseThrow().kind()!=entry.sourceInfo().kind()))
+            throw new Attention("Replacement target changed; choose Rename or Skip");
+        control.check();store.retryPublication(entry.id(),resolution);return true;
+    }
+    private static boolean published(TransferEntry entry,Optional<FileEntry> target,FileEndpoint destination,TransferControl control) throws IOException {
+        return target.isPresent() && target.orElseThrow().kind()==entry.sourceInfo().kind()
+            && (entry.sourceInfo().kind()!=FileEntry.Kind.FILE || target.orElseThrow().size()==entry.sourceInfo().size())
+            && digest(destination,entry.target(),control).equals(entry.digest());
+    }
     public static void reconcile(TransferStore store,TransferEntry entry,FileEndpoint destination,TransferControl control) throws IOException {
         reconcile(store,entry,destination,control,true);
     }
     private static void reconcile(TransferStore store,TransferEntry entry,FileEndpoint destination,TransferControl control,boolean publish) throws IOException {
         if(entry.phase()!=TransferEntry.Phase.PUBLISHING) return;
         var target=optional(destination,entry.target());var temporary=optional(destination,entry.temporary());
-        if(target.isPresent() && target.orElseThrow().kind()==entry.sourceInfo().kind()
-            && (entry.sourceInfo().kind()!=FileEntry.Kind.FILE || target.orElseThrow().size()==entry.sourceInfo().size())
-            && digest(destination,entry.target(),control).equals(entry.digest())) {
+        if(published(entry,target,destination,control)) {
             if(temporary.isPresent()) {
                 if(!owned(entry,temporary.orElseThrow())) throw new Attention("Published file verified, but partial ownership is uncertain");
                 if(!digest(destination,entry.temporary(),control).equals(entry.digest())) throw new Attention("Published file verified, but partial content changed");
@@ -94,6 +116,10 @@ public final class TransferRecovery {
             if(publish) { destination.publish(entry.temporary(),entry.target(),false);store.outcome(entry.id(),TransferEntry.Outcome.COMPLETE,""); }
             else destination.remove(entry.temporary(),false);
             store.cleaned(entry.id());return;
+        }
+        if(!publish && entry.expectedTarget().isPresent() && target.isPresent() && sameSource(entry.expectedTarget().orElseThrow(),target.orElseThrow())
+            && temporary.isPresent() && owned(entry,temporary.orElseThrow()) && digest(destination,entry.temporary(),control).equals(entry.digest())) {
+            control.check();destination.remove(entry.temporary(),false);store.cleaned(entry.id());return;
         }
         throw new Attention("Publication interrupted; target or partial needs review before retry");
     }

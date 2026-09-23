@@ -101,8 +101,8 @@ public final class SftpController implements AutoCloseable {
                 FileEndpoint endpoint;
                 while(true) { check(token);try { endpoint=future.get(100,TimeUnit.MILLISECONDS);break; } catch(TimeoutException waiting) { /* cancellation owns the request */ } }
                 active.set(endpoint);check(token);
-                String directory=target.isBlank()?endpoint.home():target.startsWith("/")?FilePaths.absolute(target):FilePaths.absolute(endpoint.home()+"/"+target);
-                if(endpoint.stat(directory).kind()!=FileEntry.Kind.DIRECTORY) throw new IOException("Path is not a directory");
+                String requested=target.isBlank()?endpoint.home():target.startsWith("/")?FilePaths.absolute(target):FilePaths.absolute(endpoint.home()+"/"+target);
+                String directory=endpoint.resolveDirectory(requested);
                 fresh=new DirectoryCache(cacheDirectory);var writing=fresh;var batch=new ArrayList<FileEntry>(256);
                 var listingEndpoint=endpoint;
                 endpoint.list(directory,entry-> { try { check(token);listingEndpoint.child(directory,entry.name());batch.add(entry);if(batch.size()==256) { writing.append(batch);batch.clear(); } } catch(IOException error) { throw new UncheckedIOException(error); } });

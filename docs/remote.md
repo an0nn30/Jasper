@@ -147,6 +147,7 @@ Connecting a shell does not automatically open the browser. There is one remote 
 each window, with an editable path, compact file list, Up, Upload, Download, Refresh,
 New folder, Delete and Copy path controls. Select multiple rows for file operations.
 The context menu also offers **Upload folder** and **Copy to host**.
+Opening a directory link deliberately resolves its path; recursive copy/delete still treat it as a link.
 
 The browser remembers each remote pane's directory and Follow terminal folder choice.
 Following uses directory reports from that pane, without running a shell command. Entering
@@ -174,7 +175,7 @@ opens the queue when several jobs are active.
 Pause retains partial files and checkpoints. Resume rechecks the source and destination
 prefixes before appending; a large retained prefix takes time to validate. Cancel stops new
 work and attempts to remove only verified, owned temporary files. Already published files
-remain. Cleanup failures stay visible and can be retried. Clear removes queue history only;
+remain. Cleanup failures stay visible with their partial path and reason in file Details, and can be retried. Clear removes queue history only;
 it requires acknowledgement when cleanup remains unresolved.
 
 After a restart, unfinished jobs are **Paused**, with no automatic authentication or network
@@ -182,7 +183,10 @@ reconnect. Resume is explicit. A changed saved host, login account or jump route
 attention rather than silently changing the copy's endpoint. Conflict choices are Replace,
 Skip or Rename for files; Merge, Skip or Rename for folders; and Skip or Rename for type
 mismatches. Applying a decision to remaining conflicts is scoped to that conflict type.
-Independent files continue while other entries need a decision.
+Independent files continue while other entries need a decision. Completed directory listings are
+retained when a scan resumes. Potential case/Unicode-normalization aliases within one job are
+rejected before copying, conservatively even on a case-sensitive server; rename or split the
+selection instead of risking one sibling replacing another.
 
 Copies preserve links as links, and attempt modification times and ordinary rwx permissions.
 Unsupported metadata becomes a warning; ownership, ACLs, extended attributes and special mode

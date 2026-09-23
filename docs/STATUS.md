@@ -2,7 +2,7 @@
 
 ## Current state — 2026-09-23
 
-### SFTP phase 1 — approved design, reviewed plan, native implementation
+### SFTP phase 1 — implemented, reviewed and verified
 
 The [SFTP design](superpowers/specs/2026-09-23-jasper-remote-sftp-design.md) is approved
 on `codex/remote-sftp` in `/Users/dustin/.codex/worktrees/remote-sftp/moray`, from main
@@ -12,7 +12,7 @@ bounded large-file/folder handling; persistent pause/resume with unfinished jobs
 paused; explicit conflicts, temporary-file publication and recoverable errors. It remains
 inside `dev.jasper.remote`, depends on SSH 7a, and does not require tunnels 7b.
 
-The draft proposes generic SDK progress/chooser additions and a plugin-owned SQLite queue.
+The implementation adds generic SDK progress/chooser APIs and a plugin-owned SQLite queue.
 The user's icon clarification is recorded in section 9.3: all SFTP artwork uses SDK
 `Appearance.icon(IconName)`; missing semantic names and Tabler/OldGNOME2 assets belong in
 the app/SDK, with both skin mappings tested. Remote adds no icon resources or custom painting.
@@ -32,8 +32,14 @@ checkpoints and restart validation, blocked-write pause, seven killed-process pu
 and a >4-GiB/100k-entry probe under a 64-MiB heap. The browser/controller, disk-backed directory pages, destination picker and cancellable
 file operations are implemented with native controls and SDK icons. Plugin wiring and Transfers management are integrated; real staged/HostedContext tests pass
 shutdown during read, checkpoint and publication, with paused recovery and lock reacquisition.
-The full check/build and final independent review are next.
-The staged plugin-loader SQLite check runs with final integration; direct driver deregistration is covered now.
+The final `./gradlew check :jasper-app:installDist` gate passed after the review fixes
+(1,845 tests: 1,842 passed, three expected skips, zero failures/errors). The independent
+review found two data-integrity issues and six control/recovery issues; all are fixed with
+regressions. This includes Unicode subtree handling, destination aliases, publication decisions,
+credential cancellation, bounded remaining-conflict policies, frozen scan frontiers, explicit
+link navigation and persistent deletion results. Distribution contents and SDK floor are
+verified; Remote bundles no icons. No deferred review minors. See
+[verification and native acceptance](remote-7c-verification.md).
 Nothing merged or pushed.
 
 ### Latest completed work

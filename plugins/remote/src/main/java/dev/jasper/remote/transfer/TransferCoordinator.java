@@ -144,7 +144,12 @@ public final class TransferCoordinator implements AutoCloseable {
             if(decision==ConflictDecision.RENAME) {
                 if(renamedTarget==null || renamedTarget.isBlank()) throw new IOException("Choose a new filename");
                 target=store.request(entry.jobId()).destination().hostId().isEmpty()?Path.of(target).getParent().resolve(validName(renamedTarget)).toString():FilePaths.child(FilePaths.parent(target),validName(renamedTarget));
-                store.renameTree(entryId,target);
+                if(entry.phase()!=TransferEntry.Phase.PUBLISHING) store.renameTree(entryId,target);
+            }
+            if(entry.phase()==TransferEntry.Phase.PUBLISHING) {
+                store.publicationDecision(entryId,decision,target);
+                if(remaining) store.policy(entry.jobId(),false,decision);
+                return null;
             }
             if(decision==ConflictDecision.SKIP && entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY) store.skipTree(entryId);
             else store.decision(entryId,decision,target);

@@ -110,4 +110,82 @@ class TransferStoreTest {
         assertThat(Collections.list(java.sql.DriverManager.getDrivers())).noneMatch(d -> d instanceof org.sqlite.JDBC);
     }
 
+    @Test void supplementaryDirectoryNamesKeepAllDescendantsBehindConflictDecision() throws Exception {
+        try(var store=new TransferStore(root)) {
+            String name="folder-\uD83D\uDE00";var job=store.create(request());
+            var directory=new FileEntry(name,FileEntry.Kind.DIRECTORY,0,1000,0755,"");
+            store.discover(job,List.of(new TransferStore.Discovered(name,"/source/"+name,"/destination/"+name,directory),
+                new TransferStore.Discovered(name+"/child","/source/"+name+"/child","/destination/"+name+"/child",file("child",3))));
+            var parent=store.entries(job,0,10).getFirst();var child=store.entries(job,0,10).get(1);
+            store.attention(parent.id(),"Destination already exists");
+            assertThat(store.pending(job,10)).isEmpty();
+            store.renameTree(parent.id(),"/destination/renamed");
+            store.decision(parent.id(),ConflictDecision.RENAME,"/destination/renamed");
+            assertThat(store.entry(child.id()).target()).isEqualTo("/destination/renamed/child");
+            assertThat(store.pending(job,10)).hasSize(2);
+            store.skipTree(parent.id());
+            assertThat(store.entry(child.id()).outcome()).isEqualTo(TransferEntry.Outcome.SKIPPED);
+            assertThat(store.job(job).skippedEntries()).isEqualTo(2);
+        }
+    }
+
+    @Test void localDestinationAliasesAreRejectedBeforeDispatchAndOnRename() throws Exception {
+        try(var store=new TransferStore(root)) {
+            for(var pair:List.of(List.of("A","a"),List.of("\u00e9","e\u0301"))) {
+                var job=store.create(request());String first=pair.get(0),second=pair.get(1);
+                store.discover(job,List.of(new TransferStore.Discovered(first,"/source/"+first,"/destination/"+first,file(first,3))));
+                assertThatThrownBy(()->store.discover(job,List.of(new TransferStore.Discovered(second,"/source/"+second,"/destination/"+second,file(second,3)))))
+                    .isInstanceOf(IOException.class).hasMessageContaining("collide");
+                assertThat(store.job(job).scanned()).isFalse();
+                store.discover(job,List.of(new TransferStore.Discovered("other","/source/other","/destination/other",file("other",3))));
+                long other=store.entries(job,0,10).getLast().id();
+                assertThatThrownBy(()->store.renameTree(other,"/destination/"+second)).isInstanceOf(IOException.class).hasMessageContaining("collide");
+                assertThat(store.entry(other).target()).isEqualTo("/destination/other");
+            }
+        }
+    }
+
+    @Test void replayDoesNotReopenFinishedDirectoryListings() throws Exception {
+        try(var store=new TransferStore(root)) {
+            var job=store.create(request());var dir=new FileEntry("folder",FileEntry.Kind.DIRECTORY,0,1000,0755,"");
+            var found=new TransferStore.Discovered("folder","/source/folder","/destination/folder",dir);
+            store.discover(job,List.of(found),true);var frontier=store.frontier(job,10).getFirst();store.finishFrontier(frontier.id());
+            store.discover(job,List.of(found),true);assertThat(store.frontier(job,10)).isEmpty();
+        }
+    }
+    @Test void applyingRemainingPolicyLeavesDecisionsForBoundedDispatchAndHonorsType() throws Exception {
+        try(var store=new TransferStore(root)) {
+            var job=store.create(request());store.discover(job,List.of(discovered(0),discovered(1)));
+            var rows=store.entries(job,0,10);var ordinary=rows.getFirst();var mismatch=rows.getLast();
+            store.conflict(ordinary.id(),Optional.of(file("file-0",3)),"Destination already exists");
+            store.conflict(mismatch.id(),Optional.of(new FileEntry("file-1",FileEntry.Kind.DIRECTORY,0,1000,0755,"")),"Destination already exists");
+            store.policy(job,false,ConflictDecision.REPLACE);
+            assertThat(store.entry(ordinary.id()).decision()).isEqualTo(ConflictDecision.ASK);
+            assertThat(store.pending(job,1)).extracting(TransferEntry::id).containsExactly(ordinary.id());
+            assertThat(store.entry(mismatch.id()).decision()).isEqualTo(ConflictDecision.ASK);
+        }
+    }
+
+    @Test void publicationDecisionSurvivesReopenWithoutChangingOriginalEvidence() throws Exception {
+        long entry;String original="/destination/original";
+        try(var store=new TransferStore(root)) {
+            var job=store.create(request());store.discover(job,List.of(new TransferStore.Discovered("file","/source/file",original,file("file",3))));entry=store.entries(job,0,1).getFirst().id();
+            store.planTemporary(entry,"/destination/.partial");store.created(entry,file(".partial",3));store.publishing(entry,"a".repeat(64),TransferEntry.Publication.ATOMIC_REPLACE,Optional.of(file("original",1)));
+            store.publicationDecision(entry,ConflictDecision.RENAME,"/destination/new");
+        }
+        try(var store=new TransferStore(root)) {
+            assertThat(store.entry(entry).target()).isEqualTo(original);assertThat(store.entry(entry).phase()).isEqualTo(TransferEntry.Phase.PUBLISHING);
+            assertThat(store.entry(entry).digest()).isEqualTo("a".repeat(64));assertThat(store.entry(entry).expectedTarget().orElseThrow().size()).isEqualTo(1);
+            assertThat(store.publicationDecision(entry).orElseThrow().target()).isEqualTo("/destination/new");
+        }
+    }
+    @Test void pendingCleanupExposesItsOwnedPathAndFailureInFileDetails() throws Exception {
+        try(var store=new TransferStore(root)) {
+            var job=store.create(request());store.discover(job,List.of(discovered(0)));long entry=store.entries(job,0,1).getFirst().id();
+            store.planTemporary(entry,"/destination/.owned-partial");store.cleanup(entry,"Permission denied");
+            assertThat(store.entries(job,0,10).getFirst().error()).contains("/destination/.owned-partial","Permission denied");
+            store.cleaned(entry);assertThat(store.entry(entry).error()).doesNotContain("Permission denied");
+        }
+    }
+
 }

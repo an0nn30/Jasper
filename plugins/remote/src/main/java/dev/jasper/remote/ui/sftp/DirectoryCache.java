@@ -34,7 +34,7 @@ public final class DirectoryCache implements AutoCloseable {
                 for(var entry:entries) {
                     statement.setString(1,entry.name());statement.setInt(2,entry.kind()==FileEntry.Kind.DIRECTORY?0:1);statement.setString(3,entry.kind().name());statement.setLong(4,entry.size());statement.setLong(5,entry.modifiedMillis());statement.setInt(6,entry.permissions());statement.setString(7,entry.linkTarget());statement.setString(8,entry.fileKey());statement.addBatch();
                 }
-                statement.executeBatch();db.commit();count+=entries.size();directories+=entries.stream().filter(e->e.kind()==FileEntry.Kind.DIRECTORY).count();
+                statement.executeBatch();db.commit();count+=entries.size();directories+=entries.stream().filter(e->e.kind()==FileEntry.Kind.DIRECTORY || e.kind()==FileEntry.Kind.LINK).count();
             } catch(SQLException failure) { db.rollback();throw failure; }
             finally { db.setAutoCommit(true); }
         } catch(SQLException failure) { throw new IOException("Cannot cache directory listing",failure); }
@@ -43,7 +43,7 @@ public final class DirectoryCache implements AutoCloseable {
     public List<FileEntry> page(long offset,int limit) throws IOException { return page(offset,limit,false); }
     public List<FileEntry> page(long offset,int limit,boolean foldersOnly) throws IOException {
         if(offset<0 || limit<1 || limit>200) throw new IllegalArgumentException("Directory page must contain 1..200 rows");
-        try(var statement=db.prepareStatement("SELECT * FROM files "+(foldersOnly?"WHERE rank=0 ":"")+"ORDER BY rank,name COLLATE NOCASE,name LIMIT ? OFFSET ?")) {
+        try(var statement=db.prepareStatement("SELECT * FROM files "+(foldersOnly?"WHERE kind IN ('DIRECTORY','LINK') ":"")+"ORDER BY rank,name COLLATE NOCASE,name LIMIT ? OFFSET ?")) {
             statement.setInt(1,limit);statement.setLong(2,offset);var result=new ArrayList<FileEntry>();
             try(var rows=statement.executeQuery()) { while(rows.next()) result.add(new FileEntry(rows.getString("name"),FileEntry.Kind.valueOf(rows.getString("kind")),rows.getLong("size"),rows.getLong("modified"),rows.getInt("permissions"),rows.getString("target"),rows.getString("file_key"))); }
             return List.copyOf(result);

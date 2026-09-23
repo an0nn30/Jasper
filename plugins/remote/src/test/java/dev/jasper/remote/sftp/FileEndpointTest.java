@@ -36,6 +36,11 @@ class FileEndpointTest {
         endpoint.symlink(root + "/alias", "empty");
         assertThatThrownBy(() -> endpoint.write(root + "/alias/escape", 0, true)).isInstanceOf(IOException.class);
         assertThatThrownBy(() -> endpoint.list(root + "/alias", e -> {})).isInstanceOf(IOException.class);
+        assertThat(endpoint.resolveDirectory(root+"/alias")).isEqualTo(endpoint.child(root,"empty"));
+        assertThat(endpoint.stat(root+"/alias").kind()).isEqualTo(FileEntry.Kind.LINK);
+        endpoint.mkdir(root+"/empty/child");
+        assertThat(endpoint.resolveDirectory(root+"/alias/child")).isEqualTo(endpoint.child(endpoint.child(root,"empty"),"child"));
+        endpoint.remove(root+"/empty/child",true);
         endpoint.remove(root + "/alias", false);
         endpoint.symlink(root + "/link-temp", "final");
         endpoint.publish(root + "/link-temp", root + "/link-final", false);

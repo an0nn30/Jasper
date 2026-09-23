@@ -175,6 +175,11 @@ public final class LocalEndpoint implements FileEndpoint {
     @Override public String canonical(String text) throws IOException {
         Path file = path(text); return (file.getParent() == null ? file.toRealPath() : file.getParent().toRealPath().resolve(file.getFileName())).toString();
     }
+    @Override public String resolveDirectory(String text) throws IOException {
+        check();String resolved=path(text).toRealPath().toString();
+        if(stat(resolved).kind()!=FileEntry.Kind.DIRECTORY) throw new IOException("Path is not a directory");
+        return resolved;
+    }
     @Override public String home() throws IOException { check(); return Path.of(System.getProperty("user.home")).toRealPath().toString(); }
     @Override public void abort() {
         closed = true;

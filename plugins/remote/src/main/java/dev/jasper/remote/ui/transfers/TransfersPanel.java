@@ -36,8 +36,8 @@ public final class TransfersPanel extends JPanel {
             String label=decision.name().substring(0,1)+decision.name().substring(1).toLowerCase(Locale.ROOT);
             add(fileButtons,label,decision==ConflictDecision.SKIP?IconName.REMOVE:IconName.COPY,icons,()->selectedEntry().ifPresent(entry->actions.resolve().accept(entry,decision)));
         }
-        add(fileButtons,"Restart file",IconName.REFRESH,icons,()->selectedEntry().ifPresent(actions.restart()));fileButtons.add(remaining);
-        add(fileButtons,"Previous files",IconName.UP,icons,()->actions.entriesPage().accept(Math.max(0,entryOffset-200)));add(fileButtons,"Next files",IconName.DOWNLOAD,icons,()->actions.entriesPage().accept(entryOffset+200));fileArea.add(fileButtons,BorderLayout.SOUTH);
+        add(fileButtons,"Restart file",IconName.REFRESH,icons,()->selectedEntry().ifPresent(actions.restart()));
+        add(fileButtons,"Previous files",IconName.UP,icons,()->actions.entriesPage().accept(Math.max(0,entryOffset-200)));add(fileButtons,"Next files",IconName.DOWNLOAD,icons,()->actions.entriesPage().accept(entryOffset+200));var fileFooter=new JPanel(new BorderLayout(4,4));fileFooter.add(fileButtons,BorderLayout.CENTER);fileFooter.add(remaining,BorderLayout.SOUTH);fileArea.add(fileFooter,BorderLayout.SOUTH);
         var split=new JSplitPane(JSplitPane.VERTICAL_SPLIT,new JScrollPane(jobs),fileArea);split.setResizeWeight(.45);split.setBorder(BorderFactory.createEmptyBorder());add(split,BorderLayout.CENTER);add(message,BorderLayout.SOUTH);
         jobs.getSelectionModel().addListSelectionListener(event->{if(!updating && !event.getValueIsAdjusting()) { refreshControls();if(actions!=null) selectedJob().ifPresent(actions.selected()); }});
         entries.getSelectionModel().addListSelectionListener(event->refreshControls());refreshControls();setPreferredSize(new Dimension(760,320));

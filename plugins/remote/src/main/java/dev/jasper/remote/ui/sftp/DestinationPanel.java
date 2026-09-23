@@ -46,6 +46,6 @@ public final class DestinationPanel extends JPanel implements AutoCloseable {
         setPreferredSize(new Dimension(500,450));
     }
     public void refresh() { controller.refresh(); }
-    public void status(boolean busy,String text) { if(!closed) browser.busy(busy,text); }
+    public void status(boolean busy,String text) { if(!closed) browser.operationStatus(busy,text); }
     @Override public void close() { if(closed) return;closed=true;generation++;if(resolving!=null) resolving.cancel(true);controller.close(); }
 }

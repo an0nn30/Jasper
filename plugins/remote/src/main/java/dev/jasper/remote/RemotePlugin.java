@@ -152,7 +152,7 @@ public class RemotePlugin implements Plugin {
             if(ref.hostId().isEmpty()) return CompletableFuture.completedFuture(null);
             try {
                 var expected=ref.identity().orElseThrow();
-                return connections.resolveIdentity(ref.hostId().orElseThrow(),owner).thenApply(actual->{if(!actual.equals(expected)) throw new java.util.concurrent.CompletionException(new IOException("Saved host or authentication identity changed; queue a new transfer"));return null;});
+                return validateResumeIdentity(expected,connections.resolveIdentity(ref.hostId().orElseThrow(),owner));
             }catch(Exception failure) { return CompletableFuture.failedFuture(failure); }
         });
         transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui);
@@ -244,6 +244,11 @@ public class RemotePlugin implements Plugin {
         return Optional.of(new dev.jasper.remote.ui.sftp.SftpUi.PaneTarget(pane.id(),identity,pane.info().remoteDirectory().map(dev.jasper.sdk.terminal.RemoteDirectory::path).orElse("")));
     }
     private void sftpFocused(UUID id) { context.terminals().pane(id).ifPresent(pane->sftpPane(pane).ifPresent(target->sftpUi.pane(pane.tab().window(),target))); }
+    static CompletableFuture<Void> validateResumeIdentity(dev.jasper.remote.client.ConnectionIdentity expected,CompletableFuture<dev.jasper.remote.client.ConnectionIdentity> source) {
+        CompletableFuture<Void> validated=source.thenApply(actual->{if(!actual.equals(expected)) throw new java.util.concurrent.CompletionException(new IOException("Saved host or authentication identity changed; queue a new transfer"));return null;});
+        validated.whenComplete((ignored,failure)->{if(validated.isCancelled())source.cancel(true);});
+        return validated;
+    }
     dev.jasper.remote.transfer.TransferCoordinator transfers() { return transfers; }
     CompletableFuture<Void> transfersStopped() { return transfers==null?CompletableFuture.completedFuture(null):transfers.stopped(); }
 

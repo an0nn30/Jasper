@@ -254,6 +254,27 @@ public final class SftpEndpoint implements FileEndpoint {
         String path = path(text); if (path.equals("/")) return client.canonicalPath(path);
         return FilePaths.child(client.canonicalPath(FilePaths.parent(path)), FilePaths.name(path));
     }
+    @Override public String resolveDirectory(String text) throws IOException {
+        String requested=client.canonicalPath(path(text));int links=0;
+        // Some SFTP servers normalize REALPATH without dereferencing symbolic links.
+        // Resolve each component deliberately here; recursive file operations never call this.
+        while(true) {
+            String resolved="/";var parts=FilePaths.absolute(requested).substring(1).split("/");boolean again=false;
+            for(int index=0;index<parts.length;index++) {
+                if(parts[index].isEmpty()) continue;
+                String next=FilePaths.child(resolved,parts[index]);var info=attributes(next);
+                if(info.isSymbolicLink()) {
+                    if(++links>40) throw new IOException("Too many directory links");
+                    String link=client.readLink(next);StringBuilder expanded=new StringBuilder(link.startsWith("/")?link:resolved+"/"+link);
+                    for(int rest=index+1;rest<parts.length;rest++) expanded.append('/').append(parts[rest]);
+                    requested=FilePaths.absolute(expanded.toString());again=true;break;
+                }
+                if(!info.isDirectory()) throw new IOException("Path is not a directory");
+                resolved=next;
+            }
+            if(!again) return resolved;
+        }
+    }
     @Override public String home() throws IOException { check(); return client.canonicalPath("."); }
     @Override public void abort() { closed = true; var owned = channel; if (owned != null) owned.close(true); lease.close(); }
     @Override public void close() { abort(); }

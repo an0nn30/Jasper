@@ -1,6 +1,6 @@
 # Remote Plan 7c — SFTP Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. The user explicitly requested an adversarial plan review followed by native implementation in this task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. The user explicitly requested an adversarial plan review followed by native implementation in this task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Ship single-sidebar SFTP browsing and durable, bounded, cancellable/resumable local/remote and remote/remote copies inside the existing Remote plugin.
 
@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-23-jasper-remote-sftp-design.md` (approved, including section 9.3 named-icon correction).
 
-**Execution status:** Independent adversarial review completed; eight findings are resolved in the contracts and acceptance tests below. Tasks 1–5 are complete. Native execution is already selected and authorized after review findings are addressed. Baseline `1fcf9a8d`; design commits `68b7fb78`, `147a7629`.
+**Execution status:** All ten tasks are complete natively. The independent plan review and final branch review each identified eight accepted findings; all are resolved. Final `./gradlew check :jasper-app:installDist` passed: 1,845 tests, 1,842 passed, three skips, zero failures/errors. Detailed execution rulings and review evidence are retained in `docs/remote-7c-verification.md`. Baseline `1fcf9a8d`; design commits `68b7fb78`, `147a7629`.
 
 ## Global Constraints
 
@@ -470,16 +470,16 @@ create `docs/remote-7c-verification.md`; strengthen lifecycle/fault/scale tests 
 
 **Interfaces:** No new production surface; prove the spec through real composed flows.
 
-- [ ] Run `./gradlew check :jasper-app:installDist` and count actual JUnit XML results.
+- [x] Run `./gradlew check :jasper-app:installDist` and count actual JUnit XML results.
   Run headless large-file/many-file/crash-process checks. Verify distribution contains the
   exact SFTP and SQLite jars and SDK floor, no Remote icon assets.
-- [ ] Document settings, UI entry points, single-browser workflows, recovery/cleanup semantics,
+- [x] Document settings, UI entry points, single-browser workflows, recovery/cleanup semantics,
   resume-validation cost, native picker behavior, unsupported metadata and runtime limitations.
   Include user-run native acceptance steps; do not launch the user's GUI or contact saved hosts.
-- [ ] Generate final review package against `1fcf9a8d` and dispatch one fresh adversarial reviewer
+- [x] Generate final review package against `1fcf9a8d` and dispatch one fresh adversarial reviewer
   with spec, plan, ledger, changed files and Review Focus. Fix important findings with regression
   tests and re-run the full suite. Record justified rulings and any deferred polish explicitly.
-- [ ] Commit final docs/fixes, mark all completed tasks and record verification evidence.
+- [x] Commit final docs/fixes, mark all completed tasks and record verification evidence.
   Leave the worktree ready for user acceptance; no merge or push is implied by implementation.
 
 ## Plan review and execution record

@@ -38,4 +38,13 @@ class SftpPanelTest {
             assertThat(panel.selection()).hasSize(1);
         });
     }
+    @Test void deletionResultSurvivesAutomaticListingRefresh() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(()-> {
+            var panel=new SftpPanel(icon->new javax.swing.ImageIcon(new java.awt.image.BufferedImage(16,16,2)));
+            panel.operationStatus(false,"Cancelled; 9 items deleted; 1 error: /data/denied: Permission denied");
+            panel.busy(true,"Loading folder…");panel.showPage("host","/data",java.util.List.of(),0,0,false);
+            assertThat(panel.operationMessage()).contains("Cancelled", "9 items deleted", "/data/denied", "Permission denied");
+        });
+    }
+
 }

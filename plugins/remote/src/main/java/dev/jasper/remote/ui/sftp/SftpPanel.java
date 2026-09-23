@@ -18,7 +18,7 @@ public class SftpPanel extends JPanel {
                           Runnable upload,Runnable uploadFolder,Runnable download,Runnable newFolder,
                           Runnable delete,Runnable copyPath,Runnable copyToHost,Runnable cancel,Consumer<Long> page) {}
     private final Function<IconName,Icon> icons;
-    private final JLabel host=label("Select an SSH host to browse files"),message=label(""),pageLabel=label("");
+    private final JLabel host=label("Select an SSH host to browse files"),message=label(""),pageLabel=label(""),operationResult=label("");
     private final JTextField path=new JTextField();
     private final JCheckBox follow=new JCheckBox("Follow terminal folder",true);
     private final Rows model=new Rows();
@@ -48,7 +48,7 @@ public class SftpPanel extends JPanel {
         var scroll=new JScrollPane(table);scroll.setBorder(BorderFactory.createEmptyBorder());scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);add(scroll,BorderLayout.CENTER);
         var south=new JPanel();south.setLayout(new BoxLayout(south,BoxLayout.Y_AXIS));
         var paging=new JPanel(new BorderLayout(4,0));var controls=new JPanel(new FlowLayout(FlowLayout.RIGHT,2,0));controls.add(previous);controls.add(next);paging.add(pageLabel,BorderLayout.CENTER);paging.add(controls,BorderLayout.EAST);south.add(paging);
-        var status=new JPanel(new BorderLayout(4,0));cancel=new JButton("Cancel",icons.apply(IconName.CLOSE));cancel.setVisible(false);status.add(message,BorderLayout.CENTER);status.add(cancel,BorderLayout.EAST);south.add(status);south.add(follow);add(south,BorderLayout.SOUTH);
+        var status=new JPanel(new BorderLayout(4,0));cancel=new JButton("Cancel",icons.apply(IconName.CLOSE));cancel.setVisible(false);status.add(message,BorderLayout.CENTER);status.add(cancel,BorderLayout.EAST);south.add(status);operationResult.setVisible(false);south.add(operationResult);south.add(follow);add(south,BorderLayout.SOUTH);
         path.addActionListener(event->{if(actions!=null) actions.navigate().accept(path.getText());});follow.addActionListener(event->{if(actions!=null) actions.follow().accept(follow.isSelected());});
         previous.addActionListener(event->{if(actions!=null) actions.page().accept(Math.max(0,offset-200));});next.addActionListener(event->{if(actions!=null) actions.page().accept(offset+200);});cancel.addActionListener(event->{if(actions!=null) actions.cancel().run();});
         table.getSelectionModel().addListSelectionListener(event->selectionChanged());
@@ -82,8 +82,13 @@ public class SftpPanel extends JPanel {
     }
     public void busy(boolean busy,String text) { cancel.setVisible(busy);table.setEnabled(!busy);path.setEnabled(!busy);buttons.get("Up").setEnabled(!busy && loaded && !path.getText().equals("/"));previous.setEnabled(!busy && offset>0);next.setEnabled(!busy && offset+entries.size()<total);message.setText(text);message.setToolTipText(text); }
     public void error(String text) { busy(false,text); }
+    public void operationStatus(boolean running,String text) {
+        operationResult.setText(running?"":text);operationResult.setToolTipText(running?null:text);operationResult.setVisible(!running && !text.isEmpty());
+        busy(running,running?text:"");
+    }
+    String operationMessage() { return operationResult.getText(); }
     public void enableBrowsing(boolean enabled) { path.setEnabled(enabled);follow.setEnabled(enabled);buttons.get("Refresh").setEnabled(enabled); }
-    private void activate() { if(actions==null) return;var selected=selection();if(selected.size()==1 && selected.getFirst().kind()==FileEntry.Kind.DIRECTORY) actions.navigate().accept(selected.getFirst().name()); }
+    private void activate() { if(actions==null) return;var selected=selection();if(selected.size()==1 && (selected.getFirst().kind()==FileEntry.Kind.DIRECTORY || selected.getFirst().kind()==FileEntry.Kind.LINK)) actions.navigate().accept(selected.getFirst().name()); }
     private void selectionChanged() { boolean selected=!selection().isEmpty();for(String name:List.of("Download selected","Delete selected","Copy paths")) buttons.get(name).setEnabled(selected);buttons.get("Upload files").setEnabled(loaded);buttons.get("New folder").setEnabled(loaded); }
     private void columns() {
         boolean nextDetails=getWidth()>=460;if(nextDetails==details) return;details=nextDetails;

@@ -32,4 +32,11 @@ class SftpPluginTest {
             assertThat(host.openRequests()).isEmpty();assertThat(host.failures()).isEmpty();
         }
     }
+    @Test void cancellingResumeValidationWithdrawsPendingCredentialResolution() {
+        var source=new CompletableFuture<dev.jasper.remote.client.ConnectionIdentity>();
+        var validated=RemotePlugin.validateResumeIdentity(null,source);
+        validated.cancel(true);
+        assertThat(source.isCancelled()).isTrue();
+    }
+
 }

@@ -25,4 +25,21 @@ class TransfersPanelTest {
             var label=(JLabel)panel.jobsTable().prepareRenderer(panel.jobsTable().getCellRenderer(0,0),0,0);assertThat(label.getClientProperty("html.disable")).isEqualTo(true);
         });
     }
+    @Test void conflictScopeLabelFitsAtNormalPanelWidth() throws Exception {
+        SwingUtilities.invokeAndWait(()-> {
+            var panel=new TransfersPanel(name->new dev.jasper.sdk.testing.FakeNamedIcon(name,false));
+            panel.setSize(760,320);layout(panel);
+            var remaining=findCheckbox(panel);
+            assertThat(remaining).isNotNull();
+            assertThat(remaining.getWidth()).isGreaterThanOrEqualTo(remaining.getPreferredSize().width);
+        });
+    }
+    private static void layout(java.awt.Container container) {
+        container.doLayout();for(var child:container.getComponents()) if(child instanceof java.awt.Container nested) layout(nested);
+    }
+    private static JCheckBox findCheckbox(java.awt.Container container) {
+        for(var child:container.getComponents()) { if(child instanceof JCheckBox checkbox)return checkbox;if(child instanceof java.awt.Container nested) { var found=findCheckbox(nested);if(found!=null)return found; } }
+        return null;
+    }
+
 }

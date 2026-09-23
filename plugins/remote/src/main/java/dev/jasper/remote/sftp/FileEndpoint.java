@@ -22,6 +22,11 @@ public interface FileEndpoint extends AutoCloseable {
     void publish(String temporary, String target, boolean replace) throws IOException;
     void metadata(String path, long modifiedMillis, int ordinaryPermissions) throws IOException;
     String canonical(String path) throws IOException;
+    /** Explicit browser navigation only: resolves links, then returns a directory's real path. */
+    default String resolveDirectory(String path) throws IOException {
+        if(stat(path).kind()!=FileEntry.Kind.DIRECTORY) throw new IOException("Path is not a directory");
+        return path;
+    }
     String home() throws IOException;
     void abort();
     @Override void close() throws IOException;

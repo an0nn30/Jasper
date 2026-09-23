@@ -14,6 +14,7 @@ public final class TransferStore implements AutoCloseable {
     public record Checkpoint(long start, long length, String digest) {}
     public record Frontier(long id, String source, String target, String relative) {}
     public record Cleanup(long entryId, String path, String reason) {}
+    public record PublicationDecision(ConflictDecision decision,String target) {}
     private Connection db;
     private FileChannel lockChannel;
     private FileLock lock;
@@ -53,12 +54,14 @@ public final class TransferStore implements AutoCloseable {
         db.setAutoCommit(false);
         try {
             execute("CREATE TABLE jobs(id TEXT PRIMARY KEY,request TEXT NOT NULL,source TEXT NOT NULL,destination TEXT NOT NULL,state TEXT NOT NULL,intent TEXT NOT NULL,created INTEGER NOT NULL,total_entries INTEGER NOT NULL DEFAULT 0,total_bytes INTEGER NOT NULL DEFAULT 0,confirmed_bytes INTEGER NOT NULL DEFAULT 0,completed INTEGER NOT NULL DEFAULT 0,skipped INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0,scanned INTEGER NOT NULL DEFAULT 0,detail TEXT NOT NULL DEFAULT '',excluded_bytes INTEGER NOT NULL DEFAULT 0,file_policy TEXT NOT NULL DEFAULT 'ASK',directory_policy TEXT NOT NULL DEFAULT 'ASK',warnings INTEGER NOT NULL DEFAULT 0)");
-            execute("CREATE TABLE entries(id INTEGER PRIMARY KEY,job TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,relative TEXT NOT NULL,source TEXT NOT NULL,target TEXT NOT NULL,info TEXT NOT NULL,bytes INTEGER NOT NULL DEFAULT 0,temp TEXT NOT NULL DEFAULT '',temp_info TEXT,phase TEXT NOT NULL DEFAULT 'PENDING',confirmed INTEGER NOT NULL DEFAULT 0,digest TEXT NOT NULL DEFAULT '',publication TEXT NOT NULL DEFAULT 'NONE',expected TEXT,decision TEXT NOT NULL DEFAULT 'ASK',outcome TEXT NOT NULL DEFAULT 'PENDING',error TEXT NOT NULL DEFAULT '',warning TEXT NOT NULL DEFAULT '',UNIQUE(job,relative))");
+            execute("CREATE TABLE entries(id INTEGER PRIMARY KEY,job TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,relative TEXT NOT NULL,source TEXT NOT NULL,target TEXT NOT NULL,target_key TEXT NOT NULL,info TEXT NOT NULL,kind TEXT NOT NULL,expected_kind TEXT,bytes INTEGER NOT NULL DEFAULT 0,temp TEXT NOT NULL DEFAULT '',temp_info TEXT,phase TEXT NOT NULL DEFAULT 'PENDING',confirmed INTEGER NOT NULL DEFAULT 0,digest TEXT NOT NULL DEFAULT '',publication TEXT NOT NULL DEFAULT 'NONE',expected TEXT,decision TEXT NOT NULL DEFAULT 'ASK',outcome TEXT NOT NULL DEFAULT 'PENDING',error TEXT NOT NULL DEFAULT '',warning TEXT NOT NULL DEFAULT '',UNIQUE(job,relative))");
             execute("CREATE INDEX entries_work ON entries(job,outcome,id)");
+            execute("CREATE INDEX entries_targets ON entries(job,target_key)");
             execute("CREATE TABLE checkpoints(entry INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,start INTEGER NOT NULL,length INTEGER NOT NULL,digest TEXT NOT NULL,PRIMARY KEY(entry,start))");
             execute("CREATE TABLE scan_frontier(id INTEGER PRIMARY KEY,job TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,source TEXT NOT NULL,target TEXT NOT NULL,relative TEXT NOT NULL,UNIQUE(job,relative))");
             execute("CREATE INDEX frontier_jobs ON scan_frontier(job,id)");
             execute("CREATE TABLE cleanup(entry INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,reason TEXT NOT NULL)");
+            execute("CREATE TABLE publication_decisions(entry INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,decision TEXT NOT NULL,target TEXT NOT NULL)");
             execute("PRAGMA user_version=1"); db.commit();
         } catch(SQLException failure) { db.rollback(); throw failure; }
         finally { db.setAutoCommit(true); }
@@ -111,33 +114,44 @@ public final class TransferStore implements AutoCloseable {
     public synchronized void discover(UUID job,List<Discovered> entries,boolean queueDirectories) throws IOException {
         if(entries.size()>256) throw new IllegalArgumentException("Discovery batch exceeds 256 entries");
         try {
+            boolean local=request(job).destination().hostId().isEmpty();
             begin(); long count=0,bytes=0;
             for(var entry:entries) {
+                String key=targetKey(entry.target(),local);
+                try(var statement=prepare("SELECT relative FROM entries WHERE job=? AND target_key=? AND relative!=? AND outcome!='SKIPPED' LIMIT 1",job,key,entry.relative());var prior=statement.executeQuery()) {
+                    if(prior.next()) throw new TransferRecovery.Attention("Destination names collide: "+prior.getString(1)+" and "+entry.relative()+"; rename or omit one source");
+                }
                 try(var statement=prepare("SELECT source FROM entries WHERE job=? AND relative=?",job,entry.relative());var prior=statement.executeQuery()) {
                     if(prior.next() && !prior.getString(1).equals(entry.source())) throw new IOException("Selected sources have the same destination name: "+entry.relative());
                 }
-                if(update("INSERT OR IGNORE INTO entries(job,relative,source,target,info,bytes) VALUES(?,?,?,?,?,?)",job,entry.relative(),entry.source(),entry.target(),TransferCodec.file(entry.sourceInfo()),entry.sourceInfo().kind()==FileEntry.Kind.FILE?Math.max(0,entry.sourceInfo().size()):0)!=0) {
-                count++; if(entry.sourceInfo().kind()==FileEntry.Kind.FILE) bytes=Math.addExact(bytes,Math.max(0,entry.sourceInfo().size()));
-            }
-                if(queueDirectories && entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY)
-                    update("INSERT OR IGNORE INTO scan_frontier(job,source,target,relative) VALUES(?,?,?,?)",job,entry.source(),entry.target(),entry.relative());
+                if(update("INSERT OR IGNORE INTO entries(job,relative,source,target,target_key,info,kind,bytes) VALUES(?,?,?,?,?,?,?,?)",job,entry.relative(),entry.source(),entry.target(),key,TransferCodec.file(entry.sourceInfo()),entry.sourceInfo().kind().name(),entry.sourceInfo().kind()==FileEntry.Kind.FILE?Math.max(0,entry.sourceInfo().size()):0)!=0) {
+                    count++; if(entry.sourceInfo().kind()==FileEntry.Kind.FILE) bytes=Math.addExact(bytes,Math.max(0,entry.sourceInfo().size()));
+                    if(queueDirectories && entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY)
+                        update("INSERT OR IGNORE INTO scan_frontier(job,source,target,relative) VALUES(?,?,?,?)",job,entry.source(),entry.target(),entry.relative());
+                }
             }
             update("UPDATE jobs SET total_entries=total_entries+?,total_bytes=total_bytes+? WHERE id=?",count,bytes,job); finish();
         } catch(SQLException | IOException | RuntimeException e) { rollback(); if(e instanceof IOException io) throw io; if(e instanceof SQLException sql) throw failure(sql); throw (RuntimeException)e; }
     }
+    private static final String ENTRIES="SELECT entries.*, (SELECT reason FROM cleanup WHERE entry=entries.id) AS cleanup_reason FROM entries";
+    private static String entryDetail(ResultSet row) throws SQLException {
+        String detail=row.getString("error").isEmpty()?row.getString("warning"):row.getString("error");
+        String cleanup=row.getString("cleanup_reason");
+        return cleanup==null?detail:detail+(detail.isEmpty()?"":"; ")+"Cleanup pending: "+row.getString("temp")+" — "+cleanup;
+    }
     private TransferEntry readEntry(ResultSet r) throws SQLException,IOException {
         String temp=r.getString("temp_info"), expected=r.getString("expected");
-        return new TransferEntry(r.getLong("id"),UUID.fromString(r.getString("job")),r.getString("relative"),r.getString("source"),r.getString("target"),TransferCodec.file(r.getString("info")),r.getString("temp"),temp==null?Optional.empty():Optional.of(TransferCodec.file(temp)),TransferEntry.Phase.valueOf(r.getString("phase")),r.getLong("confirmed"),r.getString("digest"),TransferEntry.Publication.valueOf(r.getString("publication")),expected==null?Optional.empty():Optional.of(TransferCodec.file(expected)),ConflictDecision.valueOf(r.getString("decision")),TransferEntry.Outcome.valueOf(r.getString("outcome")),(r.getString("error").isEmpty()?r.getString("warning"):r.getString("error")));
+        return new TransferEntry(r.getLong("id"),UUID.fromString(r.getString("job")),r.getString("relative"),r.getString("source"),r.getString("target"),TransferCodec.file(r.getString("info")),r.getString("temp"),temp==null?Optional.empty():Optional.of(TransferCodec.file(temp)),TransferEntry.Phase.valueOf(r.getString("phase")),r.getLong("confirmed"),r.getString("digest"),TransferEntry.Publication.valueOf(r.getString("publication")),expected==null?Optional.empty():Optional.of(TransferCodec.file(expected)),ConflictDecision.valueOf(r.getString("decision")),TransferEntry.Outcome.valueOf(r.getString("outcome")),entryDetail(r));
     }
     public synchronized TransferEntry entry(long id) throws IOException {
-        try(var statement=prepare("SELECT * FROM entries WHERE id=?",id);var result=statement.executeQuery()) { if(!result.next()) throw new IOException("Transfer entry no longer exists"); return readEntry(result); }
+        try(var statement=prepare(ENTRIES+" WHERE id=?",id);var result=statement.executeQuery()) { if(!result.next()) throw new IOException("Transfer entry no longer exists"); return readEntry(result); }
         catch(SQLException e) { throw failure(e); }
     }
     public synchronized List<TransferEntry> entries(UUID job,long offset,int limit) throws IOException {
-        page(offset,limit); return entryQuery("SELECT * FROM entries WHERE job=? ORDER BY id LIMIT ? OFFSET ?",job,limit,offset);
+        page(offset,limit); return entryQuery(ENTRIES+" WHERE job=? ORDER BY id LIMIT ? OFFSET ?",job,limit,offset);
     }
     public synchronized List<TransferEntry> pending(UUID job,int limit) throws IOException {
-        page(0,limit); return entryQuery("SELECT * FROM entries WHERE job=? AND outcome='PENDING' AND error='' ORDER BY id LIMIT ?",job,limit);
+        page(0,limit); return entryQuery(ENTRIES+" WHERE job=? AND outcome='PENDING' AND (error='' OR (phase='PENDING' AND decision='ASK' AND kind=expected_kind AND EXISTS(SELECT 1 FROM jobs j WHERE j.id=entries.job AND ((kind='DIRECTORY' AND j.directory_policy IN ('MERGE','SKIP')) OR (kind!='DIRECTORY' AND j.file_policy IN ('REPLACE','SKIP')))))) ORDER BY id LIMIT ?",job,limit);
     }
     private List<TransferEntry> entryQuery(String sql,Object... args) throws IOException {
         var values=new ArrayList<TransferEntry>();
@@ -179,7 +193,7 @@ public final class TransferStore implements AutoCloseable {
         try { update("UPDATE entries SET temp_info=? WHERE id=? AND temp_info IS NOT NULL",TransferCodec.file(proof),id); } catch(SQLException e) { throw failure(e); }
     }
     public synchronized void conflict(long id,Optional<FileEntry> target,String error) throws IOException {
-        try { update("UPDATE entries SET expected=?,decision='ASK',error=? WHERE id=?",target.isPresent()?TransferCodec.file(target.orElseThrow()):null,error,id); } catch(SQLException e) { throw failure(e); }
+        try { update("UPDATE entries SET expected=?,expected_kind=?,decision='ASK',error=? WHERE id=?",target.isPresent()?TransferCodec.file(target.orElseThrow()):null,target.map(t->t.kind().name()).orElse(null),error,id); } catch(SQLException e) { throw failure(e); }
     }
     public synchronized void reset(long id,FileEntry source) throws IOException {
         try {
@@ -188,31 +202,70 @@ public final class TransferStore implements AutoCloseable {
             if(entry.outcome()==TransferEntry.Outcome.FAILED) update("UPDATE jobs SET failed=failed-1,excluded_bytes=excluded_bytes-(SELECT bytes FROM entries WHERE id=?) WHERE id=?",id,entry.jobId());
             update("UPDATE jobs SET warnings=warnings-1 WHERE id=? AND EXISTS(SELECT 1 FROM entries WHERE id=? AND warning!='')",entry.jobId(),id);
             update("DELETE FROM checkpoints WHERE entry=?",id);
-            update("UPDATE entries SET info=?,bytes=?,temp='',temp_info=NULL,phase='PENDING',confirmed=0,digest='',publication='NONE',error='',warning='',outcome='PENDING' WHERE id=?",TransferCodec.file(source),source.kind()==FileEntry.Kind.FILE?Math.max(0,source.size()):0,id);
+            update("UPDATE entries SET info=?,kind=?,bytes=?,temp='',temp_info=NULL,phase='PENDING',confirmed=0,digest='',publication='NONE',error='',warning='',outcome='PENDING' WHERE id=?",TransferCodec.file(source),source.kind().name(),source.kind()==FileEntry.Kind.FILE?Math.max(0,source.size()):0,id);
             update("UPDATE jobs SET confirmed_bytes=confirmed_bytes-?,total_bytes=total_bytes+? WHERE id=?",entry.outcome()==TransferEntry.Outcome.FAILED?0:entry.confirmed(),Math.max(0,source.size())-Math.max(0,entry.sourceInfo().size()),entry.jobId());finish();
         } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
     }
     public synchronized List<TransferEntry> directories(UUID job,long offset,int limit) throws IOException {
         page(offset,limit);
         // Directory entries are indexed through their job and walked in reverse discovery order.
-        return entryQuery("SELECT * FROM entries WHERE job=? AND outcome='COMPLETE' ORDER BY id DESC LIMIT ? OFFSET ?",job,limit,offset);
+        return entryQuery(ENTRIES+" WHERE job=? AND outcome='COMPLETE' ORDER BY id DESC LIMIT ? OFFSET ?",job,limit,offset);
     }
     public synchronized void publishing(long id,String digest,TransferEntry.Publication method,Optional<FileEntry> target) throws IOException {
         if(!digest.matches("[0-9a-f]{64}") || method==TransferEntry.Publication.NONE) throw new IOException("Invalid publication evidence");
         try { if(update("UPDATE entries SET digest=?,publication=?,expected=?,phase='PUBLISHING' WHERE id=? AND temp_info IS NOT NULL AND phase IN ('CREATED_TEMP','COPYING')",digest,method.name(),target.isPresent()?TransferCodec.file(target.orElseThrow()):null,id)!=1) throw new IOException("Entry is not ready for publication"); } catch(SQLException e) { throw failure(e); }
     }
+    public synchronized void publicationDecision(long id,ConflictDecision decision,String target) throws IOException {
+        if(decision!=ConflictDecision.SKIP && decision!=ConflictDecision.REPLACE && decision!=ConflictDecision.RENAME) throw new IOException("Choose Skip, Replace or Rename");
+        try {
+            begin();if(entry(id).phase()!=TransferEntry.Phase.PUBLISHING) throw new IOException("Entry is no longer publishing");
+            update("INSERT INTO publication_decisions VALUES(?,?,?) ON CONFLICT(entry) DO UPDATE SET decision=excluded.decision,target=excluded.target",id,decision.name(),target);
+            update("UPDATE entries SET error='' WHERE id=?",id);finish();
+        } catch(SQLException | IOException failure) { rollback();if(failure instanceof IOException io)throw io;throw failure((SQLException)failure); }
+    }
+    public synchronized Optional<PublicationDecision> publicationDecision(long id) throws IOException {
+        try(var statement=prepare("SELECT decision,target FROM publication_decisions WHERE entry=?",id);var row=statement.executeQuery()) {
+            return row.next()?Optional.of(new PublicationDecision(ConflictDecision.valueOf(row.getString(1)),row.getString(2))):Optional.empty();
+        } catch(SQLException failure) { throw failure(failure); }
+    }
+    /** Called only after the worker proves that the old publication did not happen. */
+    public synchronized void retryPublication(long id,PublicationDecision resolution) throws IOException {
+        try {
+            begin();var entry=entry(id);
+            if(entry.phase()!=TransferEntry.Phase.PUBLISHING || !publicationDecision(id).filter(resolution::equals).isPresent()) throw new IOException("Publication decision changed");
+            String key=targetKey(resolution.target(),request(entry.jobId()).destination().hostId().isEmpty());
+            try(var statement=prepare("SELECT relative FROM entries WHERE job=? AND target_key=? AND id!=? AND outcome!='SKIPPED' LIMIT 1",entry.jobId(),key,id);var row=statement.executeQuery()) {
+                if(row.next()) throw new TransferRecovery.Attention("Destination names collide with "+row.getString(1));
+            }
+            update("UPDATE entries SET target=?,target_key=?,decision=?,expected=CASE WHEN ?='RENAME' THEN NULL ELSE expected END,expected_kind=CASE WHEN ?='RENAME' THEN NULL ELSE expected_kind END,phase='COPYING',publication='NONE',digest='',error='' WHERE id=?",resolution.target(),key,resolution.decision().name(),resolution.decision().name(),resolution.decision().name(),id);
+            update("DELETE FROM publication_decisions WHERE entry=?",id);finish();
+        } catch(SQLException | IOException failure) { rollback();if(failure instanceof IOException io)throw io;throw failure((SQLException)failure); }
+    }
+    private static String targetKey(String target,boolean local) {
+        // SFTP does not advertise the destination filesystem's case/normalization rules.
+        // Reject potential aliases conservatively on both local and remote destinations.
+        return new PathReservations.Key("local",target,true).path();
+    }
+    // SQLite substr counts Unicode code points, unlike Java String.length().
+    private static int sqlLength(String text) { return text.codePointCount(0,text.length()); }
     public synchronized void renameTree(long id,String target) throws IOException {
         try {
             begin();var entry=entry(id);String prefix=entry.relative()+"/";
-            update("UPDATE entries SET target=? || substr(target,?),expected=NULL,decision='RENAME' WHERE job=? AND (id=? OR substr(relative,1,?)=?)",target,entry.target().length()+1,entry.jobId(),id,prefix.length(),prefix);
+            boolean local=request(entry.jobId()).destination().hostId().isEmpty();
+            String oldKey=targetKey(entry.target(),local),newKey=targetKey(target,local);
+            try(var statement=prepare("SELECT a.relative,b.relative FROM entries a JOIN entries b ON b.job=a.job AND b.id!=a.id AND b.target_key=? || substr(a.target_key,?) AND b.outcome!='SKIPPED' WHERE a.job=? AND (a.id=? OR substr(a.relative,1,?)=?) LIMIT 1",newKey,sqlLength(oldKey)+1,entry.jobId(),id,sqlLength(prefix),prefix);var collision=statement.executeQuery()) {
+                if(collision.next()) throw new TransferRecovery.Attention("Destination names collide: "+collision.getString(1)+" and "+collision.getString(2));
+            }
+            update("UPDATE entries SET target=? || substr(target,?),target_key=? || substr(target_key,?),expected=NULL,decision='RENAME' WHERE job=? AND (id=? OR substr(relative,1,?)=?)",target,sqlLength(entry.target())+1,newKey,sqlLength(oldKey)+1,entry.jobId(),id,sqlLength(prefix),prefix);
+            update("UPDATE scan_frontier SET target=? || substr(target,?) WHERE job=? AND (relative=? OR substr(relative,1,?)=?)",target,sqlLength(entry.target())+1,entry.jobId(),entry.relative(),sqlLength(prefix),prefix);
             finish();
         } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
     }
     public synchronized void skipTree(long id) throws IOException {
         try {
             begin();var entry=entry(id);String prefix=entry.relative()+"/";
-            update("UPDATE jobs SET excluded_bytes=excluded_bytes+(SELECT coalesce(sum(bytes),0) FROM entries WHERE job=? AND outcome='PENDING' AND (id=? OR substr(relative,1,?)=?)) WHERE id=?",entry.jobId(),id,prefix.length(),prefix,entry.jobId());
-            int count=update("UPDATE entries SET outcome='SKIPPED',decision='SKIP',error='Skipped' WHERE job=? AND outcome='PENDING' AND (id=? OR substr(relative,1,?)=?)",entry.jobId(),id,prefix.length(),prefix);
+            update("UPDATE jobs SET excluded_bytes=excluded_bytes+(SELECT coalesce(sum(bytes),0) FROM entries WHERE job=? AND outcome='PENDING' AND (id=? OR substr(relative,1,?)=?)) WHERE id=?",entry.jobId(),id,sqlLength(prefix),prefix,entry.jobId());
+            int count=update("UPDATE entries SET outcome='SKIPPED',decision='SKIP',error='Skipped' WHERE job=? AND outcome='PENDING' AND (id=? OR substr(relative,1,?)=?)",entry.jobId(),id,sqlLength(prefix),prefix);
             update("UPDATE jobs SET skipped=skipped+? WHERE id=?",count,entry.jobId());finish();
         } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
     }
@@ -222,14 +275,8 @@ public final class TransferStore implements AutoCloseable {
     public synchronized void policy(UUID job,boolean directory,ConflictDecision decision) throws IOException {
         if(!(decision==ConflictDecision.SKIP || decision==ConflictDecision.ASK || (directory?decision==ConflictDecision.MERGE:decision==ConflictDecision.REPLACE))) throw new IOException("This decision cannot apply to remaining entries");
         try { update("UPDATE jobs SET "+(directory?"directory_policy":"file_policy")+"=? WHERE id=?",decision.name(),job); } catch(SQLException e) { throw failure(e); }
-        long offset=0;
-        while(decision!=ConflictDecision.ASK) {
-            var page=entries(job,offset,200);if(page.isEmpty())break;
-            for(var entry:page) if(entry.outcome()==TransferEntry.Outcome.PENDING && entry.expectedTarget().isPresent() && (entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY)==directory) {
-                if(decision==ConflictDecision.SKIP && directory) skipTree(entry.id());else decision(entry.id(),decision,entry.target());
-            }
-            offset+=page.size();
-        }
+        // Blocked initial conflicts become eligible through pending(), without sweeping the job
+        // or doing one FULL-synchronous transaction per file on the control lane.
     }
     public synchronized TransferCoordinator.Summary summary() throws IOException {
         String active="state IN ('QUEUED','SCANNING','VALIDATING','RUNNING','PAUSING','CANCELLING')";
@@ -242,14 +289,14 @@ public final class TransferStore implements AutoCloseable {
             begin();var entry=entry(id);update("UPDATE entries SET error=? WHERE id=?",message,id);
             if(entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY) {
                 String prefix=entry.relative()+"/";
-                update("UPDATE entries SET error='Waiting for parent decision' WHERE job=? AND outcome='PENDING' AND error='' AND substr(relative,1,?)=?",entry.jobId(),prefix.length(),prefix);
+                update("UPDATE entries SET error='Waiting for parent decision' WHERE job=? AND outcome='PENDING' AND error='' AND substr(relative,1,?)=?",entry.jobId(),sqlLength(prefix),prefix);
             }
             finish();
         } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
     }
     private void unblockChildren(TransferEntry entry) throws SQLException {
         String prefix=entry.relative()+"/";
-        update("UPDATE entries SET error='' WHERE job=? AND error='Waiting for parent decision' AND substr(relative,1,?)=?",entry.jobId(),prefix.length(),prefix);
+        update("UPDATE entries SET error='' WHERE job=? AND error='Waiting for parent decision' AND substr(relative,1,?)=?",entry.jobId(),sqlLength(prefix),prefix);
     }
     public synchronized void decision(long id,ConflictDecision decision,String target) throws IOException {
         try {
@@ -268,6 +315,7 @@ public final class TransferStore implements AutoCloseable {
         try {
             begin(); var entry=entry(id);
             if(entry.outcome()==TransferEntry.Outcome.PENDING) {
+                update("DELETE FROM publication_decisions WHERE entry=?",id);
                 update("UPDATE entries SET outcome=?,phase=CASE WHEN ?='COMPLETE' THEN 'COMPLETE' ELSE phase END,error=? WHERE id=?",outcome.name(),outcome.name(),error,id);
                 if(outcome!=TransferEntry.Outcome.COMPLETE) update("UPDATE jobs SET excluded_bytes=excluded_bytes+(SELECT bytes FROM entries WHERE id=?),confirmed_bytes=confirmed_bytes-? WHERE id=?",id,entry.confirmed(),entry.jobId());
                 String column=switch(outcome) { case COMPLETE -> "completed"; case SKIPPED -> "skipped"; case FAILED -> "failed"; default -> throw new AssertionError(); };

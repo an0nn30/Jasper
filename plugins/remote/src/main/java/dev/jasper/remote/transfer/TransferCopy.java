@@ -14,7 +14,7 @@ public final class TransferCopy {
                             TransferControl control,BiConsumer<Long,Long> progress) throws IOException {
         control.check();
         if(entry.outcome()!=TransferEntry.Outcome.PENDING) return;
-        if(entry.phase()==TransferEntry.Phase.PUBLISHING) { TransferRecovery.reconcile(store,entry,destination,control);return; }
+        if(entry.phase()==TransferEntry.Phase.PUBLISHING) { if(!TransferRecovery.resolvePublication(store,entry,destination,control)) return;entry=store.entry(entry.id()); }
         if(entry.decision()==ConflictDecision.SKIP) {
             try { TransferRecovery.cleanup(store,entry,destination,control); }
             catch(IOException failure) { store.cleanup(entry.id(),failure.getMessage()); }
@@ -23,7 +23,7 @@ public final class TransferCopy {
         if(!TransferRecovery.sameSource(entry.sourceInfo(),source.stat(entry.source()))) throw new TransferRecovery.Attention("Source changed; choose Restart or Skip");
         if(entry.sourceInfo().kind()==FileEntry.Kind.SPECIAL) { store.outcome(entry.id(),TransferEntry.Outcome.FAILED,"Special files are not transferable");return; }
         var target=TransferRecovery.optional(destination,entry.target());
-        if(target.isPresent() && entry.decision()==ConflictDecision.ASK) {
+        if(target.isPresent() && target.orElseThrow().kind()==entry.sourceInfo().kind() && entry.decision()==ConflictDecision.ASK) {
             var policy=store.policy(entry.jobId(),entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY);
             if(policy!=ConflictDecision.ASK) {
                 if(policy==ConflictDecision.SKIP) {

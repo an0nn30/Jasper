@@ -48,7 +48,7 @@ public final class SftpUi implements AutoCloseable {
         var panel=new SftpPanel(context.appearance()::icon);var window=host.window();
         Function<ConnectionIdentity,CompletableFuture<FileEndpoint>> open=identity->endpoints.open(Optional.of(identity),window,status->{});
         var controller=new SftpController(context.dataDirectory().resolve("browser-cache"),background,ui,open,panel);
-        var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,open,transfers.get().reservations(),panel::busy,controller::refresh);
+        var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,open,transfers.get().reservations(),panel::operationStatus,controller::refresh);
         var view=new View(host,panel,controller,operations);views.put(window.id(),view);
         controller.operations(new SftpController.Operations(()->upload(view,false),()->upload(view,true),()->download(view),()->newFolder(view),()->delete(view),()->copyPaths(view),()->copyHost(view),operations::cancel));
         controller.visible(host.visible());
