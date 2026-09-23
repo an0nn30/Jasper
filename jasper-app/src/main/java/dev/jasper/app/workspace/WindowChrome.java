@@ -108,9 +108,9 @@ final class WindowChrome {
         toolbar.add(toolbarGlue);
     }
 
-private void addToolbarSeparator() {
-    if (owner.retro()) toolbar.addSeparator(); else toolbar.add(new ToolbarSeparator());
-}
+    private void addToolbarSeparator() {
+        if (owner.retro()) toolbar.addSeparator(); else toolbar.add(new ToolbarSeparator());
+    }
 
     void connect(WindowContributions source) {
         contributions = source;

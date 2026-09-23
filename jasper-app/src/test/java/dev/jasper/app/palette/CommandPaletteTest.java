@@ -443,6 +443,7 @@ class CommandPaletteTest {
         try {
             var changes = new ArrayList<String>();
             var palette = new CommandPalette(false, changes::add, (row, verb) -> {}, () -> {}, () -> {});
+            assertThat(palette.chip().getForeground()).isEqualTo(UIManager.getColor("List.selectionForeground"));
             assertThat(palette.queryField().getBorder()).isEqualTo(UIManager.getBorder("TextField.border"));
             assertThat(palette.queryField().getFont()).isEqualTo(UIManager.getFont("TextField.font"));
             assertThat(palette.queryField().getActionMap().get(DefaultEditorKit.deletePrevCharAction)).isNotNull();
@@ -455,6 +456,44 @@ class CommandPaletteTest {
             assertThat(image.getRGB(2, 2) >>> 24).isEqualTo(255);
         } finally { new ThemeController(); }
     });
+}
+
+
+    @Test void renderPaletteResultsAndFormsAtBothScales() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                for (var choice : java.util.List.of(java.util.Map.entry(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.DARK),
+                        java.util.Map.entry(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT),
+                        java.util.Map.entry(dev.jasper.app.config.ThemeStyle.RETRO, dev.jasper.app.config.Appearance.LIGHT))) {
+                    new ThemeController(choice.getKey(), choice.getValue());
+                    var card = new CommandPalette(false, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
+                    card.setResults(List.of(PaletteRow.of("new_tab", "New terminal tab"), PaletteRow.of("settings", "Settings")), null, null);
+                    var host = new javax.swing.JPanel(new java.awt.GridBagLayout()); host.add(card);
+                    for (int scale : new int[]{1, 2}) saveRender(host, choice.getKey()+"-"+choice.getValue()+"-palette-"+scale, scale);
+                    card.showStep("Connect", List.of(new PaletteStep.Field("host", "Host", "example.org"), new PaletteStep.Field("user", "Username", "dustin")));
+                    for (int scale : new int[]{1, 2}) saveRender(host, choice.getKey()+"-"+choice.getValue()+"-palette-form-"+scale, scale);
+                }
+            } finally { new ThemeController(); }
+        });
+    }
+private static void layoutTree(java.awt.Container container) {
+    container.doLayout();
+    for (var child : container.getComponents())
+        if (child instanceof java.awt.Container nested) layoutTree(nested);
+}
+private static void saveRender(javax.swing.JComponent component, String name, int scale) {
+    component.setSize(960, 640);
+    layoutTree(component);
+    var image = new java.awt.image.BufferedImage(960 * scale, 640 * scale,
+        java.awt.image.BufferedImage.TYPE_INT_ARGB);
+    var graphics = image.createGraphics();
+    try { graphics.scale(scale, scale); component.printAll(graphics); }
+    finally { graphics.dispose(); }
+    try {
+        var folder = java.nio.file.Path.of("build/retro-preview");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(image, "png", folder.resolve(name + ".png").toFile());
+    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
 }
 
 }

@@ -28,43 +28,43 @@ public final class ThemeController {
     private final ThemeStyle style;
     private ThemeState state = ThemeState.defaults();
 
-public ThemeController() { this(ThemeStyle.MODERN, Appearance.DARK); }
-public ThemeController(ThemeStyle style, Appearance saved) {
-    this(style, saved, ThemeController::install);
-}
-public ThemeController(Predicate<BuiltinTheme> installer) {
-    this(ThemeStyle.MODERN, Appearance.DARK, installer);
-}
-ThemeController(ThemeStyle style, Appearance saved, Predicate<BuiltinTheme> installer) {
-    requireEdt();
-    this.style = Objects.requireNonNull(style);
-    this.installer = Objects.requireNonNull(installer);
-    this.state = ThemeState.defaults().configure(Objects.requireNonNull(saved));
-    installOrThrow(resolve(state).chrome());
-}
-public ThemeStyle style() { requireEdt(); return style; }
-private ResolvedTheme resolve(ThemeState candidate) {
-    return style == ThemeStyle.RETRO
-        ? new ResolvedTheme(BuiltinTheme.RETRO, BuiltinTheme.RETRO.palette()) : candidate.resolve();
-}
-public ResolvedTheme current() { requireEdt(); return resolve(state); }
-public Appearance choice() {
-    requireEdt(); return style == ThemeStyle.RETRO ? Appearance.LIGHT : state.choice();
-}
-public void selectAppearance(Appearance choice) {
-    requireEdt(); Objects.requireNonNull(choice);
-    if (style == ThemeStyle.MODERN) apply(state.choose(choice));
-}
-private void apply(ThemeState candidate) {
-    if (style == ThemeStyle.RETRO) { state = candidate; return; }
-    ResolvedTheme previous = resolve(state), next = resolve(candidate);
-    boolean chromeChanged = previous.chrome() != next.chrome();
-    boolean choiceChanged = state.choice() != candidate.choice();
-    if (chromeChanged) installOrThrow(next.chrome());
-    state = candidate;
-    if (!previous.equals(next) || choiceChanged)
-        for (var listener : List.copyOf(listeners)) listener.accept(next, chromeChanged);
-}
+    public ThemeController() { this(ThemeStyle.MODERN, Appearance.DARK); }
+    public ThemeController(ThemeStyle style, Appearance saved) {
+        this(style, saved, ThemeController::install);
+    }
+    public ThemeController(Predicate<BuiltinTheme> installer) {
+        this(ThemeStyle.MODERN, Appearance.DARK, installer);
+    }
+    ThemeController(ThemeStyle style, Appearance saved, Predicate<BuiltinTheme> installer) {
+        requireEdt();
+        this.style = Objects.requireNonNull(style);
+        this.installer = Objects.requireNonNull(installer);
+        this.state = ThemeState.defaults().configure(Objects.requireNonNull(saved));
+        installOrThrow(resolve(state).chrome());
+    }
+    public ThemeStyle style() { requireEdt(); return style; }
+    private ResolvedTheme resolve(ThemeState candidate) {
+        return style == ThemeStyle.RETRO
+            ? new ResolvedTheme(BuiltinTheme.RETRO, BuiltinTheme.RETRO.palette()) : candidate.resolve();
+    }
+    public ResolvedTheme current() { requireEdt(); return resolve(state); }
+    public Appearance choice() {
+        requireEdt(); return style == ThemeStyle.RETRO ? Appearance.LIGHT : state.choice();
+    }
+    public void selectAppearance(Appearance choice) {
+        requireEdt(); Objects.requireNonNull(choice);
+        if (style == ThemeStyle.MODERN) apply(state.choose(choice));
+    }
+    private void apply(ThemeState candidate) {
+        if (style == ThemeStyle.RETRO) { state = candidate; return; }
+        ResolvedTheme previous = resolve(state), next = resolve(candidate);
+        boolean chromeChanged = previous.chrome() != next.chrome();
+        boolean choiceChanged = state.choice() != candidate.choice();
+        if (chromeChanged) installOrThrow(next.chrome());
+        state = candidate;
+        if (!previous.equals(next) || choiceChanged)
+            for (var listener : List.copyOf(listeners)) listener.accept(next, chromeChanged);
+    }
 
     public void configure(Appearance saved) { requireEdt(); apply(state.configure(Objects.requireNonNull(saved))); }
     public void select(BuiltinTheme theme) { selectAppearance(Objects.requireNonNull(theme).appearance()); }
@@ -94,16 +94,16 @@ private void apply(ThemeState candidate) {
         }
     }
 
-private static boolean modernDefaultsRegistered;
-static boolean install(BuiltinTheme theme) {
-    requireEdt();
-    if (theme == BuiltinTheme.RETRO) return MetalDefaults.install();
-    if (!modernDefaultsRegistered) {
-        FlatLaf.registerCustomDefaultsSource("dev.jasper.app.themes");
-        modernDefaultsRegistered = true;
+    private static boolean modernDefaultsRegistered;
+    static boolean install(BuiltinTheme theme) {
+        requireEdt();
+        if (theme == BuiltinTheme.RETRO) return MetalDefaults.install();
+        if (!modernDefaultsRegistered) {
+            FlatLaf.registerCustomDefaultsSource("dev.jasper.app.themes");
+            modernDefaultsRegistered = true;
+        }
+        return theme == BuiltinTheme.LIGHT ? FlatLightLaf.setup() : FlatDarkLaf.setup();
     }
-    return theme == BuiltinTheme.LIGHT ? FlatLightLaf.setup() : FlatDarkLaf.setup();
-}
 
     private static void requireEdt() {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Theme operations require the EDT");

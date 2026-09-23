@@ -171,3 +171,19 @@ The terminal checker enforces its existing allowlist; the app/Buddy checker vali
 all package edges and supported Buddy signatures. Neither uses cycle exemptions.
 Javadoc and copied guide examples are normal check dependencies. See the
 [verification report](app-refactor-verification.md) for current evidence and manual gaps.
+
+## Restart-required appearance style
+
+`ThemeController` captures `ThemeStyle` from startup configuration before any plugin or
+workspace UI is constructed. Modern installs Jasper's FlatLaf defaults. Retro installs stock
+`MetalLookAndFeel` with `OceanTheme`; `MetalDefaults` adds semantic color aliases for app-owned
+painting to that LAF's defaults. It never replaces Swing delegates. `BuiltinTheme.RETRO`
+reports light chrome and owns a separate black terminal palette.
+
+Style stays fixed for the process lifetime. `ConfigurationController` derives a restart
+warning when saved and running styles differ, and removes it when they match; ordinary
+live settings still apply. New windows, hidden panels and plugin factories use the running
+style. No SDK signatures or plugin lifecycle change. Retro uses the existing tab/session
+model with Metal tab delegates, compact icon-only close controls and a flat 24-pixel GNOME
+toolbar; form buttons remain stock Metal. App icons resolve from bundled assets, while
+plugin-supplied SVGs preserve their existing contract. Native title bars remain native.

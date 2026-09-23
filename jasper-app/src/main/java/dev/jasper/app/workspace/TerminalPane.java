@@ -199,7 +199,9 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
                 LOG.log(System.Logger.Level.ERROR, "Terminal pane launch failed", failure);
                 Throwable cause = failure;
                 while (cause.getCause() != null) cause = cause.getCause();
-                removeAll(); add(new JLabel("Could not start terminal: " + cause.getMessage()));
+                removeAll();
+                var message = new JLabel("Could not start terminal: " + cause.getMessage());
+                message.setForeground(getForeground()); add(message);
                 revalidate(); repaint();
                 onFailure.accept("Could not start terminal in " + launchDirectory + ":\n" + cause.getMessage());
                 return;
@@ -430,6 +432,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
 
     void applyTheme(dev.jasper.terminal.config.Palette palette) {
         setBackground(palette.background());
+        setForeground(palette.foreground());
+        for (var child : getComponents()) if (child instanceof JLabel label) label.setForeground(palette.foreground());
         if (view != null) view.setPalette(palette);
         setActive(active);
     }

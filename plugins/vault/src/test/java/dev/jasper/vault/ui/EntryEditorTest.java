@@ -222,4 +222,45 @@ class EntryEditorTest {
             assertThat(opened).isCompletedWithValue(null);
         }
     }
+
+    @Test void renderMetalEditorAtBothScales() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var previous = javax.swing.UIManager.getLookAndFeel();
+            var previousTheme = javax.swing.plaf.metal.MetalLookAndFeel.getCurrentTheme();
+            try {
+                javax.swing.plaf.metal.MetalLookAndFeel.setCurrentTheme(new javax.swing.plaf.metal.OceanTheme());
+                javax.swing.UIManager.setLookAndFeel(new javax.swing.plaf.metal.MetalLookAndFeel());
+                try (var form = EntryEditor.login(null, value -> CompletableFuture.completedFuture(null), () -> {})) {
+                    form.name.setText("Development"); form.username.setText("dustin");
+                    var root = new javax.swing.JRootPane(); root.setContentPane(form); root.setDefaultButton(form.save);
+                    for (int scale : new int[]{1, 2}) saveRender(root, "RETRO-LIGHT-vault-"+scale, scale);
+                }
+            } catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+            finally {
+                javax.swing.plaf.metal.MetalLookAndFeel.setCurrentTheme(previousTheme);
+                try { javax.swing.UIManager.setLookAndFeel(previous); }
+                catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+            }
+        });
+    }
+private static void layoutTree(java.awt.Container container) {
+    container.doLayout();
+    for (var child : container.getComponents())
+        if (child instanceof java.awt.Container nested) layoutTree(nested);
+}
+private static void saveRender(javax.swing.JComponent component, String name, int scale) {
+    component.setSize(960, 640);
+    layoutTree(component);
+    var image = new java.awt.image.BufferedImage(960 * scale, 640 * scale,
+        java.awt.image.BufferedImage.TYPE_INT_ARGB);
+    var graphics = image.createGraphics();
+    try { graphics.scale(scale, scale); component.printAll(graphics); }
+    finally { graphics.dispose(); }
+    try {
+        var folder = java.nio.file.Path.of("build/retro-preview");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(image, "png", folder.resolve(name + ".png").toFile());
+    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+}
+
 }

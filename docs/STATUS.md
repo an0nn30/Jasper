@@ -23,31 +23,35 @@ is merged at `17c0476`. The Credential Vault design
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
-### Retro Metal appearance planning — 2026-09-22
+### Retro Metal appearance — 2026-09-22
 
-The user requested a restart-required Metal appearance option after feasibility
-investigation. A proposed [design](superpowers/specs/2026-09-22-jasper-retro-metal-design.md)
-and [implementation plan](superpowers/plans/2026-09-22-jasper-retro-metal.md) are on
-`codex/retro-metal-plan`, in the app-managed worktree
-`/Users/dustin/.codex/worktrees/retro-metal-plan/moray`, based on `ac02f94`.
-Planning only: no product code, GUI launch, merge or push. The original checkout's
-uncommitted WindowStatusBar/VaultPlugin changes were left untouched.
+Implemented on `codex/retro-metal` in `/Users/dustin/.codex/worktrees/retro-metal-plan/moray`,
+based on `ac02f94`, following the approved [design](superpowers/specs/2026-09-22-jasper-retro-metal-design.md)
+and [plan](superpowers/plans/2026-09-22-jasper-retro-metal.md). The user chose native inline
+execution with one independent final review. Headless verification passed; independent review is underway.
+See [configuration](configuration.md#retro-metal-appearance) to enable it.
 
-The proposal uses stock Metal/Ocean, light app controls, a separate black terminal
-palette, GNOME 2 app icons, ordinary OS title bars and unchanged SDK signatures.
-Style is captured before UI/plugin construction; config reload derives a restart
-notice without changing existing or newly opened windows. Plugin custom artwork
-remains plugin-owned. Exact OldGNOME2 provenance/redistribution notices are a known
-asset-packaging prerequisite; all 22 proposed 16/24-pixel source assets exist and
-their PNG dimensions were checked. Metal/Ocean is stated explicitly for review.
+Retro uses Metal/Ocean, light controls, black high-contrast terminal colors and bundled GNOME
+icons. The startup style stays fixed; reload derives a restart notice while sessions and
+live settings continue normally. Plugins report LIGHT chrome and preserve artwork and SDK
+contracts. User screenshot feedback added flat compact toolbar buttons with 24-pixel icons,
+icon-only tab close controls and unboxed status actions; forms retain Metal defaults.
+The user confirmed GPL2+ for OldGNOME2; assets include the license, honest origin notice and
+22-file hash manifest. No GUI launch, merge, push or edits to the original checkout's dirty files.
 
-At the user's explicit planning request, the written design and plan were prepared
-together for review instead of pausing between those two documentation stages.
-The implementation and execution-method gates remain pending. Recommended execution:
-native inline with one independent final review. Seven implementation tasks cover
-config, theme lifetime, icons, tabs, chrome, plugin/palette surfaces, and acceptance.
-Planning verification: AppDocumentationTest (including dated-document links) passed;
-product behavior checks in the plan are future execution work, not claimed results.
+Execution adjustments: invalid config types retain existing whole-snapshot rejection; unknown
+strings default per-field. EDT cleanup/parameterized tests explicitly marshal LAF changes.
+Compacting toolbar labels invalidates Swing's cached layout requirements. Real palette scope
+tests cover submission/cancellation in both styles. Vault's own SDK-only test module renders
+Metal forms without an app dependency; host tests render forms in all three appearances.
+Visual QA also corrected a low-contrast palette accent alias and terminal placeholder foreground; regression tests failed before both fixes. Native OS title bars, modality, menu/focus and Retina acceptance remain user-run.
+
+Verification: `verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture
+verifyPluginArchitecture check :jasper-app:installDist` passed: 1,576 tests, 1,573 passed,
+three expected skips, zero failures/errors. Inspected 1x/2x workspace, palette and Vault renders;
+modern light/dark host forms remain intact. Installed `jasper-app.jar` contains all 22 PNGs,
+matching hashes, license and notice. Source hygiene and `git diff --check` passed. No native
+window was launched. The plan's user-run OS acceptance checklist remains pending.
 
 ### macOS default shell refresh reverted — 2026-09-22
 

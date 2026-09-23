@@ -114,13 +114,19 @@ private static void installUi(PluginContext context, long stepMillis) {
 
 ## Consistent buttons, flexible layouts
 
-Use ordinary `JButton` components inside plugin content. Jasper's look and feel supplies the
+Use ordinary `JButton` components inside plugin content. In modern mode Jasper's look and feel supplies the
 TermLab reference styling: 24-logical-pixel minimum height, 72-pixel minimum text-button width,
 12-point labels, subtly rounded gray secondary buttons and blue default buttons. Text fields
 use square borders; dropdowns and lists use the reference selection colors. Dark and light
 palettes come from TermLab's theme definitions. The dark secondary text is slightly lighter
 than the source (#A7AEBB instead of #A0A7B4) to preserve the existing 4.5:1 contrast check;
 disabled button text retains Jasper's contrast-tested defaults.
+
+Retro mode supplies stock light Metal/Ocean delegates, fonts, borders and form buttons.
+No plugin changes or SDK version bump are required. `Variant.LIGHT` describes application
+chrome brightness; terminal colors are independent and retro terminals remain black.
+Plugin SVGs and custom artwork retain their existing contracts. The host's tab-close,
+toolbar and status controls use compact flat presentation; plugin form buttons retain Metal.
 
 Swing actions, mnemonics, focus and disabled states retain their behavior. Set the hosting
 `JRootPane`'s default button when a form attaches and release it when the form detaches, so a

@@ -10,6 +10,8 @@ class RetroChromeTest {
     edt(() -> {
         var owner = content(launcher(new java.util.ArrayDeque<>()),
             new ThemeController(ThemeStyle.RETRO, Appearance.DARK));
+        var starting = (javax.swing.JLabel) owner.currentPane().getComponent(0);
+        assertThat(starting.getForeground()).isEqualTo(owner.theme().palette().foreground());
         var toolbar = owner.toolbar();
         for (var child : toolbar.getComponents()) if (child instanceof javax.swing.JButton button) {
             assertThat(button.getUI()).isInstanceOf(javax.swing.plaf.metal.MetalButtonUI.class);
@@ -51,4 +53,50 @@ class RetroChromeTest {
             }
         });
     }
+
+    @Test void renderWorkspaceAndStandardFormsAtBothScales() throws Exception {
+        edt(() -> {
+            for (var choice : java.util.List.of(java.util.Map.entry(ThemeStyle.MODERN, Appearance.DARK),
+                    java.util.Map.entry(ThemeStyle.MODERN, Appearance.LIGHT), java.util.Map.entry(ThemeStyle.RETRO, Appearance.LIGHT))) {
+                try (var owner = content(launcher(new java.util.ArrayDeque<>()), new ThemeController(choice.getKey(), choice.getValue()))) {
+                    owner.currentTab().rename("<html>A long literal terminal title & development"); owner.update();
+                    owner.newTab(HOME);
+                    var model = new dev.jasper.app.contributions.Contributions();
+                    owner.connectContributions(model);
+                    model.addStatus("dev.preview.vault", false, 0).setText("Vault");
+                    var preview = new javax.swing.JPanel(new java.awt.BorderLayout());
+                    preview.add(owner);
+                    var form = new javax.swing.JPanel(new java.awt.FlowLayout());
+                    form.add(new javax.swing.JLabel("Profile")); form.add(new javax.swing.JTextField("Retro terminal", 12));
+                    form.add(new javax.swing.JPasswordField("password", 10));
+                    form.add(new javax.swing.JComboBox<>(new String[]{"Local", "Remote"}));
+                    var save = new javax.swing.JButton("Save"); form.add(save);
+                    var disabled = new javax.swing.JButton("Unavailable"); disabled.setEnabled(false); form.add(disabled);
+                    var root = new javax.swing.JRootPane(); root.setContentPane(form); root.setDefaultButton(save);
+                    preview.add(root, java.awt.BorderLayout.SOUTH);
+                    for (int scale : new int[]{1, 2}) saveRender(preview, choice.getKey()+"-"+choice.getValue()+"-workspace-"+scale, scale);
+                }
+            }
+        });
+    }
+private static void layoutTree(java.awt.Container container) {
+    container.doLayout();
+    for (var child : container.getComponents())
+        if (child instanceof java.awt.Container nested) layoutTree(nested);
+}
+private static void saveRender(javax.swing.JComponent component, String name, int scale) {
+    component.setSize(960, 640);
+    layoutTree(component);
+    var image = new java.awt.image.BufferedImage(960 * scale, 640 * scale,
+        java.awt.image.BufferedImage.TYPE_INT_ARGB);
+    var graphics = image.createGraphics();
+    try { graphics.scale(scale, scale); component.printAll(graphics); }
+    finally { graphics.dispose(); }
+    try {
+        var folder = java.nio.file.Path.of("build/retro-preview");
+        java.nio.file.Files.createDirectories(folder);
+        javax.imageio.ImageIO.write(image, "png", folder.resolve(name + ".png").toFile());
+    } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+}
+
 }

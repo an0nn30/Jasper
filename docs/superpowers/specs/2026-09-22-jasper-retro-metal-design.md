@@ -1,6 +1,6 @@
 # Jasper Retro Metal appearance
 
-**Status:** Proposed design for review, 2026-09-22. The user requested an implementation plan after the feasibility discussion and accepted Metal plus a required restart. No implementation is authorized by this document. This document and its accompanying plan are being prepared together at that explicit request; the separate written-spec review step is consolidated into their review. No product code has changed.
+**Status:** Approved for native implementation by the user's “execute natively” instruction; implemented on `codex/retro-metal`. Headless acceptance passed; independent review is underway; native OS acceptance remains user-run. The user supplied GPL2+ licensing for OldGNOME2. Subsequent screenshot feedback supersedes stock borders for app chrome: icon-only 20-pixel tab-close targets, flat compact toolbar controls with 24-pixel GNOME artwork, and unboxed status actions. Form buttons retain stock Metal.
 
 **Plan:** [Implementation plan](../plans/2026-09-22-jasper-retro-metal.md).
 
@@ -28,7 +28,7 @@ On reload, accept and preserve the desired style in the saved snapshot, but disp
 
 Other valid live settings continue to apply. Modern light/dark switching remains live while a style change is pending. Retro always resolves to light app appearance and the retro terminal palette. Saved modern `variant` and temporary overrides never install FlatLaf in retro. Disable the Light/Dark commands and the custom tab-height command in retro; show a short explanation in the Appearance menu. Persisted tab height remains available for modern mode. Retro uses Metal's preferred tab size.
 
-Follow the existing parser policy: a missing style means modern; an invalid type or unknown value reports the exact key/location and uses modern for that field; malformed TOML retains the last accepted service snapshot. Never echo arbitrary invalid text into diagnostics.
+Follow the existing parser policy: a missing style means modern; an invalid type rejects the snapshot, while an unknown string value reports the exact key/location and uses modern for that field; malformed TOML retains the last accepted service snapshot. Never echo arbitrary invalid text into diagnostics.
 
 ## Look and feel and colors
 

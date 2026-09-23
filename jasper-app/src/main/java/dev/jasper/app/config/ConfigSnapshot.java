@@ -45,15 +45,15 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         }
     }
 
-public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
-                      FontConfig font, Appearance variant, Map<String, String> keybindings,
-                      int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
-                      int maxResults, int longCommandSeconds, boolean backgroundEnabled,
-                      Map<String, Map<String, Object>> plugins) {
-    this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines,
-        terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled,
-        plugins, ThemeStyle.MODERN);
-}
+    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
+                          FontConfig font, Appearance variant, Map<String, String> keybindings,
+                          int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
+                          int maxResults, int longCommandSeconds, boolean backgroundEnabled,
+                          Map<String, Map<String, Object>> plugins) {
+        this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines,
+            terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled,
+            plugins, ThemeStyle.MODERN);
+    }
 
 
     /** Every constructor that predates plugin tables: no plugin settings. */

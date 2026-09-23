@@ -24,7 +24,8 @@ final class MetalDefaults {
         alias(defaults, "controlShadow", "Jasper.titleSeparator", "Jasper.splitDivider",
             "Component.borderColor", "Jasper.paletteBorder");
         alias(defaults, "TabbedPane.selected", "Jasper.tabSelectedBackground");
-        alias(defaults, "textHighlight", "Jasper.paletteAccent", "Component.focusedBorderColor");
+        alias(defaults, "List.selectionForeground", "Jasper.paletteAccent");
+        alias(defaults, "controlDkShadow", "Component.focusedBorderColor");
         alias(defaults, "List.selectionBackground", "Jasper.paletteSelectionBackground");
         alias(defaults, "List.selectionForeground", "Jasper.paletteSelectionForeground");
         defaults.put("Jasper.runningForeground", new Color(0x166534));

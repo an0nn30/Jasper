@@ -25,16 +25,16 @@ final class ConfigurationController implements AutoCloseable {
     private final List<dev.jasper.app.config.ConfigDiagnostic> reported = new java.util.ArrayList<>();
 
     /** The saved state plus problems plugins reported about their own tables since the last reload. */
-ConfigService.State shown() {
-    requireEdt();
-    var merged = new java.util.ArrayList<>(state.diagnostics());
-    merged.addAll(reported);
-    if (state.snapshot().style() != themes.style())
-        merged.add(new dev.jasper.app.config.ConfigDiagnostic(
-            dev.jasper.app.config.ConfigDiagnostic.Severity.WARNING,
-            state.file(), 0, 0, "ui.theme.style", "Restart Jasper to apply ui.theme.style."));
-    return new ConfigService.State(state.snapshot(), merged, state.file(), state.present());
-}
+    ConfigService.State shown() {
+        requireEdt();
+        var merged = new java.util.ArrayList<>(state.diagnostics());
+        merged.addAll(reported);
+        if (state.snapshot().style() != themes.style())
+            merged.add(new dev.jasper.app.config.ConfigDiagnostic(
+                dev.jasper.app.config.ConfigDiagnostic.Severity.WARNING,
+                state.file(), 0, 0, "ui.theme.style", "Restart Jasper to apply ui.theme.style."));
+        return new ConfigService.State(state.snapshot(), merged, state.file(), state.present());
+    }
 
     /** A plugin's complaint about one of its settings; shown with the file's diagnostics until the next reload. */
     void report(String key, String message) {

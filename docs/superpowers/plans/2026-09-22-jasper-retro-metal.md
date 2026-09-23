@@ -1,8 +1,10 @@
 # Jasper Retro Metal Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Status:** Planning only; awaiting user review. Written with the design at the user's explicit request to make a Superpowers plan after feasibility investigation. This consolidates the separate written-spec review into review of both documents; it does not authorize implementation. Baseline inspected: `ac02f94`. Planning branch: `codex/retro-metal-plan`. No product edits, GUI launch, merge, or push. Execution-method recommendation: native inline implementation plus one independent final review; user selection is pending. Known external prerequisite: provenance/redistribution terms for the exact OldGNOME2 collection must be established before committing artwork.
+**Status:** User authorized native execution; implementation tasks 1–6 and screenshot refinements are complete on `codex/retro-metal`, based on `ac02f94`. Task 7 headless verification passed (1,576 tests, three skips, no failures/errors; architecture guards, distribution, source hygiene and image inspection passed). Independent review is underway; native acceptance remains user-run. User supplied GPL2+ licensing for OldGNOME2; bundled notices record that provenance without inventing authors. Original checkout changes remain untouched. No GUI launch, merge or push.
+
+**Execution adjustments:** Preserve existing whole-snapshot rejection for invalid config types; unknown strings still default per-field. Test cleanup and parameterized cases explicitly marshal LAF changes to EDT because the existing extension intercepts ordinary test methods only. Invalidate the stock toolbar layout cache after compacting labels to prevent clipping. User screenshot feedback supersedes stock chrome borders: icon-only 20-pixel tab close targets, flat compact toolbar buttons with 24-pixel artwork, and unboxed status actions. Ordinary forms retain Metal. Palette scope integration tests cover submission/cancellation in both styles. Vault renders use standalone Metal within the SDK-only plugin test module; modern form rendering remains in the host tests. Visual QA also corrected the palette accent alias and terminal placeholder foreground, with RED/GREEN regressions. These changes preserve module boundaries.
 
 **Goal:** Add a restart-required `ui.theme.style = "retro"` option that gives Jasper stock light Metal controls, GNOME 2 application icons, and a high-contrast terminal while preserving modern mode and existing SDK/plugin behavior.
 
@@ -81,7 +83,7 @@ No app package dependency edge changes are necessary: appearance continues to de
 
 **Interfaces:** Consumes the reviewed spec/plan; produces a verified implementation branch.
 
-- [ ] **Step 1: Read the current branch and worktree state.**
+- [x] **Step 1: Read the current branch and worktree state.**
 
 ```bash
 git status --short --branch
@@ -91,7 +93,7 @@ git rev-parse --git-dir --git-common-dir
 
 Use the isolated planning worktree if it is still attached and clean. Create `codex/retro-metal` there for execution, or use the native worktree tool if executing elsewhere. Do not overwrite the unrelated `WindowStatusBar.java` / `VaultPlugin.java` edits found in the original checkout during planning. If the base has advanced, re-read touched owner files before applying the snippets; record actual deviations.
 
-- [ ] **Step 2: Run the headless baseline.**
+- [x] **Step 2: Run the headless baseline.**
 
 ```bash
 ./gradlew check
@@ -105,7 +107,7 @@ Expected: exit 0; record XML totals. The known concurrent-list race in `Attached
 
 **Interfaces:** Produces `ThemeStyle.MODERN/RETRO`, `ConfigSnapshot.style()`, `ConfigSnapshot.Builder.style(ThemeStyle)`. All existing ConfigSnapshot constructor signatures continue to mean modern; `toBuilder()` retains the new value.
 
-- [ ] **Step 1: Add these parser and builder regression tests.** Place the first two in `ConfigLoaderTest` (which already has `FILE` and `parse`), and the third in `ConfigSnapshotBuilderTest`.
+- [x] **Step 1: Add these parser and builder regression tests.** Place the first two in `ConfigLoaderTest` (which already has `FILE` and `parse`), and the third in `ConfigSnapshotBuilderTest`.
 
 ```java
 @Test void retroStyleDoesNotRewriteSavedVariant() {
@@ -140,7 +142,7 @@ Expected: exit 0; record XML totals. The known concurrent-list race in `Attached
 }
 ```
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*ConfigLoaderTest' --tests '*ConfigSnapshotBuilderTest'
@@ -148,7 +150,7 @@ Expected: exit 0; record XML totals. The known concurrent-list race in `Attached
 
 Expected: compilation failure for the new enum/accessors.
 
-- [ ] **Step 3: Add the value and wire every construction path.**
+- [x] **Step 3: Add the value and wire every construction path.**
 
 ```java
 package dev.jasper.app.config;
@@ -201,7 +203,7 @@ In both generated and example `[ui.theme]` sections insert exactly:
 # Variant applies only to modern; retro always uses light controls and a dark terminal.
 ```
 
-- [ ] **Step 4: Run GREEN and commit.**
+- [x] **Step 4: Run GREEN and commit.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*ConfigLoaderTest' --tests '*ConfigSnapshotBuilderTest' --tests '*ConfigTemplateTest'
@@ -215,7 +217,7 @@ git commit -m "feat: add startup appearance style configuration" -m "Co-Authored
 
 **Interfaces:** Produces `ThemeController(ThemeStyle, Appearance)`, `ThemeController.style()`, `BuiltinTheme.RETRO` with `.appearance()==LIGHT`, `SwingAppearance.retro()`. Existing constructors and installer seam retain their modern behavior. Saved style remains in ConfigSnapshot; the controller's final style is the effective value.
 
-- [ ] **Step 1: Create `RetroThemeTest` with the EDT extension and these tests.**
+- [x] **Step 1: Create `RetroThemeTest` with the EDT extension and these tests.**
 
 ```java
 package dev.jasper.app.appearance;
@@ -294,13 +296,13 @@ In `ConfigurationControllerTest.start`, initialize themes with the initial snaps
 
 Both integration tests are added/run in Task 4; the resolution/defaults tests are this task's immediate gate. Existing `savedFieldsApplyAcrossOwnersAndPendingHiddenViewsWithoutReplacingSessions` continues to prove session preservation; add the focused retro session regression in Task 6 without changing its existing modern-specific assertions.
 
-- [ ] **Step 2: Run RED for the independent theme tests.**
+- [x] **Step 2: Run RED for the independent theme tests.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*RetroThemeTest'
 ```
 
-- [ ] **Step 3: Add the JDK-only style predicate and app palette.**
+- [x] **Step 3: Add the JDK-only style predicate and app palette.**
 
 ```java
 package dev.jasper.app.platform;
@@ -384,7 +386,7 @@ final class MetalDefaults {
 
 The three configuration aliases above are the exact keys used by `WindowStatusBar.configColor` at the inspected baseline. Assert each is nonnull in `RetroThemeTest`. Do not import FlatLaf property files to satisfy a missing alias.
 
-- [ ] **Step 4: Resolve the final process style without multiplying state models.**
+- [x] **Step 4: Resolve the final process style without multiplying state models.**
 
 In `BuiltinTheme`, append `RETRO("retro", "Retro", RetroPalette.create())`; change `appearance()` to `return this == DARK ? Appearance.DARK : Appearance.LIGHT;`. Keep `of(Appearance)` modern-only. In `ThemeController`, remove static eager defaults registration and register the FlatLaf package once only when installing a modern theme. Add a final `ThemeStyle style` and these constructor/accessor/resolution changes:
 
@@ -476,7 +478,7 @@ ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.i
 themes = new ThemeController(startup.style(), startup.variant());
 ```
 
-- [ ] **Step 5: Derive the restart warning from saved versus captured style.** Replace `ConfigurationController.shown()` with:
+- [x] **Step 5: Derive the restart warning from saved versus captured style.** Replace `ConfigurationController.shown()` with:
 
 ```java
 ConfigService.State shown() {
@@ -495,7 +497,7 @@ No `accept()` change to style, no new restart command. The initial constructor s
 
 In the modern-only tests/previews listed above, replace `BuiltinTheme.values()` with `java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)`; these tests assert modern-specific geometry/colors, while new tests cover retro separately. In `CommandPalettePreview`'s exhaustive theme-name switch add `case RETRO -> "retro";` so all test sources still compile. This is a test-source enum migration, not permission to run the preview's GUI.
 
-- [ ] **Step 6: Run GREEN and commit.**
+- [x] **Step 6: Run GREEN and commit.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*RetroThemeTest' --tests '*ThemeStateTest' --tests '*ThemeControllerTest' --tests '*BrandedButtonsTest'
@@ -509,7 +511,7 @@ git commit -m "feat: resolve retro Metal appearance for the process lifetime" -m
 
 **Interfaces:** `AppIcons.icon(String)` returns `javax.swing.Icon`; it accepts its existing ten semantic names plus `close`. `AppIcons.themed(ClassLoader,String)` retains its exact contract. No plugin-path remapping.
 
-- [ ] **Step 1: Resolve the packaging prerequisite.** Obtain source/author/license evidence for the exact OldGNOME2 files, record the original source URL and license text in resource `NOTICE.md` and `LICENSE.txt`. Use the original distribution's notices; do not copy a license from a different GNOME theme. If unavailable, report this concrete blocker and do not redistribute the icons. Continue independent code work if useful, but do not mark this task or the feature complete.
+- [x] **Step 1: Resolve the packaging prerequisite.** Obtain source/author/license evidence for the exact OldGNOME2 files, record the original source URL and license text in resource `NOTICE.md` and `LICENSE.txt`. Use the original distribution's notices; do not copy a license from a different GNOME theme. If unavailable, report this concrete blocker and do not redistribute the icons. Continue independent code work if useful, but do not mark this task or the feature complete.
 
 The checked source mapping is:
 
@@ -527,7 +529,7 @@ The checked source mapping is:
 | bookmark | places/user-bookmarks.png |
 | close | stock/generic/stock_close.png |
 
-- [ ] **Step 2: Add `GnomeIconsTest` on EDT, then run RED.**
+- [x] **Step 2: Add `GnomeIconsTest` on EDT, then run RED.**
 
 ```java
 @Test void everyBundledIconHasRealImagesAndPaintsAtBothScales() {
@@ -555,7 +557,7 @@ The checked source mapping is:
 ./gradlew :jasper-app:test --tests '*GnomeIconsTest'
 ```
 
-- [ ] **Step 3: Copy verified assets as bytes, with a hash manifest.** Run after Step 1; use a quoted heredoc. This code creates regular files even if the source names are symlinks.
+- [x] **Step 3: Copy verified assets as bytes, with a hash manifest.** Run after Step 1; use a quoted heredoc. This code creates regular files even if the source names are symlinks.
 
 ```python
 from pathlib import Path
@@ -585,7 +587,7 @@ for size in (16, 24):
 (target / "assets.tsv").write_text("\n".join(rows) + "\n", encoding="utf-8")
 ```
 
-- [ ] **Step 4: Implement the PNG loader and mode dispatch.**
+- [x] **Step 4: Implement the PNG loader and mode dispatch.**
 
 ```java
 package dev.jasper.app.platform;
@@ -652,7 +654,7 @@ assertThat(java.util.HexFormat.of().formatHex(
 
 Keep `AppIcons.themed` using `FlatSVGIcon`; the existing foreground filter now reads the Metal-supplied `Jasper.chromeForeground` alias. Extend `AppIconsThemedTest` to install retro before its existing real-SVG painting check.
 
-- [ ] **Step 5: Run GREEN and commit approved assets with code.**
+- [x] **Step 5: Run GREEN and commit approved assets with code.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*GnomeIconsTest' --tests '*AppIconsTest' --tests '*AppIconsThemedTest'
@@ -666,7 +668,7 @@ git commit -m "feat: bundle GNOME 2 artwork for retro application icons" -m "Co-
 
 **Interfaces:** Produces package-private `RetroTabs(WindowContent)`, `refresh()`, `close()`. `WindowContent.retro()` reads the captured style. `WindowTabs` exists only in modern; all references to it are guarded. The existing JTabbedPane, TerminalTab and TerminalPane instances remain authoritative.
 
-- [ ] **Step 1: Add an EDT workspace test with these methods.** Use `DesktopTestSupport.content(launcher(pending), themes)` so launches remain queued; do not drain the queue. `closeOwners()` is the existing cleanup fixture. Restore a modern ThemeController after each test on EDT.
+- [x] **Step 1: Add an EDT workspace test with these methods.** Use `DesktopTestSupport.content(launcher(pending), themes)` so launches remain queued; do not drain the queue. `closeOwners()` is the existing cleanup fixture. Restore a modern ThemeController after each test on EDT.
 
 ```java
 @Test void metalTabsKeepTheirModelAndHeaderIdentityAcrossUpdates() throws Exception {
@@ -728,13 +730,13 @@ git commit -m "feat: bundle GNOME 2 artwork for retro application icons" -m "Co-
 
 Add a close-during-drag case by pressing the header, closing its tab through `owner.closeTab(first)`, then releasing over a surviving tab; assert the survivor's identity/count are unchanged and no exception. Header callbacks must use the current index, not an index captured at construction.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*RetroTabsTest'
 ```
 
-- [ ] **Step 3: Let the deck choose the installed delegate.** Add the `SwingAppearance` import and replace `TerminalDeck` with:
+- [x] **Step 3: Let the deck choose the installed delegate.** Add the `SwingAppearance` import and replace `TerminalDeck` with:
 
 ```java
 package dev.jasper.app.workspace;
@@ -763,7 +765,7 @@ final class TerminalDeck extends JTabbedPane {
 }
 ```
 
-- [ ] **Step 4: Add headers and gestures without a duplicate tab list.**
+- [x] **Step 4: Add headers and gestures without a duplicate tab list.**
 
 ```java
 package dev.jasper.app.workspace;
@@ -844,7 +846,7 @@ final class RetroTabs implements AutoCloseable {
 }
 ```
 
-- [ ] **Step 5: Join the presentation to WindowContent.** Add the final `RetroTabs retroTabs` field and these helpers:
+- [x] **Step 5: Join the presentation to WindowContent.** Add the final `RetroTabs retroTabs` field and these helpers:
 
 ```java
 boolean retro() { return themes.style() == dev.jasper.app.config.ThemeStyle.RETRO; }
@@ -873,7 +875,7 @@ tabs.setBackground(retro() ? UIManager.getColor("TabbedPane.background") : theme
 
 Only the actual terminal tabs/panes keep the terminal palette. Task 5 handles the remaining status/toolbar painting.
 
-- [ ] **Step 6: Run GREEN, including the deferred restart tests, and commit.**
+- [x] **Step 6: Run GREEN, including the deferred restart tests, and commit.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*RetroTabsTest' --tests '*WindowTabsTest' --tests '*ConfigurationControllerTest'
@@ -887,7 +889,7 @@ git commit -m "feat: render retro workspace tabs with stock Metal" -m "Co-Author
 
 **Interfaces:** `RetroToolbar` is package-private `JToolBar` with ordinary LAF painting and compact layout. Existing `ReferenceButton` remains the shared action/dropdown wiring but uses its JButton delegate in retro. Commands and contribution structures are unchanged.
 
-- [ ] **Step 1: Add concrete delegate/behavior tests.** In `RetroChromeTest`, use the same EDT/queued-launch/cleanup fixtures as Task 4.
+- [x] **Step 1: Add concrete delegate/behavior tests.** In `RetroChromeTest`, use the same EDT/queued-launch/cleanup fixtures as Task 4.
 
 ```java
 @Test void retroButtonsKeepMetalDelegatesAndToolbarModes() throws Exception {
@@ -919,13 +921,13 @@ git commit -m "feat: render retro workspace tabs with stock Metal" -m "Co-Author
 
 In the existing contribution tests, run toolbar button/dropdown/disabled-action cases with a retro controller as well as modern. Keep the model registrations and handler assertions; assert enabled state and actual invocation count, not only delegate classes. Add a minimum-width render asserting every visible button has positive width at least its icon+insets and remains within toolbar bounds. Use the toolbar's reported minimum width; at widths below minimum, menu actions remain available as in modern.
 
-- [ ] **Step 2: Run RED.**
+- [x] **Step 2: Run RED.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*RetroChromeTest'
 ```
 
-- [ ] **Step 3: Add the plain toolbar with compact labels.**
+- [x] **Step 3: Add the plain toolbar with compact labels.**
 
 ```java
 package dev.jasper.app.workspace;
@@ -995,7 +997,7 @@ In `setToolbarMode`, after applying the current text and visibility behavior, ad
 if (toolbar instanceof RetroToolbar retro) retro.labels(mode == ToolbarMode.ICONS_AND_LABELS);
 ```
 
-- [ ] **Step 4: Preserve stock fonts/borders in rail and status.** In `WindowRail.style`, apply the `JButton.buttonType` property and zero margin only when `!SwingAppearance.retro()`; keep icons/actions/tooltips/selection. In `WindowStatusBar`, apply empty button border/content-area/opacity overrides only in modern. Select fonts through:
+- [x] **Step 4: Preserve stock fonts/borders in rail and status.** In `WindowRail.style`, apply the `JButton.buttonType` property and zero margin only when `!SwingAppearance.retro()`; keep icons/actions/tooltips/selection. In `WindowStatusBar`, apply empty button border/content-area/opacity overrides only in modern. Select fonts through:
 
 ```java
 private static java.awt.Font statusFont() {
@@ -1019,7 +1021,7 @@ view("view.tab_height").setEnabled(!owner.retro());
 
 The exact owner method is `WindowCommands.refresh()`: replace its final appearance-selection loop with the code above. In `WindowChrome`'s Appearance menu, append a disabled `JMenuItem("Retro uses light Metal; change style in Settings and restart.")` only in retro. Do not add a misleading live style selector.
 
-- [ ] **Step 5: Run GREEN and commit.**
+- [x] **Step 5: Run GREEN and commit.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*RetroChromeTest' --tests '*WindowChromeTest' --tests '*WindowChromeHintTest' --tests '*WindowChromeContributionsTest' --tests '*ConfigurationStatusTest'
@@ -1033,7 +1035,7 @@ git commit -m "feat: use Metal controls throughout retro workspace chrome" -m "C
 
 **Interfaces:** Existing `Appearance.icon`, `Variant`, events, factories, surface handles, palette controllers and plugin contribution values remain binary-compatible. NativeShells' headless title-bar seam becomes style-aware; no native peer is created in its tests.
 
-- [ ] **Step 1: Add the auxiliary-window policy regression.** `NativeShellsChromeTest` already executes on EDT and constructs `AuxiliarySurface` without native windows. Add:
+- [x] **Step 1: Add the auxiliary-window policy regression.** `NativeShellsChromeTest` already executes on EDT and constructs `AuxiliarySurface` without native windows. Add:
 
 ```java
 @Test void retroKeepsNormalWindowDecorationsForFramesAndDialogs() {
@@ -1058,7 +1060,7 @@ git commit -m "feat: use Metal controls throughout retro workspace chrome" -m "C
 
 Add the matching root-content assertion to `RetroTabsTest` by calling `WindowContent.installTitleBar(new JRootPane(), owner, true, titles::add)` with a local `List<String> titles`; assert null bar, content identity and updated native title after `rename`/`update`.
 
-- [ ] **Step 2: Add an actual plugin-start test, not just a synthetic variant comparison.** In `JasperApplicationPluginsTest`, build this SDK-only fixture with the existing `PluginJars` helper:
+- [x] **Step 2: Add an actual plugin-start test, not just a synthetic variant comparison.** In `JasperApplicationPluginsTest`, build this SDK-only fixture with the existing `PluginJars` helper:
 
 ```java
 private static final String RETRO_FIXTURE = """
@@ -1176,7 +1178,7 @@ void retroStyleReloadKeepsALiveSessionAndAppliesFontChanges() throws Exception {
 
 Restore modern LAF on EDT after retro test cleanup (after owners close), so global Swing state does not leak between test classes. Do not create a new production fake-surface abstraction.
 
-- [ ] **Step 3: Add a palette test before changing its paint.** In `CommandPaletteTest`:
+- [x] **Step 3: Add a palette test before changing its paint.** In `CommandPaletteTest`:
 
 ```java
 @Test void retroQueryRetainsMetalBorderAndNativeEditing() throws Exception {
@@ -1202,13 +1204,13 @@ Restore modern LAF on EDT after retro test cleanup (after owners close), so glob
 
 Add a retro case to existing step-form/result execution tests using the same real row/step values: assert successful submission and cancellation callbacks, default Metal text-field border, and literal result labels. This verifies behavior, beyond a screenshot of an empty card.
 
-- [ ] **Step 4: Run RED for the policy and palette regressions.**
+- [x] **Step 4: Run RED for the policy and palette regressions.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*NativeShellsChromeTest' --tests '*CommandPaletteTest'
 ```
 
-- [ ] **Step 5: Bypass custom auxiliary chrome and modern palette presentation.** In `NativeShells.installTitleBar`, pass `supported && !SwingAppearance.retro()` to the existing `MacTitleBar.install` call. Its fallback sets `surface.holder()` as root content. Keep surface title propagation, menu bars, file picker, ownership and disposal unchanged.
+- [x] **Step 5: Bypass custom auxiliary chrome and modern palette presentation.** In `NativeShells.installTitleBar`, pass `supported && !SwingAppearance.retro()` to the existing `MacTitleBar.install` call. Its fallback sets `surface.holder()` as root content. Keep surface title propagation, menu bars, file picker, ownership and disposal unchanged.
 
 In `CommandPalette`, add:
 
@@ -1254,7 +1256,7 @@ LIGHT
 
 Do not bump SDK version/descriptor ranges for documentation. Audit all `BuiltinTheme.LIGHT` equality checks: actual brightness tests use `.appearance()==Appearance.LIGHT`; explicit modern selection and the modern FlatLaf install switch retain their intended meaning.
 
-- [ ] **Step 6: Run GREEN and commit.**
+- [x] **Step 6: Run GREEN and commit.**
 
 ```bash
 ./gradlew :jasper-app:test --tests '*NativeShellsChromeTest' --tests '*HostedUiTest' --tests '*JasperApplicationPluginsTest' --tests '*CommandPaletteTest' --tests '*WindowPanelsTest' --tests '*WindowStatusBarContributionsTest' --tests '*ConfigurationControllerTest'
@@ -1268,7 +1270,7 @@ git commit -m "feat: preserve plugin and palette behavior under Metal" -m "Co-Au
 
 **Interfaces:** Produces inspected preview PNGs, passing headless/architecture checks, a distributable app with assets/notices, and an explicit native-acceptance handoff.
 
-- [ ] **Step 1: Add a deterministic lightweight render fixture.** In `RetroChromeTest`, loop over the three constructors below on EDT, create queued-launch owners through the existing fixture, give the first tab a long literal title, create a second tab, size the owner to 960x640, recursively lay it out, and save 1x/2x PNGs under the app's `build/retro-preview/`. Include a sibling JPanel form with JLabel, JTextField, JPasswordField, JComboBox and default/disabled JButtons in each render. Keep all windows unconstructed.
+- [x] **Step 1: Add a deterministic lightweight render fixture.** In `RetroChromeTest`, loop over the three constructors below on EDT, create queued-launch owners through the existing fixture, give the first tab a long literal title, create a second tab, size the owner to 960x640, recursively lay it out, and save 1x/2x PNGs under the app's `build/retro-preview/`. Include a sibling JPanel form with JLabel, JTextField, JPasswordField, JComboBox and default/disabled JButtons in each render. Keep all windows unconstructed.
 
 ```java
 var choices = java.util.List.of(
@@ -1303,7 +1305,7 @@ private static void saveRender(javax.swing.JComponent component, String name, in
 
 Keep screenshot generation separate from assertions about exact anti-aliased pixels. Inspect images using `view_image`, checking Metal borders/fonts, readable status/selection, unclipped toolbar/tab controls, icon edges and modern appearance parity. Save palette and Vault form renders using their own package tests/helpers as well; do not import plugin internals into app production or introduce a plugin dependency on app test fixtures.
 
-- [ ] **Step 2: Add the exact user-facing configuration documentation.**
+- [x] **Step 2: Add the exact user-facing configuration documentation.**
 
 ```markdown
 ### Retro Metal appearance
@@ -1319,7 +1321,7 @@ Plugins need no changes to use ordinary Metal controls. Their custom icons and c
 
 Add this to `docs/configuration.md`; link it from app README and STATUS. Update plugin-authoring's form styling section to describe modern branded buttons versus stock Metal automatically provided by the host, and to define `Variant` as chrome brightness. Record the style lifetime and semantic-color aliases in app architecture. Do not describe new SDK APIs or live style switching.
 
-- [ ] **Step 3: Run the final integration gate.**
+- [x] **Step 3: Run the final integration gate.**
 
 ```bash
 ./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist
@@ -1327,7 +1329,7 @@ Add this to `docs/configuration.md`; link it from app README and STATUS. Update 
 
 Expected: exit 0. Inspect all `*/build/test-results/test/TEST-*.xml`, report exact failures/errors/skips and counts, and use the known-flake policy from Task 0. No `:jasper-app:run` or benchmark.
 
-- [ ] **Step 4: Verify the distribution is self-contained.** Run this from repository root:
+- [x] **Step 4: Verify the distribution is self-contained.** Run this from repository root:
 
 ```python
 from pathlib import Path
@@ -1356,7 +1358,7 @@ print("Verified 22 bundled GNOME PNGs and their notices")
 
 If the distribution directory name differs in the checked Gradle configuration, resolve it from the `installDist` task output and record that path; do not skip the jar-content assertions. Verify source hygiene using AGENTS.md's Python check and run `git diff --check`.
 
-- [ ] **Step 5: Record verification, commit documentation, and request the selected final review.**
+- [x] **Step 5: Record verification, commit documentation, and request the selected final review.**
 
 ```bash
 git diff --check
@@ -1385,4 +1387,4 @@ Native checks stay pending until the user reports results. Successful headless r
 - Built-in/contributed toolbar, rail/status defaults and disabled appearance commands: Task 5.
 - Native shell policy, palette controls/shadows, SDK-only startup and SVG compatibility: Task 6.
 - Headless images, architecture/full checks, distribution, docs and native acceptance: Task 7.
-- No implementation has been performed while writing this plan. Planning verification covers Markdown links and file/path consistency; product tests above are execution instructions, not claimed results.
+- The original plan was written before implementation; execution status and evidence are recorded above and in STATUS.md.
