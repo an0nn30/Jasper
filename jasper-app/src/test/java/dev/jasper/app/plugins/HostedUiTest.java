@@ -300,4 +300,24 @@ class HostedUiTest {
         } finally { new dev.jasper.app.appearance.ThemeController(); }
         }
     }
+
+    @Test void namedIconsBelongToHostRatherThanPluginLoader() {
+        var isolated = new HostedUi("dev.x.tool", model, containment, Runnable::run, () -> true, open::get,
+            new ClassLoader(null) {}, () -> variant,
+            handler -> () -> {}, auxiliary, terminals);
+        try {
+            for (boolean retro : new boolean[]{false, true}) {
+                new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
+                    : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
+                for (var name : dev.jasper.sdk.ui.IconName.values()) {
+                    var icon = isolated.appearance().icon(name);
+                    assertThat(icon.getIconWidth()).isEqualTo(16);
+                    assertThat(icon.getIconHeight()).isEqualTo(16);
+                    assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(retro ? 28 : 16);
+                }
+                assertThatNullPointerException().isThrownBy(() -> isolated.appearance().icon((dev.jasper.sdk.ui.IconName) null));
+                assertThatIllegalArgumentException().isThrownBy(() -> isolated.appearance().icon("dev/jasper/app/icons/search.svg"));
+            }
+        } finally { isolated.closeAll(); new dev.jasper.app.appearance.ThemeController(); }
+    }
 }

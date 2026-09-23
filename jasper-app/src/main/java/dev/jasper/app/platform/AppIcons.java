@@ -33,6 +33,12 @@ public final class AppIcons {
         return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Jasper.chromeForeground", source)));
     }
 
+    /** Host-owned semantic artwork, independent of any plugin's resource loader. */
+    public static javax.swing.Icon named(String name) {
+        String resource = NamedIcons.resource(name);
+        return SwingAppearance.retro() ? new SkinIcon(name) : themed(AppIcons.class.getClassLoader(), resource);
+    }
+
     /** Selects plugin SVG or explicit OldGNOME2 artwork for the running style. */
     public static javax.swing.Icon skin(ClassLoader loader, String modernSvgResourcePath, String retroName) {
         java.util.Objects.requireNonNull(loader, "loader");

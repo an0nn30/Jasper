@@ -212,6 +212,9 @@ final class HostedUi {
                 guard("onChanged");
                 return themeSubscriber.apply(java.util.Objects.requireNonNull(handler, "handler"));
             }
+            @Override public Icon icon(dev.jasper.sdk.ui.IconName name) {
+                return AppIcons.named(java.util.Objects.requireNonNull(name, "name").name());
+            }
             @Override public Icon icon(String svgResourcePath) { return AppIcons.themed(loader, svgResourcePath); }
             @Override public Icon icon(String modernSvgResourcePath, dev.jasper.sdk.ui.OldGnomeIcon retroIcon) {
                 java.util.Objects.requireNonNull(retroIcon, "retroIcon");
