@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-22-jasper-remote-design.md`
 
-> **Execution:** Native inline on `codex/remote-7a` in the Codex-managed worktree, from current main. Tasks 1–7 implemented; Task 8 and final review in progress. Corrections and deviations are recorded in `docs/STATUS.md`; original snippets below are retained as the approved plan.
+> **Execution:** Native inline on `codex/remote-7a` in the Codex-managed worktree, from current main. All eight tasks complete. One independent final review completed, all findings fixed with regressions. Full check and installDist pass (1,604 tests: 1,601 passed, three expected skips). Corrections and deviations are recorded in `docs/STATUS.md` and `docs/remote-7a-verification.md`; the SDK gained Panels.toggle (0.7.2). Original snippets below are retained as the approved plan. Native acceptance remains user-run.
 
 ## Global Constraints
 
@@ -38,7 +38,7 @@
 **Interfaces:**
 - Produces: `RemoteHost(UUID id, String name, String hostname, int port, String username, Auth auth, String group, boolean favorite, Optional<UUID> jump, Instant created, Instant updated)` with `RemoteHost.create(...)`, `withEdited(...)`, `withFavorite(boolean)`, `label()` = `user@host:port`; sealed `Auth` { `Vault(UUID credentialId)`, `Agent` } with `Auth.AGENT`; `HostFile.parse(String) -> Parsed(List<RemoteHost> hosts, List<String> warnings)` (throws `IOException` on TOML errors), `HostFile.format(List<RemoteHost>) -> String`, `HostFile.HEADER`, `HostFile.validate(List<RemoteHost>)` (duplicate names, dangling or cyclic jumps → `IllegalArgumentException`); `HostStore(Path file, Executor background, Executor ui)` with `hosts()`, `Optional<RemoteHost> host(UUID)`, `Optional<String> error()`, `Subscription onChanged(Runnable)`, `void load()`, `void poll()`, `CompletableFuture<Void> save(List<RemoteHost>)`, `CompletableFuture<Void> put(RemoteHost)`, `CompletableFuture<Void> remove(UUID)`; `RemoteSettings.read(PluginConfig) -> RemoteSettings(Duration connectTimeout, Duration authTimeout, Duration keepalive, Duration linger, boolean readUserKnownHosts, boolean useAgent)`.
 
-- [ ] **Step 1: Create the module files**
+- [x] **Step 1: Create the module files**
 
 `plugins/remote/build.gradle.kts`:
 
@@ -102,7 +102,7 @@ package dev.jasper.remote;
 package dev.jasper.remote.hosts;
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 `RemoteSettingsTest.java`:
 
@@ -306,12 +306,12 @@ class HostStoreTest {
 }
 ```
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: compilation failure (the module is discovered by `settings.gradle.kts`; the types are missing).
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 `RemoteSettings.java`:
 
@@ -694,12 +694,12 @@ public final class HostStore {
 
 `load()`/`poll()` use `thenAccept`, which does not return `CompletableFuture<Void>` of the right shape for `enqueue` — write both as `enqueue(() -> onBackground(...).thenAccept(...))` exactly as shown; `thenAccept` returns `CompletableFuture<Void>`, which is what `enqueue` takes. The `warnings` of a read are logged by the plugin (Task 7) through the store's `warnings()` accessor: add `private List<String> warnings = List.of();` set in `apply` and `public List<String> warnings()`.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: PASS. If `HostStoreTest.loadsSavesAndNoticesOutsideEdits` sees `changes` other than 2 after the first `put`, count listener calls: `load` (1) and the save's re-read (1); adjust only if the implementation differs, not the test's intent.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add plugins/remote
@@ -718,7 +718,7 @@ git commit -m "feat(remote): start the Remote plugin with settings, the host mod
 - Consumes: `RemoteHost`, `Auth`.
 - Produces: `SshConfig.Entry(String alias, Optional<String> hostname, OptionalInt port, Optional<String> user, Optional<String> proxyJump, Optional<String> identityFile)`; `SshConfig.Parsed(List<Entry> entries, List<String> skipped)`; `SshConfig.parse(Path config)` (one level of `Include`, globbed relative to the config's directory) and `SshConfig.parse(String text, Function<String, List<String>> includes)`; `Fingerprints.sha256(byte[] blob) -> "SHA256:…"`, `Fingerprints.ofPublicKeyLine(String line) -> Optional<String>`; `ConfigImport.Candidate(SshConfig.Entry entry, RemoteHost host, boolean exists, List<String> notes)`; `ConfigImport.plan(SshConfig.Parsed, List<RemoteHost> existing, Map<String, UUID> vaultKeysByFingerprint, Function<Path, Optional<String>> publicKeyLine, Path home, String localUser) -> List<Candidate>`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `SshConfigTest.java`:
 
@@ -846,12 +846,12 @@ class ConfigImportTest {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: compilation failure.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `hosts/Fingerprints.java`:
 
@@ -1065,12 +1065,12 @@ public final class ConfigImport {
 
 Note for the executor: when an imported name matches an existing host, `idsByName.putIfAbsent` keeps the existing id, so a `ProxyJump` to that name resolves to the existing host (what `ConfigImportTest` asserts for `prod` → the existing `Bastion`).
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/remote
@@ -1088,7 +1088,7 @@ git commit -m "feat(remote): read ~/.ssh/config and plan an import into hosts.to
 **Interfaces:**
 - Produces: `KnownHosts(Path own, Optional<Path> user)`; sealed `KnownHosts.Verdict` { `Match()`, `Mismatch(String knownFingerprint)`, `Unknown()` }; `Verdict verify(String host, int port, PublicKey key)` (throws `CorruptTrustFileException` when the own file cannot be parsed); `void trust(String host, int port, PublicKey key) throws IOException` (re-checks and appends `host key` / `[host]:port key`); `static String fingerprint(PublicKey)`; `static String hostPattern(String host, int port)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 package dev.jasper.remote.trust;
@@ -1171,12 +1171,12 @@ class KnownHostsTest {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: compilation failure.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `trust/package-info.java`:
 
@@ -1299,12 +1299,12 @@ public final class KnownHosts {
 
 If `KnownHostEntry.getMarker()` returns the marker with its leading `@`, compare against `"@revoked"` / `"@cert-authority"`; the test tells which.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/remote
@@ -1322,7 +1322,7 @@ git commit -m "feat(remote): known_hosts trust with read-only matching against t
 **Interfaces:**
 - Produces: `AgentClient(Function<byte[], byte[]> exchange)` (one framed request in, one framed reply out, without the length prefix) with `List<Identity> identities() throws IOException`, `Map.Entry<String, byte[]> sign(Identity, byte[] data, int flags) throws IOException`, `static Optional<AgentClient> forEnvironment(Map<String, String> env, String osName)`, constants `FLAG_RSA_SHA2_256 = 2`, `FLAG_RSA_SHA2_512 = 4`; `AgentClient.Identity(PublicKey key, byte[] blob, String comment)`; `MinaAgent(AgentClient) implements SshAgent`; `MinaAgentFactory(AgentClient) implements SshAgentFactory`. Test fixture `FakeAgent` (a protocol implementation over JDK keys with `byte[] handle(byte[] request)` and `serveUnixSocket(Path)`).
 
-- [ ] **Step 1: Write the fake agent and the failing tests**
+- [x] **Step 1: Write the fake agent and the failing tests**
 
 `agent/FakeAgent.java` (test source):
 
@@ -1502,12 +1502,12 @@ class AgentClientTest {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: compilation failure.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `agent/package-info.java`:
 
@@ -1703,12 +1703,12 @@ public final class MinaAgentFactory implements SshAgentFactory {
 
 If `SshAgent` does not extend `java.nio.channels.Channel` in 2.19, drop the `isOpen`/`close` overrides (the compiler says which). `ByteArrayBuffer.putBytes(byte[])` and `putString(String)` come from `Buffer`; if only the three-argument `putBytes` exists, call `putBytes(blob, 0, blob.length)`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: PASS (`talksToAUnixSocketAgent` runs on macOS).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/remote
@@ -1727,7 +1727,7 @@ git commit -m "feat(remote): ssh-agent client over the agent socket, adapted for
 - Consumes: `RemoteSettings`, `RemoteHost`, `Auth`, `KnownHosts`, `CorruptTrustFileException`, `AgentClient`, `MinaAgentFactory`, `dev.jasper.vault.api.Credential`, SDK `TerminalConnection`.
 - Produces: `HostKeyVerifier.Question(String host, int port, String keyType, String fingerprint)`, `HostKeyVerifier.Decision { CANCEL, ONCE, TRUST }`, `HostKeyVerifier(KnownHosts, Function<Question, CompletableFuture<Decision>> prompt, Supplier<Duration> timeout) implements ServerKeyVerifier`, attribute keys `HostKeyVerifier.TARGET` (`Target(String host, int port)`) and `HostKeyVerifier.REJECTION` (`String`); `Failures.message(Throwable, Duration connectTimeout) -> String`; `Connections(Supplier<RemoteSettings>, KnownHosts, Optional<AgentClient>, Function<UUID, Optional<RemoteHost>> hosts, Optional<Function<UUID, CompletableFuture<Optional<Credential>>>> credentials, Function<HostKeyVerifier.Question, CompletableFuture<HostKeyVerifier.Decision>> prompt, Executor background, Executor ui, BiFunction<Duration, Runnable, Runnable> schedule)` with `CompletableFuture<Shell> shell(UUID hostId, int columns, int rows, Consumer<String> status)`, `int channelCount()`, `boolean connected(UUID hostId)`, `Subscription onChanged(Runnable)`, `void close()`; `Connections.Shell(UUID hostId, TerminalConnection connection)`; exceptions surface as `Failures.Failure(String message)` (a `RuntimeException` whose message is the user-facing text).
 
-- [ ] **Step 1: Write the loopback server fixture and the failing tests**
+- [x] **Step 1: Write the loopback server fixture and the failing tests**
 
 `client/LoopbackServer.java` (test source):
 
@@ -2054,12 +2054,12 @@ class ConnectionsTest {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: compilation failure.
 
-- [ ] **Step 3: Implement the verifier and the failure messages**
+- [x] **Step 3: Implement the verifier and the failure messages**
 
 `client/package-info.java`:
 
@@ -2192,7 +2192,7 @@ public final class Failures {
 }
 ```
 
-- [ ] **Step 4: Implement the shell channel adapter**
+- [x] **Step 4: Implement the shell channel adapter**
 
 `client/ShellChannels.java`:
 
@@ -2239,7 +2239,7 @@ final class ShellChannels {
 }
 ```
 
-- [ ] **Step 5: Implement the registry and pipeline**
+- [x] **Step 5: Implement the registry and pipeline**
 
 `client/Connections.java`:
 
@@ -2535,12 +2535,12 @@ Notes for the executor:
 - `FilePasswordProvider.EMPTY` exists in 2.19; if not, pass `null` for an absent passphrase.
 - The `channelCount` test expects one channel per shell: `channels++` only after the channel opened.
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: PASS. These tests run real MINA threads; allow up to a minute. Flakiness candidates: the 200 ms sleeps around eviction — replace with a poll loop (`Await`-style, up to 5 s) if a run fails only there.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add plugins/remote
@@ -2559,7 +2559,7 @@ git commit -m "feat(remote): shared MINA sessions per host with the connect pipe
 - Consumes: `RemoteHost`, `Auth`, `ConfigImport.Candidate`, `SshConfig.Parsed`, `HostKeyVerifier.Question/Decision`, `dev.jasper.vault.api.CredentialDescriptor`.
 - Produces: sealed `HostRows.Row` { `Group(String name, int count, boolean collapsed)`, `Host(RemoteHost host)` }, `HostRows.rows(List<RemoteHost>, String query, Set<String> collapsed) -> List<Row>`, `HostRows.matches(RemoteHost, String query)`, `HostRows.OTHER = "Other"`; `HostsPanel(HostsPanel.Actions)` with `Actions(Consumer<RemoteHost> connect, Consumer<RemoteHost> connectSplit, Consumer<Optional<RemoteHost>> edit, Consumer<RemoteHost> duplicate, Consumer<RemoteHost> delete, BiConsumer<RemoteHost, Boolean> favorite, Runnable importConfig)`, `setHosts(List<RemoteHost>, Optional<String> error)`, `setCredentialLabels(Function<RemoteHost, String>)`, `select(UUID)`, `Set<String> collapsed()`, `setCollapsed(Set<String>)`, `Subscription onCollapsedChanged(Runnable)` (a `Runnable` list), package-private `search`, `list`, `card`, `cardName`, `cardAddress`, `cardCredential`, `cardJump`, `connect`, `edit`, `add`, `importButton`, `empty`, `activate(int index)`, `toggle(int index)`, `menuFor(int index)`; `HostEditor(List<RemoteHost> others, Optional<RemoteHost> editing, boolean vaultPresent, Function<UUID, Optional<String>> credentialName, Supplier<CompletableFuture<Optional<CredentialDescriptor>>> pick, Consumer<RemoteHost> save, Runnable cancel)` with fields `name, hostname, port, username, group, favorite, vaultAuth, agentAuth, choose, credentialLabel, jump, save, cancel, message`; `ImportPanel(List<ConfigImport.Candidate>, List<String> skipped, Consumer<List<RemoteHost>> importSelected, Runnable cancel)` with `checks`, `importButton`, `cancel`; `HostKeyPanel(HostKeyVerifier.Question, Consumer<HostKeyVerifier.Decision>)` with `cancel`, `once`, `trust`, `text`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `ui/HostRowsTest.java`:
 
@@ -2812,12 +2812,12 @@ class HostKeyPanelTest {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: compilation failure.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `ui/package-info.java`:
 
@@ -3296,12 +3296,12 @@ public final class HostKeyPanel extends JPanel {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: PASS. `HostsPanelTest` counts the popup's items (6) and clicks the second (Connect in split) and sixth (favorite toggle); `HostRows.Error` rows never select.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/remote
@@ -3322,7 +3322,7 @@ git commit -m "feat(remote): hosts panel, host editor, import and host-key dialo
 - Consumes: everything above; SDK `Plugin`, `PluginContext`, `Panels`, `PanelSpec`, `PanelHost`, `Menus`, `StatusBar`, `Windows`, `Palette`, `Terminals`, `TerminalEvents.ACTIVE_PANE_CHANGED`/`PANE_CLOSED`, `VaultApi`.
 - Produces: `RemotePlugin()` and the test constructor `RemotePlugin(Executor ui, Function<PluginContext, Optional<AgentClient>> agent, BiFunction<Duration, Runnable, Runnable> schedule, Path sshDir)`; constants `CONNECT = "dev.jasper.remote.connect"`, `HOSTS = "dev.jasper.remote.hosts"`, `SPLIT = "dev.jasper.remote.split"`, `IMPORT = "dev.jasper.remote.import"`, `STATUS = "dev.jasper.remote.status"`, `MENU = "dev.jasper.remote.menu"`, `PANEL = "dev.jasper.remote.panel"`; package-private `store()`, `connections()`, `askHostKey(Question)`, `currentHostKeyPanel()`, `currentEditor()`, `currentImport()`, `currentConfirm()`; `RemoteScope(Supplier<List<RemoteHost>> hosts, Supplier<Optional<String>> error, BiConsumer<WindowHandle, RemoteHost> connect, BiConsumer<PaneHandle, RemoteHost> connectSplit, BiConsumer<WindowHandle, RemoteHost> edit)` with `ID = "dev.jasper.remote.scope"`, verbs `CONNECT`, `SPLIT`, `EDIT`, `changed()`; `PanelState(Path file)` with `Set<String> collapsed()`, `save(Set<String>)`; `ConfirmPanel(String text, String verb, Runnable confirm, Runnable cancel)` with `confirm`, `cancel`.
 
-- [ ] **Step 1: Write the fake Vault and the failing tests**
+- [x] **Step 1: Write the fake Vault and the failing tests**
 
 `FakeVault.java` (test source):
 
@@ -3599,12 +3599,12 @@ class RemotePluginTest {
 
 The last two lines of the third test are wrong as written (the fake host's data root is not under `dir`); replace them with a check through the plugin's data directory: after `panel.toggle(0)`, `settle(host)` and `assertThat(Files.readString(context.dataDirectory().resolve("panel-state.toml"))).contains("Other")`, capturing `context` from `host.start(...)`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: compilation failure.
 
-- [ ] **Step 3: Implement the small pieces**
+- [x] **Step 3: Implement the small pieces**
 
 `KnownHosts.java`: change the field to `private final Supplier<Optional<Path>> user;`, add `public KnownHosts(Path own, Supplier<Optional<Path>> user) { this.own = own; this.user = user; }`, make the existing constructor `this(own, () -> user)`, and use `user.get()` in `verify`.
 
@@ -3769,7 +3769,7 @@ public final class RemoteScope implements PaletteScope {
 }
 ```
 
-- [ ] **Step 4: Implement the plugin**
+- [x] **Step 4: Implement the plugin**
 
 `RemotePlugin.java`:
 
@@ -4081,12 +4081,12 @@ public class RemotePlugin implements Plugin {
 
 The `duplicate` loop's `name` must be effectively final for the lambda: use a `String[] candidate` holder or a helper `private boolean nameTaken(String)`; rewrite as `while (nameTaken(name)) name = base + " " + i++;`.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-plugin-remote:test -q`
 Expected: PASS. Adjustment points: the fake host's exact `menu(...)` line format; the fake's `openRequests` line for a session split (assert only its prefix); `host.status()` text; if `ACTIVE_PANE_CHANGED` is not published by `focusTerminalPane`, call `plugin`'s `refreshSplit` path through a second `host.flush()` after `focusTerminalPane` or assert the enabled state after `SPLIT` is invoked from the pane.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add plugins/remote
@@ -4102,7 +4102,7 @@ git commit -m "feat(remote): the Remote plugin with session provider, hosts pane
 - Create: `docs/remote.md`
 - Modify: `docs/README.md`, `README.md`, `docs/app-maintenance.md`, `docs/plugin-authoring.md`, `AGENTS.md`, `docs/STATUS.md`, `docs/superpowers/specs/2026-09-22-jasper-remote-design.md` (two recorded deviations)
 
-- [ ] **Step 1: Stage and guard the module**
+- [x] **Step 1: Stage and guard the module**
 
 `jasper-app/build.gradle.kts`, in `stagePlugins` after the vault lines:
 
@@ -4117,7 +4117,7 @@ git commit -m "feat(remote): the Remote plugin with session provider, hosts pane
 val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"), ":jasper-plugin-remote" to listOf("dev.jasper.vault.api"))
 ```
 
-- [ ] **Step 2: Extend the app's bundled-plugin tests**
+- [x] **Step 2: Extend the app's bundled-plugin tests**
 
 `PluginZipsTest.java`: `hasSize(5)`; add before the final `else`:
 
@@ -4133,7 +4133,7 @@ and the ids line gains `"dev.jasper.remote"`.
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.plugins.*' -q`
 Expected: PASS. If Remote fails to start under the real runtime, read its status line: the likely causes are `Timer` or `Toolkit` use at start (both work headless) or the descriptor's `requires` (optional, so the Vault's presence must not matter).
 
-- [ ] **Step 3: Documentation**
+- [x] **Step 3: Documentation**
 
 `docs/remote.md`:
 
@@ -4245,7 +4245,7 @@ new window (no SDK window creation); panel collapse state is one saved set. Plan
 (SFTP) follow.
 ```
 
-- [ ] **Step 4: Full check and commit**
+- [x] **Step 4: Full check and commit**
 
 Run: `./gradlew check -q`
 Expected: PASS, including `verifyPluginArchitecture` (Remote imports the JDK, the SDK, `dev.jasper.vault.api`, its own packages and bundled MINA/BouncyCastle/tomlj) and the documentation link test.

@@ -169,7 +169,7 @@ public final class Connections {
             try { credential = credentialFor(host); } catch (RuntimeException bad) { fail(fresh, bad); return; }
             fresh.resources.add(() -> ui.execute(() -> credential.cancel(true)));
             credential.whenComplete((secret, denied) -> ui.execute(() -> {
-                if (fresh.evicted) { if (secret != null) secret.ifPresent(Credential::close); return; }
+                if (fresh.evicted) { if (secret != null && secret.isPresent()) secret.get().close(); return; }
                 if (denied != null) { fail(fresh, denied); return; }
                 if (host.auth() instanceof Auth.Vault && secret.isEmpty()) { fail(fresh, new Failures.Failure("Credential denied")); return; }
                 status.accept("Connecting…");
@@ -220,6 +220,7 @@ public final class Connections {
                     CoreModuleProperties.HEARTBEAT_REPLY_WAIT.set(session, current.keepalive());
                     CoreModuleProperties.HEARTBEAT_NO_REPLY_MAX.set(session, 3);
                 }
+                CoreModuleProperties.AUTH_TIMEOUT.set(session, current.authTimeout());
                 List<String> tried = new ArrayList<>();
                 if (credential.isPresent()) {
                     Credential secret = credential.get();
@@ -252,7 +253,7 @@ public final class Connections {
                 passwords.forEach(session::removePasswordIdentity);
             }
         } finally {
-            credential.ifPresent(Credential::close);
+            if (credential.isPresent()) credential.get().close();
         }
     }
 

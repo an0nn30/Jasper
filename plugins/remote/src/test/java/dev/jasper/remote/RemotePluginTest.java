@@ -159,4 +159,38 @@ class RemotePluginTest {
         }
     }
 
+    @Test void hostsActionCreatesThePanelWithoutOpeningThePalette(@TempDir Path dir) {
+        try (var host = new FakePluginHost()) {
+            var plugin = plugin(dir);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            host.invoke(RemotePlugin.HOSTS, window, null);
+            assertThat(host.paletteOpens()).isEmpty();
+            assertThat(host.openPanel(RemotePlugin.PANEL, window)).isNotNull();
+        }
+    }
+
+    @Test void failedMutationsReportAfterTheEditorCloses(@TempDir Path dir) throws Exception {
+        try (var host = new FakePluginHost()) {
+            var plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            var panel = (HostsPanel) host.openPanel(RemotePlugin.PANEL, window);
+            var saved = RemoteHost.create("saved", "example", 22, "me", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            Files.writeString(context.dataDirectory().resolve("hosts.toml"), "broken = [");
+            var menu = menuFor(panel, indexOf(panel, saved));
+            ((javax.swing.JMenuItem) menu.getComponent(3)).doClick();
+            ((javax.swing.JMenuItem) menu.getComponent(5)).doClick();
+            add(panel).doClick();
+            name(plugin.currentEditor()).setText("new"); hostname(plugin.currentEditor()).setText("example");
+            agentAuth(plugin.currentEditor()).doClick(); username(plugin.currentEditor()).setText("me");
+            save(plugin.currentEditor()).doClick();
+            host.requestClose("dialog");
+            settle(host);
+            assertThat(host.notices()).hasSize(3);
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
 }

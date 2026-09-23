@@ -217,6 +217,10 @@ class HostedUiTest {
         ui.rail().add("dev.x.tool.open");
         assertThatIllegalArgumentException().isThrownBy(() -> ui.rail().add("new_tab"));
         assertThat(model.railActions()).containsExactly("dev.x.tool.open");
+        var requests = new ArrayList<dev.jasper.app.contributions.Contributions.PanelRequest>();
+        model.onPanelRequest(requests::add);
+        ui.panels().toggle("dev.x.tool.hosts", hosts.getFirst().window());
+        assertThat(requests).containsExactly(new dev.jasper.app.contributions.Contributions.PanelRequest(window, "dev.x.tool.hosts", dev.jasper.app.contributions.Contributions.PanelRequest.Op.TOGGLE));
         panel.close();
         assertThat(model.panels()).hasSize(1);
         ui.closeAll();

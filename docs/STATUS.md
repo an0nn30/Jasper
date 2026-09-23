@@ -31,7 +31,10 @@ implements the approved [Remote design](superpowers/specs/2026-09-22-jasper-remo
 config import, host-key trust, Vault/agent authentication, shared sessions, ProxyJump, hosts panel,
 editor, palette, actions and status. [Guide and native acceptance](remote.md). Tunnels (7b) and SFTP (7c) follow.
 
-Native inline execution, one commit per task; independent final review and full verification pending.
+Native inline execution, one commit per task, followed by one independent review and a tested fix commit.
+`./gradlew check :jasper-app:installDist` passed: **1,604 tests, 1,601 passed, three expected skips,
+zero failures/errors**. All review findings are addressed; no deferred minors.
+[Execution and review record](remote-7a-verification.md).
 Plan corrections so far: current-main base preserves the shell revert; native branch/worktree and accurate
 Codex attribution replace example Claude names. Fixed the store queue's completion type, strict trust
 validation before host filtering, MINA connection-context target lookup and wrapped DNS errors.
@@ -40,6 +43,11 @@ and natural shell exit; callbacks return to the UI executor. Test fixtures use f
 BC Ed25519 keys, short Unix socket paths, complete resize replies, correct fake activation and test-only UI
 access bridges. These corrections preserve the intended behavior. The planned split/collapse/credential
 ordering/fake-Vault deviations are recorded in the spec. GUI acceptance remains user-run.
+The review fix pass composes queued host mutations, protects broken external edits, fixes optional
+Vault loading, accepts multiple legitimate keys per trust file while rejecting conflicts/revocation,
+bounds/cancels agent I/O, preserves OpenSSH first-value/quoted/commented imports, and reports
+mutation failures after editor closure. SDK 0.7.2 adds `Panels.toggle` (app and testkit) for lazy
+per-window Hosts action toggling; Remote requires it. Enter, star clicks and stale selection are fixed.
 
 ### macOS default shell refresh reverted — 2026-09-22
 

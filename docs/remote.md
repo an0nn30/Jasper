@@ -3,7 +3,7 @@
 Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or type `>ssh` in the
 command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
 split beside the current pane, Shift+Enter edits the host. The **SSH hosts** panel in the rail lists
-hosts by group with favorites first; select one for its card and Connect, double-click to connect,
+hosts by group with favorites first; select one for its card and Connect, double-click or press Enter to connect, click the star to toggle favorites,
 right-click for Connect, Connect in split, Edit, Duplicate, Delete and Favorite. The **SSH** menu
 carries the same commands plus **Import from ~/.ssh/config...**.
 
@@ -28,7 +28,7 @@ it is fixed.
 One SSH connection per host is shared by every tab, split and (later) tunnel and SFTP browser for
 that host; it stays open for a few seconds after its last use. When it drops, every pane on that host
 shows the disconnected banner and Reconnect makes a new connection. The status bar shows how many
-SSH sessions are open; clicking it opens the panel. Locking the Vault leaves live sessions alone;
+SSH sessions are open; clicking it toggles the panel. Locking the Vault leaves live sessions alone;
 only new connections need it.
 
 Settings live in `plugins/dev.jasper.remote/dev.jasper.remote.toml` (Plugins manager > Open Settings):
@@ -55,7 +55,7 @@ real desktop and a host you control:
 1. Connect to a real host with a Vault login (password), a Vault key and the system agent; verify the
    fingerprint prompt against the server's own, then that Trust and connect stops the prompt.
 2. Connect through a real bastion (jump host); confirm two host-key prompts on first use and one
-   shared bastion session in the status count.
+   saved trust entry for each host. The status count tracks shell channels, not jump transports.
 3. Open a second tab and a split on the same host: no new authentication, both interactive; close all
    and confirm the session drops after the linger.
 4. Import your `~/.ssh/config`; check the mapped fields and the "not importable" list.

@@ -70,4 +70,20 @@ class HostsPanelTest {
         assertThat(panel.list.getModel().getSize()).as("an error row leads").isEqualTo(5);
         assertThat(panel.list.getModel().getElementAt(0)).isInstanceOf(HostRows.Error.class);
     }
+    @Test void clearsRemovedSelectionAndBindsEnterAndFavoriteClick() {
+        var panel = new HostsPanel(actions);
+        panel.setHosts(List.of(nas), Optional.empty());
+        panel.select(nas.id());
+        Object action = panel.list.getInputMap().get(javax.swing.KeyStroke.getKeyStroke("ENTER"));
+        assertThat(action).isNotNull();
+        panel.list.getActionMap().get(action).actionPerformed(new java.awt.event.ActionEvent(panel.list, 0, ""));
+        panel.list.setSize(300, 100);
+        var bounds = panel.list.getCellBounds(1, 1);
+        var click = new java.awt.event.MouseEvent(panel.list, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0, 8, bounds.y + bounds.height / 2, 1, false, java.awt.event.MouseEvent.BUTTON1);
+        for (var listener : panel.list.getMouseListeners()) listener.mouseClicked(click);
+        assertThat(events).containsExactly("connect nas", "favorite nas true");
+        panel.setHosts(List.of(), Optional.empty());
+        assertThat(panel.card.isVisible()).isFalse();
+    }
+
 }

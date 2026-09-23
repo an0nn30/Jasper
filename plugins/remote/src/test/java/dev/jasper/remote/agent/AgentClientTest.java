@@ -79,4 +79,20 @@ class AgentClientTest {
         assertThatThrownBy(() -> AgentClient.forEnvironment(Map.of("SSH_AUTH_SOCK", dir.resolve("gone").toString()), "Linux").get().identities())
             .isInstanceOf(IOException.class).hasMessageContaining("agent");
     }
+    @Test void closingMinaAgentUnblocksASilentSocket() throws Exception {
+        assumeFalse(System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win"));
+        Path socket = Path.of("/tmp", "jasper-silent-" + java.util.UUID.randomUUID());
+        try (var server = java.nio.channels.ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)) {
+            server.bind(java.net.UnixDomainSocketAddress.of(socket));
+            var mina = new MinaAgent(AgentClient.forEnvironment(Map.of("SSH_AUTH_SOCK", socket.toString()), "Linux").orElseThrow());
+            var request = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                try { return mina.getIdentities(); } catch (IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
+            });
+            try (var accepted = server.accept()) {
+                mina.close();
+                assertThatThrownBy(() -> request.get(2, java.util.concurrent.TimeUnit.SECONDS)).isInstanceOf(java.util.concurrent.ExecutionException.class);
+            }
+        } finally { Files.deleteIfExists(socket); }
+    }
+
 }

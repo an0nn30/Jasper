@@ -53,25 +53,43 @@ public final class HostStore {
     public void poll() { enqueue(() -> onBackground(() -> read(false)).thenAccept(read -> { if (read != null) apply(read); })); }
 
     public CompletableFuture<Void> put(RemoteHost host) {
-        var next = new ArrayList<RemoteHost>();
-        boolean replaced = false;
-        for (RemoteHost existing : hosts) { if (existing.id().equals(host.id())) { next.add(host); replaced = true; } else next.add(existing); }
-        if (!replaced) next.add(host);
-        return save(next);
+        return mutate(current -> {
+            var next = new ArrayList<RemoteHost>();
+            boolean replaced = false;
+            for (RemoteHost existing : current) {
+                if (existing.id().equals(host.id())) { next.add(host); replaced = true; } else next.add(existing);
+            }
+            if (!replaced) next.add(host);
+            return next;
+        });
     }
 
-    public CompletableFuture<Void> remove(UUID id) { return save(hosts.stream().filter(host -> !host.id().equals(id)).toList()); }
+    public CompletableFuture<Void> remove(UUID id) { return mutate(current -> current.stream().filter(host -> !host.id().equals(id)).toList()); }
 
-    /** Validates, then writes the whole list (temp file and rename) and re-reads; refused while the file is broken. */
+    /** Writes an explicitly supplied replacement after checking the current disk file. */
     public CompletableFuture<Void> save(List<RemoteHost> next) {
         List<RemoteHost> copy = List.copyOf(next);
+        return mutate(current -> copy);
+    }
+
+    private CompletableFuture<Void> mutate(java.util.function.Function<List<RemoteHost>, List<RemoteHost>> mutation) {
         var result = new CompletableFuture<Void>();
-        enqueue(() -> {
-            try { HostFile.validate(copy); } catch (IllegalArgumentException invalid) { result.completeExceptionally(invalid); return CompletableFuture.completedFuture(null); }
-            if (error != null) { result.completeExceptionally(new IOException("hosts.toml has errors; fix it before saving: " + error)); return CompletableFuture.completedFuture(null); }
-            return onBackground(() -> { write(HostFile.format(copy)); return read(true); })
-                .whenComplete((read, failure) -> { if (failure == null) { apply(read); result.complete(null); } else result.completeExceptionally(failure); }).thenAccept(ignored -> {});
-        });
+        enqueue(() -> onBackground(() -> {
+            Read current = read(true);
+            if (current.error() != null) return current;
+            List<RemoteHost> next = List.copyOf(mutation.apply(current.hosts()));
+            HostFile.validate(next);
+            write(HostFile.format(next));
+            return read(true);
+        }).handle((read, failure) -> {
+            if (failure != null) result.completeExceptionally(failure);
+            else {
+                apply(read);
+                if (read.error() != null) result.completeExceptionally(new IOException("hosts.toml has errors; fix it before saving: " + read.error()));
+                else result.complete(null);
+            }
+            return null;
+        }));
         return result;
     }
 
@@ -83,8 +101,14 @@ public final class HostStore {
     }
 
     // Worker side. Returns null when nothing changed and the read was conditional.
-    private Read read(boolean force) throws IOException {
-        if (!Files.isRegularFile(file)) return force || size != -1 ? new Read(List.of(), List.of(), null, -1, null) : null;
+    private Read read(boolean force) {
+        try { return readFile(force); }
+        catch (IOException failure) { return new Read(List.of(), List.of(), "hosts.toml is unreadable: " + failure.getMessage(), -2, null); }
+    }
+
+    private Read readFile(boolean force) throws IOException {
+        if (Files.notExists(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return force || size != -1 ? new Read(List.of(), List.of(), null, -1, null) : null;
+        if (!Files.isRegularFile(file)) throw new IOException("not a readable regular file");
         long currentSize = Files.size(file);
         FileTime currentModified = Files.getLastModifiedTime(file);
         if (!force && currentSize == size && currentModified.equals(modified)) return null;

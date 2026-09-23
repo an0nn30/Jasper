@@ -16,6 +16,6 @@ public final class MinaAgentFactory implements SshAgentFactory {
     public MinaAgentFactory(AgentClient client) { this.client = client; }
 
     @Override public List<ChannelFactory> getChannelForwardingFactories(FactoryManager manager) { return List.of(); }
-    @Override public SshAgent createClient(Session session, FactoryManager manager) { return new MinaAgent(client); }
+    @Override public SshAgent createClient(Session session, FactoryManager manager) { return new MinaAgent(client.withTimeout(session == null ? java.time.Duration.ofSeconds(30) : org.apache.sshd.core.CoreModuleProperties.AUTH_TIMEOUT.getRequired(session))); }
     @Override public SshAgentServer createServer(ConnectionService service) { throw new UnsupportedOperationException("Jasper does not forward the agent"); }
 }

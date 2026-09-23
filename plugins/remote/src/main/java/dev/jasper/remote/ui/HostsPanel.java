@@ -96,11 +96,18 @@ public final class HostsPanel extends JPanel {
         list.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent event) {
                 int index = list.locationToIndex(event.getPoint());
-                if (index < 0) return;
+                if (index < 0 || !list.getCellBounds(index, index).contains(event.getPoint())) return;
                 if (SwingUtilities.isRightMouseButton(event)) { list.setSelectedIndex(index); JPopupMenu menu = menuFor(index); if (menu != null) menu.show(list, event.getX(), event.getY()); }
+                else if (event.getX() < 24 && model.get(index) instanceof HostRows.Host row) {
+                    if (event.getClickCount() == 1) actions.favorite().accept(row.host(), !row.host().favorite());
+                }
                 else if (event.getClickCount() == 2) activate(index);
                 else if (model.get(index) instanceof HostRows.Group) toggle(index);
             }
+        });
+        list.getInputMap().put(javax.swing.KeyStroke.getKeyStroke("ENTER"), "activateHost");
+        list.getActionMap().put("activateHost", new javax.swing.AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) { activate(list.getSelectedIndex()); }
         });
         add.addActionListener(event -> actions.edit().accept(Optional.empty()));
         importButton.addActionListener(event -> actions.importConfig().run());
@@ -167,8 +174,8 @@ public final class HostsPanel extends JPanel {
 
     private void selectionChanged() {
         HostRows.Row row = list.getSelectedValue();
-        selected = row instanceof HostRows.Host host ? host.host().id() : selected;
-        if (row instanceof HostRows.Host) refreshCard();
+        selected = row instanceof HostRows.Host host ? host.host().id() : null;
+        refreshCard();
     }
 
     private void refreshCard() {
@@ -189,7 +196,7 @@ public final class HostsPanel extends JPanel {
             JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focused);
             switch (value) {
                 case HostRows.Group group -> { label.setText((group.collapsed() ? "▸ " : "▾ ") + group.name() + "  " + group.count()); label.setFont(label.getFont().deriveFont(Font.BOLD)); }
-                case HostRows.Host host -> label.setText("    " + host.host().name() + (host.host().favorite() ? "  ★" : ""));
+                case HostRows.Host host -> label.setText((host.host().favorite() ? "★  " : "☆  ") + host.host().name());
                 case HostRows.Error error -> label.setText("⚠ " + error.message());
                 default -> { }
             }

@@ -110,8 +110,10 @@ public class RemotePlugin implements Plugin {
         panelState = new PanelState(context.dataDirectory().resolve("panel-state.toml"));
         trust = new KnownHosts(context.dataDirectory().resolve("known_hosts"), () -> settings.readUserKnownHosts() ? Optional.of(sshDir.resolve("known_hosts")) : Optional.empty());
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
+        Optional<java.util.function.Function<UUID, CompletableFuture<Optional<dev.jasper.vault.api.Credential>>>> credentialSource = Optional.empty();
+        if (vault.isPresent()) credentialSource = Optional.of(id -> vault.get().credential(id));
         connections = new Connections(() -> settings, trust, agentFactory.apply(context), store::host,
-            vault.map(api -> id -> api.credential(id)), this::askHostKey, context.background(), ui, schedule);
+            credentialSource, this::askHostKey, context.background(), ui, schedule);
         connections.onChanged(this::refreshStatus);
         icon = context.appearance().icon("dev/jasper/remote/server.svg");
 
@@ -136,7 +138,7 @@ public class RemotePlugin implements Plugin {
         poll.start();
         context.events().subscribe(TerminalEvents.ACTIVE_PANE_CHANGED, event -> splitAction.setEnabled(event.paneId().map(panes::containsKey).orElse(false)));
         context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> panes.remove(event.paneId()));
-        vault.ifPresent(api -> context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> refreshPanels()));
+        if (vault.isPresent()) context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> refreshPanels());
     }
 
     @Override public void stop() {
@@ -210,12 +212,19 @@ public class RemotePlugin implements Plugin {
 
     void editHost(WindowHandle window, Optional<RemoteHost> editing) {
         PluginDialog dialog = context.windows().dialog(new DialogSpec(editing.isPresent() ? "Edit " + editing.get().name() : "Add Host", window, true));
-        currentEditor = new HostEditor(store.hosts(), editing, vault.isPresent(), this::credentialName,
-            () -> vault.map(api -> api.pick(window)).orElseGet(() -> CompletableFuture.completedFuture(Optional.empty())),
-            host -> store.put(host).whenComplete((ignored, failure) -> ui.execute(() -> { if (failure == null) dialog.close(); else currentEditor.showError(message(failure)); })),
+        HostEditor[] editor = new HostEditor[1];
+        boolean[] closed = {false};
+        editor[0] = new HostEditor(store.hosts(), editing, vault.isPresent(), this::credentialName,
+            () -> vault.isPresent() ? vault.get().pick(window) : CompletableFuture.completedFuture(Optional.empty()),
+            host -> store.put(host).whenComplete((ignored, failure) -> ui.execute(() -> {
+                if (stopped) return;
+                if (failure == null) dialog.close();
+                else { if (!closed[0]) editor[0].showError(message(failure)); context.notices().error(message(failure)); }
+            })),
             dialog::close);
-        dialog.setContent(currentEditor);
-        dialog.onClosed(() -> currentEditor = null);
+        currentEditor = editor[0];
+        dialog.setContent(editor[0]);
+        dialog.onClosed(() -> { closed[0] = true; if (currentEditor == editor[0]) currentEditor = null; });
         dialog.show();
     }
 
@@ -231,7 +240,7 @@ public class RemotePlugin implements Plugin {
     private void importConfig(WindowHandle window) {
         Path config = sshDir.resolve("config");
         Map<String, UUID> vaultKeys = new HashMap<>();
-        vault.ifPresent(api -> { for (CredentialDescriptor descriptor : api.credentials()) if (descriptor.kind() == Kind.SSH_KEY) vaultKeys.put(descriptor.subtitle(), descriptor.id()); });
+        if (vault.isPresent()) for (CredentialDescriptor descriptor : vault.get().credentials()) if (descriptor.kind() == Kind.SSH_KEY) vaultKeys.put(descriptor.subtitle(), descriptor.id());
         Path home = Path.of(System.getProperty("user.home"));
         String user = System.getProperty("user.name", "");
         List<RemoteHost> existing = store.hosts();
@@ -261,8 +270,8 @@ public class RemotePlugin implements Plugin {
     private javax.swing.JComponent createPanel(PanelHost host) {
         WindowHandle window = host.window();
         var panel = new HostsPanel(new HostsPanel.Actions(h -> openHost(window, h), h -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitHost(pane, h)),
-            editing -> editHost(window, editing), h -> store.put(duplicate(h)), h -> deleteHost(window, h),
-            (h, favorite) -> store.put(h.withFavorite(favorite)), () -> importConfig(window)));
+            editing -> editHost(window, editing), h -> reportMutation(store.put(duplicate(h))), h -> deleteHost(window, h),
+            (h, favorite) -> reportMutation(store.put(h.withFavorite(favorite))), () -> importConfig(window)));
         panel.setCredentialLabels(this::credentialLabel);
         panel.setCollapsed(panelState.collapsed());
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
@@ -270,6 +279,12 @@ public class RemotePlugin implements Plugin {
         panels.put(window.id(), panel); panelHosts.put(window.id(), host);
         host.onClosed(() -> { panels.remove(window.id()); panelHosts.remove(window.id()); });
         return panel;
+    }
+
+    private void reportMutation(CompletableFuture<Void> mutation) {
+        mutation.whenComplete((ignored, failure) -> ui.execute(() -> {
+            if (!stopped && failure != null) context.notices().error(message(failure));
+        }));
     }
 
     private RemoteHost duplicate(RemoteHost host) {
@@ -283,9 +298,7 @@ public class RemotePlugin implements Plugin {
     private boolean nameTaken(String name) { return store.hosts().stream().anyMatch(host -> host.name().equalsIgnoreCase(name)); }
 
     private void showPanel(WindowHandle window) {
-        PanelHost host = panelHosts.get(window.id());
-        if (host != null) host.show();
-        else context.palette().open(window, RemoteScope.ID, Optional.empty(), Optional.empty());
+        context.panels().toggle(PANEL, window);
     }
 
     private void refreshPanels() { for (HostsPanel panel : panels.values()) { panel.setCredentialLabels(this::credentialLabel); panel.setHosts(store.hosts(), store.error()); } }
@@ -293,12 +306,13 @@ public class RemotePlugin implements Plugin {
     private String credentialLabel(RemoteHost host) {
         return switch (host.auth()) {
             case Auth.Agent agent -> "SSH agent";
-            case Auth.Vault credential -> vault.map(api -> api.lockState() != LockState.UNLOCKED ? "Vault locked" : credentialName(credential.credentialId()).orElse("credential missing")).orElse("needs Credential Vault");
+            case Auth.Vault credential -> vault.isEmpty() ? "needs Credential Vault" : vault.get().lockState() != LockState.UNLOCKED ? "Vault locked" : credentialName(credential.credentialId()).orElse("credential missing");
         };
     }
 
     private Optional<String> credentialName(UUID id) {
-        return vault.flatMap(api -> api.credentials().stream().filter(descriptor -> descriptor.id().equals(id)).findFirst()).map(CredentialDescriptor::name);
+        if (vault.isEmpty()) return Optional.empty();
+        return vault.get().credentials().stream().filter(descriptor -> descriptor.id().equals(id)).findFirst().map(CredentialDescriptor::name);
     }
 
     private void refreshStatus() {

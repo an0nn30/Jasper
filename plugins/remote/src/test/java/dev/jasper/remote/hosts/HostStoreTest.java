@@ -89,4 +89,35 @@ class HostStoreTest {
         assertThatThrownBy(refused::join).hasMessageContaining("jump host missing");
         assertThat(dir.resolve("hosts.toml")).doesNotExist();
     }
+    @Test void queuedMutationsComposeWithoutLosingEarlierEdits(@TempDir Path dir) {
+        HostStore store = store(dir);
+        RemoteHost a = RemoteHost.create("a", "a", 22, "u", Auth.AGENT, "", Optional.empty());
+        RemoteHost b = RemoteHost.create("b", "b", 22, "u", Auth.AGENT, "", Optional.empty());
+        store.put(a); store.put(b); run();
+        assertThat(store.hosts()).containsExactly(a, b);
+        store.put(a.withFavorite(true)); store.remove(b.id()); run();
+        assertThat(store.hosts()).singleElement().satisfies(h -> assertThat(h.favorite()).isTrue());
+    }
+
+    @Test void saveChecksDiskBeforeOverwritingAnUnpolledBrokenEdit(@TempDir Path dir) throws Exception {
+        HostStore store = store(dir);
+        RemoteHost a = RemoteHost.create("a", "a", 22, "u", Auth.AGENT, "", Optional.empty());
+        store.put(a); run();
+        Files.writeString(dir.resolve("hosts.toml"), "[[broken");
+        var saved = store.put(a.withFavorite(true)); run();
+        assertThatThrownBy(saved::join).hasMessageContaining("hosts.toml has errors");
+        assertThat(Files.readString(dir.resolve("hosts.toml"))).isEqualTo("[[broken");
+        assertThat(store.error()).isPresent();
+    }
+
+    @Test void unreadableFileIsReportedAndKeepsLastGoodHosts(@TempDir Path dir) throws Exception {
+        HostStore store = store(dir);
+        RemoteHost a = RemoteHost.create("a", "a", 22, "u", Auth.AGENT, "", Optional.empty());
+        store.put(a); run();
+        Files.delete(dir.resolve("hosts.toml")); Files.createDirectory(dir.resolve("hosts.toml"));
+        store.poll(); run();
+        assertThat(store.error()).isPresent();
+        assertThat(store.hosts()).containsExactly(a);
+    }
+
 }

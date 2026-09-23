@@ -63,4 +63,26 @@ class BundledSamplePluginTest {
         onEdt(() -> pending.set(runtime.get().stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
     }
+    @Test void remoteLoadsWithoutTheOptionalVaultPlugin() throws Exception {
+        Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
+        Path remoteOnly = java.nio.file.Files.createDirectories(root.resolve("remote-only"));
+        java.nio.file.Files.createSymbolicLink(remoteOnly.resolve("dev.jasper.remote"), staged.resolve("dev.jasper.remote").toAbsolutePath());
+        var runtime = new AtomicReference<PluginRuntime>();
+        var deck = new BuddyTestSupport();
+        onEdt(() -> {
+            runtime.set(new PluginRuntime(new PluginRuntime.Options(remoteOnly, root.resolve("user"), null, false,
+                root.resolve("plugins.toml"), root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> {}),
+                (key, message) -> {}, new dev.jasper.app.contributions.Contributions(), AppContractTest.headlessWindows(),
+                new dev.jasper.app.terminals.TerminalRegistry()));
+            runtime.get().start(Map.of(), true);
+        });
+        try {
+            assertThat(runtime.get().statusLines()).singleElement().asString().contains("dev.jasper.remote", "ACTIVE");
+        } finally {
+            var pending = new AtomicReference<List<CompletableFuture<?>>>();
+            onEdt(() -> pending.set(runtime.get().stop()));
+            CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        }
+    }
+
 }

@@ -40,26 +40,32 @@ public final class KnownHosts {
     public static String hostPattern(String host, int port) { return KnownHostHashValue.createHostPattern(host, port); }
 
     public Verdict verify(String host, int port, PublicKey key) {
-        List<Known> candidates = new ArrayList<>(entries(own, true, host, port));
-        user.get().ifPresent(file -> candidates.addAll(entries(file, false, host, port)));
+        Verdict ownVerdict = verdict(entries(own, true, host, port), key);
+        Verdict userVerdict = user.get().map(file -> verdict(entries(file, false, host, port), key)).orElseGet(Verdict.Unknown::new);
+        if (ownVerdict instanceof Verdict.Mismatch) return ownVerdict;
+        if (userVerdict instanceof Verdict.Mismatch) return userVerdict;
+        return ownVerdict instanceof Verdict.Match || userVerdict instanceof Verdict.Match ? new Verdict.Match() : new Verdict.Unknown();
+    }
+
+    private static Verdict verdict(List<Known> candidates, PublicKey key) {
         boolean matched = false;
         String mismatch = null;
         for (Known known : candidates) {
             boolean same = KeyUtils.findMatchingKey(key, List.of(known.key())) != null;
             if (known.revoked() && same) return new Verdict.Mismatch(fingerprint(known.key()));
             if (known.revoked()) continue;
-            if (same) matched = true; else if (mismatch == null) mismatch = fingerprint(known.key());
+            if (same) matched = true;
+            else if (mismatch == null) mismatch = fingerprint(known.key());
         }
-        if (mismatch != null) return new Verdict.Mismatch(mismatch);
-        return matched ? new Verdict.Match() : new Verdict.Unknown();
+        if (matched) return new Verdict.Match();
+        return mismatch == null ? new Verdict.Unknown() : new Verdict.Mismatch(mismatch);
     }
 
     /** Appends {@code pattern key} to the own file unless it is already there; refuses when the file holds a different key. */
     public synchronized void trust(String host, int port, PublicKey key) throws IOException {
-        for (Known known : entries(own, true, host, port)) {
-            if (KeyUtils.findMatchingKey(key, List.of(known.key())) != null) { if (!known.revoked()) return; }
-            else throw new IOException("known_hosts already holds a different key for " + hostPattern(host, port) + " (" + fingerprint(known.key()) + ")");
-        }
+        Verdict current = verify(host, port, key);
+        if (current instanceof Verdict.Mismatch mismatch) throw new IOException("known_hosts holds a different key or revoked key for " + hostPattern(host, port) + " (" + mismatch.knownFingerprint() + ")");
+        if (current instanceof Verdict.Match) return;
         String line = hostPattern(host, port) + " " + PublicKeyEntry.appendPublicKeyEntry(new StringBuilder(), key) + "\n";
         String existing = Files.isRegularFile(own) ? Files.readString(own, StandardCharsets.UTF_8) : "";
         if (!existing.isEmpty() && !existing.endsWith("\n")) existing += "\n";
@@ -71,7 +77,11 @@ public final class KnownHosts {
     }
 
     private static List<Known> entries(Path file, boolean strict, String host, int port) {
-        if (!Files.isRegularFile(file)) return List.of();
+        if (Files.notExists(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return List.of();
+        if (!Files.isRegularFile(file)) {
+            if (strict) throw new CorruptTrustFileException("known_hosts is not a readable regular file");
+            return List.of();
+        }
         List<String> lines;
         try { lines = Files.readAllLines(file, StandardCharsets.UTF_8); }
         catch (IOException unreadable) { if (strict) throw new CorruptTrustFileException("known_hosts is unreadable: " + unreadable.getMessage()); return List.of(); }

@@ -126,6 +126,7 @@ final class FakeUi {
 
     void closeAll() {
         actions.clear(); toolbar.clear(); sections.clear(); topLevelIds.clear(); status.clear();
+        for (Panel panel : List.copyOf(panels)) panel.instances.values().forEach(PanelInstance::close);
         panels.clear(); railActions.clear();
         for (FakeWindow window : List.copyOf(windows)) window.close();
     }
@@ -210,7 +211,7 @@ final class FakeUi {
         };
     }
 
-    static final class Panel { final PanelSpec spec; final PanelFactory factory; Panel(PanelSpec spec, PanelFactory factory) { this.spec = spec; this.factory = factory; } }
+    static final class Panel { final PanelSpec spec; final PanelFactory factory; final Map<UUID, PanelInstance> instances = new LinkedHashMap<>(); Panel(PanelSpec spec, PanelFactory factory) { this.spec = spec; this.factory = factory; } }
 
     final class FakeWindow implements PluginWindow, PluginDialog {
         final String id; final FakeWindow owner; String title; boolean shown; boolean closed;
@@ -255,31 +256,68 @@ final class FakeUi {
     final List<String[]> railActions = new ArrayList<>();
     final List<FakeWindow> windows = new ArrayList<>();
 
+    final class PanelInstance implements PanelHost {
+        final UUID windowId;
+        JComponent content;
+        boolean visible = true;
+        final List<Consumer<Boolean>> visibility = new ArrayList<>();
+        final List<Runnable> closed = new ArrayList<>();
+        PanelInstance(UUID windowId) { this.windowId = windowId; }
+        @Override public WindowHandle window() { return context.terminals.windowHandle(windowId); }
+        @Override public void show() { setVisible(true); }
+        @Override public void hide() { setVisible(false); }
+        void setVisible(boolean value) {
+            if (visible == value) return;
+            visible = value;
+            for (var listener : List.copyOf(visibility)) {
+                try { listener.accept(value); } catch (RuntimeException failure) { host.recordFailure(pluginId() + " panel visibility: " + failure); }
+            }
+        }
+        @Override public boolean visible() { return visible; }
+        @Override public Subscription onVisibility(Consumer<Boolean> handler) { visibility.add(handler); return () -> visibility.remove(handler); }
+        @Override public Subscription onClosed(Runnable handler) { closed.add(handler); return () -> closed.remove(handler); }
+        void close() {
+            for (var handler : List.copyOf(closed)) {
+                try { handler.run(); } catch (RuntimeException failure) { host.recordFailure(pluginId() + " panel closed: " + failure); }
+            }
+            closed.clear(); visibility.clear();
+        }
+    }
+
     Panels panels() {
-        return (spec, factory) -> {
+        return new Panels() {
+          @Override public Subscription register(PanelSpec spec, PanelFactory factory) {
             context.requireOpen();
             java.util.Objects.requireNonNull(factory, "factory");
             requireNamespace(spec.id(), "A panel");
             for (Panel existing : panels) if (existing.spec.id().equals(spec.id())) throw new IllegalArgumentException("Panel already registered: " + spec.id());
             var panel = new Panel(spec, factory);
             panels.add(panel);
-            return () -> panels.remove(panel);
+            return () -> { if (panels.remove(panel)) { panel.instances.values().forEach(PanelInstance::close); panel.instances.clear(); } };
+          }
+          @Override public void toggle(String panelId, WindowHandle window) {
+            context.requireOpen();
+            requireNamespace(panelId, "A panel");
+            Panel panel = panels.stream().filter(p -> p.spec.id().equals(panelId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Panel not registered: " + panelId));
+            if (!window.isOpen()) return;
+            var instance = panel.instances.get(window.id());
+            if (instance == null) openPanel(panelId, window.id());
+            else instance.setVisible(!instance.visible());
+          }
         };
     }
 
     JComponent openPanel(String panelId, UUID windowId) {
         for (Panel panel : panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            boolean[] visible = {true};
+            var existing = panel.instances.get(windowId);
+            if (existing != null) { existing.show(); return existing.content; }
             try {
-                return panel.factory.create(new PanelHost() {
-                    @Override public WindowHandle window() { return context.terminals.windowHandle(windowId); }
-                    @Override public void show() { visible[0] = true; }
-                    @Override public void hide() { visible[0] = false; }
-                    @Override public boolean visible() { return visible[0]; }
-                    @Override public Subscription onVisibility(java.util.function.Consumer<Boolean> handler) { return () -> { }; }
-                    @Override public Subscription onClosed(Runnable handler) { return () -> { }; }
-                });
+                var instance = new PanelInstance(windowId);
+                instance.content = panel.factory.create(instance);
+                if (instance.content != null) panel.instances.put(windowId, instance);
+                return instance.content;
             } catch (RuntimeException | LinkageError failure) {
                 host.recordFailure(pluginId() + " panel " + panelId + ": " + failure);
                 return null;

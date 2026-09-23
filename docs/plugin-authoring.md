@@ -519,3 +519,7 @@ their zip only matters for a Jasper built without them.
 Remote (`plugins/remote`) is a worked example for `session.provide`: connection work runs on the
 background executor, status and attachment return to the UI thread, and each shell holds a reference
 on a shared MINA session. Cancellation withdraws pending credentials and host-key prompts.
+
+In SDK 0.7.2+, `context.panels().toggle(panelId, window)` opens or hides your own
+registered panel in a terminal window. It creates the panel lazily and reuses that
+window's instance. Require `>=0.7.2` in the manifest when calling it.

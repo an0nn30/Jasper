@@ -35,7 +35,7 @@ class SshConfigTest {
         SshConfig.Entry prod = parsed.entries().getFirst();
         assertThat(prod.hostname()).contains("api.prod.example");
         assertThat(prod.port()).isEqualTo(OptionalInt.of(2222));
-        assertThat(prod.user()).as("first value wins").contains("deploy");
+        assertThat(prod.user()).as("earliest global value wins").contains("global");
         assertThat(prod.identityFile()).contains("~/.ssh/id_ed25519");
         assertThat(prod.proxyJump()).contains("bastion");
         SshConfig.Entry bastion = parsed.entries().get(1);
@@ -58,4 +58,27 @@ class SshConfigTest {
         assertThat(parsed.entries()).extracting(SshConfig.Entry::alias).containsExactly("one", "two");
         assertThat(SshConfig.parse(dir.resolve("missing")).entries()).isEmpty();
     }
+    @Test void appliesFirstValuesInFileOrderAcrossMatchingBlocks() {
+        var parsed = SshConfig.parse("User first\nHost *\n Port 2222\nHost example\n User second\n Port 22\nHost example\n HostName target\n", include -> List.of());
+        assertThat(parsed.entries()).singleElement().satisfies(entry -> {
+            assertThat(entry.user()).contains("first");
+            assertThat(entry.port()).isEqualTo(OptionalInt.of(2222));
+            assertThat(entry.hostname()).contains("target");
+        });
+    }
+
+    @Test void readsQuotedValuesAndTrailingComments() {
+        var parsed = SshConfig.parse("Host \"prod\" # comment\n HostName = \"api.example\"\n Port 2222 # alternate\n IdentityFile \"~/.ssh/work key\"\n Include \"extra files/*\" # include\n", pattern -> {
+            assertThat(pattern).isEqualTo("extra files/*");
+            return List.of(" User deploy\n");
+        });
+        assertThat(parsed.entries()).singleElement().satisfies(entry -> {
+            assertThat(entry.alias()).isEqualTo("prod");
+            assertThat(entry.hostname()).contains("api.example");
+            assertThat(entry.port()).isEqualTo(OptionalInt.of(2222));
+            assertThat(entry.identityFile()).contains("~/.ssh/work key");
+            assertThat(entry.user()).contains("deploy");
+        });
+    }
+
 }

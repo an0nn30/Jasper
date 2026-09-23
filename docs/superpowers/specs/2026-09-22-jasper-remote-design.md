@@ -46,7 +46,9 @@ onto the SDK with no application code.
 8. **Recorded plan 7a deviations:** Connect in split replaces new-window connection because the SDK
    cannot create terminal windows; collapse state is one saved set. Credential lookup precedes TCP
    connection because MINA needs the username; credentials close immediately after authentication.
-   Tests publish a fake Vault API to avoid touching the real keychain.
+   Tests publish a fake Vault API to avoid touching the real keychain. The execution review required
+   a small SDK addition: `Panels.toggle(panelId, window)` in 0.7.2, implemented by app and testkit,
+   so the Hosts action can create its panel lazily and toggle it; Remote requires SDK 0.7.2.
 
 ## 3. Shape
 

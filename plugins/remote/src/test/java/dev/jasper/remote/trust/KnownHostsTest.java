@@ -75,4 +75,40 @@ class KnownHostsTest {
         assertThat(KnownHosts.hostPattern("h", 22)).isEqualTo("h");
         assertThat(KnownHosts.hostPattern("h", 23)).isEqualTo("[h]:23");
     }
+    @Test void acceptsAnyRecordedKeyInOneFileButRejectsConflictInAnother(@TempDir Path dir) throws Exception {
+        PublicKey rsa = key("RSA", 2048), ec = key("EC", 256), changed = key("RSA", 2048);
+        Path own = dir.resolve("known_hosts"), user = dir.resolve("user");
+        Files.writeString(user, "h " + entry(rsa) + "\nh " + entry(ec) + "\n");
+        var trust = new KnownHosts(own, Optional.of(user));
+        assertThat(trust.verify("h", 22, rsa)).isInstanceOf(KnownHosts.Verdict.Match.class);
+        assertThat(trust.verify("h", 22, ec)).isInstanceOf(KnownHosts.Verdict.Match.class);
+        Files.writeString(own, "h " + entry(changed) + "\n");
+        assertThat(trust.verify("h", 22, rsa)).isInstanceOf(KnownHosts.Verdict.Mismatch.class);
+    }
+
+    @Test void trustRechecksBothFilesAndCannotUnrevokeAKey(@TempDir Path dir) throws Exception {
+        PublicKey rsa = key("RSA", 2048), changed = key("RSA", 2048);
+        Path own = dir.resolve("known_hosts"), user = dir.resolve("user");
+        var trust = new KnownHosts(own, Optional.of(user));
+        assertThat(trust.verify("h", 22, rsa)).isInstanceOf(KnownHosts.Verdict.Unknown.class);
+        Files.writeString(user, "h " + entry(changed) + "\n");
+        assertThatThrownBy(() -> trust.trust("h", 22, rsa)).isInstanceOf(java.io.IOException.class);
+        assertThat(own).doesNotExist();
+        Files.delete(user);
+        Files.writeString(own, "@revoked h " + entry(rsa) + "\n");
+        assertThatThrownBy(() -> trust.trust("h", 22, rsa)).isInstanceOf(java.io.IOException.class);
+    }
+
+    @Test void ownDirectoryIsNotAnEmptyTrustFile(@TempDir Path dir) throws Exception {
+        var trust = new KnownHosts(dir, Optional.empty());
+        assertThatThrownBy(() -> trust.verify("h", 22, key("RSA", 2048))).isInstanceOf(CorruptTrustFileException.class);
+    }
+
+    @Test void ownDanglingSymlinkIsNotAnEmptyTrustFile(@TempDir Path dir) throws Exception {
+        Path own = dir.resolve("known_hosts");
+        Files.createSymbolicLink(own, dir.resolve("missing"));
+        var trust = new KnownHosts(own, Optional.empty());
+        assertThatThrownBy(() -> trust.verify("h", 22, key("RSA", 2048))).isInstanceOf(CorruptTrustFileException.class);
+    }
+
 }

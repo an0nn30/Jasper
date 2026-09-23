@@ -37,5 +37,5 @@ public final class MinaAgent implements SshAgent {
     @Override public void removeIdentity(PublicKey key) { throw new UnsupportedOperationException("Jasper does not remove keys from the agent"); }
     @Override public void removeAllIdentities() { throw new UnsupportedOperationException("Jasper does not remove keys from the agent"); }
     @Override public boolean isOpen() { return open; }
-    @Override public void close() { open = false; }
+    @Override public void close() { open = false; client.close(); }
 }

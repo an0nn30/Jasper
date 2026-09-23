@@ -280,4 +280,18 @@ class ConnectionsTest {
         assertThat(failure(onUi(() -> connections.shell(a.id(), 80, 24, status -> {})))).contains("jump host");
     }
 
+    @Test void passphraseProtectedVaultKeyAuthenticates(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            char[] passphrase = "test Unicode \u03c0 passphrase".toCharArray();
+            SshKey generated = new KeyGenerator(dir.resolve("keys")).generate(KeyAlgorithm.ED25519, "encrypted", "test", passphrase);
+            server.allow(PublicKeyEntry.parsePublicKeyEntry(Files.readString(generated.publicPath()).strip()).resolvePublicKey(null, null, null));
+            connections(dir, Optional.empty());
+            UUID id = UUID.randomUUID();
+            credentials.put(id, new Credential(id, "encrypted", Kind.SSH_KEY, null, null, generated.privatePath(), passphrase));
+            RemoteHost target = host("encrypted", server.port(), "deploy", new Auth.Vault(id), Optional.empty());
+            assertThat(readUntil(shell(target).connection(), "\r\n")).startsWith("READY");
+            assertThat(passphrase).containsOnly((char) 0);
+        }
+    }
+
 }

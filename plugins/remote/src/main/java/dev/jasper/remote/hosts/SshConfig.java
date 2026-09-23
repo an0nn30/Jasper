@@ -53,11 +53,14 @@ public final class SshConfig {
         for (String raw : expand(text, includes).split("\n")) {
             String line = raw.strip();
             if (line.isEmpty() || line.startsWith("#")) continue;
-            String[] kv = line.split("[\\s=]+", 2);
-            String key = kv[0].toLowerCase(Locale.ROOT), value = kv.length > 1 ? kv[1].strip() : "";
+            List<String> tokens;
+            try { tokens = tokens(line); }
+            catch (IllegalArgumentException invalid) { skipped.add(line + " (invalid quoting)"); continue; }
+            if (tokens.isEmpty()) continue;
+            String key = tokens.getFirst().toLowerCase(Locale.ROOT), value = String.join(" ", tokens.subList(1, tokens.size()));
             if (key.equals("host")) {
                 List<String> aliases = new ArrayList<>();
-                for (String alias : value.split("\\s+")) {
+                for (String alias : tokens.subList(1, tokens.size())) {
                     if (alias.isEmpty()) continue;
                     if (alias.equals("*")) aliases.add(alias);
                     else if (alias.contains("*") || alias.contains("?") || alias.startsWith("!")) skipped.add("Host " + alias + " (pattern)");
@@ -73,19 +76,22 @@ public final class SshConfig {
             } else if (!skipping) current.putIfAbsent(key, value);
         }
         var entries = new ArrayList<Entry>();
-        var wildcard = new LinkedHashMap<String, String>();
-        for (var block : blocks) if (block.getKey().contains("*")) wildcard.putAll(block.getValue());
-        for (var block : blocks) {
-            for (String alias : block.getKey()) {
-                if (alias.equals("*")) continue;
-                Map<String, String> values = new LinkedHashMap<>(block.getValue());
-                global.forEach(values::putIfAbsent);
-                wildcard.forEach(values::putIfAbsent);
-                OptionalInt port = OptionalInt.empty();
-                if (values.containsKey("port")) { try { port = OptionalInt.of(Integer.parseInt(values.get("port"))); } catch (NumberFormatException bad) { skipped.add("Host " + alias + " (bad Port)"); continue; } }
-                entries.add(new Entry(alias, Optional.ofNullable(values.get("hostname")), port, Optional.ofNullable(values.get("user")),
-                    Optional.ofNullable(values.get("proxyjump")), Optional.ofNullable(values.get("identityfile"))));
+        var aliases = new java.util.LinkedHashSet<String>();
+        for (var block : blocks) for (String alias : block.getKey()) if (!alias.equals("*")) aliases.add(alias);
+        for (String alias : aliases) {
+            Map<String, String> values = new LinkedHashMap<>(global);
+            for (var block : blocks)
+                if (block.getKey().stream().anyMatch(pattern -> pattern.equals("*") || pattern.equalsIgnoreCase(alias))) block.getValue().forEach(values::putIfAbsent);
+            OptionalInt port = OptionalInt.empty();
+            if (values.containsKey("port")) {
+                try {
+                    int number = Integer.parseInt(values.get("port"));
+                    if (number < 1 || number > 65535) throw new NumberFormatException();
+                    port = OptionalInt.of(number);
+                } catch (NumberFormatException bad) { skipped.add("Host " + alias + " (bad Port)"); continue; }
             }
+            entries.add(new Entry(alias, Optional.ofNullable(values.get("hostname")), port, Optional.ofNullable(values.get("user")),
+                Optional.ofNullable(values.get("proxyjump")), Optional.ofNullable(values.get("identityfile"))));
         }
         return new Parsed(List.copyOf(entries), List.copyOf(skipped));
     }
@@ -93,11 +99,37 @@ public final class SshConfig {
     private static String expand(String text, Function<String, List<String>> includes) {
         var out = new StringBuilder();
         for (String raw : text.split("\n")) {
-            String line = raw.strip();
-            if (line.toLowerCase(Locale.ROOT).startsWith("include ")) {
-                for (String pattern : line.substring(8).strip().split("\\s+")) for (String included : includes.apply(pattern)) out.append(included).append('\n');
+            List<String> parts;
+            try { parts = tokens(raw.strip()); }
+            catch (IllegalArgumentException invalid) { out.append(raw).append('\n'); continue; }
+            if (!parts.isEmpty() && parts.getFirst().equalsIgnoreCase("include")) {
+                for (String pattern : parts.subList(1, parts.size())) for (String included : includes.apply(pattern)) out.append(included).append('\n');
             } else out.append(raw).append('\n');
         }
         return out.toString();
     }
+    private static List<String> tokens(String line) {
+        var out = new ArrayList<String>();
+        int at = 0;
+        while (at < line.length() && !Character.isWhitespace(line.charAt(at)) && line.charAt(at) != '=') at++;
+        if (at == 0 || line.charAt(0) == '#') return out;
+        out.add(line.substring(0, at));
+        while (at < line.length() && (Character.isWhitespace(line.charAt(at)) || line.charAt(at) == '=')) at++;
+        var token = new StringBuilder();
+        char quote = 0;
+        boolean started = false;
+        for (; at < line.length(); at++) {
+            char c = line.charAt(at);
+            if (c == '\\' && at + 1 < line.length()) { token.append(line.charAt(++at)); started = true; }
+            else if (quote != 0) { if (c == quote) quote = 0; else token.append(c); }
+            else if (c == '"' || c == '\'') { quote = c; started = true; }
+            else if (c == '#' && !started) break;
+            else if (Character.isWhitespace(c)) { if (started) { out.add(token.toString()); token.setLength(0); started = false; } }
+            else { token.append(c); started = true; }
+        }
+        if (quote != 0) throw new IllegalArgumentException("Unclosed quote");
+        if (started) out.add(token.toString());
+        return out;
+    }
+
 }

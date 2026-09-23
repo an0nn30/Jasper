@@ -223,3 +223,8 @@ disagree, the implementation is wrong, not the contract.
 
 Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
 per-session token from Jasper's own shell integration.
+
+SDK 0.7.2 adds `Panels.toggle(panelId, window)` for a plugin's own registered panel.
+It dispatches the same per-window lazy toggle as the rail; the app and testkit both
+reuse the panel instance after hiding it. Remote requires this version so its SSH
+Hosts menu/status action opens the panel even before its rail icon has been used.

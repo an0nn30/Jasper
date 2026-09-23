@@ -220,7 +220,8 @@ final class HostedUi {
     private Subscription wrap(dev.jasper.app.lifecycle.Subscription registration) { return subscription(registration::close); }
 
     Panels panels() {
-        return (spec, factory) -> {
+        return new Panels() {
+          @Override public Subscription register(dev.jasper.sdk.ui.PanelSpec spec, dev.jasper.sdk.ui.PanelFactory factory) {
             guard("register");
             java.util.Objects.requireNonNull(factory, "factory");
             requireNamespace(spec.id(), "A panel");
@@ -230,6 +231,14 @@ final class HostedUi {
                 return built[0];
             });
             return tracked(entry::close);
+          }
+          @Override public void toggle(String panelId, WindowHandle window) {
+            guard("toggle");
+            requireNamespace(panelId, "A panel");
+            if (model.panels().stream().noneMatch(panel -> panel.id().equals(panelId)))
+                throw new IllegalArgumentException("Panel not registered: " + panelId);
+            model.requestPanel(new Contributions.PanelRequest(window.id(), panelId, Contributions.PanelRequest.Op.TOGGLE));
+          }
         };
     }
 
