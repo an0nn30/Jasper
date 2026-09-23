@@ -23,6 +23,17 @@ public final class TransferCopy {
         if(!TransferRecovery.sameSource(entry.sourceInfo(),source.stat(entry.source()))) throw new TransferRecovery.Attention("Source changed; choose Restart or Skip");
         if(entry.sourceInfo().kind()==FileEntry.Kind.SPECIAL) { store.outcome(entry.id(),TransferEntry.Outcome.FAILED,"Special files are not transferable");return; }
         var target=TransferRecovery.optional(destination,entry.target());
+        if(target.isPresent() && entry.decision()==ConflictDecision.ASK) {
+            var policy=store.policy(entry.jobId(),entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY);
+            if(policy!=ConflictDecision.ASK) {
+                if(policy==ConflictDecision.SKIP) {
+                    if(entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY) store.skipTree(entry.id());
+                    else { store.decision(entry.id(),policy,entry.target());copy(store,store.entry(entry.id()),source,destination,control,progress); }
+                    return;
+                }
+                store.conflict(entry.id(),target,"");store.decision(entry.id(),policy,entry.target());entry=store.entry(entry.id());
+            }
+        }
         if(target.isPresent()) {
             boolean merge=entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY && target.orElseThrow().kind()==FileEntry.Kind.DIRECTORY && entry.decision()==ConflictDecision.MERGE;
             boolean replace=entry.sourceInfo().kind()!=FileEntry.Kind.DIRECTORY && target.orElseThrow().kind()==entry.sourceInfo().kind() && entry.decision()==ConflictDecision.REPLACE;
@@ -68,7 +79,8 @@ public final class TransferCopy {
             }
             if(!TransferRecovery.sameSource(entry.sourceInfo(),source.stat(entry.source()))) throw new TransferRecovery.Attention("Source changed during copy; choose Restart or Skip");
             digest=TransferRecovery.hex(full);
-            destination.metadata(entry.temporary(),entry.sourceInfo().modifiedMillis(),entry.sourceInfo().permissions());
+            try { destination.metadata(entry.temporary(),entry.sourceInfo().modifiedMillis(),entry.sourceInfo().permissions()); }
+            catch(IOException | UnsupportedOperationException unsupported) { store.warning(entry.id(),"Metadata warning: "+unsupported.getMessage()); }
             store.refreshTemporary(entry.id(),destination.stat(entry.temporary()));
         }
         control.check();entry=store.entry(entry.id());

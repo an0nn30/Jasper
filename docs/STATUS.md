@@ -30,8 +30,9 @@ Durable SQLite storage passes reopen, checkpoint, 100k-entry pagination, cross-p
 killed-writer recovery and corrupt/newer-schema preservation tests. The transfer engine now passes local/SFTP/relay copies, recursive folders and links, short pause
 checkpoints and restart validation, blocked-write pause, seven killed-process publication boundaries,
 and a >4-GiB/100k-entry probe under a 64-MiB heap. The browser/controller, disk-backed directory pages, destination picker and cancellable
-file operations are implemented with native controls and SDK icons. Next: plugin wiring,
-Transfers management, composed lifecycle checks and final review.
+file operations are implemented with native controls and SDK icons. Plugin wiring and Transfers management are integrated; real staged/HostedContext tests pass
+shutdown during read, checkpoint and publication, with paused recovery and lock reacquisition.
+The full check/build and final independent review are next.
 The staged plugin-loader SQLite check runs with final integration; direct driver deregistration is covered now.
 Nothing merged or pushed.
 

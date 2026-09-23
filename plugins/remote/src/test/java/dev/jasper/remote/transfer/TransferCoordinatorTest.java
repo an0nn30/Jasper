@@ -97,6 +97,18 @@ class TransferCoordinatorTest {
             } finally { coordinator.close();coordinator.stopped().get(5,TimeUnit.SECONDS); }
         }
     }
+
+    @Test void queuedSameDestinationDoesNotOccupyScannerNeededToFinishPriorJob() throws Exception {
+        root=root.toRealPath();Path first=Files.write(root.resolve("a"),new byte[1024*1024]),second=Files.write(root.resolve("b"),new byte[1024*1024]),dest=Files.createDirectory(root.resolve("dest"));
+        try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+            var coordinator=new TransferCoordinator(root.resolve("queue"),executor,Runnable::run,(ref,owner)->CompletableFuture.completedFuture(new LocalEndpoint()),()->2);
+            try {
+                var a=coordinator.enqueue(new TransferRequest(EndpointRef.local(),List.of(first.toString()),EndpointRef.local(),dest.toString()),null).get(3,TimeUnit.SECONDS);
+                var b=coordinator.enqueue(new TransferRequest(EndpointRef.local(),List.of(second.toString()),EndpointRef.local(),dest.toString()),null).get(3,TimeUnit.SECONDS);
+                await(coordinator,a,TransferState.COMPLETED);await(coordinator,b,TransferState.COMPLETED);
+            } finally { coordinator.close();coordinator.stopped().get(5,TimeUnit.SECONDS); }
+        }
+    }
     static TransferJob await(TransferCoordinator coordinator,UUID id,TransferState state) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);TransferJob last=null;
         while(System.nanoTime()<deadline) { last=coordinator.job(id).get(3,TimeUnit.SECONDS);if(last.state()==state) return last;

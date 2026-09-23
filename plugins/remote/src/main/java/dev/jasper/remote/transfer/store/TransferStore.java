@@ -52,8 +52,8 @@ public final class TransferStore implements AutoCloseable {
     private void schema() throws SQLException {
         db.setAutoCommit(false);
         try {
-            execute("CREATE TABLE jobs(id TEXT PRIMARY KEY,request TEXT NOT NULL,source TEXT NOT NULL,destination TEXT NOT NULL,state TEXT NOT NULL,intent TEXT NOT NULL,created INTEGER NOT NULL,total_entries INTEGER NOT NULL DEFAULT 0,total_bytes INTEGER NOT NULL DEFAULT 0,confirmed_bytes INTEGER NOT NULL DEFAULT 0,completed INTEGER NOT NULL DEFAULT 0,skipped INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0,scanned INTEGER NOT NULL DEFAULT 0,detail TEXT NOT NULL DEFAULT '')");
-            execute("CREATE TABLE entries(id INTEGER PRIMARY KEY,job TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,relative TEXT NOT NULL,source TEXT NOT NULL,target TEXT NOT NULL,info TEXT NOT NULL,temp TEXT NOT NULL DEFAULT '',temp_info TEXT,phase TEXT NOT NULL DEFAULT 'PENDING',confirmed INTEGER NOT NULL DEFAULT 0,digest TEXT NOT NULL DEFAULT '',publication TEXT NOT NULL DEFAULT 'NONE',expected TEXT,decision TEXT NOT NULL DEFAULT 'ASK',outcome TEXT NOT NULL DEFAULT 'PENDING',error TEXT NOT NULL DEFAULT '',UNIQUE(job,relative))");
+            execute("CREATE TABLE jobs(id TEXT PRIMARY KEY,request TEXT NOT NULL,source TEXT NOT NULL,destination TEXT NOT NULL,state TEXT NOT NULL,intent TEXT NOT NULL,created INTEGER NOT NULL,total_entries INTEGER NOT NULL DEFAULT 0,total_bytes INTEGER NOT NULL DEFAULT 0,confirmed_bytes INTEGER NOT NULL DEFAULT 0,completed INTEGER NOT NULL DEFAULT 0,skipped INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0,scanned INTEGER NOT NULL DEFAULT 0,detail TEXT NOT NULL DEFAULT '',excluded_bytes INTEGER NOT NULL DEFAULT 0,file_policy TEXT NOT NULL DEFAULT 'ASK',directory_policy TEXT NOT NULL DEFAULT 'ASK',warnings INTEGER NOT NULL DEFAULT 0)");
+            execute("CREATE TABLE entries(id INTEGER PRIMARY KEY,job TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,relative TEXT NOT NULL,source TEXT NOT NULL,target TEXT NOT NULL,info TEXT NOT NULL,bytes INTEGER NOT NULL DEFAULT 0,temp TEXT NOT NULL DEFAULT '',temp_info TEXT,phase TEXT NOT NULL DEFAULT 'PENDING',confirmed INTEGER NOT NULL DEFAULT 0,digest TEXT NOT NULL DEFAULT '',publication TEXT NOT NULL DEFAULT 'NONE',expected TEXT,decision TEXT NOT NULL DEFAULT 'ASK',outcome TEXT NOT NULL DEFAULT 'PENDING',error TEXT NOT NULL DEFAULT '',warning TEXT NOT NULL DEFAULT '',UNIQUE(job,relative))");
             execute("CREATE INDEX entries_work ON entries(job,outcome,id)");
             execute("CREATE TABLE checkpoints(entry INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,start INTEGER NOT NULL,length INTEGER NOT NULL,digest TEXT NOT NULL,PRIMARY KEY(entry,start))");
             execute("CREATE TABLE scan_frontier(id INTEGER PRIMARY KEY,job TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,source TEXT NOT NULL,target TEXT NOT NULL,relative TEXT NOT NULL,UNIQUE(job,relative))");
@@ -86,7 +86,7 @@ public final class TransferStore implements AutoCloseable {
         } catch(SQLException e) { throw failure(e); }
     }
     private TransferJob readJob(ResultSet r) throws SQLException {
-        return new TransferJob(UUID.fromString(r.getString("id")),r.getString("source"),r.getString("destination"),TransferState.valueOf(r.getString("state")),TransferJob.Intent.valueOf(r.getString("intent")),r.getLong("created"),r.getLong("total_entries"),r.getLong("total_bytes"),r.getLong("confirmed_bytes"),r.getLong("completed"),r.getLong("skipped"),r.getLong("failed"),r.getBoolean("scanned"),r.getString("detail"),r.getLong("cleanup_count"));
+        return new TransferJob(UUID.fromString(r.getString("id")),r.getString("source"),r.getString("destination"),TransferState.valueOf(r.getString("state")),TransferJob.Intent.valueOf(r.getString("intent")),r.getLong("created"),r.getLong("total_entries"),r.getLong("total_bytes"),r.getLong("confirmed_bytes"),r.getLong("completed"),r.getLong("skipped"),r.getLong("failed"),r.getBoolean("scanned"),r.getString("detail"),r.getLong("cleanup_count"),r.getLong("warnings"));
     }
     private static final String JOBS="SELECT jobs.*, (SELECT count(*) FROM cleanup c JOIN entries e ON e.id=c.entry WHERE e.job=jobs.id) AS cleanup_count FROM jobs";
     public synchronized TransferJob job(UUID id) throws IOException {
@@ -116,7 +116,7 @@ public final class TransferStore implements AutoCloseable {
                 try(var statement=prepare("SELECT source FROM entries WHERE job=? AND relative=?",job,entry.relative());var prior=statement.executeQuery()) {
                     if(prior.next() && !prior.getString(1).equals(entry.source())) throw new IOException("Selected sources have the same destination name: "+entry.relative());
                 }
-                if(update("INSERT OR IGNORE INTO entries(job,relative,source,target,info) VALUES(?,?,?,?,?)",job,entry.relative(),entry.source(),entry.target(),TransferCodec.file(entry.sourceInfo()))!=0) {
+                if(update("INSERT OR IGNORE INTO entries(job,relative,source,target,info,bytes) VALUES(?,?,?,?,?,?)",job,entry.relative(),entry.source(),entry.target(),TransferCodec.file(entry.sourceInfo()),entry.sourceInfo().kind()==FileEntry.Kind.FILE?Math.max(0,entry.sourceInfo().size()):0)!=0) {
                 count++; if(entry.sourceInfo().kind()==FileEntry.Kind.FILE) bytes=Math.addExact(bytes,Math.max(0,entry.sourceInfo().size()));
             }
                 if(queueDirectories && entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY)
@@ -127,7 +127,7 @@ public final class TransferStore implements AutoCloseable {
     }
     private TransferEntry readEntry(ResultSet r) throws SQLException,IOException {
         String temp=r.getString("temp_info"), expected=r.getString("expected");
-        return new TransferEntry(r.getLong("id"),UUID.fromString(r.getString("job")),r.getString("relative"),r.getString("source"),r.getString("target"),TransferCodec.file(r.getString("info")),r.getString("temp"),temp==null?Optional.empty():Optional.of(TransferCodec.file(temp)),TransferEntry.Phase.valueOf(r.getString("phase")),r.getLong("confirmed"),r.getString("digest"),TransferEntry.Publication.valueOf(r.getString("publication")),expected==null?Optional.empty():Optional.of(TransferCodec.file(expected)),ConflictDecision.valueOf(r.getString("decision")),TransferEntry.Outcome.valueOf(r.getString("outcome")),r.getString("error"));
+        return new TransferEntry(r.getLong("id"),UUID.fromString(r.getString("job")),r.getString("relative"),r.getString("source"),r.getString("target"),TransferCodec.file(r.getString("info")),r.getString("temp"),temp==null?Optional.empty():Optional.of(TransferCodec.file(temp)),TransferEntry.Phase.valueOf(r.getString("phase")),r.getLong("confirmed"),r.getString("digest"),TransferEntry.Publication.valueOf(r.getString("publication")),expected==null?Optional.empty():Optional.of(TransferCodec.file(expected)),ConflictDecision.valueOf(r.getString("decision")),TransferEntry.Outcome.valueOf(r.getString("outcome")),(r.getString("error").isEmpty()?r.getString("warning"):r.getString("error")));
     }
     public synchronized TransferEntry entry(long id) throws IOException {
         try(var statement=prepare("SELECT * FROM entries WHERE id=?",id);var result=statement.executeQuery()) { if(!result.next()) throw new IOException("Transfer entry no longer exists"); return readEntry(result); }
@@ -184,10 +184,12 @@ public final class TransferStore implements AutoCloseable {
     public synchronized void reset(long id,FileEntry source) throws IOException {
         try {
             begin();var entry=entry(id);
-            if(entry.outcome()!=TransferEntry.Outcome.PENDING) throw new IOException("Only unfinished entries can restart");
+            if(entry.outcome()!=TransferEntry.Outcome.PENDING && entry.outcome()!=TransferEntry.Outcome.FAILED) throw new IOException("Only unfinished or failed entries can restart");
+            if(entry.outcome()==TransferEntry.Outcome.FAILED) update("UPDATE jobs SET failed=failed-1,excluded_bytes=excluded_bytes-(SELECT bytes FROM entries WHERE id=?) WHERE id=?",id,entry.jobId());
+            update("UPDATE jobs SET warnings=warnings-1 WHERE id=? AND EXISTS(SELECT 1 FROM entries WHERE id=? AND warning!='')",entry.jobId(),id);
             update("DELETE FROM checkpoints WHERE entry=?",id);
-            update("UPDATE entries SET info=?,temp='',temp_info=NULL,phase='PENDING',confirmed=0,digest='',publication='NONE',error='' WHERE id=?",TransferCodec.file(source),id);
-            update("UPDATE jobs SET confirmed_bytes=confirmed_bytes-?,total_bytes=total_bytes+? WHERE id=?",entry.confirmed(),Math.max(0,source.size())-Math.max(0,entry.sourceInfo().size()),entry.jobId());finish();
+            update("UPDATE entries SET info=?,bytes=?,temp='',temp_info=NULL,phase='PENDING',confirmed=0,digest='',publication='NONE',error='',warning='',outcome='PENDING' WHERE id=?",TransferCodec.file(source),source.kind()==FileEntry.Kind.FILE?Math.max(0,source.size()):0,id);
+            update("UPDATE jobs SET confirmed_bytes=confirmed_bytes-?,total_bytes=total_bytes+? WHERE id=?",entry.outcome()==TransferEntry.Outcome.FAILED?0:entry.confirmed(),Math.max(0,source.size())-Math.max(0,entry.sourceInfo().size()),entry.jobId());finish();
         } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
     }
     public synchronized List<TransferEntry> directories(UUID job,long offset,int limit) throws IOException {
@@ -209,9 +211,31 @@ public final class TransferStore implements AutoCloseable {
     public synchronized void skipTree(long id) throws IOException {
         try {
             begin();var entry=entry(id);String prefix=entry.relative()+"/";
+            update("UPDATE jobs SET excluded_bytes=excluded_bytes+(SELECT coalesce(sum(bytes),0) FROM entries WHERE job=? AND outcome='PENDING' AND (id=? OR substr(relative,1,?)=?)) WHERE id=?",entry.jobId(),id,prefix.length(),prefix,entry.jobId());
             int count=update("UPDATE entries SET outcome='SKIPPED',decision='SKIP',error='Skipped' WHERE job=? AND outcome='PENDING' AND (id=? OR substr(relative,1,?)=?)",entry.jobId(),id,prefix.length(),prefix);
             update("UPDATE jobs SET skipped=skipped+? WHERE id=?",count,entry.jobId());finish();
         } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
+    }
+    public synchronized ConflictDecision policy(UUID job,boolean directory) throws IOException {
+        try(var statement=prepare("SELECT "+(directory?"directory_policy":"file_policy")+" FROM jobs WHERE id=?",job);var row=statement.executeQuery()) { if(!row.next()) throw new IOException("Transfer no longer exists");return ConflictDecision.valueOf(row.getString(1)); } catch(SQLException e) { throw failure(e); }
+    }
+    public synchronized void policy(UUID job,boolean directory,ConflictDecision decision) throws IOException {
+        if(!(decision==ConflictDecision.SKIP || decision==ConflictDecision.ASK || (directory?decision==ConflictDecision.MERGE:decision==ConflictDecision.REPLACE))) throw new IOException("This decision cannot apply to remaining entries");
+        try { update("UPDATE jobs SET "+(directory?"directory_policy":"file_policy")+"=? WHERE id=?",decision.name(),job); } catch(SQLException e) { throw failure(e); }
+        long offset=0;
+        while(decision!=ConflictDecision.ASK) {
+            var page=entries(job,offset,200);if(page.isEmpty())break;
+            for(var entry:page) if(entry.outcome()==TransferEntry.Outcome.PENDING && entry.expectedTarget().isPresent() && (entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY)==directory) {
+                if(decision==ConflictDecision.SKIP && directory) skipTree(entry.id());else decision(entry.id(),decision,entry.target());
+            }
+            offset+=page.size();
+        }
+    }
+    public synchronized TransferCoordinator.Summary summary() throws IOException {
+        String active="state IN ('QUEUED','SCANNING','VALIDATING','RUNNING','PAUSING','CANCELLING')";
+        try(var statement=db.createStatement();var row=statement.executeQuery("SELECT coalesce(sum(CASE WHEN "+active+" THEN total_bytes-excluded_bytes ELSE 0 END),0),coalesce(sum(CASE WHEN "+active+" THEN confirmed_bytes ELSE 0 END),0),coalesce(sum(CASE WHEN "+active+" THEN total_entries-completed-skipped-failed ELSE 0 END),0),coalesce(sum(CASE WHEN "+active+" THEN 1 ELSE 0 END),0),coalesce(sum(CASE WHEN "+active+" AND scanned=0 THEN 1 ELSE 0 END),0),coalesce(sum(CASE WHEN state='PAUSED' THEN 1 ELSE 0 END),0),coalesce(sum(CASE WHEN state IN ('NEEDS_ATTENTION','INTERRUPTED','FAILED') OR EXISTS(SELECT 1 FROM cleanup c JOIN entries e ON e.id=c.entry WHERE e.job=jobs.id) THEN 1 ELSE 0 END),0) FROM jobs")) {
+            return new TransferCoordinator.Summary(row.getLong(1),row.getLong(2),row.getLong(3),row.getInt(4),row.getInt(5),row.getInt(6),row.getInt(7));
+        } catch(SQLException e) { throw failure(e); }
     }
     public synchronized void attention(long id,String message) throws IOException {
         try {
@@ -233,12 +257,19 @@ public final class TransferStore implements AutoCloseable {
             if(entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY) unblockChildren(entry);finish();
         } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
     }
+    public synchronized void warning(long id,String text) throws IOException {
+        try {
+            begin();update("UPDATE jobs SET warnings=warnings+1 WHERE id=(SELECT job FROM entries WHERE id=? AND warning='')",id);
+            update("UPDATE entries SET warning=? WHERE id=?",text,id);finish();
+        } catch(SQLException e) { rollback();throw failure(e); }
+    }
     public synchronized void outcome(long id,TransferEntry.Outcome outcome,String error) throws IOException {
         if(outcome==TransferEntry.Outcome.PENDING) throw new IllegalArgumentException("Use reset for restart");
         try {
             begin(); var entry=entry(id);
             if(entry.outcome()==TransferEntry.Outcome.PENDING) {
                 update("UPDATE entries SET outcome=?,phase=CASE WHEN ?='COMPLETE' THEN 'COMPLETE' ELSE phase END,error=? WHERE id=?",outcome.name(),outcome.name(),error,id);
+                if(outcome!=TransferEntry.Outcome.COMPLETE) update("UPDATE jobs SET excluded_bytes=excluded_bytes+(SELECT bytes FROM entries WHERE id=?),confirmed_bytes=confirmed_bytes-? WHERE id=?",id,entry.confirmed(),entry.jobId());
                 String column=switch(outcome) { case COMPLETE -> "completed"; case SKIPPED -> "skipped"; case FAILED -> "failed"; default -> throw new AssertionError(); };
                 update("UPDATE jobs SET "+column+"="+column+"+1 WHERE id=?",entry.jobId());
             }

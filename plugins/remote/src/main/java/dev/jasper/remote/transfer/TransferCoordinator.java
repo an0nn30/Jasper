@@ -13,7 +13,12 @@ import java.util.function.*;
 /** Shared queue owner. All long-lived loops are admitted before plugin teardown can close its executor. */
 public final class TransferCoordinator implements AutoCloseable {
     public record Progress(UUID job,long bytes,long total,long sampledNanos) {}
-    public record Snapshot(List<TransferJob> jobs,List<Progress> progress,int active) {}
+    public record Summary(long totalBytes,long confirmedBytes,long remainingFiles,int runnable,int scanning,int paused,int attention) {}
+    public record Snapshot(List<TransferJob> jobs,List<Progress> progress,int active,Summary summary,List<UUID> activeJobs) {
+        public Snapshot(List<TransferJob> jobs,List<Progress> progress,int active) {
+            this(jobs,progress,active,new Summary(jobs.stream().mapToLong(TransferJob::totalBytes).sum(),jobs.stream().mapToLong(TransferJob::confirmedBytes).sum(),jobs.stream().mapToLong(j->j.totalEntries()-j.completedEntries()-j.skippedEntries()-j.failedEntries()).sum(),(int)jobs.stream().filter(j->j.intent()==TransferJob.Intent.RUN && !j.state().terminal()).count(),(int)jobs.stream().filter(j->!j.scanned()).count(),(int)jobs.stream().filter(j->j.state()==TransferState.PAUSED).count(),(int)jobs.stream().filter(j->j.state()==TransferState.NEEDS_ATTENTION || j.state()==TransferState.INTERRUPTED).count()),jobs.stream().filter(j->j.intent()==TransferJob.Intent.RUN && !j.state().terminal()).map(TransferJob::id).toList());
+        }
+    }
     private final Path directory;
     private final Executor ui;
     private final BiFunction<EndpointRef,WindowHandle,CompletableFuture<FileEndpoint>> endpoints;
@@ -42,7 +47,7 @@ public final class TransferCoordinator implements AutoCloseable {
         final boolean validateIdentity;final ConcurrentMap<Long,Progress> progress=new ConcurrentHashMap<>();
         volatile boolean activeScan;boolean finalizing,attention,cleanupOnly;
         Long restartEntry;
-        PathReservations.Lease reservation;
+        volatile PathReservations.Lease reservation;
         Run(UUID id,WindowHandle owner) { this(id,owner,false); }
         Run(UUID id,WindowHandle owner,boolean validate) { this.id=id;this.owner=owner;this.validateIdentity=validate; }
     }
@@ -100,7 +105,14 @@ public final class TransferCoordinator implements AutoCloseable {
     public CompletableFuture<TransferJob> job(UUID id) { return command(()->store.job(id)); }
     public CompletableFuture<List<TransferEntry>> entries(UUID id,long offset,int limit) { return command(()->store.entries(id,offset,limit)); }
     public CompletableFuture<Snapshot> snapshot(long offset,int limit) {
-        return command(()->new Snapshot(store.jobs(offset,limit),runs.values().stream().flatMap(run->run.progress.values().stream()).toList(),activeCopies.get()));
+        return command(()-> {
+            var progress=new ArrayList<Progress>();
+            for(var run:runs.values()) for(var sample:run.progress.entrySet()) {
+                var value=sample.getValue();long confirmed=store.entry(sample.getKey()).confirmed();
+                progress.add(new Progress(run.id,Math.max(0,value.bytes()-confirmed),value.total(),value.sampledNanos()));
+            }
+            return new Snapshot(store.jobs(offset,limit),List.copyOf(progress),activeCopies.get(),store.summary(),runs.values().stream().filter(run->!run.cleanupOnly && run.control.running()).map(run->run.id).toList());
+        });
     }
     public void pause(UUID id) { urgent(id,TransferJob.Intent.PAUSE); }
     public void cancel(UUID id) { urgent(id,TransferJob.Intent.CANCEL); }
@@ -124,7 +136,8 @@ public final class TransferCoordinator implements AutoCloseable {
             if(runs.containsKey(id)) throw new IOException("Transfer has not stopped yet");if(runs.size()>=256) throw new IOException("The transfer admission queue is full");
             store.intent(id,TransferJob.Intent.RUN);store.state(id,TransferState.VALIDATING,"");runs.put(id,new Run(id,owner,true));return null; });
     }
-    public CompletableFuture<Void> resolve(long entryId,ConflictDecision decision,String renamedTarget) {
+    public CompletableFuture<Void> resolve(long entryId,ConflictDecision decision,String renamedTarget) { return resolve(entryId,decision,renamedTarget,false); }
+    public CompletableFuture<Void> resolve(long entryId,ConflictDecision decision,String renamedTarget,boolean remaining) {
         return command(()-> { var entry=store.entry(entryId);if(runs.containsKey(entry.jobId())) throw new IOException("Wait for the transfer to stop before resolving it");
             if(decision==ConflictDecision.ASK) throw new IOException("Choose a conflict action");
             String target=entry.target();
@@ -134,13 +147,14 @@ public final class TransferCoordinator implements AutoCloseable {
                 store.renameTree(entryId,target);
             }
             if(decision==ConflictDecision.SKIP && entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY) store.skipTree(entryId);
-            else store.decision(entryId,decision,target);return null; });
+            else store.decision(entryId,decision,target);
+            if(remaining) store.policy(entry.jobId(),entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY,decision);return null; });
     }
     public CompletableFuture<Void> retry(UUID id,WindowHandle owner) { return resume(id,owner); }
     public CompletableFuture<Void> restart(long entryId,WindowHandle owner) {
         return command(()-> {
             var entry=store.entry(entryId);var job=store.job(entry.jobId());
-            if(runs.containsKey(job.id()) || job.intent()==TransferJob.Intent.CANCEL || entry.outcome()!=TransferEntry.Outcome.PENDING) throw new IOException("Entry cannot restart while active or cancelled");
+            if(runs.containsKey(job.id()) || job.intent()==TransferJob.Intent.CANCEL || entry.outcome()!=TransferEntry.Outcome.PENDING && entry.outcome()!=TransferEntry.Outcome.FAILED) throw new IOException("Entry cannot restart while active or cancelled");
             var run=new Run(job.id(),owner,true);run.restartEntry=entryId;
             store.intent(job.id(),TransferJob.Intent.RUN);store.state(job.id(),TransferState.VALIDATING,"Checking partial before restart");runs.put(job.id(),run);return null;
         });
@@ -169,7 +183,7 @@ public final class TransferCoordinator implements AutoCloseable {
             }
             int limit=Math.clamp(parallel.getAsInt(),1,8);
             for(var entry:pending) {
-                if(activeCopies.get()>=limit || run.busy.size()>=2) break;
+                if(activeCopies.get()>=limit || run.busy.size()>=2 || run.reservation==null && !run.busy.isEmpty()) break;
                 if(run.busy.contains(entry.id())) continue;
                 if(entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY && !run.busy.isEmpty()) break;
                 if(!run.busy.isEmpty() && store.entry(run.busy.iterator().next()).sourceInfo().kind()==FileEntry.Kind.DIRECTORY) break;
@@ -187,7 +201,7 @@ public final class TransferCoordinator implements AutoCloseable {
                 TransferRecovery.cleanup(store,entry,pair.destination,run.control);
                 if(store.entry(entry.id()).outcome()!=TransferEntry.Outcome.COMPLETE) {
                     var current=pair.source.stat(entry.source());
-                    if(current.kind()!=entry.sourceInfo().kind() || current.kind()==FileEntry.Kind.DIRECTORY) throw new TransferRecovery.Attention("Source type changed; skip this entry and queue a new transfer");
+                    if((current.kind()!=entry.sourceInfo().kind() && entry.sourceInfo().kind()!=FileEntry.Kind.SPECIAL) || current.kind()==FileEntry.Kind.DIRECTORY) throw new TransferRecovery.Attention("Source type changed; skip this entry and queue a new transfer");
                     store.reset(entry.id(),current);
                 }
             } catch(Throwable problem) { failure=problem; }
@@ -226,6 +240,11 @@ public final class TransferCoordinator implements AutoCloseable {
         });
     }
     private void finishWork(Run run,Throwable problem) {
+        if(problem instanceof ReservationBusy) {
+            if(run.busy.isEmpty() && !run.activeScan) release(run);
+            try { store.state(run.id,TransferState.QUEUED,"Waiting for another transfer using this folder"); }catch(IOException failure){startupFailure=failure;close();}
+            return;
+        }
         if(problem==null || !run.control.running() || closing.get()) return;
         run.attention=true;run.control.request(TransferJob.Intent.PAUSE);
         if(run.cleanupOnly) { try { store.state(run.id,TransferState.CANCELLED,"Cleanup could not finish: "+message(problem)); } catch(IOException failure) { startupFailure=failure;close(); }return; }
@@ -260,13 +279,14 @@ public final class TransferCoordinator implements AutoCloseable {
                 while(true) { var page=store.directories(run.id,offset,200);if(page.isEmpty()) break;
                     for(var entry:page) if(entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY) {
                         run.control.check();if(pair.destination.stat(entry.target()).kind()!=FileEntry.Kind.DIRECTORY) throw new TransferRecovery.Attention("Destination directory changed before metadata update");
-                        pair.destination.metadata(entry.target(),entry.sourceInfo().modifiedMillis(),entry.sourceInfo().permissions());
+                        try { pair.destination.metadata(entry.target(),entry.sourceInfo().modifiedMillis(),entry.sourceInfo().permissions()); }
+                        catch(IOException | UnsupportedOperationException unsupported) { store.warning(entry.id(),"Metadata warning: "+unsupported.getMessage()); }
                     }
                     offset+=page.size();
                 }
             } catch(Throwable problem) { failure=problem; }
             Throwable result=failure;completions.add(()-> { scanning=false;run.activeScan=false;run.finalizing=false;finishWork(run,result);
-                if(result==null && run.control.running()) try { var job=store.job(run.id);store.state(run.id,job.failedEntries()>0 || job.skippedEntries()>0?TransferState.COMPLETED_WITH_ISSUES:TransferState.COMPLETED,"");release(run);runs.remove(run.id); }
+                if(result==null && run.control.running()) try { var job=store.job(run.id);store.state(run.id,job.failedEntries()>0 || job.skippedEntries()>0 || job.metadataWarnings()>0?TransferState.COMPLETED_WITH_ISSUES:TransferState.COMPLETED,"");release(run);runs.remove(run.id); }
                 catch(IOException problem) { finishWork(run,problem); }
             });
         });
@@ -318,13 +338,14 @@ public final class TransferCoordinator implements AutoCloseable {
         var destination=new PathReservations.Key(pair.destination.id(),pair.destination.canonical(request.directory()),true);
         for(var source:keys) if(PathReservations.overlaps(source,destination)) throw new TransferRecovery.Attention("Source and destination overlap");
         keys.add(destination);
-        while(run.control.running()) {
-            synchronized(run) { if(run.reservation!=null) return;var lease=reservations.acquire(run.id,keys);if(lease.isPresent()) { run.reservation=lease.orElseThrow();return; } }
-            try { Thread.sleep(25); } catch(InterruptedException interrupted) { Thread.currentThread().interrupt();throw new TransferControl.Stopped(); }
+        run.control.check();
+        synchronized(run) {
+            if(run.reservation!=null)return;
+            run.reservation=reservations.acquire(run.id,keys).orElseThrow(ReservationBusy::new);
         }
-        throw new TransferControl.Stopped();
     }
-    private void release(Run run) { run.control.abort();run.idle.clear();synchronized(run) { if(run.reservation!=null) { run.reservation.close();run.reservation=null; } } }
+    private static final class ReservationBusy extends IOException { private static final long serialVersionUID=1L; }
+    private void release(Run run) { run.control.releaseAll();run.idle.clear();synchronized(run) { if(run.reservation!=null) { run.reservation.close();run.reservation=null; } } }
     private AutoCloseable copyPermit(Pair pair,TransferControl control) throws InterruptedException,IOException {
         var ids=new HashSet<>(List.of(pair.source.id(),pair.destination.id()));
         synchronized(endpointCopies) {

@@ -23,7 +23,7 @@ public final class SftpUi implements AutoCloseable {
     public record PaneTarget(UUID pane,ConnectionIdentity identity,String directory) {}
     private record View(PanelHost host,SftpPanel panel,SftpController controller,FileOperationController operations) {}
     private final PluginContext context;
-    private final Executor ui;
+    private final Executor ui,background;
     private final Connections connections;
     private final EndpointFactory endpoints;
     private final Supplier<TransferCoordinator> transfers;
@@ -35,20 +35,20 @@ public final class SftpUi implements AutoCloseable {
     private final Set<PluginDialog> dialogs=new HashSet<>();
     private final Map<UUID,CompletableFuture<ConnectionIdentity>> browsing=new HashMap<>();
     private volatile boolean closed;
-    public SftpUi(PluginContext context,Executor ui,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
+    public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Consumer<WindowHandle> showTransfers) {
-        this(context,ui,connections,endpoints,transfers,hosts,activePane,showTransfers,text->Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text),null));
+        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,showTransfers,text->Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text),null));
     }
-    public SftpUi(PluginContext context,Executor ui,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
+    public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Consumer<WindowHandle> showTransfers,Consumer<String> clipboard) {
-        this.context=context;this.ui=ui;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.showTransfers=showTransfers;this.clipboard=clipboard;
+        this.context=context;this.ui=ui;this.background=background;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.showTransfers=showTransfers;this.clipboard=clipboard;
         context.panels().register(new PanelSpec(PANEL,"SFTP",context.appearance().icon(IconName.FOLDER),Anchor.LEFT),this::create);
     }
     private JComponent create(PanelHost host) {
         var panel=new SftpPanel(context.appearance()::icon);var window=host.window();
         Function<ConnectionIdentity,CompletableFuture<FileEndpoint>> open=identity->endpoints.open(Optional.of(identity),window,status->{});
-        var controller=new SftpController(context.dataDirectory().resolve("browser-cache"),context.background(),ui,open,panel);
-        var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),context.background(),ui,open,transfers.get().reservations(),panel::busy,controller::refresh);
+        var controller=new SftpController(context.dataDirectory().resolve("browser-cache"),background,ui,open,panel);
+        var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,open,transfers.get().reservations(),panel::busy,controller::refresh);
         var view=new View(host,panel,controller,operations);views.put(window.id(),view);
         controller.operations(new SftpController.Operations(()->upload(view,false),()->upload(view,true),()->download(view),()->newFolder(view),()->delete(view),()->copyPaths(view),()->copyHost(view),operations::cancel));
         controller.visible(host.visible());
@@ -63,6 +63,9 @@ public final class SftpUi implements AutoCloseable {
         var pane=activePane.apply(window);
         if(pane.isPresent()) { var target=pane.orElseThrow();view.controller().open(target.pane(),target.identity(),target.directory(),true); }
         else if(view.controller().capture().isEmpty()) chooseHost(window);
+    }
+    public void show(WindowHandle window,PaneTarget pane) {
+        if(closed)return;var view=showView(window);if(view!=null)view.controller().open(pane.pane(),pane.identity(),pane.directory(),true);
     }
     public void toggle(WindowHandle window) { if(!closed) context.panels().toggle(PANEL,window); }
     public void browse(WindowHandle window,RemoteHost host) {
@@ -95,7 +98,7 @@ public final class SftpUi implements AutoCloseable {
     private static String canonicalSelection(Path path) throws IOException { Path absolute=path.toAbsolutePath().normalize();return absolute.getParent()==null?absolute.toRealPath().toString():absolute.getParent().toRealPath().resolve(absolute.getFileName()).toString(); }
     private static List<String> paths(SftpController.Capture captured) throws IOException { var paths=new ArrayList<String>();for(var file:captured.selection()) paths.add(FilePaths.child(captured.directory(),file.name()));return List.copyOf(paths); }
     private void background(Callable<TransferRequest> prepare,WindowHandle owner) {
-        context.background().execute(()-> { try { var request=prepare.call();ui.execute(()-> { if(closed || !owner.isOpen()) return;transfers.get().enqueue(request,owner).whenComplete((id,error)->ui.execute(()-> { if(closed) return;if(error!=null) context.notices().error(message(error));else if(owner.isOpen()) showTransfers.accept(owner); })); }); }
+        background.execute(()-> { try { var request=prepare.call();ui.execute(()-> { if(closed || !owner.isOpen()) return;transfers.get().enqueue(request,owner).whenComplete((id,error)->ui.execute(()-> { if(closed) return;if(error!=null) context.notices().error(message(error));else if(owner.isOpen()) showTransfers.accept(owner); })); }); }
             catch(Exception failure) { ui.execute(()-> { if(!closed) context.notices().error(message(failure)); }); } });
     }
     private void copyPaths(View view) {
@@ -116,8 +119,8 @@ public final class SftpUi implements AutoCloseable {
     private void copyHost(View view) {
         var selected=view.controller().capture();if(selected.isEmpty() || selected.orElseThrow().selection().isEmpty()) return;var source=selected.orElseThrow();var owner=view.host().window();var dialog=dialog(owner,"Copy to host");
         var pickerReference=new java.util.concurrent.atomic.AtomicReference<DestinationPanel>();
-        var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),context.background(),ui,identity->endpoints.open(Optional.of(identity),owner,status->{}),transfers.get().reservations(),(busy,text)-> { var current=pickerReference.get();if(current!=null) current.status(busy,text); },()-> { var current=pickerReference.get();if(current!=null) current.refresh(); });
-        var picker=new DestinationPanel(source.selection().size()+" items from "+source.identity().host().name()+":"+source.directory(),hosts.get(),context.dataDirectory().resolve("browser-cache"),context.background(),ui,context.appearance()::icon,
+        var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,identity->endpoints.open(Optional.of(identity),owner,status->{}),transfers.get().reservations(),(busy,text)-> { var current=pickerReference.get();if(current!=null) current.status(busy,text); },()-> { var current=pickerReference.get();if(current!=null) current.refresh(); });
+        var picker=new DestinationPanel(source.selection().size()+" items from "+source.identity().host().name()+":"+source.directory(),hosts.get(),context.dataDirectory().resolve("browser-cache"),background,ui,context.appearance()::icon,
             id->connections.resolveIdentity(id,owner),identity->endpoints.open(Optional.of(identity),owner,status->{}),destination->{dialog.close();background(()->new TransferRequest(EndpointRef.remote(source.identity()),paths(source),EndpointRef.remote(destination.identity()),destination.directory()),owner);},
             destination->nameDialog(owner,destination,operations::mkdir),operations::cancel,dialog::close);
         pickerReference.set(picker);dialog.onClosed(()-> { picker.close();operations.close(); });dialog.setContent(picker);dialog.show();

@@ -21,6 +21,7 @@ public final class TransferControl {
     public void own(FileEndpoint endpoint) { endpoints.add(endpoint); if(!running()) endpoint.abort(); }
     public void release(FileEndpoint endpoint) { endpoints.remove(endpoint); }
     public void abort() { endpoints.forEach(FileEndpoint::abort); }
+    public void releaseAll() { abort();endpoints.clear(); }
     public void abortIfStalled() { if(requestedAt!=0 && System.nanoTime()-requestedAt>500_000_000L) abort(); }
     public static final class Stopped extends IOException {
         private static final long serialVersionUID=1L;

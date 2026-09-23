@@ -31,7 +31,7 @@ class RemotePluginTest {
     final List<Runnable> scheduled = new ArrayList<>();
 
     RemotePlugin plugin(Path sshDir) {
-        return new RemotePlugin(Runnable::run, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
+        return new TestRemotePlugin(Runnable::run, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -66,15 +66,16 @@ class RemotePluginTest {
             });
             settle(host);
             assertThat(host.failures()).isEmpty();
-            assertThat(icons).singleElement().satisfies(icon -> {
-                assertThat(icon.name()).isEqualTo(dev.jasper.sdk.ui.IconName.NETWORK);
-                assertThat(icon.retro()).isEqualTo(retro);
-            });
+            assertThat(icons).anyMatch(icon->icon.name()==dev.jasper.sdk.ui.IconName.NETWORK);
+            assertThat(icons).allSatisfy(icon->assertThat(icon.retro()).isEqualTo(retro));
             assertThat(host.toolbar()).anyMatch(item -> item.contains("Sessions"));
-            assertThat(host.panels()).containsExactly("dev.jasper.remote.panel|SSH hosts|LEFT");
+            assertThat(host.panels()).containsExactly("dev.jasper.remote.transfers.panel|Transfers|BOTTOM","dev.jasper.remote.sftp.panel|SFTP|LEFT","dev.jasper.remote.panel|SSH hosts|LEFT");
         }
     }
 
+    static javax.swing.JMenuItem menuItem(javax.swing.JPopupMenu menu,String text) {
+        return java.util.Arrays.stream(menu.getComponents()).filter(javax.swing.JMenuItem.class::isInstance).map(javax.swing.JMenuItem.class::cast).filter(item->item.getText().equals(text)).findFirst().orElseThrow();
+    }
     static void settle(FakePluginHost host) { for (int i = 0; i < 20; i++) { host.runBackground(); host.flush(); } }
 
     @Test void registersItsSurfaceAndConnectsThroughSessionsToolbar(@TempDir Path dir) throws Exception {
@@ -86,7 +87,7 @@ class RemotePluginTest {
             assertThat(host.failures()).isEmpty();
             assertThat(host.actions()).contains("dev.jasper.remote.connect|Connect to SSH Host...|true", "dev.jasper.remote.hosts|SSH Hosts|true",
                 "dev.jasper.remote.split|Split with Same Host|false", "dev.jasper.remote.import|Import from ~/.ssh/config...|true");
-            assertThat(host.panels()).containsExactly("dev.jasper.remote.panel|SSH hosts|LEFT");
+            assertThat(host.panels()).containsExactly("dev.jasper.remote.transfers.panel|Transfers|BOTTOM","dev.jasper.remote.sftp.panel|SFTP|LEFT","dev.jasper.remote.panel|SSH hosts|LEFT");
             assertThat(host.scopes()).containsExactly("dev.jasper.remote.scope|SSH|connect,split,edit");
             assertThat(host.menu("top:dev.jasper.remote.menu")).isNotEmpty();
             assertThat(host.status()).as("hidden at zero").isEmpty();
@@ -240,7 +241,7 @@ class RemotePluginTest {
             RemoteHost imported = plugin.store().hosts().get(1);
             cancelImport(plugin.currentImport()).doClick();
             javax.swing.JPopupMenu menu = menuFor(panel, indexOf(panel, imported));
-            ((javax.swing.JMenuItem) menu.getComponent(4)).doClick();
+            menuItem(menu,"Delete…").doClick();
             assertThat(host.windows()).containsExactly("dialog|Delete imported?|true");
             plugin.currentConfirm().confirm.doClick();
             settle(host);
@@ -288,8 +289,8 @@ class RemotePluginTest {
             plugin.store().put(saved); settle(host);
             Files.writeString(context.dataDirectory().resolve("hosts.toml"), "broken = [");
             var menu = menuFor(panel, indexOf(panel, saved));
-            ((javax.swing.JMenuItem) menu.getComponent(3)).doClick();
-            ((javax.swing.JMenuItem) menu.getComponent(5)).doClick();
+            menuItem(menu,"Duplicate").doClick();
+            menuItem(menu,"Add to favorites").doClick();
             add(panel).doClick();
             name(plugin.currentEditor()).setText("new"); hostname(plugin.currentEditor()).setText("example");
             agentAuth(plugin.currentEditor()).doClick(); username(plugin.currentEditor()).setText("me");

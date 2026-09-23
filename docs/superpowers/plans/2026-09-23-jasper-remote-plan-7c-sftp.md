@@ -435,7 +435,7 @@ handle. `show(window)`, `toggle(window)`, `refresh(snapshot)` and `close()` use 
 Register actions `dev.jasper.remote.sftp`, `.sftp.toggle`, `.transfers`, `.transfers.toggle`,
 and `.transfers.cancel`; panels `.sftp.panel` and `.transfers.panel`. Existing actions retained.
 
-- [ ] Write real plugin/testkit tests for contributions, visibility, queue across windows,
+- [x] Write real plugin/testkit tests for contributions, visibility, queue across windows,
   no Buddy dependency, single-job cancel vs multi-job show queue, paused startup without
   authentication, pane close while transfer runs, and settings/keybinding reload.
 
@@ -445,8 +445,8 @@ assertThat(host.menu("top:dev.jasper.remote.menu")).contains("item:dev.jasper.re
 assertThat(fixture.authRequests()).isZero(); // restored paused queue
 ```
 
-- [ ] Run plugin/UI tests; expect missing contributions.
-- [ ] Implement paged table of jobs and child rows/details, per-job Pause/Resume/Cancel/Retry,
+- [x] Run plugin/UI tests; expect missing contributions.
+- [x] Implement paged table of jobs and child rows/details, per-job Pause/Resume/Cancel/Retry,
   conflict decisions and cleanup retry. Show completed-with-issues counts; Clear only discards
   safe history, with acknowledgement for pending cleanup. Publish aggregate status at 200ms
   cadence and immediately on transitions, preserving unknown totals and 64-bit remaining counts.
@@ -454,14 +454,14 @@ assertThat(fixture.authRequests()).isZero(); // restored paused queue
   host lookup and prompt ownership; serialization prevents stacked modal auth dialogs.
   Implement `[sftp] max_parallel_files=2, request_timeout_seconds=30`, both validated, and
   blank-by-default shortcut keys; global app keybindings retain precedence.
-- [ ] Run all Remote tests and affected app staged-runtime tests. Verify plugin stop closes
+- [x] Run all Remote tests and affected app staged-runtime tests. Verify plugin stop closes
   browsers/operations, checkpoints intents, stops workers before store close and releases owned
   sessions, without EDT waits. Start long-lived control/store loops during plugin start;
   stop synchronously signals those already-admitted loops and never submits work after context
   teardown. Suppress late UI callbacks. Exercise real HostedContext/staged plugin teardown during
   blocked copy, checkpoint and publication; require durable intent and queue lock reacquisition.
   Unavailable store shows error but ordinary SSH survives.
-- [ ] Commit `feat(remote): manage SFTP transfers independently of Buddy`.
+- [x] Commit `feat(remote): manage SFTP transfers independently of Buddy`.
 
 ### Task 10: Integrated acceptance, documentation and independent final review
 

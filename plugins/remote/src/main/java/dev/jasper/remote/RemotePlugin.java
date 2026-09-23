@@ -71,6 +71,13 @@ public class RemotePlugin implements Plugin {
     public static final String IMPORT = "dev.jasper.remote.import", STATUS = "dev.jasper.remote.status", MENU = "dev.jasper.remote.menu", PANEL = "dev.jasper.remote.panel";
 
     private final Executor ui;
+    private final Function<PluginContext,Executor> transferExecutor;
+    private volatile RemoteSettings.Sftp sftpSettings;
+    private dev.jasper.remote.transfer.TransferCoordinator transfers;
+    private dev.jasper.remote.ui.transfers.TransferUi transferUi;
+    private dev.jasper.remote.ui.sftp.SftpUi sftpUi;
+    private PluginAction sftpToggle;
+    public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=SFTP+".toggle";
     private final Function<PluginContext, Optional<AgentClient>> agentFactory;
     private final BiFunction<Duration, Runnable, Runnable> schedule;
     private final Path sshDir;
@@ -112,7 +119,10 @@ public class RemotePlugin implements Plugin {
     }
 
     RemotePlugin(Executor ui, Function<PluginContext, Optional<AgentClient>> agentFactory, BiFunction<Duration, Runnable, Runnable> schedule, Path sshDir) {
-        this.ui = ui; this.agentFactory = agentFactory; this.schedule = schedule; this.sshDir = sshDir;
+        this(ui,agentFactory,schedule,sshDir,PluginContext::background);
+    }
+    RemotePlugin(Executor ui, Function<PluginContext, Optional<AgentClient>> agentFactory, BiFunction<Duration,Runnable,Runnable> schedule,Path sshDir,Function<PluginContext,Executor> transferExecutor) {
+        this.ui = ui; this.agentFactory = agentFactory; this.schedule = schedule; this.sshDir = sshDir;this.transferExecutor=transferExecutor;
     }
 
     @Override public void start(PluginContext context) throws Exception {
@@ -132,12 +142,33 @@ public class RemotePlugin implements Plugin {
         connections.onChanged(this::refreshStatus);
         icon = context.appearance().icon(dev.jasper.sdk.ui.IconName.NETWORK);
 
+        sftpSettings=RemoteSettings.sftp(context.config());
+        Executor transferBackground=transferExecutor.apply(context);
+        var endpoints=new dev.jasper.remote.sftp.EndpointFactory(connections,context.background(),ui,()->sftpSettings.requestTimeout());
+        transfers=new dev.jasper.remote.transfer.TransferCoordinator(context.dataDirectory().resolve("transfers"),transferBackground,ui,(ref,owner)-> {
+            try { return endpoints.open(ref.identity(),owner,status->{}); }catch(IOException failure) { return CompletableFuture.failedFuture(failure); }
+        },()->sftpSettings.maxParallelFiles());
+        transfers.setResumeValidator((ref,owner)-> {
+            if(ref.hostId().isEmpty()) return CompletableFuture.completedFuture(null);
+            try {
+                var expected=ref.identity().orElseThrow();
+                return connections.resolveIdentity(ref.hostId().orElseThrow(),owner).thenApply(actual->{if(!actual.equals(expected)) throw new java.util.concurrent.CompletionException(new IOException("Saved host or authentication identity changed; queue a new transfer"));return null;});
+            }catch(Exception failure) { return CompletableFuture.failedFuture(failure); }
+        });
+        transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui);
+        sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::show);
+        context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp","files","browse","remote")),invoked->{
+            invoked.pane().flatMap(this::sftpPane).ifPresentOrElse(pane->sftpUi.show(invoked.window(),pane),()->sftpUi.show(invoked.window()));
+        });
+        context.menus().terminalContext().add(SFTP);
         configureShortcuts();
         splitAction = context.actions().register(ActionSpec.of(SPLIT, "Split with Same Host").withKeywords(List.of("ssh", "split")), invoked -> invoked.pane().ifPresent(this::splitSameHost));
         splitAction.setEnabled(false);
         context.actions().register(ActionSpec.of(IMPORT, "Import from ~/.ssh/config...").withKeywords(List.of("ssh", "import", "config")), invoked -> importConfig(invoked.window()));
         PluginMenu menu = context.menus().create(MENU, "SSH");
         menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(IMPORT);
+        menu.addSeparator();menu.add(SFTP);menu.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
+        context.menus().standard(StandardMenu.VIEW).add(SFTP_TOGGLE);context.menus().standard(StandardMenu.VIEW).add(dev.jasper.remote.ui.transfers.TransferUi.TOGGLE);
         context.menus().standard(StandardMenu.VIEW).add(HOSTS);
 
         scope = new RemoteScope(store::hosts, store::error, this::openHost, this::splitHost, (window, host) -> editHost(window, Optional.of(host)));
@@ -155,17 +186,19 @@ public class RemotePlugin implements Plugin {
         poll = new Timer(1000, event -> store.poll());
         poll.start();
         context.events().subscribe(TerminalEvents.ACTIVE_PANE_CHANGED, event -> {
-            event.paneId().ifPresent(this::rememberPane); refreshSplit();
+            event.paneId().ifPresent(id->{rememberPane(id);sftpFocused(id);}); refreshSplit();
         });
-        context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> rememberPane(event.paneId()));
-        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { panes.remove(event.paneId()); paneIdentities.remove(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
+        context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> { rememberPane(event.paneId());sftpFocused(event.paneId()); });
+        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { panes.remove(event.paneId()); paneIdentities.remove(event.paneId());sftpUi.forget(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
         context.events().subscribe(TerminalEvents.WINDOW_CLOSED, event -> {
             for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
         });
         if (vault.isPresent()) context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> refreshPanels());
+        context.events().subscribe(TerminalEvents.CWD_CHANGED,event->event.remoteDirectory().ifPresent(directory->sftpUi.directory(event.paneId(),directory.path())));
+        context.events().subscribe(TerminalEvents.TAB_SELECTED,event->context.terminals().window(event.windowId()).flatMap(window->window.activeTab()).flatMap(tab->tab.activePane()).ifPresent(pane->sftpFocused(pane.id())));
         context.config().onChanged(() -> {
             if (stopped) return;
-            settings = RemoteSettings.read(context.config());
+            settings = RemoteSettings.read(context.config());sftpSettings=RemoteSettings.sftp(context.config());
             configureShortcuts();
         });
     }
@@ -186,11 +219,17 @@ public class RemotePlugin implements Plugin {
                 .withKeywords(List.of("ssh", "hosts", "panel")).withDefaultBinding(next.togglePanel().orElse(null)),
                 invoked -> showPanel(invoked.window()));
         }
+        if(shortcuts==null || !next.toggleSftp().equals(shortcuts.toggleSftp())) {
+            if(sftpToggle!=null)sftpToggle.close();
+            sftpToggle=context.actions().register(ActionSpec.of(SFTP_TOGGLE,"SFTP panel").withDefaultBinding(next.toggleSftp().orElse(null)),invoked->sftpUi.toggle(invoked.window()));
+        }
+        if(shortcuts==null || !next.toggleTransfers().equals(shortcuts.toggleTransfers())) transferUi.configureBinding(next.toggleTransfers().orElse(null));
         shortcuts = next;
     }
 
     @Override public void stop() {
         stopped = true;
+        if(sftpUi!=null)sftpUi.close();if(transferUi!=null)transferUi.close();if(transfers!=null)transfers.close();
         if (configImport != null) configImport.close();
         for (var attempt : Set.copyOf(attempts)) attempt.close();
         for (var question : Set.copyOf(questions)) question.cancel(true);
@@ -198,6 +237,15 @@ public class RemotePlugin implements Plugin {
         if (sessionsToolbar != null) sessionsToolbar.close();
         if (connections != null) connections.close();
     }
+
+    private Optional<dev.jasper.remote.ui.sftp.SftpUi.PaneTarget> sftpPane(WindowHandle window) { return window.activeTab().flatMap(tab->tab.activePane()).flatMap(this::sftpPane); }
+    private Optional<dev.jasper.remote.ui.sftp.SftpUi.PaneTarget> sftpPane(PaneHandle pane) {
+        var identity=paneIdentities.get(pane.id());if(identity==null)return Optional.empty();
+        return Optional.of(new dev.jasper.remote.ui.sftp.SftpUi.PaneTarget(pane.id(),identity,pane.info().remoteDirectory().map(dev.jasper.sdk.terminal.RemoteDirectory::path).orElse("")));
+    }
+    private void sftpFocused(UUID id) { context.terminals().pane(id).ifPresent(pane->sftpPane(pane).ifPresent(target->sftpUi.pane(pane.tab().window(),target))); }
+    dev.jasper.remote.transfer.TransferCoordinator transfers() { return transfers; }
+    CompletableFuture<Void> transfersStopped() { return transfers==null?CompletableFuture.completedFuture(null):transfers.stopped(); }
 
     // ---- sessions
 
@@ -270,7 +318,7 @@ public class RemotePlugin implements Plugin {
     private void attach(PendingSession pending, Connections.Shell shell) {
         if (stopped || pending.isCancelled()) { shell.connection().close().run(); return; }
         UUID paneId = pending.pane().id();
-        panes.put(paneId, shell.hostId()); paneIdentities.put(paneId, shell.identity()); rememberPane(paneId);
+        panes.put(paneId, shell.hostId()); paneIdentities.put(paneId, shell.identity()); rememberPane(paneId);sftpFocused(paneId);
         shell.connection().exited().whenComplete((ignored, exit) -> ui.execute(() -> {
             panes.remove(paneId); paneIdentities.remove(paneId); recentPanes.remove(paneId); refreshSplit(); if (!stopped) refreshPanels();
         }));
@@ -419,6 +467,7 @@ public class RemotePlugin implements Plugin {
         panel.setDefaultGroup(panelState.defaultGroup());
         panel.onRenameDefaultGroup(() -> renameDefaultGroup(window));
         panel.onActivate(h -> activateHost(window, h));
+        panel.onBrowseFiles(h->sftpUi.browse(window,h));
         panel.setHostDetails(this::hostDetails, this::sessionCount);
         panel.setCollapsed(panelState.collapsed());
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });

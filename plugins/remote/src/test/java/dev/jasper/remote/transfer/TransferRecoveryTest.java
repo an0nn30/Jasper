@@ -104,4 +104,17 @@ class TransferRecoveryTest {
         }
     }
 
+    @Test void unsupportedMetadataPublishesContentAndRecordsAVisibleWarning() throws Exception {
+        Path source=Files.write(root.resolve("source"),new byte[]{1,2,3}),dir=Files.createDirectory(root.resolve("dest"));
+        try(var src=new LocalEndpoint();var dst=new LocalEndpoint();var db=new TransferStore(root.resolve("queue"))) {
+            FileEndpoint unsupported=(FileEndpoint)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{FileEndpoint.class},(proxy,method,args)-> {
+                if(method.getName().equals("metadata"))throw new java.io.IOException("Permissions unsupported");
+                try{return method.invoke(dst,args);}catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}
+            });
+            var job=db.create(new TransferRequest(EndpointRef.local(),List.of(source.toString()),EndpointRef.local(),dir.toString()));db.discover(job,List.of(new TransferStore.Discovered("source",source.toString(),dir.resolve("source").toString(),src.stat(source.toString()))));
+            long id=db.entries(job,0,1).getFirst().id();TransferCopy.copy(db,db.entry(id),src,unsupported,new TransferControl(),(done,total)->{});
+            assertThat(db.entry(id).outcome()).isEqualTo(TransferEntry.Outcome.COMPLETE);assertThat(db.entry(id).error()).contains("Metadata warning");assertThat(db.job(job).metadataWarnings()).isEqualTo(1);assertThat(Files.readAllBytes(dir.resolve("source"))).containsExactly(1,2,3);
+        }
+    }
+
 }

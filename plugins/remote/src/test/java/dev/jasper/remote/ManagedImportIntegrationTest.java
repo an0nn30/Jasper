@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class ManagedImportIntegrationTest {
     static final PluginInfo VAULT = new PluginInfo("dev.jasper.vault", "Credential Vault", "0.2.0", Set.of(dev.jasper.sdk.Capabilities.PALETTE_CONTRIBUTE));
-    static RemotePlugin remote(Path sshDir) { return new RemotePlugin(Runnable::run, ignored -> Optional.empty(), (delay, action) -> () -> {}, sshDir); }
+    static RemotePlugin remote(Path sshDir) { return new TestRemotePlugin(Runnable::run, ignored -> Optional.empty(), (delay, action) -> () -> {}, sshDir); }
     static void settle(FakePluginHost host) throws Exception {
         for (int i = 0; i < 6; i++) { host.runBackground(); host.flush(); SwingUtilities.invokeAndWait(() -> {}); }
     }
