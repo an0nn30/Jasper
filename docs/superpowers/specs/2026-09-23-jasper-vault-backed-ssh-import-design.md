@@ -1,8 +1,9 @@
 # Self-contained Vault-backed SSH import
 
-Status: written design awaiting user review. The user approved self-contained,
-Vault-backed authentication; this is not a separate SSH-agent service. Implementation
-has not started. Native inline execution remains the user's selected workflow.
+Status: approved by the user ("lgtm") on 2026-09-23. This is self-contained,
+Vault-backed authentication, not a separate SSH-agent service. The written
+[implementation plan](../plans/2026-09-23-jasper-vault-backed-ssh-import.md) is awaiting
+review. Implementation has not started; native inline execution remains selected.
 
 ## Intent and authority
 
