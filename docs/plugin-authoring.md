@@ -562,3 +562,12 @@ dragging, Escape dismissal or outside-click dismissal. Only one overlay may be r
 across plugins; a competing request throws `IllegalStateException`. Owner close and plugin stop
 close the handle; use `onClosed` for cancellation cleanup. Native dialogs remain available for
 required credential and trust prompts. Overlays accept terminal owners from the same host only.
+
+### Status progress (SDK 0.7.5)
+
+Use `context.statusBar().addProgress(StatusItemSpec)` for host-rendered progress. Update the
+returned `StatusProgress` on the UI thread with one `StatusProgressState`: plain label, detail,
+spoken description, `OptionalDouble` fraction and optional primary/secondary registered action
+ids. Empty fraction means indeterminate. One handle updates every window; close removes it.
+The secondary action uses its registered title (for example Cancel); the primary action can
+open a richer management panel. Throttle worker samples before posting UI updates.

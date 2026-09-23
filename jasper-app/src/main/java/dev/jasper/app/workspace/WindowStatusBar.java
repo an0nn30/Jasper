@@ -16,6 +16,7 @@ final class WindowStatusBar extends JPanel {
     private final Segment left = new Segment(new JLabel());
     private final JButton configButton = new JButton("Built-in defaults");
     private final Segment right = new Segment(configButton);
+    private final java.util.Map<String, JComponent> itemViews = new java.util.HashMap<>();
     private final Box leftItems = Box.createHorizontalBox();
     private final Box rightItems = Box.createHorizontalBox();
     Runnable onConfigurationDetails = () -> {};
@@ -77,29 +78,51 @@ final class WindowStatusBar extends JPanel {
     }
     /** Replaces the contributed items. An item with a live action is a button; any other is inert text. */
     void setContributed(List<StatusEntry> entries, Function<String, Action> actions) {
-        leftItems.removeAll();
-        rightItems.removeAll();
+        var leftViews = new ArrayList<JComponent>();
+        var rightViews = new ArrayList<JComponent>();
+        var liveIds = new java.util.HashSet<String>();
         for (StatusEntry entry : entries) {
             if (!entry.visible()) continue;
-            var item = new JButton(entry.text(), entry.icon());
-            item.setBorder(BorderFactory.createEmptyBorder()); item.setContentAreaFilled(false); item.setOpaque(false);
-            item.setFocusable(false); item.putClientProperty("html.disable", true);
-            item.setIconTextGap(UIScale.scale(5));
-            item.setToolTipText(entry.tooltip());
-            item.getAccessibleContext().setAccessibleName(entry.text().isEmpty() && entry.tooltip() != null ? entry.tooltip() : entry.text());
-            Action action = entry.actionId() == null ? null : actions.apply(entry.actionId());
-            if (action != null) {
-                item.setEnabled(action.isEnabled());
-                item.addActionListener(event -> action.actionPerformed(event));
+            liveIds.add(entry.id());
+            JComponent view = itemViews.get(entry.id());
+            if (entry.progress() != null) {
+                if (!(view instanceof StatusProgressView)) view = new StatusProgressView();
+                ((StatusProgressView) view).update(entry.progress(), actions);
             } else {
-                item.setRolloverEnabled(false);
+                if (!(view instanceof JButton)) {
+                    var item = new JButton();
+                    item.setBorder(BorderFactory.createEmptyBorder()); item.setContentAreaFilled(false); item.setOpaque(false);
+                    item.setFocusable(false); item.putClientProperty("html.disable", true);
+                    item.setIconTextGap(UIScale.scale(5));
+                    view = item;
+                }
+                var item = (JButton) view;
+                item.setText(entry.text()); item.setIcon(entry.icon()); item.setToolTipText(entry.tooltip());
+                item.getAccessibleContext().setAccessibleName(entry.text().isEmpty() && entry.tooltip() != null ? entry.tooltip() : entry.text());
+                for (var listener : item.getActionListeners()) item.removeActionListener(listener);
+                Action action = entry.actionId() == null ? null : actions.apply(entry.actionId());
+                item.setEnabled(action == null || action.isEnabled());
+                item.setRolloverEnabled(action != null);
+                if (action != null) item.addActionListener(event -> { if (action.isEnabled()) action.actionPerformed(event); });
             }
-            Box row = entry.left() ? leftItems : rightItems;
-            if (row.getComponentCount() > 0) row.add(Box.createHorizontalStrut(UIScale.scale(14)));
-            row.add(item);
+            itemViews.put(entry.id(), view);
+            (entry.left() ? leftViews : rightViews).add(view);
         }
+        itemViews.keySet().retainAll(liveIds);
+        replaceStructure(leftItems, leftViews);
+        replaceStructure(rightItems, rightViews);
         refreshTheme();
         revalidate(); repaint();
+    }
+
+    private static void replaceStructure(Box row, List<JComponent> views) {
+        var current = java.util.Arrays.stream(row.getComponents()).filter(c -> !(c instanceof Box.Filler)).toList();
+        if (current.equals(views)) return;
+        row.removeAll();
+        for (var view : views) {
+            if (row.getComponentCount() > 0) row.add(Box.createHorizontalStrut(UIScale.scale(14)));
+            row.add(view);
+        }
     }
 
     List<JButton> contributedItems(boolean leftSide) {
@@ -124,7 +147,7 @@ final class WindowStatusBar extends JPanel {
             for (Component child : row.getComponents()) if (child instanceof JButton item) {
                 item.setForeground(muted());
                 item.setFont(dev.jasper.app.platform.SwingAppearance.retro() ? UIManager.getFont("Button.font") : statusFont());
-            }
+            } else if (child instanceof StatusProgressView progress) progress.refreshTheme();
         configButton.setForeground(UIManager.getColor(configColor));
     }
 
@@ -161,8 +184,11 @@ final class WindowStatusBar extends JPanel {
             last.setBounds(firstWidth + separatorWidth, 0, Math.max(0, getWidth() - firstWidth - separatorWidth), getHeight());
         }
     }
-    @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(30)); }
-    @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(30)); }
+    @Override public Dimension getMinimumSize() { return getPreferredSize(); }
+    @Override public Dimension getPreferredSize() {
+        return new Dimension(0, Math.max(Math.max(left.getPreferredSize().height, right.getPreferredSize().height),
+            Math.max(leftItems.getPreferredSize().height, rightItems.getPreferredSize().height)));
+    }
     @Override public void doLayout() {
         int edge = Math.min(UIScale.scale(14), getWidth() / 2), leftInset = Math.min(getWidth(), UIScale.scale(26));
         int gap = UIScale.scale(14);

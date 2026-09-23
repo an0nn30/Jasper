@@ -32,6 +32,9 @@ import dev.jasper.sdk.ui.Rail;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusBar;
+import dev.jasper.sdk.ui.StatusProgress;
+import dev.jasper.sdk.ui.StatusProgressState;
+import dev.jasper.app.contributions.ProgressState;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.Toolbar;
@@ -186,7 +189,8 @@ final class HostedUi {
     }
 
     StatusBar statusBar() {
-        return spec -> {
+        return new StatusBar() {
+          @Override public StatusItem add(StatusItemSpec spec) {
             guard("add");
             requireNamespace(spec.id(), "A status item");
             StatusEntry entry = model.addStatus(spec.id(), spec.side() == Side.LEFT, spec.priority());
@@ -203,6 +207,28 @@ final class HostedUi {
                 @Override public void setVisible(boolean visible) { requireUi("setVisible"); entry.setVisible(visible); }
                 @Override public void close() { removal.close(); }
             };
+          }
+          @Override public StatusProgress addProgress(StatusItemSpec spec) {
+            guard("addProgress");
+            requireNamespace(spec.id(), "A status item");
+            StatusEntry entry = model.addStatus(spec.id(), spec.side() == Side.LEFT, spec.priority());
+            entry.setProgress(new ProgressState("", "", "", java.util.OptionalDouble.empty(), null, null));
+            var closed = new AtomicBoolean();
+            Subscription removal = tracked(() -> { closed.set(true); entry.close(); });
+            return new StatusProgress() {
+                @Override public void update(StatusProgressState state) {
+                    requireUi("update");
+                    if (closed.get()) return;
+                    java.util.Objects.requireNonNull(state, "state");
+                    if (state.actionId() != null) requireOwn(state.actionId());
+                    if (state.secondaryActionId() != null) requireOwn(state.secondaryActionId());
+                    entry.setProgress(new ProgressState(state.text(), state.detail(), state.accessibleDescription(),
+                        state.fraction(), state.actionId(), state.secondaryActionId()));
+                }
+                @Override public void setVisible(boolean value) { requireUi("setVisible"); if (!closed.get()) entry.setVisible(value); }
+                @Override public void close() { closed.set(true); removal.close(); }
+            };
+          }
         };
     }
 

@@ -12,6 +12,7 @@ public final class StatusEntry {
     private Icon icon;
     private String tooltip;
     private String actionId;
+    private ProgressState progress;
     private boolean visible = true;
     private boolean closed;
 
@@ -30,6 +31,10 @@ public final class StatusEntry {
     /** The contributed action a click invokes, or null. */
     public String actionId() { return actionId; }
     public boolean visible() { return visible && !closed; }
+
+    /** Progress presentation, or null for an ordinary status item. */
+    public ProgressState progress() { return progress; }
+    public void setProgress(ProgressState value) { if (!closed) { progress = java.util.Objects.requireNonNull(value); notifyOwner(); } }
 
     public void setText(String value) { if (!closed) { text = value == null ? "" : value.replace("\r", "").replace("\n", " "); notifyOwner(); } }
     public void setIcon(Icon value) { if (!closed) { icon = value; notifyOwner(); } }

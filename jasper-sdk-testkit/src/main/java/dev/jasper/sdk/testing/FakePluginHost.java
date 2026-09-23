@@ -350,6 +350,18 @@ public final class FakePluginHost implements AutoCloseable {
             .toList();
     }
 
+    /**
+     * Visible progress controls keyed by their contribution id.
+     * @return immutable current progress states
+     * @since 0.7.5
+     */
+    public Map<String, dev.jasper.sdk.ui.StatusProgressState> progress() {
+        var result = new java.util.LinkedHashMap<String, dev.jasper.sdk.ui.StatusProgressState>();
+        for (var context : contexts.values()) for (var item : context.ui.status)
+            if (item.visible && item.progress != null) result.put(item.spec.id(), item.progress);
+        return Map.copyOf(result);
+    }
+
     Path dataRoot() {
         if (dataRoot == null) {
             try { dataRoot = Files.createTempDirectory("jasper-fake-plugins"); }

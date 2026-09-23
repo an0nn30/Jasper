@@ -128,6 +128,22 @@ class HostedUiTest {
         assertThat(model.menus()).hasSize(2);
     }
 
+    @Test void progressUsesOwnedActionsAndIgnoresClosedUpdates() {
+        ui.actions().register(ActionSpec.of("dev.x.tool.run", "Run"), c -> {});
+        var progress = ui.statusBar().addProgress(new StatusItemSpec("dev.x.tool.progress", Side.RIGHT, 5));
+        var state = new dev.jasper.sdk.ui.StatusProgressState("Copying", "20 MiB left", "Half complete",
+            java.util.OptionalDouble.of(.5), "dev.x.tool.run", null);
+        progress.update(state);
+        assertThat(model.status().getFirst().progress().fraction()).hasValue(.5);
+        assertThat(model.status().getFirst().progress().accessibleDescription()).isEqualTo("Half complete");
+        assertThatIllegalArgumentException().isThrownBy(() -> progress.update(new dev.jasper.sdk.ui.StatusProgressState(
+            "", "", "", java.util.OptionalDouble.empty(), null, "foreign.cancel")));
+        assertThatIllegalArgumentException().isThrownBy(() -> ui.statusBar().add(new StatusItemSpec("dev.x.tool.progress", Side.RIGHT, 0)));
+        progress.close();
+        progress.update(state);
+        assertThat(model.status()).isEmpty();
+    }
+
     @Test void statusItemsAndAppearance() {
         ui.actions().register(ActionSpec.of("dev.x.tool.run", "Run"), context -> { });
         StatusItem item = ui.statusBar().add(new StatusItemSpec("dev.x.tool.state", Side.RIGHT, 5));
@@ -179,7 +195,14 @@ class HostedUiTest {
         var other = new HostedUi("dev.x.tool", model, containment, posted::add, onUi::get, () -> true,
             HostedUiTest.class.getClassLoader(), () -> Variant.DARK, handler -> () -> { }, auxiliary, terminals);
         PluginAction action = other.actions().register(ActionSpec.of("dev.x.tool.run", "Run"), context -> { });
+        var progress = other.statusBar().addProgress(new StatusItemSpec("dev.x.tool.progress", Side.RIGHT, 0));
         onUi.set(false);
+        assertThatIllegalStateException().isThrownBy(() -> other.statusBar().addProgress(new StatusItemSpec("dev.x.tool.second", Side.RIGHT, 0)));
+        assertThatIllegalStateException().isThrownBy(() -> progress.update(new dev.jasper.sdk.ui.StatusProgressState(
+            "", "", "", java.util.OptionalDouble.empty(), null, null)));
+        assertThatIllegalStateException().isThrownBy(() -> progress.setVisible(false));
+        progress.close();
+        assertThat(model.status()).hasSize(1);
         assertThatIllegalStateException().isThrownBy(() -> other.actions().register(ActionSpec.of("dev.x.tool.b", "B"), c -> { }))
             .withMessageContaining("UI thread");
         assertThatIllegalStateException().isThrownBy(() -> action.setEnabled(false));
@@ -188,6 +211,7 @@ class HostedUiTest {
         onUi.set(true);
         posted.forEach(Runnable::run);
         assertThat(model.action("dev.x.tool.run")).isEmpty();
+        assertThat(model.status()).isEmpty();
     }
 
     @Test void panelsAndRailReachTheModelWithContainedFactories() {
