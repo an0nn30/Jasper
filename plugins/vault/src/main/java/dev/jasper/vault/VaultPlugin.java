@@ -6,6 +6,7 @@ import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Side;
+import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import java.time.Duration;
@@ -123,9 +124,10 @@ public class VaultPlugin implements Plugin {
         context.actions().register(ActionSpec.of(GENERATE, "Generate SSH Key...")
             .withKeywords(List.of("vault", "ssh", "key", "generate")),
             invoked -> openThen(invoked.window(), Optional.empty(), this::showGenerator));
+        context.menus().standard(StandardMenu.FILE).add(OPEN);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 50));
         status.setText("Vault");
-        context.rail().add(OPEN);
+//        context.rail().add(OPEN);
         refreshStatus();
         context.config().onChanged(() -> { settings = VaultSettings.read(context.config(), context.dataDirectory()); timer.setTimeout(settings.autoLock()); refreshStatus(); vaultChanged(); });
         activity = event -> timer.touch();

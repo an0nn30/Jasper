@@ -118,7 +118,7 @@ final class WindowStatusBar extends JPanel {
 
     private Color muted() { return UIManager.getColor("Jasper.mutedForeground"); }
     void refreshTheme() {
-        setBackground(dev.jasper.app.platform.SwingAppearance.retro() ? UIManager.getColor("Panel.background") : palette.background());
+        setBackground(dev.jasper.app.platform.SwingAppearance.retro() ? UIManager.getColor("Panel.background") : UIManager.getColor("Jasper.titleBackground"));
         left.refreshTheme(); right.refreshTheme();
         for (Box row : new Box[]{leftItems, rightItems})
             for (Component child : row.getComponents()) if (child instanceof JButton item) {

@@ -163,7 +163,8 @@ class VaultPluginTest {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin);
-            assertThat(host.rail()).containsExactly(VaultPlugin.OPEN);
+            assertThat(host.rail()).isEmpty();
+            assertThat(host.menu("FILE")).contains("item:" + VaultPlugin.OPEN);
             assertThat(host.status()).containsExactly("dev.jasper.vault.status|RIGHT|Vault|No vault — click to create one|dev.jasper.vault.open");
             plugin.lockManager().create("hunter2!".toCharArray(), false);
             host.runBackground();
