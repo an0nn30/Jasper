@@ -1,0 +1,9 @@
+id = "dev.jasper.remote"
+name = "Remote"
+version = "0.1.0"
+entry = "dev.jasper.remote.RemotePlugin"
+sdk = ">=0.7, <0.8"
+description = "SSH hosts: saved hosts with groups and favorites, Vault or SSH-agent authentication, ProxyJump, host-key trust, a hosts panel and a palette scope."
+vendor = "Jasper"
+capabilities = ["terminal.open", "session.provide", "terminal.observe", "palette.contribute"]
+requires = [{ id = "dev.jasper.vault", version = ">=0.1", optional = true }]
