@@ -10,7 +10,7 @@ import javax.swing.Icon;
  * Inspectable, non-rendering selection from the host-owned catalog.
  * @param name requested semantic icon
  * @param retro whether the host selected retro artwork
- * @since 0.7.3
+ * @since 0.7.4
  */
 public record FakeNamedIcon(IconName name, boolean retro) implements Icon {
     /** Creates a validated selection. */

@@ -2,7 +2,7 @@ package dev.jasper.sdk.ui;
 
 /**
  * Semantic icons supplied by Jasper. The host selects artwork for the running skin.
- * @since 0.7.3
+ * @since 0.7.4
  */
 public enum IconName {
     /** Closed padlock. */

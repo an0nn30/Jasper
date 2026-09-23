@@ -108,7 +108,7 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer `context.appearance().icon(IconName.LOCK)` or `IconName.UNLOCK`
-  (import `dev.jasper.sdk.ui.IconName`, SDK `>=0.7.3, <0.8`). Jasper supplies both families
+  (import `dev.jasper.sdk.ui.IconName`, SDK `>=0.7.4, <0.8`). Jasper supplies both families
   and selects the skin; plugins need no artwork or style check. Returned icons are 16px,
   with separate 28px variants in retro host toolbars. For custom artwork, use the original
   monochrome SVG `icon("path/in/your/jar.svg")`, or pair that path with an `OldGnomeIcon`

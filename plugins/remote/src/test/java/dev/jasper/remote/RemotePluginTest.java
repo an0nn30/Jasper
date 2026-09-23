@@ -34,6 +34,47 @@ class RemotePluginTest {
         return new RemotePlugin(Runnable::run, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void hostSelectsNetworkArtworkForEitherSkin(boolean retro, @TempDir Path dir) {
+        try (var host = new FakePluginHost()) {
+            host.setRetroIcons(retro);
+            var delegate = plugin(dir.resolve("ssh"));
+            var icons = new ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
+            host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
+                public void start(dev.jasper.sdk.plugin.PluginContext context) throws Exception {
+                    var appearance = (dev.jasper.sdk.ui.Appearance) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.ui.Appearance.class}, (proxy, method, args) -> {
+                            if (method.getName().equals("icon")) {
+                                assertThat(args[0]).isInstanceOf(dev.jasper.sdk.ui.IconName.class);
+                            }
+                            try {
+                                Object value = method.invoke(context.appearance(), args);
+                                if (value instanceof dev.jasper.sdk.testing.FakeNamedIcon icon) icons.add(icon);
+                                return value;
+                            } catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                        });
+                    var wrapped = (dev.jasper.sdk.plugin.PluginContext) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.plugin.PluginContext.class}, (proxy, method, args) -> {
+                            if (method.getName().equals("appearance")) return appearance;
+                            try { return method.invoke(context, args); }
+                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                        });
+                    delegate.start(wrapped);
+                }
+                public void stop() { delegate.stop(); }
+            });
+            settle(host);
+            assertThat(host.failures()).isEmpty();
+            assertThat(icons).singleElement().satisfies(icon -> {
+                assertThat(icon.name()).isEqualTo(dev.jasper.sdk.ui.IconName.NETWORK);
+                assertThat(icon.retro()).isEqualTo(retro);
+            });
+            assertThat(host.toolbar()).anyMatch(item -> item.contains("Sessions"));
+            assertThat(host.panels()).containsExactly("dev.jasper.remote.panel|SSH hosts|LEFT");
+        }
+    }
+
     static void settle(FakePluginHost host) { for (int i = 0; i < 20; i++) { host.runBackground(); host.flush(); } }
 
     @Test void registersItsSurfaceAndConnectsThroughSessionsToolbar(@TempDir Path dir) throws Exception {

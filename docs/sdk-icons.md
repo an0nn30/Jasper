@@ -1,6 +1,6 @@
 # Plugin icons for both skins
 
-Prefer semantic names in SDK 0.7.3 (`sdk = ">=0.7.3, <0.8"` in plugin.toml):
+Prefer semantic names in SDK 0.7.4 (`sdk = ">=0.7.4, <0.8"` in plugin.toml):
 
 ```java
 import dev.jasper.sdk.ui.IconName;
@@ -13,7 +13,7 @@ button.setIcon(lock);
 Jasper owns both images and chooses the running skin. Plugins supply no paths and perform
 no style detection. Modern icons follow the live light/dark foreground; retro icons retain
 OldGNOME2 colors. Vault uses these calls for its status/menu icon and manager lock/unlock
-controls. Its modern lock/unlock resources are identical copies of its original SVG artwork.
+controls. Remote uses `IconName.NETWORK` for its Sessions toolbar, actions, host panel and status icon. Its modern lock/unlock resources are identical copies of its original SVG artwork.
 
 Use the same icon for actions, toolbar dropdowns, menus, rail/panels, status items, palette
 rows and ordinary Swing components. Returned icons are 16 logical pixels. Retro host
@@ -33,7 +33,7 @@ Headless render of actual manager buttons and status-bar controls, using named i
 ## Custom artwork remains supported
 
 For a plugin-specific image, the original `icon("path/in/your/jar.svg")` remains available.
-In SDK 0.7.2+, the custom overload also lets you choose a retro fallback explicitly:
+In SDK 0.7.4+, the custom overload also lets you choose a retro fallback explicitly:
 
 ```java
 var custom = context.appearance().icon("dev/example/special.svg", OldGnomeIcon.EXECUTE);

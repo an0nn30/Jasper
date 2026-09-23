@@ -239,7 +239,7 @@ public final class FakePluginHost implements AutoCloseable {
      * Configures the running icon style before any plugin starts. Retro uses light chrome.
      * @param retro whether the host should select OldGNOME2 artwork
      * @throws IllegalStateException after any plugin has started, including failed starts
-     * @since 0.7.2
+     * @since 0.7.4
      */
     public void setRetroIcons(boolean retro) {
         if (!contexts.isEmpty()) throw new IllegalStateException("Configure icons before starting plugins");

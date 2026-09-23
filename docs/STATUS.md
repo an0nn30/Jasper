@@ -2134,3 +2134,17 @@ Independent review caught a failed retro font reload reapplying size offsets and
 a LAF replacement, losing app aliases. The fix restores exact captured Metal defaults.
 Both before/after-replacement regressions failed before the fix and passed after it;
 scoped re-review found no remaining issues.
+
+Remote now requests IconName.NETWORK once and shares the host-selected artwork across
+its Sessions dropdown, dynamic session/manage/connect/hosts actions, hosts panel and
+SSH status indicator. Removed the plugin-owned server SVG. Main already uses SDK 0.7.2
+for panel toggling and 0.7.3 for overlays, so the combined icon API is now SDK 0.7.4;
+Remote, Vault and Sample declare that minimum, preventing old hosts from loading them
+without the icon API. Existing toggle/overlay version annotations remain intact.
+
+Fake-host checks cover both icon families. Real staged-plugin tests cover Remote without
+Vault and verify all icon placements plus separate 28px retro toolbar sizing; fixture
+copying avoids Windows symlink privileges. Inspected a headless retro Sessions toolbar
+preview. Full check and installDist passed: 1,711 tests, 1,708 passed, three expected skips,
+zero failures/errors. Installed Remote jar has the >=0.7.4 manifest and no old server.svg.
+Independent review and rollback re-review are complete. No GUI launch or push.

@@ -2,7 +2,7 @@ package dev.jasper.sdk.ui;
 
 /**
  * Bundled OldGNOME2 artwork for the retro skin. Images are supplied by the host.
- * @since 0.7.2
+ * @since 0.7.4
  */
 public enum OldGnomeIcon {
     /** Closed padlock. */

@@ -129,7 +129,7 @@ public class RemotePlugin implements Plugin {
         connections = new Connections(() -> settings, trust, agentFactory.apply(context), store::host,
             credentialSource, this::askHostKey, context.background(), ui, schedule);
         connections.onChanged(this::refreshStatus);
-        icon = context.appearance().icon("dev/jasper/remote/server.svg");
+        icon = context.appearance().icon(dev.jasper.sdk.ui.IconName.NETWORK);
 
         configureShortcuts();
         splitAction = context.actions().register(ActionSpec.of(SPLIT, "Split with Same Host").withKeywords(List.of("ssh", "split")), invoked -> invoked.pane().ifPresent(this::splitSameHost));

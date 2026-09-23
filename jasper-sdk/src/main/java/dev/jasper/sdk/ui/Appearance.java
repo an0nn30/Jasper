@@ -34,7 +34,7 @@ public interface Appearance {
      * @return the host's icon for the running skin
      * @throws NullPointerException if name is null
      * @throws UnsupportedOperationException if an older custom host has no named catalog
-     * @since 0.7.3
+     * @since 0.7.4
      */
     default Icon icon(IconName name) {
         java.util.Objects.requireNonNull(name, "name");
@@ -61,7 +61,7 @@ public interface Appearance {
      * @return the icon for the running skin
      * @throws NullPointerException if retroIcon is null
      * @throws IllegalArgumentException if the SVG path is null or its resource is absent
-     * @since 0.7.2
+     * @since 0.7.4
      */
     default Icon icon(String modernSvgResourcePath, OldGnomeIcon retroIcon) {
         java.util.Objects.requireNonNull(retroIcon, "retroIcon");

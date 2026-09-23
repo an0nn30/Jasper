@@ -11,7 +11,7 @@ import javax.swing.Icon;
  * @param modernSvgResourcePath requested plugin SVG resource
  * @param retroIcon requested bundled artwork
  * @param retro whether the fake host selected retro artwork
- * @since 0.7.2
+ * @since 0.7.4
  */
 public record FakeSkinIcon(String modernSvgResourcePath, OldGnomeIcon retroIcon, boolean retro) implements Icon {
     /** Creates a validated icon selection. */

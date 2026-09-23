@@ -224,7 +224,7 @@ disagree, the implementation is wrong, not the contract.
 Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
 per-session token from Jasper's own shell integration.
 
-## Skin-aware icons (SDK 0.7.2)
+## Skin-aware icons (SDK 0.7.4)
 
 `Appearance.icon(String, OldGnomeIcon)` adds a default modern-only fallback for existing
 Appearance implementations. HostedUi and FakePluginContext override it; no contribution
@@ -239,7 +239,7 @@ live. Legacy/custom icons are returned unchanged by the sizing helper. No global
 plugin class loaders: only the fixed raster catalog is cached. Style changes still require restart.
 See [the icon catalog and compatibility contract](sdk-icons.md).
 
-### Host-owned semantic catalog (SDK 0.7.3)
+### Host-owned semantic catalog (SDK 0.7.4)
 
 `Appearance.icon(IconName)` is now preferred. The SDK carries meanings only. HostedUi
 translates the enum at the boundary; AppIcons/NamedIcons select app-owned modern SVG or
