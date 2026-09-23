@@ -2,6 +2,24 @@
 
 ## Current state — 2026-09-23
 
+### SFTP phase 1 — written design awaiting review
+
+The [SFTP design](superpowers/specs/2026-09-23-jasper-remote-sftp-design.md) is drafted
+on `codex/remote-sftp` in `/Users/dustin/.codex/worktrees/remote-sftp/moray`, from main
+`1fcf9a8d`. Conversation-approved scope: one remote file-browser sidebar; local/remote
+and remote/remote copies; a Buddy-independent Transfers panel and status-bar progress;
+bounded large-file/folder handling; persistent pause/resume with unfinished jobs restored
+paused; explicit conflicts, temporary-file publication and recoverable errors. It remains
+inside `dev.jasper.remote`, depends on SSH 7a, and does not require tunnels 7b.
+
+The draft proposes generic SDK progress/chooser additions and a plugin-owned SQLite queue.
+It was self-reviewed for lifecycle, recovery, bounded work and architectural consistency.
+Documentation only: no implementation or dependency changes, no GUI launch, no runtime
+tests claimed. Next: user review of the written spec, then a detailed implementation plan
+using the requested SDD workflow. Nothing merged or pushed.
+
+### Latest completed work
+
 Configuration documentation follow-up: the example and settings reference now include
 explicit `ui.theme.style = "modern"` and `ui.font.family = "system"`, with optional
 UI sizing, portable fallback, full-restart behavior and retro's retained-but-ignored
