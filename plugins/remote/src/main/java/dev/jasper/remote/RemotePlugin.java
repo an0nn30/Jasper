@@ -30,6 +30,7 @@ import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.OverlaySpec;
 import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
@@ -171,7 +172,11 @@ public class RemotePlugin implements Plugin {
         var host = store.host(hostId);
         if (host.isEmpty()) { pending.fail("Host not found"); return; }
         if (pending.isCancelled() || stopped) return;
-        var attempt = new ConnectAttempt(pending.pane().tab().window(), host.get(), shell -> attach(pending, shell));
+        WindowHandle window = pending.pane().tab().window();
+        if (focusExistingAttempt(window)) { pending.fail("Another connection is already in progress"); return; }
+        final ConnectAttempt attempt;
+        try { attempt = new ConnectAttempt(window, host.get(), shell -> attach(pending, shell)); }
+        catch (RuntimeException failure) { pending.fail(message(failure)); return; }
         attempt.cancelled = () -> { if (!stopped) pending.fail("Cancelled"); };
         var cancellation = pending.onCancelled(() -> ui.execute(attempt::close));
         attempt.finished = cancellation::close;
@@ -200,9 +205,17 @@ public class RemotePlugin implements Plugin {
         recentPanes.remove(id); recentPanes.put(id, hostId);
     }
 
+    private boolean focusExistingAttempt(WindowHandle window) {
+        for (ConnectAttempt attempt : attempts) if (attempt.window.id().equals(window.id())) {
+            attempt.dialog.toFront(); return true;
+        }
+        return false;
+    }
+
     private void prepare(WindowHandle window, RemoteHost host, Function<OpenRequest, Optional<PaneHandle>> open) {
-        if (!window.isOpen() || stopped) return;
-        var attempt = new ConnectAttempt(window, host, shell -> {
+        if (!window.isOpen() || stopped || focusExistingAttempt(window)) return;
+        final ConnectAttempt attempt;
+        try { attempt = new ConnectAttempt(window, host, shell -> {
             var ready = new java.util.concurrent.atomic.AtomicReference<>(shell);
             SessionSpec spec = SessionSpec.of(host.name(), pending -> {
                 Connections.Shell first = ready.getAndSet(null);
@@ -217,7 +230,7 @@ public class RemotePlugin implements Plugin {
                 var unused = ready.getAndSet(null); if (unused != null) unused.connection().close().run();
                 throw failure;
             }
-        });
+        }); } catch (RuntimeException failure) { context.notices().error(message(failure)); return; }
         attempts.add(attempt); attempt.start();
     }
 
@@ -252,14 +265,17 @@ public class RemotePlugin implements Plugin {
         Runnable cancelled = () -> {}, finished = () -> {};
         ConnectAttempt(WindowHandle window, RemoteHost host, java.util.function.Consumer<Connections.Shell> success) {
             this.window = window; this.host = host; this.success = success;
-            dialog = context.windows().dialog(new DialogSpec("Connecting to " + host.name(), window, false));
+            dialog = context.windows().overlay(new OverlaySpec("Connecting to " + host.name(), window));
             panel = new ConnectionPanel(host.name(), host.label(), this::start, this::close);
             currentConnectionPanel = panel;
             dialog.setContent(panel); dialog.onClosed(this::close);
         }
         void start() {
             if (closed || stopped || !window.isOpen()) { close(); return; }
-            panel.working(); dialog.show();
+            if (future != null && !future.isDone()) return;
+            panel.working();
+            try { dialog.show(); }
+            catch (RuntimeException failure) { context.notices().error(message(failure)); close(); return; }
             var dimensions = window.activeTab().flatMap(tab -> tab.activePane()).map(PaneHandle::info);
             int cols = dimensions.map(info -> Math.max(1, info.columns())).orElse(80);
             int rows = dimensions.map(info -> Math.max(1, info.rows())).orElse(24);

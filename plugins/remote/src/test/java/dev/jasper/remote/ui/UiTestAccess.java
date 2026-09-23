@@ -8,6 +8,7 @@ public final class UiTestAccess {
     public static JTextField groupName(GroupNamePanel panel) { return panel.name; }
     public static JButton saveGroup(GroupNamePanel panel) { return panel.save; }
 
+    public static JButton cancel(ConnectionPanel panel) { return panel.cancel; }
     public static JButton retry(ConnectionPanel panel) { return panel.retry; }
     public static String connectionStatus(ConnectionPanel panel) { return panel.message.getText(); }
 

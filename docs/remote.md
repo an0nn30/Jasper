@@ -12,9 +12,11 @@ always open another session; the menu also offers Connect in split, Edit, Duplic
 Click the star to toggle a favorite. Right-click the default group header (**Other** initially)
 and choose **Rename group…**; that name also applies to future hosts without an explicit group.
 
-Connecting opens a small progress dialog with Cancel, followed by the tab or split once the SSH
-shell is ready. A failed attempt stays in the dialog with Retry and Close. Reconnect uses the same
-dialog while preserving the existing pane. Host-key and Vault prompts still appear when needed.
+Connecting shows a centered overlay inside the owning app window, with an explicit **Cancel**
+button. It stays centered on resize and blocks underlying input; Escape and outside clicks do not
+dismiss it. The tab or split appears once the SSH shell is ready. Failures offer **Retry** and
+**Close**. Reconnect uses the overlay while preserving the existing pane. Host-key and Vault prompts
+remain native dialogs above it. A second connection request in that window focuses the current attempt.
 The **SSH** menu carries the connection commands plus **Import from ~/.ssh/config...**.
 
 A host is a name, hostname, port, username, group, an optional jump host and how it authenticates:
@@ -88,3 +90,9 @@ For the host-list/dialog follow-up, also check:
    running pane is selected. Close both; double-click now starts a new connection.
 10. Connect to Linux/macOS/Windows hosts and search by the learned OS or IP. An SSH server that
     disallows exec requests should still provide its normal terminal.
+
+For native acceptance of the UI changes, resize the app while connecting and confirm the overlay
+stays centered; Escape/outside clicks and underlying menus should not interrupt it. Cancel should
+leave no new tab, while success should focus the connected pane. Confirm host-key/Vault prompts
+remain usable. Edit `[ui.font]` in the app configuration while Hosts is open and verify the list,
+menus, palette and subsequent connection overlay follow the new family/size.

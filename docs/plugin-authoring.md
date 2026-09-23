@@ -532,3 +532,13 @@ offset from `UIManager.getFont("Label.font")` in `updateUI()` so an already-open
 List renderers derive from their owning list on each render. Do not cache absolute fonts or use
 fixed component heights that clip enlarged text; let preferred sizes follow font metrics.
 Terminal content and intentionally monospaced code previews remain separate typography roles.
+
+### Centered progress overlays
+
+With SDK 0.7.3+, use `context.windows().overlay(new OverlaySpec("Connecting", window))` for
+short-lived progress inside a terminal window. Set ordinary Swing content, supply a Cancel button
+that aborts your work and calls `close()`, then call `show()` (nonblocking). There is no title bar,
+dragging, Escape dismissal or outside-click dismissal. Only one overlay may be reserved per window
+across plugins; a competing request throws `IllegalStateException`. Owner close and plugin stop
+close the handle; use `onClosed` for cancellation cleanup. Native dialogs remain available for
+required credential and trust prompts. Overlays accept terminal owners from the same host only.

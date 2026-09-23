@@ -62,7 +62,9 @@ class RemotePluginTest {
             assertThat(rows).containsExactly("host." + prod.id() + "|prod|true");
             host.executeInScope(RemoteScope.ID, "host." + prod.id(), "connect", window, null);
             assertThat(host.openRequests()).isEmpty();
-            assertThat(host.windows()).containsExactly("dialog|Connecting to prod|true");
+            assertThat(host.windows()).containsExactly("overlay|Connecting to prod|true");
+            plugin.openHost(context.terminals().window(window).orElseThrow(), prod);
+            assertThat(host.windows()).hasSize(1);
             settle(host);
             assertThat(host.openRequests()).containsExactly("session-tab|" + window + "|prod");
             assertThat(host.windows()).isEmpty();
@@ -96,8 +98,8 @@ class RemotePluginTest {
             while (!host.sessionState(second).startsWith("EXITED") && System.nanoTime() < deadline) { Thread.sleep(10); host.flush(); }
             assertThat(host.sessionState(second)).startsWith("EXITED");
             host.reconnectSession(second);
-            assertThat(host.windows()).containsExactly("dialog|Connecting to prod|true");
-            host.requestClose("dialog"); settle(host);
+            assertThat(host.windows()).containsExactly("overlay|Connecting to prod|true");
+            cancel(plugin.currentConnectionPanel()).doClick(); settle(host);
             assertThat(host.sessionState(second)).startsWith("EXITED");
             assertThat(plugin.connections().channelCount()).isZero();
             host.reconnectSession(second); settle(host);
@@ -226,7 +228,8 @@ class RemotePluginTest {
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
             UUID window = host.addTerminalWindow();
             plugin.openHost(context.terminals().window(window).orElseThrow(), saved);
-            host.requestClose("dialog");
+            assertThat(host.requestClose("overlay")).isFalse();
+            cancel(plugin.currentConnectionPanel()).doClick();
             settle(host);
             assertThat(host.openRequests()).isEmpty();
             assertThat(plugin.connections().channelCount()).isZero();
@@ -234,7 +237,7 @@ class RemotePluginTest {
         }
     }
 
-    @Test void failedConnectStaysInDialogAndRetriesWithoutAnEmptyTab(@TempDir Path dir) throws Exception {
+    @Test void failedConnectStaysInOverlayAndRetriesWithoutAnEmptyTab(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
             var plugin = plugin(dir);
