@@ -36,7 +36,7 @@ is merged at `17c0476`. The Credential Vault design
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
-### Self-contained SSH import — implemented, final verification in progress
+### Self-contained SSH import — implemented and verified
 
 The approved [design](superpowers/specs/2026-09-23-jasper-vault-backed-ssh-import-design.md)
 and seven-task [plan](superpowers/plans/2026-09-23-jasper-vault-backed-ssh-import.md)
@@ -57,7 +57,7 @@ transaction inputs are consumed rather than retained; one state owner combines r
 and passphrase prompts; the restart test accumulates the testkit's draining output. The existing
 plain EC PEM generator produces a form MINA rejects; supported encrypted OpenSSH ECDSA is tested,
 and the unrelated generator format is deferred. No production key/Vault was read or migrated.
-Full checks and independent review are the remaining gates. GUI and real-host acceptance remain
+`./gradlew check :jasper-app:installDist` passed with **1,757 tests: 1,754 passed, three expected skips, zero failures/errors**. Architecture guards, source hygiene and staged dependencies passed. Independent final review is complete: a stale legacy editor could persist a duplicate managed UUID and prevent unlock; stale saves and duplicate snapshots are now rejected before persistence. Held-read cancellation and overlapping durable-import regressions verify secret wiping and deduplication, including deliberate mutation checks. No minor findings remain. The [plan review record](superpowers/plans/2026-09-23-jasper-vault-backed-ssh-import.md#final-review-record-and-execution-rulings) preserves every execution ruling and its cost. Windows ACL handling was inspected but not executed on Windows; full OpenSSH semantics remain outside the documented import subset. GUI and real-host acceptance remain
 user-run; re-import and check **Update** on the affected hosts when testing this distribution.
 
 ### Remote empty-agent diagnosis — 2026-09-23

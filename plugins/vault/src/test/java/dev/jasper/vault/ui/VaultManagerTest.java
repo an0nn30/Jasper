@@ -96,6 +96,28 @@ class VaultManagerTest {
         }
     }
 
+    @Test void staleFileKeyEditorCannotCorruptAnUpgradedManagedKey() throws Exception {
+        try (var f = new VaultUiFixture(directory)) {
+            var legacy = new SshKey(UUID.randomUUID(), "old editor", "ed25519", "SHA256:test", "", directory.resolve("key"), directory.resolve("key.pub"), Instant.EPOCH);
+            f.manager.saveKey(legacy); f.drain();
+            var grant = new Grant("dev.jasper.remote", legacy.id());
+            f.lock.vault().grants().add(grant);
+            var upgrade = f.lock.transact(v -> {
+                v.keys().removeIf(k -> k.id().equals(legacy.id()));
+                v.managedKeys().add(new dev.jasper.vault.model.ManagedSshKey(legacy.id(), "imported", "ed25519", "SHA256:test", "public", new byte[]{1, 2}, null, Instant.EPOCH));
+                v.requireManagedFormat(); return null;
+            }, () -> false); f.drain(); upgrade.join();
+            byte[] durable = Files.readAllBytes(directory.resolve("vault.jv"));
+            var stale = f.manager.saveKey(legacy); f.drain();
+            assertThat(stale).isCompletedExceptionally();
+            assertThat(Files.readAllBytes(directory.resolve("vault.jv"))).isEqualTo(durable);
+            f.lock.lock(); var unlock = f.lock.unlock("test-password".toCharArray()); f.drain(); unlock.join();
+            assertThat(f.lock.vault().keys()).isEmpty(); assertThat(f.lock.vault().managedKeys()).hasSize(1);
+            assertThat(f.lock.vault().managedKeys().getFirst().id()).isEqualTo(legacy.id());
+            assertThat(f.lock.vault().grants()).containsExactly(grant);
+        }
+    }
+
     @Test void overlappingEditsRejectAndWipeTheRejectedInput() {
         try (var f = new VaultUiFixture(directory)) {
             f.manager.saveNote(new Note(UUID.randomUUID(), "One", new char[] {'1'}, Instant.EPOCH));

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. The user selected native inline execution, with one independent final review. Steps use checkbox syntax for tracking.
 
-**Status:** native implementation approved and executed on `codex/retro-metal`; final verification/review in progress. Tasks 1–6 complete. Task 7 covers real restart acceptance and staged-loader/skin tests.
+**Status:** native implementation approved and executed on `codex/retro-metal`; independent final review and both resulting fixes are complete. Full verification passed: `./gradlew check :jasper-app:installDist`, 1,757 tests (1,754 passed, three expected skips, zero failures/errors). Staged 0.2 manifests/dependencies, source hygiene, and 1x/2x Metal/FlatLaf forms verified. Task 7 includes real restart acceptance and staged-loader tests. The final fix pass rejects stale legacy-key saves, validates payload UUID uniqueness and adds held-read/held-write regressions; see the final review record below.
 
 Implementation rulings: the v1 all-kinds fixture was authored independently; manager inputs are consumed by copy-on-write transactions; unsupported legacy plain EC PEM remains rejected while supported encrypted OpenSSH ECDSA is tested; one `KeyImportPrompt` owns request/review/passphrase state. The restart fixture accumulates output because the testkit drains it. Staged tests exposed BC provider cross-loader conflicts and Swing delegate lookup; the plugins now use local provider instances and the app supplies Swing's UI-delegate classloader.
 
@@ -829,7 +829,7 @@ VaultPlugin with the existing package-private DeviceSecrets/executor constructor
 an isolated FileStore, just as VaultPluginTest.plugin() already does. The bridge adds
 no production accessors and never opens the real OS keychain.
 
-- [ ] **7.1 Write the final acceptance test before completing integration wiring.** Use real VaultPlugin, RemotePlugin and FakePluginHost with generated SSH keys and LoopbackServer. Drive setup/unlock/import consent via owner-package test bridges and actual Swing buttons. Import two aliases sharing one encrypted key; assert one managed credential, two host UUIDs and grants for Remote only. Stop plugins, remove all original fixture key files, create a fresh host/runtime using the same temporary plugin data, unlock, and connect. Assert READY from loopback and no agent factory use. Also repair an existing Agent host and verify its UUID/group/favorite survive.
+- [x] **7.1 Write the final acceptance test before completing integration wiring.** Use real VaultPlugin, RemotePlugin and FakePluginHost with generated SSH keys and LoopbackServer. Drive setup/unlock/import consent via owner-package test bridges and actual Swing buttons. Import two aliases sharing one encrypted key; assert one managed credential, two host UUIDs and grants for Remote only. Stop plugins, remove all original fixture key files, create a fresh host/runtime using the same temporary plugin data, unlock, and connect. Assert READY from loopback and no agent factory use. Also repair an existing Agent host and verify its UUID/group/favorite survive.
 
 Parameterize the fake host icon selection for modern/retro; actual LAF rendering belongs in the app tests, where FlatLaf already exists. Use existing app-level isolated PluginRuntime staging for an additional real-loader test verifying Vault 0.2 API visibility, MINA parsing dependencies, both plugins ACTIVE, and correct optional-Vault failure messages. Keep MINA and Vault implementation classes out of SDK/API signatures. Test the legacy Agent-only Remote path with Vault absent.
 
@@ -905,9 +905,9 @@ a deadline and UI/background draining; do not rely on a single sleep or a preset
 in the system agent. Put these setup statements in the test body so failure identifies
 the exact UI stage. Run this new test red before completing its missing wiring.
 
-- [ ] **7.2 Update metadata and documentation.** Change Remote description to mention managed Vault imports while retaining optional Agent use for legacy/manual hosts. Update fixture PluginInfo/dependency declarations from 0.1 to 0.2 where exercising the new import API; leave compatibility tests intentionally on old versions. Document the single user flow, encrypted passphrase handling, no-key rows, re-import Update behavior, partial persistence/retry, version-1 backup/downgrade, and the fact that generated/path-only entries stay as they were. Remove guidance claiming imports fall back to the system agent.
+- [x] **7.2 Update metadata and documentation.** Change Remote description to mention managed Vault imports while retaining optional Agent use for legacy/manual hosts. Update fixture PluginInfo/dependency declarations from 0.1 to 0.2 where exercising the new import API; leave compatibility tests intentionally on old versions. Document the single user flow, encrypted passphrase handling, no-key rows, re-import Update behavior, partial persistence/retry, version-1 backup/downgrade, and the fact that generated/path-only entries stay as they were. Remove guidance claiming imports fall back to the system agent.
 
-- [ ] **7.3 Run the full gate and inspect exact results.**
+- [x] **7.3 Run the full gate and inspect exact results.**
 
 ```sh
 ./gradlew check :jasper-app:installDist
@@ -915,9 +915,9 @@ the exact UI stage. Run this new test red before completing its missing wiring.
 
 Aggregate XML counts from `jasper-*/build/test-results/test/TEST-*.xml` and `plugins/*/build/test-results/test/TEST-*.xml`. Report tests/passes/skips/failures/errors rather than guessing from Gradle task counts. Verify both staged plugin manifests are 0.2.0, Remote has the new Vault floor, and Vault's runtime directory contains sshd-common, BouncyCastle and the selected logging adapter. Run `git diff --check` and the AGENTS.md source hygiene scan. Inspect actual 1x/2x headless import/passphrase/managed-key manager renders in both appearances; do not open a native window or start a shell.
 
-- [ ] **7.4 Perform the required independent final review.** Use requesting-code-review with the actual branch diff from the pre-implementation commit. Ask specifically for secret ownership, rollback/upgrade backup, ordered authentication, partial persistence, UI cancellation and API/classloader compatibility. Give the reviewer the spec, plan, verification log and exact SHAs; no full-history fork. Fix actionable findings with failing-then-passing regressions and rerun checks affected by each correction. Record any plan deviations in this status banner and docs/STATUS.md.
+- [x] **7.4 Perform the required independent final review.** Use requesting-code-review with the actual branch diff from the pre-implementation commit. Ask specifically for secret ownership, rollback/upgrade backup, ordered authentication, partial persistence, UI cancellation and API/classloader compatibility. Give the reviewer the spec, plan, verification log and exact SHAs; no full-history fork. Fix actionable findings with failing-then-passing regressions and rerun checks affected by each correction. Record any plan deviations in this status banner and docs/STATUS.md.
 
-- [ ] **7.5 Commit and hand off.** Commit final integration/docs as `Verify managed SSH import across plugin reloads and both skins`, with the required trailer. Leave the branch/worktree and rebuilt distribution available. Final response should say what changed, give exact verification, and tell the user to re-import/check Update on existing hosts. State native real-host acceptance remains user-run; never claim their actual host connected from loopback evidence.
+- [x] **7.5 Commit and hand off.** Commit final integration/docs as `Verify managed SSH import across plugin reloads and both skins`, with the required trailer. Leave the branch/worktree and rebuilt distribution available. Final response should say what changed, give exact verification, and tell the user to re-import/check Update on existing hosts. State native real-host acceptance remains user-run; never claim their actual host connected from loopback evidence.
 
 ## Spec coverage and self-review
 
@@ -937,3 +937,43 @@ Aggregate XML counts from `jasper-*/build/test-results/test/TEST-*.xml` and `plu
 | API versions, isolated loaders, both skins, all checks | Task 7 |
 
 Before requesting plan approval, verify every path exists or is explicitly marked Create, every new method used by another task is defined in its Interfaces or implementation step, and every Review Focus item has its owning regression above. No production changes or user credential migration are part of this planning commit.
+
+
+## Final review record and execution rulings
+
+The independent fresh-context review covered `27a9b804..5a20aed0`. Its Critical
+finding was reproduced: saving a legacy key editor after managed import upgraded
+that identity could persist a duplicate UUID and prevent the next unlock. Legacy
+saves now reject that stale editor inside the transaction; encoding validates UUID
+uniqueness across every collection before encryption. Regressions verify rejection,
+unchanged durable bytes, preserved identity/grants and successful reload.
+
+The Important finding concerned missing *actual* interleavings in tests. New tests
+hold a completed private-key read before UI delivery, cancel and inspect zeroed
+owned key/passphrase buffers; another holds the first import's durable write while
+the second commit queues, then verifies one persisted identity and grant after
+reload. Both passed existing production behavior. Temporary mutations removing
+late cleanup and commit-time deduplication made the respective assertions fail;
+the mutations were restored before final verification. The corruption regressions
+failed before their production fixes and passed afterward. No production secret
+accessor was added. There were no deferred minor findings and no second review.
+
+The decisions made during native execution, in order:
+
+| Ruling | Reason | Cost if wrong / remaining limit |
+| --- | --- | --- |
+| Independently author the all-kinds v1 binary fixture in Python. | Avoid testing the old codec against itself; exact byte roundtrip verifies compatibility. | An incorrect manually specified fixture could miss a legacy format case. |
+| Consume manager input arrays into transaction-owned copies. | Copy-on-write rollback must not retain caller secrets. | Internal callers must respect the new ownership; production callers were migrated and tested. |
+| Defer the existing plain EC PEM generator incompatibility; test supported encrypted OpenSSH ECDSA. | MINA rejects that legacy form independently of this feature. | That form requires conversion or a separate generator correction. |
+| Combine request/review/passphrase state in one `KeyImportPrompt`. | One lifecycle owner reduces secret and cancellation handoffs. | Less separation between state and prompt concerns. |
+| Accumulate fake session output instead of rereading it. | The testkit drains output on each call. | Test-only adaptation differs from the illustrative plan code. |
+| Use plugin-local BC provider instances and app-owned Swing delegate lookup. | Real staged loaders exposed cross-loader Ed25519 casts and missing UI delegates. | Broader crypto/LAF initialization surface, covered by isolated-loader tests. |
+| Realize lightweight components and lay out twice for headless renders. | Wrapped text/cell renderers otherwise produced incomplete artifacts. | Screenshots remain a headless approximation of native windows. |
+| Leave native modality, physical Retina and real-host acceptance to the user. | Respect the no-GUI/no-real-host execution boundary; exercise forms and loopback automatically. | Native-only rendering or host compatibility defects may remain. |
+| Accept inspected Windows ACL handling pending Windows execution. | The executing host is macOS; platform-specific owner-only handling remains intact. | Windows permission/failure behavior has not been exercised on Windows. |
+| Retain the plain EC PEM deferral raised again in review. | The separate generator issue remains outside this import change. | Users of that legacy form still need conversion or that fix. |
+| Support the documented OpenSSH config subset. | A complete OpenSSH parser/process replacement is outside the approved design. | Complex configurations can require manual setup. |
+
+The branch, worktree and rebuilt distribution are retained for user acceptance;
+no push, merge, native application launch or production credential migration was
+performed.

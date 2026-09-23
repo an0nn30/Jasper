@@ -101,7 +101,10 @@ public final class VaultManager {
     }
     public CompletableFuture<Void> saveKey(SshKey value) {
         if (!editable()) return rejected();
-        return transaction(v -> { v.keys().removeIf(k -> k.id().equals(value.id())); v.keys().add(value); });
+        return transaction(v -> {
+            if (v.managedKey(value.id()).isPresent()) throw new IllegalStateException("This key is now stored in Vault; reopen its editor");
+            v.keys().removeIf(k -> k.id().equals(value.id())); v.keys().add(value);
+        });
     }
     public CompletableFuture<Void> revoke(Grant grant) {
         if (!editable()) return rejected();

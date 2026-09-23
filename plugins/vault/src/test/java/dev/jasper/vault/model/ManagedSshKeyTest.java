@@ -61,4 +61,12 @@ class ManagedSshKeyTest {
         assertThatThrownBy(() -> VaultCodec.decode(Arrays.copyOf(encoded, encoded.length + 1))).isInstanceOf(CorruptVaultException.class);
         vault.zero();
     }
+
+    @Test void encodingRejectsDuplicateIdsBeforeWriting() {
+        var vault = new Vault(); UUID id = UUID.randomUUID();
+        vault.managedKeys().add(new ManagedSshKey(id, "managed", "a", "f", "p", new byte[]{1}, null, Instant.EPOCH));
+        vault.keys().add(new SshKey(id, "legacy", "a", "f", "", java.nio.file.Path.of("key"), java.nio.file.Path.of("key.pub"), Instant.EPOCH));
+        try { assertThatThrownBy(() -> VaultCodec.encode(vault)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Duplicate entry ID"); }
+        finally { vault.zero(); }
+    }
 }

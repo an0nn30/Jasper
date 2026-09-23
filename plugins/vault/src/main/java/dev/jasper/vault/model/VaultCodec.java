@@ -25,6 +25,7 @@ public final class VaultCodec {
     private VaultCodec() { }
 
     public static byte[] encode(Vault vault) {
+        validateManaged(vault);
         var bytes = new WipingOutputStream();
         try (var out = new DataOutputStream(bytes)) {
             out.writeShort(vault.managedKeys().isEmpty() ? vault.payloadVersion() : VERSION);
@@ -123,7 +124,13 @@ public final class VaultCodec {
         }
     }
 
+    /** Rejects invalid snapshots before encryption or file replacement. */
     public static void validateManaged(Vault vault) {
+        var ids = new java.util.HashSet<UUID>();
+        for (Account a : vault.accounts()) if (!ids.add(a.id())) throw new IllegalArgumentException("Duplicate entry ID");
+        for (SshKey k : vault.keys()) if (!ids.add(k.id())) throw new IllegalArgumentException("Duplicate entry ID");
+        for (ManagedSshKey k : vault.managedKeys()) if (!ids.add(k.id())) throw new IllegalArgumentException("Duplicate entry ID");
+        for (Note n : vault.notes()) if (!ids.add(n.id())) throw new IllegalArgumentException("Duplicate entry ID");
         if (vault.managedKeys().size() > 4096 || vault.managedKeys().stream().mapToLong(k -> k.privateKey().length).sum() > 64L * 1024 * 1024)
             throw new IllegalArgumentException("Too many managed key bytes");
     }
