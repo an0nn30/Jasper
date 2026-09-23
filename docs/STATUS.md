@@ -1846,7 +1846,8 @@ Added retro-only Settings and Exit buttons after the toolbar's flexible space. P
 controls stay to their left. Both use the existing application actions, preserving
 configuration availability and normal quit handling. They retain the compact 28-pixel,
 flat, labeled presentation and existing icon-only/hidden modes. Exit uses original
-24/48-pixel GNOME shutdown artwork with source hashes in the GPL2+ asset manifest.
+16/24-pixel OldGNOME2 `actions/exit.png` artwork (updated per user feedback) with
+source hashes in the GPL2+ asset manifest.
 Modern toolbar contents are unchanged.
 
 Targeted toolbar, action, contribution and icon tests passed, including red/green checks
@@ -1854,3 +1855,7 @@ for the new placement and callbacks; installDist rebuilt successfully. Inspected
 headless 2x toolbar preview. No native GUI launch, merge or push.
 
 The full application check and architecture gate also passed: 815 tests, 0 failures, 0 errors, 1 skips. Source hygiene and diff checks passed.
+
+User-selected Exit artwork follow-up: copied the collection’s exact `actions/exit.png`
+variants, removed the shutdown image and special scaling path. Icon/chrome tests and
+installDist passed; inspected the updated headless toolbar preview.

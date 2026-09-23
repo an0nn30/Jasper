@@ -21,5 +21,5 @@ resource	source	sha256
 24/history.png	24x24/stock/navigation/stock_undo-history.png	e6e4ded806c7a0722e6708f04a7b264aeff298ad71d309fb31148e2cffa0dd0c
 24/bookmark.png	24x24/places/user-bookmarks.png	b778090dfea95e75f4552d4abe889a5e10dad4216a60d7610a188720b618caa0
 24/close.png	24x24/stock/generic/stock_close.png	e7bdaf73909c0ea50f89c191d0b28361f89b87d9279339f841f34f0593af00a7
-24/exit.png	24x24/apps/gnome-shutdown.png	fbc45f1636ff339312749acf35ab521884e284735b55dda7331f1284a0fdd433
-48/exit.png	48x48/apps/gnome-shutdown.png	9e6164ad38d3a4be4b3ae1cb4d9fa00e9c1acdf16dc6ad23fcec09a19a2e0404
+16/exit.png	16x16/actions/exit.png	57e114742ef94668f9a7f58d92f8d4fedc2eabb248e0e376c02b3da71531e171
+24/exit.png	24x24/actions/exit.png	3d342460594d40070a49a8c87af92459adbb555ece77cabb73988f6cdd31562e
