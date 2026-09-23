@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.GraphicsEnvironment;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import javax.swing.plaf.FontUIResource;
 import javax.swing.UIDefaults;
@@ -44,9 +45,8 @@ final class MetalDefaults {
         return true;
     }
     private static void installFonts(UIDefaults defaults) {
-        Set<String> available = Set.of(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames());
-        String family = List.of("Helvetica Neue", "Segoe UI", "Noto Sans", "DejaVu Sans").stream()
-            .filter(available::contains).findFirst().orElse(Font.SANS_SERIF);
+        Set<String> available = Set.of(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames(Locale.ROOT));
+        String family = fontFamily(System.getProperty("os.name", ""), available);
         // Keep Metal's sizing and delegates, but remove its default bold menu/label typography.
         // LAF-local defaults leave modern mode and the terminal's configured font independent.
         for (Object key : defaults.keySet().toArray()) {
@@ -55,6 +55,16 @@ final class MetalDefaults {
                     .deriveFont(original.getSize2D())));
             }
         }
+    }
+
+    static String fontFamily(String osName, Set<String> available) {
+        String os = osName.toLowerCase(Locale.ROOT);
+        List<String> preferred = os.startsWith("mac")
+            ? List.of("Helvetica Neue", "Helvetica", "Noto Sans", "DejaVu Sans")
+            : os.startsWith("windows")
+                ? List.of("Segoe UI", "Tahoma", "Noto Sans", "DejaVu Sans")
+                : List.of("Noto Sans", "Liberation Sans", "DejaVu Sans");
+        return preferred.stream().filter(available::contains).findFirst().orElse(Font.SANS_SERIF);
     }
 
     private static void alias(UIDefaults defaults, String source, String... targets) {

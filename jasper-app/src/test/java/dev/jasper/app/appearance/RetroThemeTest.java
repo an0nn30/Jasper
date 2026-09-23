@@ -30,6 +30,39 @@ class RetroThemeTest {
         assertThat(themes.style()).isEqualTo(ThemeStyle.RETRO);
     }
 
+    @Test void fontSelectionPrefersTheHostPlatformEvenWhenOtherPlatformFontsAreInstalled() {
+        var all = java.util.Set.of("Helvetica Neue", "Helvetica", "Segoe UI", "Tahoma",
+            "Noto Sans", "Liberation Sans", "DejaVu Sans");
+        assertThat(MetalDefaults.fontFamily("Mac OS X", all)).isEqualTo("Helvetica Neue");
+        assertThat(MetalDefaults.fontFamily("Windows 11", all)).isEqualTo("Segoe UI");
+        assertThat(MetalDefaults.fontFamily("Linux", all)).isEqualTo("Noto Sans");
+        assertThat(MetalDefaults.fontFamily("Mac OS X", java.util.Set.of("Helvetica"))).isEqualTo("Helvetica");
+        assertThat(MetalDefaults.fontFamily("Windows 10", java.util.Set.of("Tahoma"))).isEqualTo("Tahoma");
+        assertThat(MetalDefaults.fontFamily("Linux", java.util.Set.of("Liberation Sans", "DejaVu Sans")))
+            .isEqualTo("Liberation Sans");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"Mac OS X", "Windows 11", "Linux", "unknown"})
+    void missingPreferredFontsRemainPortable(String os) {
+        assertThat(MetalDefaults.fontFamily(os, java.util.Set.of("DejaVu Sans"))).isEqualTo("DejaVu Sans");
+        assertThat(MetalDefaults.fontFamily(os, java.util.Set.of())).isEqualTo(java.awt.Font.SANS_SERIF);
+        assertThat(MetalDefaults.fontFamily(os, java.util.Set.of("Unrelated Font"))).isEqualTo(java.awt.Font.SANS_SERIF);
+    }
+
+    @Test void installedRetroFontsAreRegularAndModernFontsAreRestored() {
+        new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+        var modern = UIManager.getFont("Label.font");
+        new ThemeController(ThemeStyle.RETRO, Appearance.LIGHT);
+        for (String key : java.util.List.of("Menu.font", "Label.font", "Button.font", "TextField.font",
+                "TabbedPane.font", "InternalFrame.titleFont")) {
+            assertThat(UIManager.getFont(key).getStyle()).as(key).isEqualTo(java.awt.Font.PLAIN);
+            assertThat(UIManager.getFont(key).getSize()).as(key).isPositive();
+        }
+        new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+        assertThat(UIManager.getFont("Label.font")).isEqualTo(modern);
+    }
+
     @Test void metalAliasesDoNotLeakIntoTheNextModernInstallation() {
         new ThemeController(ThemeStyle.RETRO, Appearance.DARK);
         assertThat(UIManager.getBoolean("Jasper.retro")).isTrue();

@@ -1889,3 +1889,17 @@ Verified that this Mac resolves the UI defaults to Helvetica Neue Regular, and i
 headless menu/toolbar and workspace/form renders. Full application check, architecture
 verification and installDist passed (815 tests: 814 passed, one expected skip). No GUI
 launch, merge or push.
+
+### Retro font portability — 2026-09-23
+
+Font preferences now follow the host: Helvetica Neue/Helvetica on macOS, Segoe UI/Tahoma
+on Windows, Noto Sans/Liberation Sans on Linux. Noto Sans and DejaVu Sans provide
+additional installed-family fallbacks; Java SansSerif is the final fallback everywhere.
+Font discovery requests locale-neutral family names. No platform font files are copied
+or required, and all UI weights remain regular.
+
+Added checks for each OS preference when other platform fonts are also installed,
+missing preferred families, empty font inventories, and restoration of modern fonts.
+The targeted theme/chrome suite, architecture check and installDist passed locally on
+macOS. Existing CI runs check on macOS, Ubuntu and Windows; it has not been dispatched
+for this local branch, so native Linux/Windows rendering is not claimed as verified.
