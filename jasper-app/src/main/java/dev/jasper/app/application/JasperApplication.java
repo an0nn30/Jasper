@@ -56,7 +56,7 @@ import dev.jasper.app.terminals.TerminalRegistry;
 /** Application-level window and shell ownership; closing a window never exits sibling windows. */
 public final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
-    private final ThemeController themes = new ThemeController();
+    private final ThemeController themes;
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
@@ -136,6 +136,8 @@ public final class JasperApplication {
      */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir) {
+        ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
+        themes = new ThemeController(startup.style(), startup.variant());
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.

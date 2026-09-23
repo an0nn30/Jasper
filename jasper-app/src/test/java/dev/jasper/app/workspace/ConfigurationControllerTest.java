@@ -51,7 +51,7 @@ class ConfigurationControllerTest {
     void start(String text) throws Exception {
         Files.writeString(directory.resolve("config.toml"), text);
         service = new ConfigService(directory.resolve("config.toml"), false);
-        edt(() -> { themes = new ThemeController(); controller = new ConfigurationTestSupport(themes, service); });
+        edt(() -> { themes = new ThemeController(service.initialState().snapshot().style(), service.initialState().snapshot().variant()); controller = new ConfigurationTestSupport(themes, service); });
     }
     WindowContent owner() { return owner(launcher(pending)); }
     WindowContent owner(ShellLauncher launcher) {

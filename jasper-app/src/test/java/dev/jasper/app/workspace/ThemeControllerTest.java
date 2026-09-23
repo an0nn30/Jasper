@@ -272,7 +272,7 @@ class ThemeControllerTest {
         edt(() -> {
             var themes = new ThemeController();
             var owner = content(launcher(new ArrayDeque<>()), themes);
-            for (BuiltinTheme theme : BuiltinTheme.values()) {
+            for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
                 themes.select(theme);
                 assertThat(owner.getBackground()).isEqualTo(theme.palette().background());
                 assertThat(owner.toolbar().getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));

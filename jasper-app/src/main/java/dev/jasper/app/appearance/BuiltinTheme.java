@@ -3,10 +3,11 @@ package dev.jasper.app.appearance;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.terminal.config.Palette;
 
-/** The two modern variants: each pairs a FlatLaf chrome with its terminal palette. */
+/** App presentation presets, each with its terminal palette. */
 public enum BuiltinTheme {
     DARK("dark", "Dark", Palette.jasperDark()),
-    LIGHT("light", "Light", Palette.jasperLight());
+    LIGHT("light", "Light", Palette.jasperLight()),
+    RETRO("retro", "Retro", RetroPalette.create());
 
     private final String id;
     private final String label;
@@ -21,5 +22,5 @@ public enum BuiltinTheme {
     String id() { return id; }
     String label() { return label; }
     public Palette palette() { return palette; }
-    public Appearance appearance() { return this == LIGHT ? Appearance.LIGHT : Appearance.DARK; }
+    public Appearance appearance() { return this == DARK ? Appearance.DARK : Appearance.LIGHT; }
 }

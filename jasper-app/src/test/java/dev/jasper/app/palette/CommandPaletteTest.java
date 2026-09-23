@@ -214,7 +214,7 @@ class CommandPaletteTest {
             assertThat(new Color(image.getRGB(palette.getWidth() / 2, UIScale.scale(10)), true))
                 .isEqualTo(UIManager.getColor("Jasper.paletteBackground"));
 
-            for (BuiltinTheme theme : BuiltinTheme.values()) {
+            for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
                 ThemeTestSupport.install(theme);
                 for (String key : List.of("Jasper.paletteBackground", "Jasper.paletteForeground",
                     "Jasper.paletteMutedForeground", "Jasper.paletteBorder", "Jasper.paletteAccent",

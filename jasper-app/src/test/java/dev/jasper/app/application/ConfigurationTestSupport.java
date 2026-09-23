@@ -11,6 +11,7 @@ public final class ConfigurationTestSupport {
     private final ConfigurationController controller;
     public ConfigurationTestSupport(ThemeController themes, ConfigService service) { controller = new ConfigurationController(themes, service); }
     public ConfigurationTestSupport(ThemeController themes, ConfigService service, Consumer<Path> editor) { controller = new ConfigurationController(themes, service, editor); }
+    public ConfigService.State shown() { return controller.shown(); }
     public void register(WindowContent owner) { controller.register(owner); }
     public void unregister(WindowContent owner) { controller.unregister(owner); }
     public void accept(ConfigService.State state) { controller.accept(state); }

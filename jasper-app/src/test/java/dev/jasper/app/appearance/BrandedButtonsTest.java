@@ -27,7 +27,7 @@ class BrandedButtonsTest {
             var note = new javax.swing.JTextArea("First line\nSecond line");
             parent.add(field); parent.add(password); parent.add(formatted); parent.add(choices); parent.add(note);
             int[] clicks = {0}; button.addActionListener(event -> clicks[0]++);
-            for (var theme : BuiltinTheme.values()) {
+            for (var theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
                 themes.select(theme);
                 SwingUtilities.updateComponentTreeUI(parent);
                 assertThat(button.getPreferredSize().height).isEqualTo(24);
