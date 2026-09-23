@@ -92,6 +92,15 @@ actual toolbar renders at 1x/2x, headlessly without starting any shells or nativ
 User size refinement: reduced toolbar icons from 32 to 28 logical pixels, retaining captions
 below them and flat styling. The bundled 32-pixel source artwork is unchanged.
 
+### SDK icons for both skins — 2026-09-23
+
+The user approved the API direction for `Appearance.icon(modernSvgResourcePath, OldGnomeIcon)`:
+automatic skin selection, a bundled enum catalog, backward compatibility and host-managed
+16/28-pixel placement sizing. The [written design](superpowers/specs/2026-09-23-jasper-sdk-skin-icons-design.md)
+is ready for review; implementation and its plan have not started. It covers an additive SDK
+0.7.2 contract, 22 explicit OldGNOME2 choices, host/testkit support and sample/Vault adoption
+at existing SDK icon calls. The existing toolbar's Tango choices are preserved.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:
