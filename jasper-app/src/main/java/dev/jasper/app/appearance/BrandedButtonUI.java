@@ -23,10 +23,12 @@ public final class BrandedButtonUI extends FlatButtonUI {
     /** Called by Swing when installing or refreshing the application theme. */
     public static ComponentUI createUI(JComponent component) { return new BrandedButtonUI(); }
 
-    @Override protected void installDefaults(AbstractButton button) {
-        super.installDefaults(button);
-        if (button.getFont() instanceof UIResource)
-            button.setFont(new FontUIResource(button.getFont().deriveFont(Font.PLAIN, UIScale.scale(FONT_SIZE))));
+    @Override public void installUI(JComponent component) {
+        super.installUI(component);
+        if (component.getFont() instanceof UIResource) {
+            var base = javax.swing.UIManager.getFont("Label.font");
+            component.setFont(new FontUIResource(base.deriveFont(Font.PLAIN, base.getSize2D())));
+        }
     }
 
     @Override public Dimension getPreferredSize(JComponent component) {

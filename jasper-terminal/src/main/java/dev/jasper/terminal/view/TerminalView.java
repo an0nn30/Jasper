@@ -54,12 +54,14 @@ public final class TerminalView extends JComponent {
     private static final float DEFAULT_FONT_SIZE = 14f;
     private static final float MIN_FONT_SIZE = 6f;
     private static final float MAX_FONT_SIZE = 72f;
+    private static final int RESIZE_SETTLE_MILLIS = 120;
 
     private final TerminalSession session;
     private final TerminalAccess access;
     private final SearchController search;
     private final RenderScheduler rendering;
     private final BellController bells;
+    private final javax.swing.Timer resizeTimer;
     private TerminalOptions options;
     private FontSet fonts;
     private Palette palette;
@@ -113,6 +115,8 @@ public final class TerminalView extends JComponent {
         this.rendering = new RenderScheduler(this::reconcileAbsoluteRows, this::repaint, search::cancelPending,
             () -> isFocusOwner() && !exited && access.blinkingCursorInView(viewport.topRow(), this.options.cursorBlink()));
         this.bells = new BellController(() -> this.options.bell(), this::repaint, Toolkit.getDefaultToolkit()::beep);
+        this.resizeTimer = new javax.swing.Timer(RESIZE_SETTLE_MILLIS, event -> resizeSessionToFit());
+        resizeTimer.setRepeats(false);
 
         setOpaque(true);
         setFocusable(true);
@@ -125,7 +129,7 @@ public final class TerminalView extends JComponent {
         addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
-                resizeSessionToFit();
+                scheduleResize();
             }
         });
         MouseAdapter mouse = new MouseAdapter() {
@@ -188,11 +192,13 @@ public final class TerminalView extends JComponent {
         session.addListener(listener);
         reconcileAbsoluteRows();
         rendering.showing(isShowing());
+        scheduleResize();
     }
 
     /** Invalidates presentation work and unregisters its listener; leaves the session open. EDT only. */
     @Override
     public void removeNotify() {
+        resizeTimer.stop();
         rendering.detach();
         bells.detach();
         if (listener != null) {
@@ -434,7 +440,25 @@ public final class TerminalView extends JComponent {
         }
     }
 
+    private void scheduleResize() {
+        if (!isDisplayable() || getWidth() <= 0 || getHeight() <= 0) {
+            resizeTimer.stop();
+            return;
+        }
+        GridSize grid = GridSize.fit(getWidth(), getHeight(), fonts.cellWidth(), fonts.cellHeight());
+        if (grid.columns() == session.columns() && grid.rows() == session.rows()) {
+            resizeTimer.stop();
+            return;
+        }
+        // Keep emulator and shell on the same grid during a drag. Reflowing on every pixel-size
+        // event interleaves new geometry with prompt redraws still arriving for an older width.
+        resizeTimer.restart();
+    }
+
     void resizeSessionToFit() {
+        resizeTimer.stop();
+        // Unlaid-out or temporarily removed panes have no terminal geometry to publish.
+        if (getWidth() <= 0 || getHeight() <= 0) return;
         GridSize grid = GridSize.fit(getWidth(), getHeight(), fonts.cellWidth(), fonts.cellHeight());
         boolean widthChanged = grid.columns() != session.columns();
         session.resize(grid.columns(), grid.rows());

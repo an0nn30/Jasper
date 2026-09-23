@@ -198,7 +198,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     }
 
     private void style(JButton button) {
-        button.setFont(SystemFonts.system(Font.PLAIN, UIScale.scale(13f)));
+        button.setFont(SystemFonts.ui(Font.PLAIN, 13f));
         button.setForeground(foreground());
     }
 

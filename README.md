@@ -122,7 +122,7 @@ Working-directory inheritance and prompt navigation use OSC 7 and OSC 133 emitte
 
 ## Plugins
 
-Jasper loads plugins written against `jasper-sdk`. Shell History, Snippets, Credential Vault and a sample plugin are bundled with the application image (`lib/plugins/<id>/` in the packaged app); other plugins are installed by the user. Nothing loads or unloads in a running process: installs, removals and enable/disable changes take effect at the next launch.
+Jasper loads plugins written against `jasper-sdk`. Shell History, Snippets, Credential Vault, Remote (SSH), and a sample plugin are bundled with the application image (`lib/plugins/<id>/` in the packaged app); other plugins are installed by the user. Nothing loads or unloads in a running process: installs, removals and enable/disable changes take effect at the next launch.
 
 **Where plugins live.** Everything is under Jasper's home, the directory holding `config.toml` (on macOS `~/.config/jasper`; see [configuration](docs/configuration.md#location-and-startup-options) for Linux and Windows):
 
@@ -152,7 +152,7 @@ Every plugin, bundled ones too, has its own folder there with its settings file 
 - `jasper-app/`: packaged application composition, workspace, palette, providers and platform integration.
 - `jasper-buddy/`: independent JDK-only companion facade, notice model, animation and presentation.
 - `jasper-sdk/` and `jasper-sdk-testkit/`: the JDK-only plugin API and its fake host and contract suite.
-- `plugins/`: the bundled History, Snippets, Vault and sample plugins; each directory is a Gradle module.
+- `plugins/`: the bundled History, Snippets, Vault, Remote and sample plugins; each directory is a Gradle module.
 - `docs/STATUS.md`: completed work, open items and deferred findings.
 - `docs/superpowers/specs/` and `docs/superpowers/plans/`: specifications and implementation plans.
 

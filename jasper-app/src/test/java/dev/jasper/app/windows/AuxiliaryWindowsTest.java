@@ -22,6 +22,17 @@ class AuxiliaryWindowsTest {
             () -> shellEvents.add("dispose"), title -> shellEvents.add("title:" + title), () -> new Rectangle(10, 20, 640, 480), (title, initial) -> java.util.Optional.empty());
     });
 
+    @Test void onlyOneOverlayCanOwnATerminalWindow() {
+        UUID owner = UUID.randomUUID();
+        var first = windows.overlay("Connecting", owner);
+        assertThat(first.kind()).isEqualTo(AuxiliarySurface.Kind.OVERLAY);
+        assertThatIllegalStateException().isThrownBy(() -> windows.overlay("Another", owner));
+        assertThat(first.requestClose()).isFalse();
+        windows.closeOwned(owner);
+        assertThat(first.closed()).isTrue();
+        assertThat(windows.overlay("Retry", owner).closed()).isFalse();
+    }
+
     @Test void chooserUsesItsSurfaceAndDiscardsResultsWhenTheOwnerCloses() {
         var chosen = java.nio.file.Path.of("selected").toAbsolutePath();
         var initial = java.util.Optional.of(java.nio.file.Path.of("original").toAbsolutePath());

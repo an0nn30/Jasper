@@ -28,6 +28,29 @@ class WindowContributionsTest {
 
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
+    @Test void overlayBlocksMenuActionsIncludingViewAndPluginEntries() throws Exception {
+        edt(() -> {
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            var root = new JRootPane(); root.setContentPane(owner); owner.installRootBindings(root); owner.setActive(true);
+            var seen = new ArrayList<Contributions.Invocation>();
+            var model = new Contributions();
+            model.addAction("dev.x.run", "Run", null, List.of(), Optional.empty(), seen::add);
+            owner.connectContributions(model);
+            int tabs = owner.tabStrip().getTabCount(); boolean status = owner.status().isVisible();
+            root.putClientProperty(dev.jasper.app.platform.WindowInput.OVERLAY, new Object());
+            var event = new java.awt.event.ActionEvent(owner, 0, "native-menu");
+            owner.action(dev.jasper.app.commands.ActionId.NEW_TAB).actionPerformed(event);
+            owner.windowCommands().view("view.status_bar").actionPerformed(event);
+            owner.commands().find("dev.x.run").orElseThrow().action().actionPerformed(event);
+            assertThat(owner.tabStrip().getTabCount()).isEqualTo(tabs);
+            assertThat(owner.status().isVisible()).isEqualTo(status);
+            assertThat(seen).isEmpty();
+            root.putClientProperty(dev.jasper.app.platform.WindowInput.OVERLAY, null);
+            owner.commands().find("dev.x.run").orElseThrow().action().actionPerformed(event);
+            assertThat(seen).hasSize(1);
+        });
+    }
+
     @Test void aContributedActionIsACommandAShortcutAndAnInvocationWithThisWindowsIdentity() throws Exception {
         edt(() -> {
             var model = new Contributions();

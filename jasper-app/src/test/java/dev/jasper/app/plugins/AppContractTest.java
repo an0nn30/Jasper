@@ -169,7 +169,7 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public List<String> windows() {
                 return onEdtValue(() -> auxiliary.open().stream()
-                    .map(surface -> (surface.kind() == dev.jasper.app.windows.AuxiliarySurface.Kind.DIALOG ? "dialog" : surface.id())
+                    .map(surface -> (switch (surface.kind()) { case DIALOG -> "dialog"; case OVERLAY -> "overlay"; case WINDOW -> surface.id(); })
                         + "|" + surface.title() + "|" + surface.shown()).toList());
             }
             @Override public boolean requestClose(String windowId) {

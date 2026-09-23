@@ -1,4 +1,4 @@
 package dev.jasper.sdk.ui;
 
-/** A plugin's dialog over a terminal window or one of its own windows. */
+/** A plugin's native dialog, or in-window overlay, with host-owned content and lifetime. */
 public interface PluginDialog extends WindowSurface { }

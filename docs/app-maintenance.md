@@ -186,3 +186,12 @@ check, architecture guards and jar checks. Add package docs for a new package, u
 these recipes when signatures change, and document any native acceptance still needed.
 Use patterns where an actual responsibility needs them. Future SDK work can adapt these
 boundaries; this refactor promises no plugin loading, binary compatibility or permissions.
+
+## Remote lives in a plugin
+
+SSH is bundled as `dev.jasper.remote` (`plugins/remote`): `hosts` owns the saved model, polling
+and config import; `trust` owns host-key matching; `agent` adapts the agent protocol to MINA;
+`client` owns shared sessions, cancellation, ProxyJump and shell channels; `ui` owns passive Swing
+panels and the palette scope. The plugin consumes only `dev.jasper.vault.api`.
+Run `./gradlew :jasper-plugin-remote:test` for unit and embedded loopback-server tests.
+See [Remote](remote.md) for settings and native acceptance.

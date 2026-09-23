@@ -1,6 +1,19 @@
 # Jasper — Status and Handoff
 
-## Current state — 2026-09-21
+## Current state — 2026-09-23
+
+Remote plan 7a and its follow-ups are integrated into local `main` from
+`codex/remote-7a` through `22b0fd29`: SSH sessions and navigation, connection
+overlays, configurable UI typography and Remote shortcuts, keyboard-ready hosts
+sidebar, and terminal resize coalescing. The merge preserves `main`'s title-colored
+status bar and Vault placement under File instead of the rail (`c1eb3858`); their
+existing tests now assert that behavior. Nothing was pushed. The Codex-managed
+worktree is retained, including its development home and saved plugin data.
+
+Merged-result verification: `./gradlew check :jasper-app:installDist` passed with
+**1,644 tests: 1,641 passed, three expected skips, zero failures/errors**. All
+architecture checks passed and the application distribution was rebuilt. GUI
+acceptance remains user-run.
 
 Both architecture refactors are merged into local `main`: terminal through
 `c7b796b`, application/Buddy through `9b30dc2`. The completed app-refactor branch
@@ -22,6 +35,190 @@ is merged at `17c0476`. The Credential Vault design
 (`superpowers/specs/2026-09-22-jasper-vault-design.md`) has plan 6a (core and API) integrated into local `main` at `c8141b6`; plan 6b (UI)
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
+
+### Remote plan 7a (SSH) — 2026-09-22
+
+Implemented in the native worktree `/Users/dustin/.codex/worktrees/remote-7a/moray` on
+`codex/remote-7a`, now merged into local `main` (not pushed). The [7a plan](superpowers/plans/2026-09-22-jasper-remote-plan-7a-ssh.md)
+implements the approved [Remote design](superpowers/specs/2026-09-22-jasper-remote-design.md): saved hosts,
+config import, host-key trust, Vault/agent authentication, shared sessions, ProxyJump, hosts panel,
+editor, palette, actions and status. [Guide and native acceptance](remote.md). Tunnels (7b) and SFTP (7c) follow.
+
+Native inline execution, one commit per task, followed by one independent review and a tested fix commit.
+`./gradlew check :jasper-app:installDist` passed: **1,604 tests, 1,601 passed, three expected skips,
+zero failures/errors**. All review findings are addressed; no deferred minors.
+[Execution and review record](remote-7a-verification.md).
+Plan corrections so far: current-main base preserves the shell revert; native branch/worktree and accurate
+Codex attribution replace example Claude names. Fixed the store queue's completion type, strict trust
+validation before host filtering, MINA connection-context target lookup and wrapped DNS errors.
+Added lifecycle regressions and owned session references/cancellation for Vault, prompts, jump dependencies
+and natural shell exit; callbacks return to the UI executor. Test fixtures use fresh credentials,
+BC Ed25519 keys, short Unix socket paths, complete resize replies, correct fake activation and test-only UI
+access bridges. These corrections preserve the intended behavior. The planned split/collapse/credential
+ordering/fake-Vault deviations are recorded in the spec. GUI acceptance remains user-run.
+The review fix pass composes queued host mutations, protects broken external edits, fixes optional
+Vault loading, accepts multiple legitimate keys per trust file while rejecting conflicts/revocation,
+bounds/cancels agent I/O, preserves OpenSSH first-value/quoted/commented imports, and reports
+mutation failures after editor closure. SDK 0.7.2 adds `Panels.toggle` (app and testkit) for lazy
+per-window Hosts action toggling; Remote requires it. Enter, star clicks and stale selection are fixed.
+
+### Remote SSH card/dialog follow-up — 2026-09-22
+
+User-approved adjustments on the same `codex/remote-7a` worktree: renameable default group
+(persisted without rewriting hosts), larger searchable host cards with cached detected OS and IP,
+active-session badges, double-click/Enter to focus the most recently used running pane, and a
+Cancel/Retry progress dialog before tab/split creation (also used on reconnect). Explicit Connect
+still creates another session. The host editor shows the renamed default group as a placeholder.
+
+Metadata runs only over a user-established authenticated session, via bounded separate exec
+channels. No proactive passwordless connections, no commands injected into the user's shell.
+Unknown/unsupported OS discovery leaves the terminal usable. Results are cached against the
+actual authenticated endpoint; direct peer IPs are shown when useful, never a jump forward's IP.
+
+One independent review found accessibility and endpoint-cache association issues plus invisible
+keyboard selection on group headers; all are addressed with regressions. Headless FlatLaf renders
+at 360px and 240px sidebar widths and the connection dialog were inspected. Native acceptance
+remains user-run. `./gradlew check :jasper-app:installDist` passed: **1,617 tests, 1,614 passed,
+three expected skips, zero failures/errors**; Remote **69/69**. No merge or push.
+
+### Remote host-list styling revision — 2026-09-22
+
+At the user's request, replaced the rounded host cards with flat, indented tree-style rows.
+Host labels are two points larger than the base list font, with eight points of vertical padding.
+Search, favorites, group renaming, session counts and last-session activation remain. OS/IP details
+are shown in the selected-host area and tooltips and remain searchable/accessibly named.
+The separately requested connection overlay is still a design draft pending approval/Cancel choice.
+`./gradlew check :jasper-app:installDist` passed: 1,617 tests, 1,614 passed, three expected skips,
+zero failures/errors. Headless renders at 360px and 240px were inspected.
+
+### Remote list density refinement — 2026-09-22
+
+The user found the padded tree rows too loose. Reduced row padding from eight to three points
+vertically and the font increase from two points to one. Group headers use the base bold font
+with tighter spacing; an active-session dot (plus a count for multiple sessions) replaces the
+wordy row status. Selected-host details now align flush left with their action controls.
+Interaction, accessible status, search and connection behavior are unchanged.
+`./gradlew check :jasper-app:installDist` passed: 1,617 tests, 1,614 passed, three expected skips,
+zero failures/errors. Headless renders using Jasper’s actual dark theme at 360px and 240px were inspected.
+
+### App-wide UI typography — 2026-09-23
+
+User-approved `ui.font.family` / `ui.font.size` settings update chrome and plugin controls live,
+independently of terminal `[font]`. Omitted settings preserve platform defaults; sizes accept 8–32.
+Relative headings, palette/status labels, tabs and titles follow updates. Remote headings refresh
+in existing panels and progress content grows to fit. Missing families fall back to the platform.
+`./gradlew :jasper-app:test :jasper-plugin-remote:test` passed, followed by the complete check below.
+Large and fractional sizes use exact point values; live palette rows and secondary sections resize
+with the UI font, and host-star geometry follows its label metrics.
+
+### Centered connection overlay — 2026-09-23
+
+Completed the approved [overlay plan](superpowers/plans/2026-09-22-jasper-connection-overlay.md)
+natively in this worktree. SDK 0.7.3 adds `Windows.overlay(OverlaySpec)` with app/testkit ownership
+parity. Remote progress stays centered inside its owner with an explicit Cancel button, Retry/Close
+on failure and no Escape/outside dismissal. Duplicate requests focus the existing attempt. Native
+trust/Vault prompts stay usable, and owner/plugin closure cancels pending work. Bounds, scrolling,
+focus restoration and keyboard/native-menu containment have headless regression coverage.
+
+One independent review found five issues (native menu bypass, cached palette geometry, content
+revalidation, border-induced scrollbars and scaled font offsets). All are fixed and re-reviewed;
+no findings remain. Follow-up fractional-font verification also caught and fixed FlatLaf’s button
+styling rounding. Native GUI acceptance remains user-run; app-themed headless renders at default
+and 18-point UI size were inspected. No GUI was launched.
+
+`./gradlew check :jasper-app:installDist` passed: **1,634 tests, 1,631 passed, three expected skips,
+zero failures/errors**; Remote **70/70**. Distribution rebuilt with the updated app, SDK and plugins.
+No merge or push.
+
+### Overlay scrollbar correction — 2026-09-23
+
+The user reported scrollbars in native connection progress and explicitly rejected any scrolling
+fallback. Removed the host's JScrollPane completely: a plain bordered panel now sizes to its
+content and lays it out directly. This supersedes the overlay plan's constrained-window scrolling
+fallback. No SDK or Remote connection lifecycle changes.
+
+`./gradlew :jasper-app:test --tests '*WindowOverlay*' :jasper-app:installDist` passed: six overlay
+layout/focus tests, zero failures. The regression verifies no host scroll widgets even in a
+constrained root, fitted content bounds, and natural relayout. An actual app-themed headless
+ConnectionPanel probe confirmed that all visible labels/buttons fit at 12, 14, 18, 24 and 32 points
+in progress and failure states. Default/18-point previews inspected. Distribution rebuilt; no native
+GUI launched, merge or push.
+
+### Remote Sessions toolbar — 2026-09-23
+
+User-approved bounded follow-up, implemented natively in the same worktree. Remote contributes
+**Sessions** through the existing SDK dropdown, listing saved hosts alphabetically by name with
+their addresses. Selection focuses the last used running session or starts a connection in the
+invoking window. Host additions, edits, imports and removals refresh the menu; invocation resolves
+the current host record. **Manage Sessions...** shows the Hosts panel without hiding it if already
+visible, and remains available with no hosts. Chrome and popup use the existing app typography.
+
+Tests first failed on the missing toolbar/actions, then passed. The bundled-app integration test
+now verifies both the sample button and the new Sessions dropdown. Independent read-only review
+found no actionable issues. `./gradlew check :jasper-app:installDist` passed: **1,636 tests,
+1,633 passed, three expected skips, zero failures/errors**; Remote **71/71**. Distribution rebuilt.
+No GUI launched; native appearance remains user acceptance. No merge or push.
+
+### Remote View menu entry — 2026-09-23
+
+Registered the existing SSH Hosts toggle action under **View > SSH Hosts**, so it shows or hides
+the panel in the invoking window. The existing **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) binding
+already opens the palette directly in the SSH scope; no additional shortcut or action is needed.
+`./gradlew :jasper-plugin-remote:test --tests '*RemotePluginTest' :jasper-app:installDist` passed:
+ten plugin integration tests, zero failures. Distribution rebuilt; no GUI launched, merge or push.
+
+### Terminal resize and local startup follow-up — 2026-09-23
+
+Reproduced prompt fragmentation headlessly with a clean zsh (`-dfi`, no user startup files): a
+burst of immediate grid changes interleaves prompt redraws with later reflows. `TerminalView`
+now coalesces layout resizes for 120 ms, then changes the emulator and shell together. Zero-area
+layout no longer collapses the grid. Pending changes cancel on removal and refit on reattachment;
+explicit session resizes and font changes retain their immediate behavior. View-driven clean-zsh
+probes at burst and 10 ms resize intervals showed one intact prompt after narrowing/widening.
+
+Three regressions failed before the fix and pass afterward. Independent review found no production
+issues; strengthened its identified detach-cancellation test gap. `./gradlew check :jasper-app:installDist`
+passed: **1,639 tests, 1,636 passed, three expected skips, zero failures/errors**. App rebuilt.
+No native GUI launched, merge or push.
+
+The local-only prompt startup delay was traced separately to a user shell startup block appending
+Homebrew initialization on every launch. After explicit permission, backed up both user zsh files,
+removed 191 duplicate profile commands and stopped further appending; other configuration is
+preserved. Isolated profile evaluation measured 1.848 s before and 0.014 s after (not whole shell
+startup). Both files pass zsh syntax checks. No user configuration is tracked in this repository.
+
+### Remote configurable navigation shortcuts — 2026-09-23
+
+Implemented the user-approved `[shortcuts]` table in `dev.jasper.remote.toml`: `toggle_panel`
+defaults to `cmd+shift+s`, `open_palette` to `cmd+shift+h`. Missing values use defaults; blank
+strings disable the plugin preference. Reloads replace only changed action registrations under
+stable ids, refreshing shortcuts in existing windows while preserving menu/status placements.
+App-level `[keybindings]` overrides retain priority. No SDK extension or plugin restart required.
+
+Two real staged-plugin/TOML integration tests failed first, then passed: defaults, live changes,
+disable/reset, unrelated-settings stability, menu preservation, override precedence, and invalid
+or colliding bindings. Independent review confirmed action/window behavior and caught an
+inaccurate logging promise, now removed: automatic plugin reload leaves invalid/colliding bindings
+unbound but does not necessarily log the resolution problem until an app reload/start.
+
+`./gradlew check :jasper-app:installDist` passed: **1,641 tests, 1,638 passed, three expected skips,
+zero failures/errors**. Rebuilt distribution again after the settings-template comment correction.
+No GUI launched, merge or push.
+
+### Remote sidebar keyboard entry — 2026-09-23
+
+The user clarified this request targets the SSH sidebar, not the scoped command palette. Showing
+the sidebar now highlights the first visible host (skipping headings/errors) and requests list
+focus after mounting, so arrows and Enter work immediately. A hide before focus delivery cancels
+the request. Late host loading/filter results select the first available host; ordinary refresh
+preserves the selected host or folder. With all folders collapsed, the first folder is selected
+so Enter can expand it, without changing saved collapse state on opening.
+
+Independent review caught folder selection jumping to an unrelated host after collapse; fixed
+with a failing-then-passing collapse/expand regression. Selection-on-show, reopening, Down/Enter,
+late loading and refresh/filter cases are covered too. `./gradlew :jasper-plugin-remote:test
+:jasper-app:installDist` passed: **74 Remote tests, zero failures**. Distribution rebuilt; native
+focus acceptance remains user-run. No GUI launched, merge or push.
 
 ### macOS default shell refresh reverted — 2026-09-22
 

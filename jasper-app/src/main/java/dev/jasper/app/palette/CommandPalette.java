@@ -363,11 +363,28 @@ public final class CommandPalette extends JPanel {
         empty.setForeground(muted);
         results.setBackground(background);
         results.setForeground(foreground);
+        results.setFixedCellHeight(UIScale.scale(ROW_HEIGHT));
+        sectionLabel.setPreferredSize(new Dimension(0, UIScale.scale(LABEL_HEIGHT)));
+        footer.setPreferredSize(new Dimension(0, UIScale.scale(FOOTER_HEIGHT)));
+        empty.setPreferredSize(new Dimension(0, UIScale.scale(ROW_HEIGHT)));
+        stepError.setPreferredSize(new Dimension(0, UIScale.scale(LABEL_HEIGHT)));
+        stepError.setMaximumSize(new Dimension(Integer.MAX_VALUE, UIScale.scale(LABEL_HEIGHT)));
+        for (JLabel label : List.of(sectionLabel, footer, stepError))
+            label.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(16), 0, UIScale.scale(16)));
+        for (JLabel label : stepLabels) {
+            label.setPreferredSize(new Dimension(UIScale.scale(140), 0));
+            if (label.getParent() instanceof JPanel row) {
+                row.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(16), UIScale.scale(6), UIScale.scale(16)));
+                ((BorderLayout) row.getLayout()).setHgap(UIScale.scale(10));
+            }
+        }
+        ((BorderLayout) inputRow.getLayout()).setHgap(UIScale.scale(10));
+        escape.setMargin(new Insets(0, UIScale.scale(7), 0, UIScale.scale(7)));
         Font uiFont = UIManager.getFont("Label.font");
         if (uiFont != null) {
             results.setFont(uiFont);
-            chip.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(11f)));
-            footer.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(11f)));
+            chip.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
+            footer.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
         }
         results.setSelectionBackground(selection);
         results.setSelectionForeground(selectionForeground);
@@ -531,12 +548,12 @@ public final class CommandPalette extends JPanel {
             badge.colors(muted, border, selectionForeground);
             Font uiFont = UIManager.getFont("Label.font");
             if (uiFont == null) uiFont = getFont();
-            uiTitle = uiFont.deriveFont(Font.PLAIN, UIScale.scale(13f));
-            monoTitle = new Font(Font.MONOSPACED, Font.PLAIN, UIScale.scale(13));
+            uiTitle = uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(1f));
+            monoTitle = new Font(Font.MONOSPACED, Font.PLAIN, 13).deriveFont(uiTitle.getSize2D());
             icon.setFont(uiTitle);
-            detail.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(11f)));
-            tag.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(11f)));
-            badge.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(10f)));
+            detail.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
+            tag.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
+            badge.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-2f)));
         }
 
         @Override public Component getListCellRendererComponent(JList<? extends PaletteRow> list, PaletteRow row,

@@ -33,6 +33,7 @@ final class FakeTerminals implements Terminals {
 
     private final class Window implements WindowHandle {
         private final UUID id;
+        FakeWorkspace hostWorkspace() { return workspace; }
         Window(UUID id) { this.id = id; }
         @Override public UUID id() { return id; }
         @Override public List<TabHandle> tabs() {
@@ -123,6 +124,10 @@ final class FakeTerminals implements Terminals {
         @Override public boolean isOpen() { context.requireOpen(); return model().isPresent(); }
         @Override public boolean equals(Object other) { return other instanceof PaneHandle handle && handle.id().equals(id); }
         @Override public int hashCode() { return id.hashCode(); }
+    }
+
+    boolean ownsOpenWindow(WindowHandle handle) {
+        return handle instanceof Window window && window.hostWorkspace() == workspace && workspace.window(window.id()).isPresent();
     }
 
     WindowHandle windowHandle(UUID id) { return new Window(id); }

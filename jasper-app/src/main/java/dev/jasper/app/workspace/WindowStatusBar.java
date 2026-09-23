@@ -118,7 +118,7 @@ final class WindowStatusBar extends JPanel {
         for (Box row : new Box[]{leftItems, rightItems})
             for (Component child : row.getComponents()) if (child instanceof JButton item) {
                 item.setForeground(muted());
-                item.setFont(UIManager.getFont("Label.font").deriveFont(UIScale.scale(10f)));
+                item.setFont(UIManager.getFont("Label.font").deriveFont(UIManager.getFont("Label.font").getSize2D() - UIScale.scale(2f)));
             }
         configButton.setForeground(UIManager.getColor(configColor));
     }
@@ -141,7 +141,7 @@ final class WindowStatusBar extends JPanel {
         void refreshTheme() {
             for (JComponent label : new JComponent[]{first, slash, last}) {
                 label.setForeground(label == slash ? UIManager.getColor("Separator.foreground") : muted());
-                label.setFont(UIManager.getFont("Label.font").deriveFont(UIScale.scale(10f)));
+                label.setFont(UIManager.getFont("Label.font").deriveFont(UIManager.getFont("Label.font").getSize2D() - UIScale.scale(2f)));
             }
         }
         @Override public Dimension getPreferredSize() {

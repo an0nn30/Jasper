@@ -24,6 +24,13 @@ import javax.swing.UIManager;
 
 /** The manager's passive view: it renders a snapshot and reports clicks. It decides nothing. */
 final class PluginManagerPanel extends JPanel {
+    @Override public void updateUI() {
+        super.updateUI();
+        var base = UIManager.getFont("Label.font");
+        if (bannerLabel != null) bannerLabel.setFont(base.deriveFont(Font.BOLD));
+        if (title != null) title.setFont(base.deriveFont(Font.BOLD, base.getSize2D() + 3f));
+    }
+
     /** What the user can ask for. */
     record Handlers(Consumer<PluginRuntime.Row> toggle, Consumer<PluginRuntime.Row> review, Consumer<PluginRuntime.Row> remove,
                     Consumer<PluginRuntime.Row> discard, Runnable install, Consumer<PluginRuntime.Row> openSettings,

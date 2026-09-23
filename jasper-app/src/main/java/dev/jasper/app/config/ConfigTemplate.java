@@ -114,6 +114,12 @@ public final class ConfigTemplate {
             # remain reserved and are always forced to xterm-256color and truecolor.
             # This table does not change which default login shell is selected.
 
+            [ui.font]
+            # UI font for app chrome and plugin controls; updates live, independently of [font].
+            # Omit size to retain the platform default. Use 8–32 points when set.
+            # family = "system"
+            # size = 14
+
             [ui.theme]
             # Theme variant: "dark" or "light"; switches chrome and terminal colors live across windows.
             # variant = "dark"

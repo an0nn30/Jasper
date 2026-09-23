@@ -77,7 +77,8 @@ final class WindowCommands implements AutoCloseable {
                       List<String> extraKeywords) {
         Action action = new AbstractAction(label) {
             @Override public void actionPerformed(ActionEvent event) {
-                if (owner.isActiveAndOpen() && !owner.commandPalette().isOpen()) callback.run();
+                if (owner.isActiveAndOpen() && !owner.commandPalette().isOpen()
+                        && !dev.jasper.app.platform.WindowInput.blocked(owner)) callback.run();
             }
         };
         action.putValue(Command.TITLE, title);
