@@ -29,7 +29,9 @@ short reads, sparse offsets, cancellation, and SFTP through ProxyJump with a sur
 Durable SQLite storage passes reopen, checkpoint, 100k-entry pagination, cross-process locking,
 killed-writer recovery and corrupt/newer-schema preservation tests. The transfer engine now passes local/SFTP/relay copies, recursive folders and links, short pause
 checkpoints and restart validation, blocked-write pause, seven killed-process publication boundaries,
-and a >4-GiB/100k-entry probe under a 64-MiB heap. Next: browser and Transfers integration.
+and a >4-GiB/100k-entry probe under a 64-MiB heap. The browser/controller, disk-backed directory pages, destination picker and cancellable
+file operations are implemented with native controls and SDK icons. Next: plugin wiring,
+Transfers management, composed lifecycle checks and final review.
 The staged plugin-loader SQLite check runs with final integration; direct driver deregistration is covered now.
 Nothing merged or pushed.
 

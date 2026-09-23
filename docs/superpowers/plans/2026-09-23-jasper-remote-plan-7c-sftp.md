@@ -400,7 +400,7 @@ host lookup and active-pane identity/path provider. `open(host,path)`, `follow(p
 `visible(boolean)` and `close()` own generation/lease lifetime. DirectoryCache is a separate
 temporary SQLite spool with indexed sort/pages. Views have no SQL/network access.
 
-- [ ] Write headless tests for selection/Enter, fixed picker source/destination, late stale
+- [x] Write headless tests for selection/Enter, fixed picker source/destination, late stale
   directory responses, pane/window switching, manual navigation disabling follow, local pane
   retaining last remote, hidden-view release and generation checks after close.
 
@@ -412,17 +412,17 @@ fixture.completeListing(hostA, "/a", List.of("old"));
 assertThat(panel.names()).containsExactly("new");
 ```
 
-- [ ] Run browser tests; expected absent UI.
-- [ ] Build compact JTable/JList with native selection, SDK-provided icons injected through
+- [x] Run browser tests; expected absent UI.
+- [x] Build compact JTable/JList with native selection, SDK-provided icons injected through
   controller, path bar and toolbar. Use owner-based upload/download choosers. Add Upload Folder
   and Copy to host menu; destination dialog contains only one destination browser plus source
   summary. New-folder and confirmed delete run on owned background operations with cancellation.
   Preserve browser state per pane; directory events never change endpoint. No automatic panel
   opening on SSH connect. Following uses reported remote path only, no injected shell commands.
-- [ ] Run browser tests in both skins/large UI font, including 100k cached directory entries,
+- [x] Run browser tests in both skins/large UI font, including 100k cached directory entries,
   unsupported local names, literal `<html>` filenames, deletion link loops and cancellation. Verify clipboard paths do not
   inject commands and no plugin-local icon assets were added.
-- [ ] Commit `feat(remote): browse remote files in a single sidebar`.
+- [x] Commit `feat(remote): browse remote files in a single sidebar`.
 
 ### Task 9: Integrate the shared transfer queue, status controls and lifecycle
 
