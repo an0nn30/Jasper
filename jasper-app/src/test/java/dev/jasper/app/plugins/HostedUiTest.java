@@ -248,4 +248,24 @@ class HostedUiTest {
         assertThat(auxiliary.open()).isEmpty();
         assertThatCode(() -> { prompt.close(); trust.close(); manager.setTitle("after close"); }).doesNotThrowAnyException();
     }
+@Test void metalKeepsPluginSvgAndSubscriptionContracts() {
+    new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.RETRO,
+        dev.jasper.app.config.Appearance.DARK);
+    try {
+        variant = Variant.LIGHT;
+        assertThat(ui.appearance().variant()).isEqualTo(Variant.LIGHT);
+        var icon = ui.appearance().icon("dev/jasper/app/icons/search.svg");
+        var image = new java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { graphics.scale(2, 2); icon.paintIcon(new javax.swing.JLabel(), graphics, 0, 0); }
+        finally { graphics.dispose(); }
+        assertThat(icon.getIconWidth()).isEqualTo(16);
+        assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon("absent.svg"));
+        var events = new java.util.ArrayList<Variant>();
+        var subscription = ui.appearance().onChanged(events::add);
+        subscription.close();
+        assertThat(themeHandlers).isEmpty();
+    } finally { ui.closeAll(); new dev.jasper.app.appearance.ThemeController(); }
+}
+
 }

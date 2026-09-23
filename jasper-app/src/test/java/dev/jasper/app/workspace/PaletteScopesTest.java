@@ -259,9 +259,13 @@ class PaletteScopesTest {
         });
     }
 
-    @Test void aStepReplacesTheListCompletesWithValuesAndReopensWhereTheScopeAsks() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void aStepReplacesTheListCompletesWithValuesAndReopensWhereTheScopeAsks(boolean retro) throws Exception {
         edt(() -> {
-            try (var owner = owner(true)) {
+            try (var owner = new WindowContent(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
+                new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT),
+                dev.jasper.app.config.KeyBindings.defaults(true), System::nanoTime, new dev.jasper.app.commands.CommandHistory(), true)) {
                 var root = install(owner); var fake = new FakeScope(); owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 var router = PaletteKeyRouterTest.router(owner, true, root);
@@ -300,13 +304,17 @@ class PaletteScopesTest {
                 assertThat(palette.activeScopeId()).isEqualTo(PaletteScope.COMMANDS_ID);
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.resultList(card).getSelectedValue().id()).isEqualTo("new_tab");
                 assertThat(card.queryField().getText()).isEmpty();
-            }
+            } finally { new dev.jasper.app.appearance.ThemeController(); }
         });
     }
 
-    @Test void escapeLeavesAStepWithTheQueryIntactAndScopeShortcutsOrDoneDismissIt() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void escapeLeavesAStepWithTheQueryIntactAndScopeShortcutsOrDoneDismissIt(boolean retro) throws Exception {
         edt(() -> {
-            try (var owner = owner(true)) {
+            try (var owner = new WindowContent(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
+                new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT),
+                dev.jasper.app.config.KeyBindings.defaults(true), System::nanoTime, new dev.jasper.app.commands.CommandHistory(), true)) {
                 install(owner); var fake = new FakeScope(); owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
                 palette.open("test.fake");
@@ -332,7 +340,7 @@ class PaletteScopesTest {
                 palette.enterPressed(0);
                 assertThat(palette.isOpen()).isFalse();
                 assertThat(fake.completed).hasSize(1);
-            }
+            } finally { new dev.jasper.app.appearance.ThemeController(); }
         });
     }
 

@@ -182,12 +182,13 @@ final class WindowCommandPalette implements AutoCloseable {
             palette.setBounds(positioned(terminal, palette.getPreferredSize(), available, UIScale.scale(16)));
         }
         @Override protected void paintComponent(Graphics graphics) {
+            if (owner.retro()) return;
             if (!controller.isOpen()) return;
             var g = (Graphics2D) graphics.create();
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 Rectangle card = palette.getBounds();
-                g.setColor(new Color(0, 0, 0, owner.theme().chrome() == BuiltinTheme.LIGHT ? 2 : 4));
+                g.setColor(new Color(0, 0, 0, owner.theme().chrome().appearance() == dev.jasper.app.config.Appearance.LIGHT ? 2 : 4));
                 for (int i = 12; i >= 1; i--) {
                     int expansion = UIScale.scale(i), arc = UIScale.scale(24) + expansion * 2;
                     g.fillRoundRect(card.x - expansion, card.y - expansion, card.width + expansion * 2,

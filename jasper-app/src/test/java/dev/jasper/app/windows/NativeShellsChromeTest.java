@@ -32,4 +32,23 @@ class NativeShellsChromeTest {
             assertThat(content.getParent()).isSameAs(surface.holder());
         }
     }
+@Test void retroKeepsNormalWindowDecorationsForFramesAndDialogs() {
+    new ThemeController(dev.jasper.app.config.ThemeStyle.RETRO, dev.jasper.app.config.Appearance.DARK);
+    try {
+        for (var kind : AuxiliarySurface.Kind.values()) {
+            var surface = new AuxiliarySurface("dev.test.retro", "Retro editor", kind, true,
+                new java.awt.Dimension(400, 300), null, null,
+                ignored -> { throw new AssertionError("No native shell in tests"); });
+            var content = new javax.swing.JPanel(); surface.setContent(content);
+            var root = new javax.swing.JRootPane();
+            assertThat(NativeShells.installTitleBar(root, surface, true)).isNull();
+            assertThat(root.getContentPane()).isSameAs(surface.holder());
+            assertThat(content.getParent()).isSameAs(surface.holder());
+            assertThat(root.getClientProperty("apple.awt.fullWindowContent")).isNull();
+            assertThat(root.getClientProperty("apple.awt.transparentTitleBar")).isNull();
+            assertThat(root.getClientProperty("apple.awt.windowTitleVisible")).isNull();
+        }
+    } finally { new ThemeController(); }
+}
+
 }

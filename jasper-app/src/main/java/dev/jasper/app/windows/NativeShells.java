@@ -95,7 +95,7 @@ public final class NativeShells {
             .filter(NativeShells::onSomeScreen).ifPresent(frame::setBounds);
         Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
             if (chromeChanged) SwingUtilities.updateComponentTreeUI(frame);
-            if (bar != null) bar.setLight(resolved.chrome() == BuiltinTheme.LIGHT);
+            if (bar != null) bar.setLight(resolved.chrome().appearance() == dev.jasper.app.config.Appearance.LIGHT);
         });
         natives.put(surface, frame);
         return new AuxiliarySurface.Shell(() -> frame.setVisible(true), () -> {
@@ -126,7 +126,7 @@ public final class NativeShells {
         dialog.setLocationRelativeTo(owner);
         Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
             if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
-            if (bar != null) bar.setLight(resolved.chrome() == BuiltinTheme.LIGHT);
+            if (bar != null) bar.setLight(resolved.chrome().appearance() == dev.jasper.app.config.Appearance.LIGHT);
         });
         natives.put(surface, dialog);
         return new AuxiliarySurface.Shell(() -> { dialog.pack(); dialog.setLocationRelativeTo(owner); dialog.setVisible(true); },
@@ -139,7 +139,7 @@ public final class NativeShells {
 
     /** Shared, headless-testable title setup for both kinds of SDK/application auxiliary surface. */
     static MacTitleBar installTitleBar(JRootPane root, AuxiliarySurface surface, boolean supported) {
-        MacTitleBar bar = MacTitleBar.install(root, surface.holder(), new JPanel(), () -> TITLE_HEIGHT, () -> { }, supported);
+        MacTitleBar bar = MacTitleBar.install(root, surface.holder(), new JPanel(), () -> TITLE_HEIGHT, () -> { }, supported && !dev.jasper.app.platform.SwingAppearance.retro());
         if (bar != null) bar.setTitle(surface.title(), true);
         return bar;
     }

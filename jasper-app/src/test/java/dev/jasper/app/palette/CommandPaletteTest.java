@@ -348,8 +348,12 @@ class CommandPaletteTest {
         });
     }
 
-    @Test void threeVerbsShowInTheFooterAndAStepReplacesTheListWithFields() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void threeVerbsShowInTheFooterAndAStepReplacesTheListWithFields(boolean retro) throws Exception {
         SwingUtilities.invokeAndWait(() -> {
+            new ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
+            try {
             var palette = new CommandPalette(true, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
             var verbs = List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run"),
                 new PaletteVerb("save", "Save as snippet…"));
@@ -363,6 +367,7 @@ class CommandPaletteTest {
                 new PaletteStep.Field("remote", "remote", "")));
             assertThat(palette.stepShowing()).isTrue();
             assertThat(palette.stepFields()).hasSize(2);
+            if (retro) assertThat(palette.stepFields().getFirst().getBorder()).isEqualTo(UIManager.getBorder("TextField.border"));
             assertThat(palette.stepFields().getFirst().getText()).isEqualTo("main");
             assertThat(palette.stepFields().getFirst().getAccessibleContext().getAccessibleName()).isEqualTo("branch");
             assertThat(palette.stepFocusIndex()).isZero();
@@ -389,6 +394,8 @@ class CommandPaletteTest {
             assertThat(palette.resultList().getSelectedValue().id()).isEqualTo("b");
             palette.selectRow("missing");
             assertThat(palette.resultList().getSelectedValue().id()).isEqualTo("b");
+            if (retro) assertThat(palette.queryField().getBorder()).isEqualTo(UIManager.getBorder("TextField.border"));
+            } finally { new ThemeController(); }
         });
     }
 
@@ -430,4 +437,24 @@ class CommandPaletteTest {
         KeyStroke[] keys = field.getInputMap().allKeys();
         return keys != null && Arrays.stream(keys).anyMatch(key -> action.equals(field.getInputMap().get(key)));
     }
+@Test void retroQueryRetainsMetalBorderAndNativeEditing() throws Exception {
+    SwingUtilities.invokeAndWait(() -> {
+        new ThemeController(dev.jasper.app.config.ThemeStyle.RETRO, dev.jasper.app.config.Appearance.DARK);
+        try {
+            var changes = new ArrayList<String>();
+            var palette = new CommandPalette(false, changes::add, (row, verb) -> {}, () -> {}, () -> {});
+            assertThat(palette.queryField().getBorder()).isEqualTo(UIManager.getBorder("TextField.border"));
+            assertThat(palette.queryField().getFont()).isEqualTo(UIManager.getFont("TextField.font"));
+            assertThat(palette.queryField().getActionMap().get(DefaultEditorKit.deletePrevCharAction)).isNotNull();
+            palette.queryField().setText("split");
+            assertThat(changes).containsExactly("split");
+            palette.setSize(palette.getPreferredSize()); palette.doLayout();
+            var image = new BufferedImage(palette.getWidth(), palette.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics();
+            try { palette.paint(graphics); } finally { graphics.dispose(); }
+            assertThat(image.getRGB(2, 2) >>> 24).isEqualTo(255);
+        } finally { new ThemeController(); }
+    });
+}
+
 }

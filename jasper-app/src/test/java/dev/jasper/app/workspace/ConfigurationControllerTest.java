@@ -643,4 +643,19 @@ class ConfigurationControllerTest {
     });
 }
 
+@Test @DisabledOnOs(OS.WINDOWS)
+void retroStyleReloadKeepsALiveSessionAndAppliesFontChanges() throws Exception {
+    start("ui.theme.style='retro'\n");
+    edt(() -> owner()); launchAll();
+    var pane = owners.getFirst().currentPane();
+    var session = pane.session();
+    reload("ui.theme.style='modern'\nfont.size=22\n");
+    edt(() -> {
+        assertThat(pane.session()).isSameAs(session);
+        assertThat(pane.view().fontSize()).isEqualTo(22);
+        assertThat(pane.view().palette().background()).isEqualTo(java.awt.Color.BLACK);
+        assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.RETRO);
+    });
+}
+
 }

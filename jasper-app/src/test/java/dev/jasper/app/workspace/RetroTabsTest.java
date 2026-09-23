@@ -78,4 +78,16 @@ class RetroTabsTest {
             assertThat(owner.currentTab()).isSameAs(survivor);
         });
     }
+    @Test void rootKeepsNativeDecorationsAndTitleUpdates() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new java.util.ArrayDeque<>()), new ThemeController(ThemeStyle.RETRO, Appearance.LIGHT));
+            var root = new javax.swing.JRootPane();
+            var titles = new java.util.ArrayList<String>();
+            assertThat(WindowContent.installTitleBar(root, owner, true, titles::add)).isNull();
+            assertThat(root.getContentPane()).isSameAs(owner);
+            assertThat(root.getClientProperty("apple.awt.fullWindowContent")).isNull();
+            owner.currentTab().rename("Retro title"); owner.update();
+            assertThat(titles.getLast()).contains("Retro title");
+        });
+    }
 }
