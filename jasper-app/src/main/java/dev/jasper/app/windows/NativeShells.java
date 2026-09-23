@@ -73,7 +73,27 @@ public final class NativeShells {
      * @return the functions the core drives
      */
     public AuxiliarySurface.Shell create(AuxiliarySurface surface) {
-        return surface.kind() == AuxiliarySurface.Kind.WINDOW ? frame(surface) : dialog(surface);
+        return switch (surface.kind()) {
+            case WINDOW -> frame(surface);
+            case DIALOG -> dialog(surface);
+            case OVERLAY -> overlay(surface);
+        };
+    }
+
+    private AuxiliarySurface.Shell overlay(AuxiliarySurface surface) {
+        Window owner = surface.ownerWindow().map(terminalWindows).orElse(null);
+        if (!(owner instanceof javax.swing.RootPaneContainer container))
+            throw new IllegalStateException("An overlay needs an open terminal window");
+        var overlay = new WindowOverlay(container.getRootPane(), surface.holder());
+        surface.holder().getAccessibleContext().setAccessibleName(surface.title());
+        var close = new WindowAdapter() {
+            @Override public void windowClosed(WindowEvent event) { surface.close(); }
+        };
+        owner.addWindowListener(close);
+        return new AuxiliarySurface.Shell(overlay::show, overlay::focus,
+            () -> { owner.removeWindowListener(close); overlay.close(); },
+            title -> surface.holder().getAccessibleContext().setAccessibleName(title), overlay::cardBounds,
+            (title, initial) -> chooseFile(owner, title, initial, Optional.empty()));
     }
 
     private AuxiliarySurface.Shell frame(AuxiliarySurface surface) {
