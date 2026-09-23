@@ -88,6 +88,16 @@ Interaction, accessible status, search and connection behavior are unchanged.
 `./gradlew check :jasper-app:installDist` passed: 1,617 tests, 1,614 passed, three expected skips,
 zero failures/errors. Headless renders using Jasper’s actual dark theme at 360px and 240px were inspected.
 
+### App-wide UI typography — 2026-09-23
+
+User-approved `ui.font.family` / `ui.font.size` settings update chrome and plugin controls live,
+independently of terminal `[font]`. Omitted settings preserve platform defaults; sizes accept 8–32.
+Relative headings, palette/status labels, tabs and titles follow updates. Remote headings refresh
+in existing panels and progress content grows to fit. Missing families fall back to the platform.
+`./gradlew :jasper-app:test :jasper-plugin-remote:test` passed; full verification follows overlay work.
+The centered connection overlay and explicit Cancel button, plus its native implementation plan,
+are now approved and in progress.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

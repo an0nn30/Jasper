@@ -284,7 +284,7 @@ final class WindowChrome {
             return prefix.isEmpty() ? key : prefix + "+" + key;
         }
         private Font chromeFont() {
-            Font font = UIManager.getFont("Label.font").deriveFont(Font.PLAIN, UIScale.scale(11.5f));
+            Font font = UIManager.getFont("Label.font").deriveFont(Font.PLAIN, UIManager.getFont("Label.font").getSize2D() - UIScale.scale(.5f));
             return id == ActionId.NEW_TAB ? font.deriveFont(java.util.Map.of(java.awt.font.TextAttribute.WEIGHT,
                 java.awt.font.TextAttribute.WEIGHT_SEMIBOLD)) : font;
         }
@@ -292,7 +292,7 @@ final class WindowChrome {
             FontMetrics fm = getFontMetrics(chromeFont());
             int width = UIScale.scale(32);
             if (labels()) width += UIScale.scale(5) + fm.stringWidth(getText());
-            if (!hint().isEmpty()) width += UIScale.scale(8) + getFontMetrics(chromeFont().deriveFont(UIScale.scale(10f))).stringWidth(hint());
+            if (!hint().isEmpty()) width += UIScale.scale(8) + getFontMetrics(chromeFont().deriveFont(chromeFont().getSize2D() - UIScale.scale(1.5f))).stringWidth(hint());
             if ((id == ActionId.SPLIT_RIGHT || chevron) && labels()) width += UIScale.scale(16);
             int trim = labels() && id != null ? switch (id) { case NEW_TAB -> 6; case NEW_WINDOW -> 3; case FIND -> 4; default -> 0; } : 0;
             int measuredWidth = width - UIScale.scale(trim);
@@ -323,7 +323,7 @@ final class WindowChrome {
                 FontMetrics fm = g.getFontMetrics(); int baseline = (getHeight() - fm.getHeight()) / 2 + fm.getAscent();
                 g.drawString(getText(), x, baseline); x += fm.stringWidth(getText());
                 if (!hint().isEmpty()) {
-                    g.setFont(chromeFont().deriveFont(UIScale.scale(10f))); g.setColor(UIManager.getColor("Jasper.mutedForeground"));
+                    g.setFont(chromeFont().deriveFont(chromeFont().getSize2D() - UIScale.scale(1.5f))); g.setColor(UIManager.getColor("Jasper.mutedForeground"));
                     g.drawString(hint(), x + UIScale.scale(8), baseline);
                 }
                 if (id == ActionId.SPLIT_RIGHT || chevron) {

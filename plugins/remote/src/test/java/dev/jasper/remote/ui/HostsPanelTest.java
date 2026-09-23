@@ -18,6 +18,27 @@ class HostsPanelTest {
     final RemoteHost prod = RemoteHost.create("prod", "api.example", 22, "deploy", new Auth.Vault(UUID.randomUUID()), "Production", Optional.empty());
     final RemoteHost nas = RemoteHost.create("nas", "nas.local", 2222, "me", Auth.AGENT, "", Optional.of(prod.id()));
 
+    @Test void openHostDetailsAndConnectionHeadingFollowUiFontChanges() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var panel = new HostsPanel(actions);
+            panel.setHosts(List.of(prod), Optional.empty()); panel.select(prod.id());
+            var progress = new ConnectionPanel("prod", "user@host", () -> {}, () -> {});
+            Object previous = javax.swing.UIManager.get("Label.font");
+            try {
+                javax.swing.UIManager.put("Label.font", new javax.swing.plaf.FontUIResource("Serif", java.awt.Font.PLAIN, 20));
+                javax.swing.SwingUtilities.updateComponentTreeUI(panel);
+                javax.swing.SwingUtilities.updateComponentTreeUI(progress);
+                assertThat(panel.cardName.getFont().getFamily()).isEqualTo(java.awt.Font.SERIF);
+                assertThat(panel.cardName.getFont().getSize2D()).isEqualTo(20);
+                assertThat(panel.cardName.getFont().isBold()).isTrue();
+                var heading = (javax.swing.JPanel) progress.getComponent(0);
+                var title = (javax.swing.JLabel) heading.getComponent(0);
+                assertThat(title.getFont().getFamily()).isEqualTo(java.awt.Font.SERIF);
+                assertThat(title.getFont().getSize2D()).isEqualTo(23);
+            } finally { javax.swing.UIManager.put("Label.font", previous); }
+        });
+    }
+
     @Test void showsRowsCardAndRunsActions() {
         var panel = new HostsPanel(actions);
         assertThat(panel.empty.isVisible()).isTrue();

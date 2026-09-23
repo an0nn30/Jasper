@@ -366,8 +366,8 @@ public final class CommandPalette extends JPanel {
         Font uiFont = UIManager.getFont("Label.font");
         if (uiFont != null) {
             results.setFont(uiFont);
-            chip.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(11f)));
-            footer.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(11f)));
+            chip.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
+            footer.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
         }
         results.setSelectionBackground(selection);
         results.setSelectionForeground(selectionForeground);
@@ -531,12 +531,12 @@ public final class CommandPalette extends JPanel {
             badge.colors(muted, border, selectionForeground);
             Font uiFont = UIManager.getFont("Label.font");
             if (uiFont == null) uiFont = getFont();
-            uiTitle = uiFont.deriveFont(Font.PLAIN, UIScale.scale(13f));
-            monoTitle = new Font(Font.MONOSPACED, Font.PLAIN, UIScale.scale(13));
+            uiTitle = uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(1f));
+            monoTitle = new Font(Font.MONOSPACED, Font.PLAIN, 13).deriveFont(uiTitle.getSize2D());
             icon.setFont(uiTitle);
-            detail.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(11f)));
-            tag.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(11f)));
-            badge.setFont(uiFont.deriveFont(Font.PLAIN, UIScale.scale(10f)));
+            detail.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
+            tag.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
+            badge.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-2f)));
         }
 
         @Override public Component getListCellRendererComponent(JList<? extends PaletteRow> list, PaletteRow row,

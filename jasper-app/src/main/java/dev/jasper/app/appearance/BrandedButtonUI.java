@@ -26,7 +26,7 @@ public final class BrandedButtonUI extends FlatButtonUI {
     @Override protected void installDefaults(AbstractButton button) {
         super.installDefaults(button);
         if (button.getFont() instanceof UIResource)
-            button.setFont(new FontUIResource(button.getFont().deriveFont(Font.PLAIN, UIScale.scale(FONT_SIZE))));
+            button.setFont(new FontUIResource(javax.swing.UIManager.getFont("Label.font").deriveFont(Font.PLAIN)));
     }
 
     @Override public Dimension getPreferredSize(JComponent component) {

@@ -523,3 +523,12 @@ on a shared MINA session. Cancellation withdraws pending credentials and host-ke
 In SDK 0.7.2+, `context.panels().toggle(panelId, window)` opens or hides your own
 registered panel in a terminal window. It creates the panel lazily and reuses that
 window's instance. Require `>=0.7.2` in the manifest when calling it.
+
+### UI typography
+
+Plugin controls inherit the host's live `ui.font.family` and `ui.font.size` settings through Swing
+defaults. Prefer the default component fonts. For custom headings, derive style and a small size
+offset from `UIManager.getFont("Label.font")` in `updateUI()` so an already-open panel refreshes.
+List renderers derive from their owning list on each render. Do not cache absolute fonts or use
+fixed component heights that clip enlarged text; let preferred sizes follow font metrics.
+Terminal content and intentionally monospaced code previews remain separate typography roles.

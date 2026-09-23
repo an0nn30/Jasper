@@ -41,7 +41,7 @@ public final class HostsPanel extends JPanel {
     final JTextField search = new JTextField();
     final JList<HostRows.Row> list;
     final JPanel card = new JPanel();
-    final JLabel cardName = new JLabel(), cardAddress = new JLabel(), cardCredential = new JLabel(), cardJump = new JLabel(), cardInfo = new JLabel();
+    final JLabel cardName = heading(""), cardAddress = new JLabel(), cardCredential = new JLabel(), cardJump = new JLabel(), cardInfo = new JLabel();
     final JButton connect = new JButton("Connect"), edit = new JButton("Edit"), add = new JButton("+"), importButton = new JButton("Import");
     final JLabel empty = new JLabel("No hosts yet — Add or Import from ~/.ssh/config");
     private final Actions actions;
@@ -58,14 +58,22 @@ public final class HostsPanel extends JPanel {
     private Function<RemoteHost, String> metadata = host -> "";
     private java.util.function.ToIntFunction<RemoteHost> sessionCount = host -> 0;
 
+    private static JLabel heading(String text) {
+        return new JLabel(text) {
+            @Override public void updateUI() {
+                super.updateUI();
+                setFont(javax.swing.UIManager.getFont("Label.font").deriveFont(Font.BOLD));
+            }
+        };
+    }
+
     public HostsPanel(Actions actions) {
         super(new BorderLayout(0, 6));
         this.actions = actions; this.activate = actions.connect();
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         var header = new JPanel();
         header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
-        var title = new JLabel("SSH hosts");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
+        var title = heading("SSH hosts");
         header.add(title); header.add(Box.createHorizontalGlue()); header.add(importButton); header.add(Box.createHorizontalStrut(4)); header.add(add);
         var north = new JPanel(new BorderLayout(0, 6));
         north.add(header, BorderLayout.NORTH);
@@ -87,7 +95,6 @@ public final class HostsPanel extends JPanel {
         add(center, BorderLayout.CENTER);
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
-        cardName.setFont(cardName.getFont().deriveFont(Font.BOLD));
         for (JLabel detail : List.of(cardName, cardAddress, cardInfo, cardCredential, cardJump))
             detail.setAlignmentX(Component.LEFT_ALIGNMENT);
         cardInfo.putClientProperty("html.disable", true);
@@ -253,7 +260,7 @@ public final class HostsPanel extends JPanel {
         if (sessions > 0) {
             var status = new JPanel(new BorderLayout(4, 0)); status.setOpaque(false);
             java.awt.Color active = javax.swing.UIManager.getColor("Actions.Green");
-            var dot = text("●", active == null ? foreground : active, owner.getFont().deriveFont(9f));
+            var dot = text("●", active == null ? foreground : active, owner.getFont().deriveFont(Math.max(8f, owner.getFont().getSize2D() - 3f)));
             status.add(dot, BorderLayout.WEST);
             if (sessions > 1) status.add(text(String.valueOf(sessions), foreground, owner.getFont()), BorderLayout.CENTER);
             row.add(status, BorderLayout.EAST);

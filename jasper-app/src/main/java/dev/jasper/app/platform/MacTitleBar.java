@@ -141,7 +141,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
 
     private void refreshColors() {
         setBackground(UIManager.getColor("Jasper.titleBackground"));
-        title.setFont(SystemFonts.system(Font.PLAIN, UIScale.scale(13f)));
+        title.setFont(SystemFonts.ui(Font.PLAIN, 13f));
         title.setForeground(UIManager.getColor(active ? "Jasper.titleForeground" : "Jasper.titleInactiveForeground"));
         repaint();
     }

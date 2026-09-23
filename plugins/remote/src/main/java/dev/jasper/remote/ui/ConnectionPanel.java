@@ -14,10 +14,15 @@ public final class ConnectionPanel extends JPanel {
     public ConnectionPanel(String name, String address, Runnable retryAction, Runnable cancelAction) {
         super(new BorderLayout(0, 16));
         setBorder(BorderFactory.createEmptyBorder(20, 24, 16, 24));
-        setPreferredSize(new Dimension(400, 190));
         var heading = new JPanel(new java.awt.GridLayout(0, 1, 0, 5));
-        var title = new JLabel(name); title.putClientProperty("html.disable", true);
-        title.setFont(title.getFont().deriveFont(Font.BOLD, title.getFont().getSize2D() + 3));
+        var title = new JLabel(name) {
+            @Override public void updateUI() {
+                super.updateUI();
+                var base = UIManager.getFont("Label.font");
+                setFont(base.deriveFont(Font.BOLD, base.getSize2D() + 3));
+            }
+        };
+        title.putClientProperty("html.disable", true);
         var target = new JLabel(address); target.putClientProperty("html.disable", true);
         heading.add(title); heading.add(target); add(heading, BorderLayout.NORTH);
         var body = new JPanel(new BorderLayout(0, 8));
@@ -27,6 +32,10 @@ public final class ConnectionPanel extends JPanel {
         buttons.add(retry); buttons.add(cancel); add(buttons, BorderLayout.SOUTH);
         retry.addActionListener(event -> retryAction.run()); cancel.addActionListener(event -> cancelAction.run());
         working();
+    }
+    @Override public Dimension getPreferredSize() {
+        Dimension size = super.getPreferredSize();
+        return new Dimension(Math.max(400, size.width), Math.max(190, size.height));
     }
     public void working() { progress.setVisible(true); progress.setIndeterminate(true); retry.setVisible(false); cancel.setText("Cancel"); status("Preparing connection…"); }
     public void status(String text) { message.setText(text); message.setToolTipText(text); }

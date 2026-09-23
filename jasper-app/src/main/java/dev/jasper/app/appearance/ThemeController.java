@@ -1,6 +1,9 @@
 package dev.jasper.app.appearance;
 
 import dev.jasper.app.config.Appearance;
+import dev.jasper.app.config.UiFontConfig;
+import java.awt.Font;
+import javax.swing.plaf.FontUIResource;
 import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.FlatLightLaf;
@@ -27,6 +30,8 @@ public final class ThemeController {
     private final Set<BiConsumer<ResolvedTheme, Boolean>> listeners = new LinkedHashSet<>();
     private final Predicate<BuiltinTheme> installer;
     private ThemeState state = ThemeState.defaults();
+    private UiFontConfig uiFont = UiFontConfig.defaults();
+    private final Font platformFont;
 
     public ThemeController() { this(ThemeController::install); }
 
@@ -34,23 +39,45 @@ public final class ThemeController {
     public ThemeController(Predicate<BuiltinTheme> installer) {
         requireEdt();
         this.installer = Objects.requireNonNull(installer);
+        UIManager.put("defaultFont", null);
+        UIManager.put("Jasper.uiFontFamilyOverride", false);
         installOrThrow(state.resolve().chrome());
+        platformFont = UIManager.getFont("defaultFont");
     }
 
     public ResolvedTheme current() { requireEdt(); return state.resolve(); }
     public Appearance choice() { requireEdt(); return state.choice(); }
 
-    public void configure(Appearance saved) { requireEdt(); apply(state.configure(Objects.requireNonNull(saved))); }
+    public void configure(Appearance saved) { configure(saved, uiFont); }
+    public void configure(Appearance saved, UiFontConfig font) {
+        requireEdt(); apply(state.configure(Objects.requireNonNull(saved)), Objects.requireNonNull(font));
+    }
     public void selectAppearance(Appearance choice) { requireEdt(); apply(state.choose(choice)); }
     public void select(BuiltinTheme theme) { selectAppearance(Objects.requireNonNull(theme).appearance()); }
-    private void apply(ThemeState candidate) {
+    private void apply(ThemeState candidate) { apply(candidate, uiFont); }
+    private void apply(ThemeState candidate, UiFontConfig font) {
         ResolvedTheme previous = state.resolve(), next = candidate.resolve();
-        boolean chromeChanged = previous.chrome() != next.chrome();
+        boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
         boolean choiceChanged = state.choice() != candidate.choice();
-        if (chromeChanged) installOrThrow(next.chrome());
+        if (chromeChanged) {
+            Object previousOverride = uiFont.equals(UiFontConfig.defaults()) ? null : resolveFont(uiFont);
+            UIManager.put("defaultFont", font.equals(UiFontConfig.defaults()) ? null : resolveFont(font));
+            try { installOrThrow(next.chrome()); }
+            catch (RuntimeException failure) { UIManager.put("defaultFont", previousOverride); throw failure; }
+        }
+        uiFont = font;
+        UIManager.put("Jasper.uiFontFamilyOverride", !font.family().equalsIgnoreCase("system"));
         state = candidate;
-        if (!previous.equals(next) || choiceChanged)
+        if (chromeChanged || !previous.equals(next) || choiceChanged)
             for (var listener : List.copyOf(listeners)) listener.accept(next, chromeChanged);
+    }
+
+    private FontUIResource resolveFont(UiFontConfig choice) {
+        Font family = choice.family().equalsIgnoreCase("system") ? platformFont : new Font(choice.family(), Font.PLAIN, 13);
+        if (family.getFamily().equals(Font.DIALOG) && !choice.family().equalsIgnoreCase(Font.DIALOG)) family = platformFont;
+        // Jasper's ordinary form text is one point below FlatLaf's default (menus/title chrome).
+        float size = choice.size() == 0 ? platformFont.getSize2D() : choice.size() + 1;
+        return new FontUIResource(family.deriveFont(Font.PLAIN, size));
     }
 
     /** Replays current appearance; the subscribing owner closes its registration on disposal. */
