@@ -436,7 +436,9 @@ final class WindowChrome {
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
-        toolbar.setBackground(UIManager.getColor("Jasper.titleBackground"));
+        Color toolbarBackground = UIManager.getColor("Jasper.titleBackground");
+        // A plain Color tells Metal to fill the toolbar instead of painting its Ocean gradient.
+        toolbar.setBackground(owner.retro() ? new Color(toolbarBackground.getRGB()) : toolbarBackground);
         for (Component child : toolbar.getComponents()) if (!owner.retro() && child instanceof JButton button)
             button.setFont(((ReferenceButton) button).chromeFont());
         status.setBackground(owner.retro() ? UIManager.getColor("Panel.background") : owner.theme().palette().background());

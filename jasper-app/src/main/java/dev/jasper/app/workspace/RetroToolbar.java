@@ -5,7 +5,7 @@ import java.awt.Dimension;
 import javax.swing.JButton;
 import javax.swing.JToolBar;
 
-/** Normal Metal toolbar painting/layout, with app label preferences and icon-only compaction. */
+/** Metal toolbar layout and controls on a solid background, with app label preferences and icon-only compaction. */
 final class RetroToolbar extends JToolBar {
     /** Flat classic launcher button, with captions centered below its artwork. */
     static void styleButton(JButton button) {

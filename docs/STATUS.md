@@ -1859,3 +1859,10 @@ The full application check and architecture gate also passed: 815 tests, 0 failu
 User-selected Exit artwork follow-up: copied the collection’s exact `actions/exit.png`
 variants, removed the shutdown image and special scaling path. Icon/chrome tests and
 installDist passed; inspected the updated headless toolbar preview.
+
+### Flat retro toolbar background — 2026-09-23
+
+The retro toolbar now uses an explicit solid Metal light-gray background, suppressing
+Ocean's toolbar gradient while retaining the Metal delegate, border and layout.
+Targeted retro chrome/contribution tests and installDist passed; inspected the headless
+2x toolbar preview. No native GUI launch, merge or push.
