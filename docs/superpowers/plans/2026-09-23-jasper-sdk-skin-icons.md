@@ -10,7 +10,7 @@
 
 **Spec:** [Approved design](../specs/2026-09-23-jasper-sdk-skin-icons-design.md).
 
-**Status:** All four implementation tasks complete; full gate passed (1,591 tests, zero failures/errors, three expected skips). Independent final review pending. User explicitly authorized writing and executing on 2026-09-23; execute inline without another approval checkpoint. Base `4234a95`; existing isolated `codex/retro-metal` worktree. One independent final review.
+**Status:** All four implementation tasks complete; full gate passed (1,591 tests, zero failures/errors, three expected skips). Independent final review passed with no findings. Branch and worktree preserved, no merge/push. User explicitly authorized writing and executing on 2026-09-23; execute inline without another approval checkpoint. Base `4234a95`; existing isolated `codex/retro-metal` worktree. One independent final review.
 
 ## Global Constraints
 
@@ -133,3 +133,27 @@ verifyPluginArchitecture check :jasper-app:installDist` -> BUILD SUCCESSFUL. XML
 1,591 tests, 1,588 passed, three expected skips, zero failures/errors. Installed jar verification:
 55 original PNG hashes and both legal notices. Contact sheet and 1x/2x enabled/disabled toolbar
 renders inspected. Source hygiene and diff checks pass. Native acceptance remains user-run.
+
+## Independent review and final decisions
+
+Independent fresh-context review of `4234a95..ffa18ed` found no Critical, Important or Minor
+issues. Reviewer inspected actual production wiring and regression tests, XML totals and all
+55 installed image hashes/notices. No fix pass or deferred findings.
+
+Decisions made during execution:
+
+1. Proceed from the written plan without another approval because the user expressly requested
+   plan plus execution. Cost if wrong: implementation may need revision after later review.
+2. Center non-square source artwork proportionally (KEY's 48px original is 46x48), preserving
+   original bytes. Cost if wrong: a one-pixel centering adjustment may be needed.
+3. Set Swing SMALL_ICON for contributed actions as well as existing Command.ICON metadata,
+   satisfying the shared-menu regression. Effect: previously iconless plugin menus now show
+   their supplied artwork.
+4. Keep native macOS/physical Retina acceptance user-run under AGENTS.md; headless rendering
+   is verified. Cost if wrong: desktop-only visual differences may need a follow-up.
+5. Retain the user's explicit GPL2+ licensing basis and honest supplied-origin notices; no
+   independent authorship claim was added. Cost if new provenance evidence disagrees:
+   attribution/licensing records would need correction.
+
+The per-plan scratch ledger is removed after committing this record; git history, this plan,
+STATUS, tests and source preserve the implementation and review evidence.

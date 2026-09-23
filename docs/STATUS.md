@@ -112,7 +112,10 @@ in the plan; the user's direct execution request superseded another plan approva
 Full architecture guards, check and installDist passed: 1,591 tests, 1,588 passed, three
 expected skips, zero failures/errors. Installed app jar contains all 55 verified PNG hashes
 and license/notice; inspected catalog and modern/retro headless toolbar previews at 1x/2x,
-including disabled Metal icons. No GUI, login shell, merge or push. Independent review pending.
+including disabled Metal icons. Independent review of `4234a95..ffa18ed` found no issues
+and independently verified XML counts and installed assets. Native OS/physical Retina
+acceptance stays user-run; attribution retains the user's explicit GPL2+ declaration.
+No GUI, login shell, merge or push. Branch/worktree preserved; no deferred findings.
 
 ### macOS default shell refresh reverted — 2026-09-22
 
