@@ -89,6 +89,9 @@ Verified targeted toolbar actions/modes, minimum-width layout and widening, plug
 contributions, 16/24/32-pixel disabled-icon rendering, and the rebuilt distribution. Inspected
 actual toolbar renders at 1x/2x, headlessly without starting any shells or native windows.
 
+User size refinement: reduced toolbar icons from 32 to 28 logical pixels, retaining captions
+below them and flat styling. The bundled 32-pixel source artwork is unchanged.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

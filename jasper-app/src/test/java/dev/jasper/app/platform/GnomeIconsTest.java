@@ -62,7 +62,7 @@ class GnomeIconsTest {
     @Test void metalDisabledIconsRemainVisibleButDifferFromEnabledIcons() {
         new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.RETRO, dev.jasper.app.config.Appearance.LIGHT);
         try {
-            for (String name : java.util.List.of("maximize", "command")) for (int size : new int[]{16, 24, 32}) {
+            for (String name : java.util.List.of("maximize", "command")) for (int size : new int[]{16, 24, 28, 32}) {
                 var clicks = new java.util.concurrent.atomic.AtomicInteger();
                 var button = new javax.swing.JButton(GnomeIcons.icon(name, size));
                 button.addActionListener(event -> clicks.incrementAndGet());

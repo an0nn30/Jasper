@@ -21,7 +21,7 @@ final class GnomeIcons {
     static Icon icon(String name) { return icon(name, 16); }
     static Icon icon(String name, int size) {
         if (!NAMES.contains(name)) throw new IllegalArgumentException("Unknown application icon: " + name);
-        if (size != 16 && size != 24 && size != 32) throw new IllegalArgumentException("Unsupported icon size: " + size);
+        if (size != 16 && size != 24 && size != 28 && size != 32) throw new IllegalArgumentException("Unsupported icon size: " + size);
         // ImageIcon lets Metal generate its native disabled variant. Keep resolution selection in the JDK.
         return CACHE.computeIfAbsent(name + "/" + size, key -> {
             if (TANGO.contains(name)) {

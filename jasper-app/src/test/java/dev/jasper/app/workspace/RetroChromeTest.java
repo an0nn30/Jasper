@@ -18,7 +18,7 @@ class RetroChromeTest {
             assertThat(button.getBorder()).isNotNull();
             assertThat(button.isContentAreaFilled()).isFalse();
             assertThat(button.isBorderPainted()).isFalse();
-            assertThat(button.getIcon().getIconWidth()).isEqualTo(32);
+            assertThat(button.getIcon().getIconWidth()).isEqualTo(28);
             assertThat(button.getHorizontalTextPosition()).isEqualTo(javax.swing.SwingConstants.CENTER);
             assertThat(button.getVerticalTextPosition()).isEqualTo(javax.swing.SwingConstants.BOTTOM);
             assertThat(button.getPreferredSize().height).isGreaterThan(48).isLessThanOrEqualTo(64);
