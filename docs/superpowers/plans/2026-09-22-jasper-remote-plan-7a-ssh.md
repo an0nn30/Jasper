@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-22-jasper-remote-design.md`
 
+> **Execution:** Native inline on `codex/remote-7a` in the Codex-managed worktree, from current main. Tasks 1–7 implemented; Task 8 and final review in progress. Corrections and deviations are recorded in `docs/STATUS.md`; original snippets below are retained as the approved plan.
+
 ## Global Constraints
 
 - The plugin imports only the JDK, `dev.jasper.sdk.*`, `dev.jasper.vault.api.*`, its own packages and its bundled libraries (`verifyPluginArchitecture`; `gradle/plugin-architecture.gradle.kts` gains `":jasper-plugin-remote" to listOf("dev.jasper.vault.api")`).

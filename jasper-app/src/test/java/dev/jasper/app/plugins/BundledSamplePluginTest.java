@@ -35,17 +35,18 @@ class BundledSamplePluginTest {
             assertThat(contributions.action("dev.jasper.sample.demo")).get()
                 .satisfies(action -> assertThat(action.icon()).as("an SVG from the plugin's own jar").isNotNull());
             assertThat(contributions.toolbar()).hasSize(1);
-            assertThat(contributions.panels()).singleElement().satisfies(panel -> assertThat(panel.id()).isEqualTo("dev.jasper.sample.panel"));
-            assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about", "dev.jasper.vault.open");
-            assertThat(contributions.status()).hasSize(2)
+            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel");
+            assertThat(contributions.railActions()).containsExactlyInAnyOrder("dev.jasper.sample.about", "dev.jasper.vault.open");
+            assertThat(contributions.status()).hasSize(3)
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
-        assertThat(runtime.get().statusLines()).as("the sample and the three bundled feature plugins").hasSize(4)
+        assertThat(runtime.get().statusLines()).as("the sample and the four bundled feature plugins").hasSize(5)
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.1.0", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.history", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.snippets", "BUNDLED", "ACTIVE"))
-            .anySatisfy(line -> assertThat(line).contains("dev.jasper.vault", "BUNDLED", "ACTIVE"));
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.vault", "BUNDLED", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.remote", "BUNDLED", "ACTIVE"));
         var state = new AtomicReference<BuddyNotice.State>();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (state.get() != BuddyNotice.State.DONE && System.nanoTime() < deadline) {

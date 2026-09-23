@@ -23,6 +23,24 @@ is merged at `17c0476`. The Credential Vault design
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
+### Remote plan 7a (SSH) — 2026-09-22
+
+Implementation in the native worktree `/Users/dustin/.codex/worktrees/remote-7a/moray` on
+`codex/remote-7a`, not merged or pushed. The [7a plan](superpowers/plans/2026-09-22-jasper-remote-plan-7a-ssh.md)
+implements the approved [Remote design](superpowers/specs/2026-09-22-jasper-remote-design.md): saved hosts,
+config import, host-key trust, Vault/agent authentication, shared sessions, ProxyJump, hosts panel,
+editor, palette, actions and status. [Guide and native acceptance](remote.md). Tunnels (7b) and SFTP (7c) follow.
+
+Native inline execution, one commit per task; independent final review and full verification pending.
+Plan corrections so far: current-main base preserves the shell revert; native branch/worktree and accurate
+Codex attribution replace example Claude names. Fixed the store queue's completion type, strict trust
+validation before host filtering, MINA connection-context target lookup and wrapped DNS errors.
+Added lifecycle regressions and owned session references/cancellation for Vault, prompts, jump dependencies
+and natural shell exit; callbacks return to the UI executor. Test fixtures use fresh credentials,
+BC Ed25519 keys, short Unix socket paths, complete resize replies, correct fake activation and test-only UI
+access bridges. These corrections preserve the intended behavior. The planned split/collapse/credential
+ordering/fake-Vault deviations are recorded in the spec. GUI acceptance remains user-run.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

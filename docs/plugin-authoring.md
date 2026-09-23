@@ -515,3 +515,7 @@ their zip only matters for a Jasper built without them.
   `plugins/<id>/` (jars, settings and data) at the next launch, after a confirmation.
 - `jasper --safe-mode` starts without installed plugins, so a plugin that breaks startup can be
   disabled or removed; the manager then offers Restart Normally.
+
+Remote (`plugins/remote`) is a worked example for `session.provide`: connection work runs on the
+background executor, status and attachment return to the UI thread, and each shell holds a reference
+on a shared MINA session. Cancellation withdraws pending credentials and host-key prompts.

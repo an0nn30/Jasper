@@ -43,6 +43,11 @@ onto the SDK with no application code.
 7. **One shared session per host, multiplexed channels** (ControlMaster style), reference-counted
    with a short linger; shells, tunnels and SFTP are channels on it.
 
+8. **Recorded plan 7a deviations:** Connect in split replaces new-window connection because the SDK
+   cannot create terminal windows; collapse state is one saved set. Credential lookup precedes TCP
+   connection because MINA needs the username; credentials close immediately after authentication.
+   Tests publish a fake Vault API to avoid touching the real keychain.
+
 ## 3. Shape
 
 ```
@@ -109,8 +114,7 @@ Read with tomlj, written by the plugin's own writer (deterministic order, temp f
 polled once a second for outside edits like `snippets.toml`. A file that fails to parse keeps the
 last good hosts in memory and shows one error row ("hosts.toml has errors: …") in the panel and the
 palette until it parses again; a save while the file is broken is refused with a notice. No secrets
-ever enter the file. Group collapse state lives in `data/ui.toml` per window id (the SDK exposes no
-per-window UI state); it is a convenience, so a missing or broken file means "all expanded".
+ever enter the file. Group collapse state lives in one shared set in `data/panel-state.toml` (window ids do not survive restart); it is a convenience, so a missing or broken file means "all expanded".
 
 **Import.** `SshConfig` parses `~/.ssh/config` (and one level of `Include`, globbed): `Host`,
 `HostName`, `Port`, `User`, `ProxyJump`, `IdentityFile`; the first value wins per OpenSSH's rule;
@@ -210,7 +214,7 @@ Live changes apply to the next connection; the keepalive interval applies to new
   Vault" or "credential missing"), the jump host if any, Edit and Connect. Double-click or Connect
   opens a tab in that window (`terminals().openTab(window, OpenRequest.session(spec))`) titled with
   the host name, `ExitPolicy.KEEP_OPEN`. A locked or absent Vault does not disable Connect; the
-  pipeline reports. Row context menu: Connect, Connect in new window, Edit…, Duplicate, Delete…
+  pipeline reports. Row context menu: Connect, Connect in split, Edit…, Duplicate, Delete…
   (confirmation), Favorite. Empty state: "No hosts yet — Add or Import from ~/.ssh/config". A search
   with no match says so and never changes saved collapse state; filtering reveals matching groups.
 - **Host editor** (window-modal dialog): Name, Hostname, Port, Username, Group (editable combo of
@@ -223,7 +227,7 @@ Live changes apply to the next connection; the keepalive interval applies to new
 - **Palette scope** `dev.jasper.remote.scope`, label "SSH", aliases `ssh`, `remote`, `hosts`;
   rows are hosts (title name, detail `user@host:port`, tag group), favorites first, matched on name,
   hostname, username and group; verbs **Connect** (Enter, into the palette's window),
-  **Connect in new window** (Cmd/Ctrl+Enter), **Edit host…** (Shift+Enter);
+  **Connect in split** (Cmd/Ctrl+Enter), **Edit host…** (Shift+Enter);
   `shortcutActionId = dev.jasper.remote.connect`; the error row when `hosts.toml` is broken.
 - **Actions**: `dev.jasper.remote.connect` "Connect to SSH Host…" (default `cmd+shift+h`) opens the
   palette in the scope; `dev.jasper.remote.hosts` "SSH Hosts" toggles the panel (rail button);

@@ -59,3 +59,4 @@ refactored build. The [terminal](terminal-refactor-verification.md) and
 counts and review findings, with later integration/follow-up sections explicitly dated.
 
 - [Credential Vault](credential-vault.md): manager, credentials, grants, key generation and native acceptance.
+- [Remote](remote.md): SSH hosts, import from ~/.ssh/config, host-key trust, shared sessions and the hosts panel.
