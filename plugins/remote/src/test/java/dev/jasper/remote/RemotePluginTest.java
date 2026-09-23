@@ -25,7 +25,7 @@ import static dev.jasper.remote.ui.UiTestAccess.*;
 import static org.assertj.core.api.Assertions.*;
 
 class RemotePluginTest {
-    static final PluginInfo INFO = new PluginInfo("dev.jasper.remote", "Remote", "0.1.0",
+    static final PluginInfo INFO = new PluginInfo("dev.jasper.remote", "Remote", "0.2.0",
         Set.of(Capabilities.TERMINAL_OPEN, Capabilities.SESSION_PROVIDE, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE));
 
     final List<Runnable> scheduled = new ArrayList<>();

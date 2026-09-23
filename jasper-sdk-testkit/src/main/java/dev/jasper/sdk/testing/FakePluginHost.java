@@ -556,6 +556,20 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @return lines of the form {@code id|title|shown}, where a dialog's id is {@code dialog}
      */
+    /**
+     * Inspects the actual Swing content of an open plugin surface for headless form tests.
+     * @param pluginId surface owner
+     * @param title exact surface title
+     * @return content while open, empty after close or if absent
+     */
+    public java.util.Optional<javax.swing.JComponent> windowContent(String pluginId, String title) {
+        FakePluginContext context = contexts.get(pluginId);
+        if (context == null) return java.util.Optional.empty();
+        return context.ui.windows.stream().filter(w -> !w.closed && w.title.equals(title))
+            .map(w -> w.content).filter(java.util.Objects::nonNull).findFirst();
+    }
+
+    /** The currently shown plugin windows. */
     public List<String> windows() {
         List<String> lines = new ArrayList<>();
         for (FakePluginContext context : contexts.values())

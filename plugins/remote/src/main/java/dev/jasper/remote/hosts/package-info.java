@@ -1,2 +1,2 @@
-/** Saved hosts: the model, the hosts.toml file and the store that polls it. No secrets, no network. */
+/** Saved hosts and secret-free SSH import previews; ordered Vault IDs, conflict-checked writes. No secrets or network. */
 package dev.jasper.remote.hosts;

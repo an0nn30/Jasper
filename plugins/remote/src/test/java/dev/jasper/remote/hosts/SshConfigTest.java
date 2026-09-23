@@ -86,4 +86,9 @@ class SshConfigTest {
         assertThat(parsed.entries().getFirst().identityFiles()).containsExactly("global", "work key", "fallback");
     }
 
+    @Test void preservesWindowsPathSeparators() {
+        var parsed = SshConfig.parse("Host win\n IdentityFile C:\\Users\\me\\.ssh\\id_ed25519\n", i -> List.of());
+        assertThat(parsed.entries().getFirst().identityFiles()).containsExactly("C:\\Users\\me\\.ssh\\id_ed25519");
+    }
+
 }

@@ -77,6 +77,12 @@ class VaultServiceTest {
         lock.save().join();
     }
 
+    @Test void consentNamesSelectedPasswordCredentials(@TempDir Path dir) {
+        var api = service(dir).forConsumer(SSH); populate();
+        api.importSshKeys(window, List.of(), List.of(PROD));
+        assertThat(imports.getFirst().rows()).extracting(KeyImportPrompt.Row::name).containsExactly("prod");
+        imports.getFirst().cancel();
+    }
     @Test void cancelledQueuedReadNeverPublishesItsLateResult(@TempDir Path dir) throws Exception {
         var work = new java.util.ArrayDeque<Runnable>(); importBackground = work::add;
         VaultApi api = service(dir).forConsumer(SSH); populate();

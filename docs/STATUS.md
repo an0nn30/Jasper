@@ -36,20 +36,29 @@ is merged at `17c0476`. The Credential Vault design
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
-### Self-contained SSH import — design approved, plan awaiting review
+### Self-contained SSH import — implemented, final verification in progress
 
-The user clarified that config import should bring referenced private keys into
-Vault and configure hosts to use Jasper's built-in SSH client independently of the
-system agent and original key files. They confirmed Vault-backed authentication,
-not a separate SSH-agent service. The written [design](superpowers/specs/2026-09-23-jasper-vault-backed-ssh-import-design.md)
-covers encrypted managed keys, additive Vault APIs, ordered identities, re-import
-repair, compatibility, and cancellation/write failure handling. It supersedes the
-old import-to-Agent fallback for this flow. The user approved the written spec on 2026-09-23. The seven-task
-[implementation plan](superpowers/plans/2026-09-23-jasper-vault-backed-ssh-import.md)
-is written and self-reviewed, awaiting user review; native inline execution is the
-preserved choice. It covers managed storage/upgrade, serialized mutations, parsing,
-Vault import UI/API, ordered authentication, config repair and restart acceptance.
-No implementation or user credential changes have been made for this feature.
+The approved [design](superpowers/specs/2026-09-23-jasper-vault-backed-ssh-import-design.md)
+and seven-task [plan](superpowers/plans/2026-09-23-jasper-vault-backed-ssh-import.md)
+are implemented natively on `codex/retro-metal`. Vault/Remote 0.2 import referenced private keys
+and their passphrases into encrypted managed storage, grant only the requesting plugin, and save
+ordered Vault identities after persistence. Re-import **Update** repairs Agent hosts while
+preserving UUID, group and favorite. Conflicting host edits force Refresh; durable keys remain
+available for retry. Legacy manual Agent/password/path-based authentication is retained.
+
+Real Vault-form tests pass in both icon modes: two aliases deduplicate an encrypted key, repair
+an Agent host, restart with source files deleted, unlock and authenticate against loopback with
+no agent. Staged isolated-loader tests exercise the exported API, independent key parsing and
+1x/2x Metal/FlatLaf forms. These exposed and fixed setup-dialog ordering, independent setup
+waiter cancellation, BC provider isolation and Swing UI-delegate lookup from plugin components.
+
+Plan rulings: an independently authored v1 fixture replaces an old-code-generated fixture;
+transaction inputs are consumed rather than retained; one state owner combines request/review
+and passphrase prompts; the restart test accumulates the testkit's draining output. The existing
+plain EC PEM generator produces a form MINA rejects; supported encrypted OpenSSH ECDSA is tested,
+and the unrelated generator format is deferred. No production key/Vault was read or migrated.
+Full checks and independent review are the remaining gates. GUI and real-host acceptance remain
+user-run; re-import and check **Update** on the affected hosts when testing this distribution.
 
 ### Remote empty-agent diagnosis — 2026-09-23
 

@@ -36,6 +36,21 @@ class VaultPluginTest {
             new FileStore(context.dataDirectory().resolve("device.secret"))), Runnable::run);
     }
 
+    @Test void cancellingOneImportDoesNotCancelSharedVaultSetup() {
+        var plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            var owner = context.terminals().window(host.addTerminalWindow()).orElseThrow();
+            var first = plugin.service().forConsumer(SSH).importSshKeys(owner, List.of(), List.of());
+            var second = plugin.service().forConsumer(OTHER_SETUP).importSshKeys(owner, List.of(), List.of());
+            first.cancel(false);
+            assertThat(second).isNotDone(); assertThat(host.windows()).contains("dialog|Create Vault|true");
+            second.cancel(false);
+            assertThat(host.windows()).doesNotContain("dialog|Create Vault|true");
+        }
+    }
+    static final PluginInfo OTHER_SETUP = new PluginInfo("dev.jasper.other", "Other", "0.2.0", Set.of());
+
     @Test void stopLocksTheVaultEvenWhenClipboardCleanupFails() {
         String[] contents = {""};
         SecretClipboard clipboard = new SecretClipboard(text -> {

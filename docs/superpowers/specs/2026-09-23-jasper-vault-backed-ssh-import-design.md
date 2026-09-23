@@ -1,9 +1,8 @@
 # Self-contained Vault-backed SSH import
 
-Status: approved by the user ("lgtm") on 2026-09-23. This is self-contained,
-Vault-backed authentication, not a separate SSH-agent service. The written
-[implementation plan](../plans/2026-09-23-jasper-vault-backed-ssh-import.md) is awaiting
-review. Implementation has not started; native inline execution remains selected.
+Status: approved and implemented natively on `codex/retro-metal`; final verification
+and independent review are in progress. See the [implementation plan](../plans/2026-09-23-jasper-vault-backed-ssh-import.md)
+for completion evidence and implementation rulings.
 
 ## Intent and authority
 

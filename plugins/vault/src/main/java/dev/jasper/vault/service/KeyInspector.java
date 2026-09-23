@@ -13,6 +13,16 @@ import org.apache.sshd.common.util.security.SecurityUtils;
 
 /** Bounded private-key inspection; no source bytes escape on failure. */
 public final class KeyInspector {
+    static {
+        // Each plugin has its own BC classes. A JVM-global named provider may return keys
+        // owned by a different plugin loader; use this loader's provider instance instead.
+        SecurityUtils.registerSecurityProvider(new org.apache.sshd.common.util.security.bouncycastle.BouncyCastleSecurityProviderRegistrar() {
+            private final java.security.Provider local = new org.bouncycastle.jce.provider.BouncyCastleProvider();
+            @Override public boolean isNamedProviderUsed() { return false; }
+            @Override public java.security.Provider getSecurityProvider() { return local; }
+        });
+    }
+
     private KeyInspector() {}
     public static final class PassphraseRequired extends IOException { public PassphraseRequired() { super("Enter the key passphrase"); } }
     public static final class InvalidPassphrase extends IOException { public InvalidPassphrase() { super("Could not unlock the key; check its passphrase"); } }

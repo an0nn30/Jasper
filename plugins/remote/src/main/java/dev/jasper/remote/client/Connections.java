@@ -43,6 +43,16 @@ import org.apache.sshd.common.util.security.SecurityUtils;
 
 /** Shared sessions; all registry state belongs to the UI executor. Each shell and dependent hop owns a reference. */
 public final class Connections {
+    static {
+        // Each plugin has its own BC classes. A JVM-global named provider may return keys
+        // owned by a different plugin loader; use this loader's provider instance instead.
+        SecurityUtils.registerSecurityProvider(new org.apache.sshd.common.util.security.bouncycastle.BouncyCastleSecurityProviderRegistrar() {
+            private final java.security.Provider local = new org.bouncycastle.jce.provider.BouncyCastleProvider();
+            @Override public boolean isNamedProviderUsed() { return false; }
+            @Override public java.security.Provider getSecurityProvider() { return local; }
+        });
+    }
+
     public record Shell(RemoteHost host, TerminalConnection connection) {
         public UUID hostId() { return host.id(); }
     }

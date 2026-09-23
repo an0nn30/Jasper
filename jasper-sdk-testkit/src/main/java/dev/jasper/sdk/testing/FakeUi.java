@@ -215,10 +215,10 @@ final class FakeUi {
     static final class Panel { final PanelSpec spec; final PanelFactory factory; final Map<UUID, PanelInstance> instances = new LinkedHashMap<>(); Panel(PanelSpec spec, PanelFactory factory) { this.spec = spec; this.factory = factory; } }
 
     final class FakeWindow implements PluginWindow, PluginDialog {
-        final String id; final FakeWindow owner; String title; boolean shown; boolean closed;
+        final String id; final FakeWindow owner; String title; boolean shown; boolean closed; JComponent content;
         final List<BooleanSupplier> guards = new ArrayList<>(); final List<Runnable> closedHandlers = new ArrayList<>();
         FakeWindow(String id, String title, FakeWindow owner) { this.id = id; this.title = title; this.owner = owner; }
-        @Override public void setContent(JComponent content) { }
+        @Override public void setContent(JComponent content) { if (!closed) this.content = java.util.Objects.requireNonNull(content); }
         @Override public void show() { if (!closed) shown = true; }
         @Override public Optional<Path> chooseFile(String title, Optional<Path> initialPath) {
             context.requireOpen();
@@ -251,6 +251,7 @@ final class FakeUi {
             for (Runnable handler : List.copyOf(closedHandlers)) {
                 try { handler.run(); } catch (RuntimeException failure) { host.recordFailure(pluginId() + " window closed: " + failure); }
             }
+            content = null;
         }
     }
 

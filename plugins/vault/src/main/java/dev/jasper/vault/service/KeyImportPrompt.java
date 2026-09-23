@@ -50,9 +50,16 @@ public final class KeyImportPrompt {
     public CompletableFuture<Optional<SshKeyImportResult>> result() { return result; }
     public Subscription onChanged(Runnable callback) { listeners.add(callback); return () -> listeners.remove(callback); }
     public List<Row> rows() {
-        return prepared.values().stream().map(p -> new Row(p.name(), p.fingerprint(), lock.state() == LockState.UNLOCKED &&
+        var rows = new ArrayList<Row>();
+        for (PreparedKey p : prepared.values()) rows.add(new Row(p.name(), p.fingerprint(), lock.state() == LockState.UNLOCKED &&
             (lock.vault().managedKeys().stream().anyMatch(k -> k.fingerprint().equals(p.fingerprint())) ||
-             lock.vault().keys().stream().anyMatch(k -> k.fingerprint().equals(p.fingerprint()))))).toList();
+             lock.vault().keys().stream().anyMatch(k -> k.fingerprint().equals(p.fingerprint())))));
+        if (lock.state() == LockState.UNLOCKED) for (UUID id : selected) {
+            var key = lock.vault().managedKey(id).orElse(null);
+            if (key != null) rows.add(new Row(key.name(), key.fingerprint(), true));
+            else lock.vault().account(id).ifPresent(account -> rows.add(new Row(account.name(), "Password account: " + account.username(), true)));
+        }
+        return List.copyOf(rows);
     }
     public void start(Function<WindowHandle, CompletableFuture<Boolean>> open) {
         try { opening = open.apply(owner); }

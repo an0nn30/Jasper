@@ -128,7 +128,7 @@ public final class SshConfig {
         boolean started = false;
         for (; at < line.length(); at++) {
             char c = line.charAt(at);
-            if (c == '\\' && at + 1 < line.length()) { token.append(line.charAt(++at)); started = true; }
+            if (c == '\\' && at + 1 < line.length() && (line.charAt(at + 1) == '\\' || line.charAt(at + 1) == '"' || line.charAt(at + 1) == '\'' || Character.isWhitespace(line.charAt(at + 1)))) { token.append(line.charAt(++at)); started = true; }
             else if (quote != 0) { if (c == quote) quote = 0; else token.append(c); }
             else if (c == '"' || c == '\'') { quote = c; started = true; }
             else if (c == '#' && !started) break;

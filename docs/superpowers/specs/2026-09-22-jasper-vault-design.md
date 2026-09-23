@@ -1,5 +1,9 @@
 # Jasper Credential Vault — Design
 
+Managed SSH storage and config import are amended by the approved
+[self-contained Vault-backed import design](2026-09-23-jasper-vault-backed-ssh-import-design.md).
+
+
 **Status:** Approved 2026-09-22 (user decisions recorded in section 2). Realises the "Interop sketch"
 and failure walkthroughs of `2026-09-21-jasper-plugin-sdk-design.md` for the Vault side; the
 SSH/SFTP/Tunnel Manager gets its own spec and consumes the API defined here.

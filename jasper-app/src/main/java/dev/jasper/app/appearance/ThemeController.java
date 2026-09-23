@@ -48,6 +48,9 @@ public final class ThemeController {
         this.style = Objects.requireNonNull(style);
         this.installer = Objects.requireNonNull(installer);
         this.state = ThemeState.defaults().configure(Objects.requireNonNull(saved));
+        // Swing otherwise tries the component's plugin loader for third-party LAF delegates.
+        // Only UI delegate lookup belongs to the app; plugin class visibility stays isolated.
+        UIManager.put("ClassLoader", ThemeController.class.getClassLoader());
         UIManager.put("defaultFont", null);
         FORM_FONTS.forEach(key -> UIManager.put(key, null));
         UIManager.put("Jasper.uiFontFamilyOverride", false);

@@ -360,7 +360,16 @@ application loads every jar beside the plugin's own.
 
 Credential Vault (`plugins/vault`) is the worked example for `publishPerConsumer`: every plugin that
 requires it gets its own `VaultApi` whose `credential(id)` asks the user to allow *that* plugin once or
-always, and whose futures can be cancelled to withdraw the request.
+always, and whose futures can be cancelled to withdraw the request. Vault 0.2 adds
+`importSshKeys(owner, sources, selectedCredentialIds)` for a reviewed, durable batch of managed
+SSH keys and grants. Declare a Vault dependency of `>=0.2` for this flow. Source requests use
+`SshKeySource` IDs; the result maps those IDs to managed `CredentialDescriptor`s. Only managed
+SSH keys or password-only accounts can be selected as existing import credentials.
+
+A managed `Credential` exposes owned `keyBytes()` and no `keyPath()`; legacy path credentials
+keep their existing API. Always close credentials after use to clear their bytes and passphrases.
+The batch method has a default unsupported result for older API implementations. This extension
+belongs to Vault's exported API; Jasper SDK remains 0.7.4.
 
 <!-- example:pluginpalette -->
 ```java
