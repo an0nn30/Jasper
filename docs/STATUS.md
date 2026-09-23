@@ -23,6 +23,32 @@ is merged at `17c0476`. The Credential Vault design
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
+### Retro Metal appearance planning — 2026-09-22
+
+The user requested a restart-required Metal appearance option after feasibility
+investigation. A proposed [design](superpowers/specs/2026-09-22-jasper-retro-metal-design.md)
+and [implementation plan](superpowers/plans/2026-09-22-jasper-retro-metal.md) are on
+`codex/retro-metal-plan`, in the app-managed worktree
+`/Users/dustin/.codex/worktrees/retro-metal-plan/moray`, based on `ac02f94`.
+Planning only: no product code, GUI launch, merge or push. The original checkout's
+uncommitted WindowStatusBar/VaultPlugin changes were left untouched.
+
+The proposal uses stock Metal/Ocean, light app controls, a separate black terminal
+palette, GNOME 2 app icons, ordinary OS title bars and unchanged SDK signatures.
+Style is captured before UI/plugin construction; config reload derives a restart
+notice without changing existing or newly opened windows. Plugin custom artwork
+remains plugin-owned. Exact OldGNOME2 provenance/redistribution notices are a known
+asset-packaging prerequisite; all 22 proposed 16/24-pixel source assets exist and
+their PNG dimensions were checked. Metal/Ocean is stated explicitly for review.
+
+At the user's explicit planning request, the written design and plan were prepared
+together for review instead of pausing between those two documentation stages.
+The implementation and execution-method gates remain pending. Recommended execution:
+native inline with one independent final review. Seven implementation tasks cover
+config, theme lifetime, icons, tabs, chrome, plugin/palette surfaces, and acceptance.
+Planning verification: AppDocumentationTest (including dated-document links) passed;
+product behavior checks in the plan are future execution work, not claimed results.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:
