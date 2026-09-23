@@ -28,7 +28,7 @@ is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH p
 Implemented on `codex/retro-metal` in `/Users/dustin/.codex/worktrees/retro-metal-plan/moray`,
 based on `ac02f94`, following the approved [design](superpowers/specs/2026-09-22-jasper-retro-metal-design.md)
 and [plan](superpowers/plans/2026-09-22-jasper-retro-metal.md). The user chose native inline
-execution with one independent final review. Headless verification passed; independent review is underway.
+execution with one independent final review. Headless verification and the independent review fix pass are complete.
 See [configuration](configuration.md#retro-metal-appearance) to enable it.
 
 Retro uses Metal/Ocean, light controls, black high-contrast terminal colors and bundled GNOME
@@ -47,11 +47,19 @@ Metal forms without an app dependency; host tests render forms in all three appe
 Visual QA also corrected a low-contrast palette accent alias and terminal placeholder foreground; regression tests failed before both fixes. Native OS title bars, modality, menu/focus and Retina acceptance remain user-run.
 
 Verification: `verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture
-verifyPluginArchitecture check :jasper-app:installDist` passed: 1,576 tests, 1,573 passed,
+verifyPluginArchitecture check :jasper-app:installDist` passed: 1,578 tests, 1,575 passed,
 three expected skips, zero failures/errors. Inspected 1x/2x workspace, palette and Vault renders;
 modern light/dark host forms remain intact. Installed `jasper-app.jar` contains all 22 PNGs,
 matching hashes, license and notice. Source hygiene and `git diff --check` passed. No native
 window was launched. The plan's user-run OS acceptance checklist remains pending.
+
+Independent review found two issues, both fixed with failing-then-passing regressions: very
+long tab titles now elide within 240 logical pixels, preserving complete tooltip/accessibility
+text and a reachable close icon under overflow; GNOME icons use JDK multi-resolution ImageIcon
+support so Metal renders visibly disabled icons, including icon-only fallback controls.
+The full check/distribution gate passed again after these fixes. No deferred minor findings.
+The reviewer set native OS/physical Retina behavior aside; those checks remain user-run.
+Branch and worktree are preserved, with no merge or push.
 
 ### macOS default shell refresh reverted — 2026-09-22
 

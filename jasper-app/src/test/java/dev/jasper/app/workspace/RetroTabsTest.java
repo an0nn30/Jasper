@@ -94,4 +94,38 @@ class RetroTabsTest {
             assertThat(titles.getLast()).contains("Retro title");
         });
     }
+
+    @Test void longTitlesKeepCloseTargetsVisibleDuringOverflow() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new java.util.ArrayDeque<>()), new ThemeController(ThemeStyle.RETRO, Appearance.LIGHT));
+            var first = owner.currentTab();
+            String title = "Very long title " + "x".repeat(400);
+            first.rename(title); owner.update();
+            for (int i = 0; i < 12; i++) owner.newTab(HOME);
+            owner.selectTab(first);
+            owner.setSize(650, 400); layoutTree(owner);
+            var deck = owner.tabStrip();
+            var back = java.util.Arrays.stream(deck.getComponents())
+                .filter(c -> c instanceof javax.swing.plaf.basic.BasicArrowButton button
+                    && button.getDirection() == javax.swing.SwingConstants.WEST)
+                .map(c -> (javax.swing.JButton) c).findFirst().orElseThrow();
+            for (int i = 0; i < 20 && back.isEnabled(); i++) { back.doClick(0); layoutTree(owner); }
+            var header = (javax.swing.JPanel) deck.getTabComponentAt(0);
+            var label = (javax.swing.JLabel) header.getComponent(0);
+            var close = (javax.swing.JButton) header.getComponent(2);
+            assertThat(deck.getBoundsAt(0).width).isLessThan(400);
+            assertThat(label.getToolTipText()).isEqualTo(title);
+            assertThat(label.getAccessibleContext().getAccessibleName()).isEqualTo(title);
+            assertThat(close.getVisibleRect()).isEqualTo(new java.awt.Rectangle(0, 0, close.getWidth(), close.getHeight()));
+            var bounds = javax.swing.SwingUtilities.convertRectangle(header, close.getBounds(), deck);
+            assertThat(bounds.x).isGreaterThanOrEqualTo(0);
+            assertThat(bounds.x + bounds.width).isLessThanOrEqualTo(deck.getWidth());
+            close.doClick();
+            assertThat(deck.indexOfComponent(first)).isEqualTo(-1);
+        });
+    }
+    private static void layoutTree(java.awt.Container container) {
+        container.doLayout();
+        for (var child : container.getComponents()) if (child instanceof java.awt.Container nested) layoutTree(nested);
+    }
 }

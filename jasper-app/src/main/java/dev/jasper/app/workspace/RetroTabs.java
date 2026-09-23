@@ -35,7 +35,14 @@ final class RetroTabs implements AutoCloseable {
     }
     @Override public void close() { closed = true; headers.clear(); }
     private final class Header extends JPanel {
-        private final JLabel title = new JLabel(), hint = new JLabel();
+        private final JLabel title = new JLabel() {
+            @Override public java.awt.Dimension getPreferredSize() {
+                var size = super.getPreferredSize();
+                // JLabel elides at this width; the tooltip/accessibility name keep the full title.
+                return new java.awt.Dimension(Math.min(size.width, 240), size.height);
+            }
+        };
+        private final JLabel hint = new JLabel();
         private final JButton close = new JButton(AppIcons.icon("close"));
         private Point origin;
         Header(TerminalTab tab) {

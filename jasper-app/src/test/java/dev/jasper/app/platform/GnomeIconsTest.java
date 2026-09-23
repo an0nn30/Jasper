@@ -53,4 +53,39 @@ class GnomeIconsTest {
             }
         }
     }
+
+    @Test void metalDisabledIconsRemainVisibleButDifferFromEnabledIcons() {
+        new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.RETRO, dev.jasper.app.config.Appearance.LIGHT);
+        try {
+            for (String name : java.util.List.of("maximize", "command")) for (int size : new int[]{16, 24}) {
+                var clicks = new java.util.concurrent.atomic.AtomicInteger();
+                var button = new javax.swing.JButton(GnomeIcons.icon(name, size));
+                button.addActionListener(event -> clicks.incrementAndGet());
+                button.setBorderPainted(false); button.setContentAreaFilled(false); button.setFocusable(false);
+                button.setSize(size + 4, size + 4);
+                for (int scale : new int[]{1, 2}) {
+                    button.setEnabled(true);
+                    var enabled = paint(button, scale);
+                    button.setEnabled(false);
+                    var disabled = paint(button, scale);
+                    assertThat(button.getDisabledIcon()).isNotNull();
+                    int changed = 0, visible = 0;
+                    for (int y = 0; y < enabled.getHeight(); y++) for (int x = 0; x < enabled.getWidth(); x++) {
+                        if (enabled.getRGB(x, y) != disabled.getRGB(x, y)) changed++;
+                        if ((disabled.getRGB(x, y) >>> 24) != 0) visible++;
+                    }
+                    assertThat(changed).as(name + " " + size + " at " + scale).isPositive();
+                    assertThat(visible).isPositive();
+                    button.doClick(); assertThat(clicks.get()).isZero();
+                }
+            }
+        } finally { new dev.jasper.app.appearance.ThemeController(); }
+    }
+    private static java.awt.image.BufferedImage paint(javax.swing.JButton button, int scale) {
+        var image = new java.awt.image.BufferedImage(button.getWidth() * scale, button.getHeight() * scale,
+            java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { graphics.scale(scale, scale); button.paint(graphics); } finally { graphics.dispose(); }
+        return image;
+    }
 }

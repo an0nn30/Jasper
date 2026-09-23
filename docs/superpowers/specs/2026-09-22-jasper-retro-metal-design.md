@@ -1,6 +1,6 @@
 # Jasper Retro Metal appearance
 
-**Status:** Approved for native implementation by the user's “execute natively” instruction; implemented on `codex/retro-metal`. Headless acceptance passed; independent review is underway; native OS acceptance remains user-run. The user supplied GPL2+ licensing for OldGNOME2. Subsequent screenshot feedback supersedes stock borders for app chrome: icon-only 20-pixel tab-close targets, flat compact toolbar controls with 24-pixel GNOME artwork, and unboxed status actions. Form buttons retain stock Metal.
+**Status:** Approved for native implementation by the user's “execute natively” instruction; implemented on `codex/retro-metal`. Headless acceptance and the independent review fix pass passed; native OS acceptance remains user-run. The user supplied GPL2+ licensing for OldGNOME2. Subsequent screenshot feedback supersedes stock borders for app chrome: icon-only 20-pixel tab-close targets, flat compact toolbar controls with 24-pixel GNOME artwork, and unboxed status actions. Form buttons retain stock Metal.
 
 **Plan:** [Implementation plan](../plans/2026-09-22-jasper-retro-metal.md).
 
