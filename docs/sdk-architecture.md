@@ -238,3 +238,12 @@ property so menu items receive the compact artwork. Modern SVG foreground recolo
 live. Legacy/custom icons are returned unchanged by the sizing helper. No global cache holds
 plugin class loaders: only the fixed raster catalog is cached. Style changes still require restart.
 See [the icon catalog and compatibility contract](sdk-icons.md).
+
+### Host-owned semantic catalog (SDK 0.7.3)
+
+`Appearance.icon(IconName)` is now preferred. The SDK carries meanings only. HostedUi
+translates the enum at the boundary; AppIcons/NamedIcons select app-owned modern SVG or
+OldGNOME2 raster using the running skin, never the plugin loader. The old custom overloads
+remain supported. Vault uses semantic LOCK/UNLOCK in its status/menu and manager controls.
+The fake returns inspectable FakeNamedIcon(name, retro); older custom Appearance implementations
+inherit an explicit UnsupportedOperationException for this method until they implement it.

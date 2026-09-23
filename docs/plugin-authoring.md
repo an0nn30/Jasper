@@ -107,14 +107,12 @@ private static void installUi(PluginContext context, long stepMillis) {
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
-- **Icons.** `context.appearance().icon("path/in/your/jar.svg")` returns a 16 by 16 icon that
-  follows the theme. Use monochrome artwork. In SDK 0.7.2+, pair it with bundled retro artwork:
-  `context.appearance().icon("path/in/your/jar.svg", OldGnomeIcon.LOCK)`.
-  Jasper chooses the running skin automatically: modern SVG or original OldGNOME2 colors.
-  Both arguments are required, and the SVG resource must exist even in retro mode.
-  The returned icon is 16px; Jasper uses a separate 28px variant in retro host toolbars.
-  Ordinary plugin Swing buttons keep 16px. Existing one-argument and custom Swing icons
-  retain their behavior. Declare `sdk = ">=0.7.2, <0.8"` when using the overload.
+- **Icons.** Prefer `context.appearance().icon(IconName.LOCK)` or `IconName.UNLOCK`
+  (import `dev.jasper.sdk.ui.IconName`, SDK `>=0.7.3, <0.8`). Jasper supplies both families
+  and selects the skin; plugins need no artwork or style check. Returned icons are 16px,
+  with separate 28px variants in retro host toolbars. For custom artwork, use the original
+  monochrome SVG `icon("path/in/your/jar.svg")`, or pair that path with an `OldGnomeIcon`
+  fallback as the sample demonstrates. These existing APIs retain their behavior.
   See the [catalog and testing example](sdk-icons.md).
 - **Threads.** Register and mutate on the event thread. Event handlers already run there, so
   updating a status item from a handler, as the sample does, needs no marshaling.

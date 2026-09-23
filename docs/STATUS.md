@@ -117,6 +117,29 @@ and independently verified XML counts and installed assets. Native OS/physical R
 acceptance stays user-run; attribution retains the user's explicit GPL2+ declaration.
 No GUI, login shell, merge or push. Branch/worktree preserved; no deferred findings.
 
+### Semantic SDK icons and Vault — 2026-09-23
+
+Updated `codex/retro-metal` from local main `c1eb385` in merge `20f3564`, preserving its
+Vault File-menu placement/no rail entry and modern title-colored status background; retro
+continues using Metal's light panel background. Full-suite integration fixtures now verify
+these main changes while retaining status contrast checks.
+
+The user's semantic API clarification supersedes requiring plugins to choose both skins:
+SDK 0.7.3 now provides `Appearance.icon(IconName.LOCK)` / `UNLOCK` and 20 other meanings.
+Jasper owns all modern/retro artwork and uses its own resource loader. Existing custom SVG
+and OldGnomeIcon overloads remain compatible. The fake exposes FakeNamedIcon(name, retro).
+Vault's status/menu icons and actual manager lock/unlock controls use semantic names only;
+its minimum SDK is 0.7.3. Original modern lock/unlock SVGs are copied byte-for-byte into the
+host; manager buttons now share those standard shapes, including an unlock glyph.
+
+See [implementation plan](superpowers/plans/2026-09-23-jasper-semantic-icons.md) and
+[API guide with headless Vault preview](sdk-icons.md). Added 22 modern SVGs with exact
+source/hash manifest and MIT license; missing existing choices came from a pinned official
+Tabler revision. Existing OldGNOME2 catalog supplies retro images. Package verification
+confirmed 22 modern SVG and 55 retro PNG hashes plus notices. All architecture guards,
+check and installDist passed: 1,596 tests, 1,593 passed, three expected skips, zero failures/errors.
+Native GUI/login shell not launched. Independent final review pending; branch/worktree retained.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

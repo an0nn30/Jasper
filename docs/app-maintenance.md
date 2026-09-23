@@ -205,3 +205,10 @@ Run SDK/testkit checks plus OldGnomeCatalogTest, HostedUiTest, SkinIconsTest and
 WindowChromeContributionsTest, then all architecture guards, check and installDist. The
 catalog's hashes/notices must also be present in the packaged app jar. Render headlessly;
 native application launch remains a user check.
+
+For standard meanings, prefer SDK `IconName` / `Appearance.icon(IconName)` (0.7.3).
+NamedIcons maps host-native names to `icons/standard` SVGs; AppIcons uses its own class loader,
+then selects the existing OldGNOME2 catalog in retro. Keep both catalogs complete when adding
+an IconName, with standard SVG source hashes/notices. LOCK/UNLOCK match Vault's original
+modern SVG bytes. NamedIconsTest and HostedUiTest verify all meanings, resource ownership,
+foreground changes and source integrity. Keep custom SVG overloads working for branded icons.

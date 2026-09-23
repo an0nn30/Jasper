@@ -28,7 +28,7 @@ class ConfigurationStatusTest {
                     status.setMetadata("<html>very long shell".repeat(80), "/a/long/directory/".repeat(80), "120 × 36", true, false);
                     assertThat(status.getMinimumSize().width).isZero();
                     assertThat(status.getPreferredSize().width).isZero();
-                    assertThat(status.getBackground()).isEqualTo(theme.palette().background());
+                    assertThat(status.getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
                     assertThat(contrast(status.configButton().getForeground(), status.getBackground())).isGreaterThanOrEqualTo(4.5);
                     for (int width : new int[]{958, 320, 100, 20, 0}) {
                         status.setSize(width, 30); layout(status);
@@ -42,7 +42,7 @@ class ConfigurationStatusTest {
             }
         });
     }
-    @Test void statusSurfaceFollowsTheAppliedPaletteBackground() throws Exception {
+    @Test void statusSurfaceFollowsChromeRatherThanTerminalPalette() throws Exception {
         edt(() -> {
             var themes = new ThemeController();
             var status = new WindowStatusBar();
@@ -50,8 +50,8 @@ class ConfigurationStatusTest {
                 themes.select(theme);
                 status.applyPalette(theme.palette());
                 status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));
-                assertThat(status.getBackground()).isEqualTo(theme.palette().background());
-                assertThat(contrast(status.configButton().getForeground(), theme.palette().background())).isGreaterThanOrEqualTo(3);
+                assertThat(status.getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                assertThat(contrast(status.configButton().getForeground(), status.getBackground())).isGreaterThanOrEqualTo(3);
             }
             themes.select(BuiltinTheme.DARK);
         });

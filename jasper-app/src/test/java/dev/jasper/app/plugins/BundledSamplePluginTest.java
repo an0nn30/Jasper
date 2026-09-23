@@ -36,7 +36,11 @@ class BundledSamplePluginTest {
                 .satisfies(action -> assertThat(action.icon()).as("an SVG from the plugin's own jar").isNotNull());
             assertThat(contributions.toolbar()).hasSize(1);
             assertThat(contributions.panels()).singleElement().satisfies(panel -> assertThat(panel.id()).isEqualTo("dev.jasper.sample.panel"));
-            assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about", "dev.jasper.vault.open");
+            assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about");
+            assertThat(contributions.menus().stream()
+                .filter(section -> section.target().equals(dev.jasper.app.contributions.MenuTarget.standard(dev.jasper.app.contributions.MenuTarget.Slot.FILE)))
+                .flatMap(section -> section.entries().stream()).toList())
+                .contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.vault.open"));
             assertThat(contributions.status()).hasSize(2)
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));

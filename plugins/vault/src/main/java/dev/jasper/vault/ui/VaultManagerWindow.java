@@ -3,6 +3,7 @@ package dev.jasper.vault.ui;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.WindowSpec;
@@ -55,6 +56,8 @@ public final class VaultManagerWindow implements AutoCloseable {
             panel = new ManagerPanel(manager::entry, this::add, this::edit, this::delete, this::copyPublic,
                 grant -> report(manager.revoke(grant)), generate, this::changePassword, lock::lock,
                 () -> service.requestUnlock(this.owner));
+            panel.lock.setIcon(context.appearance().icon(IconName.LOCK));
+            panel.unlock.setIcon(context.appearance().icon(IconName.UNLOCK));
             panel.closeButton.addActionListener(event -> close());
             panel.cancelButton.addActionListener(event -> close());
             window.setContent(panel);

@@ -251,14 +251,14 @@ class VaultPluginTest {
             host.setRetroIcons(retro);
 
             var delegate = plugin();
-            var icons = new java.util.ArrayList<dev.jasper.sdk.testing.FakeSkinIcon>();
+            var icons = new java.util.ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
             host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
                 public void start(dev.jasper.sdk.plugin.PluginContext context) throws Exception {
                     var appearance = (dev.jasper.sdk.ui.Appearance) java.lang.reflect.Proxy.newProxyInstance(
                         getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.ui.Appearance.class}, (proxy, method, args) -> {
                             try {
                                 Object value = method.invoke(context.appearance(), args);
-                                if (value instanceof dev.jasper.sdk.testing.FakeSkinIcon icon) icons.add(icon);
+                                if (value instanceof dev.jasper.sdk.testing.FakeNamedIcon icon) icons.add(icon);
                                 return value;
                             } catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
                         });
@@ -273,7 +273,7 @@ class VaultPluginTest {
                 public void stop() { delegate.stop(); }
             });
             assertThat(host.failures()).isEmpty();
-            assertThat(icons).extracting(dev.jasper.sdk.testing.FakeSkinIcon::retroIcon).containsExactly(dev.jasper.sdk.ui.OldGnomeIcon.LOCK, dev.jasper.sdk.ui.OldGnomeIcon.UNLOCK);
+            assertThat(icons).extracting(dev.jasper.sdk.testing.FakeNamedIcon::name).containsExactly(dev.jasper.sdk.ui.IconName.LOCK, dev.jasper.sdk.ui.IconName.UNLOCK);
             assertThat(icons).allSatisfy(icon -> assertThat(icon.retro()).isEqualTo(retro));
         }
     }
