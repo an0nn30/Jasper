@@ -335,7 +335,7 @@ publisher. `enqueue(request)`, `pause(UUID)`, `resume(UUID)`, `cancel(UUID)`, `r
 `resolve(entryId,decision)` and `cleanup(UUID)` enqueue commands; `snapshot(offset,limit)`
 publishes bounded immutable rows asynchronously. Closing stops admission and drains owned work.
 
-- [ ] Write end-to-end tests for files/folders in all three directions, pause/restart/resume,
+- [x] Write end-to-end tests for files/folders in all three directions, pause/restart/resume,
   source prefix edits, acknowledged offsets, conflict decisions, cleanup failure, queued
   cancellation and crash around publication. Reuse a test Harness with real store/endpoints;
   fake only delays/fault boundaries, not filesystem results.
@@ -352,8 +352,8 @@ harness.awaitState(id, TransferState.COMPLETED);
 assertThat(harness.digest(destination, "/target/large.bin")).isEqualTo(harness.digest(source, "/large.bin"));
 ```
 
-- [ ] Run transfer tests; expect absent coordinator/recovery behavior.
-- [ ] Implement bounded scheduling (2 default/8 cap, one scanner, fair job turns), durable
+- [x] Run transfer tests; expect absent coordinator/recovery behavior.
+- [x] Implement bounded scheduling (2 default/8 cap, one scanner, fair job turns), durable
   discovery frontier, and confirmed 8-MiB segment checkpoints. No future per file. Workers
   own endpoint channels/leases and check the control token between reads/writes/discovery.
   Use separate control/store execution from payload slots so cancellation cannot queue behind
@@ -384,10 +384,10 @@ persist planned temp -> exclusive create -> persist creation evidence -> bounded
   Revalidate directory kind before recursive traversal and destination ancestry before mutations;
   directory-to-link swaps must stop rather than escape. Remote concurrent writers cannot be
   fully excluded by SFTP; changes that cannot be proved safe require attention.
-- [ ] Run transfer/recovery tests and scale diagnostics in bounded heap, with >4-GiB generated
+- [x] Run transfer/recovery tests and scale diagnostics in bounded heap, with >4-GiB generated
   streams and 100k entries. Assert bounded workers/pages/buffers and responsive control rather
   than absolute Mbps. Crash process at every publication checkpoint and verify originals survive.
-- [ ] Commit `feat(remote): stream and resume durable transfer jobs`.
+- [x] Commit `feat(remote): stream and resume durable transfer jobs`.
 
 ### Task 8: Build the single SFTP browser and remote destination picker
 

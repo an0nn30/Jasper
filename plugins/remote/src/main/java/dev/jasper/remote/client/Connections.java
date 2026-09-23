@@ -218,6 +218,16 @@ public final class Connections {
         }));
     }
 
+    /** UI-only: borrow an already authenticated route without opening connections or prompting. */
+    public Optional<SessionLease> existingLease(ConnectionIdentity identity) {
+        if(closed || !identity.resolved()) return Optional.empty();
+        Shared shared=sessions.get(identity);
+        if(shared==null || shared.session==null || !shared.session.isOpen() || !shared.session.isAuthenticated()) return Optional.empty();
+        shared.refs++;
+        if(shared.cancelLinger!=null) { shared.cancelLinger.run();shared.cancelLinger=null; }
+        return Optional.of(new SessionLease(shared.identity,shared.session,()->ui.execute(()->release(shared))));
+    }
+
     public CompletableFuture<SessionLease> lease(ConnectionIdentity identity, WindowHandle owner, Consumer<String> status) {
         var result = new CompletableFuture<SessionLease>();
         if (closed) return CompletableFuture.failedFuture(new Failures.Failure("Remote is stopping"));

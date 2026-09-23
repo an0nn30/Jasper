@@ -148,4 +148,24 @@ class SftpEndpointTest {
             assertThat(sibling.session().isOpen()).isTrue();
         }
     }
+    @Test void transferProtocolWorksLocalRemoteAndRemoteRemote() throws Exception {
+        root=root.toRealPath();byte[] payload=new byte[1024*1024+19];new Random(31).nextBytes(payload);
+        Path local=Files.write(root.resolve("local"),payload);Files.createDirectory(root.resolve("uploaded"));Files.createDirectory(root.resolve("downloaded"));Files.createDirectory(root.resolve("relayed"));
+        try(var first=new Fixture(new SftpSubsystemFactory());var second=new Fixture(new SftpSubsystemFactory());
+            var a=first.endpoint(Duration.ofSeconds(3));var b=second.endpoint(Duration.ofSeconds(3));var machine=new LocalEndpoint();
+            var db=new dev.jasper.remote.transfer.store.TransferStore(root.resolve("queue"))) {
+            copyEntry(db,machine,local.toString(),a,"/uploaded/local");
+            copyEntry(db,a,"/uploaded/local",machine,root.resolve("downloaded/local").toString());
+            copyEntry(db,a,"/uploaded/local",b,"/relayed/local");
+            assertThat(Files.readAllBytes(root.resolve("uploaded/local"))).isEqualTo(payload);
+            assertThat(Files.readAllBytes(root.resolve("downloaded/local"))).isEqualTo(payload);
+            assertThat(Files.readAllBytes(root.resolve("relayed/local"))).isEqualTo(payload);
+        }
+    }
+    private static void copyEntry(dev.jasper.remote.transfer.store.TransferStore db,FileEndpoint source,String from,FileEndpoint destination,String to) throws Exception {
+        var job=db.create(new dev.jasper.remote.transfer.TransferRequest(dev.jasper.remote.transfer.EndpointRef.local(),List.of(from),dev.jasper.remote.transfer.EndpointRef.local(),destination.parent(to)));
+        db.discover(job,List.of(new dev.jasper.remote.transfer.store.TransferStore.Discovered("local",from,to,source.stat(from))));
+        dev.jasper.remote.transfer.TransferCopy.copy(db,db.entries(job,0,1).getFirst(),source,destination,new dev.jasper.remote.transfer.TransferControl(),(done,total)->{});
+    }
+
 }

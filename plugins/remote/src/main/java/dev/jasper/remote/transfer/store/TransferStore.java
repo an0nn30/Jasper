@@ -42,6 +42,7 @@ public final class TransferStore implements AutoCloseable {
             execute("PRAGMA busy_timeout=2000"); execute("PRAGMA cache_size=-4096"); execute("PRAGMA wal_autocheckpoint=1000");
             if(version==0) schema();
             update("UPDATE jobs SET state=CASE WHEN intent='CANCEL' THEN 'CANCELLED' ELSE 'PAUSED' END, intent=CASE WHEN intent='CANCEL' THEN 'CANCEL' ELSE 'PAUSE' END WHERE state NOT IN ('COMPLETED','COMPLETED_WITH_ISSUES','CANCELLED')");
+            update("INSERT OR IGNORE INTO cleanup(entry,reason) SELECT e.id,'Cancelled before cleanup completed' FROM entries e JOIN jobs j ON j.id=e.job WHERE j.intent='CANCEL' AND e.temp!='' AND e.outcome!='COMPLETE'");
         } catch (SQLException | IOException | RuntimeException failure) {
             try { close(); } catch(IOException close) { failure.addSuppressed(close); }
             if(failure instanceof IOException io) throw io;
@@ -106,12 +107,20 @@ public final class TransferStore implements AutoCloseable {
         try { update("UPDATE jobs SET intent=? WHERE id=? AND intent!='CANCEL'",intent.name(),id); } catch(SQLException e) { throw failure(e); }
     }
     public synchronized void scanned(UUID id) throws IOException { try { update("UPDATE jobs SET scanned=1 WHERE id=?",id); } catch(SQLException e) { throw failure(e); } }
-    public synchronized void discover(UUID job,List<Discovered> entries) throws IOException {
+    public void discover(UUID job,List<Discovered> entries) throws IOException { discover(job,entries,false); }
+    public synchronized void discover(UUID job,List<Discovered> entries,boolean queueDirectories) throws IOException {
         if(entries.size()>256) throw new IllegalArgumentException("Discovery batch exceeds 256 entries");
         try {
             begin(); long count=0,bytes=0;
-            for(var entry:entries) if(update("INSERT OR IGNORE INTO entries(job,relative,source,target,info) VALUES(?,?,?,?,?)",job,entry.relative(),entry.source(),entry.target(),TransferCodec.file(entry.sourceInfo()))!=0) {
+            for(var entry:entries) {
+                try(var statement=prepare("SELECT source FROM entries WHERE job=? AND relative=?",job,entry.relative());var prior=statement.executeQuery()) {
+                    if(prior.next() && !prior.getString(1).equals(entry.source())) throw new IOException("Selected sources have the same destination name: "+entry.relative());
+                }
+                if(update("INSERT OR IGNORE INTO entries(job,relative,source,target,info) VALUES(?,?,?,?,?)",job,entry.relative(),entry.source(),entry.target(),TransferCodec.file(entry.sourceInfo()))!=0) {
                 count++; if(entry.sourceInfo().kind()==FileEntry.Kind.FILE) bytes=Math.addExact(bytes,Math.max(0,entry.sourceInfo().size()));
+            }
+                if(queueDirectories && entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY)
+                    update("INSERT OR IGNORE INTO scan_frontier(job,source,target,relative) VALUES(?,?,?,?)",job,entry.source(),entry.target(),entry.relative());
             }
             update("UPDATE jobs SET total_entries=total_entries+?,total_bytes=total_bytes+? WHERE id=?",count,bytes,job); finish();
         } catch(SQLException | IOException | RuntimeException e) { rollback(); if(e instanceof IOException io) throw io; if(e instanceof SQLException sql) throw failure(sql); throw (RuntimeException)e; }
@@ -166,9 +175,43 @@ public final class TransferStore implements AutoCloseable {
         try(var statement=prepare("SELECT * FROM checkpoints WHERE entry=? ORDER BY start LIMIT ? OFFSET ?",id,limit,offset);var result=statement.executeQuery()) { while(result.next()) values.add(new Checkpoint(result.getLong("start"),result.getLong("length"),result.getString("digest")));return List.copyOf(values); }
         catch(SQLException e) { throw failure(e); }
     }
+    public synchronized void refreshTemporary(long id,FileEntry proof) throws IOException {
+        try { update("UPDATE entries SET temp_info=? WHERE id=? AND temp_info IS NOT NULL",TransferCodec.file(proof),id); } catch(SQLException e) { throw failure(e); }
+    }
+    public synchronized void conflict(long id,Optional<FileEntry> target,String error) throws IOException {
+        try { update("UPDATE entries SET expected=?,decision='ASK',error=? WHERE id=?",target.isPresent()?TransferCodec.file(target.orElseThrow()):null,error,id); } catch(SQLException e) { throw failure(e); }
+    }
+    public synchronized void reset(long id,FileEntry source) throws IOException {
+        try {
+            begin();var entry=entry(id);
+            if(entry.outcome()!=TransferEntry.Outcome.PENDING) throw new IOException("Only unfinished entries can restart");
+            update("DELETE FROM checkpoints WHERE entry=?",id);
+            update("UPDATE entries SET info=?,temp='',temp_info=NULL,phase='PENDING',confirmed=0,digest='',publication='NONE',error='' WHERE id=?",TransferCodec.file(source),id);
+            update("UPDATE jobs SET confirmed_bytes=confirmed_bytes-?,total_bytes=total_bytes+? WHERE id=?",entry.confirmed(),Math.max(0,source.size())-Math.max(0,entry.sourceInfo().size()),entry.jobId());finish();
+        } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
+    }
+    public synchronized List<TransferEntry> directories(UUID job,long offset,int limit) throws IOException {
+        page(offset,limit);
+        // Directory entries are indexed through their job and walked in reverse discovery order.
+        return entryQuery("SELECT * FROM entries WHERE job=? AND outcome='COMPLETE' ORDER BY id DESC LIMIT ? OFFSET ?",job,limit,offset);
+    }
     public synchronized void publishing(long id,String digest,TransferEntry.Publication method,Optional<FileEntry> target) throws IOException {
         if(!digest.matches("[0-9a-f]{64}") || method==TransferEntry.Publication.NONE) throw new IOException("Invalid publication evidence");
         try { if(update("UPDATE entries SET digest=?,publication=?,expected=?,phase='PUBLISHING' WHERE id=? AND temp_info IS NOT NULL AND phase IN ('CREATED_TEMP','COPYING')",digest,method.name(),target.isPresent()?TransferCodec.file(target.orElseThrow()):null,id)!=1) throw new IOException("Entry is not ready for publication"); } catch(SQLException e) { throw failure(e); }
+    }
+    public synchronized void renameTree(long id,String target) throws IOException {
+        try {
+            begin();var entry=entry(id);String prefix=entry.relative()+"/";
+            update("UPDATE entries SET target=? || substr(target,?),expected=NULL,decision='RENAME' WHERE job=? AND (id=? OR substr(relative,1,?)=?)",target,entry.target().length()+1,entry.jobId(),id,prefix.length(),prefix);
+            finish();
+        } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
+    }
+    public synchronized void skipTree(long id) throws IOException {
+        try {
+            begin();var entry=entry(id);String prefix=entry.relative()+"/";
+            int count=update("UPDATE entries SET outcome='SKIPPED',decision='SKIP',error='Skipped' WHERE job=? AND outcome='PENDING' AND (id=? OR substr(relative,1,?)=?)",entry.jobId(),id,prefix.length(),prefix);
+            update("UPDATE jobs SET skipped=skipped+? WHERE id=?",count,entry.jobId());finish();
+        } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
     }
     public synchronized void decision(long id,ConflictDecision decision,String target) throws IOException {
         try { update("UPDATE entries SET decision=?,target=?,error='' WHERE id=? AND outcome='PENDING'",decision.name(),target,id); } catch(SQLException e) { throw failure(e); }
@@ -184,6 +227,9 @@ public final class TransferStore implements AutoCloseable {
             }
             finish();
         } catch(SQLException | IOException e) { rollback(); if(e instanceof IOException io) throw io; throw failure((SQLException)e); }
+    }
+    public synchronized void markCleanup(UUID job) throws IOException {
+        try { update("INSERT OR IGNORE INTO cleanup(entry,reason) SELECT id,'Cancelled; partial cleanup pending' FROM entries WHERE job=? AND temp!='' AND outcome!='COMPLETE'",job); } catch(SQLException e) { throw failure(e); }
     }
     public synchronized void cleanup(long id,String reason) throws IOException {
         try { update("INSERT INTO cleanup(entry,reason) VALUES(?,?) ON CONFLICT(entry) DO UPDATE SET reason=excluded.reason",id,reason); } catch(SQLException e) { throw failure(e); }

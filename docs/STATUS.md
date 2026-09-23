@@ -27,7 +27,9 @@ session leases, endpoint identity and prompt ownership changes also pass their r
 Bounded local/SFTP endpoints also pass: explicit ACK/force barriers, safe publication, links,
 short reads, sparse offsets, cancellation, and SFTP through ProxyJump with a surviving shell.
 Durable SQLite storage passes reopen, checkpoint, 100k-entry pagination, cross-process locking,
-killed-writer recovery and corrupt/newer-schema preservation tests. Next: engine, browser and Transfers integration.
+killed-writer recovery and corrupt/newer-schema preservation tests. The transfer engine now passes local/SFTP/relay copies, recursive folders and links, short pause
+checkpoints and restart validation, blocked-write pause, seven killed-process publication boundaries,
+and a >4-GiB/100k-entry probe under a 64-MiB heap. Next: browser and Transfers integration.
 The staged plugin-loader SQLite check runs with final integration; direct driver deregistration is covered now.
 Nothing merged or pushed.
 

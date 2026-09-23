@@ -24,7 +24,8 @@ public final class EndpointFactory {
         if (identity.isEmpty()) return CompletableFuture.completedFuture(new LocalEndpoint());
         var result = new CompletableFuture<FileEndpoint>();
         var opening = new AtomicReference<SftpEndpoint>();
-        var request = connections.lease(identity.orElseThrow(), owner, status);
+        var existing=connections.existingLease(identity.orElseThrow());
+        var request = existing.isPresent()?CompletableFuture.completedFuture(existing.orElseThrow()):connections.lease(identity.orElseThrow(), owner, status);
         result.whenComplete((endpoint, problem) -> {
             if (result.isCancelled()) {
                 request.cancel(true);
