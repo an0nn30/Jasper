@@ -10,7 +10,7 @@
 
 **Spec:** User's 2026-09-23 clarification supersedes the primary API in [prior design](../specs/2026-09-23-jasper-sdk-skin-icons-design.md). Semantic built-ins are preferred; custom SVG pairing remains supported. User requested update from main and direct implementation, continuing native execution.
 
-**Status:** All implementation tasks complete, full verification passed, independent review pending; main c1eb385 merged before implementation. Merge resolution keeps main's modern title background and existing light Metal background, plus Vault File-menu placement without a rail entry. Relevant app/Vault tests passed.
+**Status:** All implementation tasks complete, full verification and independent review passed with no findings; main c1eb385 merged before implementation. Merge resolution keeps main's modern title background and existing light Metal background, plus Vault File-menu placement without a rail entry. Relevant app/Vault tests passed.
 
 ## Global Constraints
 
@@ -87,3 +87,22 @@ gate passed:1596 tests,1593 passed,3 expected skips,0 failures/errors. Installed
 verified22 modern SVG hashes and55 retro PNG hashes with notices/licenses. Actual manager
 buttons and status-bar controls rendered headlessly in both skins and lock states; preview
 in docs/images/vault-semantic-icons.png. No native window or login shell launched.
+
+## Independent review and final decisions
+
+Fresh read-only review of `8ad055b..9750043` found no actionable issues. Reviewer confirmed
+all1596 XML tests (zero failures/errors,3 skips), all22 installed SVG hashes/legal notices,
+original Vault lock/unlock identity and preview. No fix pass or deferred findings.
+
+- Proceeded directly under the user's current implementation request and earlier native
+  execution authorization; the semantic API matches the clarified contract. Cost if wrong:
+  revision after native feedback.
+- Resolved main's status-background conflict by retaining its title color for modern and
+  Metal's Panel.background for retro. Cost if wrong: a style-specific color adjustment.
+- Included manager lock/unlock controls, preventing their separate painter from bypassing
+  skin selection. Effect: manager uses the shared modern lock and gains an unlock glyph.
+- Native window/physical Retina acceptance remains user-run under AGENTS.md; headless
+  tests/previews pass. Cost if wrong: a native-only visual issue may need follow-up.
+
+No merge back to main or push. This plan's scratch ledger is removed after this durable
+record is committed; branch/worktree remain ready for user testing.

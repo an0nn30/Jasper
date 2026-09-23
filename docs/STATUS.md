@@ -138,7 +138,10 @@ source/hash manifest and MIT license; missing existing choices came from a pinne
 Tabler revision. Existing OldGNOME2 catalog supplies retro images. Package verification
 confirmed 22 modern SVG and 55 retro PNG hashes plus notices. All architecture guards,
 check and installDist passed: 1,596 tests, 1,593 passed, three expected skips, zero failures/errors.
-Native GUI/login shell not launched. Independent final review pending; branch/worktree retained.
+Independent final review of `8ad055b..9750043` found no issues and independently confirmed
+XML totals, installed modern hashes and original Vault artwork identity. Native GUI/login
+shell not launched; physical desktop acceptance remains user-run. Branch/worktree retained;
+local main is an ancestor, no merge back or push, no deferred findings.
 
 ### macOS default shell refresh reverted — 2026-09-22
 
