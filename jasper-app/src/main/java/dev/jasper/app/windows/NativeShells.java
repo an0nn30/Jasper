@@ -181,6 +181,41 @@ public final class NativeShells {
         return owner.closed() ? Optional.empty() : selected;
     }
 
+    /** Owner-based multiple-file or single-directory selection, without global chooser properties. */
+    public java.util.List<Path> choosePaths(PathChoice choice, java.util.function.Consumer<Runnable> cancellation) {
+        Window owner = choice.terminalOwner() != null ? terminalWindows.apply(choice.terminalOwner()) : natives.get(choice.auxiliaryOwner());
+        if (owner == null || !owner.isShowing()) throw new IllegalArgumentException("Picker requires a shown owner");
+        if (!choice.directory()) {
+            FileDialog chooser = owner instanceof Dialog dialog ? new FileDialog(dialog, choice.title(), FileDialog.LOAD)
+                : new FileDialog((Frame) owner, choice.title(), FileDialog.LOAD);
+            try {
+                chooser.setMultipleMode(true);
+                choice.initial().ifPresent(path -> chooser.setDirectory(path.toString()));
+                cancellation.accept(chooser::dispose);
+                chooser.setVisible(true);
+                return java.util.Arrays.stream(chooser.getFiles()).map(file -> file.toPath().toAbsolutePath().normalize()).toList();
+            } finally { chooser.dispose(); }
+        }
+        var picker = new javax.swing.JFileChooser();
+        picker.setFileSelectionMode(javax.swing.JFileChooser.DIRECTORIES_ONLY);
+        picker.setMultiSelectionEnabled(false); picker.setAcceptAllFileFilterUsed(false);
+        choice.initial().ifPresent(path -> picker.setCurrentDirectory(path.toFile()));
+        var dialog = new JDialog(owner, choice.title(), Dialog.ModalityType.DOCUMENT_MODAL);
+        var selected = new java.util.ArrayList<Path>();
+        picker.addActionListener(event -> {
+            if (javax.swing.JFileChooser.APPROVE_SELECTION.equals(event.getActionCommand()) && picker.getSelectedFile() != null)
+                selected.add(picker.getSelectedFile().toPath().toAbsolutePath().normalize());
+            dialog.dispose();
+        });
+        try {
+            dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+            dialog.setContentPane(picker); dialog.pack(); dialog.setLocationRelativeTo(owner);
+            cancellation.accept(dialog::dispose);
+            dialog.setVisible(true);
+            return java.util.List.copyOf(selected);
+        } finally { dialog.dispose(); }
+    }
+
     private static Optional<Path> chooseFile(Window owner, String title, Optional<Path> initialPath, Optional<String> suffix) {
         // A dialog-owned picker must stay above its modal editor, not merely above the editor's frame.
         FileDialog chooser = owner instanceof Dialog dialog ? new FileDialog(dialog, title, FileDialog.LOAD)

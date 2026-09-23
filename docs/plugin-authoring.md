@@ -571,3 +571,13 @@ spoken description, `OptionalDouble` fraction and optional primary/secondary reg
 ids. Empty fraction means indeterminate. One handle updates every window; close removes it.
 The secondary action uses its registered title (for example Cancel); the primary action can
 open a richer management panel. Throttle worker samples before posting UI updates.
+
+### Local path pickers (SDK 0.7.5)
+
+`context.windows().chooseFiles(owner, title, initial)` returns an immutable list of local paths;
+`chooseDirectory` returns one optional directory. Invoke on the UI thread with a live terminal
+window or a shown plugin window. Both calls pump UI events, so revalidate selection-dependent
+state afterwards; owner closure or plugin stop cancels and discards the result. The host uses a
+native multiple-file picker and a themed directory picker. Paths are absolute and normalized;
+perform subsequent filesystem work in the background. Existing `WindowSurface.chooseFile`
+continues to select one file for window-owned workflows.

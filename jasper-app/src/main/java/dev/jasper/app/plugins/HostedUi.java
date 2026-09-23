@@ -334,8 +334,40 @@ final class HostedUi {
 
     private final java.util.Map<AuxiliarySurface, OwnedWindow> ownedWindows = new java.util.HashMap<>();
 
+    private java.util.List<Path> choosePaths(WindowOwner owner, String title, Optional<Path> initial, boolean directory) {
+        guard("choosePaths");
+        java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial);
+        var cancelled = new AtomicBoolean();
+        var cancelAction = new java.util.concurrent.atomic.AtomicReference<Runnable>(() -> {});
+        Runnable cancel = () -> { if (cancelled.compareAndSet(false, true)) cancelAction.get().run(); };
+        dev.jasper.app.windows.PathChoice choice;
+        Subscription ownerClosed;
+        if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window && window.surface.shown()) {
+            choice = new dev.jasper.app.windows.PathChoice(null, window.surface, title, initial, directory);
+            ownerClosed = wrap(window.surface.onClosed(cancel));
+        } else if (owner instanceof WindowHandle terminal && terminals.ownsOpenWindow(terminal)) {
+            choice = new dev.jasper.app.windows.PathChoice(terminal.id(), null, title, initial, directory);
+            ownerClosed = wrap(terminals.onWindowClosed(terminal.id(), cancel));
+        } else throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
+        Subscription stopped = tracked(cancel);
+        try {
+            var paths = windows.choose(choice, action -> {
+                cancelAction.set(action);
+                if (cancelled.get()) action.run();
+            });
+            if (cancelled.get() || !open.getAsBoolean()) return java.util.List.of();
+            return paths.stream().map(path -> path.toAbsolutePath().normalize()).toList();
+        } finally { stopped.close(); ownerClosed.close(); }
+    }
+
     Windows windows() {
         return new Windows() {
+            @Override public java.util.List<Path> chooseFiles(WindowOwner owner, String title, Optional<Path> initial) {
+                return choosePaths(owner, title, initial, false);
+            }
+            @Override public Optional<Path> chooseDirectory(WindowOwner owner, String title, Optional<Path> initial) {
+                return choosePaths(owner, title, initial, true).stream().findFirst();
+            }
             @Override public PluginWindow create(WindowSpec spec) {
                 guard("create");
                 requireNamespace(spec.id(), "A window");

@@ -559,6 +559,30 @@ public final class FakePluginHost implements AutoCloseable {
         fileSelections.addLast(java.util.Objects.requireNonNull(selection).map(path -> path.toAbsolutePath().normalize()));
     }
 
+    private final java.util.ArrayDeque<List<Path>> pathSelections = new java.util.ArrayDeque<>();
+    private Runnable duringPathSelection = () -> {};
+
+    /**
+     * Queues multiple files or one directory; an empty list scripts cancellation.
+     * @param selection selected local paths
+     * @since 0.7.5
+     */
+    public void queuePathSelection(List<Path> selection) {
+        pathSelections.addLast(selection.stream().map(path -> path.toAbsolutePath().normalize()).toList());
+    }
+    /**
+     * Runs once during the next owner-based chooser, simulating its nested UI event loop.
+     * @param action event such as owner close or plugin stop
+     * @since 0.7.5
+     */
+    public void duringPathSelection(Runnable action) { duringPathSelection = java.util.Objects.requireNonNull(action); }
+
+    List<Path> takePathSelection() {
+        var paths = pathSelections.isEmpty() ? List.<Path>of() : pathSelections.removeFirst();
+        var action = duringPathSelection; duringPathSelection = () -> {}; action.run();
+        return paths;
+    }
+
     Optional<Path> takeFileSelection() {
         return fileSelections.isEmpty() ? Optional.empty() : fileSelections.removeFirst();
     }

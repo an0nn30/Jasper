@@ -359,8 +359,25 @@ final class FakeUi {
         };
     }
 
+    private boolean liveChooserOwner(WindowOwner owner) {
+        if (owner instanceof FakeWindow window) return windows.contains(window) && window.shown && !window.closed;
+        return owner instanceof WindowHandle terminal && context.terminals.ownsOpenWindow(terminal);
+    }
+    private List<java.nio.file.Path> choosePaths(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
+        context.requireOpen(); java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial);
+        if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
+        var paths = host.takePathSelection();
+        return context.state == FakePluginContext.State.CLOSED || !liveChooserOwner(owner) ? List.of() : paths;
+    }
+
     Windows windows() {
         return new Windows() {
+            @Override public List<java.nio.file.Path> chooseFiles(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
+                return choosePaths(owner, title, initial);
+            }
+            @Override public java.util.Optional<java.nio.file.Path> chooseDirectory(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
+                return choosePaths(owner, title, initial).stream().findFirst();
+            }
             @Override public PluginWindow create(WindowSpec spec) {
                 context.requireOpen();
                 requireNamespace(spec.id(), "A window");

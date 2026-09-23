@@ -298,7 +298,7 @@ public final class JasperApplication {
         uiState = UiState.load(dirs.uiState());
         shells = new NativeShells(themes, uiState, this::nativeWindow,
             () -> newWindow(Path.of(System.getProperty("user.home"))), this::quit);
-        auxiliary = new AuxiliaryWindows(uiState, shells::create);
+        auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths);
         auxiliary.onAllClosed = () -> { if (windows.isEmpty() && !resident && !quitting) requestShutdown(); };
         plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeSource), dirs.plugins(),
             developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
