@@ -1,8 +1,8 @@
 # Jasper Remote — SFTP phase 1 design
 
-**Status:** Written spec for user review. The workflow, layout, persistent resume and
-file-handling decisions below were approved in conversation on 2026-09-23. No SFTP
-implementation has started. Written-spec approval precedes the SDD implementation plan.
+**Status:** Approved 2026-09-23, including the host-owned icon clarification. The user
+requested the implementation plan, an adversarial review of it, then native implementation.
+No SFTP implementation has started at this design milestone.
 
 **Base:** `main` at `1fcf9a8d`; design branch `codex/remote-sftp` in the native worktree
 `/Users/dustin/.codex/worktrees/remote-sftp/moray`.
@@ -488,8 +488,9 @@ There is no SFTP-specific SDK service and no exported Remote cross-plugin API.
 
 ## 10. Validation and delivery shape
 
-The implementation plan will use SDD: focused implementer tasks with spec-compliance and
-code-quality review, fix rounds on the same task, then one final integrated review. This is
+The implementation plan uses focused, testable tasks and a durable execution ledger. The
+user's final workflow choice is native implementation after an independent adversarial plan
+review, followed by one independent integrated code review (rather than per-task agents). This is
 one SFTP phase with ordered, testable milestones; internal layers can land incrementally,
 but the user-facing phase is not complete without persistent resume and transfer controls.
 

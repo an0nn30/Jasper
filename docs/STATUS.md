@@ -2,9 +2,9 @@
 
 ## Current state — 2026-09-23
 
-### SFTP phase 1 — written design awaiting review
+### SFTP phase 1 — approved design, reviewed plan, native implementation
 
-The [SFTP design](superpowers/specs/2026-09-23-jasper-remote-sftp-design.md) is drafted
+The [SFTP design](superpowers/specs/2026-09-23-jasper-remote-sftp-design.md) is approved
 on `codex/remote-sftp` in `/Users/dustin/.codex/worktrees/remote-sftp/moray`, from main
 `1fcf9a8d`. Conversation-approved scope: one remote file-browser sidebar; local/remote
 and remote/remote copies; a Buddy-independent Transfers panel and status-bar progress;
@@ -17,9 +17,13 @@ The user's icon clarification is recorded in section 9.3: all SFTP artwork uses 
 `Appearance.icon(IconName)`; missing semantic names and Tabler/OldGNOME2 assets belong in
 the app/SDK, with both skin mappings tested. Remote adds no icon resources or custom painting.
 It was self-reviewed for lifecycle, recovery, bounded work and architectural consistency.
-Documentation only: no implementation or dependency changes, no GUI launch, no runtime
-tests claimed. Next: user review of the written spec, then a detailed implementation plan
-using the requested SDD workflow. Nothing merged or pushed.
+The user requested a detailed [implementation plan](superpowers/plans/2026-09-23-jasper-remote-plan-7c-sftp.md),
+an independent adversarial plan review, then native implementation. That sequence is authorized;
+the latest native execution choice supersedes the earlier per-task-agent preference. Baseline
+`./gradlew check` passed: 1,765 tests, 1,762 passed, three expected skips, no failures/errors.
+The adversarial review found eight important contract/recovery issues; the plan now includes
+explicit resolutions and regression tests. Native implementation starts from that reviewed plan.
+Nothing merged or pushed.
 
 ### Latest completed work
 
