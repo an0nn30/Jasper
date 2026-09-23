@@ -120,4 +120,29 @@ class HostStoreTest {
         assertThat(store.hosts()).containsExactly(a);
     }
 
+    @Test void importedUpdateCannotOverwriteExternalEdit(@TempDir Path dir) throws Exception {
+        HostStore store = store(dir);
+        var original = RemoteHost.create("prod", "old", 22, "u", Auth.AGENT, "G", java.util.Optional.empty());
+        store.put(original); run();
+        var imported = original.withEdited("prod", "new", 22, "u", new Auth.VaultKeys(java.util.List.of(java.util.UUID.randomUUID())), "G", java.util.Optional.empty());
+        var save = store.importSelected(java.util.List.of(original), java.util.List.of(imported));
+        String outside = HostFile.format(java.util.List.of(original.withFavorite(true)));
+        Files.writeString(store.file(), outside); run();
+        assertThat(save).isCompletedExceptionally();
+        assertThat(Files.readString(store.file())).isEqualTo(outside);
+    }
+
+    @Test void importMergesUnrelatedHostsAndRejectsAgentJump(@TempDir Path dir) throws Exception {
+        HostStore store = store(dir);
+        var jump = RemoteHost.create("jump", "b", 22, "u", Auth.AGENT, "", Optional.empty());
+        var target = RemoteHost.create("new", "t", 22, "u", new Auth.VaultKeys(List.of(UUID.randomUUID())), "", Optional.of(jump.id()));
+        store.put(jump); run();
+        var blocked = store.importSelected(List.of(), List.of(target)); run(); assertThat(blocked).isCompletedExceptionally();
+        var managed = jump.withEdited("jump", "b", 22, "u", new Auth.VaultKeys(List.of(UUID.randomUUID())), "", Optional.empty());
+        var unrelated = RemoteHost.create("other", "o", 22, "u", Auth.AGENT, "", Optional.empty());
+        var imported = store.importSelected(List.of(jump), List.of(managed, target));
+        Files.writeString(store.file(), HostFile.format(List.of(jump, unrelated))); run();
+        assertThat(imported).isCompleted(); assertThat(store.hosts()).containsExactly(unrelated, managed, target);
+    }
+
 }

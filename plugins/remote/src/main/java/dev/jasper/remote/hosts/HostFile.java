@@ -106,7 +106,7 @@ public final class HostFile {
         Set<String> names = new HashSet<>();
         for (RemoteHost host : hosts) {
             if (!names.add(host.name().toLowerCase(Locale.ROOT))) throw new IllegalArgumentException("A host named " + host.name() + " exists");
-            byId.put(host.id(), host);
+            if (byId.put(host.id(), host) != null) throw new IllegalArgumentException("Duplicate host id");
         }
         for (RemoteHost host : hosts) {
             Set<UUID> seen = new HashSet<>();

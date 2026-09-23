@@ -47,7 +47,18 @@ public final class HostStore {
     public Subscription onChanged(Runnable listener) { listeners.add(listener); return () -> listeners.remove(listener); }
 
     /** Reads the file unconditionally. */
-    public void load() { enqueue(() -> onBackground(() -> read(true)).thenAccept(this::apply)); }
+    public void load() { reload(); }
+
+    /** Reads and publishes the current file before producing a new import preview. */
+    public CompletableFuture<Void> reload() {
+        var result = new CompletableFuture<Void>();
+        enqueue(() -> onBackground(() -> read(true)).handle((read, failure) -> {
+            if (failure != null) result.completeExceptionally(failure);
+            else { apply(read); if (read.error() == null) result.complete(null); else result.completeExceptionally(new IOException(read.error())); }
+            return null;
+        }));
+        return result;
+    }
 
     /** Reads the file when its size or modification time changed; the plugin calls this once a second. */
     public void poll() { enqueue(() -> onBackground(() -> read(false)).thenAccept(read -> { if (read != null) apply(read); })); }
@@ -70,6 +81,32 @@ public final class HostStore {
     public CompletableFuture<Void> save(List<RemoteHost> next) {
         List<RemoteHost> copy = List.copyOf(next);
         return mutate(current -> copy);
+    }
+
+    /** Merge only explicitly selected rows; reject a stale preview instead of overwriting edits. */
+    public CompletableFuture<Void> importSelected(List<RemoteHost> expected, List<RemoteHost> replacements) {
+        var before = List.copyOf(expected); var updates = List.copyOf(replacements);
+        return mutate(current -> {
+            for (var old : before) if (!current.contains(old)) throw new IllegalArgumentException("Hosts changed; refresh the import preview");
+            var expectedIds = before.stream().map(RemoteHost::id).collect(java.util.stream.Collectors.toSet());
+            for (var next : updates) {
+                if (next.auth() instanceof Auth.Agent) throw new IllegalArgumentException("Imported hosts require Vault credentials");
+                if (!expectedIds.contains(next.id()) && current.stream().anyMatch(h -> h.id().equals(next.id()) || h.name().equalsIgnoreCase(next.name())))
+                    throw new IllegalArgumentException("Hosts changed; refresh the import preview");
+            }
+            var ids = updates.stream().map(RemoteHost::id).collect(java.util.stream.Collectors.toSet());
+            var merged = new ArrayList<>(current.stream().filter(h -> !ids.contains(h.id())).toList());
+            merged.addAll(updates); HostFile.validate(merged);
+            var byId = new java.util.HashMap<UUID, RemoteHost>(); merged.forEach(h -> byId.put(h.id(), h));
+            for (var next : updates) {
+                var dependency = next;
+                while (dependency.jump().isPresent()) {
+                    dependency = byId.get(dependency.jump().orElseThrow());
+                    if (dependency.auth() instanceof Auth.Agent) throw new IllegalArgumentException("Import the jump host into Vault too: " + dependency.name());
+                }
+            }
+            return merged;
+        });
     }
 
     private CompletableFuture<Void> mutate(java.util.function.Function<List<RemoteHost>, List<RemoteHost>> mutation) {

@@ -211,7 +211,7 @@ class RemotePluginTest {
         Path sshDir = Files.createDirectories(dir.resolve("ssh"));
         Files.writeString(sshDir.resolve("config"), "Host imported\n  HostName imported.example\n  User me\n");
         try (var host = new FakePluginHost()) {
-            var vault = new FakeVault();
+            var vault = new FakeVault(); vault.password("Imported login", "me", "secret");
             host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
             RemotePlugin plugin = plugin(sshDir);
             var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
@@ -233,10 +233,12 @@ class RemotePluginTest {
             assertThat(host.invoke(RemotePlugin.IMPORT, window, null)).isTrue();
             settle(host);
             assertThat(host.windows()).containsExactly("dialog|Import from ~/.ssh/config|true");
+            chooseCredential(plugin.currentImport(), 0).doClick();
             importButton(plugin.currentImport()).doClick();
             settle(host);
             assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new", "imported");
             RemoteHost imported = plugin.store().hosts().get(1);
+            cancelImport(plugin.currentImport()).doClick();
             javax.swing.JPopupMenu menu = menuFor(panel, indexOf(panel, imported));
             ((javax.swing.JMenuItem) menu.getComponent(4)).doClick();
             assertThat(host.windows()).containsExactly("dialog|Delete imported?|true");
