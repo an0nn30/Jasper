@@ -43,6 +43,8 @@ Approved decisions:
    scoped apply-to-remaining choice. Merge never removes unrelated destination children.
 9. Detectable source/partial-destination changes require attention before resuming. Failed
    items remain retryable and cannot make a folder job appear wholly successful.
+10. All SFTP icons come from the SDK's host-owned semantic icon catalog. Missing artwork is
+    added to the base app and exposed through the SDK; Remote must not bundle or draw it.
 
 Not included: remote editing, synchronization/mirroring, moving files between hosts,
 server-to-server shell commands, SCP fallback, tunnels, ownership/ACL/xattr replication,
@@ -446,8 +448,42 @@ existing UI-thread/native-modal event-pumping convention and dispose their choos
 the owner/plugin invalidates the result. No file content is read by selection. Testkit queues
 selections and can simulate owner closure during selection.
 
-Semantic icons for the browser/status controls use `Appearance` and the existing modern/retro
-mapping. Add missing icon names only where a control has no suitable existing semantic icon.
+### 9.3 Host-owned, skin-aware icons
+
+Every SFTP browser row, toolbar/control, transfer-state indicator and plugin chrome icon uses
+`context.appearance().icon(IconName...)`. Follow the named-icon pattern in
+`plugins/vault/src/main/java/dev/jasper/vault/VaultPlugin.java` and
+`plugins/vault/src/main/java/dev/jasper/vault/ui/VaultManagerWindow.java`, where LOCK/UNLOCK
+come from the SDK. Pass the returned icons into passive UI components from their controller.
+Do not copy Vault's older custom-painted helper as a pattern for new SFTP UI.
+
+Remote must not ship new SVG/PNG icon resources, custom-painted icons, emoji substitutes,
+or plugin-side skin/resource selection. In particular, the SDK overloads accepting a plugin
+SVG path (with or without an `OldGnomeIcon` argument) do not meet this requirement. The
+named catalog lets the host select the correct artwork and sizing for the configured skin.
+
+Reuse existing meanings first: `IconName.FOLDER`, COPY, DELETE, REFRESH, ADD, CLOSE and
+other suitable catalog entries. Add missing semantic names for file/link rows, upload/download,
+parent-folder navigation, new-folder and pause/resume controls as needed. The implementation
+plan will enumerate the chosen mappings before building the SFTP views. Each addition spans
+the SDK enum, app-owned modern/retro catalogs and assets, testkit coverage and documentation.
+
+The user-provided artwork sources are:
+
+- Modern: `/Users/dustin/projects/tabler-icons`, using its existing outline SVG artwork.
+- Retro: `/Users/dustin/Downloads/OldGNOME2`, using the appropriate existing artwork and sizes.
+
+Copy required assets into the base app's resource catalogs; these source directories are
+development inputs, never runtime filesystem dependencies. Preserve source/license notices
+and the app's asset provenance/checksum records. App-side mappings select modern or retro
+artwork; the plugin imports only SDK names and never app icon classes. Preserve the existing
+host behavior for compact controls, retro toolbar sizing and theme recoloring.
+
+Contract and integration tests must resolve every added name in both skins through a plugin
+loader containing no icon resources. Remote UI tests assert the testkit's named icons, and
+rendered acceptance covers file/folder rows plus transfer controls in both skins. Review must
+confirm that SFTP added no plugin-local icon assets or painting implementations.
+
 There is no SFTP-specific SDK service and no exported Remote cross-plugin API.
 
 ## 10. Validation and delivery shape
@@ -459,7 +495,8 @@ but the user-facing phase is not complete without persistent resume and transfer
 
 Suggested dependency order for the plan:
 
-1. SDK progress and chooser contracts, real host/testkit implementations and documentation.
+1. SDK progress and chooser contracts, missing semantic icons with both app-owned skin mappings,
+   real host/testkit implementations and documentation.
 2. Shared-session leases and endpoint snapshots, preserving SSH behavior.
 3. Local/SFTP endpoint adapters and loopback SFTP fixture.
 4. Durable queue, state machine and restart/publication recovery.
@@ -470,7 +507,8 @@ Suggested dependency order for the plan:
 Verification requirements:
 
 - **Contracts:** SDK ownership, wrong-thread calls, shutdown, stale picker results, progress
-  validation, narrow status bars, accessibility, modern/retro and configured typography.
+  validation, narrow status bars, accessibility, complete named-icon mappings independent of
+  plugin resources, modern/retro and configured typography.
 - **SSH regression:** shell/session reuse, host-definition edits, Vault and agent authentication,
   shared-request cancellation, closing a shell while SFTP continues, and SFTP through ProxyJump.
 - **Real loopback SFTP:** all three directions, binary/empty/>4-GiB logical streams, directories,
@@ -522,5 +560,7 @@ Self-review: the single browser supersedes the old two-pane outline; queue contr
 depend on Buddy; restoring jobs causes no network activity; durable offsets exclude unacknowledged
 writes; crash-between-rename-and-recording has a recovery state; large folders have disk-backed
 discovery and paged UI; cancellation is scoped to owned resources; old SSH leases survive host
-edits; SDK changes remain generic and have app/testkit implementations. No implementation code
-or dependencies were changed while writing this spec.
+edits; SDK changes remain generic and have app/testkit implementations. The user's icon
+clarification is explicit: host-owned named icons only, with new Tabler/OldGNOME2 assets added
+to the app/SDK rather than Remote. No implementation code or dependencies were changed while
+writing this spec.

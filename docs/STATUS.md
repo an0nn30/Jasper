@@ -13,6 +13,9 @@ paused; explicit conflicts, temporary-file publication and recoverable errors. I
 inside `dev.jasper.remote`, depends on SSH 7a, and does not require tunnels 7b.
 
 The draft proposes generic SDK progress/chooser additions and a plugin-owned SQLite queue.
+The user's icon clarification is recorded in section 9.3: all SFTP artwork uses SDK
+`Appearance.icon(IconName)`; missing semantic names and Tabler/OldGNOME2 assets belong in
+the app/SDK, with both skin mappings tested. Remote adds no icon resources or custom painting.
 It was self-reviewed for lifecycle, recovery, bounded work and architectural consistency.
 Documentation only: no implementation or dependency changes, no GUI launch, no runtime
 tests claimed. Next: user review of the written spec, then a detailed implementation plan
