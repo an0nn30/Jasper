@@ -88,10 +88,13 @@ public final class HostsPanel extends JPanel {
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
         cardName.setFont(cardName.getFont().deriveFont(Font.BOLD));
+        for (JLabel detail : List.of(cardName, cardAddress, cardInfo, cardCredential, cardJump))
+            detail.setAlignmentX(Component.LEFT_ALIGNMENT);
         cardInfo.putClientProperty("html.disable", true);
         card.add(cardName); card.add(cardAddress); card.add(cardInfo); card.add(cardCredential); card.add(cardJump);
         var buttons = new JPanel();
         buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
+        buttons.setAlignmentX(Component.LEFT_ALIGNMENT);
         buttons.add(edit); buttons.add(Box.createHorizontalGlue()); buttons.add(connect);
         card.add(Box.createVerticalStrut(6)); card.add(buttons);
         card.setVisible(false);
@@ -108,7 +111,7 @@ public final class HostsPanel extends JPanel {
                 int index = list.locationToIndex(event.getPoint());
                 if (index < 0 || !list.getCellBounds(index, index).contains(event.getPoint())) return;
                 if (SwingUtilities.isRightMouseButton(event)) { list.setSelectedIndex(index); JPopupMenu menu = menuFor(index); if (menu != null) menu.show(list, event.getX(), event.getY()); }
-                else if (event.getX() < 36 && model.get(index) instanceof HostRows.Host row) {
+                else if (event.getX() < 30 && model.get(index) instanceof HostRows.Host row) {
                     if (event.getClickCount() == 1) actions.favorite().accept(row.host(), !row.host().favorite());
                 }
                 else if (event.getClickCount() == 2) activate(index);
@@ -225,8 +228,8 @@ public final class HostsPanel extends JPanel {
             label.setOpaque(selected);
             label.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
             label.setForeground(selected ? owner.getSelectionForeground() : owner.getForeground());
-            label.setFont(owner.getFont().deriveFont(Font.BOLD, owner.getFont().getSize2D() + 1));
-            label.setBorder(BorderFactory.createEmptyBorder(10, 4, 8, 4));
+            label.setFont(owner.getFont().deriveFont(Font.BOLD));
+            label.setBorder(BorderFactory.createEmptyBorder(5, 4, 4, 4));
             if (value instanceof HostRows.Group group) {
                 label.setText((group.collapsed() ? "▸  " : "▾  ") + group.name() + "   " + group.count());
                 if (group.name().equals(defaultGroup)) label.setToolTipText("Right-click to rename this group");
@@ -236,18 +239,25 @@ public final class HostsPanel extends JPanel {
     }
 
     private Component hostRow(JList<?> owner, RemoteHost host, boolean selected) {
-        var row = new JPanel(new BorderLayout(10, 0));
+        var row = new JPanel(new BorderLayout(6, 0));
         row.setOpaque(true);
         row.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
-        row.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 10));
+        row.setBorder(BorderFactory.createEmptyBorder(3, 12, 3, 8));
         java.awt.Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
-        Font font = owner.getFont().deriveFont(owner.getFont().getSize2D() + 2);
+        Font font = owner.getFont().deriveFont(owner.getFont().getSize2D() + 1);
         var favorite = text(host.favorite() ? "★" : "☆", foreground, font);
-        favorite.setPreferredSize(new java.awt.Dimension(18, favorite.getPreferredSize().height));
+        favorite.setPreferredSize(new java.awt.Dimension(16, favorite.getPreferredSize().height));
         row.add(favorite, BorderLayout.WEST);
         row.add(text(host.name(), foreground, font), BorderLayout.CENTER);
         int sessions = sessionCount.applyAsInt(host);
-        if (sessions > 0) row.add(text(sessions == 1 ? "●  1 session" : sessions + " sessions", foreground, owner.getFont()), BorderLayout.EAST);
+        if (sessions > 0) {
+            var status = new JPanel(new BorderLayout(4, 0)); status.setOpaque(false);
+            java.awt.Color active = javax.swing.UIManager.getColor("Actions.Green");
+            var dot = text("●", active == null ? foreground : active, owner.getFont().deriveFont(9f));
+            status.add(dot, BorderLayout.WEST);
+            if (sessions > 1) status.add(text(String.valueOf(sessions), foreground, owner.getFont()), BorderLayout.CENTER);
+            row.add(status, BorderLayout.EAST);
+        }
         String facts = metadata.apply(host);
         String description = host.name() + ", " + host.label() + (facts.isBlank() ? "" : ", " + facts)
             + ", " + sessions + (sessions == 1 ? " session" : " sessions");

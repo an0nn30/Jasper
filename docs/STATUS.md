@@ -78,6 +78,16 @@ The separately requested connection overlay is still a design draft pending appr
 `./gradlew check :jasper-app:installDist` passed: 1,617 tests, 1,614 passed, three expected skips,
 zero failures/errors. Headless renders at 360px and 240px were inspected.
 
+### Remote list density refinement — 2026-09-22
+
+The user found the padded tree rows too loose. Reduced row padding from eight to three points
+vertically and the font increase from two points to one. Group headers use the base bold font
+with tighter spacing; an active-session dot (plus a count for multiple sessions) replaces the
+wordy row status. Selected-host details now align flush left with their action controls.
+Interaction, accessible status, search and connection behavior are unchanged.
+`./gradlew check :jasper-app:installDist` passed: 1,617 tests, 1,614 passed, three expected skips,
+zero failures/errors. Headless renders using Jasper’s actual dark theme at 360px and 240px were inspected.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

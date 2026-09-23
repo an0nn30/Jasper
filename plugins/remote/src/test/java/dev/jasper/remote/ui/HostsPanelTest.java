@@ -93,7 +93,8 @@ class HostsPanelTest {
         panel.search.setText("ubuntu");
         assertThat(panel.list.getModel().getSize()).isEqualTo(2);
         var component = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(1), 1, false, false);
-        assertThat(labels(component)).contains("nas", "2 sessions");
+        assertThat(labels(component)).contains("nas");
+        assertThat(component.getAccessibleContext().getAccessibleName()).contains("2 sessions");
         assertThat(((javax.swing.JComponent) component).getToolTipText()).contains("me@nas.local:2222", "Ubuntu · 10.0.0.2");
         panel.select(nas.id());
         assertThat(panel.cardAddress.getText()).isEqualTo("me@nas.local:2222");
