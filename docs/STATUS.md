@@ -2,8 +2,9 @@
 
 ## Current state — 2026-09-23
 
-The approved keyboard shortcut reference is implemented on `codex/keyboard-shortcuts`
-in `/Users/dustin/.codex/worktrees/keyboard-shortcuts/moray`, based on local `main`.
+The approved keyboard shortcut reference is integrated into local `main` through
+`5f374e04` from `codex/keyboard-shortcuts`. The Codex-managed worktree is retained at
+`/Users/dustin/.codex/worktrees/keyboard-shortcuts/moray`.
 **Help → Keyboard Shortcuts…** opens one reusable window with grouped app/plugin rows,
 text and exact-key capture search, effective overridden bindings, conflict explanations,
 contextual keys and live updates. [Guide and native acceptance](keyboard-shortcuts.md).
@@ -17,8 +18,10 @@ reuse/live refresh, native-recorder cleanup and larger UI typography. Headless d
 previews at default/18-point typography were inspected; no native GUI was launched.
 `./gradlew check :jasper-app:installDist :jasper-app:shortcutHelpPreview` passed:
 **1,652 tests: 1,649 passed, three expected skips, zero failures/errors**. All architecture
-checks passed; the worktree distribution was rebuilt. GUI acceptance remains user-run.
-No merge or push; branch and worktree retained for integration.
+checks passed; the worktree distribution was rebuilt. After the user-approved fast-forward
+merge, `./gradlew check :jasper-app:installDist` passed again on local `main` with the same
+counts and rebuilt the main-checkout distribution. GUI acceptance remains user-run.
+Nothing was pushed; the Codex-managed worktree and branch are retained.
 
 
 Remote plan 7a and its follow-ups are integrated into local `main` from
