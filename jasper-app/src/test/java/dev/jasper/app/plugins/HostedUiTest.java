@@ -268,4 +268,36 @@ class HostedUiTest {
     } finally { ui.closeAll(); new dev.jasper.app.appearance.ThemeController(); }
 }
 
+
+    @Test void selectsEverySdkCatalogChoiceAndValidatesBothArguments() throws Exception {
+        for (boolean retro : new boolean[]{false, true}) {
+        new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
+            : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
+        try {
+            for (var choice : dev.jasper.sdk.ui.OldGnomeIcon.values()) {
+                var icon = ui.appearance().icon("dev/jasper/app/icons/search.svg", choice);
+                assertThat(icon.getIconWidth()).isEqualTo(16);
+                assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(retro ? 28 : 16);
+                if (retro) {
+                    try (var input = getClass().getResourceAsStream("/dev/jasper/app/icons/oldgnome-sdk/16/" + choice.name() + ".png")) {
+                        var source = javax.imageio.ImageIO.read(input);
+                        var actual = new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                        var expected = new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                        var g = actual.createGraphics();
+                        try { icon.paintIcon(new javax.swing.JLabel(), g, 0, 0); } finally { g.dispose(); }
+                        g = expected.createGraphics();
+                        try { g.drawImage(source, 0, 0, null); } finally { g.dispose(); }
+                        assertThat(actual.getRGB(0,0,16,16,null,0,16)).as(choice.name())
+                            .isEqualTo(expected.getRGB(0,0,16,16,null,0,16));
+                    }
+                }
+            }
+            assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon("missing.svg", dev.jasper.sdk.ui.OldGnomeIcon.LOCK));
+            assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon(null, dev.jasper.sdk.ui.OldGnomeIcon.LOCK));
+            assertThatNullPointerException().isThrownBy(() -> ui.appearance().icon("dev/jasper/app/icons/search.svg", null));
+            var legacy = ui.appearance().icon("dev/jasper/app/icons/search.svg");
+            assertThat(dev.jasper.app.platform.AppIcons.forToolbar(legacy)).isSameAs(legacy);
+        } finally { new dev.jasper.app.appearance.ThemeController(); }
+        }
+    }
 }

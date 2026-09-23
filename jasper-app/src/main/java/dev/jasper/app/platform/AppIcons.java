@@ -33,6 +33,21 @@ public final class AppIcons {
         return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Jasper.chromeForeground", source)));
     }
 
+    /** Selects plugin SVG or explicit OldGNOME2 artwork for the running style. */
+    public static javax.swing.Icon skin(ClassLoader loader, String modernSvgResourcePath, String retroName) {
+        java.util.Objects.requireNonNull(loader, "loader");
+        if (retroName == null || !OldGnomeCatalog.NAMES.contains(retroName))
+            throw new IllegalArgumentException("Unknown OldGNOME2 icon: " + retroName);
+        if (modernSvgResourcePath == null || loader.getResource(modernSvgResourcePath) == null)
+            throw new IllegalArgumentException("No such icon resource: " + modernSvgResourcePath);
+        return SwingAppearance.retro() ? new SkinIcon(retroName) : themed(loader, modernSvgResourcePath);
+    }
+
+    /** Sizes only managed retro icons; shared compact icons and external artwork remain untouched. */
+    public static javax.swing.Icon forToolbar(javax.swing.Icon icon) {
+        return icon instanceof SkinIcon managed ? managed.toolbar() : icon;
+    }
+
     private static Color themed(String key, Color source) {
         Color target = UIManager.getColor(key);
         if (target == null) return source;

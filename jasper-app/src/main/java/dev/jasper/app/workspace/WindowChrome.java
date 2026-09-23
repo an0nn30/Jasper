@@ -122,7 +122,7 @@ final class WindowChrome {
         ReferenceButton button = new ReferenceButton(action, null);
         button.setText(owner.toolbarMode() == ToolbarMode.ICONS ? null : label);
         button.putClientProperty("label", label);
-        button.setIcon(icon != null ? icon : AppIcons.toolbarIcon("command"));
+        button.setIcon(icon != null ? AppIcons.forToolbar(icon) : AppIcons.toolbarIcon("command"));
         button.setFocusable(false);
         if (owner.retro()) {
             RetroToolbar.styleButton(button);
