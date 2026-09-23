@@ -176,6 +176,9 @@ public final class FakePluginContext implements PluginContext {
             @Override public Subscription onChanged(java.util.function.Consumer<Variant> handler) {
                 return events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant()));
             }
+            @Override public javax.swing.Icon icon(dev.jasper.sdk.ui.IconName name) {
+                return new FakeNamedIcon(java.util.Objects.requireNonNull(name, "name"), host.retroIcons());
+            }
             @Override public javax.swing.Icon icon(String modernSvgResourcePath, OldGnomeIcon retroIcon) {
                 java.util.Objects.requireNonNull(retroIcon, "retroIcon");
                 icon(modernSvgResourcePath);

@@ -26,6 +26,22 @@ public interface Appearance {
     Subscription onChanged(Consumer<Variant> handler);
 
     /**
+     * A host-owned icon for a semantic name. Jasper selects the artwork for the running
+     * skin; plugins need no resource path or skin check. Compact icons are 16 pixels;
+     * retro host toolbars use an independent 28-pixel variant.
+     *
+     * @param name the meaning of the icon
+     * @return the host's icon for the running skin
+     * @throws NullPointerException if name is null
+     * @throws UnsupportedOperationException if an older custom host has no named catalog
+     * @since 0.7.3
+     */
+    default Icon icon(IconName name) {
+        java.util.Objects.requireNonNull(name, "name");
+        throw new UnsupportedOperationException("Host does not provide named icons");
+    }
+
+    /**
      * A 16 by 16 icon from an SVG in the plugin's own jars, recolored to the chrome's foreground so it
      * follows the theme without being reloaded. Use monochrome artwork.
      *

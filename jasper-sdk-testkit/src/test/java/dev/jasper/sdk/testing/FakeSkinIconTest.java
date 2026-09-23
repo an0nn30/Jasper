@@ -27,6 +27,13 @@ class FakeSkinIconTest {
                 assertThat(icon.getIconWidth()).isEqualTo(16);
                 assertThat(icon.getIconHeight()).isEqualTo(16);
             }
+            for (var name : dev.jasper.sdk.ui.IconName.values()) {
+                var named = context.appearance().icon(name);
+                assertThat(named).isEqualTo(new FakeNamedIcon(name, retro));
+                assertThat(named.getIconWidth()).isEqualTo(16);
+                assertThat(named.getIconHeight()).isEqualTo(16);
+            }
+            assertThatNullPointerException().isThrownBy(() -> context.appearance().icon((dev.jasper.sdk.ui.IconName) null));
             assertThatIllegalArgumentException().isThrownBy(() -> context.appearance().icon("missing.svg", OldGnomeIcon.LOCK));
             assertThatIllegalArgumentException().isThrownBy(() -> context.appearance().icon(null, OldGnomeIcon.LOCK));
             assertThatNullPointerException().isThrownBy(() -> context.appearance().icon(RESOURCE, null));

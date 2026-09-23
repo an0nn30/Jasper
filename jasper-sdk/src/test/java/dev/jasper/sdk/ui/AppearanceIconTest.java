@@ -19,6 +19,8 @@ class AppearanceIconTest {
             }
         };
         assertThat(legacy.icon("icon.svg", OldGnomeIcon.LOCK)).isSameAs(original);
+        assertThatThrownBy(() -> legacy.icon(IconName.LOCK)).isInstanceOf(UnsupportedOperationException.class);
+        assertThatNullPointerException().isThrownBy(() -> legacy.icon((IconName) null));
         assertThatNullPointerException().isThrownBy(() -> legacy.icon("icon.svg", null));
         assertThatIllegalArgumentException().isThrownBy(() -> legacy.icon(null, OldGnomeIcon.LOCK));
         assertThatIllegalArgumentException().isThrownBy(() -> legacy.icon("missing", OldGnomeIcon.LOCK));
