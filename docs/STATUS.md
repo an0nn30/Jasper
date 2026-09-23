@@ -36,6 +36,18 @@ is merged at `17c0476`. The Credential Vault design
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
+### Self-contained SSH import — design awaiting review
+
+The user clarified that config import should bring referenced private keys into
+Vault and configure hosts to use Jasper's built-in SSH client independently of the
+system agent and original key files. They confirmed Vault-backed authentication,
+not a separate SSH-agent service. The written [design](superpowers/specs/2026-09-23-jasper-vault-backed-ssh-import-design.md)
+covers encrypted managed keys, additive Vault APIs, ordered identities, re-import
+repair, compatibility, and cancellation/write failure handling. It supersedes the
+old import-to-Agent fallback for this flow. Written-spec review and the subsequent
+implementation plan remain pending; native inline execution is the preserved choice.
+No implementation or user credential changes have been made for this feature.
+
 ### Remote empty-agent diagnosis — 2026-09-23
 
 Investigated the user's imported-host authentication failure on `codex/retro-metal`.
