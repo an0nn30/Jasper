@@ -1839,3 +1839,18 @@ Task 1 was independently approved with no required fixes. Task 2 added RED/GREEN
 The readiness branch was pushed after explicit user approval. Initial CI passed macOS/Linux but failed three Windows app tests. Test-only `a5f4dc1` uses the platform line separator for the exact logging fallback assertion and adds method-level Windows exclusions for two existing `/bin/sh` fixtures. Production code, package and measured runtime remain unchanged. Focused 15/15 and local full 575 passed/one known skip; `c793925` additionally fixes an off-EDT test resize race without weakening its grid/connector assertions; focused8/full575pass1skip and the confirming three-platform run passed. Details and the controller-review substitution caused by the agent service's thread limit are recorded in the [readiness handoff](terminal-readiness.md#publication-and-ci-follow-up).
 
 App refactor execution ruling: coordinator shutdown preserves pane-owned session close; late arrivals close immediately. The controlled lifecycle tests use a child JVM through supported APIs because app tests cannot access terminal fake connectors.
+
+### Retro toolbar Settings and Exit — 2026-09-23
+
+Added retro-only Settings and Exit buttons after the toolbar's flexible space. Plugin
+controls stay to their left. Both use the existing application actions, preserving
+configuration availability and normal quit handling. They retain the compact 28-pixel,
+flat, labeled presentation and existing icon-only/hidden modes. Exit uses original
+24/48-pixel GNOME shutdown artwork with source hashes in the GPL2+ asset manifest.
+Modern toolbar contents are unchanged.
+
+Targeted toolbar, action, contribution and icon tests passed, including red/green checks
+for the new placement and callbacks; installDist rebuilt successfully. Inspected the
+headless 2x toolbar preview. No native GUI launch, merge or push.
+
+The full application check and architecture gate also passed: 815 tests, 0 failures, 0 errors, 1 skips. Source hygiene and diff checks passed.

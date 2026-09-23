@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.*;
 class GnomeIconsTest {
 @Test void everyBundledIconHasRealImagesAndPaintsAtBothScales() {
     for (String name : java.util.List.of("square-plus", "app-window", "columns-2", "maximize",
-            "search", "settings", "refresh", "command", "history", "bookmark", "close")) {
+            "search", "settings", "refresh", "command", "history", "bookmark", "close", "exit")) {
         var icon = GnomeIcons.icon(name);
         assertThat(icon.getIconWidth()).isEqualTo(16);
         assertThat(icon.getIconHeight()).isEqualTo(16);
@@ -26,7 +26,7 @@ class GnomeIconsTest {
 }
 
     @Test void resourceManifestAndLicenseTravelWithTheIcons() throws Exception {
-        verifyManifest("gnome2", 22, java.util.List.of("LICENSE.txt", "NOTICE.md"));
+        verifyManifest("gnome2", 24, java.util.List.of("LICENSE.txt", "NOTICE.md"));
         verifyManifest("tango", 10, java.util.List.of("COPYING", "AUTHORS", "NOTICE.md"));
     }
 
@@ -62,7 +62,7 @@ class GnomeIconsTest {
     @Test void metalDisabledIconsRemainVisibleButDifferFromEnabledIcons() {
         new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.RETRO, dev.jasper.app.config.Appearance.LIGHT);
         try {
-            for (String name : java.util.List.of("maximize", "command")) for (int size : new int[]{16, 24, 28, 32}) {
+            for (String name : java.util.List.of("maximize", "command", "exit")) for (int size : new int[]{16, 24, 28, 32}) {
                 var clicks = new java.util.concurrent.atomic.AtomicInteger();
                 var button = new javax.swing.JButton(GnomeIcons.icon(name, size));
                 button.addActionListener(event -> clicks.incrementAndGet());

@@ -44,6 +44,42 @@ class RetroChromeTest {
     });
 }
 
+    @Test void retroTrailingControlsUseSettingsAndQuitActions() throws Exception {
+        edt(() -> {
+            for (var style : ThemeStyle.values()) {
+                var settingsCalls = new java.util.concurrent.atomic.AtomicInteger();
+                var quitCalls = new java.util.concurrent.atomic.AtomicInteger();
+                try (var owner = new WindowContent(launcher(new java.util.ArrayDeque<>()), HOME,
+                        path -> {}, quitCalls::incrementAndGet, () -> {}, new ThemeController(style, Appearance.LIGHT))) {
+                    var toolbar = owner.toolbar();
+                    var buttons = java.util.Arrays.stream(toolbar.getComponents())
+                        .filter(javax.swing.JButton.class::isInstance).map(javax.swing.JButton.class::cast).toList();
+                    if (style != ThemeStyle.RETRO) {
+                        assertThat(buttons).noneMatch(button -> button.getAction() == owner.action(dev.jasper.app.commands.ActionId.QUIT)
+                            || button.getAction() == owner.action(dev.jasper.app.commands.ActionId.OPEN_SETTINGS));
+                        continue;
+                    }
+                    var settings = buttons.get(buttons.size() - 2);
+                    var exit = buttons.getLast();
+                    assertThat(settings.getText()).isEqualTo("Settings");
+                    assertThat(exit.getText()).isEqualTo("Exit");
+                    assertThat(settings.getAction()).isSameAs(owner.action(dev.jasper.app.commands.ActionId.OPEN_SETTINGS));
+                    assertThat(exit.getAction()).isSameAs(owner.action(dev.jasper.app.commands.ActionId.QUIT));
+                    assertThat(settings.isEnabled()).isFalse();
+                    owner.connectConfiguration(settingsCalls::incrementAndGet, () -> {}, () -> {});
+                    settings.doClick(); exit.doClick();
+                    assertThat(settingsCalls.get()).isEqualTo(1);
+                    assertThat(quitCalls.get()).isEqualTo(1);
+                    toolbar.setSize(960, toolbar.getPreferredSize().height); toolbar.doLayout();
+                    assertThat(settings.getX()).isGreaterThan(800);
+                    assertThat(exit.getX() + exit.getWidth()).isEqualTo(toolbar.getWidth() - toolbar.getInsets().right);
+                    owner.disconnectConfiguration();
+                    assertThat(settings.isEnabled()).isFalse();
+                }
+            }
+        });
+    }
+
     @Test void minimumToolbarWidthKeepsEveryIconAndBorderReachable() throws Exception {
         edt(() -> {
             var owner = content(launcher(new java.util.ArrayDeque<>()), new ThemeController(ThemeStyle.RETRO, Appearance.LIGHT));

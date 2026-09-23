@@ -106,6 +106,10 @@ final class WindowChrome {
         addButton(ActionId.ZOOM_PANE, "maximize"); addButton(ActionId.FIND, "search");
         addToolbarSeparator();
         toolbar.add(toolbarGlue);
+        if (owner.retro()) {
+            addButton(ActionId.OPEN_SETTINGS, "settings");
+            addButton(ActionId.QUIT, "exit");
+        }
     }
 
     private void addToolbarSeparator() {
@@ -259,7 +263,7 @@ final class WindowChrome {
         String label = switch (id) {
             case NEW_TAB -> "New tab"; case NEW_WINDOW -> "New window";
             case SPLIT_RIGHT -> "Split"; case ZOOM_PANE -> "Zoom pane";
-            case RELOAD_CONFIG -> "Reload config"; default -> id.label();
+            case RELOAD_CONFIG -> "Reload config"; case QUIT -> "Exit"; default -> id.label();
         };
         ReferenceButton button = new ReferenceButton(owner.action(id), id);
         button.setText(label); button.putClientProperty("label", label);

@@ -61,6 +61,7 @@ class WindowChromeContributionsTest {
             List<String> after = buttons(owner);
             assertThat(after).containsSubsequence("Find", "Run Tool", "Tool");
             assertThat(after).hasSize(before.size() + 2);
+            if (retro) assertThat(after).endsWith("Run Tool", "Tool", "Settings", "Exit");
             JButton button = null;
             for (Component child : owner.toolbar().getComponents())
                 if (child instanceof JButton candidate && "Run Tool".equals(candidate.getClientProperty("label"))) button = candidate;

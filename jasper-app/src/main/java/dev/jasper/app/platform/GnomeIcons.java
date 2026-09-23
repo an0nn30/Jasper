@@ -14,7 +14,7 @@ import javax.swing.ImageIcon;
 /** Self-contained, full-color raster artwork. Source and license travel with the resources. */
 final class GnomeIcons {
     static final Set<String> NAMES = Set.of("square-plus", "app-window", "columns-2", "maximize",
-        "search", "settings", "refresh", "command", "history", "bookmark", "close");
+        "search", "settings", "refresh", "command", "history", "bookmark", "close", "exit");
     private static final Set<String> TANGO = Set.of("square-plus", "app-window", "columns-2", "maximize", "search");
     private static final Map<String, Icon> CACHE = new ConcurrentHashMap<>();
     private GnomeIcons() {}
@@ -24,6 +24,11 @@ final class GnomeIcons {
         if (size != 16 && size != 24 && size != 28 && size != 32) throw new IllegalArgumentException("Unsupported icon size: " + size);
         // ImageIcon lets Metal generate its native disabled variant. Keep resolution selection in the JDK.
         return CACHE.computeIfAbsent(name + "/" + size, key -> {
+            if (name.equals("exit")) {
+                var large = read("gnome2", name, 48);
+                var base = size == 24 ? read("gnome2", name, 24) : sized(large, size);
+                return new ImageIcon(new BaseMultiResolutionImage(base, large));
+            }
             if (TANGO.contains(name)) {
                 var large = read("tango", name, 32);
                 if (size == 32) return new ImageIcon(large);
