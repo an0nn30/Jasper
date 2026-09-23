@@ -61,4 +61,16 @@ class HostFileTest {
         assertThat(RemoteHost.create("x", "x", 22, "", new Auth.Vault(UUID.randomUUID()), "", Optional.empty()).label()).isEqualTo("x:22");
         assertThat(a.label()).isEqualTo("u@a:22");
     }
+    @Test void orderedManagedIdsRoundTripAndInvalidFormsAreRejected() throws Exception {
+        UUID second = UUID.randomUUID();
+        var keys = new Auth.VaultKeys(List.of(CRED, second, CRED));
+        var host = bastion().withEdited("managed", "server", 22, "ops", keys, "", Optional.empty());
+        String text = HostFile.format(List.of(host));
+        assertThat(HostFile.parse(text).hosts()).containsExactly(host);
+        assertThat(keys.credentialIds()).containsExactly(CRED, second);
+        assertThatThrownBy(() -> new Auth.VaultKeys(List.of())).isInstanceOf(IllegalArgumentException.class);
+        assertThat(HostFile.parse(text.replace("credentials = [", "credential = \"" + CRED + "\"\ncredentials = [")).warnings()).isNotEmpty();
+        assertThat(HostFile.parse(text.replaceAll("credentials = .*", "credentials = []")).warnings()).isNotEmpty();
+    }
+
 }

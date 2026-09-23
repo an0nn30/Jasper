@@ -500,6 +500,7 @@ public class RemotePlugin implements Plugin {
 
     private String credentialLabel(RemoteHost host) {
         return switch (host.auth()) {
+            case Auth.VaultKeys keys -> vault.isEmpty() ? "needs Credential Vault" : vault.get().lockState() != LockState.UNLOCKED ? "Vault locked" : keys.credentialIds().size() + " Vault key(s)";
             case Auth.Agent agent -> "SSH agent";
             case Auth.Vault credential -> vault.isEmpty() ? "needs Credential Vault" : vault.get().lockState() != LockState.UNLOCKED ? "Vault locked" : credentialName(credential.credentialId()).orElse("credential missing");
         };

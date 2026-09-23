@@ -64,4 +64,19 @@ class HostEditorTest {
         editor.cancel.doClick();
         assertThat(cancelled[0]).isTrue();
     }
+    @Test void preservesAndReordersManagedKeys() {
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        RemoteHost host = bastion.withEdited("managed", "server", 22, "ops", new Auth.VaultKeys(List.of(a, b)), "", Optional.empty());
+        var editor = new HostEditor(List.of(), Optional.of(host), true, id -> Optional.of(id.equals(a) ? "first" : "second"),
+            () -> CompletableFuture.completedFuture(Optional.of(login)), saved::add, () -> {});
+        editor.hostname.setText("changed"); editor.save.doClick();
+        assertThat(saved.getLast().auth()).isEqualTo(new Auth.VaultKeys(List.of(a, b)));
+        editor.keyList.setSelectedIndex(1); editor.moveUp.doClick(); editor.save.doClick();
+        assertThat(saved.getLast().auth()).isEqualTo(new Auth.VaultKeys(List.of(b, a)));
+        editor.addKey.doClick();
+        assertThat(editor.message.getText()).contains("managed SSH key");
+        editor.removeKey.doClick(); editor.save.doClick();
+        assertThat(saved.getLast().auth()).isEqualTo(new Auth.VaultKeys(List.of(a)));
+    }
+
 }

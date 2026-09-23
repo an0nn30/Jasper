@@ -100,6 +100,22 @@ class ConnectionsTest {
         catch (Exception other) { return other.toString(); }
     }
 
+    @Test void managedKeysAuthenticateAfterSourceDeletionWithoutAgent(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            var generator = new KeyGenerator(dir.resolve("keys"));
+            SshKey first = generator.generate(KeyAlgorithm.ED25519, "first", "test");
+            SshKey second = generator.generate(KeyAlgorithm.ED25519, "second", "test", "phrase".toCharArray());
+            server.allow(PublicKeyEntry.parsePublicKeyEntry(Files.readString(second.publicPath()).strip()).resolvePublicKey(null, null, null));
+            UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+            credentials.put(a, new Credential(a, "first", Kind.SSH_KEY, null, null, null, Files.readAllBytes(first.privatePath()), null));
+            credentials.put(b, new Credential(b, "second", Kind.SSH_KEY, null, null, null, Files.readAllBytes(second.privatePath()), "phrase".toCharArray()));
+            for (Path path : List.of(first.privatePath(), first.publicPath(), second.privatePath(), second.publicPath())) Files.delete(path);
+            connections(dir, Optional.empty());
+            var target = host("managed", server.port(), "deploy", new Auth.VaultKeys(List.of(a, b)), Optional.empty());
+            assertThat(readUntil(shell(target).connection(), "\r\n")).startsWith("READY");
+            assertThat(credentials.values()).allSatisfy(c -> assertThatThrownBy(c::keyBytes).isInstanceOf(IllegalStateException.class));
+        }
+    }
     @Test void passwordAuthOpensAShellThatEchoesResizesAndExits(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer()) {
             connections(dir, Optional.empty());
@@ -268,6 +284,35 @@ class ConnectionsTest {
         onUi(() -> future.cancel(true));
         onUi(() -> {});
         assertThat(pending).isCancelled();
+    }
+
+    @Test void cancellingSecondKeyRequestClosesFirstCopy(@TempDir Path dir) throws Exception {
+        UUID firstId = UUID.randomUUID(), secondId = UUID.randomUUID();
+        var first = new Credential(firstId, "first", Kind.SSH_KEY, null, null, null, new byte[] {1}, null);
+        var second = new CompletableFuture<Optional<Credential>>();
+        var requested = new CompletableFuture<Void>();
+        connections = new Connections(() -> settings, new KnownHosts(dir.resolve("known_hosts"), Optional.empty()), Optional.empty(),
+            id -> Optional.ofNullable(hosts.get(id)), Optional.of(id -> {
+                if (id.equals(firstId)) return CompletableFuture.completedFuture(Optional.of(first));
+                requested.complete(null); return second;
+            }), q -> CompletableFuture.completedFuture(decision), background, ui, (delay, task) -> () -> {});
+        var target = host("waiting", 22, "u", new Auth.VaultKeys(List.of(firstId, secondId)), Optional.empty());
+        var future = onUi(() -> connections.shell(target.id(), 80, 24, status -> {}));
+        requested.get(5, TimeUnit.SECONDS);
+        onUi(() -> future.cancel(true)); onUi(() -> {}); onUi(() -> {});
+        assertThat(second).isCancelled();
+        assertThatThrownBy(first::keyBytes).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test void managedHostRejectsPathAndPasswordCredentials(@TempDir Path dir) {
+        connections(dir, Optional.empty());
+        UUID pathId = UUID.randomUUID();
+        credentials.put(pathId, new Credential(pathId, "legacy", Kind.SSH_KEY, null, null, dir.resolve("absent"), null));
+        for (UUID id : List.of(pathId, passwordCredential())) {
+            var target = host(id.toString(), 22, "u", new Auth.VaultKeys(List.of(id)), Optional.empty());
+            assertThat(failure(onUi(() -> connections.shell(target.id(), 80, 24, s -> {})))).contains("Import this key");
+            assertThatThrownBy(credentials.get(id)::keyBytes).isInstanceOf(IllegalStateException.class);
+        }
     }
 
     @Test void callbacksUseUiAndJumpReleasesAfterLastShell(@TempDir Path dir) throws Exception {

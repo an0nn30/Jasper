@@ -11,5 +11,12 @@ public sealed interface Auth {
         public Vault { Objects.requireNonNull(credentialId, "credentialId"); }
     }
 
+    record VaultKeys(java.util.List<UUID> credentialIds) implements Auth {
+        public VaultKeys {
+            credentialIds = java.util.List.copyOf(new java.util.LinkedHashSet<>(credentialIds));
+            if (credentialIds.isEmpty()) throw new IllegalArgumentException("Choose at least one Vault key");
+        }
+    }
+
     record Agent() implements Auth { }
 }
