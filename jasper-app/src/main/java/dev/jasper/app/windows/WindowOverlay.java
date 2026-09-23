@@ -28,11 +28,19 @@ final class WindowOverlay implements AutoCloseable {
 
     WindowOverlay(JRootPane root, JComponent content, KeyboardFocusManager focusManager) {
         this.root = root; this.content = content; this.focusManager = focusManager;
-        card = new JScrollPane(content);
+        card = new JScrollPane(content) {
+            // Propagate preferred-size changes to the backdrop, which owns centering.
+            @Override public boolean isValidateRoot() { return false; }
+        };
         card.setBorder(BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor") == null
             ? Color.GRAY : UIManager.getColor("Component.borderColor")));
         card.setFocusCycleRoot(true);
-        card.setFocusTraversalPolicy(new LayoutFocusTraversalPolicy());
+        card.setFocusTraversalPolicy(new ContainerOrderFocusTraversalPolicy() {
+            @Override protected boolean accept(Component component) {
+                return !(component instanceof JPanel || component instanceof JScrollPane
+                    || component instanceof JViewport || component instanceof JLabel) && super.accept(component);
+            }
+        });
         card.setFocusable(true);
         backdrop.setLayout(null); backdrop.add(card);
     }
@@ -134,7 +142,7 @@ final class WindowOverlay implements AutoCloseable {
         }
         @Override public void doLayout() {
             // Derive every time: retry messages and live UI font changes can alter preferred size.
-            Dimension preferred = content.getPreferredSize();
+            Dimension preferred = card.getPreferredSize();
             int margin = Math.min(16, Math.min(getWidth(), getHeight()) / 2);
             var bounds = centered(preferred, new Dimension(Math.max(0, getWidth() - 2 * margin), Math.max(0, getHeight() - 2 * margin)));
             bounds.translate(margin, margin); card.setBounds(bounds); card.doLayout();

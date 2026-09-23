@@ -88,6 +88,7 @@ final class WindowContributions implements AutoCloseable {
 
     /** From a shortcut, the palette, a menu, the toolbar or a status item. */
     void invoke(String id) {
+        if (dev.jasper.app.platform.WindowInput.blocked(owner)) return;
         if (owner.closed() || owner.commandPalette() != null && owner.commandPalette().isOpen()) return;
         Optional<java.util.UUID> pane = Optional.ofNullable(owner.currentPane()).map(TerminalPane::id);
         model.action(id).ifPresent(entry -> entry.invoke(new Contributions.Invocation(owner.id(), pane)));

@@ -2,6 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Native execution was already requested; finish with one independent review.
 
+**Status:** Complete, executed natively. Full check/installDist passed: 1,634 tests, 1,631 passed,
+three expected skips; Remote 70/70. Default/18-point headless renders inspected. One independent
+review and fix pass completed with no remaining findings. UI typography was separately approved
+and implemented on this branch. Implementation refinements: shared platform root-input marker
+avoids a workspace/windows package dependency; container-order focus traversal supports headless
+roots; scrollpane border insets and validation-root propagation preserve natural layout; native menu
+callbacks honor overlay containment. No merge, push or native GUI launch.
+
 **Goal:** Present Remote connection progress in the center of its owning app window, with explicit Cancel, without creating a native progress window.
 
 **Architecture:** Extend the existing SDK Windows facade and AuxiliarySurface lifetime with an overlay kind. A headless-testable Swing host mounts in the owning root pane. Remote retains its existing connection, retry, cancellation and prepared-shell ownership.
@@ -48,7 +56,7 @@
 - Overlay creation requires an open terminal owner from the same host; show is nonblocking.
 - `AuxiliaryWindows.closeOwned(UUID)` closes terminal-owned surfaces even before show.
 
-- [ ] Add regression coverage for singleton ownership, foreign/closed owners, context stop, owner close before show, idempotent close and reuse after close.
+- [x] Add regression coverage for singleton ownership, foreign/closed owners, context stop, owner close before show, idempotent close and reuse after close.
 
 ```java
 @Test void onlyOneOverlayCanOwnATerminalWindow() {
@@ -62,8 +70,8 @@
 }
 ```
 
-- [ ] Run the affected tests and confirm failure because the overlay API is absent.
-- [ ] Implement the SDK value and method, including Javadoc thread, owner and duplicate constraints.
+- [x] Run the affected tests and confirm failure because the overlay API is absent.
+- [x] Implement the SDK value and method, including Javadoc thread, owner and duplicate constraints.
 
 ```java
 public record OverlaySpec(String title, WindowHandle owner) {
@@ -91,7 +99,7 @@ public void closeOwned(UUID ownerWindow) {
 
 Wire terminal removal to `closeOwned`. HostedUi validates handles against its existing terminal registry before creating the surface and adds the surface to plugin cleanup. The fake uses host-wide owner reservations (not per-plugin reservations), releases them on close, and mirrors terminal and context cleanup. Keep native dialog behavior intact.
 
-- [ ] Run SDK, testkit and affected app lifecycle/contract tests. Commit with Co-Authored-By trailer.
+- [x] Run SDK, testkit and affected app lifecycle/contract tests. Commit with Co-Authored-By trailer.
 
 ### Task 2: Centered root-pane host and input containment
 
@@ -105,7 +113,7 @@ Wire terminal removal to `closeOwned`. HostedUi validates handles against its ex
 - Produces a shell whose show/front focus content, dispose detaches it, title updates accessibility, bounds report card bounds and file chooser uses the owner window.
 - `WindowOverlay(JRootPane, JComponent)` owns its resize/focus/key listeners; `show()`, `focus()`, `close()` are EDT-confined and idempotent.
 
-- [ ] Add headless tests for exact center, resize/content/font relayout, tiny dimensions, outside clicks and Escape, keyboard containment, restoration only when overlay owned focus, and repeated show/close listener counts.
+- [x] Add headless tests for exact center, resize/content/font relayout, tiny dimensions, outside clicks and Escape, keyboard containment, restoration only when overlay owned focus, and repeated show/close listener counts.
 
 ```java
 @Test void centersAndClampsToTheAvailableWindow() {
@@ -126,7 +134,7 @@ Wire terminal removal to `closeOwned`. HostedUi validates handles against its ex
 }
 ```
 
-- [ ] Confirm failure, then implement the layered host with null layout, a dimmed backdrop and the card bounds calculation below. Revalidate layout when the content changes. Wrap constrained content in a scroll container so Cancel/Retry remain reachable at large UI sizes.
+- [x] Confirm failure, then implement the layered host with null layout, a dimmed backdrop and the card bounds calculation below. Revalidate layout when the content changes. Wrap constrained content in a scroll container so Cancel/Retry remain reachable at large UI sizes.
 
 ```java
 static Rectangle centered(Dimension preferred, Dimension available) {
@@ -138,8 +146,8 @@ static Rectangle centered(Dimension preferred, Dimension available) {
 
 Use a layer above the palette. Swallow backdrop mouse/motion/wheel events without dismissal. Keep a focus cycle inside the content. Intercept owner keyboard shortcuts before the existing palette dispatcher; allow events belonging to a separate native prompt. Escape is consumed. Save prior focus on first show and restore it only when closing while the overlay owns focus; a successful handoff to a new pane must keep that pane focused. Remove root properties, listeners and dispatchers on close; never retain them globally after owner disposal. Test native prompt exemption via the event-source containment decision, without opening a GUI.
 
-- [ ] Route NativeShells overlay creation through the owner root pane and share existing file-picker ownership. Refresh overlay content on theme/font changes via the owning root; do not add an extra native window to the `natives` map.
-- [ ] Run headless overlay, window, keyboard and architecture tests. Commit with Co-Authored-By trailer.
+- [x] Route NativeShells overlay creation through the owner root pane and share existing file-picker ownership. Refresh overlay content on theme/font changes via the owning root; do not add an extra native window to the `natives` map.
+- [x] Run headless overlay, window, keyboard and architecture tests. Commit with Co-Authored-By trailer.
 
 ### Task 3: Remote integration and acceptance
 
@@ -152,9 +160,9 @@ Use a layer above the palette. Swallow backdrop mouse/motion/wheel events withou
 - Consumes `Windows.overlay(new OverlaySpec(title, window))`.
 - Retains `ConnectAttempt` cancellation, retries, prepared-shell delivery and reconnect callbacks.
 
-- [ ] Extend existing connection tests to assert overlay surface, no early tab, failure/retry, Cancel during pending auth, owner/plugin stop, same-window duplicate request and successful handoff focus.
-- [ ] Run Remote tests and observe the new overlay expectation fail.
-- [ ] Replace only progress dialog creation:
+- [x] Extend existing connection tests to assert overlay surface, no early tab, failure/retry, Cancel during pending auth, owner/plugin stop, same-window duplicate request and successful handoff focus.
+- [x] Run Remote tests and observe the new overlay expectation fail.
+- [x] Replace only progress dialog creation:
 
 ```java
 dialog = context.windows().overlay(new OverlaySpec("Connecting to " + host.name(), window));
@@ -162,6 +170,6 @@ dialog = context.windows().overlay(new OverlaySpec("Connecting to " + host.name(
 
 Before creating any tab/split/reconnect attempt, find an existing attempt with the same window id; bring it forward and return without starting another shell request. Keep host-key, Vault, edit and import dialogs native. Report any rejected overlay reservation through existing notices without leaving an attempt in the set. Cancel remains explicit; no window decorations or automatic dismissal paths are added.
 
-- [ ] Run Remote tests, inspect an app-themed headless overlay render at default and enlarged UI fonts, then run `./gradlew check :jasper-app:installDist` serially.
-- [ ] Record XML test counts, limitations and native user acceptance steps in STATUS. Commit with Co-Authored-By trailer.
-- [ ] Obtain one independent whole-change review; address findings and rerun affected checks. Do not merge, push or launch the GUI.
+- [x] Run Remote tests, inspect an app-themed headless overlay render at default and enlarged UI fonts, then run `./gradlew check :jasper-app:installDist` serially.
+- [x] Record XML test counts, limitations and native user acceptance steps in STATUS. Commit with Co-Authored-By trailer.
+- [x] Obtain one independent whole-change review; address findings and rerun affected checks. Do not merge, push or launch the GUI.

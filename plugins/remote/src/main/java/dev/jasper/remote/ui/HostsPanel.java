@@ -118,7 +118,7 @@ public final class HostsPanel extends JPanel {
                 int index = list.locationToIndex(event.getPoint());
                 if (index < 0 || !list.getCellBounds(index, index).contains(event.getPoint())) return;
                 if (SwingUtilities.isRightMouseButton(event)) { list.setSelectedIndex(index); JPopupMenu menu = menuFor(index); if (menu != null) menu.show(list, event.getX(), event.getY()); }
-                else if (event.getX() < 30 && model.get(index) instanceof HostRows.Host row) {
+                else if (event.getX() < 14 + favoriteWidth(list) && model.get(index) instanceof HostRows.Host row) {
                     if (event.getClickCount() == 1) actions.favorite().accept(row.host(), !row.host().favorite());
                 }
                 else if (event.getClickCount() == 2) activate(index);
@@ -245,6 +245,11 @@ public final class HostsPanel extends JPanel {
         }
     }
 
+    private static int favoriteWidth(JList<?> owner) {
+        var metrics = owner.getFontMetrics(owner.getFont().deriveFont(owner.getFont().getSize2D() + 1));
+        return Math.max(16, Math.max(metrics.stringWidth("★"), metrics.stringWidth("☆")) + 2);
+    }
+
     private Component hostRow(JList<?> owner, RemoteHost host, boolean selected) {
         var row = new JPanel(new BorderLayout(6, 0));
         row.setOpaque(true);
@@ -253,7 +258,7 @@ public final class HostsPanel extends JPanel {
         java.awt.Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
         Font font = owner.getFont().deriveFont(owner.getFont().getSize2D() + 1);
         var favorite = text(host.favorite() ? "★" : "☆", foreground, font);
-        favorite.setPreferredSize(new java.awt.Dimension(16, favorite.getPreferredSize().height));
+        favorite.setPreferredSize(new java.awt.Dimension(favoriteWidth(owner), favorite.getPreferredSize().height));
         row.add(favorite, BorderLayout.WEST);
         row.add(text(host.name(), foreground, font), BorderLayout.CENTER);
         int sessions = sessionCount.applyAsInt(host);

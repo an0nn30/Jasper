@@ -18,7 +18,7 @@ class WindowOverlayTest {
         for (int i = 0; i < 3; i++) {
             var overlay = new WindowOverlay(root, card);
             overlay.show(); overlay.show();
-            assertThat(overlay.cardBounds()).isEqualTo(new Rectangle(200, 205, 400, 190));
+            assertThat(overlay.cardBounds()).isEqualTo(new Rectangle(199, 204, 402, 192));
             root.getLayeredPane().setSize(240, 140); overlay.layout();
             Rectangle bounds = overlay.cardBounds();
             assertThat(bounds.x * 2 + bounds.width).isEqualTo(240);
@@ -39,6 +39,12 @@ class WindowOverlayTest {
         card.add(cancel); card.add(text);
         var overlay = new WindowOverlay(root, card); overlay.show();
         try {
+            var backdrop = root.getLayeredPane().getComponent(0);
+            var outside = new java.awt.event.MouseEvent(backdrop, java.awt.event.MouseEvent.MOUSE_PRESSED,
+                0, 0, 1, 1, 1, false);
+            backdrop.dispatchEvent(outside);
+            assertThat(outside.isConsumed()).isTrue();
+            assertThat(dev.jasper.app.platform.WindowInput.blocked(root)).isTrue();
             assertThat(overlay.filterKey(key(behind, KeyEvent.VK_A, 0))).isTrue();
             assertThat(overlay.filterKey(key(cancel, KeyEvent.VK_ESCAPE, 0))).isTrue();
             assertThat(overlay.filterKey(key(cancel, KeyEvent.VK_N, KeyEvent.META_DOWN_MASK))).isTrue();
@@ -57,9 +63,31 @@ class WindowOverlayTest {
         try {
             int layers = root.getLayeredPane().getComponentCount();
             card.setPreferredSize(new Dimension(500, 250)); overlay.layout();
-            assertThat(overlay.cardBounds()).isEqualTo(new Rectangle(150, 175, 500, 250));
+            assertThat(overlay.cardBounds()).isEqualTo(new Rectangle(149, 174, 502, 252));
             assertThat(root.getLayeredPane().getComponentCount()).isEqualTo(layers);
         } finally { overlay.close(); }
+    }
+
+    @Test void contentRevalidationRecentersNaturallyAndNormalSizeNeedsNoScrollbars() {
+        var outer = new JPanel(new java.awt.BorderLayout());
+        var root = new JRootPane(); outer.add(root); outer.setSize(800, 600); outer.addNotify(); outer.validate();
+        var content = new JPanel(); content.setPreferredSize(new Dimension(400, 190));
+        var overlay = new WindowOverlay(root, content);
+        try {
+            overlay.show(); root.validate();
+            var scroll = (JScrollPane) content.getParent().getParent();
+            scroll.doLayout(); scroll.getViewport().doLayout();
+            assertThat(scroll.getHorizontalScrollBar().isVisible()).isFalse();
+            assertThat(scroll.getVerticalScrollBar().isVisible()).isFalse();
+            content.setPreferredSize(new Dimension(500, 250));
+            content.revalidate();
+            // Drive Swing's nearest validate root without needing a native Window in this test.
+            java.awt.Container validationRoot = content;
+            while (validationRoot instanceof JComponent component && !component.isValidateRoot())
+                validationRoot = validationRoot.getParent();
+            validationRoot.validate();
+            assertThat(overlay.cardBounds()).isEqualTo(new Rectangle(149, 174, 502, 252));
+        } finally { overlay.close(); outer.removeNotify(); }
     }
 
     private static KeyEvent key(JComponent source, int code, int modifiers) {

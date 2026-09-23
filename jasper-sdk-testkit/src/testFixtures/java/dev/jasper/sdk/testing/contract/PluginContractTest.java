@@ -105,6 +105,23 @@ public abstract class PluginContractTest {
         return context.get();
     }
 
+    @Test void pluginStopClosesOverlaysAndExplicitCloseReleasesTheirReservation() {
+        var context = started("test.overlay", Set.of());
+        UUID window = h.addTerminalWindow();
+        var closed = new AtomicInteger();
+        h.ui(() -> {
+            var owner = context.terminals().window(window).orElseThrow();
+            var first = context.windows().overlay(new dev.jasper.sdk.ui.OverlaySpec("First", owner));
+            first.onClosed(closed::incrementAndGet); first.show(); first.close(); first.close();
+            var second = context.windows().overlay(new dev.jasper.sdk.ui.OverlaySpec("Second", owner));
+            second.onClosed(closed::incrementAndGet); second.show();
+        });
+        assertThat(closed.get()).isEqualTo(1);
+        h.stopAll(); h.flush();
+        assertThat(closed.get()).isEqualTo(2);
+        assertThat(h.windows()).isEmpty();
+    }
+
     @Test void overlaysReserveAnOwnerAcrossPluginsAndCloseWithTheOwner() {
         var first = new AtomicReference<PluginContext>();
         var second = new AtomicReference<PluginContext>();

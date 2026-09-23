@@ -84,6 +84,7 @@ public final class NativeShells {
         Window owner = surface.ownerWindow().map(terminalWindows).orElse(null);
         if (!(owner instanceof javax.swing.RootPaneContainer container))
             throw new IllegalStateException("An overlay needs an open terminal window");
+        SwingUtilities.updateComponentTreeUI(surface.holder());
         var overlay = new WindowOverlay(container.getRootPane(), surface.holder());
         surface.holder().getAccessibleContext().setAccessibleName(surface.title());
         var close = new WindowAdapter() {

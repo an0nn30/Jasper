@@ -8,6 +8,19 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class UiTypographyTest {
+    @Test void configuredPointSizesAreExactAcrossTheWholeSupportedRange() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var themes = new ThemeController();
+            try {
+                for (float size : new float[]{8, 12, 14, 18.5f, 24, 28, 32}) {
+                    themes.configure(Appearance.DARK, new UiFontConfig("system", size));
+                    assertThat(new JLabel().getFont().getSize2D()).as("configured %s", size).isEqualTo(size);
+                    assertThat(new JButton().getFont().getSize2D()).isEqualTo(size);
+                }
+            } finally { themes.configure(Appearance.DARK, UiFontConfig.defaults()); }
+        });
+    }
+
     @Test void missingFamiliesFallBackAndFontChangesDoNotDisturbTemporaryThemeSelection() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var themes = new ThemeController();

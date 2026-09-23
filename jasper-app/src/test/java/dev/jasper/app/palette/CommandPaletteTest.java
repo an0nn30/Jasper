@@ -30,6 +30,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class CommandPaletteTest {
+    @Test void liveTypographyResizesExistingRowsAndSecondarySections() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var themes = new dev.jasper.app.appearance.ThemeController();
+            var palette = new CommandPalette(true, text -> {}, (row, verb) -> {}, () -> {}, () -> {});
+            try {
+                for (float size : new float[]{18, 32, 12}) {
+                    themes.configure(dev.jasper.app.config.Appearance.DARK, new dev.jasper.app.config.UiFontConfig("system", size));
+                    javax.swing.SwingUtilities.updateComponentTreeUI(palette); palette.refreshTheme();
+                    assertThat(palette.resultList().getFixedCellHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(40));
+                    assertThat(palette.footer().getPreferredSize().height).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(24));
+                    assertThat(palette.sectionLabel().getPreferredSize().height).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(24));
+                }
+            } finally { themes.configure(dev.jasper.app.config.Appearance.DARK, dev.jasper.app.config.UiFontConfig.defaults()); }
+        });
+    }
+
     @Test void queryNotifiesWhenClearedAndKeepsNativeEditingActions() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new ArrayList<String>();

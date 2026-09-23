@@ -363,6 +363,23 @@ public final class CommandPalette extends JPanel {
         empty.setForeground(muted);
         results.setBackground(background);
         results.setForeground(foreground);
+        results.setFixedCellHeight(UIScale.scale(ROW_HEIGHT));
+        sectionLabel.setPreferredSize(new Dimension(0, UIScale.scale(LABEL_HEIGHT)));
+        footer.setPreferredSize(new Dimension(0, UIScale.scale(FOOTER_HEIGHT)));
+        empty.setPreferredSize(new Dimension(0, UIScale.scale(ROW_HEIGHT)));
+        stepError.setPreferredSize(new Dimension(0, UIScale.scale(LABEL_HEIGHT)));
+        stepError.setMaximumSize(new Dimension(Integer.MAX_VALUE, UIScale.scale(LABEL_HEIGHT)));
+        for (JLabel label : List.of(sectionLabel, footer, stepError))
+            label.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(16), 0, UIScale.scale(16)));
+        for (JLabel label : stepLabels) {
+            label.setPreferredSize(new Dimension(UIScale.scale(140), 0));
+            if (label.getParent() instanceof JPanel row) {
+                row.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(16), UIScale.scale(6), UIScale.scale(16)));
+                ((BorderLayout) row.getLayout()).setHgap(UIScale.scale(10));
+            }
+        }
+        ((BorderLayout) inputRow.getLayout()).setHgap(UIScale.scale(10));
+        escape.setMargin(new Insets(0, UIScale.scale(7), 0, UIScale.scale(7)));
         Font uiFont = UIManager.getFont("Label.font");
         if (uiFont != null) {
             results.setFont(uiFont);

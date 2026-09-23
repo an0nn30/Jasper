@@ -94,9 +94,28 @@ User-approved `ui.font.family` / `ui.font.size` settings update chrome and plugi
 independently of terminal `[font]`. Omitted settings preserve platform defaults; sizes accept 8–32.
 Relative headings, palette/status labels, tabs and titles follow updates. Remote headings refresh
 in existing panels and progress content grows to fit. Missing families fall back to the platform.
-`./gradlew :jasper-app:test :jasper-plugin-remote:test` passed; full verification follows overlay work.
-The centered connection overlay and explicit Cancel button, plus its native implementation plan,
-are now approved and in progress.
+`./gradlew :jasper-app:test :jasper-plugin-remote:test` passed, followed by the complete check below.
+Large and fractional sizes use exact point values; live palette rows and secondary sections resize
+with the UI font, and host-star geometry follows its label metrics.
+
+### Centered connection overlay — 2026-09-23
+
+Completed the approved [overlay plan](superpowers/plans/2026-09-22-jasper-connection-overlay.md)
+natively in this worktree. SDK 0.7.3 adds `Windows.overlay(OverlaySpec)` with app/testkit ownership
+parity. Remote progress stays centered inside its owner with an explicit Cancel button, Retry/Close
+on failure and no Escape/outside dismissal. Duplicate requests focus the existing attempt. Native
+trust/Vault prompts stay usable, and owner/plugin closure cancels pending work. Bounds, scrolling,
+focus restoration and keyboard/native-menu containment have headless regression coverage.
+
+One independent review found five issues (native menu bypass, cached palette geometry, content
+revalidation, border-induced scrollbars and scaled font offsets). All are fixed and re-reviewed;
+no findings remain. Follow-up fractional-font verification also caught and fixed FlatLaf’s button
+styling rounding. Native GUI acceptance remains user-run; app-themed headless renders at default
+and 18-point UI size were inspected. No GUI was launched.
+
+`./gradlew check :jasper-app:installDist` passed: **1,634 tests, 1,631 passed, three expected skips,
+zero failures/errors**; Remote **70/70**. Distribution rebuilt with the updated app, SDK and plugins.
+No merge or push.
 
 ### macOS default shell refresh reverted — 2026-09-22
 

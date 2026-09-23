@@ -32,6 +32,9 @@ public final class ThemeController {
     private ThemeState state = ThemeState.defaults();
     private UiFontConfig uiFont = UiFontConfig.defaults();
     private final Font platformFont;
+    private final float platformLabelSize;
+    private static final List<String> FORM_FONTS = List.of("Label.font", "List.font", "TextField.font",
+        "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font");
 
     public ThemeController() { this(ThemeController::install); }
 
@@ -40,9 +43,11 @@ public final class ThemeController {
         requireEdt();
         this.installer = Objects.requireNonNull(installer);
         UIManager.put("defaultFont", null);
+        FORM_FONTS.forEach(key -> UIManager.put(key, null));
         UIManager.put("Jasper.uiFontFamilyOverride", false);
         installOrThrow(state.resolve().chrome());
         platformFont = UIManager.getFont("defaultFont");
+        platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
 
     public ResolvedTheme current() { requireEdt(); return state.resolve(); }
@@ -60,10 +65,9 @@ public final class ThemeController {
         boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
         boolean choiceChanged = state.choice() != candidate.choice();
         if (chromeChanged) {
-            Object previousOverride = uiFont.equals(UiFontConfig.defaults()) ? null : resolveFont(uiFont);
-            UIManager.put("defaultFont", font.equals(UiFontConfig.defaults()) ? null : resolveFont(font));
+            installFontDefaults(font);
             try { installOrThrow(next.chrome()); }
-            catch (RuntimeException failure) { UIManager.put("defaultFont", previousOverride); throw failure; }
+            catch (RuntimeException failure) { installFontDefaults(uiFont); throw failure; }
         }
         uiFont = font;
         UIManager.put("Jasper.uiFontFamilyOverride", !font.family().equalsIgnoreCase("system"));
@@ -75,9 +79,20 @@ public final class ThemeController {
     private FontUIResource resolveFont(UiFontConfig choice) {
         Font family = choice.family().equalsIgnoreCase("system") ? platformFont : new Font(choice.family(), Font.PLAIN, 13);
         if (family.getFamily().equals(Font.DIALOG) && !choice.family().equalsIgnoreCase(Font.DIALOG)) family = platformFont;
-        // Jasper's ordinary form text is one point below FlatLaf's default (menus/title chrome).
-        float size = choice.size() == 0 ? platformFont.getSize2D() : choice.size() + 1;
+        // Retain the platform's title/menu offset relative to ordinary form text.
+        float size = choice.size() == 0 ? platformFont.getSize2D()
+            : choice.size() + platformFont.getSize2D() - platformLabelSize;
         return new FontUIResource(family.deriveFont(Font.PLAIN, size));
+    }
+
+    private void installFontDefaults(UiFontConfig choice) {
+        boolean defaults = choice.equals(UiFontConfig.defaults());
+        Font family = resolveFont(choice);
+        UIManager.put("defaultFont", defaults ? null : family);
+        // FlatLaf scales relative offsets with the UI scale. Explicit base-control fonts preserve
+        // exact configured point sizes, including fractions, without changing unset defaults.
+        FontUIResource form = new FontUIResource(family.deriveFont(choice.size() == 0 ? platformLabelSize : choice.size()));
+        for (String key : FORM_FONTS) UIManager.put(key, defaults ? null : form);
     }
 
     /** Replays current appearance; the subscribing owner closes its registration on disposal. */
