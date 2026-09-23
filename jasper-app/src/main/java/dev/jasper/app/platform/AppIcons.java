@@ -16,6 +16,11 @@ public final class AppIcons {
         return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Jasper.chromeForeground", source)));
     }
 
+    /** Application toolbar artwork: large GNOME icons in retro, regular modern icons otherwise. */
+    public static javax.swing.Icon toolbarIcon(String name) {
+        return SwingAppearance.retro() ? GnomeIcons.icon(name, 24) : icon(name);
+    }
+
     /**
      * A chrome-sized icon from an SVG that another class loader holds, recolored like the bundled icons.
      * The color is read from the look and feel at paint time, so the icon follows theme changes.

@@ -29,6 +29,10 @@ class RetroTabsTest {
         assertThat(label.getClientProperty("html.disable")).isEqualTo(true);
         assertThat(label.getToolTipText()).isEqualTo(first.title());
         var close = (javax.swing.JButton) ((javax.swing.JPanel) deck.getTabComponentAt(0)).getComponent(2);
+        assertThat(close.isBorderPainted()).isFalse();
+        assertThat(close.isContentAreaFilled()).isFalse();
+        assertThat(close.getPreferredSize().width).isEqualTo(20);
+        assertThat(close.getPreferredSize().height).isEqualTo(20);
         close.doClick();
         assertThat(deck.getTabCount()).isEqualTo(1);
         assertThat(owner.currentTab()).isSameAs(first);

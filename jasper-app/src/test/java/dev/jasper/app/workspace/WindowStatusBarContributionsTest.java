@@ -44,6 +44,10 @@ class WindowStatusBarContributionsTest {
         assertThat(bar.contributedItems(true)).extracting(JButton::getText).containsExactly("example.org");
         JButton locked = bar.contributedItems(false).get(1);
         assertThat(locked.getToolTipText()).isEqualTo("Vault is locked");
+        if (retro) {
+            assertThat(locked.isContentAreaFilled()).isFalse();
+            assertThat(locked.getInsets()).isEqualTo(new java.awt.Insets(0, 0, 0, 0));
+        }
         locked.doClick();
         bar.contributedItems(false).get(0).doClick();
         assertThat(clicks).containsExactly("run");

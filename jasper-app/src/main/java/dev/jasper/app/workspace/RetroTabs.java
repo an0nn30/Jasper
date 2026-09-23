@@ -44,6 +44,10 @@ final class RetroTabs implements AutoCloseable {
             title.putClientProperty("html.disable", true);
             hint.putClientProperty("html.disable", true);
             close.setFocusable(false);
+            close.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 2, 2, 2));
+            close.setBorderPainted(false);
+            close.setContentAreaFilled(false);
+            close.setOpaque(false);
             close.addActionListener(event -> { if (!closed) owner.closeTab(tab); });
             add(title); add(hint); add(close);
             var gestures = new MouseAdapter() {

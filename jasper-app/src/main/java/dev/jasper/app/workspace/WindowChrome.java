@@ -92,7 +92,7 @@ final class WindowChrome {
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
         addToolbarSeparator();
         JButton split = addButton(ActionId.SPLIT_RIGHT, "columns-2");
-        split.setAction(null); split.setText("Split"); split.setIcon(AppIcons.icon("columns-2"));
+        split.setAction(null); split.setText("Split"); split.setIcon(AppIcons.toolbarIcon("columns-2"));
         split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");
         split.addActionListener(event -> {
             owner.updateActions(); JPopupMenu popup = new JPopupMenu();
@@ -122,9 +122,15 @@ private void addToolbarSeparator() {
         ReferenceButton button = new ReferenceButton(action, null);
         button.setText(owner.toolbarMode() == ToolbarMode.ICONS ? null : label);
         button.putClientProperty("label", label);
-        button.setIcon(icon != null ? icon : AppIcons.icon("command"));
+        button.setIcon(icon != null ? icon : AppIcons.toolbarIcon("command"));
         button.setFocusable(false);
-        if (!owner.retro()) {
+        if (owner.retro()) {
+            button.setMargin(new java.awt.Insets(2, 2, 2, 2));
+            button.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+            button.setBorderPainted(false);
+            button.setContentAreaFilled(false);
+            button.setOpaque(false);
+        } else {
             button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
             button.setIconTextGap(UIScale.scale(8));
         }
@@ -261,8 +267,14 @@ private void addToolbarSeparator() {
         };
         ReferenceButton button = new ReferenceButton(owner.action(id), id);
         button.setText(label); button.putClientProperty("label", label);
-        button.setIcon(AppIcons.icon(icon)); button.setFocusable(false);
-        if (!owner.retro()) {
+        button.setIcon(AppIcons.toolbarIcon(icon)); button.setFocusable(false);
+        if (owner.retro()) {
+            button.setMargin(new java.awt.Insets(2, 2, 2, 2));
+            button.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+            button.setBorderPainted(false);
+            button.setContentAreaFilled(false);
+            button.setOpaque(false);
+        } else {
             button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
             button.setIconTextGap(UIScale.scale(8));
         }

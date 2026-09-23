@@ -19,9 +19,11 @@ final class GnomeIcons {
         "search", "settings", "refresh", "command", "history", "bookmark", "close");
     private static final Map<String, Icon> CACHE = new ConcurrentHashMap<>();
     private GnomeIcons() {}
-    static Icon icon(String name) {
+    static Icon icon(String name) { return icon(name, 16); }
+    static Icon icon(String name, int size) {
         if (!NAMES.contains(name)) throw new IllegalArgumentException("Unknown application icon: " + name);
-        return CACHE.computeIfAbsent(name, key -> new Raster(read(key, 16), read(key, 24)));
+        if (size != 16 && size != 24) throw new IllegalArgumentException("Unsupported icon size: " + size);
+        return CACHE.computeIfAbsent(name + "/" + size, key -> new Raster(read(name, 16), read(name, 24), size));
     }
     private static BufferedImage read(String name, int size) {
         String path = "/dev/jasper/app/icons/gnome2/" + size + "/" + name + ".png";
@@ -33,18 +35,18 @@ final class GnomeIcons {
             return image;
         } catch (IOException failure) { throw new UncheckedIOException(failure); }
     }
-    private record Raster(BufferedImage small, BufferedImage large) implements Icon {
-        @Override public int getIconWidth() { return 16; }
-        @Override public int getIconHeight() { return 16; }
+    private record Raster(BufferedImage small, BufferedImage large, int size) implements Icon {
+        @Override public int getIconWidth() { return size; }
+        @Override public int getIconHeight() { return size; }
         @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
             var g = (Graphics2D) graphics.create();
             try {
                 var transform = g.getTransform();
                 double scale = Math.max(Math.hypot(transform.getScaleX(), transform.getShearY()),
                     Math.hypot(transform.getShearX(), transform.getScaleY()));
-                var image = scale <= 1 ? small : large;
+                var image = size * scale <= 16 ? small : large;
                 g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                g.drawImage(image, x, y, 16, 16, component);
+                g.drawImage(image, x, y, size, size, component);
             } finally { g.dispose(); }
         }
     }

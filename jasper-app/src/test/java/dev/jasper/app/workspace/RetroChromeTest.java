@@ -14,7 +14,10 @@ class RetroChromeTest {
         for (var child : toolbar.getComponents()) if (child instanceof javax.swing.JButton button) {
             assertThat(button.getUI()).isInstanceOf(javax.swing.plaf.metal.MetalButtonUI.class);
             assertThat(button.getBorder()).isNotNull();
-            assertThat(button.isContentAreaFilled()).isTrue();
+            assertThat(button.isContentAreaFilled()).isFalse();
+            assertThat(button.isBorderPainted()).isFalse();
+            assertThat(button.getIcon().getIconWidth()).isEqualTo(24);
+            assertThat(button.getPreferredSize().height).isLessThanOrEqualTo(28);
             assertThat(button.getFont()).isEqualTo(javax.swing.UIManager.getFont("Button.font"));
         }
         owner.setToolbarMode(dev.jasper.app.config.ToolbarMode.ICONS);
@@ -25,6 +28,8 @@ class RetroChromeTest {
         assertThat(toolbar.isVisible()).isTrue();
         ((javax.swing.JButton) toolbar.getComponent(0)).doClick();
         assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+        assertThat(owner.status().configButton().isContentAreaFilled()).isFalse();
+        assertThat(owner.status().configButton().getBorder().getBorderInsets(owner.status().configButton())).isEqualTo(new java.awt.Insets(0, 0, 0, 0));
         assertThat(owner.status().getBackground()).isEqualTo(javax.swing.UIManager.getColor("Panel.background"));
         assertThat(owner.windowCommands().view("view.appearance.dark").isEnabled()).isFalse();
         assertThat(owner.windowCommands().view("view.appearance.light").isEnabled()).isFalse();

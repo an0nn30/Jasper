@@ -29,10 +29,8 @@ final class WindowStatusBar extends JPanel {
 
     WindowStatusBar() {
         super(null);
-        if (!dev.jasper.app.platform.SwingAppearance.retro()) {
-            configButton.setBorder(BorderFactory.createEmptyBorder());
-            configButton.setContentAreaFilled(false); configButton.setOpaque(false);
-        }
+        configButton.setBorder(BorderFactory.createEmptyBorder());
+        configButton.setContentAreaFilled(false); configButton.setOpaque(false);
         configButton.setEnabled(false); configButton.putClientProperty("html.disable", true);
         configButton.addActionListener(event -> onConfigurationDetails.run());
         add(left); add(leftItems); add(rightItems); add(right); refreshTheme();
@@ -84,9 +82,7 @@ final class WindowStatusBar extends JPanel {
         for (StatusEntry entry : entries) {
             if (!entry.visible()) continue;
             var item = new JButton(entry.text(), entry.icon());
-            if (!dev.jasper.app.platform.SwingAppearance.retro()) {
-                item.setBorder(BorderFactory.createEmptyBorder()); item.setContentAreaFilled(false); item.setOpaque(false);
-            }
+            item.setBorder(BorderFactory.createEmptyBorder()); item.setContentAreaFilled(false); item.setOpaque(false);
             item.setFocusable(false); item.putClientProperty("html.disable", true);
             item.setIconTextGap(UIScale.scale(5));
             item.setToolTipText(entry.tooltip());
