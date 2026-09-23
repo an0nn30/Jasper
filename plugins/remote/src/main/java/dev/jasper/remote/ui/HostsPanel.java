@@ -133,6 +133,13 @@ public final class HostsPanel extends JPanel {
         importButton.addActionListener(event -> actions.importConfig().run());
         connect.addActionListener(event -> selectedHost().ifPresent(actions.connect()));
         edit.addActionListener(event -> selectedHost().ifPresent(host -> actions.edit().accept(Optional.of(host))));
+        addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
+                selectFirstHost();
+                // Wait for the host to finish mounting/layout; a hide before then must not steal focus.
+                SwingUtilities.invokeLater(() -> { if (isShowing()) list.requestFocusInWindow(); });
+            }
+        });
         rebuild();
     }
 
@@ -151,6 +158,21 @@ public final class HostsPanel extends JPanel {
 
     public void select(UUID hostId) {
         for (int i = 0; i < model.size(); i++) if (model.get(i) instanceof HostRows.Host row && row.host().id().equals(hostId)) { list.setSelectedIndex(i); return; }
+    }
+
+    private void selectFirstHost() {
+        int firstGroup = -1;
+        for (int i = 0; i < model.size(); i++) {
+            if (model.get(i) instanceof HostRows.Host) {
+                list.setSelectedIndex(i);
+                list.ensureIndexIsVisible(i);
+                return;
+            }
+            if (firstGroup < 0 && model.get(i) instanceof HostRows.Group) firstGroup = i;
+        }
+        // When all folders are collapsed, Enter can expand the first folder. Never select an error.
+        if (firstGroup >= 0) { list.setSelectedIndex(firstGroup); list.ensureIndexIsVisible(firstGroup); }
+        else list.clearSelection();
     }
 
     Optional<RemoteHost> selectedHost() { return hosts.stream().filter(host -> host.id().equals(selected)).findFirst(); }
@@ -193,6 +215,7 @@ public final class HostsPanel extends JPanel {
 
     private void rebuild() {
         UUID keep = selected;
+        HostRows.Row previous = list.getSelectedValue();
         model.clear();
         error.ifPresent(message -> model.addElement(new HostRows.Error(message)));
         String query = search.getText().strip().toLowerCase(java.util.Locale.ROOT);
@@ -204,6 +227,13 @@ public final class HostsPanel extends JPanel {
         empty.setText(hosts.isEmpty() ? "No hosts yet — Add or Import from ~/.ssh/config" : "No hosts match");
         empty.setVisible(hosts.isEmpty() || (searching && model.size() == (error.isPresent() ? 1 : 0)));
         if (keep != null) select(keep);
+        else if (previous instanceof HostRows.Group group) {
+            for (int i = 0; i < model.size(); i++)
+                if (model.get(i) instanceof HostRows.Group next && next.name().equals(group.name())) {
+                    list.setSelectedIndex(i); break;
+                }
+        }
+        if (list.isSelectionEmpty()) selectFirstHost();
         selectionChanged();
     }
 

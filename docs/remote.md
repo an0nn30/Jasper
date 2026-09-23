@@ -5,7 +5,8 @@ command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Ente
 split beside the current pane, Shift+Enter edits the host. The **SSH hosts** panel shows searchable
 compact tree-style rows grouped by folder, favorites first, with slightly larger text.
 Choose **View > SSH Hosts** or press **Cmd+Shift+S** (Ctrl+Shift+S elsewhere) to show or hide
-the panel in the current window. Both navigation shortcuts are configurable below.
+the panel in the current window. Opening the sidebar highlights the first visible host and focuses
+the list, ready for arrow keys and Enter. Both navigation shortcuts are configurable below.
 A small dot marks an active session; multiple sessions show a count. Selecting a host shows its
 address and detected OS/IP below the list.
 The same details are available in the row tooltip and remain searchable. Double-click or Enter returns to the most recently used running pane for

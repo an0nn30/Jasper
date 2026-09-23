@@ -18,6 +18,62 @@ class HostsPanelTest {
     final RemoteHost prod = RemoteHost.create("prod", "api.example", 22, "deploy", new Auth.Vault(UUID.randomUUID()), "Production", Optional.empty());
     final RemoteHost nas = RemoteHost.create("nas", "nas.local", 2222, "me", Auth.AGENT, "", Optional.of(prod.id()));
 
+    @Test void showingSelectsFirstHostAndArrowKeysNavigateImmediately() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var panel = new HostsPanel(actions);
+            var second = RemoteHost.create("staging", "staging.example", 22, "me", Auth.AGENT, "Production", Optional.empty());
+            panel.setHosts(List.of(second, prod, nas), Optional.of("A host file warning"));
+            panel.select(nas.id());
+            panel.addNotify();
+            try {
+                assertThat(panel.selectedHost()).contains(prod);
+                assertThat(panel.list.getSelectedValue()).isInstanceOf(HostRows.Host.class);
+                panel.list.getActionMap().get("selectNextRow").actionPerformed(
+                    new java.awt.event.ActionEvent(panel.list, 0, "Down"));
+                assertThat(panel.selectedHost()).contains(second);
+                panel.list.getActionMap().get("activateHost").actionPerformed(
+                    new java.awt.event.ActionEvent(panel.list, 0, "Enter"));
+                assertThat(events).containsExactly("connect staging");
+                panel.removeNotify();
+                panel.addNotify();
+                assertThat(panel.selectedHost()).contains(prod);
+            } finally { panel.removeNotify(); }
+        });
+    }
+
+    @Test void selectedGroupSurvivesCollapseExpandAndHostRefresh() {
+        var panel = new HostsPanel(actions);
+        panel.setHosts(List.of(prod, nas), Optional.empty());
+        panel.list.setSelectedIndex(0);
+        var enter = panel.list.getActionMap().get("activateHost");
+        var event = new java.awt.event.ActionEvent(panel.list, 0, "Enter");
+        enter.actionPerformed(event);
+        assertThat(panel.list.getSelectedValue()).isEqualTo(new HostRows.Group("Production", 1, true));
+        panel.setHosts(List.of(prod, nas), Optional.empty());
+        assertThat(panel.list.getSelectedValue()).isEqualTo(new HostRows.Group("Production", 1, true));
+        enter.actionPerformed(event);
+        assertThat(panel.list.getSelectedValue()).isEqualTo(new HostRows.Group("Production", 1, false));
+        assertThat(events).isEmpty();
+    }
+
+    @Test void lateHostsSelectFirstButRefreshKeepsKeyboardSelection() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            var panel = new HostsPanel(actions);
+            panel.addNotify();
+            try {
+                panel.setHosts(List.of(prod, nas), Optional.empty());
+                assertThat(panel.selectedHost()).contains(prod);
+                panel.select(nas.id());
+                panel.setHosts(List.of(prod, nas), Optional.empty());
+                assertThat(panel.selectedHost()).contains(nas);
+                panel.search.setText("no match");
+                assertThat(panel.selectedHost()).isEmpty();
+                panel.search.setText("prod");
+                assertThat(panel.selectedHost()).contains(prod);
+            } finally { panel.removeNotify(); }
+        });
+    }
+
     @Test void openHostDetailsAndConnectionHeadingFollowUiFontChanges() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
             var panel = new HostsPanel(actions);

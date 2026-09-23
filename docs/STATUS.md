@@ -192,6 +192,21 @@ unbound but does not necessarily log the resolution problem until an app reload/
 zero failures/errors**. Rebuilt distribution again after the settings-template comment correction.
 No GUI launched, merge or push.
 
+### Remote sidebar keyboard entry — 2026-09-23
+
+The user clarified this request targets the SSH sidebar, not the scoped command palette. Showing
+the sidebar now highlights the first visible host (skipping headings/errors) and requests list
+focus after mounting, so arrows and Enter work immediately. A hide before focus delivery cancels
+the request. Late host loading/filter results select the first available host; ordinary refresh
+preserves the selected host or folder. With all folders collapsed, the first folder is selected
+so Enter can expand it, without changing saved collapse state on opening.
+
+Independent review caught folder selection jumping to an unrelated host after collapse; fixed
+with a failing-then-passing collapse/expand regression. Selection-on-show, reopening, Down/Enter,
+late loading and refresh/filter cases are covered too. `./gradlew :jasper-plugin-remote:test
+:jasper-app:installDist` passed: **74 Remote tests, zero failures**. Distribution rebuilt; native
+focus acceptance remains user-run. No GUI launched, merge or push.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:
