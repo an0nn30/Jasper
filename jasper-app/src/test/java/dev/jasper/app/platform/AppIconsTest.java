@@ -16,7 +16,7 @@ class AppIconsTest {
         edt(() -> {
             new ThemeController();
             for (String name : ICONS) {
-                FlatSVGIcon icon = AppIcons.icon(name);
+                FlatSVGIcon icon = (FlatSVGIcon) AppIcons.icon(name);
                 assertThat(icon.hasFound()).as(name).isTrue();
                 assertThat(icon.getIconWidth()).isEqualTo(16);
                 BufferedImage image = paint(icon);
@@ -29,7 +29,7 @@ class AppIconsTest {
     @Test void existingOutlineRecolorsOnThemeChange() throws Exception {
         edt(() -> {
             var themes = new ThemeController();
-            FlatSVGIcon icon = AppIcons.icon("square-plus");
+            FlatSVGIcon icon = (FlatSVGIcon) AppIcons.icon("square-plus");
             assertThat(hasColor(paint(icon), 0xd3d7df)).isTrue();
             themes.select(BuiltinTheme.LIGHT);
             assertThat(hasColor(paint(icon), 0x383a42)).isTrue();

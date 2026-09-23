@@ -4,13 +4,15 @@ import com.formdev.flatlaf.extras.FlatSVGIcon;
 import java.awt.Color;
 import javax.swing.UIManager;
 
-/** Bundled Tabler icons; no network access is needed to render chrome. */
+/** Bundled Tabler or GNOME 2 icons; no network access is needed to render chrome. */
 public final class AppIcons {
     private AppIcons() {}
-    public static FlatSVGIcon icon(String name) {
-        if (!java.util.Set.of("square-plus", "app-window", "columns-2", "maximize", "search", "settings", "refresh", "command", "history", "bookmark").contains(name))
+    public static javax.swing.Icon icon(String name) {
+        if (!GnomeIcons.NAMES.contains(name))
             throw new IllegalArgumentException("Unknown application icon: " + name);
-        FlatSVGIcon icon = new FlatSVGIcon("dev/jasper/app/icons/" + name + ".svg", 16, 16);
+        if (SwingAppearance.retro()) return GnomeIcons.icon(name);
+        String resource = name.equals("close") ? "dev/jasper/app/icons/title/x.svg" : "dev/jasper/app/icons/" + name + ".svg";
+        FlatSVGIcon icon = new FlatSVGIcon(resource, 16, 16);
         return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Jasper.chromeForeground", source)));
     }
 
