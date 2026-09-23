@@ -7,7 +7,8 @@ three expected skips; Remote 70/70. Default/18-point headless renders inspected.
 review and fix pass completed with no remaining findings. UI typography was separately approved
 and implemented on this branch. Implementation refinements: shared platform root-input marker
 avoids a workspace/windows package dependency; container-order focus traversal supports headless
-roots; scrollpane border insets and validation-root propagation preserve natural layout; native menu
+roots; a plain bordered panel preserves natural layout without introducing scrollbars (user correction,
+2026-09-23, superseding the scrolling fallback below); native menu
 callbacks honor overlay containment. No merge, push or native GUI launch.
 
 **Goal:** Present Remote connection progress in the center of its owning app window, with explicit Cancel, without creating a native progress window.
@@ -134,7 +135,7 @@ Wire terminal removal to `closeOwned`. HostedUi validates handles against its ex
 }
 ```
 
-- [x] Confirm failure, then implement the layered host with null layout, a dimmed backdrop and the card bounds calculation below. Revalidate layout when the content changes. Wrap constrained content in a scroll container so Cancel/Retry remain reachable at large UI sizes.
+- [x] Confirm failure, then implement the layered host with null layout, a dimmed backdrop and the card bounds calculation below. Revalidate layout when the content changes. **Superseded by user correction 2026-09-23:** use a plain bordered panel; grow to content preferred size and lay out within available bounds without adding scrollbars.
 
 ```java
 static Rectangle centered(Dimension preferred, Dimension available) {

@@ -117,6 +117,20 @@ and 18-point UI size were inspected. No GUI was launched.
 zero failures/errors**; Remote **70/70**. Distribution rebuilt with the updated app, SDK and plugins.
 No merge or push.
 
+### Overlay scrollbar correction — 2026-09-23
+
+The user reported scrollbars in native connection progress and explicitly rejected any scrolling
+fallback. Removed the host's JScrollPane completely: a plain bordered panel now sizes to its
+content and lays it out directly. This supersedes the overlay plan's constrained-window scrolling
+fallback. No SDK or Remote connection lifecycle changes.
+
+`./gradlew :jasper-app:test --tests '*WindowOverlay*' :jasper-app:installDist` passed: six overlay
+layout/focus tests, zero failures. The regression verifies no host scroll widgets even in a
+constrained root, fitted content bounds, and natural relayout. An actual app-themed headless
+ConnectionPanel probe confirmed that all visible labels/buttons fit at 12, 14, 18, 24 and 32 points
+in progress and failure states. Default/18-point previews inspected. Distribution rebuilt; no native
+GUI launched, merge or push.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

@@ -1,6 +1,7 @@
 # Connection progress overlay
 
 **Approved:** 2026-09-22, including the explicit Cancel button. Native execution requested.
+User correction 2026-09-23: the overlay must not introduce scrollbars; fit its content in a plain bordered panel.
 
 ## User intent
 

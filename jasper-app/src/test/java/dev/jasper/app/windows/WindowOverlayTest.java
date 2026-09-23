@@ -75,10 +75,10 @@ class WindowOverlayTest {
         var overlay = new WindowOverlay(root, content);
         try {
             overlay.show(); root.validate();
-            var scroll = (JScrollPane) content.getParent().getParent();
-            scroll.doLayout(); scroll.getViewport().doLayout();
-            assertThat(scroll.getHorizontalScrollBar().isVisible()).isFalse();
-            assertThat(scroll.getVerticalScrollBar().isVisible()).isFalse();
+            assertThat(hasScrollbars(root.getLayeredPane())).isFalse();
+            var card = (JPanel) content.getParent();
+            assertThat(content.getBounds()).isEqualTo(new Rectangle(1, 1, 400, 190));
+            assertThat(card.getSize()).isEqualTo(new Dimension(402, 192));
             content.setPreferredSize(new Dimension(500, 250));
             content.revalidate();
             // Drive Swing's nearest validate root without needing a native Window in this test.
@@ -88,6 +88,29 @@ class WindowOverlayTest {
             validationRoot.validate();
             assertThat(overlay.cardBounds()).isEqualTo(new Rectangle(149, 174, 502, 252));
         } finally { overlay.close(); outer.removeNotify(); }
+    }
+
+    @Test void constrainedOverlayLaysOutContentInItsAvailableInteriorWithoutScrolling() {
+        var root = new JRootPane(); root.getLayeredPane().setSize(360, 260);
+        var content = new JPanel(new java.awt.BorderLayout());
+        var cancel = new JButton("Cancel"); content.add(cancel, java.awt.BorderLayout.SOUTH);
+        content.setPreferredSize(new Dimension(500, 280));
+        var overlay = new WindowOverlay(root, content);
+        try {
+            overlay.show(); content.doLayout();
+            assertThat(hasScrollbars(root.getLayeredPane())).isFalse();
+            Rectangle bounds = overlay.cardBounds();
+            assertThat(content.getSize()).isEqualTo(new Dimension(bounds.width - 2, bounds.height - 2));
+            assertThat(content.getBounds().contains(javax.swing.SwingUtilities.convertRectangle(cancel.getParent(), cancel.getBounds(), content.getParent()))).isTrue();
+        } finally { overlay.close(); }
+    }
+
+    private static boolean hasScrollbars(java.awt.Container container) {
+        for (var child : container.getComponents()) {
+            if (child instanceof JScrollBar || child instanceof JScrollPane) return true;
+            if (child instanceof java.awt.Container nested && hasScrollbars(nested)) return true;
+        }
+        return false;
     }
 
     private static KeyEvent key(JComponent source, int code, int modifiers) {

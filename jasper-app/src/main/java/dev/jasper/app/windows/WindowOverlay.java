@@ -12,7 +12,7 @@ final class WindowOverlay implements AutoCloseable {
     private final JRootPane root;
     private final JComponent content;
     private final Backdrop backdrop = new Backdrop();
-    private final JScrollPane card;
+    private final JPanel card;
     private final KeyboardFocusManager focusManager;
     private final KeyEventDispatcher keys = this::filterKey;
     private final ComponentAdapter resize = new ComponentAdapter() {
@@ -28,10 +28,9 @@ final class WindowOverlay implements AutoCloseable {
 
     WindowOverlay(JRootPane root, JComponent content, KeyboardFocusManager focusManager) {
         this.root = root; this.content = content; this.focusManager = focusManager;
-        card = new JScrollPane(content) {
-            // Propagate preferred-size changes to the backdrop, which owns centering.
-            @Override public boolean isValidateRoot() { return false; }
-        };
+        // A progress overlay is a single fitted surface, never a scrolling viewport.
+        card = new JPanel(new BorderLayout());
+        card.add(content, BorderLayout.CENTER);
         card.setBorder(BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor") == null
             ? Color.GRAY : UIManager.getColor("Component.borderColor")));
         card.setFocusCycleRoot(true);
@@ -118,7 +117,7 @@ final class WindowOverlay implements AutoCloseable {
         root.getLayeredPane().removeComponentListener(resize);
         if (root.getClientProperty(WindowInput.OVERLAY) == this) root.putClientProperty(WindowInput.OVERLAY, null);
         root.getLayeredPane().remove(backdrop);
-        card.setViewportView(null);
+        card.removeAll();
         root.revalidate(); root.repaint();
         Component previous = priorFocus; priorFocus = null;
         // A successful connection may already have requested focus for its new pane. Let it win.
