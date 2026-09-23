@@ -34,7 +34,7 @@ class MockUiTest {
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
                 assertThat(image.getRGB(650, 37) & 0xffffff).isEqualTo(0x313439);
                 assertThat(image.getRGB(650, 70) & 0xffffff).isEqualTo(0x23262c);
-                assertThat(image.getRGB(500, 700)).isEqualTo(image.getRGB(500, 940));
+                assertThat(new Color(image.getRGB(500, 940))).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             }
         });
     }

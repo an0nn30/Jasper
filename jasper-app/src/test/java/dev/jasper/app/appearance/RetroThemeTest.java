@@ -50,6 +50,33 @@ class RetroThemeTest {
         assertThat(MetalDefaults.fontFamily(os, java.util.Set.of("Unrelated Font"))).isEqualTo(java.awt.Font.SANS_SERIF);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void failedFontReloadRestoresExactPreviousDefaults(boolean replaceBeforeFailure) throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var reject = new java.util.concurrent.atomic.AtomicBoolean();
+            var themes = new ThemeController(ThemeStyle.RETRO, Appearance.LIGHT, theme -> {
+                if (!reject.get() || replaceBeforeFailure) ThemeController.install(theme);
+                return !reject.get();
+            });
+            var saved = new dev.jasper.app.config.UiFontConfig("Serif", 18);
+            themes.configure(Appearance.LIGHT, saved);
+            var original = UIManager.getFont("Label.font");
+            var titleColor = UIManager.getColor("Jasper.retroTitleBackground");
+            reject.set(true);
+            assertThatThrownBy(() -> themes.configure(Appearance.LIGHT,
+                new dev.jasper.app.config.UiFontConfig("SansSerif", 24)))
+                .isInstanceOf(ThemeController.InstallationFailure.class);
+            assertThat(UIManager.getFont("Label.font")).isEqualTo(original);
+            assertThat(UIManager.getFont("Button.font")).isEqualTo(original);
+            assertThat(UIManager.getBoolean("Jasper.retro")).isTrue();
+            assertThat(UIManager.getColor("Jasper.retroTitleBackground")).isEqualTo(titleColor);
+            reject.set(false);
+            themes.configure(Appearance.LIGHT, saved);
+            assertThat(UIManager.getFont("Label.font")).isEqualTo(original);
+        });
+    }
+
     @Test void installedRetroFontsAreRegularAndModernFontsAreRestored() {
         new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
         var modern = UIManager.getFont("Label.font");

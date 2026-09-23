@@ -79,6 +79,13 @@ public final class ThemeController {
         boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
         boolean choiceChanged = style == ThemeStyle.MODERN && state.choice() != candidate.choice();
         if (chromeChanged) {
+            // Metal's app aliases and fonts live in its LAF defaults. Capture the exact
+            // previous values: restoring an existing LAF may rebuild its stock defaults.
+            UIDefaults previousRetroDefaults = null;
+            if (style == ThemeStyle.RETRO) {
+                previousRetroDefaults = new UIDefaults();
+                previousRetroDefaults.putAll(UIManager.getLookAndFeelDefaults());
+            }
             installFontDefaults(font);
             try {
                 installOrThrow(next.chrome());
@@ -86,7 +93,11 @@ public final class ThemeController {
             }
             catch (RuntimeException failure) {
                 installFontDefaults(uiFont);
-                if (style == ThemeStyle.RETRO) MetalDefaults.configureFonts(resolveFont(uiFont), platformLabelSize);
+                if (previousRetroDefaults != null) {
+                    UIDefaults restored = UIManager.getLookAndFeelDefaults();
+                    restored.clear();
+                    restored.putAll(previousRetroDefaults);
+                }
                 throw failure;
             }
         }

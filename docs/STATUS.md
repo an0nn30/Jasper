@@ -2121,3 +2121,16 @@ fullscreen on macOS remain user-run acceptance. No merge or push.
 
 Independent review found no actionable correctness issues in runtime fallback, native
 integration, menu placement/keyboard handling, tab ownership, auxiliary windows or disposal.
+
+### Main integration and Remote semantic icons — 2026-09-23
+
+Fetched origin; local main (6aac2ff9) was 27 commits ahead and held the requested Remote
+SSH merge. Merged it into codex/retro-metal in 55ededf, retaining retro title/menu/toolbar
+styling, portable fonts and semantic SDK APIs alongside the new SSH UI and [ui.font]
+configuration. Retro now honors explicit UI font reloads while retaining its own defaults.
+Resolved a stale status-render assertion to match main's title-colored status background.
+
+Independent review caught a failed retro font reload reapplying size offsets and, after
+a LAF replacement, losing app aliases. The fix restores exact captured Metal defaults.
+Both before/after-replacement regressions failed before the fix and passed after it;
+scoped re-review found no remaining issues.
