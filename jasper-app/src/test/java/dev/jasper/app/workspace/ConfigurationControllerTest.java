@@ -614,4 +614,33 @@ class ConfigurationControllerTest {
                 .isEqualTo(KeyStroke.getKeyStroke("ctrl shift T"));
         });
     }
+@Test void changingDesiredStyleKeepsExistingAndNewOwnersUntilRestart() throws Exception {
+    start("ui.theme.style='retro'\n");
+    edt(() -> owner());
+    var first = owners.getFirst();
+    var retained = first.currentPane();
+    reload("ui.theme.style='modern'\nfont.size=21\n");
+    edt(() -> {
+        owner();
+        assertThat(themes.style()).isEqualTo(dev.jasper.app.config.ThemeStyle.RETRO);
+        assertThat(first.currentPane()).isSameAs(retained);
+        assertThat(owners).allSatisfy(w -> assertThat(w.theme().chrome()).isEqualTo(BuiltinTheme.RETRO));
+        assertThat(controller.shown().diagnostics()).filteredOn(d -> d.key().equals("ui.theme.style"))
+            .singleElement().satisfies(d -> assertThat(d.message()).contains("Restart Jasper"));
+        assertThat(controller.snapshot().fontSize()).isEqualTo(21);
+    });
+    reload("ui.theme.style='retro'\n");
+    edt(() -> assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().equals("ui.theme.style")));
+}
+
+@Test void modernVariantRemainsLiveWhileRetroIsPending() throws Exception {
+    start("ui.theme.style='modern'\nui.theme.variant='dark'\n");
+    reload("ui.theme.style='retro'\nui.theme.variant='light'\n");
+    edt(() -> {
+        assertThat(themes.style()).isEqualTo(dev.jasper.app.config.ThemeStyle.MODERN);
+        assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+        assertThat(controller.shown().diagnostics()).anyMatch(d -> d.key().equals("ui.theme.style"));
+    });
+}
+
 }

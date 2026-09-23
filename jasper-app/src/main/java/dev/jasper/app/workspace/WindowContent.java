@@ -44,6 +44,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Runnable onEmpty;
     private final JTabbedPane tabs = new TerminalDeck();
     private final WindowTabs windowTabs;
+    private final RetroTabs retroTabs;
     private final WorkspaceActions workspaceActions;
     private final CommandRegistry commands = new CommandRegistry();
     private final WindowCommands windowCommands;
@@ -158,9 +159,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
-        windowTabs = new WindowTabs(this, animationClock);
+        windowTabs = retro() ? null : new WindowTabs(this, animationClock);
+        retroTabs = retro() ? new RetroTabs(this) : null;
         var north = new JPanel(new BorderLayout());
-        north.add(windowTabs, BorderLayout.NORTH); north.add(chrome.toolbar(), BorderLayout.CENTER);
+        if (windowTabs != null) north.add(windowTabs, BorderLayout.NORTH);
+        north.add(chrome.toolbar(), BorderLayout.CENTER);
         regions = new WorkspaceRegions(tabs);
         rail = new WindowRail(action(ActionId.OPEN_SETTINGS));
         rail.setVisible(false);
@@ -183,16 +186,16 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
                                       Consumer<String> nativeTitle) {
         var bar = MacTitleBar.install(root, content, content.windowTabs(), content::tabHeight,
-            () -> content.onMinimumSizeChanged.run(), supported);
+            () -> content.onMinimumSizeChanged.run(), supported && !content.retro());
         content.onTitle = value -> {
             String display = TerminalTitle.windowTitle(value);
             nativeTitle.accept(display);
             if (bar != null) bar.setTitle(display, content.tabStrip().getTabCount() <= 1);
         };
         if (bar != null) {
-            content.onThemeChanged = theme -> bar.setLight(theme.chrome() == BuiltinTheme.LIGHT);
+            content.onThemeChanged = theme -> bar.setLight(theme.chrome().appearance() == Appearance.LIGHT);
             content.onTabHeightChanged = bar::refreshHeight;
-            bar.setLight(content.theme().chrome() == BuiltinTheme.LIGHT);
+            bar.setLight(content.theme().chrome().appearance() == Appearance.LIGHT);
         }
         content.update();
         return bar;
@@ -279,7 +282,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (contributed != null) contributed.applyAccelerators();
         if (root != null) installRootBindings(root);
         toolbar().revalidate(); toolbar().repaint();
-        windowTabs.refresh();
+        refreshTabs();
     }
 
     public void connectConfiguration(Runnable settings, Runnable reload, Runnable unregister) {
@@ -398,6 +401,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     JMenuBar menuBar() { return chrome.menuBar(); }
     JTabbedPane tabStrip() { return tabs; }
     WindowTabs windowTabs() { return windowTabs; }
+    boolean retro() { return themes.style() == dev.jasper.app.config.ThemeStyle.RETRO; }
+private void refreshTabs() {
+    if (retroTabs != null) retroTabs.refresh(); else windowTabs.refresh();
+}
+
     public TerminalTab currentTab() { return (TerminalTab) tabs.getSelectedComponent(); }
     public TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
     Path directory() { return currentPane() == null ? Path.of(System.getProperty("user.home")) : currentPane().directory(); }
@@ -548,7 +556,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         chrome.status().setMetadata(pane == null ? "" : pane.shellLabel(), pane == null ? "" : pane.locationLabel(),
             pane == null ? "" : size, pane != null && pane.running(), pane != null && pane.shellIntegrationDetected());
         onTitle.accept(currentTab() == null ? "Jasper" : currentTab().title());
-        updateActions(); windowTabs.refresh(); onMinimumSizeChanged.run();
+        updateActions(); refreshTabs(); onMinimumSizeChanged.run();
         if (terminals != null) terminals.refresh();
     }
 
@@ -587,7 +595,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 }
             }
             setBackground(theme.palette().background());
-            tabs.setBackground(theme.palette().background());
+            tabs.setBackground(retro() ? UIManager.getColor("TabbedPane.background") : theme.palette().background());
             chrome.status().applyPalette(theme.palette());
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
@@ -603,7 +611,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             throw new IllegalArgumentException("Tab height must be between 28 and 72 pixels");
         if (closed || tabHeight == height) return;
         tabHeight = height;
-        windowTabs.revalidate(); windowTabs.repaint();
+        if (windowTabs != null) { windowTabs.revalidate(); windowTabs.repaint(); }
         onTabHeightChanged.run();
         revalidate(); repaint();
         JRootPane root = SwingUtilities.getRootPane(this);
@@ -613,7 +621,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     void setActive(boolean value) {
         if (!value && commandPalette != null) commandPalette.dismiss();
-        active = value; windowTabs.setActive(value); update();
+        active = value; if (windowTabs != null) windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {
         toolbarMode = mode; chrome.setToolbarMode(mode); updateActions(); revalidate(); onMinimumSizeChanged.run();
@@ -632,7 +640,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         syncPaletteDispatcher();
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};
-        windowTabs.close();
+        if (windowTabs != null) windowTabs.close();
+        if (retroTabs != null) retroTabs.close();
         themeRegistration.close();
         Runnable closeTabs = () -> {
             for (TerminalTab tab : terminalTabs()) { tab.close(); if (terminals != null) terminals.tabClosed(tab); }
@@ -641,7 +650,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         tabs.removeAll(); removeRootBindings();
         if (terminals != null) { terminals.close(); terminals = null; }
         workspaceActions.disable();
-        windowTabs.refresh();
+        refreshTabs();
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
         confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
