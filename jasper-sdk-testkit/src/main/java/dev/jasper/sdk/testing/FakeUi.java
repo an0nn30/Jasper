@@ -10,6 +10,7 @@ import dev.jasper.sdk.ui.ActionContext;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.OverlaySpec;
 import dev.jasper.sdk.ui.Menus;
 import dev.jasper.sdk.ui.PanelFactory;
 import dev.jasper.sdk.ui.PanelHost;
@@ -234,6 +235,7 @@ final class FakeUi {
         @Override public Subscription onClosing(BooleanSupplier guard) { guards.add(guard); return () -> guards.remove(guard); }
         @Override public Subscription onClosed(Runnable handler) { closedHandlers.add(handler); return () -> closedHandlers.remove(handler); }
         boolean requestClose() {
+            if (id.equals("overlay")) return false;
             for (BooleanSupplier guard : List.copyOf(guards)) {
                 try { if (!guard.getAsBoolean()) return false; }
                 catch (RuntimeException failure) { host.recordFailure(pluginId() + " closing guard: " + failure); }
@@ -345,6 +347,17 @@ final class FakeUi {
                 var window = new FakeWindow(spec.id(), spec.title(), null);
                 windows.add(window);
                 return window;
+            }
+            @Override public PluginDialog overlay(OverlaySpec spec) {
+                context.requireOpen();
+                if (!context.terminals.ownsOpenWindow(spec.owner()))
+                    throw new IllegalArgumentException("An overlay needs an open terminal window from this host");
+                if (host.overlays.containsKey(spec.owner().id())) throw new IllegalStateException("This window already has an overlay");
+                var overlay = new FakeWindow("overlay", spec.title(), null);
+                host.overlays.put(spec.owner().id(), overlay);
+                overlay.onClosed(() -> host.overlays.remove(spec.owner().id(), overlay));
+                windows.add(overlay);
+                return overlay;
             }
             @Override public PluginDialog dialog(DialogSpec spec) {
                 context.requireOpen();

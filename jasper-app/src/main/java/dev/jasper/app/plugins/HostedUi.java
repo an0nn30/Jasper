@@ -20,6 +20,7 @@ import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.OverlaySpec;
 import dev.jasper.sdk.ui.Menus;
 import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.Panels;
@@ -313,6 +314,16 @@ final class HostedUi {
                 surface.onClosed(() -> ownedWindows.remove(surface));
                 closers.add(surface::close);
                 return window;
+            }
+            @Override public PluginDialog overlay(OverlaySpec spec) {
+                guard("overlay");
+                if (!terminals.ownsOpenWindow(spec.owner()))
+                    throw new IllegalArgumentException("An overlay needs an open terminal window from this host");
+                AuxiliarySurface surface = windows.overlay(spec.title(), spec.owner().id());
+                var ownerClosed = terminals.onWindowClosed(spec.owner().id(), () -> windows.closeOwned(spec.owner().id()));
+                surface.onClosed(ownerClosed::close);
+                closers.add(surface::close);
+                return new OwnedDialog(surface);
             }
             @Override public PluginDialog dialog(DialogSpec spec) {
                 guard("dialog");

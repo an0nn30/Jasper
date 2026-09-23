@@ -71,6 +71,7 @@ public final class FakePluginHost implements AutoCloseable {
     private final Map<String, Map<String, Object>> presets = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
     final List<String> reports = new CopyOnWriteArrayList<>();
+    final Map<UUID, FakeUi.FakeWindow> overlays = new HashMap<>();
     private Path dataRoot;
     private final boolean ownsRoot;
     private volatile Variant variant = Variant.DARK;
@@ -373,6 +374,11 @@ public final class FakePluginHost implements AutoCloseable {
         checkType(topic);
         if (!topic.payloadType().isInstance(payload))
             throw new IllegalArgumentException("Payload is not a " + topic.payloadType().getName());
+        if (owner.equals(APP) && topic.equals(TerminalEvents.WINDOW_CLOSED)
+                && payload instanceof TerminalEvents.WindowEvent gone) {
+            var overlay = overlays.get(gone.windowId());
+            if (overlay != null) overlay.close();
+        }
         events.add(() -> deliver(topic.id(), payload));
     }
 

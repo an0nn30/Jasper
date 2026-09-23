@@ -28,7 +28,7 @@ public final class AuxiliarySurface {
                         BiFunction<String, Optional<Path>, Optional<Path>> chooseFile) { }
 
     /** Whether this is a top-level window or a dialog over another window. */
-    public enum Kind { WINDOW, DIALOG }
+    public enum Kind { WINDOW, DIALOG, OVERLAY }
 
     private static final System.Logger LOG = System.getLogger(AuxiliarySurface.class.getName());
     private final String id;
@@ -108,6 +108,7 @@ public final class AuxiliarySurface {
     /** A user's attempt to close: every guard is consulted; one that throws cannot trap the window open. */
     public boolean requestClose() {
         if (closed) return true;
+        if (kind == Kind.OVERLAY) return false;
         for (BooleanSupplier guard : List.copyOf(guards)) {
             try { if (!guard.getAsBoolean()) return false; }
             catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A window closing guard failed", failure); }
