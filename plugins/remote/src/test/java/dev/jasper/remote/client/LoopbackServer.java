@@ -24,6 +24,7 @@ import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
  */
 public final class LoopbackServer implements AutoCloseable {
     public final SshServer server = SshServer.setUpDefaultServer();
+    public final List<String> execCommands = new java.util.concurrent.CopyOnWriteArrayList<>();
     public final List<PublicKey> allowed = new ArrayList<>();
     public final SimpleGeneratorHostKeyProvider hostKey = new SimpleGeneratorHostKeyProvider();
 
@@ -44,6 +45,25 @@ public final class LoopbackServer implements AutoCloseable {
     public PublicKey hostPublicKey() throws IOException, java.security.GeneralSecurityException { return hostKey.loadKeys(null).iterator().next().getPublic(); }
     public void allow(PublicKey key) { allowed.add(key); }
     @Override public void close() throws IOException { server.stop(true); }
+
+    public void execReplies(java.util.Map<String, String> replies) { execReplies(replies, true); }
+    public void execReplies(java.util.Map<String, String> replies, boolean finish) {
+        server.setCommandFactory((channel, command) -> {
+            execCommands.add(command);
+            return new Command() {
+                OutputStream out;
+                ExitCallback exit;
+                @Override public void setInputStream(InputStream in) {}
+                @Override public void setOutputStream(OutputStream value) { out = value; }
+                @Override public void setErrorStream(OutputStream err) {}
+                @Override public void setExitCallback(ExitCallback value) { exit = value; }
+                @Override public void start(ChannelSession channel, Environment env) throws IOException {
+                    out.write(replies.getOrDefault(command, "").getBytes(StandardCharsets.UTF_8)); out.flush(); if (finish) exit.onExit(replies.containsKey(command) ? 0 : 1);
+                }
+                @Override public void destroy(ChannelSession channel) {}
+            };
+        });
+    }
 
     static final class Echo implements Command {
         private InputStream in; private OutputStream out; private ExitCallback exit; private Thread thread;

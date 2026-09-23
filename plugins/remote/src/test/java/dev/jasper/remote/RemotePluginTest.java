@@ -61,9 +61,12 @@ class RemotePluginTest {
             List<String> rows = host.searchScope(RemoteScope.ID, "", window, null);
             assertThat(rows).containsExactly("host." + prod.id() + "|prod|true");
             host.executeInScope(RemoteScope.ID, "host." + prod.id(), "connect", window, null);
-            assertThat(host.openRequests()).containsExactly("session-tab|" + window + "|prod");
-            UUID pane = host.terminalPanes().getFirst();
+            assertThat(host.openRequests()).isEmpty();
+            assertThat(host.windows()).containsExactly("dialog|Connecting to prod|true");
             settle(host);
+            assertThat(host.openRequests()).containsExactly("session-tab|" + window + "|prod");
+            assertThat(host.windows()).isEmpty();
+            UUID pane = host.terminalPanes().getFirst();
             assertThat(host.sessionState(pane)).isEqualTo("RUNNING|");
             assertThat(host.status()).containsExactly("dev.jasper.remote.status|RIGHT|1 SSH session||dev.jasper.remote.hosts");
             Thread.sleep(300);
@@ -77,9 +80,29 @@ class RemotePluginTest {
             assertThat(host.openRequests()).hasSize(2).last().asString().startsWith("session-split");
             assertThat(host.terminalPanes()).hasSize(2);
             assertThat(host.status().getFirst()).contains("2 SSH sessions");
+            UUID second = host.terminalPanes().stream().filter(id -> !id.equals(pane)).findFirst().orElseThrow();
+            host.focusTerminalPane(pane); host.flush();
+            plugin.activateHost(context.terminals().window(window).orElseThrow(), prod);
+            assertThat(context.terminals().activePane()).get().extracting(dev.jasper.sdk.terminal.PaneHandle::id).isEqualTo(pane);
+            host.focusTerminalPane(second); host.flush();
+            plugin.activateHost(context.terminals().window(window).orElseThrow(), prod);
+            assertThat(context.terminals().activePane()).get().extracting(dev.jasper.sdk.terminal.PaneHandle::id).isEqualTo(second);
+            assertThat(host.openRequests()).hasSize(2);
             host.closeTerminalPane(pane);
             host.flush();
             assertThat(host.status().getFirst()).contains("1 SSH session");
+            host.typeIntoSession(second, "q");
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(3);
+            while (!host.sessionState(second).startsWith("EXITED") && System.nanoTime() < deadline) { Thread.sleep(10); host.flush(); }
+            assertThat(host.sessionState(second)).startsWith("EXITED");
+            host.reconnectSession(second);
+            assertThat(host.windows()).containsExactly("dialog|Connecting to prod|true");
+            host.requestClose("dialog"); settle(host);
+            assertThat(host.sessionState(second)).startsWith("EXITED");
+            assertThat(plugin.connections().channelCount()).isZero();
+            host.reconnectSession(second); settle(host);
+            assertThat(host.sessionState(second)).isEqualTo("RUNNING|");
+            assertThat(host.openRequests()).hasSize(2);
             host.stopAll();
             assertThat(host.failures()).isEmpty();
         }
@@ -190,6 +213,66 @@ class RemotePluginTest {
             settle(host);
             assertThat(host.notices()).hasSize(3);
             assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void cancelledConnectCreatesNoTabOrRetainedChannel(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            var plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            var saved = RemoteHost.create("test", "127.0.0.1", server.port(), "deploy", new Auth.Vault(vault.password("p", "deploy", "s3cret")), "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            plugin.openHost(context.terminals().window(window).orElseThrow(), saved);
+            host.requestClose("dialog");
+            settle(host);
+            assertThat(host.openRequests()).isEmpty();
+            assertThat(plugin.connections().channelCount()).isZero();
+            assertThat(host.windows()).isEmpty();
+        }
+    }
+
+    @Test void failedConnectStaysInDialogAndRetriesWithoutAnEmptyTab(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var vault = new FakeVault(); host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            var plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            UUID credential = vault.password("p", "deploy", "wrong");
+            var saved = RemoteHost.create("test", "127.0.0.1", server.port(), "deploy", new Auth.Vault(credential), "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            plugin.openHost(context.terminals().window(window).orElseThrow(), saved); settle(host);
+            assertThat(host.openRequests()).isEmpty();
+            assertThat(host.windows()).hasSize(1);
+            assertThat(connectionStatus(plugin.currentConnectionPanel())).contains("Authentication failed");
+            vault.secrets.put(credential, () -> new dev.jasper.vault.api.Credential(credential, "p", dev.jasper.vault.api.Kind.ACCOUNT_PASSWORD, "deploy", "s3cret".toCharArray(), null, null));
+            retry(plugin.currentConnectionPanel()).doClick(); settle(host);
+            assertThat(host.openRequests()).hasSize(1);
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void renamesDefaultGroupThroughThePanel(@TempDir Path dir) throws Exception {
+        try (var host = new FakePluginHost()) {
+            var plugin = plugin(dir);
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            UUID window = host.addTerminalWindow();
+            var saved = RemoteHost.create("home", "example", 22, "me", Auth.AGENT, "", Optional.empty());
+            plugin.store().put(saved); settle(host);
+            var panel = (HostsPanel) host.openPanel(RemotePlugin.PANEL, window);
+            var menu = menuFor(panel, 0);
+            ((javax.swing.JMenuItem) menu.getComponent(0)).doClick();
+            groupName(plugin.currentGroupEditor()).setText("My machines");
+            saveGroup(plugin.currentGroupEditor()).doClick(); settle(host);
+            assertThat(host.windows()).isEmpty();
+            assertThat(list(panel).getModel().getElementAt(0)).isInstanceOfSatisfying(dev.jasper.remote.ui.HostRows.Group.class,
+                group -> assertThat(group.name()).isEqualTo("My machines"));
+            assertThat(new PanelState(context.dataDirectory().resolve("panel-state.toml")).defaultGroup()).isEqualTo("My machines");
+            assertThat(plugin.store().hosts().getFirst().group()).isEmpty();
         }
     }
 

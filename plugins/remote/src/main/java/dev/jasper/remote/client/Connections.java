@@ -4,6 +4,7 @@ import dev.jasper.remote.RemoteSettings;
 import dev.jasper.remote.agent.AgentClient;
 import dev.jasper.remote.agent.MinaAgentFactory;
 import dev.jasper.remote.hosts.Auth;
+import dev.jasper.remote.hosts.HostInfo;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.trust.KnownHosts;
 import dev.jasper.sdk.Subscription;
@@ -42,7 +43,9 @@ import org.apache.sshd.common.util.security.SecurityUtils;
 
 /** Shared sessions; all registry state belongs to the UI executor. Each shell and dependent hop owns a reference. */
 public final class Connections {
-    public record Shell(UUID hostId, TerminalConnection connection) {}
+    public record Shell(RemoteHost host, TerminalConnection connection) {
+        public UUID hostId() { return host.id(); }
+    }
     private static final AttributeRepository.AttributeKey<HostKeyVerifier> VERIFY = new AttributeRepository.AttributeKey<>();
     private final Supplier<RemoteSettings> settings;
     private final KnownHosts trust;
@@ -81,6 +84,7 @@ public final class Connections {
         final HostKeyVerifier verifier;
         Shared parent;
         ClientSession session;
+        CompletableFuture<HostInfo> info;
         int refs;
         boolean evicted;
         Runnable cancelLinger;
@@ -111,6 +115,21 @@ public final class Connections {
     public boolean connected(UUID id) { Shared s = sessions.get(id); return s != null && s.session != null && s.session.isOpen(); }
     public Subscription onChanged(Runnable listener) { listeners.add(listener); return () -> listeners.remove(listener); }
 
+    /** Best-effort metadata on the existing transport, cached for its lifetime; never authenticates a new connection. */
+    public CompletableFuture<HostInfo> inspect(Shell shell) {
+        Shared shared = sessions.get(shell.hostId());
+        if (closed || shared == null || shared.host != shell.host() || shared.session == null || !shared.session.isOpen()) return CompletableFuture.completedFuture(HostInfo.EMPTY);
+        if (shared.info != null) return shared.info;
+        shared.refs++;
+        if (shared.cancelLinger != null) { shared.cancelLinger.run(); shared.cancelLinger = null; }
+        shared.info = new CompletableFuture<>();
+        onBackground(() -> HostProbe.read(shared.session, shared.parent == null)).whenComplete((info, failure) -> ui.execute(() -> {
+            shared.info.complete(failure == null ? info : HostInfo.EMPTY);
+            release(shared);
+        }));
+        return shared.info;
+    }
+
     public CompletableFuture<Shell> shell(UUID id, int columns, int rows, Consumer<String> status) {
         var result = new CompletableFuture<Shell>();
         RemoteHost host = hosts.apply(id).orElse(null);
@@ -134,7 +153,7 @@ public final class Connections {
                     if (openFailure != null) { release.run(); result.completeExceptionally(failure(shared, openFailure)); return; }
                     if (result.isDone()) { connection.close().run(); return; }
                     if (!released[0]) { counted[0] = true; channels++; notifyChanged(); }
-                    if (!result.complete(new Shell(id, connection))) connection.close().run();
+                    if (!result.complete(new Shell(shared.host, connection))) connection.close().run();
                 }));
         }));
         return result;

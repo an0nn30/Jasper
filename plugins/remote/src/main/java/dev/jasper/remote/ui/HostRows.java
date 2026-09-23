@@ -27,11 +27,15 @@ public final class HostRows {
 
     /** Collapsed groups hide their hosts unless a search is active; the search never changes {@code collapsed}. */
     public static List<Row> rows(List<RemoteHost> hosts, String query, Set<String> collapsed) {
+        return rows(hosts, query, collapsed, OTHER);
+    }
+
+    public static List<Row> rows(List<RemoteHost> hosts, String query, Set<String> collapsed, String defaultGroup) {
         boolean searching = !query.strip().isEmpty();
-        var groups = new TreeMap<String, List<RemoteHost>>(Comparator.comparing((String name) -> name.equals(OTHER) ? 1 : 0).thenComparing(name -> name.toLowerCase(Locale.ROOT)));
+        var groups = new TreeMap<String, List<RemoteHost>>(Comparator.comparing((String name) -> name.equals(defaultGroup) ? 1 : 0).thenComparing(name -> name.toLowerCase(Locale.ROOT)));
         for (RemoteHost host : hosts) {
-            if (!matches(host, query)) continue;
-            groups.computeIfAbsent(host.group().isEmpty() ? OTHER : host.group(), name -> new ArrayList<>()).add(host);
+            if (!matches(host, query) && !(host.group().isEmpty() && defaultGroup.toLowerCase(Locale.ROOT).contains(query.strip().toLowerCase(Locale.ROOT)))) continue;
+            groups.computeIfAbsent(host.group().isEmpty() ? defaultGroup : host.group(), name -> new ArrayList<>()).add(host);
         }
         var rows = new ArrayList<Row>();
         for (var entry : groups.entrySet()) {

@@ -86,4 +86,36 @@ class HostsPanelTest {
         assertThat(panel.card.isVisible()).isFalse();
     }
 
+    @Test void cardsExposeMetadataSessionCountAndSearchTheCachedDetails() {
+        var panel = new HostsPanel(actions);
+        panel.setHostDetails(host -> host.id().equals(nas.id()) ? "Ubuntu · 10.0.0.2" : "macOS", host -> host.id().equals(nas.id()) ? 2 : 0);
+        panel.setHosts(List.of(nas, prod), Optional.empty());
+        panel.search.setText("ubuntu");
+        assertThat(panel.list.getModel().getSize()).isEqualTo(2);
+        var component = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(1), 1, false, false);
+        assertThat(labels(component)).contains("nas", "me@nas.local:2222", "Ubuntu · 10.0.0.2", "2 sessions");
+        assertThat(component.getPreferredSize().height).isGreaterThanOrEqualTo(72);
+    }
+    private static List<String> labels(java.awt.Component component) {
+        var out = new ArrayList<String>();
+        if (component instanceof javax.swing.JLabel label) out.add(label.getText());
+        if (component instanceof java.awt.Container container) for (var child : container.getComponents()) out.addAll(labels(child));
+        return out;
+    }
+
+    @Test void cardsExposeTheirIdentityToAssistiveTechnology() {
+        var panel = new HostsPanel(actions);
+        panel.setHostDetails(host -> "Ubuntu", host -> 1);
+        panel.setHosts(List.of(nas), Optional.empty());
+        var row = panel.list.getAccessibleContext().getAccessibleChild(1).getAccessibleContext();
+        assertThat(row.getAccessibleName()).contains("nas", "me@nas.local:2222", "Ubuntu", "1 session");
+    }
+
+    @Test void keyboardSelectionIsVisibleOnGroupHeaders() {
+        var panel = new HostsPanel(actions); panel.setHosts(List.of(nas), Optional.empty());
+        var renderer = panel.list.getCellRenderer().getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(0), 0, true, true);
+        assertThat(((javax.swing.JComponent) renderer).isOpaque()).isTrue();
+        assertThat(renderer.getBackground()).isEqualTo(panel.list.getSelectionBackground());
+    }
+
 }

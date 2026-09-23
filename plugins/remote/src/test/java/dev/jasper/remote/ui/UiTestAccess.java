@@ -5,6 +5,12 @@ import javax.swing.*;
 /** Owner-package access to passive UI controls for plugin integration tests. */
 public final class UiTestAccess {
     private UiTestAccess() {}
+    public static JTextField groupName(GroupNamePanel panel) { return panel.name; }
+    public static JButton saveGroup(GroupNamePanel panel) { return panel.save; }
+
+    public static JButton retry(ConnectionPanel panel) { return panel.retry; }
+    public static String connectionStatus(ConnectionPanel panel) { return panel.message.getText(); }
+
     public static JButton trust(HostKeyPanel panel) { return panel.trust; }
     public static JButton add(HostsPanel panel) { return panel.add; }
     public static JList<HostRows.Row> list(HostsPanel panel) { return panel.list; }

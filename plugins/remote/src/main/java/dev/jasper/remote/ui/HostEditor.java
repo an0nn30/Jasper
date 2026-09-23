@@ -40,6 +40,11 @@ public final class HostEditor extends JPanel {
     final JLabel message = new JLabel(" ");
     private UUID credentialId;
 
+    public void setDefaultGroupName(String name) {
+        if (group.getEditor().getEditorComponent() instanceof JTextField field)
+            field.putClientProperty("JTextField.placeholderText", name + " (default)");
+    }
+
     public HostEditor(List<RemoteHost> others, Optional<RemoteHost> editing, boolean vaultPresent, Function<UUID, Optional<String>> credentialName,
                       Supplier<CompletableFuture<Optional<CredentialDescriptor>>> pick, Consumer<RemoteHost> onSave, Runnable onCancel) {
         super(new BorderLayout(0, 8));

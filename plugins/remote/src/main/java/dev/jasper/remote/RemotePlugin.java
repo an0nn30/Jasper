@@ -10,6 +10,9 @@ import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.hosts.SshConfig;
 import dev.jasper.remote.trust.KnownHosts;
 import dev.jasper.remote.ui.ConfirmPanel;
+import dev.jasper.remote.ui.ConnectionPanel;
+import dev.jasper.remote.ui.GroupNamePanel;
+import dev.jasper.remote.hosts.HostInfoCache;
 import dev.jasper.remote.ui.HostEditor;
 import dev.jasper.remote.ui.HostKeyPanel;
 import dev.jasper.remote.ui.HostsPanel;
@@ -90,6 +93,11 @@ public class RemotePlugin implements Plugin {
     private HostEditor currentEditor;
     private ImportPanel currentImport;
     private ConfirmPanel currentConfirm;
+    private ConnectionPanel currentConnectionPanel;
+    private GroupNamePanel currentGroupEditor;
+    private HostInfoCache hostInfo;
+    private final Set<ConnectAttempt> attempts = new java.util.HashSet<>();
+    private final java.util.LinkedHashMap<UUID, UUID> recentPanes = new java.util.LinkedHashMap<>();
 
     public RemotePlugin() {
         this(SwingUtilities::invokeLater, context -> AgentClient.forEnvironment(System.getenv(), System.getProperty("os.name", "")),
@@ -108,6 +116,8 @@ public class RemotePlugin implements Plugin {
         context.config().onChanged(() -> settings = RemoteSettings.read(context.config()));
         store = new HostStore(context.dataDirectory().resolve("hosts.toml"), context.background(), ui);
         panelState = new PanelState(context.dataDirectory().resolve("panel-state.toml"));
+        hostInfo = new HostInfoCache(context.dataDirectory().resolve("host-info.properties"));
+        context.background().execute(() -> { hostInfo.load(); ui.execute(() -> { if (!stopped) refreshPanels(); }); });
         trust = new KnownHosts(context.dataDirectory().resolve("known_hosts"), () -> settings.readUserKnownHosts() ? Optional.of(sshDir.resolve("known_hosts")) : Optional.empty());
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
         Optional<java.util.function.Function<UUID, CompletableFuture<Optional<dev.jasper.vault.api.Credential>>>> credentialSource = Optional.empty();
@@ -136,13 +146,20 @@ public class RemotePlugin implements Plugin {
         store.load();
         poll = new Timer(1000, event -> store.poll());
         poll.start();
-        context.events().subscribe(TerminalEvents.ACTIVE_PANE_CHANGED, event -> splitAction.setEnabled(event.paneId().map(panes::containsKey).orElse(false)));
-        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> panes.remove(event.paneId()));
+        context.events().subscribe(TerminalEvents.ACTIVE_PANE_CHANGED, event -> {
+            event.paneId().ifPresent(this::rememberPane); refreshSplit();
+        });
+        context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> rememberPane(event.paneId()));
+        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { panes.remove(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
+        context.events().subscribe(TerminalEvents.WINDOW_CLOSED, event -> {
+            for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
+        });
         if (vault.isPresent()) context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> refreshPanels());
     }
 
     @Override public void stop() {
         stopped = true;
+        for (var attempt : Set.copyOf(attempts)) attempt.close();
         for (var question : Set.copyOf(questions)) question.cancel(true);
         if (poll != null) poll.stop();
         if (connections != null) connections.close();
@@ -150,25 +167,120 @@ public class RemotePlugin implements Plugin {
 
     // ---- sessions
 
-    SessionSpec session(RemoteHost host) { return SessionSpec.of(host.name(), pending -> connect(pending, host.id())); }
-
     private void connect(PendingSession pending, UUID hostId) {
-        CompletableFuture<Connections.Shell> future = connections.shell(hostId, pending.columns(), pending.rows(), pending::status);
-        var cancellation = pending.onCancelled(() -> ui.execute(() -> future.cancel(true)));
-        future.whenComplete((shell, failure) -> ui.execute(() -> {
-            cancellation.close();
-            if (stopped) { if (shell != null) shell.connection().close().run(); return; }
-            if (failure != null) { pending.fail(message(failure)); return; }
-            UUID paneId = pending.pane().id();
-            panes.put(paneId, hostId);
-            shell.connection().exited().whenComplete((ignored, exit) -> ui.execute(() -> { panes.remove(paneId); refreshSplit(); }));
-            pending.attach(shell.connection());
-            refreshSplit();
-        }));
+        var host = store.host(hostId);
+        if (host.isEmpty()) { pending.fail("Host not found"); return; }
+        if (pending.isCancelled() || stopped) return;
+        var attempt = new ConnectAttempt(pending.pane().tab().window(), host.get(), shell -> attach(pending, shell));
+        attempt.cancelled = () -> { if (!stopped) pending.fail("Cancelled"); };
+        var cancellation = pending.onCancelled(() -> ui.execute(attempt::close));
+        attempt.finished = cancellation::close;
+        attempts.add(attempt); attempt.start();
     }
 
-    void openHost(WindowHandle window, RemoteHost host) { context.terminals().openTab(window, OpenRequest.session(session(host))); }
-    void splitHost(PaneHandle pane, RemoteHost host) { context.terminals().split(pane, Direction.RIGHT, OpenRequest.session(session(host))); }
+    void openHost(WindowHandle window, RemoteHost host) {
+        prepare(window, host, request -> context.terminals().openTab(window, request));
+    }
+    void splitHost(PaneHandle pane, RemoteHost host) {
+        prepare(pane.tab().window(), host, request -> context.terminals().split(pane, Direction.RIGHT, request));
+    }
+
+    void activateHost(WindowHandle window, RemoteHost host) {
+        for (UUID id : recentPanes.sequencedKeySet().reversed()) {
+            if (!host.id().equals(panes.get(id))) continue;
+            var pane = context.terminals().pane(id);
+            if (pane.isPresent() && pane.get().info().state() == dev.jasper.sdk.terminal.SessionState.RUNNING) { pane.get().focus(); return; }
+        }
+        openHost(window, host);
+    }
+
+    private void rememberPane(UUID id) {
+        UUID hostId = panes.get(id);
+        if (hostId == null) return;
+        recentPanes.remove(id); recentPanes.put(id, hostId);
+    }
+
+    private void prepare(WindowHandle window, RemoteHost host, Function<OpenRequest, Optional<PaneHandle>> open) {
+        if (!window.isOpen() || stopped) return;
+        var attempt = new ConnectAttempt(window, host, shell -> {
+            var ready = new java.util.concurrent.atomic.AtomicReference<>(shell);
+            SessionSpec spec = SessionSpec.of(host.name(), pending -> {
+                Connections.Shell first = ready.getAndSet(null);
+                if (first == null) connect(pending, host.id());
+                else ui.execute(() -> attach(pending, first));
+            });
+            try {
+                if (open.apply(OpenRequest.session(spec)).isEmpty()) {
+                    var unused = ready.getAndSet(null); if (unused != null) unused.connection().close().run();
+                }
+            } catch (RuntimeException failure) {
+                var unused = ready.getAndSet(null); if (unused != null) unused.connection().close().run();
+                throw failure;
+            }
+        });
+        attempts.add(attempt); attempt.start();
+    }
+
+    private void attach(PendingSession pending, Connections.Shell shell) {
+        if (stopped || pending.isCancelled()) { shell.connection().close().run(); return; }
+        UUID paneId = pending.pane().id();
+        panes.put(paneId, shell.hostId()); rememberPane(paneId);
+        shell.connection().exited().whenComplete((ignored, exit) -> ui.execute(() -> {
+            panes.remove(paneId); recentPanes.remove(paneId); refreshSplit(); if (!stopped) refreshPanels();
+        }));
+        pending.attach(shell.connection());
+        RemoteHost authenticatedHost = shell.host();
+        connections.inspect(shell).thenAccept(info -> {
+            if (stopped) return;
+            context.background().execute(() -> {
+                try { hostInfo.put(authenticatedHost, info); }
+                catch (IOException unavailable) { context.log().log(System.Logger.Level.DEBUG, "Host information cache: {0}", unavailable.getMessage()); }
+                ui.execute(() -> { if (!stopped) refreshPanels(); });
+            });
+        });
+        refreshSplit(); refreshPanels();
+    }
+
+    private final class ConnectAttempt {
+        final WindowHandle window;
+        final RemoteHost host;
+        final java.util.function.Consumer<Connections.Shell> success;
+        final PluginDialog dialog;
+        final ConnectionPanel panel;
+        CompletableFuture<Connections.Shell> future;
+        boolean closed, delivered;
+        Runnable cancelled = () -> {}, finished = () -> {};
+        ConnectAttempt(WindowHandle window, RemoteHost host, java.util.function.Consumer<Connections.Shell> success) {
+            this.window = window; this.host = host; this.success = success;
+            dialog = context.windows().dialog(new DialogSpec("Connecting to " + host.name(), window, false));
+            panel = new ConnectionPanel(host.name(), host.label(), this::start, this::close);
+            currentConnectionPanel = panel;
+            dialog.setContent(panel); dialog.onClosed(this::close);
+        }
+        void start() {
+            if (closed || stopped || !window.isOpen()) { close(); return; }
+            panel.working(); dialog.show();
+            var dimensions = window.activeTab().flatMap(tab -> tab.activePane()).map(PaneHandle::info);
+            int cols = dimensions.map(info -> Math.max(1, info.columns())).orElse(80);
+            int rows = dimensions.map(info -> Math.max(1, info.rows())).orElse(24);
+            future = connections.shell(host.id(), cols, rows, panel::status);
+            future.whenComplete((shell, failure) -> ui.execute(() -> {
+                if (closed || stopped || !window.isOpen()) { if (shell != null) shell.connection().close().run(); close(); return; }
+                if (failure != null) { panel.failed(message(failure)); return; }
+                try { success.accept(shell); delivered = true; close(); }
+                catch (RuntimeException problem) { shell.connection().close().run(); panel.failed(message(problem)); }
+            }));
+        }
+        void close() {
+            if (closed) return;
+            closed = true; attempts.remove(this);
+            if (future != null && !future.isDone()) future.cancel(true);
+            panel.finished(); finished.run();
+            if (!delivered) cancelled.run();
+            dialog.close();
+            if (currentConnectionPanel == panel) currentConnectionPanel = null;
+        }
+    }
 
     private void splitSameHost(PaneHandle pane) {
         UUID hostId = panes.get(pane.id());
@@ -222,6 +334,7 @@ public class RemotePlugin implements Plugin {
                 else { if (!closed[0]) editor[0].showError(message(failure)); context.notices().error(message(failure)); }
             })),
             dialog::close);
+        editor[0].setDefaultGroupName(panelState.defaultGroup());
         currentEditor = editor[0];
         dialog.setContent(editor[0]);
         dialog.onClosed(() -> { closed[0] = true; if (currentEditor == editor[0]) currentEditor = null; });
@@ -273,6 +386,10 @@ public class RemotePlugin implements Plugin {
             editing -> editHost(window, editing), h -> reportMutation(store.put(duplicate(h))), h -> deleteHost(window, h),
             (h, favorite) -> reportMutation(store.put(h.withFavorite(favorite))), () -> importConfig(window)));
         panel.setCredentialLabels(this::credentialLabel);
+        panel.setDefaultGroup(panelState.defaultGroup());
+        panel.onRenameDefaultGroup(() -> renameDefaultGroup(window));
+        panel.onActivate(h -> activateHost(window, h));
+        panel.setHostDetails(this::hostDetails, this::sessionCount);
         panel.setCollapsed(panelState.collapsed());
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
         panel.setHosts(store.hosts(), store.error());
@@ -301,7 +418,38 @@ public class RemotePlugin implements Plugin {
         context.panels().toggle(PANEL, window);
     }
 
-    private void refreshPanels() { for (HostsPanel panel : panels.values()) { panel.setCredentialLabels(this::credentialLabel); panel.setHosts(store.hosts(), store.error()); } }
+    private void refreshPanels() {
+        for (HostsPanel panel : panels.values()) {
+            panel.setCredentialLabels(this::credentialLabel);
+            panel.setDefaultGroup(panelState.defaultGroup());
+            panel.setHostDetails(this::hostDetails, this::sessionCount);
+            panel.setHosts(store.hosts(), store.error());
+        }
+    }
+
+    private int sessionCount(RemoteHost host) { return (int) panes.values().stream().filter(host.id()::equals).count(); }
+    private String hostDetails(RemoteHost host) {
+        var info = hostInfo.get(host);
+        String address = info.address().equals(host.hostname()) ? "" : info.address();
+        return info.os().isEmpty() ? address : address.isEmpty() ? info.os() : info.os() + " · " + address;
+    }
+
+    private void renameDefaultGroup(WindowHandle window) {
+        PluginDialog dialog = context.windows().dialog(new DialogSpec("Rename default group", window, true));
+        GroupNamePanel[] editor = new GroupNamePanel[1];
+        editor[0] = new GroupNamePanel(panelState.defaultGroup(), name -> {
+            try {
+                String value = name.strip();
+                if (store.hosts().stream().anyMatch(host -> !host.group().isEmpty() && host.group().equalsIgnoreCase(value)))
+                    throw new IllegalArgumentException("A group with that name already exists");
+                panelState.renameDefaultGroup(value);
+                for (var panel : panels.values()) panel.setCollapsed(panelState.collapsed());
+                refreshPanels(); dialog.close();
+            } catch (IOException | IllegalArgumentException failure) { editor[0].showError(message(failure)); }
+        }, dialog::close);
+        currentGroupEditor = editor[0]; dialog.setContent(editor[0]);
+        dialog.onClosed(() -> { if (currentGroupEditor == editor[0]) currentGroupEditor = null; }); dialog.show();
+    }
 
     private String credentialLabel(RemoteHost host) {
         return switch (host.auth()) {
@@ -327,5 +475,7 @@ public class RemotePlugin implements Plugin {
     HostKeyPanel currentHostKeyPanel() { return currentHostKeyPanel; }
     HostEditor currentEditor() { return currentEditor; }
     ImportPanel currentImport() { return currentImport; }
+    GroupNamePanel currentGroupEditor() { return currentGroupEditor; }
+    ConnectionPanel currentConnectionPanel() { return currentConnectionPanel; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
 }

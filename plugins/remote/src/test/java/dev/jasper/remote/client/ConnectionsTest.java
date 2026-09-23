@@ -294,4 +294,65 @@ class ConnectionsTest {
         }
     }
 
+    @Test void inspectsOperatingSystemOnAnExistingSessionWithoutOpeningAnotherShell(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.execReplies(Map.of("uname -s", "Linux\n", "cat /etc/os-release", "NAME=Ubuntu\nPRETTY_NAME=\"Ubuntu 24.04 LTS\"\n"));
+            connections(dir, Optional.empty());
+            var host = host("linux", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = shell(host);
+            var info = onUi(() -> connections.inspect(shell)).get(5, TimeUnit.SECONDS);
+            assertThat(info.os()).isEqualTo("Ubuntu 24.04 LTS");
+            assertThat(info.address()).isEqualTo("127.0.0.1");
+            assertThat(onUi(connections::channelCount)).isEqualTo(1);
+            assertThat(server.execCommands).containsExactly("uname -s", "cat /etc/os-release");
+            onUi(() -> connections.inspect(shell)).get(5, TimeUnit.SECONDS);
+            assertThat(server.execCommands).hasSize(2);
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void unavailableHostInformationDoesNotBreakTheShell(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("unknown", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = shell(host);
+            var info = onUi(() -> connections.inspect(shell)).get(5, TimeUnit.SECONDS);
+            assertThat(info.os()).isEmpty();
+            assertThat(shell.connection().exited()).isNotDone();
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void silentMetadataCommandTimesOutWithoutBlockingOrClosingTheShell(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.execReplies(Map.of(), false);
+            connections(dir, Optional.empty());
+            var host = host("silent", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = shell(host);
+            var info = onUi(() -> connections.inspect(shell)).get(6, TimeUnit.SECONDS);
+            assertThat(info.os()).isEmpty();
+            assertThat(shell.connection().exited()).isNotDone();
+            assertThat(onUi(connections::channelCount)).isEqualTo(1);
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void inspectionKeepsTheAuthenticatedEndpointWhenSavedHostChanges(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.execReplies(Map.of("uname -s", "Darwin\n"));
+            connections(dir, Optional.empty());
+            var original = host("mac", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = shell(original);
+            var changed = original.withEdited("new", "different.example", 22, "deploy", original.auth(), "", Optional.empty());
+            onUi(() -> hosts.put(original.id(), changed));
+            assertThat(shell.host()).isEqualTo(original);
+            var info = onUi(() -> connections.inspect(shell)).get(5, TimeUnit.SECONDS);
+            var cache = new dev.jasper.remote.hosts.HostInfoCache(dir.resolve("facts.properties"));
+            cache.put(shell.host(), info);
+            assertThat(cache.get(original).os()).isEqualTo("macOS");
+            assertThat(cache.get(changed).os()).isEmpty();
+            shell.connection().close().run();
+        }
+    }
+
 }

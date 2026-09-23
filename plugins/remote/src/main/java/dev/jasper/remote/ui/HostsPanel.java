@@ -53,10 +53,15 @@ public final class HostsPanel extends JPanel {
     private Optional<String> error = Optional.empty();
     private Function<RemoteHost, String> credentialLabels = host -> "";
     private UUID selected;
+    private String defaultGroup = HostRows.OTHER;
+    private Runnable renameDefaultGroup = () -> {};
+    private Consumer<RemoteHost> activate;
+    private Function<RemoteHost, String> metadata = host -> "";
+    private java.util.function.ToIntFunction<RemoteHost> sessionCount = host -> 0;
 
     public HostsPanel(Actions actions) {
         super(new BorderLayout(0, 6));
-        this.actions = actions;
+        this.actions = actions; this.activate = actions.connect();
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         var header = new JPanel();
         header.setLayout(new BoxLayout(header, BoxLayout.X_AXIS));
@@ -68,11 +73,16 @@ public final class HostsPanel extends JPanel {
         search.putClientProperty("JTextField.placeholderText", "Search hosts…");
         north.add(search, BorderLayout.SOUTH);
         add(north, BorderLayout.NORTH);
-        list = new JList<>(model);
+        list = new JList<>(model) {
+            @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        };
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setCellRenderer(new Renderer());
         var center = new JPanel(new BorderLayout());
-        center.add(new JScrollPane(list), BorderLayout.CENTER);
+        var scroll = new JScrollPane(list);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        center.add(scroll, BorderLayout.CENTER);
         empty.setBorder(BorderFactory.createEmptyBorder(12, 4, 12, 4));
         center.add(empty, BorderLayout.SOUTH);
         add(center, BorderLayout.CENTER);
@@ -98,7 +108,7 @@ public final class HostsPanel extends JPanel {
                 int index = list.locationToIndex(event.getPoint());
                 if (index < 0 || !list.getCellBounds(index, index).contains(event.getPoint())) return;
                 if (SwingUtilities.isRightMouseButton(event)) { list.setSelectedIndex(index); JPopupMenu menu = menuFor(index); if (menu != null) menu.show(list, event.getX(), event.getY()); }
-                else if (event.getX() < 24 && model.get(index) instanceof HostRows.Host row) {
+                else if (event.getX() < 36 && model.get(index) instanceof HostRows.Host row) {
                     if (event.getClickCount() == 1) actions.favorite().accept(row.host(), !row.host().favorite());
                 }
                 else if (event.getClickCount() == 2) activate(index);
@@ -114,6 +124,13 @@ public final class HostsPanel extends JPanel {
         connect.addActionListener(event -> selectedHost().ifPresent(actions.connect()));
         edit.addActionListener(event -> selectedHost().ifPresent(host -> actions.edit().accept(Optional.of(host))));
         rebuild();
+    }
+
+    public void setDefaultGroup(String name) { defaultGroup = name; rebuild(); }
+    public void onRenameDefaultGroup(Runnable rename) { renameDefaultGroup = rename; }
+    public void onActivate(Consumer<RemoteHost> action) { activate = action; }
+    public void setHostDetails(Function<RemoteHost, String> details, java.util.function.ToIntFunction<RemoteHost> sessions) {
+        metadata = details; sessionCount = sessions; rebuild();
     }
 
     public void setHosts(List<RemoteHost> hosts, Optional<String> error) { this.hosts = List.copyOf(hosts); this.error = error; rebuild(); }
@@ -132,7 +149,7 @@ public final class HostsPanel extends JPanel {
     void activate(int index) {
         if (index < 0 || index >= model.size()) return;
         switch (model.get(index)) {
-            case HostRows.Host row -> actions.connect().accept(row.host());
+            case HostRows.Host row -> activate.accept(row.host());
             case HostRows.Group group -> toggle(index);
             case HostRows.Error ignored -> { }
         }
@@ -146,10 +163,14 @@ public final class HostsPanel extends JPanel {
     }
 
     JPopupMenu menuFor(int index) {
-        if (index < 0 || !(model.get(index) instanceof HostRows.Host row)) return null;
+        if (index < 0 || index >= model.size()) return null;
+        if (model.get(index) instanceof HostRows.Group group && group.name().equals(defaultGroup)) {
+            var menu = new JPopupMenu(); menu.add(item("Rename group…", renameDefaultGroup)); return menu;
+        }
+        if (!(model.get(index) instanceof HostRows.Host row)) return null;
         RemoteHost host = row.host();
         var menu = new JPopupMenu();
-        menu.add(item("Connect", () -> actions.connect().accept(host)));
+        menu.add(item("Connect in new tab", () -> actions.connect().accept(host)));
         menu.add(item("Connect in split", () -> actions.connectSplit().accept(host)));
         menu.add(item("Edit…", () -> actions.edit().accept(Optional.of(host))));
         menu.add(item("Duplicate", () -> actions.duplicate().accept(host)));
@@ -164,7 +185,11 @@ public final class HostsPanel extends JPanel {
         UUID keep = selected;
         model.clear();
         error.ifPresent(message -> model.addElement(new HostRows.Error(message)));
-        HostRows.rows(hosts, search.getText(), collapsed).forEach(model::addElement);
+        String query = search.getText().strip().toLowerCase(java.util.Locale.ROOT);
+        List<RemoteHost> matching = hosts.stream().filter(host -> HostRows.matches(host, query)
+            || (host.group().isEmpty() && defaultGroup.toLowerCase(java.util.Locale.ROOT).contains(query))
+            || metadata.apply(host).toLowerCase(java.util.Locale.ROOT).contains(query)).toList();
+        HostRows.rows(matching, "", query.isEmpty() ? collapsed : Set.of(), defaultGroup).forEach(model::addElement);
         boolean searching = !search.getText().strip().isEmpty();
         empty.setText(hosts.isEmpty() ? "No hosts yet — Add or Import from ~/.ssh/config" : "No hosts match");
         empty.setVisible(hosts.isEmpty() || (searching && model.size() == (error.isPresent() ? 1 : 0)));
@@ -191,16 +216,70 @@ public final class HostsPanel extends JPanel {
         });
     }
 
-    private static final class Renderer extends DefaultListCellRenderer {
-        @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focused) {
-            JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focused);
-            switch (value) {
-                case HostRows.Group group -> { label.setText((group.collapsed() ? "▸ " : "▾ ") + group.name() + "  " + group.count()); label.setFont(label.getFont().deriveFont(Font.BOLD)); }
-                case HostRows.Host host -> label.setText((host.host().favorite() ? "★  " : "☆  ") + host.host().name());
-                case HostRows.Error error -> label.setText("⚠ " + error.message());
-                default -> { }
-            }
+    private final class Renderer implements javax.swing.ListCellRenderer<HostRows.Row> {
+        @Override public Component getListCellRendererComponent(JList<? extends HostRows.Row> owner, HostRows.Row value, int index, boolean selected, boolean focused) {
+            if (value instanceof HostRows.Host row) return hostCard(owner, row.host(), selected, focused);
+            JLabel label = new JLabel(); label.putClientProperty("html.disable", true);
+            label.setOpaque(selected);
+            label.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
+            label.setForeground(selected ? owner.getSelectionForeground() : owner.getForeground());
+            label.setFont(owner.getFont().deriveFont(Font.BOLD));
+            label.setBorder(BorderFactory.createEmptyBorder(12, 4, 8, 4));
+            if (value instanceof HostRows.Group group) {
+                label.setText((group.collapsed() ? "▸  " : "▾  ") + group.name() + "   " + group.count());
+                if (group.name().equals(defaultGroup)) label.setToolTipText("Right-click to rename this group");
+            } else if (value instanceof HostRows.Error error) label.setText(error.message());
             return label;
+        }
+    }
+
+    private Component hostCard(JList<?> owner, RemoteHost host, boolean selected, boolean focused) {
+        java.awt.Color fill = selected ? owner.getSelectionBackground() : javax.swing.UIManager.getColor("TextField.background");
+        if (fill == null) fill = owner.getBackground();
+        java.awt.Color edge = javax.swing.UIManager.getColor("Component.borderColor");
+        if (edge == null) edge = owner.getForeground().darker();
+        var body = new RoundedCard(fill, edge);
+        body.setLayout(new BorderLayout(8, 7));
+        body.setBorder(BorderFactory.createEmptyBorder(12, 10, 12, 12));
+        java.awt.Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
+        var favorite = text(host.favorite() ? "★" : "☆", foreground, owner.getFont().deriveFont(18f));
+        favorite.setVerticalAlignment(JLabel.TOP); favorite.setPreferredSize(new java.awt.Dimension(20, 22));
+        body.add(favorite, BorderLayout.WEST);
+        var content = new JPanel(new BorderLayout(0, 5)); content.setOpaque(false);
+        var top = new JPanel(new BorderLayout(8, 0)); top.setOpaque(false);
+        top.add(text(host.name(), foreground, owner.getFont().deriveFont(Font.BOLD, owner.getFont().getSize2D() + 2)), BorderLayout.CENTER);
+        int sessions = sessionCount.applyAsInt(host);
+        if (sessions > 0) {
+            var badge = text(sessions == 1 ? "●  1 session" : sessions + " sessions", foreground, owner.getFont().deriveFont(Math.max(10f, owner.getFont().getSize2D() - 1)));
+            top.add(badge, BorderLayout.EAST);
+        }
+        content.add(top, BorderLayout.NORTH);
+        var details = new JPanel(new java.awt.GridLayout(0, 1, 0, 4)); details.setOpaque(false);
+        details.add(text(host.label(), foreground, owner.getFont()));
+        String facts = metadata.apply(host);
+        details.add(text(facts.isBlank() ? "SSH host" : facts, foreground, owner.getFont().deriveFont(Math.max(10f, owner.getFont().getSize2D() - 1))));
+        content.add(details, BorderLayout.CENTER); body.add(content, BorderLayout.CENTER);
+        var margin = new JPanel(new BorderLayout()); margin.setOpaque(false);
+        margin.setBorder(BorderFactory.createEmptyBorder(0, 1, 7, 1)); margin.add(body);
+        margin.getAccessibleContext().setAccessibleName(host.name() + ", " + host.label()
+            + (facts.isBlank() ? "" : ", " + facts) + ", " + sessions + (sessions == 1 ? " session" : " sessions"));
+        return margin;
+    }
+
+    private static JLabel text(String value, java.awt.Color foreground, Font font) {
+        var label = new JLabel(value); label.putClientProperty("html.disable", true);
+        label.setForeground(foreground); label.setFont(font); label.setToolTipText(value); return label;
+    }
+
+    private static final class RoundedCard extends JPanel {
+        private final java.awt.Color fill, edge;
+        RoundedCard(java.awt.Color fill, java.awt.Color edge) { this.fill = fill; this.edge = edge; setOpaque(false); }
+        @Override protected void paintComponent(java.awt.Graphics graphics) {
+            var g = (java.awt.Graphics2D) graphics.create();
+            g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(fill); g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
+            g.setColor(edge); g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12); g.dispose();
+            super.paintComponent(graphics);
         }
     }
 }

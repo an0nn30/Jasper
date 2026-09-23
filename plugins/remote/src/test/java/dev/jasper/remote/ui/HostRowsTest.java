@@ -36,4 +36,11 @@ class HostRowsTest {
             case HostRows.Host host -> host.host().name() + (host.host().favorite() ? "*" : "");
         };
     }
+    @Test void renamedDefaultGroupAppliesToExistingAndNewUngroupedHostsAndSearch() {
+        var hosts = List.of(host("one", "", false), host("two", "", false));
+        assertThat(HostRows.rows(hosts, "machines", Set.of(), "My machines")).extracting(HostRowsTest::describe)
+            .containsExactly("My machines(2)", "one", "two");
+        assertThat(hosts).allSatisfy(host -> assertThat(host.group()).isEmpty());
+    }
+
 }

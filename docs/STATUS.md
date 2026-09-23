@@ -49,6 +49,25 @@ bounds/cancels agent I/O, preserves OpenSSH first-value/quoted/commented imports
 mutation failures after editor closure. SDK 0.7.2 adds `Panels.toggle` (app and testkit) for lazy
 per-window Hosts action toggling; Remote requires it. Enter, star clicks and stale selection are fixed.
 
+### Remote SSH card/dialog follow-up — 2026-09-22
+
+User-approved adjustments on the same `codex/remote-7a` worktree: renameable default group
+(persisted without rewriting hosts), larger searchable host cards with cached detected OS and IP,
+active-session badges, double-click/Enter to focus the most recently used running pane, and a
+Cancel/Retry progress dialog before tab/split creation (also used on reconnect). Explicit Connect
+still creates another session. The host editor shows the renamed default group as a placeholder.
+
+Metadata runs only over a user-established authenticated session, via bounded separate exec
+channels. No proactive passwordless connections, no commands injected into the user's shell.
+Unknown/unsupported OS discovery leaves the terminal usable. Results are cached against the
+actual authenticated endpoint; direct peer IPs are shown when useful, never a jump forward's IP.
+
+One independent review found accessibility and endpoint-cache association issues plus invisible
+keyboard selection on group headers; all are addressed with regressions. Headless FlatLaf renders
+at 360px and 240px sidebar widths and the connection dialog were inspected. Native acceptance
+remains user-run. `./gradlew check :jasper-app:installDist` passed: **1,617 tests, 1,614 passed,
+three expected skips, zero failures/errors**; Remote **69/69**. No merge or push.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

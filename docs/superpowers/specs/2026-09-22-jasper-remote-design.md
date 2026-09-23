@@ -50,6 +50,20 @@ onto the SDK with no application code.
    a small SDK addition: `Panels.toggle(panelId, window)` in 0.7.2, implemented by app and testkit,
    so the Hosts action can create its panel lazily and toggle it; Remote requires SDK 0.7.2.
 
+### Approved UX follow-up (2026-09-22)
+
+The user requested a renameable default group, a compact connection-progress window before opening
+a terminal, and larger searchable host cards. The cards additionally show cached detected OS/IP and
+an active-session indicator; double-click/Enter focuses the most recently used running pane, while
+explicit Connect/new-tab/split actions create another session. Default-group naming is persisted in
+panel state, applying to existing and new ungrouped hosts. The loader offers Cancel and Retry;
+reconnect retains the existing pane and uses the same loader.
+
+OS discovery occurs after a successful connection (including key authentication), using fixed,
+bounded read-only exec requests over that transport. It does not initiate background logins or
+write commands into the interactive shell. Facts are best-effort, stored separately from host
+configuration, and associated with the authenticated endpoint snapshot.
+
 ## 3. Shape
 
 ```

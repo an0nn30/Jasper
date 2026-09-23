@@ -26,8 +26,26 @@ final class PanelState {
         } catch (IOException | RuntimeException unreadable) { return Set.of(); }
     }
 
-    void save(Set<String> groups) throws IOException {
-        var out = new StringBuilder("# Jasper Remote panel state.\ncollapsed = [");
+    String defaultGroup() {
+        try {
+            if (!Files.isRegularFile(file)) return "Other";
+            String name = Toml.parse(Files.readString(file)).getString("default_group");
+            return name == null || name.isBlank() ? "Other" : name;
+        } catch (IOException | RuntimeException unreadable) { return "Other"; }
+    }
+
+    void renameDefaultGroup(String name) throws IOException {
+        name = name.strip();
+        if (name.isBlank() || name.length() > 80) throw new IllegalArgumentException("Use a group name from 1 to 80 characters");
+        var groups = new LinkedHashSet<>(collapsed());
+        if (groups.remove(defaultGroup())) groups.add(name);
+        save(groups, name);
+    }
+
+    void save(Set<String> groups) throws IOException { save(groups, defaultGroup()); }
+
+    private void save(Set<String> groups, String defaultGroup) throws IOException {
+        var out = new StringBuilder("# Jasper Remote panel state.\ndefault_group = ").append(dev.jasper.remote.hosts.HostFile.tomlString(defaultGroup)).append("\ncollapsed = [");
         boolean first = true;
         for (String group : groups) { if (!first) out.append(", "); first = false; out.append(dev.jasper.remote.hosts.HostFile.tomlString(group)); }
         Files.createDirectories(file.toAbsolutePath().getParent());
