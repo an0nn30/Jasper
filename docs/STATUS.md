@@ -36,6 +36,27 @@ is merged at `17c0476`. The Credential Vault design
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
+### Remote empty-agent diagnosis — 2026-09-23
+
+Investigated the user's imported-host authentication failure on `codex/retro-metal`.
+The merge changed Remote's icon selection only; its SSH authentication code matched main.
+Saved hosts in the previous SSH worktree use Vault, while the fresh imports here use Agent;
+the current system agent reported no identities. Development homes and Vault files are
+separate. No private keys were read, credentials migrated, or real remote connection opened.
+
+Remote now checks for usable agent identities before TCP/host-key prompts and explains how
+to recover, instead of reporting generic authentication rejection. The probe uses the auth
+timeout and connection cancellation ownership; retry queries the agent again. A regression
+failed with the user's original message, then passed after the fix, including successful
+loopback SSH authentication after adding a generated key to the test agent. Existing Vault
+and agent connection tests pass. Independent review found no actionable issues. The guide
+explains Vault mapping, agent loading, and separate development homes. Choosing/configuring
+a credential for the user's current saved hosts remains user-dependent.
+
+Verification: `./gradlew check :jasper-app:installDist` passed: 1,712 tests,
+1,709 passed, three expected skips, zero failures/errors. Distribution rebuilt;
+source hygiene and `git diff --check` passed. No native GUI launch or push.
+
 ### Retro Metal appearance — 2026-09-22
 
 Implemented on `codex/retro-metal` in `/Users/dustin/.codex/worktrees/retro-metal-plan/moray`,

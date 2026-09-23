@@ -172,6 +172,23 @@ class ConnectionsTest {
         assertThat(failure(onUi(() -> connections.shell(noAgent.id(), 80, 24, s -> { })))).isEqualTo("SSH agent not available");
     }
 
+    @Test void emptyAgentExplainsMissingKeysAndRetryUsesNewlyLoadedKey(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var agent = new FakeAgent()) {
+            connections(dir, Optional.of(new AgentClient(agent::handle)));
+            RemoteHost target = host("imported", server.port(), "deploy", Auth.AGENT, Optional.empty());
+            String error = failure(onUi(() -> connections.shell(target.id(), 80, 24, s -> { })));
+            assertThat(error).contains("SSH agent", "no usable keys", "Vault");
+            assertThat(questions).as("no host-key prompt when no key can be offered").isEmpty();
+            assertThat(onUi(connections::channelCount)).isZero();
+
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA"); generator.initialize(2048);
+            KeyPair pair = generator.generateKeyPair();
+            agent.keys.add(pair);
+            server.allow(pair.getPublic());
+            assertThat(readUntil(shell(target).connection(), "\r\n")).startsWith("READY");
+        }
+    }
+
     @Test void hostKeyDecisionsAndChangesAreEnforced(@TempDir Path dir) throws Exception {
         int port;
         try (var server = new LoopbackServer()) {

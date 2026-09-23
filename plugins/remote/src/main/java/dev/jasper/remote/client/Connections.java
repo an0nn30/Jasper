@@ -216,6 +216,17 @@ public final class Connections {
         String username = host.username().isEmpty() ? credential.flatMap(Credential::username).orElse("") : host.username();
         try {
             if (username.isEmpty()) throw new Failures.Failure("No username for " + host.name());
+            if (host.auth() instanceof Auth.Agent) {
+                try (AgentClient probe = agent.orElseThrow().withTimeout(current.authTimeout())) {
+                    shared.resources.add(probe::close);
+                    if (probe.identities().isEmpty()) {
+                        throw new Failures.Failure("SSH agent has no usable keys; load a key or choose Vault.");
+                    }
+                } catch (IOException unavailable) {
+                    throw new Failures.Failure("SSH agent unavailable: " + unavailable.getMessage(), unavailable);
+                }
+                shared.resources.check();
+            }
             SshClient client = client(host.auth() instanceof Auth.Agent);
             shared.resources.check();
             String address = host.hostname(); int port = host.port();

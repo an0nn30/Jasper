@@ -39,6 +39,13 @@ one level of `Include`) and shows what each entry would become; wildcard hosts a
 listed as not importable. An `IdentityFile` whose public key is a key in the Vault becomes that
 credential; any other becomes the agent. Nothing is imported silently, and `~/.ssh` is never written.
 
+If an imported host reports that the **SSH agent has no usable keys**, its identity file was
+not matched to an unlocked Vault key and the agent currently has nothing to offer. Load the key
+with `ssh-add /path/to/key`, then Retry, or edit the host and select a Vault credential. Merely
+listing `IdentityFile` in OpenSSH config does not load that key into the agent. Each development
+worktree has its own Jasper home and Vault; importing the same hosts in another worktree does
+not copy their credentials. Unlock the Vault before importing to match its existing keys.
+
 The first connection to a host shows its key type and SHA256 fingerprint with **Cancel**,
 **Connect once** and **Trust and connect**; trusting writes `plugins/dev.jasper.remote/data/known_hosts`.
 Keys already in `~/.ssh/known_hosts` (hashed entries included) connect without asking. A key that
