@@ -68,6 +68,16 @@ at 360px and 240px sidebar widths and the connection dialog were inspected. Nati
 remains user-run. `./gradlew check :jasper-app:installDist` passed: **1,617 tests, 1,614 passed,
 three expected skips, zero failures/errors**; Remote **69/69**. No merge or push.
 
+### Remote host-list styling revision — 2026-09-22
+
+At the user's request, replaced the rounded host cards with flat, indented tree-style rows.
+Host labels are two points larger than the base list font, with eight points of vertical padding.
+Search, favorites, group renaming, session counts and last-session activation remain. OS/IP details
+are shown in the selected-host area and tooltips and remain searchable/accessibly named.
+The separately requested connection overlay is still a design draft pending approval/Cancel choice.
+`./gradlew check :jasper-app:installDist` passed: 1,617 tests, 1,614 passed, three expected skips,
+zero failures/errors. Headless renders at 360px and 240px were inspected.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

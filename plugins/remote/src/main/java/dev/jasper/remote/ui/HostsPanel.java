@@ -19,7 +19,6 @@ import java.util.function.Function;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -42,7 +41,7 @@ public final class HostsPanel extends JPanel {
     final JTextField search = new JTextField();
     final JList<HostRows.Row> list;
     final JPanel card = new JPanel();
-    final JLabel cardName = new JLabel(), cardAddress = new JLabel(), cardCredential = new JLabel(), cardJump = new JLabel();
+    final JLabel cardName = new JLabel(), cardAddress = new JLabel(), cardCredential = new JLabel(), cardJump = new JLabel(), cardInfo = new JLabel();
     final JButton connect = new JButton("Connect"), edit = new JButton("Edit"), add = new JButton("+"), importButton = new JButton("Import");
     final JLabel empty = new JLabel("No hosts yet — Add or Import from ~/.ssh/config");
     private final Actions actions;
@@ -89,7 +88,8 @@ public final class HostsPanel extends JPanel {
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
         cardName.setFont(cardName.getFont().deriveFont(Font.BOLD));
-        card.add(cardName); card.add(cardAddress); card.add(cardCredential); card.add(cardJump);
+        cardInfo.putClientProperty("html.disable", true);
+        card.add(cardName); card.add(cardAddress); card.add(cardInfo); card.add(cardCredential); card.add(cardJump);
         var buttons = new JPanel();
         buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
         buttons.add(edit); buttons.add(Box.createHorizontalGlue()); buttons.add(connect);
@@ -210,6 +210,8 @@ public final class HostsPanel extends JPanel {
             cardName.setText(h.name());
             cardAddress.setText(h.label());
             cardCredential.setText(credentialLabels.apply(h));
+            String facts = metadata.apply(h);
+            cardInfo.setText(facts); cardInfo.setVisible(!facts.isBlank());
             String via = h.jump().flatMap(id -> hosts.stream().filter(other -> other.id().equals(id)).findFirst()).map(RemoteHost::name).orElse(null);
             cardJump.setVisible(via != null);
             cardJump.setText(via == null ? "" : "via " + via);
@@ -218,13 +220,13 @@ public final class HostsPanel extends JPanel {
 
     private final class Renderer implements javax.swing.ListCellRenderer<HostRows.Row> {
         @Override public Component getListCellRendererComponent(JList<? extends HostRows.Row> owner, HostRows.Row value, int index, boolean selected, boolean focused) {
-            if (value instanceof HostRows.Host row) return hostCard(owner, row.host(), selected, focused);
+            if (value instanceof HostRows.Host row) return hostRow(owner, row.host(), selected);
             JLabel label = new JLabel(); label.putClientProperty("html.disable", true);
             label.setOpaque(selected);
             label.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
             label.setForeground(selected ? owner.getSelectionForeground() : owner.getForeground());
-            label.setFont(owner.getFont().deriveFont(Font.BOLD));
-            label.setBorder(BorderFactory.createEmptyBorder(12, 4, 8, 4));
+            label.setFont(owner.getFont().deriveFont(Font.BOLD, owner.getFont().getSize2D() + 1));
+            label.setBorder(BorderFactory.createEmptyBorder(10, 4, 8, 4));
             if (value instanceof HostRows.Group group) {
                 label.setText((group.collapsed() ? "▸  " : "▾  ") + group.name() + "   " + group.count());
                 if (group.name().equals(defaultGroup)) label.setToolTipText("Right-click to rename this group");
@@ -233,53 +235,29 @@ public final class HostsPanel extends JPanel {
         }
     }
 
-    private Component hostCard(JList<?> owner, RemoteHost host, boolean selected, boolean focused) {
-        java.awt.Color fill = selected ? owner.getSelectionBackground() : javax.swing.UIManager.getColor("TextField.background");
-        if (fill == null) fill = owner.getBackground();
-        java.awt.Color edge = javax.swing.UIManager.getColor("Component.borderColor");
-        if (edge == null) edge = owner.getForeground().darker();
-        var body = new RoundedCard(fill, edge);
-        body.setLayout(new BorderLayout(8, 7));
-        body.setBorder(BorderFactory.createEmptyBorder(12, 10, 12, 12));
+    private Component hostRow(JList<?> owner, RemoteHost host, boolean selected) {
+        var row = new JPanel(new BorderLayout(10, 0));
+        row.setOpaque(true);
+        row.setBackground(selected ? owner.getSelectionBackground() : owner.getBackground());
+        row.setBorder(BorderFactory.createEmptyBorder(8, 16, 8, 10));
         java.awt.Color foreground = selected ? owner.getSelectionForeground() : owner.getForeground();
-        var favorite = text(host.favorite() ? "★" : "☆", foreground, owner.getFont().deriveFont(18f));
-        favorite.setVerticalAlignment(JLabel.TOP); favorite.setPreferredSize(new java.awt.Dimension(20, 22));
-        body.add(favorite, BorderLayout.WEST);
-        var content = new JPanel(new BorderLayout(0, 5)); content.setOpaque(false);
-        var top = new JPanel(new BorderLayout(8, 0)); top.setOpaque(false);
-        top.add(text(host.name(), foreground, owner.getFont().deriveFont(Font.BOLD, owner.getFont().getSize2D() + 2)), BorderLayout.CENTER);
+        Font font = owner.getFont().deriveFont(owner.getFont().getSize2D() + 2);
+        var favorite = text(host.favorite() ? "★" : "☆", foreground, font);
+        favorite.setPreferredSize(new java.awt.Dimension(18, favorite.getPreferredSize().height));
+        row.add(favorite, BorderLayout.WEST);
+        row.add(text(host.name(), foreground, font), BorderLayout.CENTER);
         int sessions = sessionCount.applyAsInt(host);
-        if (sessions > 0) {
-            var badge = text(sessions == 1 ? "●  1 session" : sessions + " sessions", foreground, owner.getFont().deriveFont(Math.max(10f, owner.getFont().getSize2D() - 1)));
-            top.add(badge, BorderLayout.EAST);
-        }
-        content.add(top, BorderLayout.NORTH);
-        var details = new JPanel(new java.awt.GridLayout(0, 1, 0, 4)); details.setOpaque(false);
-        details.add(text(host.label(), foreground, owner.getFont()));
+        if (sessions > 0) row.add(text(sessions == 1 ? "●  1 session" : sessions + " sessions", foreground, owner.getFont()), BorderLayout.EAST);
         String facts = metadata.apply(host);
-        details.add(text(facts.isBlank() ? "SSH host" : facts, foreground, owner.getFont().deriveFont(Math.max(10f, owner.getFont().getSize2D() - 1))));
-        content.add(details, BorderLayout.CENTER); body.add(content, BorderLayout.CENTER);
-        var margin = new JPanel(new BorderLayout()); margin.setOpaque(false);
-        margin.setBorder(BorderFactory.createEmptyBorder(0, 1, 7, 1)); margin.add(body);
-        margin.getAccessibleContext().setAccessibleName(host.name() + ", " + host.label()
-            + (facts.isBlank() ? "" : ", " + facts) + ", " + sessions + (sessions == 1 ? " session" : " sessions"));
-        return margin;
+        String description = host.name() + ", " + host.label() + (facts.isBlank() ? "" : ", " + facts)
+            + ", " + sessions + (sessions == 1 ? " session" : " sessions");
+        row.setToolTipText(description);
+        row.getAccessibleContext().setAccessibleName(description);
+        return row;
     }
 
     private static JLabel text(String value, java.awt.Color foreground, Font font) {
         var label = new JLabel(value); label.putClientProperty("html.disable", true);
-        label.setForeground(foreground); label.setFont(font); label.setToolTipText(value); return label;
-    }
-
-    private static final class RoundedCard extends JPanel {
-        private final java.awt.Color fill, edge;
-        RoundedCard(java.awt.Color fill, java.awt.Color edge) { this.fill = fill; this.edge = edge; setOpaque(false); }
-        @Override protected void paintComponent(java.awt.Graphics graphics) {
-            var g = (java.awt.Graphics2D) graphics.create();
-            g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(fill); g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
-            g.setColor(edge); g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12); g.dispose();
-            super.paintComponent(graphics);
-        }
+        label.setForeground(foreground); label.setFont(font); return label;
     }
 }

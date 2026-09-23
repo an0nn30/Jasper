@@ -3,8 +3,9 @@
 Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or type `>ssh` in the
 command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
 split beside the current pane, Shift+Enter edits the host. The **SSH hosts** panel shows searchable
-cards grouped by folder, favorites first. Cards show the address, detected OS when known, and the
-number of open sessions. Double-click or Enter returns to the most recently used running pane for
+tree-style rows grouped by folder, favorites first, with more padding and slightly larger text.
+Rows show session counts; selecting a host shows its address and detected OS/IP below the list.
+The same details are available in the row tooltip and remain searchable. Double-click or Enter returns to the most recently used running pane for
 that host, or connects when none is open. **Connect** and the **Connect in new tab** context action
 always open another session; the menu also offers Connect in split, Edit, Duplicate and Delete.
 Click the star to toggle a favorite. Right-click the default group header (**Other** initially)
@@ -78,11 +79,11 @@ real desktop and a host you control:
 5. Pull the network or stop `sshd`: every pane on that host shows the banner; Reconnect works after.
 6. Lock the Vault while connected (sessions stay), then Connect a Vault host (unlock prompt appears).
 
-For the card/dialog follow-up, also check:
+For the host-list/dialog follow-up, also check:
 
 7. Rename **Other**, restart, and add another ungrouped host; both use the saved name.
 8. Cancel a slow connection and retry a rejected login; no empty tab should appear.
-9. Open two sessions for one host, focus each in turn, then double-click its card; the last used
+9. Open two sessions for one host, focus each in turn, then double-click its row; the last used
    running pane is selected. Close both; double-click now starts a new connection.
 10. Connect to Linux/macOS/Windows hosts and search by the learned OS or IP. An SSH server that
     disallows exec requests should still provide its normal terminal.

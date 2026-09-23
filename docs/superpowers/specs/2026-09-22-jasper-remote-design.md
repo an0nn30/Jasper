@@ -64,6 +64,11 @@ bounded read-only exec requests over that transport. It does not initiate backgr
 write commands into the interactive shell. Facts are best-effort, stored separately from host
 configuration, and associated with the authenticated endpoint snapshot.
 
+The user's subsequent styling revision replaces rounded cards with the original tree-style list,
+using slightly larger text and more row padding. The row retains the session count; OS/IP moves to
+the selected-host details and tooltip and stays searchable. Group renaming and last-session
+activation remain unchanged. A separate centered connection-overlay design is pending review.
+
 ## 3. Shape
 
 ```
