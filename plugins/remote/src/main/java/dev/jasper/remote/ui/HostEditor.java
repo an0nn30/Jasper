@@ -108,6 +108,8 @@ public final class HostEditor extends JPanel {
         });
     }
 
+    public void showError(String error) { message.setText(error); }
+
     private static void row(JPanel form, GridBagConstraints at, String label, java.awt.Component field) {
         at.gridx = 0; form.add(new JLabel(label), at); at.gridx = 1; form.add(field, at); at.gridy++;
     }

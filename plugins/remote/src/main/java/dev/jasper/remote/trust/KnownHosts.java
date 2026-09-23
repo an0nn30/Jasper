@@ -31,16 +31,17 @@ public final class KnownHosts {
     private record Known(String pattern, PublicKey key, boolean revoked) { }
 
     private final Path own;
-    private final Optional<Path> user;
+    private final java.util.function.Supplier<Optional<Path>> user;
 
-    public KnownHosts(Path own, Optional<Path> user) { this.own = own; this.user = user; }
+    public KnownHosts(Path own, Optional<Path> user) { this(own, () -> user); }
+    public KnownHosts(Path own, java.util.function.Supplier<Optional<Path>> user) { this.own = own; this.user = user; }
 
     public static String fingerprint(PublicKey key) { return KeyUtils.getFingerPrint(key); }
     public static String hostPattern(String host, int port) { return KnownHostHashValue.createHostPattern(host, port); }
 
     public Verdict verify(String host, int port, PublicKey key) {
         List<Known> candidates = new ArrayList<>(entries(own, true, host, port));
-        user.ifPresent(file -> candidates.addAll(entries(file, false, host, port)));
+        user.get().ifPresent(file -> candidates.addAll(entries(file, false, host, port)));
         boolean matched = false;
         String mismatch = null;
         for (Known known : candidates) {

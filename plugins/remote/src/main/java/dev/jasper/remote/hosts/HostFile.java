@@ -131,7 +131,7 @@ public final class HostFile {
     }
 
     /** A TOML basic string: backslash, quote, tab, newlines and other control characters escaped. */
-    static String tomlString(String text) {
+    public static String tomlString(String text) {
         var out = new StringBuilder("\"");
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
