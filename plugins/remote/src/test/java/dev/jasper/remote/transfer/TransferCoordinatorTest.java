@@ -81,6 +81,22 @@ class TransferCoordinatorTest {
             } finally { coordinator.close();release.countDown();coordinator.stopped().get(5,TimeUnit.SECONDS); }
         }
     }
+
+    @Test void independentFileFinishesWhileAnotherWaitsForConflictDecision() throws Exception {
+        root=root.toRealPath();Path source=Files.createDirectory(root.resolve("source")),dest=Files.createDirectory(root.resolve("dest"));
+        Path a=Files.writeString(source.resolve("a"),"new"),b=Files.writeString(source.resolve("b"),"second");Files.writeString(dest.resolve("a"),"original");
+        try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+            var coordinator=new TransferCoordinator(root.resolve("queue"),executor,Runnable::run,(ref,owner)->CompletableFuture.completedFuture(new LocalEndpoint()),()->1);
+            try {
+                var id=coordinator.enqueue(new TransferRequest(EndpointRef.local(),List.of(a.toString(),b.toString()),EndpointRef.local(),dest.toString()),null).get(3,TimeUnit.SECONDS);
+                await(coordinator,id,TransferState.NEEDS_ATTENTION);
+                assertThat(Files.readString(dest.resolve("b"))).isEqualTo("second");assertThat(Files.readString(dest.resolve("a"))).isEqualTo("original");
+                var entry=coordinator.entries(id,0,200).get(3,TimeUnit.SECONDS).stream().filter(e->e.relative().equals("a")).findFirst().orElseThrow();
+                coordinator.resolve(entry.id(),ConflictDecision.SKIP,null).get(3,TimeUnit.SECONDS);coordinator.resume(id,null).get(3,TimeUnit.SECONDS);
+                await(coordinator,id,TransferState.COMPLETED_WITH_ISSUES);
+            } finally { coordinator.close();coordinator.stopped().get(5,TimeUnit.SECONDS); }
+        }
+    }
     static TransferJob await(TransferCoordinator coordinator,UUID id,TransferState state) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);TransferJob last=null;
         while(System.nanoTime()<deadline) { last=coordinator.job(id).get(3,TimeUnit.SECONDS);if(last.state()==state) return last;

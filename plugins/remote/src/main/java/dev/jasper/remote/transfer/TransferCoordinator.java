@@ -161,7 +161,12 @@ public final class TransferCoordinator implements AutoCloseable {
             if(!job.scanned()) { if(!run.activeScan && !scanning) dispatchScan(run,false);continue; }
             if(run.activeScan) continue;
             var pending=store.pending(run.id,Math.min(200,8+run.busy.size()));
-            if(pending.isEmpty() && run.busy.isEmpty()) { if(!scanning) finalizeDirectories(run);continue; }
+            if(pending.isEmpty() && run.busy.isEmpty()) {
+                if(job.totalEntries()>job.completedEntries()+job.skippedEntries()+job.failedEntries()) {
+                    store.intent(run.id,TransferJob.Intent.PAUSE);store.state(run.id,TransferState.NEEDS_ATTENTION,"Resolve unfinished entries in Details");release(run);runs.remove(run.id);
+                } else if(!scanning) finalizeDirectories(run);
+                continue;
+            }
             int limit=Math.clamp(parallel.getAsInt(),1,8);
             for(var entry:pending) {
                 if(activeCopies.get()>=limit || run.busy.size()>=2) break;
@@ -214,7 +219,10 @@ public final class TransferCoordinator implements AutoCloseable {
                     TransferCopy.copy(store,entry,pair.source,pair.destination,run.control,(done,total)->run.progress.put(entry.id(),new Progress(run.id,done,total,System.nanoTime())));
                 }
             } catch(Throwable problem) { failure=problem; }
-            Throwable result=failure;completions.add(()-> { activeCopies.decrementAndGet();run.busy.remove(entry.id());run.progress.remove(entry.id());finishWork(run,result); });
+            Throwable result=failure;completions.add(()-> { activeCopies.decrementAndGet();run.busy.remove(entry.id());run.progress.remove(entry.id());
+                if(result instanceof TransferRecovery.Attention && run.control.running()) {
+                    try { store.attention(entry.id(),message(result)); } catch(IOException storeFailure) { finishWork(run,storeFailure); }
+                } else finishWork(run,result); });
         });
     }
     private void finishWork(Run run,Throwable problem) {

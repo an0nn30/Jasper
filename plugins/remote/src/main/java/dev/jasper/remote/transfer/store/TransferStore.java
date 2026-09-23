@@ -137,7 +137,7 @@ public final class TransferStore implements AutoCloseable {
         page(offset,limit); return entryQuery("SELECT * FROM entries WHERE job=? ORDER BY id LIMIT ? OFFSET ?",job,limit,offset);
     }
     public synchronized List<TransferEntry> pending(UUID job,int limit) throws IOException {
-        page(0,limit); return entryQuery("SELECT * FROM entries WHERE job=? AND outcome='PENDING' ORDER BY id LIMIT ?",job,limit);
+        page(0,limit); return entryQuery("SELECT * FROM entries WHERE job=? AND outcome='PENDING' AND error='' ORDER BY id LIMIT ?",job,limit);
     }
     private List<TransferEntry> entryQuery(String sql,Object... args) throws IOException {
         var values=new ArrayList<TransferEntry>();
@@ -213,8 +213,25 @@ public final class TransferStore implements AutoCloseable {
             update("UPDATE jobs SET skipped=skipped+? WHERE id=?",count,entry.jobId());finish();
         } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
     }
+    public synchronized void attention(long id,String message) throws IOException {
+        try {
+            begin();var entry=entry(id);update("UPDATE entries SET error=? WHERE id=?",message,id);
+            if(entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY) {
+                String prefix=entry.relative()+"/";
+                update("UPDATE entries SET error='Waiting for parent decision' WHERE job=? AND outcome='PENDING' AND error='' AND substr(relative,1,?)=?",entry.jobId(),prefix.length(),prefix);
+            }
+            finish();
+        } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
+    }
+    private void unblockChildren(TransferEntry entry) throws SQLException {
+        String prefix=entry.relative()+"/";
+        update("UPDATE entries SET error='' WHERE job=? AND error='Waiting for parent decision' AND substr(relative,1,?)=?",entry.jobId(),prefix.length(),prefix);
+    }
     public synchronized void decision(long id,ConflictDecision decision,String target) throws IOException {
-        try { update("UPDATE entries SET decision=?,target=?,error='' WHERE id=? AND outcome='PENDING'",decision.name(),target,id); } catch(SQLException e) { throw failure(e); }
+        try {
+            begin();var entry=entry(id);update("UPDATE entries SET decision=?,target=?,error='' WHERE id=? AND outcome='PENDING'",decision.name(),target,id);
+            if(entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY) unblockChildren(entry);finish();
+        } catch(SQLException | IOException e) { rollback();if(e instanceof IOException io) throw io;throw failure((SQLException)e); }
     }
     public synchronized void outcome(long id,TransferEntry.Outcome outcome,String error) throws IOException {
         if(outcome==TransferEntry.Outcome.PENDING) throw new IllegalArgumentException("Use reset for restart");
