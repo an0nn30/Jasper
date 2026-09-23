@@ -34,7 +34,13 @@ class BundledSamplePluginTest {
         onEdt(() -> {
             assertThat(contributions.action("dev.jasper.sample.demo")).get()
                 .satisfies(action -> assertThat(action.icon()).as("an SVG from the plugin's own jar").isNotNull());
-            assertThat(contributions.toolbar()).hasSize(1);
+            assertThat(contributions.toolbar()).hasSize(2)
+                .contains(new dev.jasper.app.contributions.ToolbarEntry.Button("dev.jasper.sample.demo"))
+                .anySatisfy(entry -> assertThat(entry).isInstanceOfSatisfying(
+                    dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, dropdown -> {
+                        assertThat(dropdown.title()).isEqualTo("Sessions");
+                        assertThat(dropdown.actionIds()).containsExactly("dev.jasper.remote.sessions.manage");
+                    }));
             assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel");
             assertThat(contributions.railActions()).containsExactlyInAnyOrder("dev.jasper.sample.about", "dev.jasper.vault.open");
             assertThat(contributions.status()).hasSize(3)

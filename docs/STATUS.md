@@ -131,6 +131,21 @@ ConnectionPanel probe confirmed that all visible labels/buttons fit at 12, 14, 1
 in progress and failure states. Default/18-point previews inspected. Distribution rebuilt; no native
 GUI launched, merge or push.
 
+### Remote Sessions toolbar — 2026-09-23
+
+User-approved bounded follow-up, implemented natively in the same worktree. Remote contributes
+**Sessions** through the existing SDK dropdown, listing saved hosts alphabetically by name with
+their addresses. Selection focuses the last used running session or starts a connection in the
+invoking window. Host additions, edits, imports and removals refresh the menu; invocation resolves
+the current host record. **Manage Sessions...** shows the Hosts panel without hiding it if already
+visible, and remains available with no hosts. Chrome and popup use the existing app typography.
+
+Tests first failed on the missing toolbar/actions, then passed. The bundled-app integration test
+now verifies both the sample button and the new Sessions dropdown. Independent read-only review
+found no actionable issues. `./gradlew check :jasper-app:installDist` passed: **1,636 tests,
+1,633 passed, three expected skips, zero failures/errors**; Remote **71/71**. Distribution rebuilt.
+No GUI launched; native appearance remains user acceptance. No merge or push.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

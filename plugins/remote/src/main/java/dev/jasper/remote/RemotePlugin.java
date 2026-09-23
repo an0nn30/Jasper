@@ -83,6 +83,7 @@ public class RemotePlugin implements Plugin {
     private RemoteScope scope;
     private StatusItem status;
     private PluginAction splitAction;
+    private SessionsToolbar sessionsToolbar;
     private Timer poll;
     private Icon icon;
     private boolean stopped;
@@ -142,8 +143,12 @@ public class RemotePlugin implements Plugin {
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 60));
         status.setIcon(icon); status.setAction(HOSTS); status.setVisible(false);
         context.panels().register(new PanelSpec(PANEL, "SSH hosts", icon, Anchor.LEFT), this::createPanel);
+        sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> {
+            PanelHost panel = panelHosts.get(window.id());
+            if (panel == null) showPanel(window); else panel.show();
+        });
 
-        store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
+        store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
         store.load();
         poll = new Timer(1000, event -> store.poll());
         poll.start();
@@ -163,6 +168,7 @@ public class RemotePlugin implements Plugin {
         for (var attempt : Set.copyOf(attempts)) attempt.close();
         for (var question : Set.copyOf(questions)) question.cancel(true);
         if (poll != null) poll.stop();
+        if (sessionsToolbar != null) sessionsToolbar.close();
         if (connections != null) connections.close();
     }
 

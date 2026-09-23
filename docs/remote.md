@@ -12,6 +12,11 @@ always open another session; the menu also offers Connect in split, Edit, Duplic
 Click the star to toggle a favorite. Right-click the default group header (**Other** initially)
 and choose **Rename group…**; that name also applies to future hosts without an explicit group.
 
+The toolbar’s **Sessions** dropdown lists saved hosts alphabetically with their addresses.
+Choose a host to focus its most recently used running session, or connect in a new tab if none
+is open. **Manage Sessions...** opens the hosts panel, including when no hosts are saved.
+The list updates when hosts are added, edited, imported or removed.
+
 Connecting shows a centered overlay inside the owning app window, with an explicit **Cancel**
 button. It stays centered on resize and blocks underlying input; Escape and outside clicks do not
 dismiss it. The tab or split appears once the SSH shell is ready. Failures offer **Retry** and
@@ -63,8 +68,8 @@ use_ssh_agent = true
 ```
 
 The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split` and
-`dev.jasper.remote.import`; bind them like other contributed actions. Tunnels and SFTP follow in
-later versions of this plugin.
+`dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
+contributed actions. Tunnels and SFTP follow in later versions of this plugin.
 
 ## Native acceptance
 

@@ -36,7 +36,7 @@ class RemotePluginTest {
 
     static void settle(FakePluginHost host) { for (int i = 0; i < 20; i++) { host.runBackground(); host.flush(); } }
 
-    @Test void registersItsSurfaceAndConnectsThroughTheScope(@TempDir Path dir) throws Exception {
+    @Test void registersItsSurfaceAndConnectsThroughSessionsToolbar(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var vault = new FakeVault();
             host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
@@ -60,7 +60,7 @@ class RemotePluginTest {
             host.activateTerminalWindow(window);
             List<String> rows = host.searchScope(RemoteScope.ID, "", window, null);
             assertThat(rows).containsExactly("host." + prod.id() + "|prod|true");
-            host.executeInScope(RemoteScope.ID, "host." + prod.id(), "connect", window, null);
+            assertThat(host.invoke("dev.jasper.remote.session.h" + prod.id(), window, null)).isTrue();
             assertThat(host.openRequests()).isEmpty();
             assertThat(host.windows()).containsExactly("overlay|Connecting to prod|true");
             plugin.openHost(context.terminals().window(window).orElseThrow(), prod);
@@ -84,10 +84,10 @@ class RemotePluginTest {
             assertThat(host.status().getFirst()).contains("2 SSH sessions");
             UUID second = host.terminalPanes().stream().filter(id -> !id.equals(pane)).findFirst().orElseThrow();
             host.focusTerminalPane(pane); host.flush();
-            plugin.activateHost(context.terminals().window(window).orElseThrow(), prod);
+            assertThat(host.invoke("dev.jasper.remote.session.h" + prod.id(), window, null)).isTrue();
             assertThat(context.terminals().activePane()).get().extracting(dev.jasper.sdk.terminal.PaneHandle::id).isEqualTo(pane);
             host.focusTerminalPane(second); host.flush();
-            plugin.activateHost(context.terminals().window(window).orElseThrow(), prod);
+            assertThat(host.invoke("dev.jasper.remote.session.h" + prod.id(), window, null)).isTrue();
             assertThat(context.terminals().activePane()).get().extracting(dev.jasper.sdk.terminal.PaneHandle::id).isEqualTo(second);
             assertThat(host.openRequests()).hasSize(2);
             host.closeTerminalPane(pane);
@@ -106,6 +106,46 @@ class RemotePluginTest {
             assertThat(host.sessionState(second)).isEqualTo("RUNNING|");
             assertThat(host.openRequests()).hasSize(2);
             host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void sessionsToolbarTracksSavedHostsAndCleansUp(@TempDir Path dir) {
+        try (var host = new FakePluginHost()) {
+            RemotePlugin plugin = plugin(dir);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            String manage = "dev.jasper.remote.sessions.manage";
+            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + manage);
+            assertThat(host.actions()).contains(manage + "|Manage Sessions...|true");
+            UUID window = host.addTerminalWindow();
+            assertThat(host.invoke(manage, window, null)).isTrue();
+            assertThat(host.openPanel(RemotePlugin.PANEL, window)).isInstanceOf(HostsPanel.class);
+
+            var zebra = RemoteHost.create("Zebra", "z.example", 22, "me", new Auth.Agent(), "", Optional.empty());
+            var alpha = RemoteHost.create("alpha", "a.example", 2222, "root", new Auth.Agent(), "", Optional.empty());
+            plugin.store().put(zebra); plugin.store().put(alpha); settle(host);
+            String zebraAction = "dev.jasper.remote.session.h" + zebra.id();
+            String alphaAction = "dev.jasper.remote.session.h" + alpha.id();
+            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + alphaAction + "," + zebraAction + "," + manage);
+            assertThat(host.actions()).contains(alphaAction + "|alpha (root@a.example:2222)|true");
+
+            var renamed = zebra.withEdited("Aardvark", "new.example", 2200, "deploy", zebra.auth(), "", Optional.empty());
+            plugin.store().put(renamed); settle(host);
+            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + zebraAction + "," + alphaAction + "," + manage);
+            assertThat(host.actions()).contains(zebraAction + "|Aardvark (deploy@new.example:2200)|true");
+            assertThat(host.invoke(zebraAction, window, null)).isTrue();
+            assertThat(host.windows()).containsExactly("overlay|Connecting to Aardvark|true");
+            cancel(plugin.currentConnectionPanel()).doClick(); settle(host);
+
+            plugin.store().remove(zebra.id()); settle(host);
+            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + alphaAction + "," + manage);
+            assertThat(host.invoke(zebraAction, window, null)).isFalse();
+            plugin.store().remove(alpha.id()); settle(host);
+            assertThat(host.toolbar()).containsExactly("menu:Sessions:" + manage);
+            host.stopAll();
+            assertThat(host.toolbar()).isEmpty();
+            assertThat(host.actions()).isEmpty();
             assertThat(host.failures()).isEmpty();
         }
     }
