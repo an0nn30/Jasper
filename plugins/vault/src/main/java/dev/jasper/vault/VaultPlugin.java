@@ -1,5 +1,6 @@
 package dev.jasper.vault;
 
+import dev.jasper.sdk.ui.OldGnomeIcon;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
@@ -108,8 +109,8 @@ public class VaultPlugin implements Plugin {
         service = new VaultService(lock, () -> context.terminals().activeWindow().or(() -> context.terminals().windows().stream().findFirst()),
             this::showUnlock, this::showGrant, this::showPick, context.notices()::error);
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
-        locked = context.appearance().icon("dev/jasper/vault/lock.svg");
-        unlocked = context.appearance().icon("dev/jasper/vault/lock-open.svg");
+        locked = context.appearance().icon("dev/jasper/vault/lock.svg", OldGnomeIcon.LOCK);
+        unlocked = context.appearance().icon("dev/jasper/vault/lock-open.svg", OldGnomeIcon.UNLOCK);
         context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withIcon(locked).withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("F8"),
             invoked -> open(invoked.window(), Optional.empty()));
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock")), invoked -> lock.lock());

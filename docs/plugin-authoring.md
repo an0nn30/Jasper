@@ -73,7 +73,7 @@ built-in chrome; a plugin supplies titles, icons and handlers, never components.
 private static void installUi(PluginContext context, long stepMillis) {
     PluginAction[] demo = new PluginAction[1];
     demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
-            .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg"))
+            .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg", OldGnomeIcon.EXECUTE))
             .withKeywords(List.of("sample", "demo", "activity"))
             .withDefaultBinding("cmd+alt+j"),
         invoked -> {
@@ -108,7 +108,14 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** `context.appearance().icon("path/in/your/jar.svg")` returns a 16 by 16 icon that
-  follows the theme. Use monochrome artwork.
+  follows the theme. Use monochrome artwork. In SDK 0.7.2+, pair it with bundled retro artwork:
+  `context.appearance().icon("path/in/your/jar.svg", OldGnomeIcon.LOCK)`.
+  Jasper chooses the running skin automatically: modern SVG or original OldGNOME2 colors.
+  Both arguments are required, and the SVG resource must exist even in retro mode.
+  The returned icon is 16px; Jasper uses a separate 28px variant in retro host toolbars.
+  Ordinary plugin Swing buttons keep 16px. Existing one-argument and custom Swing icons
+  retain their behavior. Declare `sdk = ">=0.7.2, <0.8"` when using the overload.
+  See the [catalog and testing example](sdk-icons.md).
 - **Threads.** Register and mutate on the event thread. Event handlers already run there, so
   updating a status item from a handler, as the sample does, needs no marshaling.
 
@@ -154,7 +161,7 @@ without your plugin ever seeing a frame.
 <!-- example:pluginpanels -->
 ```java
 private static void installPanelAndWindow(PluginContext context, long stepMillis) {
-    var icon = context.appearance().icon("dev/jasper/sample/flask.svg");
+    var icon = context.appearance().icon("dev/jasper/sample/flask.svg", OldGnomeIcon.EXECUTE);
     // One instance per window, built the first time the panel is shown there.
     context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", icon, Anchor.LEFT), host -> {
         var run = new JButton("Run sample activity");

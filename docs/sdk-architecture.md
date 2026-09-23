@@ -223,3 +223,18 @@ disagree, the implementation is wrong, not the contract.
 
 Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
 per-session token from Jasper's own shell integration.
+
+## Skin-aware icons (SDK 0.7.2)
+
+`Appearance.icon(String, OldGnomeIcon)` adds a default modern-only fallback for existing
+Appearance implementations. HostedUi and FakePluginContext override it; no contribution
+record changes. HostedUi converts enum names into validated app-native catalog keys at the
+plugin boundary. SDK types never enter platform/workspace/contribution production packages.
+
+The platform owns the explicit OldGNOME2 resource catalog and a captured retro ImageIcon.
+WindowChrome requests a separate 28px variant for host toolbar placements; shared action,
+menu and palette icons stay 16px. WindowContributions also populates Swing's SMALL_ICON
+property so menu items receive the compact artwork. Modern SVG foreground recoloring stays
+live. Legacy/custom icons are returned unchanged by the sizing helper. No global cache holds
+plugin class loaders: only the fixed raster catalog is cached. Style changes still require restart.
+See [the icon catalog and compatibility contract](sdk-icons.md).

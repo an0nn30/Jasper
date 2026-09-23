@@ -94,12 +94,25 @@ below them and flat styling. The bundled 32-pixel source artwork is unchanged.
 
 ### SDK icons for both skins — 2026-09-23
 
-The user approved the API direction for `Appearance.icon(modernSvgResourcePath, OldGnomeIcon)`:
-automatic skin selection, a bundled enum catalog, backward compatibility and host-managed
-16/28-pixel placement sizing. The [written design](superpowers/specs/2026-09-23-jasper-sdk-skin-icons-design.md)
-is ready for review; implementation and its plan have not started. It covers an additive SDK
-0.7.2 contract, 22 explicit OldGNOME2 choices, host/testkit support and sample/Vault adoption
-at existing SDK icon calls. The existing toolbar's Tango choices are preserved.
+Implemented SDK 0.7.2 on `codex/retro-metal` per the approved [design](superpowers/specs/2026-09-23-jasper-sdk-skin-icons-design.md)
+and [native implementation plan](superpowers/plans/2026-09-23-jasper-sdk-skin-icons.md).
+`Appearance.icon(modernSvgResourcePath, OldGnomeIcon)` selects modern SVG or one of 22
+explicit OldGNOME2 choices. Host toolbars use independent 28px retro variants; shared
+menu/palette/plugin-content icons remain 16px. Existing icon calls and custom icons keep
+their behavior. Sample and Vault's existing SDK icon calls opt in, with SDK >=0.7.2 manifests.
+The fake host supports pre-start style configuration and inspectable icon selections.
+
+Bundled 55 unmodified originals with GPL2+ notice/license and source hashes. See the
+[catalog and examples](sdk-icons.md). Source images lacking larger variants are enlarged;
+the original rectangular keyring image is centered with its proportions preserved. A
+shared-placement regression also exposed missing Swing SMALL_ICON metadata; contributed
+menus now display their supplied compact icons. These execution adjustments are recorded
+in the plan; the user's direct execution request superseded another plan approval checkpoint.
+
+Full architecture guards, check and installDist passed: 1,591 tests, 1,588 passed, three
+expected skips, zero failures/errors. Installed app jar contains all 55 verified PNG hashes
+and license/notice; inspected catalog and modern/retro headless toolbar previews at 1x/2x,
+including disabled Metal icons. No GUI, login shell, merge or push. Independent review pending.
 
 ### macOS default shell refresh reverted — 2026-09-22
 
