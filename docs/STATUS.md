@@ -1876,3 +1876,16 @@ The retro menu bar now has an explicit one-pixel soft-gray bottom separator. Thi
 remains visible next to a toolbar, where Metal suppresses its own default menu border.
 Targeted chrome/contribution tests and installDist passed; visually checked a headless
 root-pane render with the menu bar directly above the toolbar.
+
+### Regular system typography in retro mode — 2026-09-23
+
+Retro UI defaults now use Helvetica Neue Regular when available, followed by Segoe UI,
+Noto Sans, DejaVu Sans and logical SansSerif. Existing Metal font sizes are retained;
+toolbar captions keep their one-point reduction. Menus, tab titles, standard buttons
+and plugin forms inherit regular-weight defaults. Terminal font configuration remains
+independent, and macOS still controls the native window-title font. No font is bundled.
+
+Verified that this Mac resolves the UI defaults to Helvetica Neue Regular, and inspected
+headless menu/toolbar and workspace/form renders. Full application check, architecture
+verification and installDist passed (815 tests: 814 passed, one expected skip). No GUI
+launch, merge or push.
