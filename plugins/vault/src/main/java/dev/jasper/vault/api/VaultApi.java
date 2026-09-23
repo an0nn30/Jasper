@@ -17,6 +17,12 @@ public interface VaultApi {
     /** Every lock transition, including the lock at plugin stop. */
     Topic<LockState> LOCK_STATE_CHANGED = Topic.of("dev.jasper.vault.lock-state", LockState.class);
 
+    /** Imports selected keys into encrypted storage after Vault-owned review and consent; empty on cancellation. */
+    default CompletableFuture<Optional<SshKeyImportResult>> importSshKeys(WindowHandle owner,
+            List<SshKeySource> sources, List<UUID> selectedCredentials) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("This Vault does not support managed key import"));
+    }
+
     LockState lockState();
 
     /** Prompts for the master password over {@code owner} when locked; {@code true} once unlocked, {@code false} on cancel or without a vault. */

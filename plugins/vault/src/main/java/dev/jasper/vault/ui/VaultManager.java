@@ -52,6 +52,7 @@ public final class VaultManager {
         var rows = new ArrayList<Row>();
         lock.vault().accounts().forEach(a -> rows.add(new Row(a.id(), a.name(), a.username(), Type.LOGIN)));
         lock.vault().keys().forEach(k -> rows.add(new Row(k.id(), k.name(), k.fingerprint(), Type.SSH_KEY)));
+        lock.vault().managedKeys().forEach(k -> rows.add(new Row(k.id(), k.name(), "Stored in Vault · " + k.fingerprint(), Type.SSH_KEY)));
         lock.vault().notes().forEach(n -> rows.add(new Row(n.id(), n.name(), "Secure note", Type.NOTE)));
         return List.copyOf(rows);
     }
@@ -63,6 +64,7 @@ public final class VaultManager {
         if (lock.state() != LockState.UNLOCKED) return Optional.empty();
         Vault v = lock.vault();
         return v.account(id).map(a -> (Object) a).or(() -> v.key(id).map(k -> (Object) k))
+            .or(() -> v.managedKey(id).map(k -> (Object) k))
             .or(() -> v.notes().stream().filter(n -> n.id().equals(id)).map(n -> (Object) n).findFirst());
     }
     public CompletableFuture<Void> saveAccount(Account value) {
@@ -89,6 +91,14 @@ public final class VaultManager {
             v.notes().add(new Note(value.id(), value.name(), value.text().clone(), value.updated()));
         }).whenComplete((ignored, failure) -> value.zero());
     }
+    public CompletableFuture<Void> renameManaged(UUID id, String name) {
+        if (!editable()) return rejected();
+        return transaction(v -> {
+            var old = v.managedKey(id).orElseThrow();
+            var renamed = old.renamed(name);
+            v.managedKeys().remove(old); old.close(); v.managedKeys().add(renamed);
+        });
+    }
     public CompletableFuture<Void> saveKey(SshKey value) {
         if (!editable()) return rejected();
         return transaction(v -> { v.keys().removeIf(k -> k.id().equals(value.id())); v.keys().add(value); });
@@ -106,6 +116,8 @@ public final class VaultManager {
     }
     public CompletableFuture<String> publicKey(UUID id) {
         if (lock.state() != LockState.UNLOCKED) return CompletableFuture.failedFuture(new IllegalStateException("The vault is locked"));
+        var managed = lock.vault().managedKey(id);
+        if (managed.isPresent()) return CompletableFuture.completedFuture(managed.get().publicKey());
         SshKey key = lock.vault().key(id).orElseThrow(() -> new IllegalArgumentException("Select an SSH key"));
         long expected = generation;
         return io(() -> {

@@ -113,6 +113,12 @@ public final class VaultManagerWindow implements AutoCloseable {
         manager.entry(id).ifPresent(value -> {
             switch (value) {
                 case Account a -> dialog("Edit Login", close -> EntryEditor.login(a, manager::saveAccount, close));
+                case dev.jasper.vault.model.ManagedSshKey k -> dialog("Edit stored SSH key", close -> {
+                    var form = new EditorForm(close); var name = new javax.swing.JTextField(k.name(), 28);
+                    form.field("Name", name); form.field("Storage", new JLabel("Stored in Vault"));
+                    form.field("Fingerprint", new JLabel(k.fingerprint()));
+                    UUID keyId = k.id(); form.submit(() -> manager.renameManaged(keyId, name.getText().strip())); return form;
+                });
                 case SshKey k -> dialog("Edit SSH Key", close -> EntryEditor.key(k, manager::importKey, close));
                 case Note n -> dialog("Edit Secure Note", close -> EntryEditor.note(n, manager::saveNote, close));
                 default -> throw new IllegalArgumentException("Unknown vault entry");

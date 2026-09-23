@@ -166,6 +166,7 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
     private String subtitle(VaultManager.Row row) {
         return entry.apply(row.id()).map(value -> switch (value) {
             case Account a -> a.username() + " \u00b7 " + (a.auth() instanceof Auth.Password ? "password" : a.auth() instanceof Auth.Key ? "SSH key" : "SSH key and password");
+            case dev.jasper.vault.model.ManagedSshKey k -> "Stored in Vault · " + k.fingerprint();
             case SshKey k -> k.algorithm() + " \u00b7 " + k.fingerprint();
             default -> row.subtitle();
         }).orElse(row.subtitle());

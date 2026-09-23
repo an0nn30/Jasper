@@ -49,12 +49,14 @@ class VaultServiceTest {
         };
     }
 
+    final List<KeyImportPrompt> imports = new ArrayList<>();
     final List<UnlockPrompt> unlocks = new ArrayList<>();
     final List<GrantPrompt> grants = new ArrayList<>();
     final List<PickPrompt> picks = new ArrayList<>();
     final List<String> notices = new ArrayList<>();
     final List<LockState> states = new ArrayList<>();
     final WindowHandle window = window();
+    java.util.concurrent.Executor importBackground = Runnable::run;
     LockManager lock;
     VaultService service;
 
@@ -63,7 +65,7 @@ class VaultServiceTest {
         var keychain = new KeychainStore("Linux", command -> { throw new UncheckedIOException(new IOException("none")); }, dir.resolve("x"));
         var secrets = new DeviceSecrets(keychain, new FileStore(dir.resolve("device.secret")));
         lock = new LockManager(new VaultFile(dir.resolve("vault.jv")), secrets, Runnable::run, Runnable::run, state -> { states.add(state); if (service != null) service.lockStateChanged(state); });
-        service = new VaultService(lock, () -> Optional.of(window), unlocks::add, grants::add, picks::add, notices::add);
+        service = new VaultService(lock, () -> Optional.of(window), unlocks::add, grants::add, picks::add, notices::add, importBackground, Runnable::run, owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> {});
         return service;
     }
 
@@ -75,6 +77,50 @@ class VaultServiceTest {
         lock.save().join();
     }
 
+    @Test void cancelledQueuedReadNeverPublishesItsLateResult(@TempDir Path dir) throws Exception {
+        var work = new java.util.ArrayDeque<Runnable>(); importBackground = work::add;
+        VaultApi api = service(dir).forConsumer(SSH); populate();
+        var key = new dev.jasper.vault.keygen.KeyGenerator(dir.resolve("keys")).generate(dev.jasper.vault.keygen.KeyAlgorithm.ED25519, "fixture", "test");
+        var pending = api.importSshKeys(window, List.of(new dev.jasper.vault.api.SshKeySource(UUID.randomUUID(), "key", key.privatePath())), List.of());
+        imports.getFirst().cancel(); work.removeFirst().run();
+        assertThat(pending.join()).isEmpty(); assertThat(lock.vault().managedKeys()).isEmpty(); assertThat(lock.vault().grants()).isEmpty();
+    }
+    @Test void twoReviewedImportsDeduplicateAgainstCommitState(@TempDir Path dir) throws Exception {
+        VaultApi api = service(dir).forConsumer(SSH); populate();
+        var key = new dev.jasper.vault.keygen.KeyGenerator(dir.resolve("keys")).generate(dev.jasper.vault.keygen.KeyAlgorithm.ED25519, "fixture", "test");
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        var one = api.importSshKeys(window, List.of(new dev.jasper.vault.api.SshKeySource(a, "one", key.privatePath())), List.of());
+        var two = api.importSshKeys(window, List.of(new dev.jasper.vault.api.SshKeySource(b, "two", key.privatePath())), List.of());
+        imports.get(0).commit(); imports.get(1).commit();
+        assertThat(one.join().orElseThrow().keys().get(a).id()).isEqualTo(two.join().orElseThrow().keys().get(b).id());
+        assertThat(lock.vault().managedKeys()).hasSize(1);
+    }
+    @Test void managedImportDeduplicatesAndGrantsOnlyOnCommit(@TempDir Path dir) throws Exception {
+        VaultApi api = service(dir).forConsumer(SSH); populate();
+        var generated = new dev.jasper.vault.keygen.KeyGenerator(dir.resolve("keys")).generate(dev.jasper.vault.keygen.KeyAlgorithm.ED25519, "fixture", "test");
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        var imported = api.importSshKeys(window, List.of(
+            new dev.jasper.vault.api.SshKeySource(a, "a", generated.privatePath()),
+            new dev.jasper.vault.api.SshKeySource(b, "b", generated.privatePath())), List.of());
+        assertThat(imported).isNotDone(); assertThat(lock.vault().managedKeys()).isEmpty();
+        imports.getFirst().commit();
+        var bindings = imported.join().orElseThrow().keys();
+        assertThat(bindings.get(a).id()).isEqualTo(bindings.get(b).id());
+        assertThat(lock.vault().managedKeys()).hasSize(1);
+        assertThat(lock.vault().grants()).contains(new Grant(SSH.id(), bindings.get(a).id()));
+        java.nio.file.Files.delete(generated.privatePath());
+        try (Credential credential = api.credential(bindings.get(a).id()).join().orElseThrow()) {
+            assertThat(credential.keyBytes()).isPresent(); assertThat(credential.keyPath()).isEmpty();
+        }
+        assertThat(service.forConsumer(OTHER).credential(bindings.get(a).id())).isNotDone();
+    }
+    @Test void cancellingPreparedImportMakesNoChanges(@TempDir Path dir) throws Exception {
+        VaultApi api = service(dir).forConsumer(SSH); populate();
+        var generated = new dev.jasper.vault.keygen.KeyGenerator(dir.resolve("keys")).generate(dev.jasper.vault.keygen.KeyAlgorithm.ED25519, "fixture", "test");
+        var result = api.importSshKeys(window, List.of(new dev.jasper.vault.api.SshKeySource(UUID.randomUUID(), "a", generated.privatePath())), List.of());
+        imports.getFirst().cancel();
+        assertThat(result.join()).isEmpty(); assertThat(lock.vault().managedKeys()).isEmpty();
+    }
     @Test void descriptorsCarryNoSecretsAndNeedNoGrant(@TempDir Path dir) {
         VaultApi api = service(dir).forConsumer(SSH);
         assertThat(api.lockState()).isEqualTo(LockState.NO_VAULT);
@@ -224,7 +270,7 @@ class VaultServiceTest {
 
     @Test void withoutAnyWindowARequestFails(@TempDir Path dir) {
         service(dir);
-        service = new VaultService(lock, Optional::empty, unlocks::add, grants::add, picks::add, notices::add);
+        service = new VaultService(lock, Optional::empty, unlocks::add, grants::add, picks::add, notices::add, importBackground, Runnable::run, owner -> CompletableFuture.completedFuture(lock.state() == LockState.UNLOCKED), imports::add, () -> {});
         populate();
         lock.lock();
         assertThat(service.forConsumer(SSH).credential(PROD)).isCompletedWithValue(Optional.empty());

@@ -108,7 +108,12 @@ public class VaultPlugin implements Plugin {
         timer.setTimeout(settings.autoLock());
         lock = new LockManager(new VaultFile(context.dataDirectory().resolve("vault.jv")), secretsFactory.apply(context), context.background(), ui, this::lockStateChanged);
         service = new VaultService(lock, () -> context.terminals().activeWindow().or(() -> context.terminals().windows().stream().findFirst()),
-            this::showUnlock, this::showGrant, this::showPick, context.notices()::error);
+            this::showUnlock, this::showGrant, this::showPick, context.notices()::error,
+            context.background(), ui, owner -> switch (lock.state()) {
+                case NO_VAULT -> createVault(owner);
+                case LOCKED -> service.requestUnlock(owner);
+                case UNLOCKED -> CompletableFuture.completedFuture(true);
+            }, this::showImport, this::vaultChanged);
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
         locked = context.appearance().icon(IconName.LOCK);
         unlocked = context.appearance().icon(IconName.UNLOCK);
@@ -138,6 +143,7 @@ public class VaultPlugin implements Plugin {
 
     @Override public void stop() {
         stopped = true;
+        if (service != null) service.closeImports();
         if (ticker != null) ticker.stop();
         if (activity != null) Toolkit.getDefaultToolkit().removeAWTEventListener(activity);
         try {
@@ -244,6 +250,16 @@ public class VaultPlugin implements Plugin {
         prompt.onDismiss(() -> { currentGrant = null; dialog.close(); vaultChanged(); });
         dialog.onClosed(prompt::cancel);
         dialog.show();
+    }
+
+    private void showImport(dev.jasper.vault.service.KeyImportPrompt prompt) {
+        PluginDialog dialog = context.windows().dialog(new DialogSpec("Import SSH keys", owner(prompt.owner()), true));
+        var panel = new dev.jasper.vault.ui.KeyImportPanel(prompt);
+        dialog.setContent(panel);
+        prompt.result().whenComplete((value, failure) -> ui.execute(dialog::close));
+        dialog.onClosed(() -> { panel.close(); prompt.cancel(); });
+        // Start-up work can continue inside a native modal event loop.
+        javax.swing.SwingUtilities.invokeLater(() -> { if (!prompt.result().isDone()) dialog.show(); });
     }
 
     private void showPick(PickPrompt prompt) {
