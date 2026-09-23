@@ -26,7 +26,9 @@ explicit resolutions and regression tests. Native implementation has completed s
 session leases, endpoint identity and prompt ownership changes also pass their regression suites.
 Bounded local/SFTP endpoints also pass: explicit ACK/force barriers, safe publication, links,
 short reads, sparse offsets, cancellation, and SFTP through ProxyJump with a surviving shell.
-Next: durable queue, engine, browser and Transfers integration.
+Durable SQLite storage passes reopen, checkpoint, 100k-entry pagination, cross-process locking,
+killed-writer recovery and corrupt/newer-schema preservation tests. Next: engine, browser and Transfers integration.
+The staged plugin-loader SQLite check runs with final integration; direct driver deregistration is covered now.
 Nothing merged or pushed.
 
 ### Latest completed work

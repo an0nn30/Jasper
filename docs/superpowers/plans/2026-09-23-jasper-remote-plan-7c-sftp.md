@@ -290,7 +290,7 @@ Do not use Java serialization. Entry phases are PLANNED_TEMP, CREATED_TEMP, COPY
 PUBLISHING, COMPLETE and CLEANUP. Persist creation evidence only after exclusive creation;
 a planned random path is never ownership evidence. An ambiguous create/crash requires attention.
 
-- [ ] Write reopen, crash, duplicate-discovery and multi-process lock tests with the real DB.
+- [x] Write reopen, crash, duplicate-discovery and multi-process lock tests with the real DB.
 
 ```java
 UUID id;
@@ -301,8 +301,8 @@ try (var db = new TransferStore(root)) {
 }
 ```
 
-- [ ] Run store tests; expected absent schema/store.
-- [ ] Implement schema version 1 with jobs, entries, scan_frontier, checkpoints, cleanup.
+- [x] Run store tests; expected absent schema/store.
+- [x] Implement schema version 1 with jobs, entries, scan_frontier, checkpoints, cleanup.
   Unique `(job_id,relative_path)` makes directory replay idempotent. Entry stores original
   source metadata, temp/final paths, confirmed offset, digest segments, decision and outcome.
   Publishing intent includes full-file digest and expected target state. No payload/secret fields.
@@ -320,9 +320,9 @@ PRAGMA cache_size=-4096;
   Startup changes active states to paused except cancellation intent; preserve diagnostics.
   Corrupt/newer schema refuses mutation without deleting data. Batch writes and indexed pages
   bound memory; never load all checkpoints or all entries at once.
-- [ ] Test 100,000 synthetic entries queried in pages and killed writer recovery; driver through
-  the real staged plugin loader; no silent queue reset and no second-process ownership.
-- [ ] Commit `feat(remote): persist transfer jobs and restart checkpoints`.
+- [x] Test 100,000 synthetic entries queried in pages and killed writer recovery; driver through
+  the real staged plugin loader (deferred to Task 10 integration; direct driver lifecycle covered here); no silent queue reset and no second-process ownership.
+- [x] Commit `feat(remote): persist transfer jobs and restart checkpoints`.
 
 ### Task 7: Implement transfer scheduling, scanning, copy and recovery
 
