@@ -154,6 +154,26 @@ already opens the palette directly in the SSH scope; no additional shortcut or a
 `./gradlew :jasper-plugin-remote:test --tests '*RemotePluginTest' :jasper-app:installDist` passed:
 ten plugin integration tests, zero failures. Distribution rebuilt; no GUI launched, merge or push.
 
+### Terminal resize and local startup follow-up — 2026-09-23
+
+Reproduced prompt fragmentation headlessly with a clean zsh (`-dfi`, no user startup files): a
+burst of immediate grid changes interleaves prompt redraws with later reflows. `TerminalView`
+now coalesces layout resizes for 120 ms, then changes the emulator and shell together. Zero-area
+layout no longer collapses the grid. Pending changes cancel on removal and refit on reattachment;
+explicit session resizes and font changes retain their immediate behavior. View-driven clean-zsh
+probes at burst and 10 ms resize intervals showed one intact prompt after narrowing/widening.
+
+Three regressions failed before the fix and pass afterward. Independent review found no production
+issues; strengthened its identified detach-cancellation test gap. `./gradlew check :jasper-app:installDist`
+passed: **1,639 tests, 1,636 passed, three expected skips, zero failures/errors**. App rebuilt.
+No native GUI launched, merge or push.
+
+The local-only prompt startup delay was traced separately to a user shell startup block appending
+Homebrew initialization on every launch. After explicit permission, backed up both user zsh files,
+removed 191 duplicate profile commands and stopped further appending; other configuration is
+preserved. Isolated profile evaluation measured 1.848 s before and 0.014 s after (not whole shell
+startup). Both files pass zsh syntax checks. No user configuration is tracked in this repository.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:
