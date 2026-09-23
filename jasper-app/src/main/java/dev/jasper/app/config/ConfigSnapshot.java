@@ -15,7 +15,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                       FontConfig font, Appearance variant, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
                       int maxResults, int longCommandSeconds, boolean backgroundEnabled,
-                      Map<String, Map<String, Object>> plugins) {
+                      Map<String, Map<String, Object>> plugins, ThemeStyle style) {
     public ConfigSnapshot {
         if (longCommandSeconds < 0 || longCommandSeconds > 3600)
             throw new IllegalArgumentException("Long-command seconds must be 0\u20133600.");
@@ -28,6 +28,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         Objects.requireNonNull(terminal, "terminal");
         Objects.requireNonNull(toolbar, "toolbar");
         Objects.requireNonNull(variant, "variant");
+        Objects.requireNonNull(style, "style");
         keybindings = Map.copyOf(keybindings);
         // Plugin tables arrive deeply immutable from the loader; only the outer map is copied here.
         plugins = Map.copyOf(plugins);
@@ -43,6 +44,17 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             }
         }
     }
+
+public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
+                      FontConfig font, Appearance variant, Map<String, String> keybindings,
+                      int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
+                      int maxResults, int longCommandSeconds, boolean backgroundEnabled,
+                      Map<String, Map<String, Object>> plugins) {
+    this(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines,
+        terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled,
+        plugins, ThemeStyle.MODERN);
+}
+
 
     /** Every constructor that predates plugin tables: no plugin settings. */
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
@@ -106,6 +118,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private boolean statusBar;
         private FontConfig font;
         private Appearance variant;
+        private ThemeStyle style;
         private Map<String, String> keybindings;
         private int columns;
         private int lines;
@@ -121,6 +134,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             statusBar = source.statusBar();
             font = source.font();
             variant = source.variant();
+            style = source.style();
             keybindings = source.keybindings();
             columns = source.columns();
             lines = source.lines();
@@ -135,6 +149,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder toolbar(ToolbarMode value) { toolbar = value; return this; }
         public Builder statusBar(boolean value) { statusBar = value; return this; }
         public Builder font(FontConfig value) { font = value; return this; }
+        public Builder style(ThemeStyle value) { style = value; return this; }
         public Builder variant(Appearance value) { variant = value; return this; }
         public Builder keybindings(Map<String, String> value) { keybindings = Map.copyOf(value); return this; }
         public Builder columns(int value) { columns = value; return this; }
@@ -146,7 +161,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder backgroundEnabled(boolean value) { backgroundEnabled = value; return this; }
         public Builder plugins(Map<String, Map<String, Object>> value) { plugins = Map.copyOf(value); return this; }
         public ConfigSnapshot build() {
-            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins);
+            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, variant, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, style);
         }
     }
 }

@@ -115,6 +115,10 @@ public final class ConfigTemplate {
             # This table does not change which default login shell is selected.
 
             [ui.theme]
+            # Application style: "modern" or "retro" (stock light Java Metal).
+            # Changing style requires fully restarting Jasper; existing sessions keep their current style.
+            # style = "modern"
+            # Variant applies only to modern; retro always uses light controls and a dark terminal.
             # Theme variant: "dark" or "light"; switches chrome and terminal colors live across windows.
             # variant = "dark"
 
