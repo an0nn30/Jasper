@@ -84,6 +84,8 @@ public class RemotePlugin implements Plugin {
     private RemoteScope scope;
     private StatusItem status;
     private PluginAction splitAction;
+    private PluginAction connectAction, hostsAction;
+    private RemoteShortcuts shortcuts;
     private SessionsToolbar sessionsToolbar;
     private Timer poll;
     private Icon icon;
@@ -116,7 +118,6 @@ public class RemotePlugin implements Plugin {
         this.context = context;
         Files.createDirectories(context.dataDirectory());
         settings = RemoteSettings.read(context.config());
-        context.config().onChanged(() -> settings = RemoteSettings.read(context.config()));
         store = new HostStore(context.dataDirectory().resolve("hosts.toml"), context.background(), ui);
         panelState = new PanelState(context.dataDirectory().resolve("panel-state.toml"));
         hostInfo = new HostInfoCache(context.dataDirectory().resolve("host-info.properties"));
@@ -130,9 +131,7 @@ public class RemotePlugin implements Plugin {
         connections.onChanged(this::refreshStatus);
         icon = context.appearance().icon("dev/jasper/remote/server.svg");
 
-        context.actions().register(ActionSpec.of(CONNECT, "Connect to SSH Host...").withIcon(icon).withKeywords(List.of("ssh", "remote", "host", "connect")).withDefaultBinding("cmd+shift+h"),
-            invoked -> context.palette().open(invoked.window(), RemoteScope.ID, Optional.empty(), Optional.empty()));
-        context.actions().register(ActionSpec.of(HOSTS, "SSH Hosts").withIcon(icon).withKeywords(List.of("ssh", "hosts", "panel")), invoked -> showPanel(invoked.window()));
+        configureShortcuts();
         splitAction = context.actions().register(ActionSpec.of(SPLIT, "Split with Same Host").withKeywords(List.of("ssh", "split")), invoked -> invoked.pane().ifPresent(this::splitSameHost));
         splitAction.setEnabled(false);
         context.actions().register(ActionSpec.of(IMPORT, "Import from ~/.ssh/config...").withKeywords(List.of("ssh", "import", "config")), invoked -> importConfig(invoked.window()));
@@ -163,6 +162,30 @@ public class RemotePlugin implements Plugin {
             for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
         });
         if (vault.isPresent()) context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> refreshPanels());
+        context.config().onChanged(() -> {
+            if (stopped) return;
+            settings = RemoteSettings.read(context.config());
+            configureShortcuts();
+        });
+    }
+
+    private void configureShortcuts() {
+        RemoteShortcuts next = RemoteShortcuts.read(context.config());
+        // Binding preferences are immutable in the SDK. Replace only changed actions under their
+        // stable ids; the host refreshes shortcuts and existing placements in every open window.
+        if (shortcuts == null || !next.openPalette().equals(shortcuts.openPalette())) {
+            if (connectAction != null) connectAction.close();
+            connectAction = context.actions().register(ActionSpec.of(CONNECT, "Connect to SSH Host...").withIcon(icon)
+                .withKeywords(List.of("ssh", "remote", "host", "connect")).withDefaultBinding(next.openPalette().orElse(null)),
+                invoked -> context.palette().open(invoked.window(), RemoteScope.ID, Optional.empty(), Optional.empty()));
+        }
+        if (shortcuts == null || !next.togglePanel().equals(shortcuts.togglePanel())) {
+            if (hostsAction != null) hostsAction.close();
+            hostsAction = context.actions().register(ActionSpec.of(HOSTS, "SSH Hosts").withIcon(icon)
+                .withKeywords(List.of("ssh", "hosts", "panel")).withDefaultBinding(next.togglePanel().orElse(null)),
+                invoked -> showPanel(invoked.window()));
+        }
+        shortcuts = next;
     }
 
     @Override public void stop() {

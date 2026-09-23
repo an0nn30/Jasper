@@ -174,6 +174,24 @@ removed 191 duplicate profile commands and stopped further appending; other conf
 preserved. Isolated profile evaluation measured 1.848 s before and 0.014 s after (not whole shell
 startup). Both files pass zsh syntax checks. No user configuration is tracked in this repository.
 
+### Remote configurable navigation shortcuts — 2026-09-23
+
+Implemented the user-approved `[shortcuts]` table in `dev.jasper.remote.toml`: `toggle_panel`
+defaults to `cmd+shift+s`, `open_palette` to `cmd+shift+h`. Missing values use defaults; blank
+strings disable the plugin preference. Reloads replace only changed action registrations under
+stable ids, refreshing shortcuts in existing windows while preserving menu/status placements.
+App-level `[keybindings]` overrides retain priority. No SDK extension or plugin restart required.
+
+Two real staged-plugin/TOML integration tests failed first, then passed: defaults, live changes,
+disable/reset, unrelated-settings stability, menu preservation, override precedence, and invalid
+or colliding bindings. Independent review confirmed action/window behavior and caught an
+inaccurate logging promise, now removed: automatic plugin reload leaves invalid/colliding bindings
+unbound but does not necessarily log the resolution problem until an app reload/start.
+
+`./gradlew check :jasper-app:installDist` passed: **1,641 tests, 1,638 passed, three expected skips,
+zero failures/errors**. Rebuilt distribution again after the settings-template comment correction.
+No GUI launched, merge or push.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

@@ -4,7 +4,8 @@ Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or
 command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
 split beside the current pane, Shift+Enter edits the host. The **SSH hosts** panel shows searchable
 compact tree-style rows grouped by folder, favorites first, with slightly larger text.
-Choose **View > SSH Hosts** to show or hide the panel in the current window.
+Choose **View > SSH Hosts** or press **Cmd+Shift+S** (Ctrl+Shift+S elsewhere) to show or hide
+the panel in the current window. Both navigation shortcuts are configurable below.
 A small dot marks an active session; multiple sessions show a count. Selecting a host shows its
 address and detected OS/IP below the list.
 The same details are available in the row tooltip and remain searchable. Double-click or Enter returns to the most recently used running pane for
@@ -66,7 +67,18 @@ keepalive_seconds = 30          # 0 disables
 session_linger_seconds = 5
 read_user_known_hosts = true
 use_ssh_agent = true
+
+[shortcuts]
+toggle_panel = "cmd+shift+s"
+open_palette = "cmd+shift+h"
 ```
+
+Shortcut edits apply live to all open windows; no plugin restart is needed. Omitted keys use the
+defaults above; set a value to `""` to leave that action without a plugin shortcut. `cmd` means
+Command on macOS and Ctrl+Shift elsewhere. Syntax and collision handling follow Jasper’s normal
+keybindings: an invalid shortcut or one already claimed is left unbound. An explicit
+app-level `[keybindings]` override for the same action still takes priority, even when its plugin
+shortcut is disabled. Connection settings remain above the `[shortcuts]` table.
 
 The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split` and
 `dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other

@@ -1,7 +1,14 @@
-# Settings for Remote. Jasper reads this file live; changes apply to the next connection.
+# Settings for Remote. Jasper reads this file live; connection settings apply to the next connection.
 # connect_timeout_seconds = 10
 # auth_timeout_seconds = 30
 # keepalive_seconds = 30          # server-alive interval; 0 disables
 # session_linger_seconds = 5      # how long an idle shared session stays open after its last channel
 # read_user_known_hosts = true    # also match host keys against ~/.ssh/known_hosts (never written)
 # use_ssh_agent = true            # offer identities from SSH_AUTH_SOCK / the OpenSSH named pipe
+
+# Navigation shortcuts update live. Use "" to disable a plugin shortcut.
+# cmd means Command on macOS and Ctrl+Shift elsewhere. App [keybindings] overrides win.
+# Invalid or conflicting shortcuts are left unbound.
+[shortcuts]
+toggle_panel = "cmd+shift+s"
+open_palette = "cmd+shift+h"
