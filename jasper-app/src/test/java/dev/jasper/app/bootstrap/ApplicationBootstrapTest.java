@@ -15,6 +15,27 @@ import static org.assertj.core.api.Assertions.*;
 
 class ApplicationBootstrapTest {
     @TempDir Path directory;
+    @Test void desktopMenuPlacementUsesTheStartupSkin() throws Exception {
+        String menuKey = "apple.laf.useScreenMenuBar", appearanceKey = "apple.awt.application.appearance";
+        String previousMenu = System.getProperty(menuKey), previousAppearance = System.getProperty(appearanceKey);
+        try {
+            for (String style : new String[]{"retro", "modern"}) {
+                Path file = directory.resolve(style + ".toml");
+                Files.writeString(file, "[ui.theme]\nstyle='" + style + "'\n");
+                try (var service = new ConfigService(file, true)) {
+                    // Override an inherited JVM setting in either direction before desktop startup.
+                    System.setProperty(menuKey, style.equals("retro") ? "true" : "false");
+                    ApplicationBootstrap.configureDesktopProperties(service.initialState().snapshot().style());
+                    assertThat(System.getProperty(menuKey)).isEqualTo(style.equals("modern") ? "true" : "false");
+                    assertThat(System.getProperty(appearanceKey)).isEqualTo("system");
+                }
+            }
+        } finally {
+            if (previousMenu == null) System.clearProperty(menuKey); else System.setProperty(menuKey, previousMenu);
+            if (previousAppearance == null) System.clearProperty(appearanceKey); else System.setProperty(appearanceKey, previousAppearance);
+        }
+    }
+
     @Test void helpAndErrorsExitBeforeConfigurationOrDesktopStartup() {
         var out = new ByteArrayOutputStream(); var error = new ByteArrayOutputStream();
         var stdout = new PrintStream(out); var stderr = new PrintStream(error);

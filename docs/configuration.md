@@ -551,6 +551,6 @@ Style changes take effect only after restarting the process. Reload keeps curren
 
 The saved `variant` remains available for modern mode. Retro always uses light controls, so Light/Dark and custom tab-height commands are unavailable there. Font, terminal cursor, toolbar visibility, keybinding and other live settings continue to work normally.
 
-Plugins need no changes to use ordinary Metal controls. Their custom icons and custom-painted content remain plugin-owned. Native OS title bars and file dialogs remain native; the Jasper logo and Buddy artwork are unchanged.
+Plugins need no changes to use ordinary Metal controls. Their custom icons and custom-painted content remain plugin-owned. On macOS, retro places application menus inside each window; modern uses the macOS menu bar. This follows the startup style and requires a full process restart. OS title bars and file dialogs remain native; the Jasper logo and Buddy artwork are unchanged.
 
 Toolbar buttons stay flat with 28-pixel classic icons and centered labels beneath them. Retro captions use regular weight at one point below the Metal button font, with compact five-pixel side padding. Icon-only and hidden toolbar modes remain available; tab close controls are icon-only, and status actions remain unboxed. Ordinary form buttons retain Metal styling.

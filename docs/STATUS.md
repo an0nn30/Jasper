@@ -152,6 +152,16 @@ Icons remain 28px; built-in and contributed buttons share the style. Modern tool
 is unchanged. Verified existing toolbar modes, minimum width, label restoration, contributed
 controls and headless previews; distribution rebuilt without launching the GUI.
 
+### Retro in-window menu bar — 2026-09-23
+
+Per user request, desktop bootstrap now sets `apple.laf.useScreenMenuBar=false` for the
+captured retro startup style and true for modern, before Swing/toolkit initialization.
+Existing terminal and auxiliary window JMenuBars stay attached to their frames, so retro
+renders them inside the windows on macOS. Full process restart is required; config reload
+does not change this process-wide selection. Startup configuration regression verifies both
+styles override inherited JVM values. Headless bootstrap/chrome/window checks and installDist
+passed; native macOS acceptance remains user-run. No GUI launch or push.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:
