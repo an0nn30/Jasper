@@ -61,6 +61,21 @@ The full check/distribution gate passed again after these fixes. No deferred min
 The reviewer set native OS/physical Retina behavior aside; those checks remain user-run.
 Branch and worktree are preserved, with no merge or push.
 
+### Retro toolbar icon refinement — 2026-09-23
+
+After native screenshot feedback that the OldGNOME2 toolbar symbols were too faint,
+replaced the five core toolbar glyphs with clearer classic Tango choices: blue plus
+(New Tab), blue monitor (New Window), paired windows (Split), blue expansion arrows
+(Zoom), and a blue-lens magnifier (Find). The rest of the original collection remains.
+Flat 24-pixel toolbar geometry, icon-only closes and disabled-state behavior are unchanged.
+
+Ten unmodified Tango 0.8.90 PNGs (16/32-pixel sources) are bundled with upstream COPYING,
+AUTHORS, source URL and hash manifest. The upstream release places these icons in the
+public domain. JDK multi-resolution ImageIcons retain stock Metal disabled rendering;
+32-pixel sources are rendered to 24 logical pixels for toolbar use. No runtime downloads.
+Targeted icon/resource, disabled-state, toolbar/tab tests and installDist passed. Inspected
+the enabled toolbar preview and workspace render. No native GUI launch, merge or push.
+
 ### macOS default shell refresh reverted — 2026-09-22
 
 At the user's request, reverted `dddfc57` and its integration note `238769f`:

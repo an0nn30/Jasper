@@ -4,7 +4,7 @@ import com.formdev.flatlaf.extras.FlatSVGIcon;
 import java.awt.Color;
 import javax.swing.UIManager;
 
-/** Bundled Tabler or GNOME 2 icons; no network access is needed to render chrome. */
+/** Bundled Tabler, GNOME 2 and Tango icons; no network access is needed to render chrome. */
 public final class AppIcons {
     private AppIcons() {}
     public static javax.swing.Icon icon(String name) {
@@ -16,7 +16,7 @@ public final class AppIcons {
         return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Jasper.chromeForeground", source)));
     }
 
-    /** Application toolbar artwork: large GNOME icons in retro, regular modern icons otherwise. */
+    /** Application toolbar artwork: large classic icons in retro, regular modern icons otherwise. */
     public static javax.swing.Icon toolbarIcon(String name) {
         return SwingAppearance.retro() ? GnomeIcons.icon(name, 24) : icon(name);
     }

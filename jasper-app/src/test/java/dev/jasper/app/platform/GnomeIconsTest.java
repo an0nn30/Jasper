@@ -26,14 +26,19 @@ class GnomeIconsTest {
 }
 
     @Test void resourceManifestAndLicenseTravelWithTheIcons() throws Exception {
-        String base = "/dev/jasper/app/icons/gnome2/";
+        verifyManifest("gnome2", 22, java.util.List.of("LICENSE.txt", "NOTICE.md"));
+        verifyManifest("tango", 10, java.util.List.of("COPYING", "AUTHORS", "NOTICE.md"));
+    }
+
+    private static void verifyManifest(String family, int count, java.util.List<String> notices) throws Exception {
+        String base = "/dev/jasper/app/icons/" + family + "/";
         String manifest;
         try (var input = GnomeIcons.class.getResourceAsStream(base + "assets.tsv")) {
             assertThat(input).isNotNull();
             manifest = new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
         }
         var rows = manifest.lines().skip(1).toList();
-        assertThat(rows).hasSize(22);
+        assertThat(rows).hasSize(count);
         for (String row : rows) {
             String[] values = row.split("\t");
             try (var input = GnomeIcons.class.getResourceAsStream(base + values[0])) {
@@ -46,7 +51,7 @@ class GnomeIconsTest {
                 assertThat(image.getHeight()).isEqualTo(size);
             }
         }
-        for (String notice : java.util.List.of("LICENSE.txt", "NOTICE.md")) {
+        for (String notice : notices) {
             try (var input = GnomeIcons.class.getResourceAsStream(base + notice)) {
                 assertThat(input).isNotNull();
                 assertThat(input.readAllBytes()).isNotEmpty();

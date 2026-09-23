@@ -545,7 +545,7 @@ supported: a `[colors]` table is reported as an unknown setting and ignored. See
 
 ### Retro Metal appearance
 
-Set `style = "retro"` under `[ui.theme]`, then fully restart Jasper. Retro uses Java's stock light Metal/Ocean controls, GNOME 2 application icons, and a black high-contrast terminal. `style = "modern"` restores the current appearance. Existing configuration files default to modern.
+Set `style = "retro"` under `[ui.theme]`, then fully restart Jasper. Retro uses Java's stock light Metal/Ocean controls, GNOME 2 and Tango application icons, and a black high-contrast terminal. `style = "modern"` restores the current appearance. Existing configuration files default to modern.
 
 Style changes take effect only after restarting the process. Reload keeps current sessions and windows as they are and shows a restart notice; changing the setting back clears that notice. When background residency is enabled, closing every window does not restart Jasper.
 
@@ -553,4 +553,4 @@ The saved `variant` remains available for modern mode. Retro always uses light c
 
 Plugins need no changes to use ordinary Metal controls. Their custom icons and custom-painted content remain plugin-owned. Native OS title bars and file dialogs remain native; the Jasper logo and Buddy artwork are unchanged.
 
-Toolbar buttons stay flat with 24-pixel GNOME icons, tab close controls are icon-only, and status actions remain unboxed. Ordinary form buttons retain Metal styling.
+Toolbar buttons stay flat with 24-pixel classic icons, tab close controls are icon-only, and status actions remain unboxed. Ordinary form buttons retain Metal styling.
