@@ -121,3 +121,23 @@ Run targeted tests during implementation, then all architecture guards, `./gradl
 An overload returning the existing Swing type is chosen because it fits all current contribution and plugin-content APIs. Replacing every icon field with a descriptor would impose broader migration. Plugin-side style detection would duplicate host policy and sizing. Neither is needed for the approved requirement.
 
 The implementation remains one runnable deliverable on the existing isolated `codex/retro-metal` branch. After approval of this written spec, prepare the implementation plan for review. The user's earlier native execution preference remains the default; do not infer permission to merge or push. Record any execution deviation in the plan and `docs/STATUS.md`.
+
+## User amendment: semantic host-owned icons
+
+On 2026-09-23 the user clarified that ordinary plugins should request only a semantic icon
+name. The primary API is now `Appearance.icon(IconName.LOCK)` / `UNLOCK`, with all22
+catalog meanings available. Jasper owns the modern and retro mappings, resource loading,
+recoloring and placement sizing. The prior SVG methods remain available for custom artwork.
+Vault uses the semantic API and keeps its original modern lock/unlock SVG shapes, copied into
+the app-owned catalog; it contains no skin test or image path at the call sites. SDK0.7.3 is
+required for named icons. A default method preserves old Appearance implementations but
+throws UnsupportedOperationException if they do not implement the new catalog. Real and
+fake hosts support every name; null names fail with NullPointerException. FakeNamedIcon
+records the semantic name and captured retro flag, with16px dimensions and no rendering.
+
+Modern resources ship in the app with their own source/hash/license manifest. They are
+resolved through the application loader, never through a plugin loader. Retro uses the
+existing OldGNOME2 catalog. Existing custom-overload semantics and restart behavior remain.
+See the [native follow-up plan](../plans/2026-09-23-jasper-semantic-icons.md). The user also
+authorized merging local main into the feature worktree; this does not authorize merging
+back into main or pushing.
