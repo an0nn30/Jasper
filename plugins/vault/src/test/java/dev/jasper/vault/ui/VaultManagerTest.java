@@ -49,9 +49,9 @@ class VaultManagerTest {
             Files.writeString(directory.resolve("vault.jv/block"), "block replacement");
             var save = f.manager.saveAccount(account(id, fresh)); f.drain();
             assertThat(save).isCompletedExceptionally();
-            assertThat(((Auth.Password) f.lock.vault().account(id).orElseThrow().auth()).password()).isEqualTo(old);
+            assertThat(((Auth.Password) f.lock.vault().account(id).orElseThrow().auth()).password()).isEqualTo("old".toCharArray());
             assertThat(fresh).containsOnly((char) 0);
-            assertThat(old).containsExactly('o', 'l', 'd');
+            assertThat(old).as("input consumed into a private transaction copy").containsOnly((char) 0);
         }
     }
 

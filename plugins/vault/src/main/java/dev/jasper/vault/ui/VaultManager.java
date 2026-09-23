@@ -41,7 +41,7 @@ public final class VaultManager {
     private final Runnable changed;
     private boolean busy;
     private long generation;
-    private Runnable retainedCleanup = () -> { };
+    private Runnable retainedCleanup = () -> {};
 
     public VaultManager(LockManager lock, Executor background, Executor ui, Runnable changed) {
         this.lock = lock; this.background = background; this.ui = ui; this.changed = changed;
@@ -67,56 +67,42 @@ public final class VaultManager {
     }
     public CompletableFuture<Void> saveAccount(Account value) {
         if (!editable()) { value.auth().zero(); return rejected(); }
-        Vault v = lock.vault();
-        Account old = v.account(value.id()).orElse(null);
-        return replace(v.accounts(), old, value, () -> { if (old != null) old.auth().zero(); }, value.auth()::zero);
+        retainedCleanup = value.auth()::zero;
+        return transaction(v -> {
+            Account old = v.account(value.id()).orElse(null);
+            if (old != null) { v.accounts().remove(old); old.auth().zero(); }
+            v.accounts().add(new Account(value.id(), value.name(), value.username(), copyAuth(value.auth()), value.created(), value.updated()));
+        }).whenComplete((ignored, failure) -> value.auth().zero());
+    }
+    private static Auth copyAuth(Auth auth) {
+        return switch (auth) {
+            case Auth.Password p -> new Auth.Password(p.password().clone());
+            case Auth.Key k -> new Auth.Key(k.keyPath(), k.passphrase() == null ? null : k.passphrase().clone());
+            case Auth.KeyAndPassword k -> new Auth.KeyAndPassword(k.keyPath(), k.passphrase() == null ? null : k.passphrase().clone(), k.password().clone());
+        };
     }
     public CompletableFuture<Void> saveNote(Note value) {
         if (!editable()) { value.zero(); return rejected(); }
-        Vault v = lock.vault();
-        Note old = v.notes().stream().filter(n -> n.id().equals(value.id())).findFirst().orElse(null);
-        return replace(v.notes(), old, value, () -> { if (old != null) old.zero(); }, value::zero);
+        retainedCleanup = value::zero;
+        return transaction(v -> {
+            v.notes().removeIf(n -> { if (!n.id().equals(value.id())) return false; n.zero(); return true; });
+            v.notes().add(new Note(value.id(), value.name(), value.text().clone(), value.updated()));
+        }).whenComplete((ignored, failure) -> value.zero());
     }
     public CompletableFuture<Void> saveKey(SshKey value) {
         if (!editable()) return rejected();
-        return replace(lock.vault().keys(), lock.vault().key(value.id()).orElse(null), value, () -> { }, () -> { });
-    }
-    private <T> CompletableFuture<Void> replace(List<T> list, T old, T value, Runnable oldCleanup, Runnable newCleanup) {
-        int index = old == null ? list.size() : list.indexOf(old);
-        return edit(v -> { if (old == null) list.add(value); else list.set(index, value); },
-            () -> { if (old == null) list.remove(value); else list.set(index, old); }, oldCleanup, newCleanup);
+        return transaction(v -> { v.keys().removeIf(k -> k.id().equals(value.id())); v.keys().add(value); });
     }
     public CompletableFuture<Void> revoke(Grant grant) {
         if (!editable()) return rejected();
-        Vault v = lock.vault();
-        boolean existed = v.grants().contains(grant);
-        return edit(ignored -> v.grants().remove(grant), () -> { if (existed) v.grants().add(grant); }, () -> { }, () -> { });
+        return transaction(v -> v.grants().remove(grant));
     }
     public CompletableFuture<Void> delete(UUID id, boolean deleteFiles) {
         if (!editable()) return rejected();
-        Vault v = lock.vault();
         Object value = entry(id).orElseThrow(() -> new IllegalArgumentException("The entry no longer exists"));
-        List<Grant> grants = v.grants().stream().filter(g -> g.credentialId().equals(id)).toList();
-        Runnable wipe = () -> { if (value instanceof Account a) a.auth().zero(); if (value instanceof Note n) n.zero(); };
-        var saved = edit(ignored -> {
-            v.accounts().remove(value); v.keys().remove(value); v.notes().remove(value); v.grants().removeAll(grants);
-        }, () -> {
-            if (value instanceof Account a) v.accounts().add(a);
-            if (value instanceof SshKey k) v.keys().add(k);
-            if (value instanceof Note n) v.notes().add(n);
-            v.grants().addAll(grants);
-        }, wipe, () -> { });
+        var saved = transaction(v -> v.remove(id));
         if (!deleteFiles || !(value instanceof SshKey key)) return saved;
-        return saved.thenCompose(ignored -> io(() -> {
-            IOException failure = null;
-            for (var path : List.of(key.privatePath(), key.publicPath())) {
-                try { Files.deleteIfExists(path); }
-                catch (IOException problem) { if (failure == null) failure = problem; else failure.addSuppressed(problem); }
-            }
-            if (failure != null) throw new IOException("Entry removed; could not delete all key files: "
-                + key.privatePath() + ", " + key.publicPath(), failure);
-            return null;
-        }));
+        return saved.thenCompose(ignored -> removeGeneratedFiles(key));
     }
     public CompletableFuture<String> publicKey(UUID id) {
         if (lock.state() != LockState.UNLOCKED) return CompletableFuture.failedFuture(new IllegalStateException("The vault is locked"));
@@ -134,28 +120,15 @@ public final class VaultManager {
         });
     }
     /** Called on lock/stop, even if a save is still pending. */
-    public void invalidate() { generation++; retainedCleanup.run(); retainedCleanup = () -> { }; }
+    public void invalidate() { generation++; retainedCleanup.run(); retainedCleanup = () -> {}; }
     private boolean editable() { return !busy && lock.state() == LockState.UNLOCKED; }
     private CompletableFuture<Void> rejected() {
         return CompletableFuture.failedFuture(new IllegalStateException(busy ? "An edit is still saving" : "The vault is locked"));
     }
-    private CompletableFuture<Void> edit(Consumer<Vault> apply, Runnable undo, Runnable committed, Runnable rejected) {
-        Vault original = lock.vault();
-        long expected = generation;
-        busy = true; retainedCleanup = committed;
-        CompletableFuture<Void> save;
-        try { apply.accept(original); save = lock.save(); }
-        catch (RuntimeException failure) { save = CompletableFuture.failedFuture(failure); }
-        return save.handle((ignored, failure) -> {
-            boolean same = expected == generation && lock.state() == LockState.UNLOCKED && lock.vault() == original;
-            if (failure == null) committed.run();
-            else if (same) { undo.run(); rejected.run(); }
-            else { committed.run(); rejected.run(); }
-            retainedCleanup = () -> { }; busy = false;
-            changed.run();
-            if (failure != null) throw new java.util.concurrent.CompletionException(failure);
-            return null;
-        });
+    private CompletableFuture<Void> transaction(Consumer<Vault> mutation) {
+        long expected = generation; busy = true;
+        return lock.transact(v -> { mutation.accept(v); return (Void) null; }, () -> generation != expected)
+            .whenComplete((ignored, failure) -> { busy = false; retainedCleanup = () -> {}; changed.run(); });
     }
     private <T> CompletableFuture<T> io(Callable<T> operation) {
         var result = new CompletableFuture<T>();
@@ -197,12 +170,11 @@ public final class VaultManager {
             if (generation != expected || lock.state() != LockState.UNLOCKED) {
                 save = CompletableFuture.failedFuture(new IllegalStateException("The vault was locked during key generation"));
             } else {
-                Vault original = lock.vault();
-                Account account = username.map(user -> new Account(UUID.randomUUID(), name + " (" + user + ")", user,
-                    new Auth.Key(key.privatePath(), phrase == null ? null : phrase.clone()), Instant.now(), Instant.now())).orElse(null);
-                save = edit(v -> { v.keys().add(key); if (account != null) v.accounts().add(account); },
-                    () -> { original.keys().remove(key); if (account != null) original.accounts().remove(account); },
-                    () -> { }, () -> { if (account != null) account.auth().zero(); });
+                save = transaction(v -> {
+                    v.keys().add(key);
+                    username.ifPresent(user -> v.accounts().add(new Account(UUID.randomUUID(), name + " (" + user + ")", user,
+                        new Auth.Key(key.privatePath(), phrase == null ? null : phrase.clone()), Instant.now(), Instant.now())));
+                });
             }
             return save.handle((ignored, failure) -> failure).thenCompose(failure -> {
                 if (failure == null) return CompletableFuture.completedFuture(null);
@@ -217,7 +189,7 @@ public final class VaultManager {
                 });
             });
         });
-        return operation.whenComplete((ignored, failure) -> { SecureBytes.zero(phrase); busy = false; changed.run(); });
+        return operation.whenComplete((ignored, failure) -> { SecureBytes.zero(phrase); busy = false; retainedCleanup = () -> {}; changed.run(); });
     }
     private CompletableFuture<Void> removeGeneratedFiles(SshKey key) {
         return io(() -> {

@@ -115,8 +115,11 @@ public final class VaultService {
             case DENY -> prompt.settle(Optional::empty);
             case ALLOW_ONCE -> prompt.settle(() -> copyOf(prompt.grant().credentialId()));
             case ALWAYS -> {
-                if (lock.state() == LockState.UNLOCKED) { lock.vault().grants().add(prompt.grant()); lock.save(); }
-                prompt.settle(() -> copyOf(prompt.grant().credentialId()));
+                lock.transact(v -> { v.grants().add(prompt.grant()); return (Void) null; }, () -> false)
+                    .whenComplete((ignored, failure) -> {
+                        if (failure != null) { notice.accept("Could not save the credential grant"); prompt.settle(Optional::empty); }
+                        else prompt.settle(() -> copyOf(prompt.grant().credentialId()));
+                    });
             }
         }
     }

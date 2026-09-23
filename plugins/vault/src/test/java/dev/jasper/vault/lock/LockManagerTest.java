@@ -45,6 +45,49 @@ class LockManagerTest {
         catch (CompletionException failure) { return failure.getCause(); }
     }
 
+    @Test void failedUpgradeBackupLeavesVersionOneReadable(@TempDir Path dir) throws Exception {
+        LockManager lock = manager(dir); lock.create("pw".toCharArray(), false); runBackground();
+        byte[] before = java.nio.file.Files.readAllBytes(dir.resolve("vault.jv"));
+        java.nio.file.Files.createDirectory(dir.resolve("vault.jv.v1-backup"));
+        var failed = lock.transact(v -> { v.requireManagedFormat(); return true; }, () -> false);
+        runBackground(); assertThat(failed).isCompletedExceptionally();
+        assertThat(lock.vault().payloadVersion()).isEqualTo(1);
+        assertThat(java.nio.file.Files.readAllBytes(dir.resolve("vault.jv"))).isEqualTo(before);
+    }
+    @Test void queuedTransactionUsesSurvivingPasswordAfterFailedRekey(@TempDir Path dir) throws Exception {
+        LockManager lock = manager(dir); lock.create("pw".toCharArray(), false); runBackground();
+        var changed = lock.changePassword("wrong".toCharArray(), "new".toCharArray());
+        var saved = lock.transact(v -> { v.requireManagedFormat(); return true; }, () -> false);
+        runBackground(); assertThat(changed).isCompletedExceptionally(); saved.join();
+        lock.lock(); var opened = lock.unlock("pw".toCharArray()); runBackground(); opened.join();
+        assertThat(lock.vault().payloadVersion()).isEqualTo(2);
+    }
+    @Test void transactionsPublishAfterDurableSaveAndCompose(@TempDir Path dir) {
+        LockManager lock = manager(dir); lock.create("pw".toCharArray(), false); runBackground();
+        UUID a = UUID.randomUUID(), b = UUID.randomUUID();
+        var first = lock.transact(v -> { v.notes().add(new dev.jasper.vault.model.Note(a, "a", new char[]{'a'}, Instant.EPOCH)); return a; }, () -> false);
+        var second = lock.transact(v -> { assertThat(v.notes()).extracting(dev.jasper.vault.model.Note::id).contains(a); v.notes().add(new dev.jasper.vault.model.Note(b, "b", new char[]{'b'}, Instant.EPOCH)); return b; }, () -> false);
+        assertThat(lock.vault().notes()).isEmpty(); runBackground();
+        assertThat(first.join()).isEqualTo(a); assertThat(second.join()).isEqualTo(b);
+        assertThat(lock.vault().notes()).hasSize(2);
+    }
+    @Test void failedTransactionLeavesPublishedVaultAndDiskUntouched(@TempDir Path dir) throws Exception {
+        LockManager lock = manager(dir); lock.create("pw".toCharArray(), false); runBackground();
+        byte[] before = java.nio.file.Files.readAllBytes(dir.resolve("vault.jv"));
+        java.nio.file.Files.createDirectory(dir.resolve("vault.jv.tmp"));
+        var failed = lock.transact(v -> { v.notes().add(new dev.jasper.vault.model.Note(UUID.randomUUID(), "x", new char[]{'x'}, Instant.EPOCH)); return true; }, () -> false);
+        runBackground(); assertThat(failed).isCompletedExceptionally(); assertThat(lock.vault().notes()).isEmpty();
+        assertThat(java.nio.file.Files.readAllBytes(dir.resolve("vault.jv"))).isEqualTo(before);
+    }
+    @Test void managedUpgradeBacksUpActualEncryptedPredecessor(@TempDir Path dir) throws Exception {
+        LockManager lock = manager(dir); lock.create("pw".toCharArray(), false); runBackground();
+        byte[] before = java.nio.file.Files.readAllBytes(dir.resolve("vault.jv"));
+        var imported = lock.transact(v -> { v.requireManagedFormat(); return true; }, () -> false);
+        runBackground(); imported.join();
+        assertThat(java.nio.file.Files.readAllBytes(dir.resolve("vault.jv.v1-backup"))).isEqualTo(before);
+        lock.lock(); var unlocked = lock.unlock("pw".toCharArray()); runBackground(); unlocked.join();
+        assertThat(lock.vault().payloadVersion()).isEqualTo(2);
+    }
     @Test void createsLocksAndUnlocksWithTheEdits(@TempDir Path dir) throws Exception {
         LockManager manager = manager(dir);
         assertThat(manager.state()).isEqualTo(LockState.NO_VAULT);
