@@ -1866,3 +1866,8 @@ The retro toolbar now uses an explicit solid Metal light-gray background, suppre
 Ocean's toolbar gradient while retaining the Metal delegate, border and layout.
 Targeted retro chrome/contribution tests and installDist passed; inspected the headless
 2x toolbar preview. No native GUI launch, merge or push.
+
+The retro menu bar now uses the same solid background as the toolbar, per the next
+screenshot refinement. Metal menu behavior and selection painting are retained.
+Targeted chrome/contribution tests and installDist passed; inspected a headless 2x
+combined menu/toolbar preview. No native GUI launch, merge or push.
