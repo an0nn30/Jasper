@@ -259,7 +259,10 @@ final class WindowContributions implements AutoCloseable {
                 action = new AbstractAction(entry.title()) {
                     @Override public void actionPerformed(ActionEvent event) { invoke(id); }
                 };
-                if (entry.icon() != null) action.putValue(Command.ICON, entry.icon());
+                if (entry.icon() != null) {
+                    action.putValue(Command.ICON, entry.icon());
+                    action.putValue(Action.SMALL_ICON, entry.icon());
+                }
                 actions.put(id, action);
                 List<String> keywords = new ArrayList<>(List.of(id.replace('.', ' ').replace('_', ' ')));
                 keywords.addAll(entry.keywords());

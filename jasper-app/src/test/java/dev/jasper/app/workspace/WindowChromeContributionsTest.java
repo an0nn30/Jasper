@@ -44,11 +44,12 @@ class WindowChromeContributionsTest {
         return null;
     }
 
-    @Test void toolbarControlsFollowBuiltinsAndFollowModeAndRemoval() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void toolbarControlsFollowBuiltinsAndFollowModeAndRemoval(boolean retro) throws Exception {
         edt(() -> {
             var model = new Contributions();
             List<Contributions.Invocation> seen = new ArrayList<>();
-            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.DARK));
             List<String> before = buttons(owner);
             owner.connectContributions(model);
             ActionEntry run = model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), seen::add);
@@ -60,10 +61,16 @@ class WindowChromeContributionsTest {
             List<String> after = buttons(owner);
             assertThat(after).containsSubsequence("Find", "Run Tool", "Tool");
             assertThat(after).hasSize(before.size() + 2);
+            if (retro) assertThat(after).endsWith("Run Tool", "Tool", "Settings", "Exit");
             JButton button = null;
             for (Component child : owner.toolbar().getComponents())
                 if (child instanceof JButton candidate && "Run Tool".equals(candidate.getClientProperty("label"))) button = candidate;
             assertThat(button.getIcon()).as("a fallback icon keeps the toolbar's icon-led layout").isNotNull();
+            if (retro) {
+                assertThat(button.getIcon().getIconWidth()).isEqualTo(28);
+                assertThat(button.getHorizontalTextPosition()).isEqualTo(javax.swing.SwingConstants.CENTER);
+                assertThat(button.getVerticalTextPosition()).isEqualTo(javax.swing.SwingConstants.BOTTOM);
+            }
             button.doClick();
             assertThat(seen).hasSize(1);
 
@@ -111,6 +118,49 @@ class WindowChromeContributionsTest {
             run.close();
             assertThat(items(menu(owner, "View"))).hasSize(viewBefore);
             assertThat(owner.chrome().contextMenu().getComponentCount()).isEqualTo(contextBefore);
+        });
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void sharedManagedIconsSizePerPlacementInMultipleWindows(boolean retro) throws Exception {
+        edt(() -> {
+            var theme = new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
+                : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
+            try {
+                var icon = dev.jasper.app.platform.AppIcons.skin(getClass().getClassLoader(), "dev/jasper/app/icons/search.svg", "LOCK");
+                var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(19,19,java.awt.image.BufferedImage.TYPE_INT_ARGB));
+                var model = new Contributions();
+                model.addAction("dev.x.lock", "Lock", icon, List.of(), Optional.empty(), event -> {});
+                model.addAction("dev.x.custom", "Custom", custom, List.of(), Optional.empty(), event -> {});
+                model.addToolbar(new ToolbarEntry.Button("dev.x.lock"));
+                model.addToolbar(new ToolbarEntry.Dropdown(icon, "Locks", List.of("dev.x.lock")));
+                model.addToolbar(new ToolbarEntry.Button("dev.x.custom"));
+                model.addMenuSection(MenuTarget.topLevel("dev.x.icons", "Icons")).set(List.of(new MenuEntry.Item("dev.x.lock")));
+                for (int i=0; i<2; i++) {
+                    var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), theme);
+                    owner.connectContributions(model);
+                    for (Component child : owner.toolbar().getComponents()) {
+                        if (!(child instanceof JButton button)) continue;
+                        var label = button.getClientProperty("label");
+                        if ("Lock".equals(label) || "Locks".equals(label))
+                            assertThat(button.getIcon().getIconWidth()).isEqualTo(retro ? 28 : 16);
+                        if ("Custom".equals(label)) assertThat(button.getIcon()).isSameAs(custom);
+                    }
+                    var menuIcon = ((JMenuItem) menu(owner, "Icons").getMenuComponent(0)).getIcon();
+                    assertThat(menuIcon).isSameAs(icon);
+                    assertThat(menuIcon.getIconWidth()).isEqualTo(16);
+                    owner.setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
+                    owner.toolbar().setSize(owner.toolbar().getMinimumSize().width,100);
+                    owner.toolbar().doLayout();
+                    owner.toolbar().setSize(1800,100);
+                    owner.toolbar().doLayout();
+                    for (Component child : owner.toolbar().getComponents())
+                        if (child instanceof JButton button && "Lock".equals(button.getClientProperty("label")))
+                            assertThat(button.getText()).isEqualTo("Lock");
+                }
+                assertThat(model.action("dev.x.lock").orElseThrow().icon()).isSameAs(icon);
+                assertThat(icon.getIconWidth()).isEqualTo(16);
+            } finally { new dev.jasper.app.appearance.ThemeController(); }
         });
     }
 }

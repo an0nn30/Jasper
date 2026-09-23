@@ -545,6 +545,18 @@ The former `[colors]` table (`appearance`, `theme`) and custom palette files are
 supported: a `[colors]` table is reported as an unknown setting and ignored. See the
 [dark](design/mock-ui-dark.png) and [light](design/mock-ui-light.png) renders.
 
+### Retro Metal appearance
+
+Set `style = "retro"` under `[ui.theme]`, then fully restart Jasper. Retro uses Java's stock light Metal/Ocean controls, GNOME 2 and Tango application icons, and a black high-contrast terminal. `style = "modern"` restores the current appearance. Existing configuration files default to modern.
+
+Style changes take effect only after restarting the process. Reload keeps current sessions and windows as they are and shows a restart notice; changing the setting back clears that notice. When background residency is enabled, closing every window does not restart Jasper.
+
+The saved `variant` remains available for modern mode. Retro always uses light controls, so Light/Dark and custom tab-height commands are unavailable there. Font, terminal cursor, toolbar visibility, keybinding and other live settings continue to work normally.
+
+Plugins need no changes to use ordinary Metal controls. Their custom icons and custom-painted content remain plugin-owned. On macOS, retro places application menus inside each window; modern uses the macOS menu bar. This follows the startup style and requires a full process restart. On supported macOS/JBR installations, terminal and plugin windows use a compact, flat gray title bar with centered regular-weight text and native traffic lights. The menu stays below the title bar and terminal tabs remain below the toolbar. Windows, Linux and unsupported runtimes retain native title bars. File dialogs remain native; the Jasper logo and Buddy artwork are unchanged.
+
+Retro UI text uses regular-weight system fonts: Helvetica Neue (then Helvetica) on macOS, Segoe UI (then Tahoma) on Windows, and Noto Sans (then Liberation Sans) on Linux. All platforms fall back to Noto Sans/DejaVu Sans when applicable, then Java’s portable SansSerif font if no preferred family is installed. Fonts are discovered locally; none require downloading or bundling. The terminal keeps its configured monospace font. The retro menu bar and toolbar have matching solid light-gray backgrounds, separated by a subtle gray line. Toolbar buttons stay flat with 28-pixel classic icons and centered labels beneath them. Retro captions use regular weight at one point below the Metal button font, with compact five-pixel side padding. Settings and Exit sit at the far right; Settings opens the configuration file and Exit uses the normal application quit flow. Icon-only and hidden toolbar modes remain available; tab close controls are icon-only, and status actions remain unboxed. Ordinary form buttons retain Metal styling.
+
 ### Interface typography
 
 `[font]` controls terminal text. `[ui.font]` independently controls application and plugin UI:

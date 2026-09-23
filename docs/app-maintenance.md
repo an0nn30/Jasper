@@ -187,6 +187,32 @@ these recipes when signatures change, and document any native acceptance still n
 Use patterns where an actual responsibility needs them. Future SDK work can adapt these
 boundaries; this refactor promises no plugin loading, binary compatibility or permissions.
 
+## Maintaining SDK skin icons
+
+`Appearance.icon(path, OldGnomeIcon)` is implemented at HostedUi's SDK boundary; AppIcons
+selects the family and adapts managed icons for toolbars. OldGnomeCatalog owns the distinct
+`icons/oldgnome-sdk` resources; do not reuse GnomeIcons' semantic mapping because some
+built-in toolbar entries deliberately use Tango. Existing custom icons keep their dimensions.
+
+To add a catalog choice, add the SDK enum constant, copy available 16/24/32/48 originals,
+add the app-native source-size entry, update assets.tsv hashes and the [catalog](sdk-icons.md),
+and preserve LICENSE.txt/NOTICE.md. Keep original bytes, including rectangular sources;
+the loader centers those with their proportions intact. Rendering uses a nearest adequate
+source or the largest available source, with 1x/2x JDK multi-resolution images. Low-resolution
+originals can look softer when enlarged; do not silently replace them with different artwork.
+
+Run SDK/testkit checks plus OldGnomeCatalogTest, HostedUiTest, SkinIconsTest and
+WindowChromeContributionsTest, then all architecture guards, check and installDist. The
+catalog's hashes/notices must also be present in the packaged app jar. Render headlessly;
+native application launch remains a user check.
+
+For standard meanings, prefer SDK `IconName` / `Appearance.icon(IconName)` (0.7.3).
+NamedIcons maps host-native names to `icons/standard` SVGs; AppIcons uses its own class loader,
+then selects the existing OldGNOME2 catalog in retro. Keep both catalogs complete when adding
+an IconName, with standard SVG source hashes/notices. LOCK/UNLOCK match Vault's original
+modern SVG bytes. NamedIconsTest and HostedUiTest verify all meanings, resource ownership,
+foreground changes and source integrity. Keep custom SVG overloads working for branded icons.
+
 ## Remote lives in a plugin
 
 SSH is bundled as `dev.jasper.remote` (`plugins/remote`): `hosts` owns the saved model, polling

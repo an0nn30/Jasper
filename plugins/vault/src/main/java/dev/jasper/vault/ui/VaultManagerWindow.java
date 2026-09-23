@@ -3,6 +3,7 @@ package dev.jasper.vault.ui;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.WindowSpec;
@@ -55,6 +56,8 @@ public final class VaultManagerWindow implements AutoCloseable {
             panel = new ManagerPanel(manager::entry, this::add, this::edit, this::delete, this::copyPublic,
                 grant -> report(manager.revoke(grant)), generate, this::changePassword, lock::lock,
                 () -> service.requestUnlock(this.owner));
+            panel.lock.setIcon(context.appearance().icon(IconName.LOCK));
+            panel.unlock.setIcon(context.appearance().icon(IconName.UNLOCK));
             panel.closeButton.addActionListener(event -> close());
             panel.cancelButton.addActionListener(event -> close());
             window.setContent(panel);
@@ -110,6 +113,12 @@ public final class VaultManagerWindow implements AutoCloseable {
         manager.entry(id).ifPresent(value -> {
             switch (value) {
                 case Account a -> dialog("Edit Login", close -> EntryEditor.login(a, manager::saveAccount, close));
+                case dev.jasper.vault.model.ManagedSshKey k -> dialog("Edit stored SSH key", close -> {
+                    var form = new EditorForm(close); var name = new javax.swing.JTextField(k.name(), 28);
+                    form.field("Name", name); form.field("Storage", new JLabel("Stored in Vault"));
+                    form.field("Fingerprint", new JLabel(k.fingerprint()));
+                    UUID keyId = k.id(); form.submit(() -> manager.renameManaged(keyId, name.getText().strip())); return form;
+                });
                 case SshKey k -> dialog("Edit SSH Key", close -> EntryEditor.key(k, manager::importKey, close));
                 case Note n -> dialog("Edit Secure Note", close -> EntryEditor.note(n, manager::saveNote, close));
                 default -> throw new IllegalArgumentException("Unknown vault entry");

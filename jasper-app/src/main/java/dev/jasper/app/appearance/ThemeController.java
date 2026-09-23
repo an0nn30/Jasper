@@ -1,6 +1,7 @@
 package dev.jasper.app.appearance;
 
 import dev.jasper.app.config.Appearance;
+import dev.jasper.app.config.ThemeStyle;
 import dev.jasper.app.config.UiFontConfig;
 import java.awt.Font;
 import javax.swing.plaf.FontUIResource;
@@ -18,8 +19,6 @@ import javax.swing.*;
 
 /** Application-owned, EDT-confined theme selection and value subscriptions. */
 public final class ThemeController {
-    // FlatLaf appends registrations, so register this package once rather than once per switch.
-    static { FlatLaf.registerCustomDefaultsSource("dev.jasper.app.themes"); }
 
     public static final class InstallationFailure extends IllegalStateException {
         InstallationFailure(BuiltinTheme theme, RuntimeException cause) {
@@ -29,6 +28,7 @@ public final class ThemeController {
 
     private final Set<BiConsumer<ResolvedTheme, Boolean>> listeners = new LinkedHashSet<>();
     private final Predicate<BuiltinTheme> installer;
+    private final ThemeStyle style;
     private ThemeState state = ThemeState.defaults();
     private UiFontConfig uiFont = UiFontConfig.defaults();
     private final Font platformFont;
@@ -36,38 +36,73 @@ public final class ThemeController {
     private static final List<String> FORM_FONTS = List.of("Label.font", "List.font", "TextField.font",
         "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font");
 
-    public ThemeController() { this(ThemeController::install); }
-
-    /** Installation is a boundary so failure can be exercised without constructing native windows. */
+    public ThemeController() { this(ThemeStyle.MODERN, Appearance.DARK); }
+    public ThemeController(ThemeStyle style, Appearance saved) {
+        this(style, saved, ThemeController::install);
+    }
     public ThemeController(Predicate<BuiltinTheme> installer) {
+        this(ThemeStyle.MODERN, Appearance.DARK, installer);
+    }
+    ThemeController(ThemeStyle style, Appearance saved, Predicate<BuiltinTheme> installer) {
         requireEdt();
+        this.style = Objects.requireNonNull(style);
         this.installer = Objects.requireNonNull(installer);
+        this.state = ThemeState.defaults().configure(Objects.requireNonNull(saved));
+        // Swing otherwise tries the component's plugin loader for third-party LAF delegates.
+        // Only UI delegate lookup belongs to the app; plugin class visibility stays isolated.
+        UIManager.put("ClassLoader", ThemeController.class.getClassLoader());
         UIManager.put("defaultFont", null);
         FORM_FONTS.forEach(key -> UIManager.put(key, null));
         UIManager.put("Jasper.uiFontFamilyOverride", false);
-        installOrThrow(state.resolve().chrome());
-        platformFont = UIManager.getFont("defaultFont");
+        installOrThrow(resolve(state).chrome());
+        platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
-
-    public ResolvedTheme current() { requireEdt(); return state.resolve(); }
-    public Appearance choice() { requireEdt(); return state.choice(); }
-
+    public ThemeStyle style() { requireEdt(); return style; }
+    private ResolvedTheme resolve(ThemeState candidate) {
+        return style == ThemeStyle.RETRO
+            ? new ResolvedTheme(BuiltinTheme.RETRO, BuiltinTheme.RETRO.palette()) : candidate.resolve();
+    }
+    public ResolvedTheme current() { requireEdt(); return resolve(state); }
+    public Appearance choice() {
+        requireEdt(); return style == ThemeStyle.RETRO ? Appearance.LIGHT : state.choice();
+    }
+    public void selectAppearance(Appearance choice) {
+        requireEdt(); Objects.requireNonNull(choice);
+        if (style == ThemeStyle.MODERN) apply(state.choose(choice));
+    }
     public void configure(Appearance saved) { configure(saved, uiFont); }
     public void configure(Appearance saved, UiFontConfig font) {
         requireEdt(); apply(state.configure(Objects.requireNonNull(saved)), Objects.requireNonNull(font));
     }
-    public void selectAppearance(Appearance choice) { requireEdt(); apply(state.choose(choice)); }
     public void select(BuiltinTheme theme) { selectAppearance(Objects.requireNonNull(theme).appearance()); }
     private void apply(ThemeState candidate) { apply(candidate, uiFont); }
     private void apply(ThemeState candidate, UiFontConfig font) {
-        ResolvedTheme previous = state.resolve(), next = candidate.resolve();
+        ResolvedTheme previous = resolve(state), next = resolve(candidate);
         boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
-        boolean choiceChanged = state.choice() != candidate.choice();
+        boolean choiceChanged = style == ThemeStyle.MODERN && state.choice() != candidate.choice();
         if (chromeChanged) {
+            // Metal's app aliases and fonts live in its LAF defaults. Capture the exact
+            // previous values: restoring an existing LAF may rebuild its stock defaults.
+            UIDefaults previousRetroDefaults = null;
+            if (style == ThemeStyle.RETRO) {
+                previousRetroDefaults = new UIDefaults();
+                previousRetroDefaults.putAll(UIManager.getLookAndFeelDefaults());
+            }
             installFontDefaults(font);
-            try { installOrThrow(next.chrome()); }
-            catch (RuntimeException failure) { installFontDefaults(uiFont); throw failure; }
+            try {
+                installOrThrow(next.chrome());
+                if (style == ThemeStyle.RETRO) MetalDefaults.configureFonts(resolveFont(font), platformLabelSize);
+            }
+            catch (RuntimeException failure) {
+                installFontDefaults(uiFont);
+                if (previousRetroDefaults != null) {
+                    UIDefaults restored = UIManager.getLookAndFeelDefaults();
+                    restored.clear();
+                    restored.putAll(previousRetroDefaults);
+                }
+                throw failure;
+            }
         }
         uiFont = font;
         UIManager.put("Jasper.uiFontFamilyOverride", !font.family().equalsIgnoreCase("system"));
@@ -86,6 +121,7 @@ public final class ThemeController {
     }
 
     private void installFontDefaults(UiFontConfig choice) {
+        if (style == ThemeStyle.RETRO) return;
         boolean defaults = choice.equals(UiFontConfig.defaults());
         Font family = resolveFont(choice);
         UIManager.put("defaultFont", defaults ? null : family);
@@ -106,9 +142,11 @@ public final class ThemeController {
 
     private void installOrThrow(BuiltinTheme theme) {
         LookAndFeel previous = UIManager.getLookAndFeel();
+        var previousMetalTheme = javax.swing.plaf.metal.MetalLookAndFeel.getCurrentTheme();
         try {
             if (!installer.test(theme)) throw new IllegalStateException("Could not apply theme: " + theme.label());
         } catch (RuntimeException failure) {
+            javax.swing.plaf.metal.MetalLookAndFeel.setCurrentTheme(previousMetalTheme);
             // A failed setup may have installed a LAF before one of its initialization hooks failed.
             if (UIManager.getLookAndFeel() != previous) {
                 try { UIManager.setLookAndFeel(previous); }
@@ -118,12 +156,15 @@ public final class ThemeController {
         }
     }
 
+    private static boolean modernDefaultsRegistered;
     static boolean install(BuiltinTheme theme) {
         requireEdt();
-        return switch (theme) {
-            case LIGHT -> FlatLightLaf.setup();
-            case DARK -> FlatDarkLaf.setup();
-        };
+        if (theme == BuiltinTheme.RETRO) return MetalDefaults.install();
+        if (!modernDefaultsRegistered) {
+            FlatLaf.registerCustomDefaultsSource("dev.jasper.app.themes");
+            modernDefaultsRegistered = true;
+        }
+        return theme == BuiltinTheme.LIGHT ? FlatLightLaf.setup() : FlatDarkLaf.setup();
     }
 
     private static void requireEdt() {

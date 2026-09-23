@@ -36,7 +36,7 @@ class SshConfigTest {
         assertThat(prod.hostname()).contains("api.prod.example");
         assertThat(prod.port()).isEqualTo(OptionalInt.of(2222));
         assertThat(prod.user()).as("earliest global value wins").contains("global");
-        assertThat(prod.identityFile()).contains("~/.ssh/id_ed25519");
+        assertThat(prod.identityFiles()).contains("~/.ssh/id_ed25519");
         assertThat(prod.proxyJump()).contains("bastion");
         SshConfig.Entry bastion = parsed.entries().get(1);
         assertThat(bastion.hostname()).contains("bastion.example");
@@ -76,9 +76,19 @@ class SshConfigTest {
             assertThat(entry.alias()).isEqualTo("prod");
             assertThat(entry.hostname()).contains("api.example");
             assertThat(entry.port()).isEqualTo(OptionalInt.of(2222));
-            assertThat(entry.identityFile()).contains("~/.ssh/work key");
+            assertThat(entry.identityFiles()).contains("~/.ssh/work key");
             assertThat(entry.user()).contains("deploy");
         });
+    }
+
+    @Test void accumulatesIdentitiesAcrossMatchingBlocks() {
+        var parsed = SshConfig.parse("IdentityFile global\nHost prod\n IdentityFile \"work key\"\n IdentityFile global\n IdentityFile none\nHost *\n IdentityFile fallback\n", i -> List.of());
+        assertThat(parsed.entries().getFirst().identityFiles()).containsExactly("global", "work key", "fallback");
+    }
+
+    @Test void preservesWindowsPathSeparators() {
+        var parsed = SshConfig.parse("Host win\n IdentityFile C:\\Users\\me\\.ssh\\id_ed25519\n", i -> List.of());
+        assertThat(parsed.entries().getFirst().identityFiles()).containsExactly("C:\\Users\\me\\.ssh\\id_ed25519");
     }
 
 }

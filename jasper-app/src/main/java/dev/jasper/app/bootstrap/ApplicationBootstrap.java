@@ -2,6 +2,7 @@ package dev.jasper.app.bootstrap;
 
 import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.config.ConfigService;
+import dev.jasper.app.config.ThemeStyle;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellIntegrationScripts;
 import dev.jasper.app.platform.AppDirs;
@@ -44,8 +45,7 @@ public final class ApplicationBootstrap {
             });
             Runtime.getRuntime().addShutdownHook(shutdown);
             acquired.own((AutoCloseable) () -> removeShutdownHook(shutdown));
-            System.setProperty("apple.awt.application.appearance", "system");
-            System.setProperty("apple.laf.useScreenMenuBar", "true");
+            configureDesktopProperties(service.initialState().snapshot().style());
             // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.
             JasperApplication.preparePlugins(dirs);
             SwingUtilities.invokeLater(() -> startDesktop(service, options, dirs, log, exceptions, shutdown, endpoint));
@@ -55,6 +55,12 @@ public final class ApplicationBootstrap {
             acquired.rollback(failure);
             LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
         }
+    }
+
+    /** macOS reads these settings during toolkit/LAF initialization; never change them on reload. */
+    static void configureDesktopProperties(ThemeStyle startupStyle) {
+        System.setProperty("apple.awt.application.appearance", "system");
+        System.setProperty("apple.laf.useScreenMenuBar", Boolean.toString(startupStyle != ThemeStyle.RETRO));
     }
 
     private static void startDesktop(ConfigService service, AppArguments options, AppDirs dirs, AppLog log,

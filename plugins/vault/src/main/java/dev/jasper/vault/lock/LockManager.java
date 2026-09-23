@@ -32,6 +32,11 @@ public final class LockManager {
     private boolean bound;
     private long generation;
     private boolean changingPassword;
+    private int mutations;
+    private final java.util.Set<Vault> staged = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    private int persistedVersion = 1;
+    public boolean busy() { return changingPassword || mutations != 0; }
+    public long generation() { return generation; }
     private CompletableFuture<Void> lastWrite = CompletableFuture.completedFuture(null);
 
     private record Opened(Vault vault, byte[] key, byte[] salt, boolean bound) { }
@@ -89,6 +94,7 @@ public final class LockManager {
     /** Zeroes everything and publishes {@link LockState#LOCKED}; a no-op when already locked. */
     public void lock() {
         generation++;
+        staged.forEach(Vault::zero); staged.clear();
         if (vault == null) return;
         vault.zero();
         SecureBytes.zero(key); SecureBytes.zero(salt);
@@ -117,6 +123,50 @@ public final class LockManager {
         try { bytes = VaultCipher.seal(key, salt, bound, plain); } finally { SecureBytes.zero(plain); }
         lastWrite = lastWrite.handle((ignored, failure) -> null).thenCompose(ignored -> onBackground(() -> { file.write(bytes); return null; }));
         return lastWrite;
+    }
+
+    /** Stages an isolated edit and publishes it only after the ordered durable write. */
+    public <T> CompletableFuture<T> transact(java.util.function.Function<Vault, T> mutation, BooleanSupplier cancelled) {
+        var result = new CompletableFuture<T>();
+        long expected = generation;
+        mutations++;
+        lastWrite = lastWrite.handle((ignored, failure) -> null).thenCompose(ignored -> {
+            if (vault == null || expected != generation || cancelled.getAsBoolean() || result.isCancelled())
+                return CompletableFuture.<Void>failedFuture(new IllegalStateException("The vault operation was cancelled"));
+            Vault original = vault;
+            byte[] snapshot = VaultCodec.encode(original);
+            Vault draft;
+            try { draft = VaultCodec.decode(snapshot); } finally { SecureBytes.zero(snapshot); }
+            staged.add(draft);
+            T value; byte[] encrypted;
+            try {
+                value = mutation.apply(draft);
+                VaultCodec.validateManaged(draft);
+                if (cancelled.getAsBoolean() || result.isCancelled()) throw new IllegalStateException("The vault operation was cancelled");
+                byte[] plain = VaultCodec.encode(draft);
+                try { encrypted = VaultCipher.seal(key, salt, bound, plain); } finally { SecureBytes.zero(plain); }
+            } catch (Throwable failure) { staged.remove(draft); draft.zero(); return CompletableFuture.<Void>failedFuture(failure); }
+            int version = draft.payloadVersion();
+            boolean upgrade = persistedVersion == 1 && version == 2;
+            return onBackground(() -> {
+                if (upgrade && file.exists()) file.backupVersionOne(file.read());
+                file.write(encrypted); return (Void) null;
+            }).handle((nothing, failure) -> {
+                staged.remove(draft);
+                if (failure == null) persistedVersion = version;
+                if (failure == null && expected == generation && vault == original) {
+                    vault = draft; original.zero(); result.complete(value);
+                } else {
+                    draft.zero();
+                    result.completeExceptionally(failure == null ? new IllegalStateException("Vault saved; the vault was locked meanwhile") : failure);
+                }
+                return (Void) null;
+            });
+        }).whenComplete((ignored, failure) -> {
+            mutations--;
+            if (failure != null) result.completeExceptionally(failure);
+        });
+        return result;
     }
 
     public CompletableFuture<Void> changePassword(char[] current, char[] replacement) {
@@ -173,7 +223,7 @@ public final class LockManager {
             opened.vault().zero(); SecureBytes.zero(opened.key()); SecureBytes.zero(opened.salt());
             throw new IllegalStateException("The vault operation was cancelled");
         }
-        vault = opened.vault(); key = opened.key(); salt = opened.salt(); bound = opened.bound();
+        vault = opened.vault(); persistedVersion = vault.payloadVersion(); key = opened.key(); salt = opened.salt(); bound = opened.bound();
         listener.accept(LockState.UNLOCKED);
     }
 

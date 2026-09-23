@@ -96,7 +96,7 @@ public class RemotePlugin implements Plugin {
     private final Map<UUID, UUID> panes = new HashMap<>();
     private HostKeyPanel currentHostKeyPanel;
     private HostEditor currentEditor;
-    private ImportPanel currentImport;
+    private ConfigImportController configImport;
     private ConfirmPanel currentConfirm;
     private ConnectionPanel currentConnectionPanel;
     private GroupNamePanel currentGroupEditor;
@@ -129,7 +129,7 @@ public class RemotePlugin implements Plugin {
         connections = new Connections(() -> settings, trust, agentFactory.apply(context), store::host,
             credentialSource, this::askHostKey, context.background(), ui, schedule);
         connections.onChanged(this::refreshStatus);
-        icon = context.appearance().icon("dev/jasper/remote/server.svg");
+        icon = context.appearance().icon(dev.jasper.sdk.ui.IconName.NETWORK);
 
         configureShortcuts();
         splitAction = context.actions().register(ActionSpec.of(SPLIT, "Split with Same Host").withKeywords(List.of("ssh", "split")), invoked -> invoked.pane().ifPresent(this::splitSameHost));
@@ -190,6 +190,7 @@ public class RemotePlugin implements Plugin {
 
     @Override public void stop() {
         stopped = true;
+        if (configImport != null) configImport.close();
         for (var attempt : Set.copyOf(attempts)) attempt.close();
         for (var question : Set.copyOf(questions)) question.cancel(true);
         if (poll != null) poll.stop();
@@ -398,31 +399,9 @@ public class RemotePlugin implements Plugin {
     }
 
     private void importConfig(WindowHandle window) {
-        Path config = sshDir.resolve("config");
-        Map<String, UUID> vaultKeys = new HashMap<>();
-        if (vault.isPresent()) for (CredentialDescriptor descriptor : vault.get().credentials()) if (descriptor.kind() == Kind.SSH_KEY) vaultKeys.put(descriptor.subtitle(), descriptor.id());
-        Path home = Path.of(System.getProperty("user.home"));
-        String user = System.getProperty("user.name", "");
-        List<RemoteHost> existing = store.hosts();
-        context.background().execute(() -> {
-            SshConfig.Parsed parsed;
-            try { parsed = SshConfig.parse(config); }
-            catch (IOException unreadable) { ui.execute(() -> context.notices().error("Could not read " + config + ": " + unreadable.getMessage())); return; }
-            List<ConfigImport.Candidate> plan = ConfigImport.plan(parsed, existing, vaultKeys, pub -> { try { return Files.isRegularFile(pub) ? Optional.of(Files.readString(pub)) : Optional.empty(); } catch (IOException e) { return Optional.empty(); } }, home, user);
-            ui.execute(() -> {
-                if (stopped || !window.isOpen()) return;
-                PluginDialog dialog = context.windows().dialog(new DialogSpec("Import from ~/.ssh/config", window, true));
-                currentImport = new ImportPanel(plan, parsed.skipped(), chosen -> {
-                    var next = new java.util.ArrayList<>(store.hosts());
-                    Set<String> names = new java.util.HashSet<>(next.stream().map(host -> host.name().toLowerCase(java.util.Locale.ROOT)).toList());
-                    for (RemoteHost host : chosen) if (names.add(host.name().toLowerCase(java.util.Locale.ROOT))) next.add(host);
-                    store.save(next).whenComplete((ignored, failure) -> ui.execute(() -> { if (failure != null) context.notices().error(message(failure)); dialog.close(); }));
-                }, dialog::close);
-                dialog.setContent(currentImport);
-                dialog.onClosed(() -> currentImport = null);
-                dialog.show();
-            });
-        });
+        if (configImport != null) configImport.close();
+        configImport = new ConfigImportController(context, vault, store, sshDir, ui);
+        configImport.show(window);
     }
 
     // ---- panel and status
@@ -500,6 +479,7 @@ public class RemotePlugin implements Plugin {
 
     private String credentialLabel(RemoteHost host) {
         return switch (host.auth()) {
+            case Auth.VaultKeys keys -> vault.isEmpty() ? "needs Credential Vault" : vault.get().lockState() != LockState.UNLOCKED ? "Vault locked" : keys.credentialIds().size() + " Vault key(s)";
             case Auth.Agent agent -> "SSH agent";
             case Auth.Vault credential -> vault.isEmpty() ? "needs Credential Vault" : vault.get().lockState() != LockState.UNLOCKED ? "Vault locked" : credentialName(credential.credentialId()).orElse("credential missing");
         };
@@ -521,7 +501,7 @@ public class RemotePlugin implements Plugin {
     Connections connections() { return connections; }
     HostKeyPanel currentHostKeyPanel() { return currentHostKeyPanel; }
     HostEditor currentEditor() { return currentEditor; }
-    ImportPanel currentImport() { return currentImport; }
+    ImportPanel currentImport() { return configImport == null ? null : configImport.panel(); }
     GroupNamePanel currentGroupEditor() { return currentGroupEditor; }
     ConnectionPanel currentConnectionPanel() { return currentConnectionPanel; }
     ConfirmPanel currentConfirm() { return currentConfirm; }

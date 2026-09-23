@@ -3,7 +3,7 @@ package dev.jasper.vault.model;
 import dev.jasper.vault.crypto.CorruptVaultException;
 import dev.jasper.vault.crypto.SecureBytes;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import dev.jasper.vault.crypto.WipingOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -19,15 +19,16 @@ import java.util.UUID;
  * null, and the intermediate byte arrays are zeroed. Instants are epoch seconds.
  */
 public final class VaultCodec {
-    static final int VERSION = 1;
+    static final int VERSION = 2;
     private static final int MAX_LENGTH = 1 << 24;
 
     private VaultCodec() { }
 
     public static byte[] encode(Vault vault) {
-        var bytes = new ByteArrayOutputStream();
+        validateManaged(vault);
+        var bytes = new WipingOutputStream();
         try (var out = new DataOutputStream(bytes)) {
-            out.writeShort(VERSION);
+            out.writeShort(vault.managedKeys().isEmpty() ? vault.payloadVersion() : VERSION);
             out.writeInt(vault.accounts().size());
             for (Account account : vault.accounts()) {
                 uuid(out, account.id()); string(out, account.name()); string(out, account.username());
@@ -47,17 +48,27 @@ public final class VaultCodec {
             for (Note note : vault.notes()) { uuid(out, note.id()); string(out, note.name()); secret(out, note.text()); out.writeLong(note.updated().getEpochSecond()); }
             out.writeInt(vault.grants().size());
             for (Grant grant : vault.grants()) { string(out, grant.pluginId()); uuid(out, grant.credentialId()); }
+            if (vault.payloadVersion() == 2 || !vault.managedKeys().isEmpty()) {
+                validateManaged(vault);
+                out.writeInt(vault.managedKeys().size());
+                for (ManagedSshKey key : vault.managedKeys()) {
+                    uuid(out, key.id()); string(out, key.name()); string(out, key.algorithm());
+                    string(out, key.fingerprint()); string(out, key.publicKey());
+                    out.writeInt(key.privateKey().length); out.write(key.privateKey());
+                    secret(out, key.passphrase()); out.writeLong(key.created().getEpochSecond());
+                }
+            }
+            return bytes.toByteArray();
         } catch (IOException impossible) {
             throw new IllegalStateException(impossible);
         }
-        return bytes.toByteArray();
     }
 
     public static Vault decode(byte[] bytes) {
         var vault = new Vault();
         try (var in = new DataInputStream(new ByteArrayInputStream(bytes))) {
             int version = in.readUnsignedShort();
-            if (version != VERSION) throw new CorruptVaultException("The vault contents are version " + version + "; this plugin reads version " + VERSION);
+            if (version != 1 && version != VERSION) throw new CorruptVaultException("The vault contents are version " + version + "; this plugin reads version " + VERSION);
             int accounts = count(in);
             for (int i = 0; i < accounts; i++) {
                 UUID id = uuid(in); String name = string(in), username = string(in);
@@ -76,14 +87,52 @@ public final class VaultCodec {
             for (int i = 0; i < notes; i++) vault.notes().add(new Note(uuid(in), string(in), secret(in), Instant.ofEpochSecond(in.readLong())));
             int grants = count(in);
             for (int i = 0; i < grants; i++) vault.grants().add(new Grant(string(in), uuid(in)));
+            if (version == 2) {
+                vault.requireManagedFormat();
+                int managed = count(in);
+                if (managed > 4096) throw new CorruptVaultException("Too many managed keys");
+                long total = 0;
+                for (int i = 0; i < managed; i++) {
+                    UUID id = uuid(in); String name = string(in), algorithm = string(in), fingerprint = string(in), pub = string(in);
+                    byte[] key = null; char[] phrase = null;
+                    try {
+                        int length = count(in);
+                        total += length;
+                        if (length < 1 || length > ManagedSshKey.MAX_BYTES || total > 64L * 1024 * 1024)
+                            throw new CorruptVaultException("Bad managed-key size");
+                        key = new byte[length]; in.readFully(key); phrase = secretOrNull(in);
+                        vault.managedKeys().add(new ManagedSshKey(id, name, algorithm, fingerprint, pub, key, phrase, Instant.ofEpochSecond(in.readLong())));
+                        key = null; phrase = null;
+                    } finally { SecureBytes.zero(key); SecureBytes.zero(phrase); }
+                }
+            }
+            var ids = new java.util.HashSet<UUID>();
+            for (Account a : vault.accounts()) if (!ids.add(a.id())) throw new CorruptVaultException("Duplicate entry ID");
+            for (SshKey k : vault.keys()) if (!ids.add(k.id())) throw new CorruptVaultException("Duplicate entry ID");
+            for (ManagedSshKey k : vault.managedKeys()) if (!ids.add(k.id())) throw new CorruptVaultException("Duplicate entry ID");
+            for (Note n : vault.notes()) if (!ids.add(n.id())) throw new CorruptVaultException("Duplicate entry ID");
+            if (in.read() != -1) throw new CorruptVaultException("Trailing vault data");
             return vault;
         } catch (EOFException truncated) {
             vault.zero();
             throw new CorruptVaultException("The vault contents are truncated");
-        } catch (IOException | IllegalArgumentException failure) {
+        } catch (CorruptVaultException failure) {
+            vault.zero(); throw failure;
+        } catch (IOException | RuntimeException failure) {
             vault.zero();
-            throw new CorruptVaultException("The vault contents are unreadable: " + failure.getMessage());
+            throw new CorruptVaultException("The vault contents are unreadable");
         }
+    }
+
+    /** Rejects invalid snapshots before encryption or file replacement. */
+    public static void validateManaged(Vault vault) {
+        var ids = new java.util.HashSet<UUID>();
+        for (Account a : vault.accounts()) if (!ids.add(a.id())) throw new IllegalArgumentException("Duplicate entry ID");
+        for (SshKey k : vault.keys()) if (!ids.add(k.id())) throw new IllegalArgumentException("Duplicate entry ID");
+        for (ManagedSshKey k : vault.managedKeys()) if (!ids.add(k.id())) throw new IllegalArgumentException("Duplicate entry ID");
+        for (Note n : vault.notes()) if (!ids.add(n.id())) throw new IllegalArgumentException("Duplicate entry ID");
+        if (vault.managedKeys().size() > 4096 || vault.managedKeys().stream().mapToLong(k -> k.privateKey().length).sum() > 64L * 1024 * 1024)
+            throw new IllegalArgumentException("Too many managed key bytes");
     }
 
     private static void uuid(DataOutputStream out, UUID id) throws IOException { out.writeLong(id.getMostSignificantBits()); out.writeLong(id.getLeastSignificantBits()); }
@@ -94,7 +143,7 @@ public final class VaultCodec {
         out.writeInt(utf8.length); out.write(utf8);
     }
 
-    private static String string(DataInputStream in) throws IOException { return new String(in.readNBytes(count(in)), StandardCharsets.UTF_8); }
+    private static String string(DataInputStream in) throws IOException { byte[] bytes = new byte[count(in)]; in.readFully(bytes); return new String(bytes, StandardCharsets.UTF_8); }
 
     private static void secret(DataOutputStream out, char[] text) throws IOException {
         if (text == null) { out.writeInt(-1); return; }
@@ -106,9 +155,8 @@ public final class VaultCodec {
         int length = in.readInt();
         if (length == -1) return null;
         if (length < 0 || length > MAX_LENGTH) throw new CorruptVaultException("Bad length");
-        byte[] utf8 = in.readNBytes(length);
-        if (utf8.length != length) throw new EOFException();
-        try { return SecureBytes.chars(utf8); } finally { SecureBytes.zero(utf8); }
+        byte[] utf8 = new byte[length];
+        try { in.readFully(utf8); return SecureBytes.chars(utf8); } finally { SecureBytes.zero(utf8); }
     }
 
     private static char[] secret(DataInputStream in) throws IOException {

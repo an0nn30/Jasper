@@ -15,7 +15,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class WindowStatusBarContributionsTest {
-    @Test void itemsRenderInPriorityOrderOnTheirSideAndClickTheirAction() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void itemsRenderInPriorityOrderOnTheirSideAndClickTheirAction(boolean retro) throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+        new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
         var model = new Contributions();
         List<String> clicks = new ArrayList<>();
         Action run = new AbstractAction("Run") {
@@ -40,6 +44,10 @@ class WindowStatusBarContributionsTest {
         assertThat(bar.contributedItems(true)).extracting(JButton::getText).containsExactly("example.org");
         JButton locked = bar.contributedItems(false).get(1);
         assertThat(locked.getToolTipText()).isEqualTo("Vault is locked");
+        if (retro) {
+            assertThat(locked.isContentAreaFilled()).isFalse();
+            assertThat(locked.getInsets()).isEqualTo(new java.awt.Insets(0, 0, 0, 0));
+        }
         locked.doClick();
         bar.contributedItems(false).get(0).doClick();
         assertThat(clicks).containsExactly("run");
@@ -50,6 +58,8 @@ class WindowStatusBarContributionsTest {
         bar.setContributed(List.of(), id -> null);
         assertThat(bar.contributedItems(false)).isEmpty();
         assertThat(bar.contributedItems(true)).isEmpty();
+        new dev.jasper.app.appearance.ThemeController();
+        });
     }
 
     @Test void theConfigurationSegmentKeepsItsFullWidthWhenSpaceIsTight() {

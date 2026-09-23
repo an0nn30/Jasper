@@ -114,4 +114,19 @@ class VaultManagerWindowTest {
             window.close();
         }
     }
+
+    @Test void managerLockAndUnlockUseHostNamedIcons() throws Exception {
+        for (boolean retro : new boolean[]{false, true}) try (var f = new VaultUiFixture(java.nio.file.Files.createDirectories(directory.resolve(retro ? "retro" : "modern"))); var host = new FakePluginHost()) {
+            host.setRetroIcons(retro);
+            PluginContext context = host.start(new PluginInfo("dev.jasper.vault", "Vault", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
+            host.addTerminalWindow(); WindowHandle owner = context.terminals().windows().getFirst();
+            var service = new VaultService(f.lock, () -> Optional.of(owner), p -> {}, p -> {}, p -> {}, text -> {});
+            var window = new VaultManagerWindow(context, f.lock, f.manager, service,
+                new SecretClipboard(text -> {}, Optional::empty, clear -> {}), () -> "status", () -> {});
+            window.show(owner, Optional.empty());
+            assertThat(window.panel.lock.getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.LOCK, retro));
+            assertThat(window.panel.unlock.getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.UNLOCK, retro));
+            window.close();
+        }
+    }
 }

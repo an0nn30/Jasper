@@ -20,10 +20,13 @@ import java.util.concurrent.CompletableFuture;
 
 /** A stand-in Vault plugin: always unlocked, every credential granted, {@code pick} answers the first descriptor. */
 public final class FakeVault implements Plugin {
-    public static final PluginInfo INFO = new PluginInfo("dev.jasper.vault", "Credential Vault", "0.1.0", Set.of());
+    public static final PluginInfo INFO = new PluginInfo("dev.jasper.vault", "Credential Vault", "0.2.0", Set.of());
     public final Map<UUID, CredentialDescriptor> descriptors = new LinkedHashMap<>();
     public final Map<UUID, java.util.function.Supplier<Credential>> secrets = new LinkedHashMap<>();
     public final List<String> consumers = new ArrayList<>();
+    public List<dev.jasper.vault.api.SshKeySource> importedSources = List.of();
+    public List<UUID> selectedIds = List.of();
+    public CompletableFuture<Optional<dev.jasper.vault.api.SshKeyImportResult>> pendingImport;
     public LockState state = LockState.UNLOCKED;
 
     public UUID password(String name, String username, String password) {
@@ -44,6 +47,11 @@ public final class FakeVault implements Plugin {
         context.services().publishPerConsumer(VaultApi.class, consumer -> {
             consumers.add(consumer.id());
             return new VaultApi() {
+                @Override public CompletableFuture<Optional<dev.jasper.vault.api.SshKeyImportResult>> importSshKeys(WindowHandle owner, List<dev.jasper.vault.api.SshKeySource> sources, List<UUID> selected) {
+                    importedSources = List.copyOf(sources); selectedIds = List.copyOf(selected);
+                    if (pendingImport != null) return pendingImport;
+                    return CompletableFuture.completedFuture(Optional.of(new dev.jasper.vault.api.SshKeyImportResult(Map.of(), selected.stream().map(descriptors::get).toList())));
+                }
                 @Override public LockState lockState() { return state; }
                 @Override public CompletableFuture<Boolean> ensureUnlocked(WindowHandle owner) { return CompletableFuture.completedFuture(state == LockState.UNLOCKED); }
                 @Override public List<CredentialDescriptor> credentials() { return state == LockState.UNLOCKED ? List.copyOf(descriptors.values()) : List.of(); }

@@ -181,4 +181,36 @@ class SamplePluginTest {
                 assertThat(host.paletteOpens()).containsExactly(window + " dev.jasper.sample.greetings - -");
             }
         }
+
+    @Test void requestsBothIconFamiliesForEitherSkin() {
+        for (boolean retro : new boolean[]{false, true}) try (var host = new FakePluginHost()) {
+            host.setRetroIcons(retro);
+            host.setConfig("dev.jasper.sample", Map.of("demo_ui", true));
+            var delegate = new SamplePlugin();
+            var icons = new java.util.ArrayList<dev.jasper.sdk.testing.FakeSkinIcon>();
+            host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
+                public void start(dev.jasper.sdk.plugin.PluginContext context) throws Exception {
+                    var appearance = (dev.jasper.sdk.ui.Appearance) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.ui.Appearance.class}, (proxy, method, args) -> {
+                            try {
+                                Object value = method.invoke(context.appearance(), args);
+                                if (value instanceof dev.jasper.sdk.testing.FakeSkinIcon icon) icons.add(icon);
+                                return value;
+                            } catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                        });
+                    var wrapped = (dev.jasper.sdk.plugin.PluginContext) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.plugin.PluginContext.class}, (proxy, method, args) -> {
+                            if (method.getName().equals("appearance")) return appearance;
+                            try { return method.invoke(context, args); }
+                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                        });
+                    delegate.start(wrapped);
+                }
+                public void stop() { delegate.stop(); }
+            });
+            assertThat(host.failures()).isEmpty();
+            assertThat(icons).extracting(dev.jasper.sdk.testing.FakeSkinIcon::retroIcon).containsExactly(dev.jasper.sdk.ui.OldGnomeIcon.EXECUTE, dev.jasper.sdk.ui.OldGnomeIcon.EXECUTE);
+            assertThat(icons).allSatisfy(icon -> assertThat(icon.retro()).isEqualTo(retro));
+        }
+    }
 }

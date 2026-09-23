@@ -10,7 +10,7 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
-| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `Appearance`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `Notices`, `Platform` |
+| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `Appearance`, `IconName`, `OldGnomeIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `Notices`, `Platform` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
 
@@ -21,3 +21,17 @@ implement everything else, so methods can be added without breaking plugins.
 Start with the [authoring guide](../docs/plugin-authoring.md); the
 [architecture](../docs/sdk-architecture.md) explains loading, threading and lifetimes.
 Unit-test a plugin with `dev.jasper.sdk.testing.FakePluginHost` from `jasper-sdk-testkit`.
+
+## Icons for both skins (0.7.4)
+
+```java
+var lock = context.appearance().icon(IconName.LOCK);
+var unlock = context.appearance().icon(IconName.UNLOCK);
+```
+
+Import `dev.jasper.sdk.ui.IconName`. Jasper supplies both modern and retro artwork; plugins
+request only the meaning, without image paths or skin checks. Compact icons stay 16px;
+retro host toolbars use an independent 28px variant. Declare SDK `>=0.7.4, <0.8` for named icons.
+The existing custom SVG and SVG/OldGnomeIcon overloads remain supported. Custom older hosts
+inherit UnsupportedOperationException for named requests until they implement the new catalog.
+See the [catalog, size rules and testkit example](../docs/sdk-icons.md).

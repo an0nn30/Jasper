@@ -191,7 +191,7 @@ public final class CommandPalettePreview {
                 .append("Swing UI scale: ").append(UIScale.getUserScaleFactor()).append("\n")
                 .append("Pixel output scales: 1x, 2x\n\n");
             for (Scenario scenario : Scenario.values()) {
-                for (BuiltinTheme theme : BuiltinTheme.values()) {
+                for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
                     configure(scenario, theme);
                     assertScenario(scenario);
                     for (int pixelScale : List.of(1, 2)) {
@@ -290,6 +290,7 @@ public final class CommandPalettePreview {
             return switch (theme) {
                 case DARK -> "dark";
                 case LIGHT -> "light";
+                case RETRO -> "retro";
             };
         }
 

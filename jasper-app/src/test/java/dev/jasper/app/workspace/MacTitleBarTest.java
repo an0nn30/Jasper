@@ -20,7 +20,7 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MacTitleBarTest {
-    @AfterEach void cleanup() throws Exception { closeOwners(); }
+    @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new dev.jasper.app.appearance.ThemeController()); }
 
     @Test void supportedRootHidesOnlyNativeDrawingAndRetainsTitleMetadata() throws Exception {
         edt(() -> {
@@ -149,7 +149,7 @@ class MacTitleBarTest {
             var placeholder = new JPanel();
             try (var bar = MacTitleBar.install(root, new JPanel(), placeholder, () -> 38, () -> { }, true)) {
                 bar.setTitle("Credential Vault", true);
-                for (BuiltinTheme theme : BuiltinTheme.values()) {
+                for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
                     themes.select(theme); SwingUtilities.updateComponentTreeUI(root);
                     bar.setLight(theme == BuiltinTheme.LIGHT); bar.setSize(800, 38); bar.doLayout();
                     var image = new BufferedImage(800, 38, BufferedImage.TYPE_INT_RGB);
@@ -161,6 +161,64 @@ class MacTitleBarTest {
                 }
             }
         });
+    }
+
+    @Test void retroTitleStaysAboveMenusAndNeverTakesTheWorkspaceTabs() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()), new dev.jasper.app.appearance.ThemeController(
+                dev.jasper.app.config.ThemeStyle.RETRO, dev.jasper.app.config.Appearance.LIGHT));
+            var root = new JRootPane();
+            var metadata = new AtomicReference<String>();
+            try (var bar = WindowContent.installTitleBar(root, owner, true, metadata::set)) {
+                assertThat(bar).isNotNull();
+                bar.setMenuBar(owner.menuBar());
+                owner.installRootBindings(root);
+                root.setSize(960, 640); layoutTree(root);
+                assertThat(bar.getHeight()).isEqualTo(32);
+                assertThat(root.getJMenuBar()).as("the menu is below the native title region").isNull();
+                var menuPoint = SwingUtilities.convertPoint(owner.menuBar(), 0, 0, root);
+                assertThat(menuPoint.y).isEqualTo(bar.getHeight());
+                assertThat(SwingUtilities.isDescendingFrom(owner.tabStrip(), owner)).isTrue();
+                assertThat(SwingUtilities.isDescendingFrom(owner.tabStrip(), bar)).isFalse();
+                assertThat(label(bar).getFont().getStyle()).isEqualTo(Font.PLAIN);
+                assertThat(label(bar).getFont().getFamily()).isEqualTo(UIManager.getFont("Label.font").getFamily());
+                assertThat(pixel(bar).getRed()).isLessThan(owner.toolbar().getBackground().getRed());
+                owner.newTab(HOME); owner.currentTab().rename("build logs"); owner.update(); layoutTree(root);
+                assertThat(label(bar).isVisible()).isTrue();
+                assertThat(label(bar).getText()).isEqualTo("build logs");
+                assertThat(metadata.get()).isEqualTo("build logs");
+                assertThat(label(bar).getX() * 2 + label(bar).getWidth()).isEqualTo(bar.getWidth());
+                int count = owner.tabStrip().getTabCount();
+                owner.menuBar().getMenu(0).getItem(0).doClick();
+                assertThat(owner.tabStrip().getTabCount()).isEqualTo(count + 1);
+                owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(root);
+                assertThat(bar.getHeight()).isEqualTo(32);
+                assertThat(owner.menuBar().isVisible()).isTrue();
+                root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(12, 6, 140, 20));
+                bar.doLayout();
+                assertThat(label(bar).getX()).isGreaterThanOrEqualTo(160);
+                bar.setSize(80, 32); bar.doLayout();
+                assertThat(label(bar).getWidth()).isZero();
+            }
+        });
+    }
+
+    @Test void retroUnsupportedRootKeepsNativeDecorationsAndMenuPlacement() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()), new dev.jasper.app.appearance.ThemeController(
+                dev.jasper.app.config.ThemeStyle.RETRO, dev.jasper.app.config.Appearance.LIGHT));
+            var root = new JRootPane();
+            assertThat(WindowContent.installTitleBar(root, owner, false, title -> {})).isNull();
+            root.setJMenuBar(owner.menuBar());
+            assertThat(root.getContentPane()).isSameAs(owner);
+            assertThat(root.getJMenuBar()).isSameAs(owner.menuBar());
+            assertThat(root.getClientProperty("apple.awt.fullWindowContent")).isNull();
+        });
+    }
+
+    private static void layoutTree(Container container) {
+        container.doLayout();
+        for (var child : container.getComponents()) if (child instanceof Container nested) layoutTree(nested);
     }
 
     private static JLabel label(MacTitleBar bar) { return (JLabel) bar.getComponent(0); }

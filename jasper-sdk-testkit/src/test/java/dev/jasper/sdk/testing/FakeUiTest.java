@@ -75,4 +75,15 @@ class FakeUiTest {
             assertThatIllegalArgumentException().isThrownBy(() -> context.appearance().icon("no/such/icon.svg"));
         }
     }
+    @Test void retainsRealDialogContentUntilClose() {
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), c -> {});
+            var owner = context.terminals().window(host.addTerminalWindow()).orElseThrow();
+            var dialog = context.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Inspect", owner, true));
+            var panel = new javax.swing.JPanel(); dialog.setContent(panel); dialog.show();
+            assertThat(host.windowContent(INFO.id(), "Inspect")).containsSame(panel);
+            dialog.close(); assertThat(host.windowContent(INFO.id(), "Inspect")).isEmpty();
+        }
+    }
+
 }

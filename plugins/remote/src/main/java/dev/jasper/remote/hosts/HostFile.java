@@ -56,10 +56,12 @@ public final class HostFile {
     private static RemoteHost host(TomlTable table) {
         UUID id = optional(table, "id").map(HostFile::uuid).orElseGet(UUID::randomUUID);
         String auth = optional(table, "auth").orElse("agent");
+        if (table.get("credential") != null && table.get("credentials") != null) throw new IllegalArgumentException("Choose one credential form");
         Auth resolved = switch (auth) {
             case "agent" -> Auth.AGENT;
+            case "vault-keys" -> new Auth.VaultKeys(keyIds(table));
             case "vault" -> new Auth.Vault(uuid(optional(table, "credential").orElseThrow(() -> new IllegalArgumentException("'credential' is required for auth = \"vault\""))));
-            default -> throw new IllegalArgumentException("'auth' must be \"vault\" or \"agent\"");
+            default -> throw new IllegalArgumentException("'auth' must be \"vault\", \"vault-keys\" or \"agent\"");
         };
         long port = table.get("port") instanceof Long value ? value : 22;
         if (port < 1 || port > 65535) throw new IllegalArgumentException("'port' must be 1 to 65535");
@@ -67,6 +69,16 @@ public final class HostFile {
         return new RemoteHost(id, optional(table, "name").orElse(""), optional(table, "hostname").orElse(""), (int) port, optional(table, "username").orElse(""),
             resolved, optional(table, "group").orElse(""), table.get("favorite") instanceof Boolean favorite && favorite,
             optional(table, "jump").map(HostFile::uuid), created, instant(table, "updated").orElse(created));
+    }
+
+    private static List<UUID> keyIds(TomlTable table) {
+        if (!(table.get("credentials") instanceof TomlArray array)) throw new IllegalArgumentException("Vault keys need a credentials array");
+        var ids = new ArrayList<UUID>();
+        for (int i = 0; i < array.size(); i++) {
+            if (!(array.get(i) instanceof String text)) throw new IllegalArgumentException("A credential ID must be a string");
+            ids.add(uuid(text));
+        }
+        return ids;
     }
 
     private static Optional<String> optional(TomlTable table, String key) {
@@ -94,7 +106,7 @@ public final class HostFile {
         Set<String> names = new HashSet<>();
         for (RemoteHost host : hosts) {
             if (!names.add(host.name().toLowerCase(Locale.ROOT))) throw new IllegalArgumentException("A host named " + host.name() + " exists");
-            byId.put(host.id(), host);
+            if (byId.put(host.id(), host) != null) throw new IllegalArgumentException("Duplicate host id");
         }
         for (RemoteHost host : hosts) {
             Set<UUID> seen = new HashSet<>();
@@ -118,6 +130,8 @@ public final class HostFile {
             out.append("port = ").append(host.port()).append('\n');
             out.append("username = ").append(tomlString(host.username())).append('\n');
             switch (host.auth()) {
+                case Auth.VaultKeys keys -> out.append("auth = \"vault-keys\"\ncredentials = [")
+                    .append(String.join(", ", keys.credentialIds().stream().map(id -> "\"" + id + "\"").toList())).append("]\n");
                 case Auth.Agent agent -> out.append("auth = \"agent\"\n");
                 case Auth.Vault vault -> out.append("auth = \"vault\"\ncredential = \"").append(vault.credentialId()).append("\"\n");
             }

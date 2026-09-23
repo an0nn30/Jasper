@@ -23,5 +23,10 @@ public final class UiTestAccess {
     public static JTextField username(HostEditor editor) { return editor.username; }
     public static JRadioButton agentAuth(HostEditor editor) { return editor.agentAuth; }
     public static JButton save(HostEditor editor) { return editor.save; }
+    public static JButton chooseCredential(ImportPanel panel, int row) { return panel.choose.get(row); }
+    public static JButton refreshImport(ImportPanel panel) { return panel.refresh; }
+    public static JButton cancelImport(ImportPanel panel) { return panel.cancel; }
+    public static JCheckBox importCheck(ImportPanel panel, int row) { return panel.checks.get(row); }
+    public static String importStatus(ImportPanel panel) { return panel.status.getText(); }
     public static JButton importButton(ImportPanel panel) { return panel.importButton; }
 }

@@ -2,6 +2,20 @@
 
 ## Current state — 2026-09-23
 
+The user approved merging all `codex/retro-metal` work through `adfc37cb` into
+`main` and pushing `main` to `origin`. The conflict-free merge preserves the newer
+keyboard-shortcut reference and includes Metal retro chrome, bundled OldGNOME2
+icons, portable typography, skin-aware SDK icons, Vault/Remote icon migration and
+self-contained Vault-backed SSH import. The Codex-managed feature worktree and its
+development data are retained.
+
+Merged-result verification: `./gradlew check :jasper-app:installDist` passed in
+1m51s with **1,765 tests: 1,762 passed, three expected skips, zero failures/errors**.
+Architecture guards, source hygiene and diff checks passed; the main-checkout
+application distribution was rebuilt. Native GUI and real-host acceptance remain
+user-run. Earlier integration/publication notes below describe their historical
+milestones.
+
 The approved keyboard shortcut reference is integrated into local `main` through
 `5f374e04` from `codex/keyboard-shortcuts`. The Codex-managed worktree is retained at
 `/Users/dustin/.codex/worktrees/keyboard-shortcuts/moray`.
@@ -57,6 +71,190 @@ is merged at `17c0476`. The Credential Vault design
 (`superpowers/specs/2026-09-22-jasper-vault-design.md`) has plan 6a (core and API) integrated into local `main` at `c8141b6`; plan 6b (UI)
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
+
+### Self-contained SSH import — implemented and verified
+
+The approved [design](superpowers/specs/2026-09-23-jasper-vault-backed-ssh-import-design.md)
+and seven-task [plan](superpowers/plans/2026-09-23-jasper-vault-backed-ssh-import.md)
+are implemented natively on `codex/retro-metal`. Vault/Remote 0.2 import referenced private keys
+and their passphrases into encrypted managed storage, grant only the requesting plugin, and save
+ordered Vault identities after persistence. Re-import **Update** repairs Agent hosts while
+preserving UUID, group and favorite. Conflicting host edits force Refresh; durable keys remain
+available for retry. Legacy manual Agent/password/path-based authentication is retained.
+
+Real Vault-form tests pass in both icon modes: two aliases deduplicate an encrypted key, repair
+an Agent host, restart with source files deleted, unlock and authenticate against loopback with
+no agent. Staged isolated-loader tests exercise the exported API, independent key parsing and
+1x/2x Metal/FlatLaf forms. These exposed and fixed setup-dialog ordering, independent setup
+waiter cancellation, BC provider isolation and Swing UI-delegate lookup from plugin components.
+
+Plan rulings: an independently authored v1 fixture replaces an old-code-generated fixture;
+transaction inputs are consumed rather than retained; one state owner combines request/review
+and passphrase prompts; the restart test accumulates the testkit's draining output. The existing
+plain EC PEM generator produces a form MINA rejects; supported encrypted OpenSSH ECDSA is tested,
+and the unrelated generator format is deferred. No production key/Vault was read or migrated.
+`./gradlew check :jasper-app:installDist` passed with **1,757 tests: 1,754 passed, three expected skips, zero failures/errors**. Architecture guards, source hygiene and staged dependencies passed. Independent final review is complete: a stale legacy editor could persist a duplicate managed UUID and prevent unlock; stale saves and duplicate snapshots are now rejected before persistence. Held-read cancellation and overlapping durable-import regressions verify secret wiping and deduplication, including deliberate mutation checks. No minor findings remain. The [plan review record](superpowers/plans/2026-09-23-jasper-vault-backed-ssh-import.md#final-review-record-and-execution-rulings) preserves every execution ruling and its cost. Windows ACL handling was inspected but not executed on Windows; full OpenSSH semantics remain outside the documented import subset. GUI and real-host acceptance remain
+user-run; re-import and check **Update** on the affected hosts when testing this distribution.
+
+### Remote empty-agent diagnosis — 2026-09-23
+
+Investigated the user's imported-host authentication failure on `codex/retro-metal`.
+The merge changed Remote's icon selection only; its SSH authentication code matched main.
+Saved hosts in the previous SSH worktree use Vault, while the fresh imports here use Agent;
+the current system agent reported no identities. Development homes and Vault files are
+separate. No private keys were read, credentials migrated, or real remote connection opened.
+
+Remote now checks for usable agent identities before TCP/host-key prompts and explains how
+to recover, instead of reporting generic authentication rejection. The probe uses the auth
+timeout and connection cancellation ownership; retry queries the agent again. A regression
+failed with the user's original message, then passed after the fix, including successful
+loopback SSH authentication after adding a generated key to the test agent. Existing Vault
+and agent connection tests pass. Independent review found no actionable issues. The guide
+explains Vault mapping, agent loading, and separate development homes. Choosing/configuring
+a credential for the user's current saved hosts remains user-dependent.
+
+Verification: `./gradlew check :jasper-app:installDist` passed: 1,712 tests,
+1,709 passed, three expected skips, zero failures/errors. Distribution rebuilt;
+source hygiene and `git diff --check` passed. No native GUI launch or push.
+
+### Retro Metal appearance — 2026-09-22
+
+Implemented on `codex/retro-metal` in `/Users/dustin/.codex/worktrees/retro-metal-plan/moray`,
+based on `ac02f94`, following the approved [design](superpowers/specs/2026-09-22-jasper-retro-metal-design.md)
+and [plan](superpowers/plans/2026-09-22-jasper-retro-metal.md). The user chose native inline
+execution with one independent final review. Headless verification and the independent review fix pass are complete.
+See [configuration](configuration.md#retro-metal-appearance) to enable it.
+
+Retro uses Metal/Ocean, light controls, black high-contrast terminal colors and bundled GNOME
+icons. The startup style stays fixed; reload derives a restart notice while sessions and
+live settings continue normally. Plugins report LIGHT chrome and preserve artwork and SDK
+contracts. User screenshot feedback added flat compact toolbar buttons with 24-pixel icons,
+icon-only tab close controls and unboxed status actions; forms retain Metal defaults.
+The user confirmed GPL2+ for OldGNOME2; assets include the license, honest origin notice and
+22-file hash manifest. No GUI launch, merge, push or edits to the original checkout's dirty files.
+
+Execution adjustments: invalid config types retain existing whole-snapshot rejection; unknown
+strings default per-field. EDT cleanup/parameterized tests explicitly marshal LAF changes.
+Compacting toolbar labels invalidates Swing's cached layout requirements. Real palette scope
+tests cover submission/cancellation in both styles. Vault's own SDK-only test module renders
+Metal forms without an app dependency; host tests render forms in all three appearances.
+Visual QA also corrected a low-contrast palette accent alias and terminal placeholder foreground; regression tests failed before both fixes. Native OS title bars, modality, menu/focus and Retina acceptance remain user-run.
+
+Verification: `verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture
+verifyPluginArchitecture check :jasper-app:installDist` passed: 1,578 tests, 1,575 passed,
+three expected skips, zero failures/errors. Inspected 1x/2x workspace, palette and Vault renders;
+modern light/dark host forms remain intact. Installed `jasper-app.jar` contains all 22 PNGs,
+matching hashes, license and notice. Source hygiene and `git diff --check` passed. No native
+window was launched. The plan's user-run OS acceptance checklist remains pending.
+
+Independent review found two issues, both fixed with failing-then-passing regressions: very
+long tab titles now elide within 240 logical pixels, preserving complete tooltip/accessibility
+text and a reachable close icon under overflow; GNOME icons use JDK multi-resolution ImageIcon
+support so Metal renders visibly disabled icons, including icon-only fallback controls.
+The full check/distribution gate passed again after these fixes. No deferred minor findings.
+The reviewer set native OS/physical Retina behavior aside; those checks remain user-run.
+Branch and worktree are preserved, with no merge or push.
+
+### Retro toolbar icon refinement — 2026-09-23
+
+After native screenshot feedback that the OldGNOME2 toolbar symbols were too faint,
+replaced the five core toolbar glyphs with clearer classic Tango choices: blue plus
+(New Tab), blue monitor (New Window), paired windows (Split), blue expansion arrows
+(Zoom), and a blue-lens magnifier (Find). The rest of the original collection remains.
+Flat 24-pixel toolbar geometry, icon-only closes and disabled-state behavior are unchanged.
+
+Ten unmodified Tango 0.8.90 PNGs (16/32-pixel sources) are bundled with upstream COPYING,
+AUTHORS, source URL and hash manifest. The upstream release places these icons in the
+public domain. JDK multi-resolution ImageIcons retain stock Metal disabled rendering;
+32-pixel sources are rendered to 24 logical pixels for toolbar use. No runtime downloads.
+Targeted icon/resource, disabled-state, toolbar/tab tests and installDist passed. Inspected
+the enabled toolbar preview and workspace render. No native GUI launch, merge or push.
+
+### Retro toolbar captions — 2026-09-23
+
+Following the user's MobaXTerm reference, retro toolbar icons are now 32 logical pixels
+with centered labels underneath and flat buttons. Standard Metal font/disabled behavior
+remain intact. Built-in controls and contributed buttons/dropdowns use the same caption
+placement; plugin-owned artwork remains unchanged. Icon-only mode is shorter, hidden mode
+still hides the bar, and narrow windows compact labels then restore them when widened.
+Modern toolbar presentation and tab-close controls are unchanged. No new assets/dependencies.
+
+Verified targeted toolbar actions/modes, minimum-width layout and widening, plugin toolbar
+contributions, 16/24/32-pixel disabled-icon rendering, and the rebuilt distribution. Inspected
+actual toolbar renders at 1x/2x, headlessly without starting any shells or native windows.
+
+User size refinement: reduced toolbar icons from 32 to 28 logical pixels, retaining captions
+below them and flat styling. The bundled 32-pixel source artwork is unchanged.
+
+### SDK icons for both skins — 2026-09-23
+
+Implemented SDK 0.7.2 on `codex/retro-metal` per the approved [design](superpowers/specs/2026-09-23-jasper-sdk-skin-icons-design.md)
+and [native implementation plan](superpowers/plans/2026-09-23-jasper-sdk-skin-icons.md).
+`Appearance.icon(modernSvgResourcePath, OldGnomeIcon)` selects modern SVG or one of 22
+explicit OldGNOME2 choices. Host toolbars use independent 28px retro variants; shared
+menu/palette/plugin-content icons remain 16px. Existing icon calls and custom icons keep
+their behavior. Sample and Vault's existing SDK icon calls opt in, with SDK >=0.7.2 manifests.
+The fake host supports pre-start style configuration and inspectable icon selections.
+
+Bundled 55 unmodified originals with GPL2+ notice/license and source hashes. See the
+[catalog and examples](sdk-icons.md). Source images lacking larger variants are enlarged;
+the original rectangular keyring image is centered with its proportions preserved. A
+shared-placement regression also exposed missing Swing SMALL_ICON metadata; contributed
+menus now display their supplied compact icons. These execution adjustments are recorded
+in the plan; the user's direct execution request superseded another plan approval checkpoint.
+
+Full architecture guards, check and installDist passed: 1,591 tests, 1,588 passed, three
+expected skips, zero failures/errors. Installed app jar contains all 55 verified PNG hashes
+and license/notice; inspected catalog and modern/retro headless toolbar previews at 1x/2x,
+including disabled Metal icons. Independent review of `4234a95..ffa18ed` found no issues
+and independently verified XML counts and installed assets. Native OS/physical Retina
+acceptance stays user-run; attribution retains the user's explicit GPL2+ declaration.
+No GUI, login shell, merge or push. Branch/worktree preserved; no deferred findings.
+
+### Semantic SDK icons and Vault — 2026-09-23
+
+Updated `codex/retro-metal` from local main `c1eb385` in merge `20f3564`, preserving its
+Vault File-menu placement/no rail entry and modern title-colored status background; retro
+continues using Metal's light panel background. Full-suite integration fixtures now verify
+these main changes while retaining status contrast checks.
+
+The user's semantic API clarification supersedes requiring plugins to choose both skins:
+SDK 0.7.3 now provides `Appearance.icon(IconName.LOCK)` / `UNLOCK` and 20 other meanings.
+Jasper owns all modern/retro artwork and uses its own resource loader. Existing custom SVG
+and OldGnomeIcon overloads remain compatible. The fake exposes FakeNamedIcon(name, retro).
+Vault's status/menu icons and actual manager lock/unlock controls use semantic names only;
+its minimum SDK is 0.7.3. Original modern lock/unlock SVGs are copied byte-for-byte into the
+host; manager buttons now share those standard shapes, including an unlock glyph.
+
+See [implementation plan](superpowers/plans/2026-09-23-jasper-semantic-icons.md) and
+[API guide with headless Vault preview](sdk-icons.md). Added 22 modern SVGs with exact
+source/hash manifest and MIT license; missing existing choices came from a pinned official
+Tabler revision. Existing OldGNOME2 catalog supplies retro images. Package verification
+confirmed 22 modern SVG and 55 retro PNG hashes plus notices. All architecture guards,
+check and installDist passed: 1,596 tests, 1,593 passed, three expected skips, zero failures/errors.
+Independent final review of `8ad055b..9750043` found no issues and independently confirmed
+XML totals, installed modern hashes and original Vault artwork identity. Native GUI/login
+shell not launched; physical desktop acceptance remains user-run. Branch/worktree retained;
+local main is an ancestor, no merge back or push, no deferred findings.
+
+### Retro toolbar spacing refinement — 2026-09-23
+
+User screenshot feedback requested a tighter MobaXTerm-like toolbar. Reduced retro button
+padding from 8 to 5 logical pixels per side and from 4 to 3 vertically. Captions now use
+regular weight, one point smaller than the Metal button font, with a 3-pixel icon/text gap.
+Icons remain 28px; built-in and contributed buttons share the style. Modern toolbar styling
+is unchanged. Verified existing toolbar modes, minimum width, label restoration, contributed
+controls and headless previews; distribution rebuilt without launching the GUI.
+
+### Retro in-window menu bar — 2026-09-23
+
+Per user request, desktop bootstrap now sets `apple.laf.useScreenMenuBar=false` for the
+captured retro startup style and true for modern, before Swing/toolkit initialization.
+Existing terminal and auxiliary window JMenuBars stay attached to their frames, so retro
+renders them inside the windows on macOS. Full process restart is required; config reload
+does not change this process-wide selection. Startup configuration regression verifies both
+styles override inherited JVM values. Headless bootstrap/chrome/window checks and installDist
+passed; native macOS acceptance remains user-run. No GUI launch or push.
 
 ### Remote plan 7a (SSH) — 2026-09-22
 
@@ -1919,3 +2117,115 @@ Task 1 was independently approved with no required fixes. Task 2 added RED/GREEN
 The readiness branch was pushed after explicit user approval. Initial CI passed macOS/Linux but failed three Windows app tests. Test-only `a5f4dc1` uses the platform line separator for the exact logging fallback assertion and adds method-level Windows exclusions for two existing `/bin/sh` fixtures. Production code, package and measured runtime remain unchanged. Focused 15/15 and local full 575 passed/one known skip; `c793925` additionally fixes an off-EDT test resize race without weakening its grid/connector assertions; focused8/full575pass1skip and the confirming three-platform run passed. Details and the controller-review substitution caused by the agent service's thread limit are recorded in the [readiness handoff](terminal-readiness.md#publication-and-ci-follow-up).
 
 App refactor execution ruling: coordinator shutdown preserves pane-owned session close; late arrivals close immediately. The controlled lifecycle tests use a child JVM through supported APIs because app tests cannot access terminal fake connectors.
+
+### Retro toolbar Settings and Exit — 2026-09-23
+
+Added retro-only Settings and Exit buttons after the toolbar's flexible space. Plugin
+controls stay to their left. Both use the existing application actions, preserving
+configuration availability and normal quit handling. They retain the compact 28-pixel,
+flat, labeled presentation and existing icon-only/hidden modes. Exit uses original
+16/24-pixel OldGNOME2 `actions/exit.png` artwork (updated per user feedback) with
+source hashes in the GPL2+ asset manifest.
+Modern toolbar contents are unchanged.
+
+Targeted toolbar, action, contribution and icon tests passed, including red/green checks
+for the new placement and callbacks; installDist rebuilt successfully. Inspected the
+headless 2x toolbar preview. No native GUI launch, merge or push.
+
+The full application check and architecture gate also passed: 815 tests, 0 failures, 0 errors, 1 skips. Source hygiene and diff checks passed.
+
+User-selected Exit artwork follow-up: copied the collection’s exact `actions/exit.png`
+variants, removed the shutdown image and special scaling path. Icon/chrome tests and
+installDist passed; inspected the updated headless toolbar preview.
+
+### Flat retro toolbar background — 2026-09-23
+
+The retro toolbar now uses an explicit solid Metal light-gray background, suppressing
+Ocean's toolbar gradient while retaining the Metal delegate, border and layout.
+Targeted retro chrome/contribution tests and installDist passed; inspected the headless
+2x toolbar preview. No native GUI launch, merge or push.
+
+The retro menu bar now uses the same solid background as the toolbar, per the next
+screenshot refinement. Metal menu behavior and selection painting are retained.
+Targeted chrome/contribution tests and installDist passed; inspected a headless 2x
+combined menu/toolbar preview. No native GUI launch, merge or push.
+
+The retro menu bar now has an explicit one-pixel soft-gray bottom separator. This
+remains visible next to a toolbar, where Metal suppresses its own default menu border.
+Targeted chrome/contribution tests and installDist passed; visually checked a headless
+root-pane render with the menu bar directly above the toolbar.
+
+### Regular system typography in retro mode — 2026-09-23
+
+Retro UI defaults now use Helvetica Neue Regular when available, followed by Segoe UI,
+Noto Sans, DejaVu Sans and logical SansSerif. Existing Metal font sizes are retained;
+toolbar captions keep their one-point reduction. Menus, tab titles, standard buttons
+and plugin forms inherit regular-weight defaults. Terminal font configuration remains
+independent, and macOS still controls the native window-title font. No font is bundled.
+
+Verified that this Mac resolves the UI defaults to Helvetica Neue Regular, and inspected
+headless menu/toolbar and workspace/form renders. Full application check, architecture
+verification and installDist passed (815 tests: 814 passed, one expected skip). No GUI
+launch, merge or push.
+
+### Retro font portability — 2026-09-23
+
+Font preferences now follow the host: Helvetica Neue/Helvetica on macOS, Segoe UI/Tahoma
+on Windows, Noto Sans/Liberation Sans on Linux. Noto Sans and DejaVu Sans provide
+additional installed-family fallbacks; Java SansSerif is the final fallback everywhere.
+Font discovery requests locale-neutral family names. No platform font files are copied
+or required, and all UI weights remain regular.
+
+Added checks for each OS preference when other platform fonts are also installed,
+missing preferred families, empty font inventories, and restoration of modern fonts.
+The targeted theme/chrome suite, architecture check and installDist passed locally on
+macOS. Existing CI runs check on macOS, Ubuntu and Windows; it has not been dispatched
+for this local branch, so native Linux/Windows rendering is not claimed as verified.
+
+### Custom retro macOS title bar — 2026-09-23
+
+Implemented the user-approved compact title treatment as a bounded extension of the
+existing MacTitleBar. Supported macOS/JBR windows keep OS traffic lights and native
+window gestures, with a 32-logical-pixel flat gray title strip, regular retro font,
+centered title and subtle divider. Title color is slightly darker than menu/toolbar.
+The menu sits below the native control region; Metal tabs stay below the toolbar with
+one or many sessions. Terminal and auxiliary frames/dialogs share the treatment.
+Windows, Linux and runtimes without the required custom-decoration support retain
+native title bars. Updated the original retro design with the approved amendment.
+
+A new layout/metadata/menu-action regression failed before enabling the custom retro
+header and passed afterward. Full application check, architecture gates and installDist
+passed: 824 tests, 823 passed, one expected skip, zero failures/errors. Inspected
+headless 1x/2x previews with one and two tabs; source hygiene and diff checks passed.
+No native GUI launched: traffic-light hover/actions, dragging, double-click and
+fullscreen on macOS remain user-run acceptance. No merge or push.
+
+Independent review found no actionable correctness issues in runtime fallback, native
+integration, menu placement/keyboard handling, tab ownership, auxiliary windows or disposal.
+
+### Main integration and Remote semantic icons — 2026-09-23
+
+Fetched origin; local main (6aac2ff9) was 27 commits ahead and held the requested Remote
+SSH merge. Merged it into codex/retro-metal in 55ededf, retaining retro title/menu/toolbar
+styling, portable fonts and semantic SDK APIs alongside the new SSH UI and [ui.font]
+configuration. Retro now honors explicit UI font reloads while retaining its own defaults.
+Resolved a stale status-render assertion to match main's title-colored status background.
+
+Independent review caught a failed retro font reload reapplying size offsets and, after
+a LAF replacement, losing app aliases. The fix restores exact captured Metal defaults.
+Both before/after-replacement regressions failed before the fix and passed after it;
+scoped re-review found no remaining issues.
+
+Remote now requests IconName.NETWORK once and shares the host-selected artwork across
+its Sessions dropdown, dynamic session/manage/connect/hosts actions, hosts panel and
+SSH status indicator. Removed the plugin-owned server SVG. Main already uses SDK 0.7.2
+for panel toggling and 0.7.3 for overlays, so the combined icon API is now SDK 0.7.4;
+Remote, Vault and Sample declare that minimum, preventing old hosts from loading them
+without the icon API. Existing toggle/overlay version annotations remain intact.
+
+Fake-host checks cover both icon families. Real staged-plugin tests cover Remote without
+Vault and verify all icon placements plus separate 28px retro toolbar sizing; fixture
+copying avoids Windows symlink privileges. Inspected a headless retro Sessions toolbar
+preview. Full check and installDist passed: 1,711 tests, 1,708 passed, three expected skips,
+zero failures/errors. Installed Remote jar has the >=0.7.4 manifest and no old server.svg.
+Independent review and rollback re-review are complete. No GUI launch or push.

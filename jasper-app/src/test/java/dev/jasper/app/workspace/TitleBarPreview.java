@@ -21,7 +21,7 @@ public final class TitleBarPreview {
                 var owner = content(launcher(new ArrayDeque<>()));
                 var root = new JRootPane();
                 try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
-                    for (BuiltinTheme theme : BuiltinTheme.values()) {
+                    for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
                         owner.selectTheme(theme);
                         while (owner.tabStrip().getTabCount() > 1) owner.closeTab(owner.currentTab());
                         owner.currentTab().rename("~ (-zsh)");

@@ -35,6 +35,11 @@ public final class VaultService {
     private final Consumer<GrantPrompt> showGrant;
     private final Consumer<PickPrompt> showPick;
     private final Consumer<String> notice;
+    private java.util.concurrent.Executor background, ui;
+    private java.util.function.Function<WindowHandle, CompletableFuture<Boolean>> openForImport;
+    private Consumer<KeyImportPrompt> showImport;
+    private Runnable changed;
+    private final Set<KeyImportPrompt> imports = new HashSet<>();
     private UnlockPrompt unlock;
     private final Map<Grant, GrantPrompt> grantPrompts = new HashMap<>();
     private final List<PickPrompt> pickPrompts = new ArrayList<>();
@@ -46,11 +51,23 @@ public final class VaultService {
         this.lock = lock; this.fallbackOwner = fallbackOwner; this.showUnlock = showUnlock; this.showGrant = showGrant; this.showPick = showPick; this.notice = notice;
     }
 
+    public VaultService(LockManager lock, Supplier<Optional<WindowHandle>> fallbackOwner, Consumer<UnlockPrompt> showUnlock,
+                        Consumer<GrantPrompt> showGrant, Consumer<PickPrompt> showPick, Consumer<String> notice,
+                        java.util.concurrent.Executor background, java.util.concurrent.Executor ui,
+                        java.util.function.Function<WindowHandle, CompletableFuture<Boolean>> openForImport,
+                        Consumer<KeyImportPrompt> showImport, Runnable changed) {
+        this(lock, fallbackOwner, showUnlock, showGrant, showPick, notice);
+        this.background = background; this.ui = ui; this.openForImport = openForImport;
+        this.showImport = showImport; this.changed = changed;
+    }
+    public void closeImports() { for (KeyImportPrompt prompt : List.copyOf(imports)) prompt.cancel(); }
+
     public VaultApi forConsumer(PluginInfo consumer) { return new ConsumerApi(consumer); }
 
     /** Wire this to the lock manager's listener: a lock forgets one-time grants and closes every grant and pick prompt. */
     public void lockStateChanged(LockState state) {
         if (state == LockState.UNLOCKED) return;
+        closeImports();
         oneTime.clear();
         for (GrantPrompt prompt : List.copyOf(grantPrompts.values())) prompt.answer(GrantPrompt.Decision.DENY);
         for (PickPrompt prompt : List.copyOf(pickPrompts)) prompt.cancel();
@@ -78,6 +95,7 @@ public final class VaultService {
         List<CredentialDescriptor> out = new ArrayList<>();
         for (Account account : lock.vault().accounts()) out.add(describe(account));
         for (SshKey key : lock.vault().keys()) out.add(describe(key));
+        for (var key : lock.vault().managedKeys()) out.add(KeyImportPrompt.descriptor(key));
         return List.copyOf(out);
     }
 
@@ -106,6 +124,12 @@ public final class VaultService {
                 case Auth.KeyAndPassword b -> new Credential(a.id(), a.name(), Kind.ACCOUNT_KEY_AND_PASSWORD, a.username(), b.password().clone(), b.keyPath(), b.passphrase() == null ? null : b.passphrase().clone());
             });
         }
+        var managed = lock.vault().managedKey(id);
+        if (managed.isPresent()) {
+            var k = managed.get();
+            return Optional.of(new Credential(k.id(), k.name(), Kind.SSH_KEY, null, null, null,
+                k.privateKey().clone(), k.passphrase() == null ? null : k.passphrase().clone()));
+        }
         return lock.vault().key(id).map(key -> new Credential(key.id(), key.name(), Kind.SSH_KEY, null, null, key.privatePath(), null));
     }
 
@@ -115,8 +139,11 @@ public final class VaultService {
             case DENY -> prompt.settle(Optional::empty);
             case ALLOW_ONCE -> prompt.settle(() -> copyOf(prompt.grant().credentialId()));
             case ALWAYS -> {
-                if (lock.state() == LockState.UNLOCKED) { lock.vault().grants().add(prompt.grant()); lock.save(); }
-                prompt.settle(() -> copyOf(prompt.grant().credentialId()));
+                lock.transact(v -> { v.grants().add(prompt.grant()); return (Void) null; }, () -> false)
+                    .whenComplete((ignored, failure) -> {
+                        if (failure != null) { notice.accept("Could not save the credential grant"); prompt.settle(Optional::empty); }
+                        else prompt.settle(() -> copyOf(prompt.grant().credentialId()));
+                    });
             }
         }
     }
@@ -129,6 +156,17 @@ public final class VaultService {
     private final class ConsumerApi implements VaultApi {
         private final PluginInfo consumer;
         ConsumerApi(PluginInfo consumer) { this.consumer = consumer; }
+
+        @Override public CompletableFuture<Optional<dev.jasper.vault.api.SshKeyImportResult>> importSshKeys(
+                WindowHandle owner, List<dev.jasper.vault.api.SshKeySource> sources, List<UUID> selected) {
+            if (showImport == null) return VaultApi.super.importSshKeys(owner, sources, selected);
+            lastOwner.put(consumer.id(), owner);
+            KeyImportPrompt prompt = new KeyImportPrompt(consumer, owner, sources, selected, lock, background, ui, notice, changed);
+            imports.add(prompt);
+            prompt.result().whenComplete((value, failure) -> imports.remove(prompt));
+            showImport.accept(prompt); prompt.start(openForImport);
+            return prompt.result();
+        }
 
         @Override public LockState lockState() { return lock.state(); }
 

@@ -100,8 +100,9 @@ public final class NativeShells {
     private AuxiliarySurface.Shell frame(AuxiliarySurface surface) {
         var frame = new JFrame(surface.title());
         frame.setIconImages(ApplicationIcon.images());
-        MacTitleBar bar = installTitleBar(frame.getRootPane(), surface, SystemInfo.isMacFullWindowContentSupported);
-        frame.setJMenuBar(menuBar(surface));
+        MacTitleBar bar = installTitleBar(frame.getRootPane(), surface, MacTitleBar.isSupported());
+        if (bar != null) bar.setMenuBar(menuBar(surface));
+        else frame.setJMenuBar(menuBar(surface));
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
@@ -116,7 +117,7 @@ public final class NativeShells {
             .filter(NativeShells::onSomeScreen).ifPresent(frame::setBounds);
         Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
             if (chromeChanged) SwingUtilities.updateComponentTreeUI(frame);
-            if (bar != null) bar.setLight(resolved.chrome() == BuiltinTheme.LIGHT);
+            if (bar != null) bar.setLight(resolved.chrome().appearance() == dev.jasper.app.config.Appearance.LIGHT);
         });
         natives.put(surface, frame);
         return new AuxiliarySurface.Shell(() -> frame.setVisible(true), () -> {
@@ -135,7 +136,7 @@ public final class NativeShells {
             .orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null));
         var dialog = new JDialog(owner, surface.title(), surface.modal() ? Dialog.ModalityType.DOCUMENT_MODAL : Dialog.ModalityType.MODELESS);
         dialog.setIconImages(ApplicationIcon.images());
-        MacTitleBar bar = installTitleBar(dialog.getRootPane(), surface, SystemInfo.isMacFullWindowContentSupported);
+        MacTitleBar bar = installTitleBar(dialog.getRootPane(), surface, MacTitleBar.isSupported());
         dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         dialog.addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
@@ -147,7 +148,7 @@ public final class NativeShells {
         dialog.setLocationRelativeTo(owner);
         Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
             if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
-            if (bar != null) bar.setLight(resolved.chrome() == BuiltinTheme.LIGHT);
+            if (bar != null) bar.setLight(resolved.chrome().appearance() == dev.jasper.app.config.Appearance.LIGHT);
         });
         natives.put(surface, dialog);
         return new AuxiliarySurface.Shell(() -> { dialog.pack(); dialog.setLocationRelativeTo(owner); dialog.setVisible(true); },

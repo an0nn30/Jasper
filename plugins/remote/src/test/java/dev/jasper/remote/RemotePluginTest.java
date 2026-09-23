@@ -25,13 +25,54 @@ import static dev.jasper.remote.ui.UiTestAccess.*;
 import static org.assertj.core.api.Assertions.*;
 
 class RemotePluginTest {
-    static final PluginInfo INFO = new PluginInfo("dev.jasper.remote", "Remote", "0.1.0",
+    static final PluginInfo INFO = new PluginInfo("dev.jasper.remote", "Remote", "0.2.0",
         Set.of(Capabilities.TERMINAL_OPEN, Capabilities.SESSION_PROVIDE, Capabilities.TERMINAL_OBSERVE, Capabilities.PALETTE_CONTRIBUTE));
 
     final List<Runnable> scheduled = new ArrayList<>();
 
     RemotePlugin plugin(Path sshDir) {
         return new RemotePlugin(Runnable::run, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void hostSelectsNetworkArtworkForEitherSkin(boolean retro, @TempDir Path dir) {
+        try (var host = new FakePluginHost()) {
+            host.setRetroIcons(retro);
+            var delegate = plugin(dir.resolve("ssh"));
+            var icons = new ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
+            host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
+                public void start(dev.jasper.sdk.plugin.PluginContext context) throws Exception {
+                    var appearance = (dev.jasper.sdk.ui.Appearance) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.ui.Appearance.class}, (proxy, method, args) -> {
+                            if (method.getName().equals("icon")) {
+                                assertThat(args[0]).isInstanceOf(dev.jasper.sdk.ui.IconName.class);
+                            }
+                            try {
+                                Object value = method.invoke(context.appearance(), args);
+                                if (value instanceof dev.jasper.sdk.testing.FakeNamedIcon icon) icons.add(icon);
+                                return value;
+                            } catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                        });
+                    var wrapped = (dev.jasper.sdk.plugin.PluginContext) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.plugin.PluginContext.class}, (proxy, method, args) -> {
+                            if (method.getName().equals("appearance")) return appearance;
+                            try { return method.invoke(context, args); }
+                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                        });
+                    delegate.start(wrapped);
+                }
+                public void stop() { delegate.stop(); }
+            });
+            settle(host);
+            assertThat(host.failures()).isEmpty();
+            assertThat(icons).singleElement().satisfies(icon -> {
+                assertThat(icon.name()).isEqualTo(dev.jasper.sdk.ui.IconName.NETWORK);
+                assertThat(icon.retro()).isEqualTo(retro);
+            });
+            assertThat(host.toolbar()).anyMatch(item -> item.contains("Sessions"));
+            assertThat(host.panels()).containsExactly("dev.jasper.remote.panel|SSH hosts|LEFT");
+        }
     }
 
     static void settle(FakePluginHost host) { for (int i = 0; i < 20; i++) { host.runBackground(); host.flush(); } }
@@ -170,7 +211,7 @@ class RemotePluginTest {
         Path sshDir = Files.createDirectories(dir.resolve("ssh"));
         Files.writeString(sshDir.resolve("config"), "Host imported\n  HostName imported.example\n  User me\n");
         try (var host = new FakePluginHost()) {
-            var vault = new FakeVault();
+            var vault = new FakeVault(); vault.password("Imported login", "me", "secret");
             host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
             RemotePlugin plugin = plugin(sshDir);
             var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
@@ -192,10 +233,12 @@ class RemotePluginTest {
             assertThat(host.invoke(RemotePlugin.IMPORT, window, null)).isTrue();
             settle(host);
             assertThat(host.windows()).containsExactly("dialog|Import from ~/.ssh/config|true");
+            chooseCredential(plugin.currentImport(), 0).doClick();
             importButton(plugin.currentImport()).doClick();
             settle(host);
             assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new", "imported");
             RemoteHost imported = plugin.store().hosts().get(1);
+            cancelImport(plugin.currentImport()).doClick();
             javax.swing.JPopupMenu menu = menuFor(panel, indexOf(panel, imported));
             ((javax.swing.JMenuItem) menu.getComponent(4)).doClick();
             assertThat(host.windows()).containsExactly("dialog|Delete imported?|true");

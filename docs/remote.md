@@ -34,10 +34,33 @@ username) or the **SSH agent** (`SSH_AUTH_SOCK`, or the OpenSSH agent pipe on Wi
 second. The file never holds a secret. A jump host makes the connection go through that host first,
 with its own authentication and host-key check.
 
-**Import** reads `~/.ssh/config` (`Host`, `HostName`, `Port`, `User`, `ProxyJump`, `IdentityFile`,
-one level of `Include`) and shows what each entry would become; wildcard hosts and `Match` blocks are
-listed as not importable. An `IdentityFile` whose public key is a key in the Vault becomes that
-credential; any other becomes the agent. Nothing is imported silently, and `~/.ssh` is never written.
+**Import** reads `~/.ssh/config` (`Host`, `HostName`, `Port`, `User`, `ProxyJump`, ordered
+`IdentityFile` directives and one level of `Include`). Wildcard hosts and `Match` blocks are
+listed as unsupported. Select the hosts to import; existing aliases start unchecked and can be
+selected for **Update**. Updates preserve their UUID, creation date, group and favorite.
+
+Vault creates or unlocks its encrypted store, reads only the selected keys and asks for encrypted
+key passphrases. Review the fingerprints and press **Import and use** to save the key material,
+passphrases and Remote's grants. Repeated keys are deduplicated by fingerprint. A matching standalone
+file-based Vault key is promoted while preserving its UUID and grants. Source files are untouched.
+Hosts with no IdentityFile require a chosen stored Vault key or password. Unsupported paths,
+unreadable keys and unresolved jump hosts block the affected selection; there is no Agent fallback.
+
+Imported hosts authenticate from Vault even after a restart without their original files or the
+system agent. To repair an earlier Agent import, re-import and check **Update** for that host.
+Multiple identities stay ordered and can be reordered in the host editor. Existing manual Agent,
+password and path-based Vault hosts continue to work. Each development worktree has its own Jasper
+home and Vault; this operation imports into the home of the app you are running.
+
+Keys are saved before hosts. If the hosts file changes or cannot be saved, the keys remain safely
+in Vault; **Refresh** and retry to reuse them. Cancellation before host saving leaves hosts unchanged.
+Once a durable write starts it completes; cancelling cannot undo keys already saved.
+
+The first managed key upgrades the inner Vault payload to version 2 and preserves an encrypted,
+owner-readable `vault.jv.v1-backup` beside `vault.jv`. Backup failure aborts the upgrade. Older Vault
+versions cannot read version 2: to downgrade, stop Jasper and restore that backup, accepting that it
+contains only pre-upgrade credentials and may require the previous master password/device binding.
+Generated and unrelated path-based credentials remain as they were. No decrypted key files are created.
 
 The first connection to a host shows its key type and SHA256 fingerprint with **Cancel**,
 **Connect once** and **Trust and connect**; trusting writes `plugins/dev.jasper.remote/data/known_hosts`.

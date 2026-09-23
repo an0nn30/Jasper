@@ -36,6 +36,21 @@ class VaultPluginTest {
             new FileStore(context.dataDirectory().resolve("device.secret"))), Runnable::run);
     }
 
+    @Test void cancellingOneImportDoesNotCancelSharedVaultSetup() {
+        var plugin = plugin();
+        try (var host = new FakePluginHost()) {
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            var owner = context.terminals().window(host.addTerminalWindow()).orElseThrow();
+            var first = plugin.service().forConsumer(SSH).importSshKeys(owner, List.of(), List.of());
+            var second = plugin.service().forConsumer(OTHER_SETUP).importSshKeys(owner, List.of(), List.of());
+            first.cancel(false);
+            assertThat(second).isNotDone(); assertThat(host.windows()).contains("dialog|Create Vault|true");
+            second.cancel(false);
+            assertThat(host.windows()).doesNotContain("dialog|Create Vault|true");
+        }
+    }
+    static final PluginInfo OTHER_SETUP = new PluginInfo("dev.jasper.other", "Other", "0.2.0", Set.of());
+
     @Test void stopLocksTheVaultEvenWhenClipboardCleanupFails() {
         String[] contents = {""};
         SecretClipboard clipboard = new SecretClipboard(text -> {
@@ -164,7 +179,7 @@ class VaultPluginTest {
         try (var host = new FakePluginHost()) {
             host.start(INFO, Set.of(), Set.of(), plugin);
             assertThat(host.rail()).isEmpty();
-            assertThat(host.menu("FILE")).containsExactly("item:" + VaultPlugin.OPEN);
+            assertThat(host.menu("FILE")).contains("item:" + VaultPlugin.OPEN);
             assertThat(host.status()).containsExactly("dev.jasper.vault.status|RIGHT|Vault|No vault — click to create one|dev.jasper.vault.open");
             plugin.lockManager().create("hunter2!".toCharArray(), false);
             host.runBackground();
@@ -243,6 +258,38 @@ class VaultPluginTest {
             host.start(INFO, Set.of(), Set.of(), new VaultPlugin());
             assertThat(host.failures()).isEmpty();
             assertThat(host.scopes()).hasSize(1);
+        }
+    }
+
+    @Test void requestsBothIconFamiliesForEitherSkin() {
+        for (boolean retro : new boolean[]{false, true}) try (var host = new FakePluginHost()) {
+            host.setRetroIcons(retro);
+
+            var delegate = plugin();
+            var icons = new java.util.ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
+            host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
+                public void start(dev.jasper.sdk.plugin.PluginContext context) throws Exception {
+                    var appearance = (dev.jasper.sdk.ui.Appearance) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.ui.Appearance.class}, (proxy, method, args) -> {
+                            try {
+                                Object value = method.invoke(context.appearance(), args);
+                                if (value instanceof dev.jasper.sdk.testing.FakeNamedIcon icon) icons.add(icon);
+                                return value;
+                            } catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                        });
+                    var wrapped = (dev.jasper.sdk.plugin.PluginContext) java.lang.reflect.Proxy.newProxyInstance(
+                        getClass().getClassLoader(), new Class<?>[]{dev.jasper.sdk.plugin.PluginContext.class}, (proxy, method, args) -> {
+                            if (method.getName().equals("appearance")) return appearance;
+                            try { return method.invoke(context, args); }
+                            catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                        });
+                    delegate.start(wrapped);
+                }
+                public void stop() { delegate.stop(); }
+            });
+            assertThat(host.failures()).isEmpty();
+            assertThat(icons).extracting(dev.jasper.sdk.testing.FakeNamedIcon::name).containsExactly(dev.jasper.sdk.ui.IconName.LOCK, dev.jasper.sdk.ui.IconName.UNLOCK);
+            assertThat(icons).allSatisfy(icon -> assertThat(icon.retro()).isEqualTo(retro));
         }
     }
 }

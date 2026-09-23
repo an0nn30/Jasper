@@ -27,9 +27,12 @@ final class ConfigurationController implements AutoCloseable {
     /** The saved state plus problems plugins reported about their own tables since the last reload. */
     ConfigService.State shown() {
         requireEdt();
-        if (reported.isEmpty()) return state;
         var merged = new java.util.ArrayList<>(state.diagnostics());
         merged.addAll(reported);
+        if (state.snapshot().style() != themes.style())
+            merged.add(new dev.jasper.app.config.ConfigDiagnostic(
+                dev.jasper.app.config.ConfigDiagnostic.Severity.WARNING,
+                state.file(), 0, 0, "ui.theme.style", "Restart Jasper to apply ui.theme.style."));
         return new ConfigService.State(state.snapshot(), merged, state.file(), state.present());
     }
 

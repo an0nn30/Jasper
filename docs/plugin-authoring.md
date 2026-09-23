@@ -73,7 +73,7 @@ built-in chrome; a plugin supplies titles, icons and handlers, never components.
 private static void installUi(PluginContext context, long stepMillis) {
     PluginAction[] demo = new PluginAction[1];
     demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
-            .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg"))
+            .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg", OldGnomeIcon.EXECUTE))
             .withKeywords(List.of("sample", "demo", "activity"))
             .withDefaultBinding("cmd+alt+j"),
         invoked -> {
@@ -107,20 +107,31 @@ private static void installUi(PluginContext context, long stepMillis) {
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
-- **Icons.** `context.appearance().icon("path/in/your/jar.svg")` returns a 16 by 16 icon that
-  follows the theme. Use monochrome artwork.
+- **Icons.** Prefer `context.appearance().icon(IconName.LOCK)` or `IconName.UNLOCK`
+  (import `dev.jasper.sdk.ui.IconName`, SDK `>=0.7.4, <0.8`). Jasper supplies both families
+  and selects the skin; plugins need no artwork or style check. Returned icons are 16px,
+  with separate 28px variants in retro host toolbars. For custom artwork, use the original
+  monochrome SVG `icon("path/in/your/jar.svg")`, or pair that path with an `OldGnomeIcon`
+  fallback as the sample demonstrates. These existing APIs retain their behavior.
+  See the [catalog and testing example](sdk-icons.md).
 - **Threads.** Register and mutate on the event thread. Event handlers already run there, so
   updating a status item from a handler, as the sample does, needs no marshaling.
 
 ## Consistent buttons, flexible layouts
 
-Use ordinary `JButton` components inside plugin content. Jasper's look and feel supplies the
+Use ordinary `JButton` components inside plugin content. In modern mode Jasper's look and feel supplies the
 TermLab reference styling: 24-logical-pixel minimum height, 72-pixel minimum text-button width,
 12-point labels, subtly rounded gray secondary buttons and blue default buttons. Text fields
 use square borders; dropdowns and lists use the reference selection colors. Dark and light
 palettes come from TermLab's theme definitions. The dark secondary text is slightly lighter
 than the source (#A7AEBB instead of #A0A7B4) to preserve the existing 4.5:1 contrast check;
 disabled button text retains Jasper's contrast-tested defaults.
+
+Retro mode supplies stock light Metal/Ocean delegates, fonts, borders and form buttons.
+No plugin changes or SDK version bump are required. `Variant.LIGHT` describes application
+chrome brightness; terminal colors are independent and retro terminals remain black.
+Plugin SVGs and custom artwork retain their existing contracts. The host's tab-close,
+toolbar and status controls use compact flat presentation; plugin form buttons retain Metal.
 
 Swing actions, mnemonics, focus and disabled states retain their behavior. Set the hosting
 `JRootPane`'s default button when a form attaches and release it when the form detaches, so a
@@ -148,7 +159,7 @@ without your plugin ever seeing a frame.
 <!-- example:pluginpanels -->
 ```java
 private static void installPanelAndWindow(PluginContext context, long stepMillis) {
-    var icon = context.appearance().icon("dev/jasper/sample/flask.svg");
+    var icon = context.appearance().icon("dev/jasper/sample/flask.svg", OldGnomeIcon.EXECUTE);
     // One instance per window, built the first time the panel is shown there.
     context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", icon, Anchor.LEFT), host -> {
         var run = new JButton("Run sample activity");
@@ -349,7 +360,16 @@ application loads every jar beside the plugin's own.
 
 Credential Vault (`plugins/vault`) is the worked example for `publishPerConsumer`: every plugin that
 requires it gets its own `VaultApi` whose `credential(id)` asks the user to allow *that* plugin once or
-always, and whose futures can be cancelled to withdraw the request.
+always, and whose futures can be cancelled to withdraw the request. Vault 0.2 adds
+`importSshKeys(owner, sources, selectedCredentialIds)` for a reviewed, durable batch of managed
+SSH keys and grants. Declare a Vault dependency of `>=0.2` for this flow. Source requests use
+`SshKeySource` IDs; the result maps those IDs to managed `CredentialDescriptor`s. Only managed
+SSH keys or password-only accounts can be selected as existing import credentials.
+
+A managed `Credential` exposes owned `keyBytes()` and no `keyPath()`; legacy path credentials
+keep their existing API. Always close credentials after use to clear their bytes and passphrases.
+The batch method has a default unsupported result for older API implementations. This extension
+belongs to Vault's exported API; Jasper SDK remains 0.7.4.
 
 <!-- example:pluginpalette -->
 ```java

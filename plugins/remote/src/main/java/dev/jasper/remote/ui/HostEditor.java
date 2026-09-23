@@ -39,6 +39,11 @@ public final class HostEditor extends JPanel {
     final JButton save, cancel = new JButton("Cancel");
     final JLabel message = new JLabel(" ");
     private UUID credentialId;
+    private final java.util.List<UUID> managedIds = new java.util.ArrayList<>();
+    private final javax.swing.DefaultListModel<String> keyNames = new javax.swing.DefaultListModel<>();
+    final javax.swing.JList<String> keyList = new javax.swing.JList<>(keyNames);
+    final JButton addKey = new JButton("Add stored key…"), removeKey = new JButton("Remove"),
+        moveUp = new JButton("Move up"), moveDown = new JButton("Move down");
 
     public void setDefaultGroupName(String name) {
         if (group.getEditor().getEditorComponent() instanceof JTextField field)
@@ -68,6 +73,7 @@ public final class HostEditor extends JPanel {
             group.setSelectedItem(host.group()); favorite.setSelected(host.favorite());
             switch (host.auth()) {
                 case Auth.Vault vault -> { vaultAuth.setSelected(true); credentialId = vault.credentialId(); credentialLabel.setText(credentialName.apply(credentialId).orElse("credential missing")); }
+                case Auth.VaultKeys keys -> { vaultAuth.setSelected(true); managedIds.addAll(keys.credentialIds()); credentialLabel.setText(managedIds.size() + " Vault key(s)"); }
                 case Auth.Agent agent -> agentAuth.setSelected(true);
             }
             host.jump().ifPresent(id -> { for (int i = 1; i < jump.getItemCount(); i++) if (((RemoteHost) jump.getItemAt(i)).id().equals(id)) jump.setSelectedIndex(i); });
@@ -80,7 +86,14 @@ public final class HostEditor extends JPanel {
         row(form, at, "Group", group); row(form, at, "", favorite);
         var auth = new JPanel(); auth.setLayout(new BoxLayout(auth, BoxLayout.X_AXIS));
         auth.add(vaultAuth); auth.add(Box.createHorizontalStrut(6)); auth.add(choose); auth.add(Box.createHorizontalStrut(6)); auth.add(credentialLabel); auth.add(Box.createHorizontalStrut(12)); auth.add(agentAuth);
-        row(form, at, "Authentication", auth); row(form, at, "Jump host", jump);
+        row(form, at, "Authentication", auth);
+        keyList.setVisibleRowCount(3);
+        var keyPanel = new JPanel(new BorderLayout(4, 4));
+        keyPanel.add(new javax.swing.JScrollPane(keyList), BorderLayout.CENTER);
+        var keyButtons = new JPanel();
+        for (JButton button : List.of(addKey, removeKey, moveUp, moveDown)) keyButtons.add(button);
+        keyPanel.add(keyButtons, BorderLayout.SOUTH);
+        row(form, at, "Ordered Vault keys", keyPanel); row(form, at, "Jump host", jump);
         add(form, BorderLayout.CENTER);
         var south = new JPanel(); south.setLayout(new BoxLayout(south, BoxLayout.Y_AXIS));
         south.add(message);
@@ -89,9 +102,45 @@ public final class HostEditor extends JPanel {
         south.add(buttons);
         add(south, BorderLayout.SOUTH);
 
-        Runnable syncAuth = () -> choose.setEnabled(vaultAuth.isSelected());
-        vaultAuth.addActionListener(e -> syncAuth.run()); agentAuth.addActionListener(e -> syncAuth.run()); syncAuth.run();
-        choose.addActionListener(event -> pick.get().thenAccept(chosen -> chosen.ifPresent(descriptor -> { credentialId = descriptor.id(); credentialLabel.setText(descriptor.name()); })));
+        Runnable refreshKeys = () -> {
+            int selected = keyList.getSelectedIndex();
+            keyNames.clear();
+            managedIds.forEach(id -> keyNames.addElement(credentialName.apply(id).orElse("credential missing")));
+            if (!managedIds.isEmpty()) {
+                credentialLabel.setText(managedIds.size() + " Vault key(s)");
+                keyList.setSelectedIndex(Math.max(0, Math.min(selected, managedIds.size() - 1)));
+            }
+        };
+        Runnable syncAuth = () -> {
+            choose.setEnabled(vaultAuth.isSelected()); keyList.setEnabled(vaultAuth.isSelected());
+            for (JButton button : List.of(addKey, removeKey, moveUp, moveDown)) button.setEnabled(vaultAuth.isSelected() && vaultPresent);
+        };
+        vaultAuth.addActionListener(e -> syncAuth.run()); agentAuth.addActionListener(e -> syncAuth.run()); syncAuth.run(); refreshKeys.run();
+        choose.addActionListener(event -> pick.get().thenAccept(chosen -> chosen.ifPresent(descriptor -> {
+            managedIds.clear(); credentialId = descriptor.id(); refreshKeys.run(); credentialLabel.setText(descriptor.name());
+        })));
+        addKey.addActionListener(event -> pick.get().thenAccept(chosen -> chosen.ifPresent(descriptor -> {
+            if (descriptor.kind() != dev.jasper.vault.api.Kind.SSH_KEY || !descriptor.managedKey()) {
+                message.setText("Choose a managed SSH key stored in Vault"); return;
+            }
+            credentialId = null;
+            if (!managedIds.contains(descriptor.id())) managedIds.add(descriptor.id());
+            refreshKeys.run();
+        })));
+        removeKey.addActionListener(event -> {
+            int atKey = keyList.getSelectedIndex();
+            if (atKey >= 0) managedIds.remove(atKey);
+            refreshKeys.run();
+            if (managedIds.isEmpty()) credentialLabel.setText("none chosen");
+        });
+        moveUp.addActionListener(event -> {
+            int atKey = keyList.getSelectedIndex();
+            if (atKey > 0) { java.util.Collections.swap(managedIds, atKey, atKey - 1); refreshKeys.run(); keyList.setSelectedIndex(atKey - 1); }
+        });
+        moveDown.addActionListener(event -> {
+            int atKey = keyList.getSelectedIndex();
+            if (atKey >= 0 && atKey + 1 < managedIds.size()) { java.util.Collections.swap(managedIds, atKey, atKey + 1); refreshKeys.run(); keyList.setSelectedIndex(atKey + 1); }
+        });
         cancel.addActionListener(event -> onCancel.run());
         save.addActionListener(event -> {
             try {
@@ -99,7 +148,7 @@ public final class HostEditor extends JPanel {
                 int portValue;
                 try { portValue = Integer.parseInt(port.getText().strip()); } catch (NumberFormatException bad) { throw new IllegalArgumentException("The port must be a number from 1 to 65535"); }
                 Auth chosen;
-                if (vaultAuth.isSelected()) { if (credentialId == null) throw new IllegalArgumentException("Choose a credential, or use the SSH agent"); chosen = new Auth.Vault(credentialId); }
+                if (vaultAuth.isSelected()) { if (credentialId == null && managedIds.isEmpty()) throw new IllegalArgumentException("Choose a credential, or use the SSH agent"); chosen = managedIds.isEmpty() ? new Auth.Vault(credentialId) : new Auth.VaultKeys(managedIds); }
                 else chosen = Auth.AGENT;
                 String groupValue = group.getEditor().getItem() == null ? "" : group.getEditor().getItem().toString();
                 Optional<UUID> jumpValue = jump.getSelectedItem() instanceof RemoteHost target ? Optional.of(target.id()) : Optional.empty();

@@ -74,25 +74,51 @@ class BundledSamplePluginTest {
         onEdt(() -> pending.set(runtime.get().stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
     }
-    @Test void remoteLoadsWithoutTheOptionalVaultPlugin() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void remoteLoadsWithoutVaultAndUsesHostIconsForEveryPlacement(boolean retro) throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
         Path remoteOnly = java.nio.file.Files.createDirectories(root.resolve("remote-only"));
-        java.nio.file.Files.createSymbolicLink(remoteOnly.resolve("dev.jasper.remote"), staged.resolve("dev.jasper.remote").toAbsolutePath());
+        Path source = staged.resolve("dev.jasper.remote");
+        try (var paths = java.nio.file.Files.walk(source)) {
+            for (Path path : paths.toList()) {
+                Path target = remoteOnly.resolve("dev.jasper.remote").resolve(source.relativize(path));
+                if (java.nio.file.Files.isDirectory(path)) java.nio.file.Files.createDirectories(target);
+                else java.nio.file.Files.copy(path, target);
+            }
+        }
         var runtime = new AtomicReference<PluginRuntime>();
         var deck = new BuddyTestSupport();
+        var contributions = new dev.jasper.app.contributions.Contributions();
         onEdt(() -> {
+            new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
+                : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
             runtime.set(new PluginRuntime(new PluginRuntime.Options(remoteOnly, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> {}),
-                (key, message) -> {}, new dev.jasper.app.contributions.Contributions(), AppContractTest.headlessWindows(),
+                (key, message) -> {}, contributions, AppContractTest.headlessWindows(),
                 new dev.jasper.app.terminals.TerminalRegistry()));
             runtime.get().start(Map.of(), true);
         });
         try {
             assertThat(runtime.get().statusLines()).singleElement().asString().contains("dev.jasper.remote", "ACTIVE");
+            onEdt(() -> {
+                var icon = contributions.action("dev.jasper.remote.hosts").orElseThrow().icon();
+                assertThat(icon.getIconWidth()).isEqualTo(16);
+                if (retro) assertThat(icon).isNotInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
+                else assertThat(icon).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
+                assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(retro ? 28 : 16);
+                assertThat(contributions.action("dev.jasper.remote.connect").orElseThrow().icon()).isSameAs(icon);
+                assertThat(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon()).isSameAs(icon);
+                assertThat(contributions.panels()).singleElement().satisfies(panel -> assertThat(panel.icon()).isSameAs(icon));
+                assertThat(contributions.status()).singleElement().satisfies(status -> assertThat(status.icon()).isSameAs(icon));
+                assertThat(contributions.toolbar()).singleElement().isInstanceOfSatisfying(
+                    dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, menu -> assertThat(menu.icon()).isSameAs(icon));
+            });
         } finally {
             var pending = new AtomicReference<List<CompletableFuture<?>>>();
             onEdt(() -> pending.set(runtime.get().stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            onEdt(() -> new dev.jasper.app.appearance.ThemeController());
         }
     }
 

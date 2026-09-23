@@ -338,4 +338,29 @@ class ConfigLoaderTest {
                 assertThat(d.message()).contains("plugins/dev.example.tool/dev.example.tool.toml");
             });
         }
+@Test void retroStyleDoesNotRewriteSavedVariant() {
+    var result = parse("[ui.theme]\nstyle='retro'\nvariant='dark'\n");
+    assertThat(result.rejected()).isFalse();
+    assertThat(result.diagnostics()).isEmpty();
+    assertThat(result.snapshot().style()).isEqualTo(ThemeStyle.RETRO);
+    assertThat(result.snapshot().variant()).isEqualTo(Appearance.DARK);
+    assertThat(parse("").snapshot().style()).isEqualTo(ThemeStyle.MODERN);
+}
+
+@Test void invalidStyleUsesTheExistingPerFieldDiagnosticPolicy() {
+    for (String value : java.util.List.of("'private-value'", "7", "true")) {
+        var result = parse("[ui.theme]\nstyle=" + value + "\nvariant='light'\n");
+        assertThat(result.rejected()).isEqualTo(!value.startsWith("'"));
+        assertThat(result.snapshot().style()).isEqualTo(ThemeStyle.MODERN);
+        assertThat(result.snapshot().variant()).isEqualTo(Appearance.LIGHT);
+        assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
+            assertThat(problem.key()).isEqualTo("ui.theme.style");
+            assertThat(problem.line()).isEqualTo(2);
+            assertThat(problem.column()).isEqualTo(1);
+            assertThat(problem.message()).doesNotContain("private-value");
+        });
+    }
+}
+
+
 }

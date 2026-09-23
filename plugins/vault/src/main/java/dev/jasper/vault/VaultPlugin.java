@@ -1,5 +1,6 @@
 package dev.jasper.vault;
 
+import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
@@ -80,6 +81,7 @@ public class VaultPlugin implements Plugin {
     private VaultManagerWindow managerWindow;
     private PluginDialog createDialog;
     private CompletableFuture<Boolean> creating;
+    private final java.util.Set<CompletableFuture<Boolean>> createWaiters = new java.util.HashSet<>();
     private boolean stopped;
     /** Milliseconds for the inactivity clock; tests set it, production reads the wall clock. */
     long clock = -1;
@@ -107,10 +109,15 @@ public class VaultPlugin implements Plugin {
         timer.setTimeout(settings.autoLock());
         lock = new LockManager(new VaultFile(context.dataDirectory().resolve("vault.jv")), secretsFactory.apply(context), context.background(), ui, this::lockStateChanged);
         service = new VaultService(lock, () -> context.terminals().activeWindow().or(() -> context.terminals().windows().stream().findFirst()),
-            this::showUnlock, this::showGrant, this::showPick, context.notices()::error);
+            this::showUnlock, this::showGrant, this::showPick, context.notices()::error,
+            context.background(), ui, owner -> switch (lock.state()) {
+                case NO_VAULT -> createVault(owner);
+                case LOCKED -> service.requestUnlock(owner);
+                case UNLOCKED -> CompletableFuture.completedFuture(true);
+            }, this::showImport, this::vaultChanged);
         context.services().publishPerConsumer(VaultApi.class, service::forConsumer);
-        locked = context.appearance().icon("dev/jasper/vault/lock.svg");
-        unlocked = context.appearance().icon("dev/jasper/vault/lock-open.svg");
+        locked = context.appearance().icon(IconName.LOCK);
+        unlocked = context.appearance().icon(IconName.UNLOCK);
         context.actions().register(ActionSpec.of(OPEN, "Open Vault...").withIcon(locked).withKeywords(List.of("vault", "credentials", "password", "unlock")).withDefaultBinding("F8"),
             invoked -> open(invoked.window(), Optional.empty()));
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock")), invoked -> lock.lock());
@@ -137,6 +144,7 @@ public class VaultPlugin implements Plugin {
 
     @Override public void stop() {
         stopped = true;
+        if (service != null) service.closeImports();
         if (ticker != null) ticker.stop();
         if (activity != null) Toolkit.getDefaultToolkit().removeAWTEventListener(activity);
         try {
@@ -193,7 +201,7 @@ public class VaultPlugin implements Plugin {
     }
 
     private CompletableFuture<Boolean> createVault(WindowHandle owner) {
-        if (creating != null) { createDialog.toFront(); return creating; }
+        if (creating != null) { createDialog.toFront(); return attachCreate(); }
         var result = new CompletableFuture<Boolean>();
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Create Vault", owner, true));
         creating = result; createDialog = dialog;
@@ -220,8 +228,22 @@ public class VaultPlugin implements Plugin {
                 result.complete(false);
             }
         });
+        var waiter = attachCreate();
         dialog.show();
-        return result;
+        return waiter;
+    }
+
+    private CompletableFuture<Boolean> attachCreate() {
+        var shared = creating;
+        var waiter = new CompletableFuture<Boolean>(); createWaiters.add(waiter);
+        shared.whenComplete((ok, failure) -> {
+            if (failure == null) waiter.complete(ok); else waiter.completeExceptionally(failure);
+        });
+        waiter.whenComplete((ok, failure) -> ui.execute(() -> {
+            createWaiters.remove(waiter);
+            if (waiter.isCancelled() && createWaiters.isEmpty() && creating == shared && !shared.isDone()) createDialog.close();
+        }));
+        return waiter;
     }
 
     private void showUnlock(UnlockPrompt prompt) {
@@ -243,6 +265,22 @@ public class VaultPlugin implements Plugin {
         prompt.onDismiss(() -> { currentGrant = null; dialog.close(); vaultChanged(); });
         dialog.onClosed(prompt::cancel);
         dialog.show();
+    }
+
+    private void showImport(dev.jasper.vault.service.KeyImportPrompt prompt) {
+        PluginDialog dialog = context.windows().dialog(new DialogSpec("Import SSH keys", owner(prompt.owner()), true));
+        var panel = new dev.jasper.vault.ui.KeyImportPanel(prompt);
+        dialog.setContent(panel);
+        prompt.result().whenComplete((value, failure) -> ui.execute(dialog::close));
+        boolean[] shown = {false};
+        // Setup/unlock owns its modal loop first. Never cover it with a waiting import dialog.
+        var ready = prompt.onChanged(() -> {
+            if (prompt.phase() != dev.jasper.vault.service.KeyImportPrompt.Phase.OPENING && !prompt.result().isDone() && !shown[0]) {
+                shown[0] = true;
+                javax.swing.SwingUtilities.invokeLater(() -> { if (!prompt.result().isDone()) dialog.show(); });
+            }
+        });
+        dialog.onClosed(() -> { ready.close(); panel.close(); prompt.cancel(); });
     }
 
     private void showPick(PickPrompt prompt) {

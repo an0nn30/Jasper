@@ -17,13 +17,17 @@ import java.util.stream.Stream;
 
 /**
  * A small reader of OpenSSH client configuration: Host blocks with HostName, Port, User, ProxyJump and
- * IdentityFile; the first value wins per key, global lines and {@code Host *} supply defaults; one level of
+ * IdentityFile; scalar first values win and identities accumulate, global lines and {@code Host *} supply defaults; one level of
  * Include. Wildcard Host patterns and Match blocks are skipped and listed.
  */
 public final class SshConfig {
-    public record Entry(String alias, Optional<String> hostname, OptionalInt port, Optional<String> user, Optional<String> proxyJump, Optional<String> identityFile) { }
+    public record Entry(String alias, Optional<String> hostname, OptionalInt port, Optional<String> user, Optional<String> proxyJump, List<String> identityFiles) { public Entry { identityFiles = List.copyOf(identityFiles); } }
     public record Parsed(List<Entry> entries, List<String> skipped) { }
 
+    private static final class Block {
+        final Map<String, String> values = new LinkedHashMap<>();
+        final List<String> identities = new ArrayList<>();
+    }
     private SshConfig() { }
 
     /** Reads {@code config}; a missing file is empty. Includes resolve relative to the file's directory. */
@@ -45,10 +49,10 @@ public final class SshConfig {
     }
 
     public static Parsed parse(String text, Function<String, List<String>> includes) {
-        var blocks = new ArrayList<Map.Entry<List<String>, Map<String, String>>>();
+        var blocks = new ArrayList<Map.Entry<List<String>, Block>>();
         var skipped = new ArrayList<String>();
-        var global = new LinkedHashMap<String, String>();
-        Map<String, String> current = global;
+        var global = new Block();
+        Block current = global;
         boolean skipping = false;
         for (String raw : expand(text, includes).split("\n")) {
             String line = raw.strip();
@@ -66,22 +70,26 @@ public final class SshConfig {
                     else if (alias.contains("*") || alias.contains("?") || alias.startsWith("!")) skipped.add("Host " + alias + " (pattern)");
                     else aliases.add(alias);
                 }
-                current = new LinkedHashMap<>();
+                current = new Block();
                 blocks.add(Map.entry(aliases, current));
                 skipping = false;
             } else if (key.equals("match")) {
                 skipped.add("Match " + value + " (Match block)");
-                current = new LinkedHashMap<>();
+                current = new Block();
                 skipping = true;
-            } else if (!skipping) current.putIfAbsent(key, value);
+            } else if (!skipping) {
+                if (key.equals("identityfile")) { if (!value.equalsIgnoreCase("none")) current.identities.add(value); }
+                else current.values.putIfAbsent(key, value);
+            }
         }
         var entries = new ArrayList<Entry>();
         var aliases = new java.util.LinkedHashSet<String>();
         for (var block : blocks) for (String alias : block.getKey()) if (!alias.equals("*")) aliases.add(alias);
         for (String alias : aliases) {
-            Map<String, String> values = new LinkedHashMap<>(global);
+            Map<String, String> values = new LinkedHashMap<>(global.values);
+            var identities = new java.util.LinkedHashSet<>(global.identities);
             for (var block : blocks)
-                if (block.getKey().stream().anyMatch(pattern -> pattern.equals("*") || pattern.equalsIgnoreCase(alias))) block.getValue().forEach(values::putIfAbsent);
+                if (block.getKey().stream().anyMatch(pattern -> pattern.equals("*") || pattern.equalsIgnoreCase(alias))) { block.getValue().values.forEach(values::putIfAbsent); identities.addAll(block.getValue().identities); }
             OptionalInt port = OptionalInt.empty();
             if (values.containsKey("port")) {
                 try {
@@ -91,7 +99,7 @@ public final class SshConfig {
                 } catch (NumberFormatException bad) { skipped.add("Host " + alias + " (bad Port)"); continue; }
             }
             entries.add(new Entry(alias, Optional.ofNullable(values.get("hostname")), port, Optional.ofNullable(values.get("user")),
-                Optional.ofNullable(values.get("proxyjump")), Optional.ofNullable(values.get("identityfile"))));
+                Optional.ofNullable(values.get("proxyjump")), List.copyOf(identities)));
         }
         return new Parsed(List.copyOf(entries), List.copyOf(skipped));
     }
@@ -120,7 +128,7 @@ public final class SshConfig {
         boolean started = false;
         for (; at < line.length(); at++) {
             char c = line.charAt(at);
-            if (c == '\\' && at + 1 < line.length()) { token.append(line.charAt(++at)); started = true; }
+            if (c == '\\' && at + 1 < line.length() && (line.charAt(at + 1) == '\\' || line.charAt(at + 1) == '"' || line.charAt(at + 1) == '\'' || Character.isWhitespace(line.charAt(at + 1)))) { token.append(line.charAt(++at)); started = true; }
             else if (quote != 0) { if (c == quote) quote = 0; else token.append(c); }
             else if (c == '"' || c == '\'') { quote = c; started = true; }
             else if (c == '#' && !started) break;

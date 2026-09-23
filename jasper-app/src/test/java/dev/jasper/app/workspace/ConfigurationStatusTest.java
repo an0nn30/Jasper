@@ -17,7 +17,7 @@ class ConfigurationStatusTest {
     @Test void statusKeepsConfigAndMetadataBoundedAndReadableInBothThemes() throws Exception {
         edt(() -> {
             var themes = new ThemeController();
-            for (BuiltinTheme theme : BuiltinTheme.values()) {
+            for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
                 themes.select(theme);
                 var status = new WindowStatusBar();
                 status.applyPalette(theme.palette());
@@ -42,11 +42,11 @@ class ConfigurationStatusTest {
             }
         });
     }
-    @Test void statusSurfaceFollowsTheTitleBackground() throws Exception {
+    @Test void statusSurfaceFollowsChromeRatherThanTerminalPalette() throws Exception {
         edt(() -> {
             var themes = new ThemeController();
             var status = new WindowStatusBar();
-            for (var theme : BuiltinTheme.values()) {
+            for (var theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
                 themes.select(theme);
                 status.applyPalette(theme.palette());
                 status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));

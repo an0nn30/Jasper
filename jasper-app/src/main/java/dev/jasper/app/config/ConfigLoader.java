@@ -48,7 +48,7 @@ public final class ConfigLoader {
         Map.entry(List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height")),
         Map.entry(List.of("ui"), Set.of("theme", "font")),
         Map.entry(List.of("ui", "font"), Set.of("family", "size")),
-        Map.entry(List.of("ui", "theme"), Set.of("variant")),
+        Map.entry(List.of("ui", "theme"), Set.of("variant", "style")),
         Map.entry(List.of("terminal"), Set.of("shell", "env", "scrollback", "option_as_meta", "cursor",
             "dim_inactive_panes", "copy_on_select", "bell", "on_exit", "shell_integration")),
         Map.entry(List.of("terminal", "shell"), Set.of("program", "args")),
@@ -88,6 +88,7 @@ public final class ConfigLoader {
     private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
     private ShellIntegrationMode shellIntegration = ShellIntegrationMode.AUTO;
     private Appearance variant = Appearance.DARK;
+    private ThemeStyle style = ThemeStyle.MODERN;
     private Map<String, String> keybindings = Map.of();
     private Map<String, Map<String, Object>> plugins = Map.of();
     private static final java.util.regex.Pattern PLUGIN_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
@@ -115,7 +116,7 @@ public final class ConfigLoader {
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, new UiFontConfig(uiFontFamily, uiFontSize));
+                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, style, new UiFontConfig(uiFontFamily, uiFontSize));
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -220,6 +221,8 @@ public final class ConfigLoader {
             case "font.fallback" -> fallback = strings(path, value, ConfigLoader::fontName, fallback);
             case "font.ligatures" -> ligatures = bool(path, value, ligatures);
             case "font.line_height" -> lineHeight = number(path, value, 1, 3, lineHeight);
+            case "ui.theme.style" -> style = choice(path, value, Map.of(
+    "modern", ThemeStyle.MODERN, "retro", ThemeStyle.RETRO), style);
             case "ui.theme.variant" -> variant = choice(path, value, Map.of(
                 "light", Appearance.LIGHT, "dark", Appearance.DARK), variant);
             case "terminal.shell.program" -> program = string(path, value,

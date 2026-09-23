@@ -43,6 +43,16 @@ import org.apache.sshd.common.util.security.SecurityUtils;
 
 /** Shared sessions; all registry state belongs to the UI executor. Each shell and dependent hop owns a reference. */
 public final class Connections {
+    static {
+        // Each plugin has its own BC classes. A JVM-global named provider may return keys
+        // owned by a different plugin loader; use this loader's provider instance instead.
+        SecurityUtils.registerSecurityProvider(new org.apache.sshd.common.util.security.bouncycastle.BouncyCastleSecurityProviderRegistrar() {
+            private final java.security.Provider local = new org.bouncycastle.jce.provider.BouncyCastleProvider();
+            @Override public boolean isNamedProviderUsed() { return false; }
+            @Override public java.security.Provider getSecurityProvider() { return local; }
+        });
+    }
+
     public record Shell(RemoteHost host, TerminalConnection connection) {
         public UUID hostId() { return host.id(); }
     }
@@ -184,13 +194,13 @@ public final class Connections {
         via.whenComplete((jump, failure) -> ui.execute(() -> {
             if (fresh.evicted) return;
             if (failure != null) { fail(fresh, failure); return; }
-            CompletableFuture<Optional<Credential>> credential;
+            CompletableFuture<List<Credential>> credential;
             try { credential = credentialFor(host); } catch (RuntimeException bad) { fail(fresh, bad); return; }
             fresh.resources.add(() -> ui.execute(() -> credential.cancel(true)));
             credential.whenComplete((secret, denied) -> ui.execute(() -> {
-                if (fresh.evicted) { if (secret != null && secret.isPresent()) secret.get().close(); return; }
+                if (fresh.evicted) { if (secret != null) secret.forEach(Credential::close); return; }
                 if (denied != null) { fail(fresh, denied); return; }
-                if (host.auth() instanceof Auth.Vault && secret.isEmpty()) { fail(fresh, new Failures.Failure("Credential denied")); return; }
+                if (!(host.auth() instanceof Auth.Agent) && secret.isEmpty()) { fail(fresh, new Failures.Failure("Credential denied")); return; }
                 status.accept("Connecting…");
                 onBackground(() -> connect(host, secret, Optional.ofNullable(jump), fresh, status)).whenComplete((session, problem) -> ui.execute(() -> {
                     if (problem != null) { fail(fresh, problem); return; }
@@ -204,18 +214,60 @@ public final class Connections {
         }));
         return fresh;
     }
-    private CompletableFuture<Optional<Credential>> credentialFor(RemoteHost host) {
-        return switch (host.auth()) {
-            case Auth.Agent ignored -> agent.isPresent() && settings.get().useAgent() ? CompletableFuture.completedFuture(Optional.empty()) : CompletableFuture.failedFuture(new Failures.Failure("SSH agent not available"));
-            case Auth.Vault vault -> credentials.map(source -> source.apply(vault.credentialId())).orElseGet(() -> CompletableFuture.failedFuture(new Failures.Failure("needs Credential Vault")));
-        };
+    private CompletableFuture<List<Credential>> credentialFor(RemoteHost host) {
+        if (host.auth() instanceof Auth.Agent)
+            return agent.isPresent() && settings.get().useAgent() ? CompletableFuture.completedFuture(List.of())
+                : CompletableFuture.failedFuture(new Failures.Failure("SSH agent not available"));
+        if (credentials.isEmpty()) return CompletableFuture.failedFuture(new Failures.Failure("needs Credential Vault"));
+        List<UUID> ids = host.auth() instanceof Auth.Vault v ? List.of(v.credentialId()) : ((Auth.VaultKeys) host.auth()).credentialIds();
+        var result = new CompletableFuture<List<Credential>>();
+        var acquired = new ArrayList<Credential>();
+        var active = new java.util.concurrent.atomic.AtomicReference<CompletableFuture<Optional<Credential>>>();
+        result.whenComplete((values, failure) -> {
+            if (failure != null) ui.execute(() -> {
+                acquired.forEach(Credential::close); acquired.clear();
+                var pending = active.get(); if (pending != null) pending.cancel(false);
+            });
+        });
+        acquireCredential(ids, 0, acquired, active, result, host.auth() instanceof Auth.VaultKeys);
+        return result;
+    }
+    private void acquireCredential(List<UUID> ids, int at, List<Credential> acquired,
+            java.util.concurrent.atomic.AtomicReference<CompletableFuture<Optional<Credential>>> active,
+            CompletableFuture<List<Credential>> result, boolean managedOnly) {
+        if (result.isDone()) return;
+        if (at == ids.size()) { result.complete(List.copyOf(acquired)); return; }
+        CompletableFuture<Optional<Credential>> request;
+        try { request = credentials.orElseThrow().apply(ids.get(at)); active.set(request); }
+        catch (RuntimeException failure) { result.completeExceptionally(failure); return; }
+        request.whenComplete((value, failure) -> ui.execute(() -> {
+            if (result.isDone()) { if (value != null) value.ifPresent(Credential::close); return; }
+            if (failure != null) { result.completeExceptionally(failure); return; }
+            if (value.isEmpty()) { result.completeExceptionally(new Failures.Failure("Credential denied")); return; }
+            Credential secret = value.orElseThrow();
+            if (managedOnly && (secret.kind() != dev.jasper.vault.api.Kind.SSH_KEY || secret.keyBytes().isEmpty() || secret.keyPath().isPresent())) {
+                secret.close(); result.completeExceptionally(new Failures.Failure("Import this key into Vault before connecting")); return;
+            }
+            acquired.add(secret); acquireCredential(ids, at + 1, acquired, active, result, managedOnly);
+        }));
     }
     /** Background: TCP (through the jump's forward when given), host key, authentication. Closes the credential. */
-    private ClientSession connect(RemoteHost host, Optional<Credential> credential, Optional<ClientSession> jump, Shared shared, Consumer<String> status) throws Exception {
+    private ClientSession connect(RemoteHost host, List<Credential> credential, Optional<ClientSession> jump, Shared shared, Consumer<String> status) throws Exception {
         RemoteSettings current = shared.settings;
-        String username = host.username().isEmpty() ? credential.flatMap(Credential::username).orElse("") : host.username();
+        String username = host.username().isEmpty() ? credential.stream().flatMap(c -> c.username().stream()).findFirst().orElse("") : host.username();
         try {
             if (username.isEmpty()) throw new Failures.Failure("No username for " + host.name());
+            if (host.auth() instanceof Auth.Agent) {
+                try (AgentClient probe = agent.orElseThrow().withTimeout(current.authTimeout())) {
+                    shared.resources.add(probe::close);
+                    if (probe.identities().isEmpty()) {
+                        throw new Failures.Failure("SSH agent has no usable keys; load a key or choose Vault.");
+                    }
+                } catch (IOException unavailable) {
+                    throw new Failures.Failure("SSH agent unavailable: " + unavailable.getMessage(), unavailable);
+                }
+                shared.resources.check();
+            }
             SshClient client = client(host.auth() instanceof Auth.Agent);
             shared.resources.check();
             String address = host.hostname(); int port = host.port();
@@ -241,19 +293,19 @@ public final class Connections {
                 }
                 CoreModuleProperties.AUTH_TIMEOUT.set(session, current.authTimeout());
                 List<String> tried = new ArrayList<>();
-                if (credential.isPresent()) {
-                    Credential secret = credential.get();
-                    if (secret.keyPath().isPresent()) {
+                for (Credential secret : credential) {
+                    if (secret.keyPath().isPresent() || secret.keyBytes().isPresent()) {
                         String passphrase = secret.passphrase() == null ? null : new String(secret.passphrase());
-                        try (var stream = Files.newInputStream(secret.keyPath().get())) {
-                            Iterable<KeyPair> pairs = SecurityUtils.loadKeyPairIdentities(session, NamedResource.ofName(secret.keyPath().get().toString()), stream,
+                        try (var stream = secret.keyBytes().isPresent() ? new java.io.ByteArrayInputStream(secret.keyBytes().orElseThrow()) : Files.newInputStream(secret.keyPath().orElseThrow())) {
+                            Iterable<KeyPair> pairs = SecurityUtils.loadKeyPairIdentities(session, NamedResource.ofName("Vault SSH key"), stream,
                                 passphrase == null ? FilePasswordProvider.EMPTY : FilePasswordProvider.of(passphrase));
                             for (KeyPair pair : pairs) { session.addPublicKeyIdentity(pair); keys.add(pair); }
-                        } catch (IOException | GeneralSecurityException unreadable) { throw new Failures.Failure("Could not read the key " + secret.keyPath().get().getFileName() + ": " + unreadable.getMessage()); }
+                        } catch (IOException | GeneralSecurityException unreadable) { throw new Failures.Failure("Could not read the Vault key " + secret.name()); }
                         tried.add("publickey");
                     }
                     if (secret.password() != null) { String password = new String(secret.password()); session.addPasswordIdentity(password); passwords.add(password); tried.add("password"); }
-                } else tried.add("publickey (agent)");
+                }
+                if (credential.isEmpty()) tried.add("publickey (agent)");
                 ui.execute(() -> status.accept("Authenticating…"));
                 try { var auth = session.auth(); shared.resources.add(auth::cancel); auth.verify(current.authTimeout()); }
                 catch (IOException denied) {
@@ -272,7 +324,7 @@ public final class Connections {
                 passwords.forEach(session::removePasswordIdentity);
             }
         } finally {
-            if (credential.isPresent()) credential.get().close();
+            credential.forEach(Credential::close);
         }
     }
 
