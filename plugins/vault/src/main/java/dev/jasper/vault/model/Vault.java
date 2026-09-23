@@ -9,6 +9,12 @@ import java.util.UUID;
 
 /** The decrypted contents. Mutable, edited on the UI thread only, saved by the lock manager after each edit. */
 public final class Vault {
+    private int payloadVersion = 1;
+    private final List<ManagedSshKey> managedKeys = new ArrayList<>();
+    public int payloadVersion() { return payloadVersion; }
+    public void requireManagedFormat() { payloadVersion = 2; }
+    public List<ManagedSshKey> managedKeys() { return managedKeys; }
+    public Optional<ManagedSshKey> managedKey(UUID id) { return managedKeys.stream().filter(k -> k.id().equals(id)).findFirst(); }
     private final List<Account> accounts = new ArrayList<>();
     private final List<SshKey> keys = new ArrayList<>();
     private final List<Note> notes = new ArrayList<>();
@@ -26,6 +32,7 @@ public final class Vault {
     public void remove(UUID id) {
         accounts.removeIf(account -> { if (!account.id().equals(id)) return false; account.auth().zero(); return true; });
         keys.removeIf(key -> key.id().equals(id));
+        managedKeys.removeIf(key -> { if (!key.id().equals(id)) return false; key.close(); return true; });
         notes.removeIf(note -> { if (!note.id().equals(id)) return false; note.zero(); return true; });
         grants.removeIf(grant -> grant.credentialId().equals(id));
     }
@@ -34,6 +41,7 @@ public final class Vault {
     public void zero() {
         accounts.forEach(account -> account.auth().zero());
         notes.forEach(Note::zero);
+        managedKeys.forEach(ManagedSshKey::close); managedKeys.clear();
         accounts.clear(); keys.clear(); notes.clear(); grants.clear();
     }
 }
