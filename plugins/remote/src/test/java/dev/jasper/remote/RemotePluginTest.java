@@ -15,10 +15,12 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import dev.jasper.remote.ui.sftp.SftpUi;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.remote.ui.UiTestAccess.*;
@@ -147,6 +149,53 @@ class RemotePluginTest {
             host.reconnectSession(second); settle(host);
             assertThat(host.sessionState(second)).isEqualTo("RUNNING|");
             assertThat(host.openRequests()).hasSize(2);
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    @Test void followedPanesGetTheirOwnConnectionAndProbeTheirFolder(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            server.execReplies(Map.of("uname -s", "Linux\n", "cat /etc/os-release", "", "sh -s", "/srv/app\0"));
+            var vault = new FakeVault();
+            host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            RemotePlugin plugin = plugin(dir.resolve("ssh"));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            UUID credential = vault.password("deploy login", "deploy", "s3cret");
+            RemoteHost shared = RemoteHost.create("shared", "127.0.0.1", server.port(), "", new Auth.Vault(credential), "", Optional.empty()).withFollowDirectory(false);
+            RemoteHost followed = RemoteHost.create("followed", "127.0.0.1", server.port(), "", new Auth.Vault(credential), "", Optional.empty());
+            plugin.store().put(shared); plugin.store().put(followed);
+            settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            var handle = context.terminals().window(window).orElseThrow();
+            plugin.openHost(handle, shared); settle(host);
+            plugin.openHost(handle, shared); settle(host);
+            assertThat(server.server.getActiveSessions()).as("unfollowed panes share a connection").hasSize(1);
+            plugin.openHost(handle, followed); settle(host);
+            plugin.openHost(handle, followed); settle(host);
+            assertThat(server.server.getActiveSessions()).as("each followed pane has its own").hasSize(3);
+
+            assertThat(host.openPanel(SftpUi.PANEL, window)).isNotNull();
+            UUID followedPane = host.terminalPanes().getLast();
+            host.focusTerminalPane(followedPane); host.flush();
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+            while (!server.execCommands.contains("sh -s") && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
+            assertThat(server.execCommands).as("focus probes the followed pane").contains("sh -s");
+
+            long before = server.execCommands.stream().filter("sh -s"::equals).count();
+            host.typeIntoSession(followedPane, "\r");
+            deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+            while (server.execCommands.stream().filter("sh -s"::equals).count() == before && System.nanoTime() < deadline) {
+                var tasks = List.copyOf(scheduled); scheduled.clear(); tasks.forEach(Runnable::run);
+                settle(host); Thread.sleep(20);
+            }
+            assertThat(server.execCommands.stream().filter("sh -s"::equals).count()).as("Enter probes again").isGreaterThan(before);
+
+            long probes = server.execCommands.stream().filter("sh -s"::equals).count();
+            host.focusTerminalPane(host.terminalPanes().getFirst()); host.flush(); settle(host);
+            assertThat(server.execCommands.stream().filter("sh -s"::equals).count()).as("unfollowed panes are never probed").isEqualTo(probes);
             host.stopAll();
             assertThat(host.failures()).isEmpty();
         }

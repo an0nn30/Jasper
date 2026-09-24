@@ -1,9 +1,6 @@
 # Jasper Remote — shell directory probe for SFTP follow
 
-**Status:** Design approved in conversation 2026-09-24; written spec approved the same day, then
-revised on the user's direction: a dedicated connection per pane replaces the environment tag
-(macOS `ps -E` no longer shows another process's environment), and follow covers Linux and
-macOS hosts only. The revision awaits the user's review. No implementation has started.
+**Status:** Approved and implemented on `codex/remote-sftp`; GUI acceptance is the user's.
 
 **Base:** `codex/remote-sftp` at `ffc34fb1`.
 

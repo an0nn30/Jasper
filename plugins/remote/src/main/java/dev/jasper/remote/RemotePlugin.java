@@ -76,6 +76,7 @@ public class RemotePlugin implements Plugin {
     private dev.jasper.remote.transfer.TransferCoordinator transfers;
     private dev.jasper.remote.ui.transfers.TransferUi transferUi;
     private dev.jasper.remote.ui.sftp.SftpUi sftpUi;
+    private dev.jasper.remote.ui.sftp.DirectoryFollower follower;
     private PluginAction sftpToggle;
     public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=SFTP+".toggle";
     private final Function<PluginContext, Optional<AgentClient>> agentFactory;
@@ -157,6 +158,8 @@ public class RemotePlugin implements Plugin {
         });
         transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui);
         sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::show);
+        follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id),sftpUi::directory,sftpUi::notice);
+        sftpUi.onFollowRequested(follower::request);
         context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp","files","browse","remote")),invoked->{
             invoked.pane().flatMap(this::sftpPane).ifPresentOrElse(pane->sftpUi.show(invoked.window(),pane),()->sftpUi.show(invoked.window()));
         });
@@ -189,12 +192,12 @@ public class RemotePlugin implements Plugin {
             event.paneId().ifPresent(id->{rememberPane(id);sftpFocused(id);}); refreshSplit();
         });
         context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> { rememberPane(event.paneId());sftpFocused(event.paneId()); });
-        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { panes.remove(event.paneId()); paneIdentities.remove(event.paneId());sftpUi.forget(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
+        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.forget(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
         context.events().subscribe(TerminalEvents.WINDOW_CLOSED, event -> {
             for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
         });
         if (vault.isPresent()) context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> refreshPanels());
-        context.events().subscribe(TerminalEvents.CWD_CHANGED,event->event.remoteDirectory().ifPresent(directory->sftpUi.directory(event.paneId(),directory.path())));
+        context.events().subscribe(TerminalEvents.CWD_CHANGED,event->event.remoteDirectory().ifPresent(directory->{follower.reported(event.paneId());sftpUi.directory(event.paneId(),directory.path());}));
         context.events().subscribe(TerminalEvents.TAB_SELECTED,event->context.terminals().window(event.windowId()).flatMap(window->window.activeTab()).flatMap(tab->tab.activePane()).ifPresent(pane->sftpFocused(pane.id())));
         context.config().onChanged(() -> {
             if (stopped) return;
@@ -229,7 +232,7 @@ public class RemotePlugin implements Plugin {
 
     @Override public void stop() {
         stopped = true;
-        if(sftpUi!=null)sftpUi.close();if(transferUi!=null)transferUi.close();if(transfers!=null)transfers.close();
+        if(follower!=null)follower.close();if(sftpUi!=null)sftpUi.close();if(transferUi!=null)transferUi.close();if(transfers!=null)transfers.close();
         if (configImport != null) configImport.close();
         for (var attempt : Set.copyOf(attempts)) attempt.close();
         for (var question : Set.copyOf(questions)) question.cancel(true);
@@ -244,6 +247,16 @@ public class RemotePlugin implements Plugin {
         return Optional.of(new dev.jasper.remote.ui.sftp.SftpUi.PaneTarget(pane.id(),identity,pane.info().remoteDirectory().map(dev.jasper.sdk.terminal.RemoteDirectory::path).orElse("")));
     }
     private void sftpFocused(UUID id) { context.terminals().pane(id).ifPresent(pane->sftpPane(pane).ifPresent(target->sftpUi.pane(pane.tab().window(),target))); }
+    /** Linux and macOS panes on a dedicated connection report their folder to SFTP follow; Windows hosts are not followed. */
+    private void followFolder(UUID paneId, Connections.Shell shell, dev.jasper.remote.hosts.HostInfo info) {
+        if (shell.folder().isEmpty() || "Windows".equals(info.os())) return;
+        var folder = shell.folder().orElseThrow();
+        follower.track(paneId, () -> CompletableFuture.supplyAsync(() -> {
+            try { return folder.read(); } catch (IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
+        }, context.background()));
+        folder.onEnter(() -> ui.execute(() -> follower.enter(paneId)));
+        follower.request(paneId);
+    }
     static CompletableFuture<Void> validateResumeIdentity(dev.jasper.remote.client.ConnectionIdentity expected,CompletableFuture<dev.jasper.remote.client.ConnectionIdentity> source) {
         CompletableFuture<Void> validated=source.thenApply(actual->{if(!actual.equals(expected)) throw new java.util.concurrent.CompletionException(new IOException("Saved host or authentication identity changed; queue a new transfer"));return null;});
         validated.whenComplete((ignored,failure)->{if(validated.isCancelled())source.cancel(true);});
@@ -325,12 +338,13 @@ public class RemotePlugin implements Plugin {
         UUID paneId = pending.pane().id();
         panes.put(paneId, shell.hostId()); paneIdentities.put(paneId, shell.identity()); rememberPane(paneId);sftpFocused(paneId);
         shell.connection().exited().whenComplete((ignored, exit) -> ui.execute(() -> {
-            panes.remove(paneId); paneIdentities.remove(paneId); recentPanes.remove(paneId); refreshSplit(); if (!stopped) refreshPanels();
+            panes.remove(paneId); paneIdentities.remove(paneId); follower.forget(paneId); recentPanes.remove(paneId); refreshSplit(); if (!stopped) refreshPanels();
         }));
         pending.attach(shell.connection());
         RemoteHost authenticatedHost = shell.host();
         connections.inspect(shell).thenAccept(info -> {
             if (stopped) return;
+            ui.execute(() -> { if (!stopped && panes.containsKey(paneId)) followFolder(paneId, shell, info); });
             context.background().execute(() -> {
                 try { hostInfo.put(authenticatedHost, info); }
                 catch (IOException unavailable) { context.log().log(System.Logger.Level.DEBUG, "Host information cache: {0}", unavailable.getMessage()); }
@@ -365,7 +379,9 @@ public class RemotePlugin implements Plugin {
             var dimensions = window.activeTab().flatMap(tab -> tab.activePane()).map(PaneHandle::info);
             int cols = dimensions.map(info -> Math.max(1, info.columns())).orElse(80);
             int rows = dimensions.map(info -> Math.max(1, info.rows())).orElse(24);
-            future = connections.shell(host.id(), window, cols, rows, panel::status);
+            // Followed panes get their own connection so the probe can tell their shell apart (see the directory probe spec).
+            boolean dedicated = host.followDirectory() && !"Windows".equals(hostInfo.get(host).os());
+            future = connections.shell(host.id(), window, cols, rows, panel::status, dedicated);
             future.whenComplete((shell, failure) -> ui.execute(() -> {
                 if (closed || stopped || !window.isOpen()) { if (shell != null) shell.connection().close().run(); close(); return; }
                 if (failure != null) { panel.failed(message(failure)); return; }

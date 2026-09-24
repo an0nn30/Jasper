@@ -2,6 +2,17 @@
 
 ## Current state — 2026-09-23
 
+### SFTP directory follow probe — 2026-09-24
+
+Follow terminal folder only followed OSC 7, which stock bash and zsh do not send over SSH. The
+[directory probe amendment](superpowers/specs/2026-09-24-jasper-remote-directory-probe-design.md)
+([plan](superpowers/plans/2026-09-24-jasper-remote-directory-probe.md)) adds a fixed read-only
+probe on a separate exec channel for Linux and macOS hosts; each followed pane has its own SSH
+connection so the probe can tell shells apart (macOS no longer shows other processes'
+environments). Automated tests cover the script against real local processes, dedicated leases,
+the follower policy and the plugin wiring. The GUI acceptance steps in
+[remote-7c-verification](remote-7c-verification.md) are the user's.
+
 ### SFTP phase 1 — implemented, reviewed and verified
 
 The [SFTP design](superpowers/specs/2026-09-23-jasper-remote-sftp-design.md) is approved

@@ -68,6 +68,12 @@ you control for the following acceptance steps:
    copied content and explicit cleanup retry/acknowledgement before forgetting cleanup history.
 8. Set `toggle_sftp` and `toggle_transfers` in Remote's TOML; verify live changes and app override
    precedence. Set copy concurrency and a short request timeout for a deliberately stalled host.
+9. Directory follow without shell integration (2026-09-24 amendment): on the Mac host and a stock
+   Linux bash host, open two panes each and `cd` in each; the sidebar follows the focused pane
+   within about half a second. Check `bash` inside `zsh`, a program started in another folder,
+   `sudo -s` (falls back to the login shell's folder), a Windows host (no following, otherwise
+   unchanged), the host setting off (panes share one connection, no following), and that the
+   prompt, MOTD and shell history show nothing Remote ran.
 
 ## Boundaries
 

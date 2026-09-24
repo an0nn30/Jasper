@@ -150,10 +150,15 @@ The context menu also offers **Upload folder** and **Copy to host**.
 Opening a directory link deliberately resolves its path; recursive copy/delete still treat it as a link.
 
 The browser remembers each remote pane's directory and Follow terminal folder choice.
-Following uses directory reports from that pane, without running a shell command. Entering
-a path or navigating a folder turns following off; Refresh preserves it. Selecting a local
-terminal leaves the last remote browser available. Browsing and transfers hold their own SSH
-leases, so closing the source terminal does not cancel a copy.
+Following uses the pane's own directory reports (OSC 7) when its shell sends them. Otherwise,
+on Linux and macOS hosts, Remote reads the shell's folder after you press Enter or focus the
+pane, with a fixed read-only script on a separate SSH exec channel: nothing is typed into your
+shell. For this, each pane of a host with **Track shell folder for SFTP follow** (on by default,
+in the host editor) has its own SSH connection. Windows hosts are not followed. A host that
+refuses exec channels shows "This host does not report the shell's folder". Entering a path or
+navigating a folder turns following off; Refresh preserves it. Selecting a local terminal
+leaves the last remote browser available. Browsing and transfers hold their own SSH leases, so
+closing the source terminal does not cancel a copy.
 
 - **Upload** opens the owning window's native file picker; the selection goes into the
   displayed remote directory. **Upload folder** picks a local directory recursively.
