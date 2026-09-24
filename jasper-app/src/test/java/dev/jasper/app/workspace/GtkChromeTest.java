@@ -31,6 +31,8 @@ class GtkChromeTest {
             var actions = java.util.Arrays.stream(owner.toolbar().getComponents()).filter(JButton.class::isInstance)
                 .map(c -> ((JButton) c).getAction()).toList();
             assertThat(actions).contains(owner.action(ActionId.OPEN_SETTINGS), owner.action(ActionId.QUIT));
+            for (var child : owner.toolbar().getComponents()) if (child instanceof JButton button)
+                assertThat(button.getIcon().getIconWidth()).isEqualTo(24);
             assertThat(owner.windowCommands().view("view.appearance.dark").isEnabled()).isFalse();
             assertThat(owner.windowCommands().view("view.tab_height").isEnabled()).isFalse();
             assertThat(menuTexts(owner.menuBar())).contains("GTK follows the desktop theme; change style in Settings and restart.");

@@ -4,20 +4,22 @@ import com.formdev.flatlaf.extras.FlatSVGIcon;
 import java.awt.Color;
 import javax.swing.UIManager;
 
-/** Bundled Tabler, GNOME 2 and Tango icons; no network access is needed to render chrome. */
+/** Bundled Tabler, GNOME 2 and Tango icons, or the desktop icon theme in GTK; no network access. */
 public final class AppIcons {
     private AppIcons() {}
     public static javax.swing.Icon icon(String name) {
         if (!GnomeIcons.NAMES.contains(name))
             throw new IllegalArgumentException("Unknown application icon: " + name);
+        if (SwingAppearance.gtk()) return DesktopIcons.app(name, DesktopIcons.COMPACT);
         if (SwingAppearance.retro()) return GnomeIcons.icon(name);
         String resource = name.equals("close") ? "dev/jasper/app/icons/title/x.svg" : "dev/jasper/app/icons/" + name + ".svg";
         FlatSVGIcon icon = new FlatSVGIcon(resource, 16, 16);
         return icon.setColorFilter(new FlatSVGIcon.ColorFilter(source -> themed("Jasper.chromeForeground", source)));
     }
 
-    /** Application toolbar artwork: large classic icons in retro, regular modern icons otherwise. */
+    /** Application toolbar artwork: desktop icons in GTK, large classic icons in retro, regular modern icons otherwise. */
     public static javax.swing.Icon toolbarIcon(String name) {
+        if (SwingAppearance.gtk()) return DesktopIcons.app(name, DesktopIcons.TOOLBAR);
         return SwingAppearance.retro() ? GnomeIcons.icon(name, 28) : icon(name);
     }
 
@@ -36,6 +38,7 @@ public final class AppIcons {
     /** Host-owned semantic artwork, independent of any plugin's resource loader. */
     public static javax.swing.Icon named(String name) {
         String resource = NamedIcons.resource(name);
+        if (SwingAppearance.gtk()) return DesktopIcons.skin(name);
         return SwingAppearance.retro() ? new SkinIcon(name) : themed(AppIcons.class.getClassLoader(), resource);
     }
 
@@ -46,11 +49,13 @@ public final class AppIcons {
             throw new IllegalArgumentException("Unknown OldGNOME2 icon: " + retroName);
         if (modernSvgResourcePath == null || loader.getResource(modernSvgResourcePath) == null)
             throw new IllegalArgumentException("No such icon resource: " + modernSvgResourcePath);
+        if (SwingAppearance.gtk()) return DesktopIcons.skin(retroName);
         return SwingAppearance.retro() ? new SkinIcon(retroName) : themed(loader, modernSvgResourcePath);
     }
 
-    /** Sizes only managed retro icons; shared compact icons and external artwork remain untouched. */
+    /** Sizes only managed retro and GTK icons; shared compact icons and external artwork remain untouched. */
     public static javax.swing.Icon forToolbar(javax.swing.Icon icon) {
+        if (icon instanceof DesktopSkinIcon desktop) return desktop.toolbar();
         return icon instanceof SkinIcon managed ? managed.toolbar() : icon;
     }
 

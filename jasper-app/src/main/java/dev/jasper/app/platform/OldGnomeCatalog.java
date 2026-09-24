@@ -43,7 +43,7 @@ final class OldGnomeCatalog {
 
     static ImageIcon icon(String name, int size) {
         if (name == null || !NAMES.contains(name)) throw new IllegalArgumentException("Unknown OldGNOME2 icon: " + name);
-        if (size != 16 && size != 28) throw new IllegalArgumentException("Unsupported icon size: " + size);
+        if (size != 16 && size != 24 && size != 28) throw new IllegalArgumentException("Unsupported icon size: " + size);
         return CACHE.computeIfAbsent(name + "/" + size, key -> new ImageIcon(
             new BaseMultiResolutionImage(image(name, size), image(name, size * 2))));
     }
