@@ -2,6 +2,20 @@
 
 ## Current state — 2026-09-23
 
+**GTK style (2026-09-24):** On `claude/gtk-theme`, `ui.theme.style = "gtk"` installs Java's GTK look
+and feel with retro's native chrome, a terminal palette derived from the GTK text view, and icons from
+the freedesktop icon theme ([spec](superpowers/specs/2026-09-24-jasper-gtk-theme-design.md),
+[plan](superpowers/plans/2026-09-24-jasper-gtk-theme.md)). Unavailable GTK falls back to modern with a
+status warning. Deviations taken during execution: the terminal palette has no selection foreground, so
+only the selection background is derived; `ThemeController.reason()` uses the installer's own failure
+message (the `InstallationFailure`'s direct cause) rather than the root cause, so the status warning
+shows the friendly text (fix commit 48651522); `FreedesktopIcons` rejects absolute `Directories=`
+entries and only returns files that stay inside their theme root (fix commit 506dfed5);
+`GtkDefaults.install()` splits the multi-catch into separate catch blocks (same semantics).
+`./gradlew check`: tests=1804 failures=0 errors=0 skipped=3. Not done:
+Linux GUI verification (Adwaita, Adwaita-dark, a third-party icon theme, explicit `ui.font`, Wayland
+fallback), merge, push.
+
 Configuration documentation follow-up: the example and settings reference now include
 explicit `ui.theme.style = "modern"` and `ui.font.family = "system"`, with optional
 UI sizing, portable fallback, full-restart behavior and retro's retained-but-ignored

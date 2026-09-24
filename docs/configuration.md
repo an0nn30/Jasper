@@ -568,6 +568,21 @@ Plugins need no changes to use ordinary Metal controls. Plugins using [SDK seman
 
 Retro UI text uses regular-weight system fonts: Helvetica Neue (then Helvetica) on macOS, Segoe UI (then Tahoma) on Windows, and Noto Sans (then Liberation Sans) on Linux. All platforms fall back to Noto Sans/DejaVu Sans when applicable, then Java’s portable SansSerif font if no preferred family is installed. Fonts are discovered locally; none require downloading or bundling. The terminal keeps its configured monospace font. The retro menu bar and toolbar have matching solid light-gray backgrounds, separated by a subtle gray line. Toolbar buttons stay flat with 28-pixel classic icons and centered labels beneath them. Retro captions use regular weight at one point below the Metal button font, with compact five-pixel side padding. Settings and Exit sit at the far right; Settings opens the configuration file and Exit uses the normal application quit flow. Icon-only and hidden toolbar modes remain available; tab close controls are icon-only, and status actions remain unboxed. Ordinary form buttons retain Metal styling.
 
+### GTK appearance
+
+On Linux, set `style = "gtk"` in your existing `[ui.theme]` table and fully quit and relaunch Jasper.
+Jasper then uses Java's GTK look and feel, so controls, menus, fonts and colours follow your desktop's
+GTK theme, and toolbar, menu and plugin icons come from your icon theme (for example Adwaita or Papirus),
+with Jasper's bundled artwork for any icon the theme lacks. Tabs, toolbar and title bar use the same
+standard layout as retro. The terminal takes its background, text, cursor and selection colours from the
+theme's text views; the 16 ANSI colours follow Jasper Dark or Jasper Light by the background's brightness.
+`variant` is ignored. Desktop theme changes apply on the next launch.
+
+Where GTK is not available (macOS, Windows, or a Linux session whose Java runtime cannot load native GTK,
+which can include Wayland-native sessions), Jasper starts in the modern style and the status bar explains
+why. Explicit `ui.font` settings are applied through Swing's per-control font keys, which the GTK look and
+feel consults before its theme font; this still needs checking on a Linux desktop.
+
 ### Interface typography
 
 `[font]` controls terminal text. `[ui.font]` independently controls application and plugin UI:

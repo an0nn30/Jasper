@@ -26,9 +26,10 @@ public interface Appearance {
     Subscription onChanged(Consumer<Variant> handler);
 
     /**
-     * A host-owned icon for a semantic name. Jasper selects the artwork for the running
-     * skin; plugins need no resource path or skin check. Compact icons are 16 pixels;
-     * retro host toolbars use an independent 28-pixel variant.
+     * A host-owned icon for a semantic name. Jasper selects the artwork for the running skin, including
+     * the desktop icon theme when the host runs its GTK style; plugins need no resource path or skin
+     * check. Compact icons are 16 pixels; retro host toolbars use an independent 28-pixel variant and
+     * GTK host toolbars a 24-pixel one.
      *
      * @param name the meaning of the icon
      * @return the host's icon for the running skin
@@ -51,10 +52,10 @@ public interface Appearance {
      */
     Icon icon(String svgResourcePath);
     /**
-     * A 16 by 16 icon using the plugin's monochrome SVG in modern mode and bundled
-     * OldGNOME2 artwork in retro mode. Jasper adapts it to 28 pixels in retro host
-     * toolbars without resizing this shared icon. Both arguments are validated in both skins.
-     * Older implementations inherit the modern-only fallback.
+     * A 16 by 16 icon using the plugin's monochrome SVG in modern mode, bundled OldGNOME2 artwork in
+     * retro mode, and the matching desktop icon-theme artwork (else the OldGNOME2 artwork) in GTK mode.
+     * Jasper adapts it to 28 pixels in retro host toolbars without resizing this shared icon. Both
+     * arguments are validated in both skins. Older implementations inherit the modern-only fallback.
      *
      * @param modernSvgResourcePath SVG classpath path in the plugin's jars, without a leading slash
      * @param retroIcon bundled retro artwork

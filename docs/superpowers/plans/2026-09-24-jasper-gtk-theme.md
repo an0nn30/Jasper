@@ -2,7 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: written 2026-09-24, awaiting user review. Branch `claude/gtk-theme`.
+Status: implemented on claude/gtk-theme; ./gradlew check green (tests=1804 failures=0 errors=0 skipped=3); Linux GUI verification pending (user).
+
+Deviations taken during execution:
+- The terminal `Palette` record has no selection foreground; only the selection background is derived from the sampled GTK text selection colour.
+- `ThemeController.reason()` uses the installer's own failure message (the `InstallationFailure`'s direct cause) rather than the root cause, so the status warning shows the friendly text (fix commit 48651522).
+- `FreedesktopIcons` rejects absolute `Directories=` entries and only returns files that stay inside their theme root (fix commit 506dfed5).
+- `GtkDefaults.install()` splits the multi-catch into separate catch blocks (same semantics).
 
 **Goal:** Add `ui.theme.style = "gtk"`, which installs the JDK's GTK look and feel, uses native Swing chrome, derives the terminal colours from the GTK theme and draws icons from the desktop's freedesktop icon theme, falling back to modern where GTK is unavailable.
 

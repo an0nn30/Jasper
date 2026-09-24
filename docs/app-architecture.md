@@ -188,3 +188,9 @@ style. No SDK signatures or plugin lifecycle change. Retro uses the existing tab
 model with Metal tab delegates, compact icon-only close controls and a flat 24-pixel GNOME
 toolbar; form buttons remain stock Metal. App icons resolve from bundled assets, while
 plugin-supplied SVGs preserve their existing contract. Native title bars remain native.
+GTK installs the JDK's GTKLookAndFeel by class name; GtkDefaults samples its colours into
+the same Jasper.* aliases and GtkPalette derives the terminal palette. When GTK cannot be
+installed the controller installs modern and keeps the requested style for the restart
+check. SwingAppearance.nativeChrome() selects the standard-Swing tabs, toolbar and title
+for retro and GTK; retro() is Metal paint only. In GTK, AppIcons resolves freedesktop names
+through FreedesktopIcons (Icon Theme Specification) before bundled artwork.

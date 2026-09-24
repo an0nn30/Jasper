@@ -206,6 +206,9 @@ WindowChromeContributionsTest, then all architecture guards, check and installDi
 catalog's hashes/notices must also be present in the packaged app jar. Render headlessly;
 native application launch remains a user check.
 
+A new application or semantic icon also needs freedesktop candidates in FreedesktopNames;
+FreedesktopNamesTest fails until it has them.
+
 For standard meanings, prefer SDK `IconName` / `Appearance.icon(IconName)` (0.7.3).
 NamedIcons maps host-native names to `icons/standard` SVGs; AppIcons uses its own class loader,
 then selects the existing OldGNOME2 catalog in retro. Keep both catalogs complete when adding

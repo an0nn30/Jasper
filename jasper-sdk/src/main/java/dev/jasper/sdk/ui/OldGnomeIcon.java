@@ -1,7 +1,8 @@
 package dev.jasper.sdk.ui;
 
 /**
- * Bundled OldGNOME2 artwork for the retro skin. Images are supplied by the host.
+ * Semantic artwork for the classic skins. The host supplies bundled OldGNOME2 images in retro, and
+ * desktop icon-theme images with those as fallback in GTK.
  * @since 0.7.4
  */
 public enum OldGnomeIcon {
