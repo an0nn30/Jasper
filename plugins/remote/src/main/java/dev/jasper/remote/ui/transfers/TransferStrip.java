@@ -33,15 +33,15 @@ public final class TransferStrip extends JPanel {
 
     public void rows(List<TransferRows.Row> rows) {
         unavailable.setVisible(false);
-        var keep = new HashSet<UUID>();
         list.removeAll();
+        var oldViews = new LinkedHashMap<>(views);
+        views.clear();
         for (var row : rows) {
-            keep.add(row.id());
-            var view = views.computeIfAbsent(row.id(), id -> new RowView(id, actions));
+            var view = oldViews.computeIfAbsent(row.id(), id -> new RowView(id, actions));
+            views.put(row.id(), view);
             view.show(row);
             list.add(view);
         }
-        views.keySet().retainAll(keep);
         resize();
         setVisible(!rows.isEmpty());
     }
@@ -68,6 +68,7 @@ public final class TransferStrip extends JPanel {
     int visibleRows() { return Math.min(views.size(), VISIBLE_ROWS); }
     Optional<RowView> view(UUID id) { return Optional.ofNullable(views.get(id)); }
     String unavailableText() { return unavailable.isVisible() ? unavailable.getText() : ""; }
+    List<UUID> order() { return List.copyOf(views.keySet()); }
 
     static JLabel label(String text) {
         var label = new JLabel(text);

@@ -110,4 +110,16 @@ class TransferStripTest {
         assertThat(chosen).containsExactly(ConflictDecision.REPLACE, ConflictDecision.SKIP, "cancel");
         assertThat(panel.skip.getText()).isEqualTo("Skip existing");
     }
+
+    @Test void rowOrderFollowsDisplayOrderWhenReordered() {
+        var a = UUID.randomUUID();
+        var b = UUID.randomUUID();
+        var c = UUID.randomUUID();
+        strip.rows(List.of(row(a, "40%", Optional.empty(), false), row(b, "50%", Optional.empty(), false)));
+        var viewA = strip.view(a).orElseThrow();
+        assertThat(strip.order()).containsExactly(a, b);
+        strip.rows(List.of(row(c, "30%", Optional.empty(), false), row(a, "40%", Optional.empty(), false), row(b, "50%", Optional.empty(), false)));
+        assertThat(strip.order()).containsExactly(c, a, b);
+        assertThat(strip.view(a).orElseThrow()).isSameAs(viewA);
+    }
 }
