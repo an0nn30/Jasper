@@ -32,6 +32,7 @@ public final class HostEditor extends JPanel {
     final JTextField name = new JTextField(24), hostname = new JTextField(24), port = new JTextField("22", 6), username = new JTextField(16);
     final JComboBox<String> group = new JComboBox<>();
     final JCheckBox favorite = new JCheckBox("Favorite");
+    final JCheckBox followDirectory = new JCheckBox("Track shell folder for SFTP follow", true);
     final JRadioButton vaultAuth = new JRadioButton("Vault credential"), agentAuth = new JRadioButton("SSH agent");
     final JButton choose = new JButton("Choose…");
     final JLabel credentialLabel = new JLabel("none chosen");
@@ -70,7 +71,7 @@ public final class HostEditor extends JPanel {
         if (!vaultPresent) { vaultAuth.setText("Vault credential (needs Credential Vault)"); }
         editing.ifPresentOrElse(host -> {
             name.setText(host.name()); hostname.setText(host.hostname()); port.setText(String.valueOf(host.port())); username.setText(host.username());
-            group.setSelectedItem(host.group()); favorite.setSelected(host.favorite());
+            group.setSelectedItem(host.group()); favorite.setSelected(host.favorite()); followDirectory.setSelected(host.followDirectory());
             switch (host.auth()) {
                 case Auth.Vault vault -> { vaultAuth.setSelected(true); credentialId = vault.credentialId(); credentialLabel.setText(credentialName.apply(credentialId).orElse("credential missing")); }
                 case Auth.VaultKeys keys -> { vaultAuth.setSelected(true); managedIds.addAll(keys.credentialIds()); credentialLabel.setText(managedIds.size() + " Vault key(s)"); }
@@ -83,7 +84,7 @@ public final class HostEditor extends JPanel {
         var at = new GridBagConstraints();
         at.insets = new Insets(3, 3, 3, 3); at.anchor = GridBagConstraints.WEST; at.gridy = 0;
         row(form, at, "Name", name); row(form, at, "Hostname", hostname); row(form, at, "Port", port); row(form, at, "Username", username);
-        row(form, at, "Group", group); row(form, at, "", favorite);
+        row(form, at, "Group", group); row(form, at, "", favorite); row(form, at, "", followDirectory);
         var auth = new JPanel(); auth.setLayout(new BoxLayout(auth, BoxLayout.X_AXIS));
         auth.add(vaultAuth); auth.add(Box.createHorizontalStrut(6)); auth.add(choose); auth.add(Box.createHorizontalStrut(6)); auth.add(credentialLabel); auth.add(Box.createHorizontalStrut(12)); auth.add(agentAuth);
         row(form, at, "Authentication", auth);
@@ -157,7 +158,7 @@ public final class HostEditor extends JPanel {
                     if (other.name().equalsIgnoreCase(name.getText().strip()) && editing.map(host -> !host.id().equals(other.id())).orElse(true)) throw new IllegalArgumentException("A host named " + other.name() + " exists");
                 RemoteHost host = editing.map(existing -> existing.withEdited(name.getText(), hostname.getText(), portValue, username.getText(), chosen, groupValue, jumpValue))
                     .orElseGet(() -> RemoteHost.create(name.getText(), hostname.getText(), portValue, username.getText(), chosen, groupValue, jumpValue));
-                onSave.accept(favorite.isSelected() ? host.withFavorite(true) : host.withFavorite(false));
+                onSave.accept(host.withFavorite(favorite.isSelected()).withFollowDirectory(followDirectory.isSelected()));
             } catch (IllegalArgumentException invalid) { message.setText(invalid.getMessage()); }
         });
     }
