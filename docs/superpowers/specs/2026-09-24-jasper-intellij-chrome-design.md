@@ -1,6 +1,6 @@
 # IntelliJ-style modern chrome and colour icons
 
-**Status:** Design approved section by section by the user on 2026-09-24. Written specification awaiting user review. No plan yet.
+**Status:** Design approved section by section by the user on 2026-09-24. Written specification approved on 2026-09-24. On 2026-09-24, during planning, the user trimmed the new SDK icon names from ten to four (SPLIT, ZOOM, TERMINAL, SERVER), because the repository has no suitable retro rasters for the rest.
 
 ## Purpose and scope
 
@@ -13,7 +13,7 @@ Decisions the user made:
 - Toolbar composition A: tab and window group, pane group, plugin group, and Find and Settings pinned to the right.
 - Tabs copy IntelliJ editor tabs in shape and behaviour. Per-tab coloured backgrounds (IntelliJ "file colours") are **out of scope**.
 - The find bar restyle to IntelliJ's single-line find bar is **in scope**.
-- New retro names use the closest existing GNOME2 or Tango rasters already in the repository, not new OldGNOME2 artwork.
+- New retro names use the closest existing GNOME2 or OldGNOME2 rasters already in the repository, not new artwork. Only four names are added now. RUN, DEBUG, STOP, SYNC, UPLOAD and DOWNLOAD wait until a plugin needs them and suitable retro artwork exists.
 
 Out of scope:
 - a selector combo in the toolbar (IntelliJ's run-configuration box);
@@ -112,9 +112,14 @@ On platforms without macOS full-window content, the OS draws the titlebar and ro
 ### SDK 0.7.5
 
 - `JasperSdk.VERSION` becomes `0.7.5`. The plugin range `>=0.7.4, <0.8` is unaffected.
-- **`IconName`** gains, each `@since 0.7.5`: `SPLIT`, `ZOOM`, `TERMINAL`, `SERVER`, `RUN`, `DEBUG`, `STOP`, `SYNC`, `UPLOAD` and `DOWNLOAD`.
-- **`OldGnomeIcon`** gains the same ten entries.
-  - Their retro rasters (16 and 24 px, plus the 28 px toolbar adaptation) come from the closest existing GNOME2 or Tango artwork already in the repository.
+- **`IconName`** gains, each `@since 0.7.5`: `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`.
+- **`OldGnomeIcon`** gains the same four entries.
+  - Their retro rasters (16 and 24 px, plus the 28 px toolbar adaptation) are byte-identical copies of existing repository artwork:
+    - SPLIT: GNOME2 `stock_table-split`;
+    - ZOOM: GNOME2 `view-fullscreen`;
+    - TERMINAL: GNOME2 `gtk-execute`;
+    - SERVER: OldGNOME2 `NETWORK`.
+  - All four come from the same OldGNOME2 collection and licence.
   - Each choice is recorded in `oldgnome-sdk/assets.tsv`, with its source set and licence noted in `NOTICE.md`.
 - **`Appearance.icon(String svgResourcePath)`** changes behaviour. It is documented in the Javadoc and the SDK notes as a 0.7.5 behaviour change:
   - Old contract: "recoloured to the chrome's foreground; use monochrome artwork".
@@ -127,7 +132,7 @@ On platforms without macOS full-window content, the OS draws the titlebar and ro
 ### Plugin guidance (`docs/plugin-authoring.md`, new "Icons" section)
 
 - Prefer `IconName`: the host supplies modern and retro artwork.
-- For custom art, draw a 16 × 16 SVG in the IntelliJ light palette (grey `#6E6E6E`, blue `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`). Colour carries meaning: green for run, red for stop or error, blue for navigation and transfer.
+- For custom art, draw a 16 × 16 SVG in the IntelliJ light palette (grey `#6E6E6E`, blue `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`). Colour carries meaning: green for run or success, red for stop or error, blue for navigation and transfer.
 - Use `icon(svg, OldGnomeIcon)` to choose retro artwork for custom art.
 
 ## 6. Error handling and edge cases
