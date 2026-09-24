@@ -137,6 +137,11 @@ same file is rejected when endpoint/canonical-path identity can establish the ov
 
 ### 3.1 Shared queue, independent views
 
+*Amended 2026-09-24:* the bottom Transfers panel and its per-file details are replaced by a
+transfer strip in the SFTP sidebar with an ask-before-copying conflict dialog; see the
+[transfer strip amendment](2026-09-24-jasper-remote-transfer-strip-design.md). Queue semantics
+below still apply.
+
 Register `dev.jasper.remote.transfers.panel`, title **Transfers**, default anchor BOTTOM.
 `dev.jasper.remote.transfers` is an always-available **Transfers** show action in SSH and
 the command palette. Status clicks show it rather than toggling an already-open panel off.
