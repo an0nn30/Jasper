@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.platform.AppIcons;
 import java.awt.BorderLayout;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -23,6 +24,7 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     private long renderGeneration;
     private boolean closed;
     private boolean active = true;
+    private Icon terminalIcon;
     Runnable onChanged = () -> {};
     Runnable onEmpty = () -> {};
     Consumer<String> onError = message -> {};
@@ -66,6 +68,15 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
         return state.title(pane == null ? null : pane.tabTitle(), pane == null ? null : pane.directory());
     }
     void rename(String name) { state.rename(name); onChanged.run(); }
+
+    /** The focused pane's provider icon, or the host terminal icon for local shells. */
+    Icon icon() {
+        TerminalPane pane = focusedPane();
+        Icon provided = pane == null ? null : pane.providedIcon();
+        if (provided != null) return provided;
+        if (terminalIcon == null) terminalIcon = AppIcons.named("TERMINAL");
+        return terminalIcon;
+    }
 
     public void split(SplitTree.Axis axis) { split(focusedPane(), axis, null); }
 

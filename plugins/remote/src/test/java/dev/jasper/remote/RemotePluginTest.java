@@ -66,10 +66,9 @@ class RemotePluginTest {
             });
             settle(host);
             assertThat(host.failures()).isEmpty();
-            assertThat(icons).singleElement().satisfies(icon -> {
-                assertThat(icon.name()).isEqualTo(dev.jasper.sdk.ui.IconName.NETWORK);
-                assertThat(icon.retro()).isEqualTo(retro);
-            });
+            assertThat(icons).extracting(dev.jasper.sdk.testing.FakeNamedIcon::name)
+                .containsExactly(dev.jasper.sdk.ui.IconName.NETWORK, dev.jasper.sdk.ui.IconName.SERVER);
+            assertThat(icons).allMatch(icon -> icon.retro() == retro);
             assertThat(host.toolbar()).anyMatch(item -> item.contains("Sessions"));
             assertThat(host.panels()).containsExactly("dev.jasper.remote.panel|SSH hosts|LEFT");
         }

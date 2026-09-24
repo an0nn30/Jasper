@@ -40,7 +40,7 @@ final class HostedSessions {
             track(attempt);
             Throwable failure = containment.attempt(pluginId, "session connector", () -> { spec.connector().accept(new Pending(attempt)); return null; });
             if (failure != null) attempt.fail(failure.getMessage() == null ? failure.toString() : failure.getMessage());
-        }, contained);
+        }, contained, spec.icon().orElse(null));
     }
 
     private void track(SessionAttempt attempt) {

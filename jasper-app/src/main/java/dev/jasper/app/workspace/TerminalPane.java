@@ -370,6 +370,9 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     /** Where this pane is, for display: {@code host:path} when the program reports a remote directory. */
     String locationLabel() { return remoteOf(session).map(RemoteLocation::label).orElseGet(() -> directory().toString()); }
 
+    /** The provider's tab icon, or {@code null} for a local shell or a provider that chose none. */
+    javax.swing.Icon providedIcon() { return request == null ? null : request.icon(); }
+
     /** What this pane is right now, for the terminal registry. */
     PaneSnapshot snapshot() {
         Optional<String> provider = request == null ? Optional.empty() : Optional.of(request.providerId());
