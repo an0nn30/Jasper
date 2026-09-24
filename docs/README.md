@@ -60,5 +60,6 @@ counts and review findings, with later integration/follow-up sections explicitly
 
 - [Credential Vault](credential-vault.md): manager, credentials, grants, key generation and native acceptance.
 - [Remote](remote.md): SSH hosts, import from ~/.ssh/config, host-key trust, shared sessions and the hosts panel.
+- [SFTP phase 1 design](superpowers/specs/2026-09-23-jasper-remote-sftp-design.md): approved file browser and persistent transfer management within Remote; implementation plan under adversarial review.
 
 - [Keyboard shortcut reference](keyboard-shortcuts.md): Help window, searching and key capture.

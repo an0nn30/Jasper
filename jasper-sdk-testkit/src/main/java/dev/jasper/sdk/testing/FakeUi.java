@@ -23,6 +23,8 @@ import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.Rail;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusBar;
+import dev.jasper.sdk.ui.StatusProgress;
+import dev.jasper.sdk.ui.StatusProgressState;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.Toolbar;
@@ -91,10 +93,18 @@ final class FakeUi {
         }
     }
 
-    static final class Status implements StatusItem {
+    static final class Status implements StatusItem, StatusProgress {
         final StatusItemSpec spec; final FakeUi ui;
+        StatusProgressState progress;
         String text = ""; String tooltip; String actionId; boolean visible = true; boolean closed;
         Status(FakeUi ui, StatusItemSpec spec) { this.ui = ui; this.spec = spec; }
+        @Override public void update(StatusProgressState value) {
+            if (closed) return;
+            java.util.Objects.requireNonNull(value);
+            if (value.actionId() != null) ui.requireOwn(value.actionId());
+            if (value.secondaryActionId() != null) ui.requireOwn(value.secondaryActionId());
+            progress = value; text = value.text(); tooltip = value.detail(); actionId = value.actionId();
+        }
         @Override public void setText(String value) { if (!closed) text = value == null ? "" : value.replace("\r", "").replace("\n", " "); }
         @Override public void setIcon(Icon icon) { }
         @Override public void setTooltip(String value) { if (!closed) tooltip = value; }
@@ -126,6 +136,7 @@ final class FakeUi {
     }
 
     void closeAll() {
+        for (var item : status) item.closed = true;
         actions.clear(); toolbar.clear(); sections.clear(); topLevelIds.clear(); status.clear();
         for (Panel panel : List.copyOf(panels)) panel.instances.values().forEach(PanelInstance::close);
         panels.clear(); railActions.clear();
@@ -201,15 +212,24 @@ final class FakeUi {
     }
 
     StatusBar statusBar() {
-        return spec -> {
-            context.requireOpen();
-            requireNamespace(spec.id(), "A status item");
-            for (Status existing : status)
-                if (existing.spec.id().equals(spec.id())) throw new IllegalArgumentException("Status item already exists: " + spec.id());
-            var item = new Status(this, spec);
-            status.add(item);
-            return item;
+        return new StatusBar() {
+            @Override public StatusItem add(StatusItemSpec spec) { return addStatus(spec); }
+            @Override public StatusProgress addProgress(StatusItemSpec spec) {
+                var item = addStatus(spec);
+                item.update(new StatusProgressState("", "", "", java.util.OptionalDouble.empty(), null, null));
+                return item;
+            }
         };
+    }
+
+    private Status addStatus(StatusItemSpec spec) {
+        context.requireOpen();
+        requireNamespace(spec.id(), "A status item");
+        for (Status existing : status)
+            if (existing.spec.id().equals(spec.id())) throw new IllegalArgumentException("Status item already exists: " + spec.id());
+        var item = new Status(this, spec);
+        status.add(item);
+        return item;
     }
 
     static final class Panel { final PanelSpec spec; final PanelFactory factory; final Map<UUID, PanelInstance> instances = new LinkedHashMap<>(); Panel(PanelSpec spec, PanelFactory factory) { this.spec = spec; this.factory = factory; } }
@@ -339,8 +359,25 @@ final class FakeUi {
         };
     }
 
+    private boolean liveChooserOwner(WindowOwner owner) {
+        if (owner instanceof FakeWindow window) return windows.contains(window) && window.shown && !window.closed;
+        return owner instanceof WindowHandle terminal && context.terminals.ownsOpenWindow(terminal);
+    }
+    private List<java.nio.file.Path> choosePaths(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
+        context.requireOpen(); java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial);
+        if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
+        var paths = host.takePathSelection();
+        return context.state == FakePluginContext.State.CLOSED || !liveChooserOwner(owner) ? List.of() : paths;
+    }
+
     Windows windows() {
         return new Windows() {
+            @Override public List<java.nio.file.Path> chooseFiles(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
+                return choosePaths(owner, title, initial);
+            }
+            @Override public java.util.Optional<java.nio.file.Path> chooseDirectory(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
+                return choosePaths(owner, title, initial).stream().findFirst();
+            }
             @Override public PluginWindow create(WindowSpec spec) {
                 context.requireOpen();
                 requireNamespace(spec.id(), "A window");

@@ -66,9 +66,11 @@ public final class HostFile {
         long port = table.get("port") instanceof Long value ? value : 22;
         if (port < 1 || port > 65535) throw new IllegalArgumentException("'port' must be 1 to 65535");
         Instant created = instant(table, "created").orElseGet(Instant::now);
+        Object follow = table.get("follow_directory");
+        if (follow != null && !(follow instanceof Boolean)) throw new IllegalArgumentException("'follow_directory' must be true or false");
         return new RemoteHost(id, optional(table, "name").orElse(""), optional(table, "hostname").orElse(""), (int) port, optional(table, "username").orElse(""),
             resolved, optional(table, "group").orElse(""), table.get("favorite") instanceof Boolean favorite && favorite,
-            optional(table, "jump").map(HostFile::uuid), created, instant(table, "updated").orElse(created));
+            optional(table, "jump").map(HostFile::uuid), created, instant(table, "updated").orElse(created), !Boolean.FALSE.equals(follow));
     }
 
     private static List<UUID> keyIds(TomlTable table) {
@@ -138,6 +140,7 @@ public final class HostFile {
             if (!host.group().isEmpty()) out.append("group = ").append(tomlString(host.group())).append('\n');
             out.append("favorite = ").append(host.favorite()).append('\n');
             host.jump().ifPresent(jump -> out.append("jump = \"").append(jump).append("\"\n"));
+            if (!host.followDirectory()) out.append("follow_directory = false\n");
             out.append("created = ").append(DateTimeFormatter.ISO_INSTANT.format(host.created())).append('\n');
             out.append("updated = ").append(DateTimeFormatter.ISO_INSTANT.format(host.updated())).append('\n');
         }

@@ -1,0 +1,19 @@
+package dev.jasper.remote.ui.transfers;
+
+import dev.jasper.remote.transfer.*;
+import java.util.*;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+
+class TransferPresentationTest {
+    @Test void unknownScanIsIndeterminateAndLargeRemainingCountsDoNotOverflow() {
+        var id=UUID.randomUUID();long bytes=5L*1024*1024*1024;
+        var scanning=new TransferJob(id,"local","host",TransferState.SCANNING,TransferJob.Intent.RUN,0,1,bytes,0,0,0,0,false,"",0);
+        var presentation=new TransferPresentation();
+        var first=presentation.update(new TransferCoordinator.Snapshot(List.of(scanning),List.of(),0),1_000_000_000L);
+        assertThat(first.fraction()).isEmpty();assertThat(first.text()).contains("Scanning");
+        var running=new TransferJob(id,"local","host",TransferState.RUNNING,TransferJob.Intent.RUN,0,1,bytes,1024,0,0,0,true,"",0);
+        var next=presentation.update(new TransferCoordinator.Snapshot(List.of(running),List.of(),1),2_000_000_000L);
+        assertThat(next.detail()).contains("5.0 GiB");assertThat(next.fraction().orElseThrow()).isBetween(0.0,1.0);
+    }
+}

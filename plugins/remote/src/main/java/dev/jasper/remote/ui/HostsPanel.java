@@ -55,6 +55,7 @@ public final class HostsPanel extends JPanel {
     private String defaultGroup = HostRows.OTHER;
     private Runnable renameDefaultGroup = () -> {};
     private Consumer<RemoteHost> activate;
+    private Consumer<RemoteHost> browseFiles;
     private Function<RemoteHost, String> metadata = host -> "";
     private java.util.function.ToIntFunction<RemoteHost> sessionCount = host -> 0;
 
@@ -145,6 +146,7 @@ public final class HostsPanel extends JPanel {
 
     public void setDefaultGroup(String name) { defaultGroup = name; rebuild(); }
     public void onRenameDefaultGroup(Runnable rename) { renameDefaultGroup = rename; }
+    public void onBrowseFiles(Consumer<RemoteHost> action) { browseFiles=action; }
     public void onActivate(Consumer<RemoteHost> action) { activate = action; }
     public void setHostDetails(Function<RemoteHost, String> details, java.util.function.ToIntFunction<RemoteHost> sessions) {
         metadata = details; sessionCount = sessions; rebuild();
@@ -204,6 +206,7 @@ public final class HostsPanel extends JPanel {
         var menu = new JPopupMenu();
         menu.add(item("Connect in new tab", () -> actions.connect().accept(host)));
         menu.add(item("Connect in split", () -> actions.connectSplit().accept(host)));
+        if(browseFiles!=null) menu.add(item("Browse files",()->browseFiles.accept(host)));
         menu.add(item("Edit…", () -> actions.edit().accept(Optional.of(host))));
         menu.add(item("Duplicate", () -> actions.duplicate().accept(host)));
         menu.add(item("Delete…", () -> actions.delete().accept(host)));

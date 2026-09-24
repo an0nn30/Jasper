@@ -21,3 +21,11 @@ SAVE.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4
 SEARCH.svg	repository:jasper-app/src/main/resources/dev/jasper/app/icons/search.svg	0d4097e3dfda56d18434b4ad74df9c68a86ff54f06392c55ec1476fc66eddc99
 SETTINGS.svg	repository:jasper-app/src/main/resources/dev/jasper/app/icons/settings.svg	1ebc021f026db74789acabd70f170b44bb5f97dedefd0d6c954d97b94de416d6
 UNLOCK.svg	repository:plugins/vault/src/main/resources/dev/jasper/vault/lock-open.svg	cb6a6cf10c1d7dcebab9a6b806e3ea5b7a88eac6300936d276e12df21223a0b8
+FILE.svg	local:tabler-icons/icons/outline/file.svg	dafd413378bd36151892f59328e29b1e5fcd6b2a5de4f44a029a237161e2edb4
+LINK.svg	local:tabler-icons/icons/outline/link.svg	0c1448dddf85857b80da2c51ddb5a27399013d3830eb756654cce2eef93fff33
+UPLOAD.svg	local:tabler-icons/icons/outline/upload.svg	b6d9fe0e24b1c889d1edba29268ba8e3759792a381b43fb9268f603caaea98f1
+DOWNLOAD.svg	local:tabler-icons/icons/outline/download.svg	4c3498b4dc4e7f007db234f293b396ae1b23f18646e1d36f8bc4e08a31bf97b1
+UP.svg	local:tabler-icons/icons/outline/arrow-up.svg	4f0871cbdd4c4fdad80f462954f8cb1dd635a826e6895fc878198591a6dfc2d9
+NEW_FOLDER.svg	local:tabler-icons/icons/outline/folder-plus.svg	5de24f14fb3f72adff197ce08c462edd93bc5cd427bd3a6bddd7eb36ae8b4885
+PAUSE.svg	local:tabler-icons/icons/outline/player-pause.svg	d7ad7676cd255ce1032aec7af31c96ca99609dfee562a24f153475c0e992a664
+RESUME.svg	local:tabler-icons/icons/outline/player-play.svg	0178cf0262ec89422d632f6122c6be34a8b57db32dd1aea38dd283bdeecbfc2f

@@ -104,4 +104,11 @@ class RemoteShortcutConfigTest {
             assertThat(resolved.problems()).extracting(KeyBindings.Problem::actionId).contains(HOSTS, CONNECT);
         });
     }
+    @Test void sftpBindingIsBlankByDefaultAndReloadsThroughTheRemoteFile() throws Exception {
+        start();
+        onEdt(()-> { var initial=resolve(Map.of());assertThat(initial.bindings().strokeFor("dev.jasper.remote.sftp.toggle")).isEmpty(); });
+        reload("[shortcuts]\ntoggle_sftp = 'cmd+alt+f'\n");
+        onEdt(()-> { var changed=resolve(Map.of());assertThat(changed.bindings().strokeFor("dev.jasper.remote.sftp.toggle")).isPresent(); });
+    }
+
 }

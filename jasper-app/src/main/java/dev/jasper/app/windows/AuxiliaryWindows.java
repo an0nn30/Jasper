@@ -10,13 +10,26 @@ import java.util.function.Function;
 
 /** Creates and tracks auxiliary surfaces, reuses open singletons and remembers window bounds. EDT only. */
 public final class AuxiliaryWindows implements AutoCloseable {
+    private final PathChooser chooser;
     private final UiState state;
     private final Function<AuxiliarySurface, AuxiliarySurface.Shell> shells;
     private final List<AuxiliarySurface> open = new ArrayList<>();
 
     public AuxiliaryWindows(UiState state, Function<AuxiliarySurface, AuxiliarySurface.Shell> shells) {
+        this(state, shells, (choice, cancellation) -> List.of());
+    }
+
+    public AuxiliaryWindows(UiState state, Function<AuxiliarySurface, AuxiliarySurface.Shell> shells, PathChooser chooser) {
+        this.chooser = Objects.requireNonNull(chooser);
         this.state = Objects.requireNonNull(state);
         this.shells = Objects.requireNonNull(shells);
+    }
+
+    /** Synchronous chooser boundary; caller owns cancellation registration and validates the owner. */
+    public List<java.nio.file.Path> choose(PathChoice choice, java.util.function.Consumer<Runnable> cancellation) {
+        if (choice.auxiliaryOwner() != null && (!open.contains(choice.auxiliaryOwner()) || !choice.auxiliaryOwner().shown()))
+            throw new IllegalArgumentException("Picker requires a shown, open owner");
+        return List.copyOf(chooser.choose(choice, cancellation));
     }
 
     public AuxiliarySurface window(String id, String title, Dimension preferred, boolean singleton) {

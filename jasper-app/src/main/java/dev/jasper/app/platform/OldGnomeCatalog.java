@@ -15,6 +15,15 @@ import javax.swing.ImageIcon;
 /** Explicit OldGNOME2 SDK catalog; never substitutes other icon families. */
 final class OldGnomeCatalog {
     private static final Map<String, List<Integer>> SOURCES = Map.ofEntries(
+        Map.entry("FILE", java.util.List.of(16, 52)),
+        Map.entry("LINK", java.util.List.of(16, 24)),
+        Map.entry("UPLOAD", java.util.List.of(16, 24)),
+        Map.entry("DOWNLOAD", java.util.List.of(16, 24)),
+        Map.entry("UP", java.util.List.of(16, 24)),
+        Map.entry("NEW_FOLDER", java.util.List.of(16)),
+        Map.entry("PAUSE", java.util.List.of(16, 24)),
+        Map.entry("RESUME", java.util.List.of(16, 24)),
+
         Map.entry("LOCK", java.util.List.of(16, 24, 32, 48)),
         Map.entry("UNLOCK", java.util.List.of(16, 24, 32, 48)),
         Map.entry("KEY", java.util.List.of(16, 24, 32, 48)),

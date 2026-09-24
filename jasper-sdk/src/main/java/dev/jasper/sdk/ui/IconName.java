@@ -48,5 +48,21 @@ public enum IconName {
     /** Help. */
     HELP,
     /** Close. */
-    CLOSE;
+    CLOSE,
+    /** File. @since 0.7.5 */
+    FILE,
+    /** Link. @since 0.7.5 */
+    LINK,
+    /** Upload. @since 0.7.5 */
+    UPLOAD,
+    /** Download. @since 0.7.5 */
+    DOWNLOAD,
+    /** Up. @since 0.7.5 */
+    UP,
+    /** New Folder. @since 0.7.5 */
+    NEW_FOLDER,
+    /** Pause. @since 0.7.5 */
+    PAUSE,
+    /** Resume. @since 0.7.5 */
+    RESUME;
 }

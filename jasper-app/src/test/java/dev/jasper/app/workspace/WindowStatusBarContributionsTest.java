@@ -62,6 +62,68 @@ class WindowStatusBarContributionsTest {
         });
     }
 
+    @Test void progressUpdatesInPlaceAndInvokesCurrentActions() {
+        var model = new Contributions();
+        var entry = model.addStatus("dev.x.progress", false, 0);
+        var clicks = new ArrayList<String>();
+        Action open = new AbstractAction("Open") {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) { clicks.add("open"); }
+        };
+        Action cancel = new AbstractAction("Cancel") {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) { clicks.add("cancel"); }
+        };
+        var actions = Map.of("open", open, "cancel", cancel);
+        var bar = new WindowStatusBar();
+        entry.setProgress(new dev.jasper.app.contributions.ProgressState("Copying", "20 MiB left", "Half complete",
+            java.util.OptionalDouble.of(.5), "open", "cancel"));
+        bar.setContributed(model.status(), actions::get);
+        var view = descendants(bar).filter(StatusProgressView.class::isInstance).map(StatusProgressView.class::cast).findFirst().orElseThrow();
+        var progress = descendants(view).filter(javax.swing.JProgressBar.class::isInstance).map(javax.swing.JProgressBar.class::cast).findFirst().orElseThrow();
+        assertThat(progress.getValue()).isEqualTo(500);
+        assertThat(progress.getAccessibleContext().getAccessibleDescription()).isEqualTo("Half complete");
+        entry.setProgress(new dev.jasper.app.contributions.ProgressState("Scanning", "", "Scanning files",
+            java.util.OptionalDouble.empty(), "open", "cancel"));
+        bar.setContributed(model.status(), actions::get);
+        assertThat(descendants(bar).filter(StatusProgressView.class::isInstance).findFirst()).containsSame(view);
+        assertThat(progress.isIndeterminate()).isTrue();
+        descendants(view).filter(JButton.class::isInstance).map(JButton.class::cast).forEach(JButton::doClick);
+        assertThat(clicks).containsExactly("open", "cancel");
+        cancel.setEnabled(false);
+        bar.setContributed(model.status(), actions::get);
+        assertThat(descendants(view).filter(JButton.class::isInstance).map(JButton.class::cast).filter(b -> "Cancel".equals(b.getText())).findFirst().orElseThrow().isEnabled()).isFalse();
+    }
+
+    @Test void progressFitsNarrowBarsAndLargerUiFontsInBothSkins() {
+        try {
+            for (boolean retro : new boolean[]{false, true}) {
+                new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
+                    : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
+                for (int size : new int[]{12, 18, 32}) {
+                    javax.swing.UIManager.put("Label.font", new java.awt.Font("Dialog", java.awt.Font.PLAIN, size));
+                    var view = new StatusProgressView();
+                    Action cancel = new AbstractAction("Cancel") { public void actionPerformed(java.awt.event.ActionEvent e) {} };
+                    view.update(new dev.jasper.app.contributions.ProgressState("Copying", "1 GiB left", "Copying one file",
+                        java.util.OptionalDouble.of(.25), "open", "cancel"), id -> cancel);
+                    for (int width : new int[]{0, 20, 100, 320, 500}) {
+                        view.setSize(width, view.getPreferredSize().height); view.doLayout();
+                        for (var child : view.getComponents()) {
+                            assertThat(child.getX()).isGreaterThanOrEqualTo(0);
+                            assertThat(child.getX() + child.getWidth()).isLessThanOrEqualTo(width);
+                            assertThat(child.getY() + child.getHeight()).isLessThanOrEqualTo(view.getHeight());
+                        }
+                        var image = new java.awt.image.BufferedImage(Math.max(1, width), view.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                        var g = image.createGraphics(); try { view.paint(g); } finally { g.dispose(); }
+                    }
+                }
+            }
+        } finally { new dev.jasper.app.appearance.ThemeController(); }
+    }
+
+    private static java.util.stream.Stream<java.awt.Component> descendants(java.awt.Container parent) {
+        return java.util.Arrays.stream(parent.getComponents()).flatMap(c -> c instanceof java.awt.Container nested
+            ? java.util.stream.Stream.concat(java.util.stream.Stream.of(c), descendants(nested)) : java.util.stream.Stream.of(c));
+    }
+
     @Test void theConfigurationSegmentKeepsItsFullWidthWhenSpaceIsTight() {
         var model = new Contributions();
         for (int i = 0; i < 6; i++) model.addStatus("dev.x.item" + i, i % 2 == 0, i).setText("A fairly long status item " + i);

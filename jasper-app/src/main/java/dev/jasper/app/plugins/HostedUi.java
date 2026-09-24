@@ -32,6 +32,9 @@ import dev.jasper.sdk.ui.Rail;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusBar;
+import dev.jasper.sdk.ui.StatusProgress;
+import dev.jasper.sdk.ui.StatusProgressState;
+import dev.jasper.app.contributions.ProgressState;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.Toolbar;
@@ -186,7 +189,8 @@ final class HostedUi {
     }
 
     StatusBar statusBar() {
-        return spec -> {
+        return new StatusBar() {
+          @Override public StatusItem add(StatusItemSpec spec) {
             guard("add");
             requireNamespace(spec.id(), "A status item");
             StatusEntry entry = model.addStatus(spec.id(), spec.side() == Side.LEFT, spec.priority());
@@ -203,6 +207,28 @@ final class HostedUi {
                 @Override public void setVisible(boolean visible) { requireUi("setVisible"); entry.setVisible(visible); }
                 @Override public void close() { removal.close(); }
             };
+          }
+          @Override public StatusProgress addProgress(StatusItemSpec spec) {
+            guard("addProgress");
+            requireNamespace(spec.id(), "A status item");
+            StatusEntry entry = model.addStatus(spec.id(), spec.side() == Side.LEFT, spec.priority());
+            entry.setProgress(new ProgressState("", "", "", java.util.OptionalDouble.empty(), null, null));
+            var closed = new AtomicBoolean();
+            Subscription removal = tracked(() -> { closed.set(true); entry.close(); });
+            return new StatusProgress() {
+                @Override public void update(StatusProgressState state) {
+                    requireUi("update");
+                    if (closed.get()) return;
+                    java.util.Objects.requireNonNull(state, "state");
+                    if (state.actionId() != null) requireOwn(state.actionId());
+                    if (state.secondaryActionId() != null) requireOwn(state.secondaryActionId());
+                    entry.setProgress(new ProgressState(state.text(), state.detail(), state.accessibleDescription(),
+                        state.fraction(), state.actionId(), state.secondaryActionId()));
+                }
+                @Override public void setVisible(boolean value) { requireUi("setVisible"); if (!closed.get()) entry.setVisible(value); }
+                @Override public void close() { closed.set(true); removal.close(); }
+            };
+          }
         };
     }
 
@@ -308,8 +334,40 @@ final class HostedUi {
 
     private final java.util.Map<AuxiliarySurface, OwnedWindow> ownedWindows = new java.util.HashMap<>();
 
+    private java.util.List<Path> choosePaths(WindowOwner owner, String title, Optional<Path> initial, boolean directory) {
+        guard("choosePaths");
+        java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial);
+        var cancelled = new AtomicBoolean();
+        var cancelAction = new java.util.concurrent.atomic.AtomicReference<Runnable>(() -> {});
+        Runnable cancel = () -> { if (cancelled.compareAndSet(false, true)) cancelAction.get().run(); };
+        dev.jasper.app.windows.PathChoice choice;
+        Subscription ownerClosed;
+        if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window && window.surface.shown()) {
+            choice = new dev.jasper.app.windows.PathChoice(null, window.surface, title, initial, directory);
+            ownerClosed = wrap(window.surface.onClosed(cancel));
+        } else if (owner instanceof WindowHandle terminal && terminals.ownsOpenWindow(terminal)) {
+            choice = new dev.jasper.app.windows.PathChoice(terminal.id(), null, title, initial, directory);
+            ownerClosed = wrap(terminals.onWindowClosed(terminal.id(), cancel));
+        } else throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
+        Subscription stopped = tracked(cancel);
+        try {
+            var paths = windows.choose(choice, action -> {
+                cancelAction.set(action);
+                if (cancelled.get()) action.run();
+            });
+            if (cancelled.get() || !open.getAsBoolean()) return java.util.List.of();
+            return paths.stream().map(path -> path.toAbsolutePath().normalize()).toList();
+        } finally { stopped.close(); ownerClosed.close(); }
+    }
+
     Windows windows() {
         return new Windows() {
+            @Override public java.util.List<Path> chooseFiles(WindowOwner owner, String title, Optional<Path> initial) {
+                return choosePaths(owner, title, initial, false);
+            }
+            @Override public Optional<Path> chooseDirectory(WindowOwner owner, String title, Optional<Path> initial) {
+                return choosePaths(owner, title, initial, true).stream().findFirst();
+            }
             @Override public PluginWindow create(WindowSpec spec) {
                 guard("create");
                 requireNamespace(spec.id(), "A window");

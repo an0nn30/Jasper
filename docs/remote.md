@@ -1,4 +1,4 @@
-# Remote: SSH hosts
+# Remote: SSH and SFTP
 
 Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or type `>ssh` in the
 command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
@@ -68,8 +68,8 @@ Keys already in `~/.ssh/known_hosts` (hashed entries included) connect without a
 differs from either file is rejected. A corrupt Jasper `known_hosts` refuses every connection until
 it is fixed.
 
-One SSH connection per host is shared by every tab, split and (later) tunnel and SFTP browser for
-that host; it stays open for a few seconds after its last use. When it drops, every pane on that host
+An SSH connection is shared by tabs, splits, SFTP browsers and transfers using the same
+connection identity; it stays open for a few seconds after its last use. When it drops, every pane on that host
 shows the disconnected banner and Reconnect makes a new connection. The status bar shows how many
 SSH sessions are open; clicking it toggles the panel. Locking the Vault leaves live sessions alone;
 only new connections need it.
@@ -106,7 +106,7 @@ shortcut is disabled. Connection settings remain above the `[shortcuts]` table.
 
 The actions are `dev.jasper.remote.connect`, `dev.jasper.remote.hosts`, `dev.jasper.remote.split` and
 `dev.jasper.remote.import`, plus `dev.jasper.remote.sessions.manage`; bind them like other
-contributed actions. Tunnels and SFTP follow in later versions of this plugin.
+contributed actions. Tunnels remain a later feature.
 
 ## Native acceptance
 
@@ -138,3 +138,98 @@ stays centered; Escape/outside clicks and underlying menus should not interrupt 
 leave no new tab, while success should focus the connected pane. Confirm host-key/Vault prompts
 remain usable. Edit `[ui.font]` in the app configuration while Hosts is open and verify the list,
 menus, palette and subsequent connection overlay follow the new family/size.
+
+## SFTP browsing and transfers
+
+Remote 0.3 includes SFTP in the same plugin as SSH. Choose **SSH > SFTP**, **View > SFTP**,
+**Open SFTP here** in a terminal's context menu, or **Browse files** on a saved host.
+Connecting a shell does not automatically open the browser. There is one remote browser in
+each window, with an editable path, compact file list, Up, Upload, Download, Refresh,
+New folder, Delete and Copy path controls. Select multiple rows for file operations.
+The context menu also offers **Upload folder** and **Copy to host**.
+Opening a directory link deliberately resolves its path; recursive copy/delete still treat it as a link.
+
+The browser remembers each remote pane's directory and Follow terminal folder choice.
+Following uses the pane's own directory reports (OSC 7) when its shell sends them. Otherwise,
+on Linux and macOS hosts, Remote reads the shell's folder after you press Enter or focus the
+pane, with a fixed read-only script on a separate SSH exec channel: nothing is typed into your
+shell. For this, each pane of a host with **Track shell folder for SFTP follow** (on by default,
+in the host editor) has its own SSH connection. Windows hosts are not followed. A host that
+refuses exec channels shows "This host does not report the shell's folder". Entering a path or
+navigating a folder turns following off; Refresh preserves it. Selecting a local terminal
+leaves the last remote browser available. When the SSH session of the pane the browser shows
+ends (its tab or pane closes, the shell exits or the connection drops), the browser disconnects
+and clears, showing "SSH session closed"; transfers already queued keep running. Browsing and transfers hold their own SSH leases, so
+closing the source terminal does not cancel a copy.
+
+- **Upload** opens the owning window's native file picker; the selection goes into the
+  displayed remote directory. **Upload folder** picks a local directory recursively.
+- **Download** sends the selected remote files/folders into a chosen local directory.
+- **Copy to host** opens a destination chooser with a saved-host selector and one folder
+  browser. Confirm **Copy here** to copy the captured selection. Remote-to-remote data streams
+  through Jasper; it is not staged as a local file.
+- **Delete** requires confirmation and removes the captured selection recursively. It is
+  cancellable, but already deleted entries cannot be recovered. Links themselves are deleted;
+  their targets are not traversed. Copy path writes plain paths to the clipboard.
+
+Transfers appear at the bottom of the SFTP sidebar, in every window: what is copying and where,
+a progress bar, speed and time left, and **×** to cancel. A transfer that needs you shows one
+button — **Resume** (paused or interrupted), **Resolve…**, **Retry failed** or **Retry cleanup**.
+A finished transfer shows "Done" for a few seconds and leaves; failed or cancelled ones stay until
+dismissed with ×. The strip hides when nothing is queued. Before copying onto items that already
+exist, Remote asks once: **Replace** (files replaced, folders merged), **Skip existing** or
+**Cancel**. **SSH > Transfers** shows the sidebar. The status bar displays aggregate progress,
+confirmed-data speed and bytes remaining; scanning has an unknown total. Click it to show the
+sidebar. Its cancel control cancels the sole active job, or shows the sidebar when several jobs
+are active.
+
+Pause retains partial files and checkpoints. Resume rechecks the source and destination
+prefixes before appending; a large retained prefix takes time to validate. Cancel stops new
+work and attempts to remove only verified, owned temporary files. Already published files
+remain. A cancelled transfer whose cleanup could not finish offers **Retry cleanup** on its row
+in the strip. **×** dismisses a finished or cancelled transfer; it removes queue history only, and
+asks first when cleanup remains unresolved.
+
+After a restart, unfinished jobs are **Paused**, with no automatic authentication or network
+reconnect. Resume is explicit. A changed saved host, login account or jump route requires
+attention rather than silently changing the copy's endpoint. Conflict choices are Replace,
+Skip or Rename for files; Merge, Skip or Rename for folders; and Skip or Rename for type
+mismatches. Applying a decision to remaining conflicts is scoped to that conflict type.
+Independent files continue while other entries need a decision. Completed directory listings are
+retained when a scan resumes. Potential case/Unicode-normalization aliases within one job are
+rejected before copying, conservatively even on a case-sensitive server; rename or split the
+selection instead of risking one sibling replacing another.
+
+Copies preserve links as links, and attempt modification times and ordinary rwx permissions.
+Unsupported metadata becomes a warning; ownership, ACLs, extended attributes and special mode
+bits are not copied. Special files are reported as issues. Servers without safe atomic replace
+cannot replace an existing file. Jasper never substitutes a delete-then-copy operation.
+Files are published from exclusive sibling temporary files after validation. Ambiguous partial
+ownership or a changed final file requires attention; Jasper does not guess and delete it.
+External programs can still race namespace changes, so avoid modifying a destination during a
+copy. SFTP protocol limitations can make an interrupted partial unverifiable; restarting that
+file may be necessary rather than resuming it.
+
+The private persistent queue is `plugins/dev.jasper.remote/data/transfers/queue.sqlite`, beside
+its lifetime lock and SQLite journal files. It stores paths, route/account identity, checkpoint
+hashes and decisions, not credentials or file payloads. A corrupt/newer queue or a second
+process holding its lock disables transfers with an error while ordinary SSH remains available.
+Do not remove the queue to resolve a cleanup issue: it contains the partial-file ownership record.
+
+Add these options to Remote's existing TOML tables (do not duplicate a table):
+
+```toml
+[shortcuts]
+# Existing toggle_panel and open_palette entries may remain here.
+toggle_sftp = ""                 # e.g. "cmd+alt+f"
+
+[sftp]
+max_parallel_files = 2           # clamped to 1..8; at most two copies per endpoint
+request_timeout_seconds = 30    # clamped to 1..300
+```
+
+Shortcut changes apply live; app-level keybindings retain precedence. Actions are
+`dev.jasper.remote.sftp`, `.sftp.toggle`, `.transfers` and
+`.transfers.cancel` (each suffix uses the `dev.jasper.remote` prefix). Controls inherit the
+app UI font and use SDK semantic icons for the selected skin. Native acceptance and the
+verified build commands are in [SFTP verification](remote-7c-verification.md).

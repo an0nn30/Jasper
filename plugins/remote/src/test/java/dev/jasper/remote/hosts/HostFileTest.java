@@ -73,4 +73,18 @@ class HostFileTest {
         assertThat(HostFile.parse(text.replaceAll("credentials = .*", "credentials = []")).warnings()).isNotEmpty();
     }
 
+    @Test void followDirectoryDefaultsOnAndOnlyOffIsWritten() throws IOException {
+        assertThat(bastion().followDirectory()).isTrue();
+        assertThat(HostFile.format(List.of(bastion()))).doesNotContain("follow_directory");
+        RemoteHost off = bastion().withFollowDirectory(false);
+        String text = HostFile.format(List.of(off));
+        assertThat(text).contains("follow_directory = false");
+        assertThat(HostFile.parse(text).hosts()).containsExactly(off);
+        assertThat(off.withFavorite(true).followDirectory()).as("other edits keep it").isFalse();
+        assertThat(off.withEdited("b", "b", 22, "u", Auth.AGENT, "", Optional.empty()).followDirectory()).isFalse();
+        HostFile.Parsed bad = HostFile.parse(HostFile.HEADER + "\n[[host]]\nname = \"a\"\nhostname = \"a\"\nauth = \"agent\"\nusername = \"u\"\nfollow_directory = \"no\"\n");
+        assertThat(bad.hosts()).isEmpty();
+        assertThat(bad.warnings()).singleElement().asString().contains("follow_directory");
+    }
+
 }

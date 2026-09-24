@@ -15,7 +15,7 @@ class ConfigImportControllerTest {
         try (var app = new FakePluginHost()) {
             var vault = new FakeVault(); vault.pendingImport = new CompletableFuture<>();
             app.start(FakeVault.INFO, Set.of(), Set.of(), vault);
-            var remote = new RemotePlugin(Runnable::run, c -> Optional.empty(), (d, r) -> () -> {}, dir);
+            var remote = new TestRemotePlugin(Runnable::run, c -> Optional.empty(), (d, r) -> () -> {}, dir);
             app.start(RemotePluginTest.INFO, Set.of(), Set.of("dev.jasper.vault"), remote);
             var old = RemoteHost.create("prod", "old", 22, "u", Auth.AGENT, "My group", Optional.empty()).withFavorite(true);
             remote.store().put(old); RemotePluginTest.settle(app);
@@ -38,7 +38,7 @@ class ConfigImportControllerTest {
         try (var app = new FakePluginHost()) {
             var vault = new FakeVault(); vault.password("login", "me", "secret"); vault.pendingImport = new CompletableFuture<>();
             app.start(FakeVault.INFO, Set.of(), Set.of(), vault);
-            var remote = new RemotePlugin(Runnable::run, c -> Optional.empty(), (d, r) -> () -> {}, dir);
+            var remote = new TestRemotePlugin(Runnable::run, c -> Optional.empty(), (d, r) -> () -> {}, dir);
             app.start(RemotePluginTest.INFO, Set.of(), Set.of("dev.jasper.vault"), remote);
             var window = app.addTerminalWindow(); app.invoke(RemotePlugin.IMPORT, window, null); RemotePluginTest.settle(app);
             var panel = remote.currentImport(); importButton(panel).doClick();
@@ -53,7 +53,7 @@ class ConfigImportControllerTest {
         try (var app = new FakePluginHost()) {
             var vault = new FakeVault(); vault.pendingImport = new CompletableFuture<>();
             app.start(FakeVault.INFO, Set.of(), Set.of(), vault);
-            var remote = new RemotePlugin(Runnable::run, c -> Optional.empty(), (d, r) -> () -> {}, dir);
+            var remote = new TestRemotePlugin(Runnable::run, c -> Optional.empty(), (d, r) -> () -> {}, dir);
             app.start(RemotePluginTest.INFO, Set.of(), Set.of("dev.jasper.vault"), remote);
             var old = RemoteHost.create("prod", "old", 22, "u", Auth.AGENT, "G", Optional.empty());
             remote.store().put(old); RemotePluginTest.settle(app);

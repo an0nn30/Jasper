@@ -35,6 +35,8 @@ import java.util.function.Function;
 import org.apache.sshd.common.config.keys.PublicKeyEntry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
@@ -44,6 +46,8 @@ class ConnectionsTest {
     final ExecutorService ui = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("ui").factory());
     final Map<UUID, RemoteHost> hosts = new HashMap<>();
     final Map<UUID, Credential> credentials = new HashMap<>();
+    final List<char[]> issuedPassphrases = new ArrayList<>();
+    final List<Credential> issued = new ArrayList<>();
     final List<HostKeyVerifier.Question> questions = new ArrayList<>();
     final List<Runnable> scheduled = new ArrayList<>();
     HostKeyVerifier.Decision decision = HostKeyVerifier.Decision.TRUST;
@@ -59,7 +63,16 @@ class ConnectionsTest {
 
     Connections connections(Path dir, Optional<AgentClient> agent) {
         trust = new KnownHosts(dir.resolve("known_hosts"), Optional.empty());
-        Function<UUID, CompletableFuture<Optional<Credential>>> vault = id -> CompletableFuture.completedFuture(Optional.ofNullable(credentials.get(id)));
+        Function<UUID, CompletableFuture<Optional<Credential>>> vault = id -> {
+            Credential seed = credentials.get(id);
+            if (seed == null) return CompletableFuture.completedFuture(Optional.empty());
+            var copy = new Credential(seed.id(), seed.name(), seed.kind(), seed.username().orElse(null),
+                seed.password() == null ? null : seed.password().clone(), seed.keyPath().orElse(null),
+                seed.keyBytes().map(byte[]::clone).orElse(null), seed.passphrase() == null ? null : seed.passphrase().clone());
+            issued.add(copy);
+            if (copy.passphrase() != null) issuedPassphrases.add(copy.passphrase());
+            return CompletableFuture.completedFuture(Optional.of(copy));
+        };
         connections = new Connections(() -> settings, trust, agent, id -> Optional.ofNullable(hosts.get(id)), Optional.of(vault),
             question -> { questions.add(question); return CompletableFuture.completedFuture(decision); }, background, ui,
             (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); });
@@ -79,6 +92,13 @@ class ConnectionsTest {
     }
 
     Connections.Shell shell(RemoteHost host) { return onUi(() -> connections.shell(host.id(), 100, 30, status -> { })).join(); }
+    Connections.Shell dedicatedShell(RemoteHost host) { return onUi(() -> connections.shell(host.id(), null, 100, 30, status -> { }, true)).join(); }
+
+    static void awaitSessions(LoopbackServer server, int count) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (server.server.getActiveSessions().size() != count && System.nanoTime() < deadline) Thread.sleep(20);
+        assertThat(server.server.getActiveSessions()).hasSize(count);
+    }
 
     static String readUntil(TerminalConnection connection, String marker) throws IOException {
         var out = new StringBuilder();
@@ -100,6 +120,117 @@ class ConnectionsTest {
         catch (Exception other) { return other.toString(); }
     }
 
+    @Test void leasesShareWithShellAndKeepCapturedEndpointAfterHostEdit(@TempDir Path dir) throws Exception {
+        try (var firstServer = new LoopbackServer(); var secondServer = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("target", firstServer.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = shell(host);
+            var first = onUi(() -> connections.lease(shell.identity(), null, status -> {})).get(10, TimeUnit.SECONDS);
+            var second = onUi(() -> connections.lease(shell.identity(), null, status -> {})).get(10, TimeUnit.SECONDS);
+            assertThat(first.session()).isSameAs(second.session());
+            first.close(); first.close();
+            onUi(() -> {});
+            assertThat(second.session().isOpen()).isTrue();
+            assertThat(onUi(connections::channelCount)).isEqualTo(1);
+            var edited = host.withEdited("target renamed", "127.0.0.1", secondServer.port(), "deploy", new Auth.Vault(passwordCredential()), "", Optional.empty());
+            hosts.put(host.id(), edited);
+            var current = onUi(() -> connections.lease(connections.identity(host.id()), null, status -> {})).get(10, TimeUnit.SECONDS);
+            assertThat(current.session()).isNotSameAs(second.session());
+            var original = onUi(() -> connections.lease(shell.identity(), null, status -> {})).get(10, TimeUnit.SECONDS);
+            assertThat(original.session()).isSameAs(second.session());
+            assertThat(original.identity().host().port()).isEqualTo(firstServer.port());
+            original.close(); second.close(); current.close(); shell.connection().close().run();
+        }
+    }
+
+    @Test void effectiveVaultUsernameChangesCannotReuseOldSession(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.server.setPasswordAuthenticator((user, password, session) -> password.equals("s3cret"));
+            connections(dir, Optional.empty());
+            UUID credential = passwordCredential();
+            var host = host("target", server.port(), "", new Auth.Vault(credential), Optional.empty());
+            var first = onUi(() -> connections.lease(connections.identity(host.id()), null, status -> {})).get(10, TimeUnit.SECONDS);
+            credentials.put(credential, new Credential(credential, "changed", Kind.ACCOUNT_PASSWORD, "other", "s3cret".toCharArray(), null, null));
+            var second = onUi(() -> connections.lease(connections.identity(host.id()), null, status -> {})).get(10, TimeUnit.SECONDS);
+            assertThat(second.session()).isNotSameAs(first.session());
+            assertThat(first.session().getUsername()).isEqualTo("deploy");
+            assertThat(second.session().getUsername()).isEqualTo("other");
+            first.close(); second.close();
+        }
+    }
+
+    static final class Owner implements dev.jasper.sdk.terminal.WindowHandle {
+        final UUID id = UUID.randomUUID(); boolean open = true;
+        public UUID id() { return id; }
+        public List<dev.jasper.sdk.terminal.TabHandle> tabs() { return List.of(); }
+        public Optional<dev.jasper.sdk.terminal.TabHandle> activeTab() { return Optional.empty(); }
+        public boolean isActive() { return false; }
+        public boolean isOpen() { return open; }
+        public void toFront() {}
+    }
+
+    @Test void deadPromptOwnerDoesNotCancelAnotherWindowsAcquire(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            var firstOwner = new Owner(); var secondOwner = new Owner();
+            var firstPrompt = new CompletableFuture<dev.jasper.sdk.terminal.WindowHandle>();
+            var secondPrompt = new CompletableFuture<dev.jasper.sdk.terminal.WindowHandle>();
+            var firstAnswer = new CompletableFuture<HostKeyVerifier.Decision>();
+            connections = new Connections(() -> settings, new KnownHosts(dir.resolve("known_hosts"), Optional.empty()), Optional.empty(),
+                id -> Optional.ofNullable(hosts.get(id)), Optional.of((owner, id) -> CompletableFuture.completedFuture(Optional.of(
+                    new Credential(id, "login", Kind.ACCOUNT_PASSWORD, "deploy", "s3cret".toCharArray(), null, null)))),
+                (owner, question) -> {
+                    if (!firstPrompt.isDone()) { firstPrompt.complete(owner); return firstAnswer; }
+                    secondPrompt.complete(owner); return CompletableFuture.completedFuture(HostKeyVerifier.Decision.TRUST);
+                }, background, ui, (delay, task) -> () -> {});
+            var host = host("shared", server.port(), "deploy", new Auth.Vault(UUID.randomUUID()), Optional.empty());
+            var first = onUi(() -> connections.lease(connections.identity(host.id()), firstOwner, status -> {}));
+            var second = onUi(() -> connections.lease(connections.identity(host.id()), secondOwner, status -> {}));
+            assertThat(firstPrompt.get(10, TimeUnit.SECONDS)).isSameAs(firstOwner);
+            onUi(() -> { firstOwner.open = false; first.cancel(true); });
+            assertThat(secondPrompt.get(10, TimeUnit.SECONDS)).isSameAs(secondOwner);
+            try (var lease = second.get(10, TimeUnit.SECONDS)) { assertThat(lease.session().isOpen()).isTrue(); }
+            assertThat(firstAnswer).isCancelled();
+        }
+    }
+
+    @Test void deadCredentialOwnerHandsSharedAcquireToSurvivingWindow(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            var firstOwner = new Owner(); var secondOwner = new Owner();
+            var waiting = new CompletableFuture<Optional<Credential>>();
+            var requested = new CompletableFuture<Void>();
+            connections = new Connections(() -> settings, new KnownHosts(dir.resolve("known_hosts"), Optional.empty()), Optional.empty(),
+                id -> Optional.ofNullable(hosts.get(id)), Optional.of((owner, id) -> {
+                    if (owner == firstOwner) { requested.complete(null); return waiting; }
+                    assertThat(owner).isSameAs(secondOwner);
+                    return CompletableFuture.completedFuture(Optional.of(new Credential(id, "login", Kind.ACCOUNT_PASSWORD, "deploy", "s3cret".toCharArray(), null, null)));
+                }), (owner, question) -> CompletableFuture.completedFuture(HostKeyVerifier.Decision.TRUST), background, ui, (delay, task) -> () -> {});
+            var host = host("shared", server.port(), "deploy", new Auth.Vault(UUID.randomUUID()), Optional.empty());
+            var first = onUi(() -> connections.lease(connections.identity(host.id()), firstOwner, status -> {}));
+            var second = onUi(() -> connections.lease(connections.identity(host.id()), secondOwner, status -> {}));
+            requested.get(10, TimeUnit.SECONDS);
+            onUi(() -> { firstOwner.open = false; first.cancel(true); waiting.complete(Optional.empty()); });
+            try (var lease = second.get(10, TimeUnit.SECONDS)) { assertThat(lease.session().isOpen()).isTrue(); }
+        }
+    }
+
+    @Test void changedJumpVaultUsernameChangesEntireRouteIdentity(@TempDir Path dir) throws Exception {
+        try (var jumpServer = new LoopbackServer(); var target = new LoopbackServer()) {
+            jumpServer.server.setPasswordAuthenticator((user, password, session) -> password.equals("s3cret"));
+            connections(dir, Optional.empty());
+            UUID login = passwordCredential();
+            var jump = host("jump", jumpServer.port(), "", new Auth.Vault(login), Optional.empty());
+            var host = host("target", target.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.of(jump.id()));
+            var first = onUi(() -> connections.lease(connections.identity(host.id()), null, status -> {})).get(10, TimeUnit.SECONDS);
+            credentials.put(login, new Credential(login, "changed", Kind.ACCOUNT_PASSWORD, "other", "s3cret".toCharArray(), null, null));
+            var second = onUi(() -> connections.lease(connections.identity(host.id()), null, status -> {})).get(10, TimeUnit.SECONDS);
+            assertThat(first.identity().hops().get(1).username()).isEqualTo("deploy");
+            assertThat(second.identity().hops().get(1).username()).isEqualTo("other");
+            assertThat(second.session()).isNotSameAs(first.session());
+            assertThat(first.session().isOpen()).isTrue();
+            first.close(); second.close();
+        }
+    }
+
     @Test void managedKeysAuthenticateAfterSourceDeletionWithoutAgent(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer()) {
             var generator = new KeyGenerator(dir.resolve("keys"));
@@ -113,7 +244,7 @@ class ConnectionsTest {
             connections(dir, Optional.empty());
             var target = host("managed", server.port(), "deploy", new Auth.VaultKeys(List.of(a, b)), Optional.empty());
             assertThat(readUntil(shell(target).connection(), "\r\n")).startsWith("READY");
-            assertThat(credentials.values()).allSatisfy(c -> assertThatThrownBy(c::keyBytes).isInstanceOf(IllegalStateException.class));
+            assertThat(issued).isNotEmpty().allSatisfy(c -> assertThatThrownBy(c::keyBytes).isInstanceOf(IllegalStateException.class));
         }
     }
     @Test void passwordAuthOpensAShellThatEchoesResizesAndExits(@TempDir Path dir) throws Exception {
@@ -144,7 +275,7 @@ class ConnectionsTest {
             onUi(scheduled.getFirst());
             Thread.sleep(200);
             assertThat(onUi(() -> connections.connected(host.id()))).isFalse();
-            assertThat(credentials.values()).allSatisfy(credential -> assertThatThrownBy(credential::password).as("closed after use").isInstanceOf(IllegalStateException.class));
+            assertThat(issued).isNotEmpty().allSatisfy(credential -> assertThatThrownBy(credential::password).as("closed after use").isInstanceOf(IllegalStateException.class));
         }
     }
 
@@ -311,7 +442,7 @@ class ConnectionsTest {
         for (UUID id : List.of(pathId, passwordCredential())) {
             var target = host(id.toString(), 22, "u", new Auth.VaultKeys(List.of(id)), Optional.empty());
             assertThat(failure(onUi(() -> connections.shell(target.id(), 80, 24, s -> {})))).contains("Import this key");
-            assertThatThrownBy(credentials.get(id)::keyBytes).isInstanceOf(IllegalStateException.class);
+            assertThat(issued).allSatisfy(copy -> assertThatThrownBy(copy::keyBytes).isInstanceOf(IllegalStateException.class));
         }
     }
 
@@ -352,7 +483,7 @@ class ConnectionsTest {
             credentials.put(id, new Credential(id, "encrypted", Kind.SSH_KEY, null, null, generated.privatePath(), passphrase));
             RemoteHost target = host("encrypted", server.port(), "deploy", new Auth.Vault(id), Optional.empty());
             assertThat(readUntil(shell(target).connection(), "\r\n")).startsWith("READY");
-            assertThat(passphrase).containsOnly((char) 0);
+            assertThat(issuedPassphrases.getLast()).containsOnly((char) 0);
         }
     }
 
@@ -413,6 +544,93 @@ class ConnectionsTest {
             cache.put(shell.host(), info);
             assertThat(cache.get(original).os()).isEqualTo("macOS");
             assertThat(cache.get(changed).os()).isEmpty();
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void dedicatedShellsGetTheirOwnConnectionsAndCloseWithTheirShell(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("followed", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shared = shell(host);
+            var first = dedicatedShell(host);
+            var second = dedicatedShell(host);
+            awaitSessions(server, 3);
+            assertThat(shared.folder()).isEmpty();
+            assertThat(first.folder()).isPresent();
+            assertThat(readUntil(first.connection(), "\r\n")).startsWith("READY");
+            var lease = onUi(() -> connections.lease(shared.identity(), null, status -> { })).get(10, TimeUnit.SECONDS);
+            awaitSessions(server, 3);
+            lease.close();
+            first.connection().close().run();
+            awaitSessions(server, 2);
+            assertThat(onUi(() -> List.copyOf(scheduled))).as("a dedicated connection does not linger").isEmpty();
+            shared.connection().close().run();
+            Thread.sleep(200);
+            assertThat(server.server.getActiveSessions()).as("the shared connection lingers").hasSize(2);
+            onUi(() -> { var tasks = List.copyOf(scheduled); scheduled.clear(); tasks.forEach(Runnable::run); });
+            awaitSessions(server, 1);
+            second.connection().close().run();
+            awaitSessions(server, 0);
+        }
+    }
+
+    @Test void dedicatedShellProbesItsOwnSessionAndMapsExitStatuses(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("probe", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = dedicatedShell(host);
+            var folder = shell.folder().orElseThrow();
+            server.execResult("sh -s", 0, "jasper-cwd\0/srv/app\0".getBytes(StandardCharsets.UTF_8));
+            assertThat(folder.read()).contains("/srv/app");
+            assertThat(server.execCommands).containsExactly("sh -s");
+            server.execResult("sh -s", 0, new byte[0]);
+            assertThat(folder.read()).isEmpty();
+            server.execResult("sh -s", 3, new byte[0]);
+            assertThatThrownBy(folder::read).isInstanceOf(ShellFolder.Unsupported.class);
+            server.execResult("sh -s", 1, new byte[0]);
+            assertThatThrownBy(folder::read).isInstanceOf(IOException.class).isNotInstanceOf(ShellFolder.Unsupported.class).hasMessage("Directory probe failed");
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void enterInTheShellSignalsItsFolder(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("enter", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = dedicatedShell(host);
+            var entered = new java.util.concurrent.CountDownLatch(1);
+            shell.folder().orElseThrow().onEnter(entered::countDown);
+            type(shell.connection(), "ls\r");
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(readUntil(shell.connection(), "ls\r")).as("the bytes still reach the shell").contains("ls\r");
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void inspectionUsesTheDedicatedShellsOwnConnection(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.execReplies(Map.of("uname -s", "Darwin\n"));
+            connections(dir, Optional.empty());
+            var host = host("mac", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = dedicatedShell(host);
+            assertThat(onUi(() -> connections.inspect(shell)).get(5, TimeUnit.SECONDS).os()).isEqualTo("macOS");
+            awaitSessions(server, 1);
+            shell.connection().close().run();
+            awaitSessions(server, 0);
+        }
+    }
+
+    @Test @EnabledOnOs({OS.LINUX, OS.MAC}) void probeScriptRunsOverARealExecChannel(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.server.setCommandFactory(org.apache.sshd.server.shell.ProcessShellCommandFactory.INSTANCE);
+            connections(dir, Optional.empty());
+            var host = host("real", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = dedicatedShell(host);
+            // The test JVM normally has no sshd ancestor, so the script finds no shell. What matters: the real
+            // `sh -s` received the whole script and its end of input, and exited 0 within the timeout.
+            var result = shell.folder().orElseThrow().read();
+            assertThat(result.isEmpty() || result.orElseThrow().startsWith("/")).isTrue();
             shell.connection().close().run();
         }
     }

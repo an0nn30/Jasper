@@ -12,3 +12,9 @@
 [shortcuts]
 toggle_panel = "cmd+shift+s"
 open_palette = "cmd+shift+h"
+
+toggle_sftp = ""
+
+[sftp]
+max_parallel_files = 2           # 1..8 globally; at most two files per endpoint
+request_timeout_seconds = 30    # 1..300 seconds per SFTP request

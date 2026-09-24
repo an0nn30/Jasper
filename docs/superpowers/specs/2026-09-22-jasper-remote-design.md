@@ -279,6 +279,11 @@ Live changes apply to the next connection; the keepalive interval applies to new
 
 ## 9. Tunnels (7b) and SFTP (7c)
 
+**SFTP follow-up (2026-09-23):** The user refined 7c to a single remote browser with local
+pickers and a remote destination picker, plus a persistent, Buddy-independent transfer
+manager. The [phase-1 SFTP design](2026-09-23-jasper-remote-sftp-design.md) records those
+approved decisions. Its single sidebar replaces the historical two-pane outline below.
+
 - **Tunnels.** `Tunnel(UUID id, String name, UUID hostId, Kind LOCAL|REMOTE|DYNAMIC, String
   bindAddress, int bindPort, String targetHost, int targetPort, boolean autoStart)` in
   `data/tunnels.toml`; a "Tunnels" tab in the panel with per-row start/stop and state (stopped,

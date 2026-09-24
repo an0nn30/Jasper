@@ -41,14 +41,14 @@ class BundledSamplePluginTest {
                         assertThat(dropdown.title()).isEqualTo("Sessions");
                         assertThat(dropdown.actionIds()).containsExactly("dev.jasper.remote.sessions.manage");
                     }));
-            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel");
+            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel", "dev.jasper.remote.sftp.panel");
             assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about");
             assertThat(contributions.menus()).anySatisfy(menu -> {
                 assertThat(menu.target()).isEqualTo(dev.jasper.app.contributions.MenuTarget.standard(
                     dev.jasper.app.contributions.MenuTarget.Slot.FILE));
                 assertThat(menu.entries()).contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.vault.open"));
             });
-            assertThat(contributions.status()).hasSize(3)
+            assertThat(contributions.status()).hasSize(4)
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
@@ -109,8 +109,12 @@ class BundledSamplePluginTest {
                 assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(retro ? 28 : 16);
                 assertThat(contributions.action("dev.jasper.remote.connect").orElseThrow().icon()).isSameAs(icon);
                 assertThat(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon()).isSameAs(icon);
-                assertThat(contributions.panels()).singleElement().satisfies(panel -> assertThat(panel.icon()).isSameAs(icon));
-                assertThat(contributions.status()).singleElement().satisfies(status -> assertThat(status.icon()).isSameAs(icon));
+                assertThat(contributions.panels()).hasSize(2).allSatisfy(panel -> {
+                    assertThat(panel.icon()).isNotNull();
+                    if(retro) assertThat(panel.icon()).isNotInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
+                    else assertThat(panel.icon()).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
+                });
+                assertThat(contributions.status()).hasSize(2).anySatisfy(status -> assertThat(status.icon()).isSameAs(icon));
                 assertThat(contributions.toolbar()).singleElement().isInstanceOfSatisfying(
                     dev.jasper.app.contributions.ToolbarEntry.Dropdown.class, menu -> assertThat(menu.icon()).isSameAs(icon));
             });

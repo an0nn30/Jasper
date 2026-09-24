@@ -79,4 +79,20 @@ class HostEditorTest {
         assertThat(saved.getLast().auth()).isEqualTo(new Auth.VaultKeys(List.of(a)));
     }
 
+    @Test void followDirectoryIsOnForNewHostsAndKeptWhenEditing() {
+        var editor = new HostEditor(List.of(), Optional.empty(), false, id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()), saved::add, () -> { });
+        assertThat(editor.followDirectory.isSelected()).isTrue();
+        assertThat(editor.followDirectory.getText()).isEqualTo("Track shell folder for SFTP follow");
+        editor.name.setText("n"); editor.hostname.setText("h"); editor.username.setText("u");
+        editor.followDirectory.setSelected(false);
+        editor.save.doClick();
+        assertThat(saved).singleElement().satisfies(host -> assertThat(host.followDirectory()).isFalse());
+        var edit = new HostEditor(List.of(), Optional.of(saved.getFirst()), false, id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()), saved::add, () -> { });
+        assertThat(edit.followDirectory.isSelected()).isFalse();
+        edit.followDirectory.setSelected(true);
+        edit.save.doClick();
+        assertThat(saved.getLast().followDirectory()).isTrue();
+        assertThat(saved.getLast().id()).isEqualTo(saved.getFirst().id());
+    }
+
 }

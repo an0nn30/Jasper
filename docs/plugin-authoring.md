@@ -369,7 +369,7 @@ SSH keys or password-only accounts can be selected as existing import credential
 A managed `Credential` exposes owned `keyBytes()` and no `keyPath()`; legacy path credentials
 keep their existing API. Always close credentials after use to clear their bytes and passphrases.
 The batch method has a default unsupported result for older API implementations. This extension
-belongs to Vault's exported API; Jasper SDK remains 0.7.4.
+belongs to Vault's exported API; it does not expose Vault internals through the Jasper SDK.
 
 <!-- example:pluginpalette -->
 ```java
@@ -562,3 +562,22 @@ dragging, Escape dismissal or outside-click dismissal. Only one overlay may be r
 across plugins; a competing request throws `IllegalStateException`. Owner close and plugin stop
 close the handle; use `onClosed` for cancellation cleanup. Native dialogs remain available for
 required credential and trust prompts. Overlays accept terminal owners from the same host only.
+
+### Status progress (SDK 0.7.5)
+
+Use `context.statusBar().addProgress(StatusItemSpec)` for host-rendered progress. Update the
+returned `StatusProgress` on the UI thread with one `StatusProgressState`: plain label, detail,
+spoken description, `OptionalDouble` fraction and optional primary/secondary registered action
+ids. Empty fraction means indeterminate. One handle updates every window; close removes it.
+The secondary action uses its registered title (for example Cancel); the primary action can
+open a richer management panel. Throttle worker samples before posting UI updates.
+
+### Local path pickers (SDK 0.7.5)
+
+`context.windows().chooseFiles(owner, title, initial)` returns an immutable list of local paths;
+`chooseDirectory` returns one optional directory. Invoke on the UI thread with a live terminal
+window or a shown plugin window. Both calls pump UI events, so revalidate selection-dependent
+state afterwards; owner closure or plugin stop cancels and discards the result. The host uses a
+native multiple-file picker and a themed directory picker. Paths are absolute and normalized;
+perform subsequent filesystem work in the background. Existing `WindowSurface.chooseFile`
+continues to select one file for window-owned workflows.

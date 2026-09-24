@@ -10,3 +10,6 @@ LICENSE is included as LICENSE.txt. Existing bundled Tabler resources retain the
 parent directory's LICENSE.txt as well. No runtime download is performed.
 
 assets.tsv records every original source path/URL and SHA-256 of unmodified SVG bytes.
+
+File and transfer icons were copied unmodified from the user-supplied
+~/projects/tabler-icons/icons/outline collection (MIT), on 2026-09-23.

@@ -2,6 +2,84 @@
 
 ## Current state — 2026-09-23
 
+### Transfer strip — 2026-09-24
+
+The bottom Transfers panel (two paged tables, thirteen buttons) is replaced by a compact strip at
+the bottom of the SFTP sidebar with one contextual action per transfer, and uploads, downloads and
+host-to-host copies ask once before copying onto existing items
+([amendment](superpowers/specs/2026-09-24-jasper-remote-transfer-strip-design.md),
+[plan](superpowers/plans/2026-09-24-jasper-remote-transfer-strip.md)). The queue, durability and
+recovery are unchanged; the "Replace / Skip existing" choice is stored in the job's existing
+file/folder policies. A finish whose only issues are skipped items fades like a clean one.
+The final review added two queue operations: **Retry failed** (`TransferCoordinator.retryFailed`)
+re-reads each failed item's source on the scan lane and resets it with the same per-entry
+`TransferStore.reset` that Restart uses, leaving skipped items skipped; **Resolve…** finds the
+first entry needing a decision with `firstAttention`, however far into the job it is.
+GUI acceptance is item 11 of [remote-7c-verification](remote-7c-verification.md).
+
+### SFTP directory follow probe — 2026-09-24
+
+Follow terminal folder only followed OSC 7, which stock bash and zsh do not send over SSH. The
+[directory probe amendment](superpowers/specs/2026-09-24-jasper-remote-directory-probe-design.md)
+([plan](superpowers/plans/2026-09-24-jasper-remote-directory-probe.md)) adds a fixed read-only
+probe on a separate exec channel for Linux and macOS hosts; each followed pane has its own SSH
+connection so the probe can tell shells apart (macOS no longer shows other processes'
+environments). Automated tests cover the script against real local processes, dedicated leases,
+the follower policy and the plugin wiring. The GUI acceptance steps in
+[remote-7c-verification](remote-7c-verification.md) are the user's.
+
+Final review fix wave (2026-09-24): `DirectoryFollower.request` (an explicit ask — focus, panel
+shown, follow turned back on) now resets the last-delivered path before probing, so its result
+always delivers even when unchanged; this closes a gap where re-enabling Follow after a manual
+sidebar navigation could leave the sidebar stuck on the manually chosen folder. Enter-triggered
+results are still delivered only when they differ from the last delivered path. The probe script
+now prints a `jasper-cwd` marker field before the directory so remote-user startup-file output
+cannot be mistaken for the path; `DirectoryProbe.parse` takes the field after the last marker.
+`DirectoryProbe.read` now takes one deadline shared between channel-open and waitFor instead of
+applying the 2 s timeout to each.
+
+### SFTP phase 1 — implemented, reviewed and verified
+
+The [SFTP design](superpowers/specs/2026-09-23-jasper-remote-sftp-design.md) is approved
+on `codex/remote-sftp` in `/Users/dustin/.codex/worktrees/remote-sftp/moray`, from main
+`1fcf9a8d`. Conversation-approved scope: one remote file-browser sidebar; local/remote
+and remote/remote copies; a Buddy-independent Transfers panel and status-bar progress;
+bounded large-file/folder handling; persistent pause/resume with unfinished jobs restored
+paused; explicit conflicts, temporary-file publication and recoverable errors. It remains
+inside `dev.jasper.remote`, depends on SSH 7a, and does not require tunnels 7b.
+
+The implementation adds generic SDK progress/chooser APIs and a plugin-owned SQLite queue.
+The user's icon clarification is recorded in section 9.3: all SFTP artwork uses SDK
+`Appearance.icon(IconName)`; missing semantic names and Tabler/OldGNOME2 assets belong in
+the app/SDK, with both skin mappings tested. Remote adds no icon resources or custom painting.
+It was self-reviewed for lifecycle, recovery, bounded work and architectural consistency.
+The user requested a detailed [implementation plan](superpowers/plans/2026-09-23-jasper-remote-plan-7c-sftp.md),
+an independent adversarial plan review, then native implementation. That sequence is authorized;
+the latest native execution choice supersedes the earlier per-task-agent preference. Baseline
+`./gradlew check` passed: 1,765 tests, 1,762 passed, three expected skips, no failures/errors.
+The adversarial review found eight important contract/recovery issues; the plan now includes
+explicit resolutions and regression tests. Native implementation has completed semantic icons, status progress, and owner-based pickers;
+session leases, endpoint identity and prompt ownership changes also pass their regression suites.
+Bounded local/SFTP endpoints also pass: explicit ACK/force barriers, safe publication, links,
+short reads, sparse offsets, cancellation, and SFTP through ProxyJump with a surviving shell.
+Durable SQLite storage passes reopen, checkpoint, 100k-entry pagination, cross-process locking,
+killed-writer recovery and corrupt/newer-schema preservation tests. The transfer engine now passes local/SFTP/relay copies, recursive folders and links, short pause
+checkpoints and restart validation, blocked-write pause, seven killed-process publication boundaries,
+and a >4-GiB/100k-entry probe under a 64-MiB heap. The browser/controller, disk-backed directory pages, destination picker and cancellable
+file operations are implemented with native controls and SDK icons. Plugin wiring and Transfers management are integrated; real staged/HostedContext tests pass
+shutdown during read, checkpoint and publication, with paused recovery and lock reacquisition.
+The final `./gradlew check :jasper-app:installDist` gate passed after the review fixes
+(1,845 tests: 1,842 passed, three expected skips, zero failures/errors). The independent
+review found two data-integrity issues and six control/recovery issues; all are fixed with
+regressions. This includes Unicode subtree handling, destination aliases, publication decisions,
+credential cancellation, bounded remaining-conflict policies, frozen scan frontiers, explicit
+link navigation and persistent deletion results. Distribution contents and SDK floor are
+verified; Remote bundles no icons. No deferred review minors. See
+[verification and native acceptance](remote-7c-verification.md).
+Nothing merged or pushed.
+
+### Latest completed work
+
 Configuration documentation follow-up: the example and settings reference now include
 explicit `ui.theme.style = "modern"` and `ui.font.family = "system"`, with optional
 UI sizing, portable fallback, full-restart behavior and retro's retained-but-ignored

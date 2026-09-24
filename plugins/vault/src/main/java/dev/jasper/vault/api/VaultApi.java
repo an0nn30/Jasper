@@ -37,6 +37,9 @@ public interface VaultApi {
      */
     CompletableFuture<Optional<Credential>> credential(UUID id);
 
+    /** Secret request whose unlock/grant prompts belong to the captured window. */
+    default CompletableFuture<Optional<Credential>> credential(WindowHandle owner, UUID id) { return credential(id); }
+
     /** The user's choice from a picker over {@code owner}; the choice is a one-time grant for this plugin. */
     CompletableFuture<Optional<CredentialDescriptor>> pick(WindowHandle owner);
 }
