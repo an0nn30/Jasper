@@ -21,6 +21,7 @@ final class DirectoryProbe {
     static final String COMMAND = "sh -s";
     static final int UNSUPPORTED = 3;
     private static final int LIMIT = 8192;
+    private static final byte[] MARKER = "jasper-cwd\0".getBytes(StandardCharsets.UTF_8);
     private static final byte[] SCRIPT = load();
 
     private DirectoryProbe() { }
@@ -42,13 +43,15 @@ final class DirectoryProbe {
             @Override public synchronized void write(int value) { if (output.size() < LIMIT) output.write(value); }
             @Override public synchronized void write(byte[] bytes, int start, int length) { output.write(bytes, start, Math.min(length, Math.max(0, LIMIT - output.size()))); }
         };
+        var deadline = System.nanoTime() + timeout.toNanos();
         var channel = session.createExecChannel(COMMAND);
         try {
             channel.setIn(new ByteArrayInputStream(SCRIPT));
             channel.setOut(bounded);
             channel.setErr(OutputStream.nullOutputStream());
             channel.open().verify(timeout);
-            if (!channel.waitFor(Set.of(ClientChannelEvent.CLOSED), timeout).contains(ClientChannelEvent.CLOSED)) throw new IOException("Directory probe timed out");
+            var remaining = Duration.ofNanos(Math.max(1_000_000L, deadline - System.nanoTime()));
+            if (!channel.waitFor(Set.of(ClientChannelEvent.CLOSED), remaining).contains(ClientChannelEvent.CLOSED)) throw new IOException("Directory probe timed out");
             Integer status = channel.getExitStatus();
             if (status != null && status == UNSUPPORTED) throw new ShellFolder.Unsupported();
             if (status == null || status != 0) throw new IOException("Directory probe failed");
@@ -58,17 +61,33 @@ final class DirectoryProbe {
         }
     }
 
-    /** The first NUL-terminated field when it is an absolute UTF-8 path. */
+    /**
+     * The NUL-terminated field after the LAST {@code jasper-cwd\0} marker, when it is an absolute
+     * UTF-8 path. Output the remote user's own startup files print before the script runs cannot be
+     * mistaken for the marker or the path it introduces.
+     */
     static Optional<String> parse(byte[] output) {
+        int markerStart = lastIndexOf(output, MARKER);
+        if (markerStart < 0) return Optional.empty();
+        int fieldStart = markerStart + MARKER.length;
         int end = -1;
-        for (int i = 0; i < output.length; i++) if (output[i] == 0) { end = i; break; }
-        if (end <= 0) return Optional.empty();
+        for (int i = fieldStart; i < output.length; i++) if (output[i] == 0) { end = i; break; }
+        if (end < 0) return Optional.empty();
         try {
             String path = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
-                .decode(ByteBuffer.wrap(output, 0, end)).toString();
+                .decode(ByteBuffer.wrap(output, fieldStart, end - fieldStart)).toString();
             return path.startsWith("/") ? Optional.of(path) : Optional.empty();
         } catch (CharacterCodingException malformed) {
             return Optional.empty();
         }
+    }
+
+    private static int lastIndexOf(byte[] haystack, byte[] needle) {
+        outer:
+        for (int i = haystack.length - needle.length; i >= 0; i--) {
+            for (int j = 0; j < needle.length; j++) if (haystack[i + j] != needle[j]) continue outer;
+            return i;
+        }
+        return -1;
     }
 }
