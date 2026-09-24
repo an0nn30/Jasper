@@ -8,15 +8,16 @@ import com.jetbrains.WindowDecorations;
 import java.awt.*;
 import java.awt.event.*;
 import java.beans.PropertyChangeListener;
-import java.util.function.IntSupplier;
 import javax.swing.*;
 
-/** Integrated modern tabs or a retro title; macOS owns window controls and gestures. */
+/** A centred window title over macOS's native controls; toolbar and tabs live in the window content. */
 public final class MacTitleBar extends JPanel implements AutoCloseable {
+    /** Unscaled height of the modern title row. */
+    public static final int MODERN_HEIGHT = 28;
+    /** Unscaled height of the retro title row. */
+    public static final int RETRO_HEIGHT = 32;
     private final JRootPane root;
     private final boolean retro;
-    private final JComponent tabs;
-    private final IntSupplier tabHeight;
     private final Runnable minimumSizeChanged;
     private final JLabel title = new JLabel("Jasper", SwingConstants.CENTER);
     private final PropertyChangeListener boundsChanged;
@@ -43,29 +44,27 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     }
 
     /** Called before pack; the host owns its component and notification wiring. */
-    public static MacTitleBar install(JRootPane root, JComponent content, JComponent tabs,
-                               IntSupplier tabHeight, Runnable minimumSizeChanged, boolean supported) {
+    public static MacTitleBar install(JRootPane root, JComponent content, Runnable minimumSizeChanged, boolean supported) {
         root.setContentPane(content);
         if (!supported) return null;
         root.putClientProperty("apple.awt.fullWindowContent", true);
         root.putClientProperty("apple.awt.transparentTitleBar", true);
         root.putClientProperty("apple.awt.windowTitleVisible", false);
-        var bar = new MacTitleBar(root, tabs, tabHeight, minimumSizeChanged);
+        var bar = new MacTitleBar(root, minimumSizeChanged);
         var surface = new JPanel(new BorderLayout());
         surface.add(bar, BorderLayout.NORTH); surface.add(content, BorderLayout.CENTER);
         root.setContentPane(surface);
         return bar;
     }
 
-    private MacTitleBar(JRootPane root, JComponent tabs, IntSupplier tabHeight, Runnable minimumSizeChanged) {
+    private MacTitleBar(JRootPane root, Runnable minimumSizeChanged) {
         super(null);
         this.root = root; this.retro = SwingAppearance.retro();
-        this.tabs = retro ? null : tabs;
-        this.tabHeight = tabHeight; this.minimumSizeChanged = minimumSizeChanged;
+        this.minimumSizeChanged = minimumSizeChanged;
         boundsChanged = event -> { revalidate(); repaint(); minimumSizeChanged.run(); };
         title.putClientProperty("html.disable", true);
         title.getAccessibleContext().setAccessibleName("Window title");
-        add(title); if (this.tabs != null) add(this.tabs);
+        add(title);
         root.addPropertyChangeListener(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, boundsChanged);
     }
 
@@ -84,11 +83,9 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     }
 
     /** Updates metadata independently of the window's workspace model. */
-    public void setTitle(String value, boolean singleTab) {
+    public void setTitle(String value) {
         if (closed) return;
         if (!value.equals(title.getText())) title.setText(value);
-        title.setVisible(retro || singleTab);
-        if (tabs != null) tabs.setVisible(!singleTab);
         revalidate(); repaint();
     }
 
@@ -131,29 +128,17 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         return Math.max(UIScale.scale(120), Math.max(nativeLeft, controlsEnd) + UIScale.scale(8));
     }
 
-    private int titleHeight() { return UIScale.scale(retro ? 32 : tabHeight.getAsInt()); }
-
-    public void refreshHeight() {
-        if (closed) return;
-        refreshNativeGeometry();
-        revalidate(); repaint(); root.revalidate(); root.repaint();
-    }
+    private int titleHeight() { return UIScale.scale(retro ? RETRO_HEIGHT : MODERN_HEIGHT); }
 
     @Override public Dimension getMinimumSize() {
-        int width = retro ? 2 * Math.max(safeInset(), nativeRight) + UIScale.scale(64)
-            : safeInset() + nativeRight + tabs.getMinimumSize().width;
-        return new Dimension(width, titleHeight());
+        return new Dimension(2 * Math.max(safeInset(), nativeRight) + UIScale.scale(64), titleHeight());
     }
     @Override public Dimension getPreferredSize() { return new Dimension(Math.max(UIScale.scale(400), getMinimumSize().width), titleHeight()); }
 
     @Override public void doLayout() {
         refreshNativeGeometry();
-        int left = Math.min(safeInset(), getWidth());
-        int available = Math.max(0, getWidth() - left - nativeRight);
-        if (tabs != null) tabs.setBounds(left, 0, available, getHeight());
-        // A lone session uses the ordinary centered window title. Reserve the same space
-        // at both ends so native controls cannot shift the title away from the window center.
-        int inset = Math.max(left, nativeRight);
+        // Reserve the same space at both ends so native controls cannot shift the title off centre.
+        int inset = Math.max(Math.min(safeInset(), getWidth()), nativeRight);
         title.setBounds(inset, 0, Math.max(0, getWidth() - 2 * inset), getHeight());
     }
 
@@ -169,7 +154,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     private void refreshColors() {
         setBackground(UIManager.getColor(retro ? "Jasper.retroTitleBackground" : "Jasper.titleBackground"));
         title.setFont(retro ? UIManager.getFont("Label.font").deriveFont(Font.PLAIN, UIManager.getFont("Label.font").getSize2D() + UIScale.scale(1f))
-            : SystemFonts.ui(Font.PLAIN, 13f));
+            : SystemFonts.ui(Font.BOLD, 13f));
         title.setForeground(UIManager.getColor(active ? "Jasper.titleForeground" : "Jasper.titleInactiveForeground"));
         repaint();
     }

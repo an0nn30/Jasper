@@ -128,18 +128,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings) {
-        this(launcher, directory, newWindow, quit, onEmpty, themes, bindings, System::nanoTime);
-    }
-
-    WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock) {
-        this(launcher, directory, newWindow, quit, onEmpty, themes, bindings, animationClock,
+        this(launcher, directory, newWindow, quit, onEmpty, themes, bindings,
             new CommandHistory(), System.getProperty("os.name").startsWith("Mac"));
     }
 
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes, KeyBindings bindings, java.util.function.LongSupplier animationClock,
-                  CommandHistory history, boolean macOs) {
+                  ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
         super(new BorderLayout());
         this.baseBindings = bindings;
         this.bindings = bindings;
@@ -159,11 +153,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
-        windowTabs = retro() ? null : new WindowTabs(this, animationClock);
+        windowTabs = retro() ? null : new WindowTabs(this);
         retroTabs = retro() ? new RetroTabs(this) : null;
         var north = new JPanel(new BorderLayout());
-        if (windowTabs != null) north.add(windowTabs, BorderLayout.NORTH);
-        north.add(chrome.toolbar(), BorderLayout.CENTER);
+        north.add(chrome.toolbar(), BorderLayout.NORTH);
+        if (windowTabs != null) north.add(windowTabs, BorderLayout.SOUTH);
         regions = new WorkspaceRegions(tabs);
         rail = new WindowRail(action(ActionId.OPEN_SETTINGS));
         rail.setVisible(false);
@@ -185,16 +179,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Workspace adapter: wires title/theme values to the platform-only title bar. */
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
                                       Consumer<String> nativeTitle) {
-        var bar = MacTitleBar.install(root, content, content.windowTabs(), content::tabHeight,
-            () -> content.onMinimumSizeChanged.run(), supported);
+        var bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), supported);
         content.onTitle = value -> {
             String display = TerminalTitle.windowTitle(value);
             nativeTitle.accept(display);
-            if (bar != null) bar.setTitle(display, content.tabStrip().getTabCount() <= 1);
+            if (bar != null) bar.setTitle(display);
         };
         if (bar != null) {
             content.onThemeChanged = theme -> bar.setLight(theme.chrome().appearance() == Appearance.LIGHT);
-            content.onTabHeightChanged = bar::refreshHeight;
             bar.setLight(content.theme().chrome().appearance() == Appearance.LIGHT);
         }
         content.update();

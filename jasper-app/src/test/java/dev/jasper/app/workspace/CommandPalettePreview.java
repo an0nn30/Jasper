@@ -147,7 +147,7 @@ public final class CommandPalettePreview {
                 var themes = new ThemeController();
                 var history = new CommandHistory();
                 var owner = new WindowContent(launcher, DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
-                    themes, KeyBindings.defaults(true), System::nanoTime, history, true);
+                    themes, KeyBindings.defaults(true), history, true);
                 var root = new JRootPane();
                 var titleBar = WindowContent.installTitleBar(root, owner, true, title -> {});
                 owner.installRootBindings(root);

@@ -59,41 +59,36 @@ class MacTitleBarTest {
         });
     }
 
-    @Test void nativeBoundsKeepOneIntegratedHeaderSafeAndTitleClipped() throws Exception {
+    @Test void modernHeaderIsATitleRowAboveTheToolbarAndTheTabStrip() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var root = new JRootPane();
             var minimumChanges = new AtomicInteger();
             owner.onMinimumSizeChanged = minimumChanges::incrementAndGet;
             try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
-                assertThat(bar.getPreferredSize().height).isEqualTo(38);
-                JComponent tabs = WindowTabsTest.named(bar, "windowTabs");
-                assertThat(tabs).as("the real tabs are in the native header").isNotNull();
-                assertThat(WindowTabsTest.named(owner, "windowTabs")).isNull();
-                bar.setSize(959, 38); bar.doLayout();
-                assertThat(tabs.getX()).isEqualTo(120);
-                assertThat(label(bar).getHorizontalAlignment()).isEqualTo(SwingConstants.CENTER);
-                assertThat(tabs.isVisible()).isFalse();
+                assertThat(bar.getPreferredSize().height).isEqualTo(28);
+                assertThat(bar.getComponentCount()).as("only the title").isEqualTo(1);
+                JComponent tabs = WindowTabsTest.named(owner, "windowTabs");
+                assertThat(tabs).as("tabs live in the window content").isNotNull();
+                root.setSize(959, 600); layoutTree(root);
+                Point toolbar = SwingUtilities.convertPoint(owner.toolbar(), 0, 0, root);
+                Point strip = SwingUtilities.convertPoint(tabs, 0, 0, root);
+                assertThat(toolbar.y).isEqualTo(bar.getHeight());
+                assertThat(strip.y).isEqualTo(toolbar.y + owner.toolbar().getHeight());
                 assertThat(label(bar).isVisible()).isTrue();
                 assertThat(label(bar).getX() * 2 + label(bar).getWidth()).isEqualTo(bar.getWidth());
-                owner.newTab(HOME); bar.doLayout();
-                assertThat(tabs.isVisible()).isTrue();
-                assertThat(label(bar).isVisible()).isFalse();
-                assertThat(tabs.getWidth()).isEqualTo(959 - 120);
+                owner.newTab(HOME); layoutTree(root);
+                assertThat(label(bar).isVisible()).as("the title stays with many tabs").isTrue();
                 root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(12, 6, 110, 34));
                 assertThat(minimumChanges.get()).isPositive();
                 bar.doLayout();
-                assertThat(tabs.getX()).isGreaterThanOrEqualTo(122);
+                assertThat(label(bar).getX()).isGreaterThanOrEqualTo(130);
                 var before = bar.getMinimumSize();
                 owner.currentTab().rename("extremely long shell title ".repeat(100)); owner.update();
                 assertThat(bar.getMinimumSize()).isEqualTo(before);
                 assertThat(bar.getPreferredSize().width).isLessThan(1000);
-                bar.setSize(80, 38); bar.doLayout();
+                bar.setSize(80, 28); bar.doLayout();
                 assertThat(label(bar).getWidth()).isZero();
-                assertThat(tabs.getWidth()).isZero();
-                root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle());
-                bar.setSize(959, 38); bar.doLayout();
-                assertThat(tabs.getX()).isEqualTo(120);
             }
         });
     }
@@ -118,7 +113,7 @@ class MacTitleBarTest {
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0x383a42));
                 owner.setToolbarMode(ToolbarMode.HIDDEN);
                 assertThat(bar.isVisible()).isTrue();
-                assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 38);
+                assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 28);
             }
         });
     }
@@ -146,13 +141,12 @@ class MacTitleBarTest {
         edt(() -> {
             var themes = new dev.jasper.app.appearance.ThemeController();
             var root = new JRootPane();
-            var placeholder = new JPanel();
-            try (var bar = MacTitleBar.install(root, new JPanel(), placeholder, () -> 38, () -> { }, true)) {
-                bar.setTitle("Credential Vault", true);
+            try (var bar = MacTitleBar.install(root, new JPanel(), () -> { }, true)) {
+                bar.setTitle("Credential Vault");
                 for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
                     themes.select(theme); SwingUtilities.updateComponentTreeUI(root);
-                    bar.setLight(theme == BuiltinTheme.LIGHT); bar.setSize(800, 38); bar.doLayout();
-                    var image = new BufferedImage(800, 38, BufferedImage.TYPE_INT_RGB);
+                    bar.setLight(theme == BuiltinTheme.LIGHT); bar.setSize(800, 28); bar.doLayout();
+                    var image = new BufferedImage(800, 28, BufferedImage.TYPE_INT_RGB);
                     var graphics = image.createGraphics();
                     try { bar.paint(graphics); } finally { graphics.dispose(); }
                     for (int x : new int[] {5, 119, 121, 350, 795})

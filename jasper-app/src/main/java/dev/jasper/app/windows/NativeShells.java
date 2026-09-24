@@ -42,7 +42,6 @@ import java.util.Optional;
  * testable lives in {@link AuxiliarySurface}. EDT only; never constructed in headless tests.
  */
 public final class NativeShells {
-    private static final int TITLE_HEIGHT = 38;
     private final ThemeController themes;
     private final UiState state;
     private final Function<UUID, Window> terminalWindows;
@@ -128,7 +127,7 @@ public final class NativeShells {
             if (bar != null) bar.close();
             natives.remove(surface);
             frame.dispose();
-        }, title -> { frame.setTitle(title); if (bar != null) bar.setTitle(title, true); }, frame::getBounds, (title, initial) -> chooseFile(frame, title, initial, Optional.empty()));
+        }, title -> { frame.setTitle(title); if (bar != null) bar.setTitle(title); }, frame::getBounds, (title, initial) -> chooseFile(frame, title, initial, Optional.empty()));
     }
 
     private AuxiliarySurface.Shell dialog(AuxiliarySurface surface) {
@@ -156,13 +155,13 @@ public final class NativeShells {
                 theme.close();
                 if (bar != null) bar.close();
                 natives.remove(surface); dialog.dispose();
-            }, title -> { dialog.setTitle(title); if (bar != null) bar.setTitle(title, true); }, dialog::getBounds, (title, initial) -> chooseFile(dialog, title, initial, Optional.empty()));
+            }, title -> { dialog.setTitle(title); if (bar != null) bar.setTitle(title); }, dialog::getBounds, (title, initial) -> chooseFile(dialog, title, initial, Optional.empty()));
     }
 
     /** Shared, headless-testable title setup for both kinds of SDK/application auxiliary surface. */
     static MacTitleBar installTitleBar(JRootPane root, AuxiliarySurface surface, boolean supported) {
-        MacTitleBar bar = MacTitleBar.install(root, surface.holder(), new JPanel(), () -> TITLE_HEIGHT, () -> { }, supported);
-        if (bar != null) bar.setTitle(surface.title(), true);
+        MacTitleBar bar = MacTitleBar.install(root, surface.holder(), () -> { }, supported);
+        if (bar != null) bar.setTitle(surface.title());
         return bar;
     }
 

@@ -30,8 +30,7 @@ class WindowCommandPaletteTest {
     }
     static WindowContent owner(CommandHistory history) {
         return new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
-            path -> {}, () -> {}, () -> {}, new ThemeController(), KeyBindings.defaults(true),
-            System::nanoTime, history, true);
+            path -> {}, () -> {}, () -> {}, new ThemeController(), KeyBindings.defaults(true), history, true);
     }
     static Command command(String id, Runnable run) {
         return new Command(id, new AbstractAction(id) {
@@ -186,7 +185,7 @@ class WindowCommandPaletteTest {
                 content[0] = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
                     path -> {}, () -> { content[0].close(); application.quit(); },
                     () -> { content[0].close(); ApplicationTestSupport.windowClosed(application, null); }, new ThemeController(),
-                    KeyBindings.defaults(true), System::nanoTime, history[0], true);
+                    KeyBindings.defaults(true), history[0], true);
                 install(content[0]); content[0].commandPalette().toggle();
                 content[0].commandPalette().component().queryField().setText(quit ? "quit" : "close tab");
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(content[0].commandPalette().component());

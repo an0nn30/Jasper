@@ -223,7 +223,7 @@ class CommandPaletteShortcutsTest {
                         } catch (java.io.IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
                     }, "controlled input fixture");
                     owner[0] = new WindowContent(launcher, directory, path -> {}, () -> {}, () -> {},
-                        new ThemeController(), KeyBindings.defaults(mac), System::nanoTime, new CommandHistory(), mac);
+                        new ThemeController(), KeyBindings.defaults(mac), new CommandHistory(), mac);
                     install(owner[0]);
                 });
                 pending.remove().run();
@@ -285,7 +285,7 @@ class CommandPaletteShortcutsTest {
     static int primary(boolean mac) { return mac ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK; }
     static WindowContent owner(boolean mac) {
         return new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
-            new ThemeController(), KeyBindings.defaults(mac), System::nanoTime, new CommandHistory(), mac);
+            new ThemeController(), KeyBindings.defaults(mac), new CommandHistory(), mac);
     }
     static JRootPane install(WindowContent owner) {
         var root = new JRootPane(); root.setContentPane(owner); owner.installRootBindings(root);

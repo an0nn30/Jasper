@@ -8,8 +8,6 @@ class PackagedResourcesTest {
     @Test void productionJarPreservesResourcesAndContainsNoBuddyOrTestImplementation() throws Exception {
         try (var jar = new JarFile(System.getProperty("jasper.appJar"))) {
             for (String name : java.util.List.of(
-                "dev/jasper/app/icons/LICENSE.txt",
-                "dev/jasper/app/icons/SOURCE.txt",
                 "dev/jasper/app/icons/intellij/find.svg",
                 "dev/jasper/app/icons/app/linux/icon-16.png",
                 "dev/jasper/app/icons/app/linux/icon-24.png",
@@ -46,10 +44,6 @@ class PackagedResourcesTest {
                 "dev/jasper/app/icons/intellij/gearPlain.svg",
                 "dev/jasper/app/icons/intellij/refresh.svg",
                 "dev/jasper/app/icons/standard/LOCK.svg",
-                "dev/jasper/app/icons/title/SOURCE.txt",
-                "dev/jasper/app/icons/title/plus.svg",
-                "dev/jasper/app/icons/title/terminal-2.svg",
-                "dev/jasper/app/icons/title/x.svg",
                 "dev/jasper/app/shell-integration/bash/rc.bash",
                 "dev/jasper/app/shell-integration/fish/fish/vendor_conf.d/jasper.fish",
                 "dev/jasper/app/shell-integration/jasper.bash",

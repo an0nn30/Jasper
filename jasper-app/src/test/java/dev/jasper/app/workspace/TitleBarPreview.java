@@ -41,7 +41,7 @@ public final class TitleBarPreview {
     }
 
     private static void render(MacTitleBar bar, Path output, BuiltinTheme theme, String name, int width) {
-        WindowTabsTest.layout(bar, width, 38);
+        WindowTabsTest.layout(bar, width, 28);
         var image = new BufferedImage(width * 2, 76, BufferedImage.TYPE_INT_RGB);
         var graphics = image.createGraphics();
         try { graphics.scale(2, 2); bar.printAll(graphics); }
