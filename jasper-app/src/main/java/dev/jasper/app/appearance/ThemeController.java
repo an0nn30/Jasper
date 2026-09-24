@@ -3,6 +3,7 @@ package dev.jasper.app.appearance;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ThemeStyle;
 import dev.jasper.app.config.UiFontConfig;
+import dev.jasper.terminal.config.Palette;
 import java.awt.Font;
 import javax.swing.plaf.FontUIResource;
 import com.formdev.flatlaf.FlatDarkLaf;
@@ -11,6 +12,7 @@ import com.formdev.flatlaf.FlatLightLaf;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import dev.jasper.app.lifecycle.Subscription;
@@ -26,9 +28,13 @@ public final class ThemeController {
         }
     }
 
+    private static final System.Logger LOG = System.getLogger(ThemeController.class.getName());
     private final Set<BiConsumer<ResolvedTheme, Boolean>> listeners = new LinkedHashSet<>();
     private final Predicate<BuiltinTheme> installer;
-    private final ThemeStyle style;
+    private final ThemeStyle requestedStyle;
+    private ThemeStyle style;
+    private String fallbackReason;
+    private Palette gtkPalette = BuiltinTheme.GTK.palette();
     private ThemeState state = ThemeState.defaults();
     private UiFontConfig uiFont = UiFontConfig.defaults();
     private final Font platformFont;
@@ -45,7 +51,8 @@ public final class ThemeController {
     }
     ThemeController(ThemeStyle style, Appearance saved, Predicate<BuiltinTheme> installer) {
         requireEdt();
-        this.style = Objects.requireNonNull(style);
+        this.requestedStyle = Objects.requireNonNull(style);
+        this.style = style;
         this.installer = Objects.requireNonNull(installer);
         this.state = ThemeState.defaults().configure(Objects.requireNonNull(saved));
         // Swing otherwise tries the component's plugin loader for third-party LAF delegates.
@@ -54,18 +61,33 @@ public final class ThemeController {
         UIManager.put("defaultFont", null);
         FORM_FONTS.forEach(key -> UIManager.put(key, null));
         UIManager.put("Jasper.uiFontFamilyOverride", false);
-        installOrThrow(resolve(state).chrome());
+        try { installChrome(resolve(state).chrome()); }
+        catch (InstallationFailure failure) {
+            if (style != ThemeStyle.GTK) throw failure;
+            this.style = ThemeStyle.MODERN;
+            fallbackReason = "GTK appearance is unavailable (" + reason(failure) + "); using modern.";
+            LOG.log(System.Logger.Level.WARNING, fallbackReason, failure);
+            installChrome(resolve(state).chrome());
+        }
         platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
+    /** The installed style: the requested one, or modern after a GTK fallback. */
     public ThemeStyle style() { requireEdt(); return style; }
+    /** The configured style, which a restart would try again. */
+    public ThemeStyle requestedStyle() { requireEdt(); return requestedStyle; }
+    /** Why the requested style could not be installed, when it could not. */
+    public Optional<String> fallbackReason() { requireEdt(); return Optional.ofNullable(fallbackReason); }
     private ResolvedTheme resolve(ThemeState candidate) {
-        return style == ThemeStyle.RETRO
-            ? new ResolvedTheme(BuiltinTheme.RETRO, BuiltinTheme.RETRO.palette()) : candidate.resolve();
+        return switch (style) {
+            case RETRO -> new ResolvedTheme(BuiltinTheme.RETRO, BuiltinTheme.RETRO.palette());
+            case GTK -> new ResolvedTheme(BuiltinTheme.GTK, gtkPalette);
+            case MODERN -> candidate.resolve();
+        };
     }
     public ResolvedTheme current() { requireEdt(); return resolve(state); }
     public Appearance choice() {
-        requireEdt(); return style == ThemeStyle.RETRO ? Appearance.LIGHT : state.choice();
+        requireEdt(); return style == ThemeStyle.MODERN ? state.choice() : resolve(state).appearance();
     }
     public void selectAppearance(Appearance choice) {
         requireEdt(); Objects.requireNonNull(choice);
@@ -91,7 +113,7 @@ public final class ThemeController {
             }
             installFontDefaults(font);
             try {
-                installOrThrow(next.chrome());
+                installChrome(next.chrome());
                 if (style == ThemeStyle.RETRO) MetalDefaults.configureFonts(resolveFont(font), platformLabelSize);
             }
             catch (RuntimeException failure) {
@@ -156,9 +178,22 @@ public final class ThemeController {
         }
     }
 
+    private void installChrome(BuiltinTheme theme) {
+        installOrThrow(theme);
+        if (theme == BuiltinTheme.GTK) gtkPalette = GtkPalette.from(UIManager::getColor);
+    }
+
+    private static String reason(Throwable failure) {
+        Throwable cause = failure;
+        while (cause.getCause() != null) cause = cause.getCause();
+        String message = cause.getMessage();
+        return message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
+    }
+
     private static boolean modernDefaultsRegistered;
     static boolean install(BuiltinTheme theme) {
         requireEdt();
+        if (theme == BuiltinTheme.GTK) return GtkDefaults.install();
         if (theme == BuiltinTheme.RETRO) return MetalDefaults.install();
         if (!modernDefaultsRegistered) {
             FlatLaf.registerCustomDefaultsSource("dev.jasper.app.themes");
