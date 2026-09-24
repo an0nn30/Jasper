@@ -34,6 +34,7 @@ public final class SftpController implements AutoCloseable {
     private volatile long generation;
     private volatile boolean closed;
     private boolean visible=true,loading,foldersOnly;
+    private Consumer<UUID> followRequests=pane->{};
     public void foldersOnly(boolean value) { foldersOnly=value; }
     private State state;
     private View displayed;
@@ -49,6 +50,13 @@ public final class SftpController implements AutoCloseable {
         background.execute(this::loop);
     }
     public void operations(Operations operations) { this.operations=operations; }
+    /** Receives the pane whose shell folder this view wants now. */
+    public void onFollowRequested(Consumer<UUID> listener) { followRequests=listener; }
+    /** True while this visible view follows {@code pane}'s terminal folder. */
+    public boolean following(UUID pane) { return !closed && visible && state!=null && state.follow && state.pane.equals(pane); }
+    /** Shows {@code text} while this visible view shows {@code pane}. */
+    public void notice(UUID pane,String text) { if(!closed && visible && state!=null && state.pane.equals(pane)) panel.error(text); }
+    private void requestFollow() { if(!closed && visible && state!=null && state.follow) followRequests.accept(state.pane); }
     public CompletableFuture<Void> stopped() { return stopped; }
     public Optional<Capture> capture() { return displayed==null?Optional.empty():Optional.of(new Capture(displayed.identity(),displayed.path(),panel.selection())); }
     public void open(UUID pane,ConnectionIdentity identity,String reported,boolean explicit) {
@@ -57,7 +65,7 @@ public final class SftpController implements AutoCloseable {
         if(remembered==null || !remembered.identity.equals(identity)) { remembered=new State(pane,identity,hint);states.put(pane,remembered); }
         remembered.reported=hint;if(remembered.follow && !hint.isBlank()) remembered.path=hint;
         boolean changed=state!=remembered;state=remembered;panel.following(state.follow);
-        if(visible && (changed || explicit || displayed==null)) load(state.path,explicit);
+        if(visible && (changed || explicit || displayed==null)) load(state.path,explicit);requestFollow();
     }
     public void follow(UUID pane,String reported) {
         var remembered=states.get(pane);if(remembered==null) return;remembered.reported=reported;
@@ -66,7 +74,7 @@ public final class SftpController implements AutoCloseable {
     public void forget(UUID pane) { states.remove(pane); }
     public void following(boolean follow) {
         if(state==null) return;state.follow=follow;panel.following(follow);
-        if(follow && !state.reported.isBlank()) { state.path=state.reported;if(visible) load(state.path,false); }
+        if(follow && !state.reported.isBlank()) { state.path=state.reported;if(visible) load(state.path,false); }if(follow) requestFollow();
     }
     public void manual(String requested) {
         if(state==null || closed) return;
@@ -81,7 +89,7 @@ public final class SftpController implements AutoCloseable {
     public void refresh() { if(state!=null && visible && !closed) load(state.path,false); }
     public void visible(boolean value) {
         if(closed || visible==value) return;visible=value;
-        if(value) { if(state!=null) load(state.path,true); }
+        if(value) { if(state!=null) load(state.path,true);requestFollow(); }
         else { cancel();submit(()-> { closeCache();cachedView=null; }); }
     }
     public void cancel() {

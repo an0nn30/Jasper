@@ -40,6 +40,32 @@ class SftpControllerTest {
             } finally { SwingUtilities.invokeAndWait(holder[0]::close);holder[0].stopped().get(5,TimeUnit.SECONDS); }
         }
     }
+    @Test void reportsWhichPaneItFollowsAndAsksForItsFolder() throws Exception {
+        var identity=host("A");var pane=UUID.randomUUID();var other=UUID.randomUUID();var requests=new ArrayList<UUID>();var holder=new SftpController[1];
+        try(var workers=Executors.newVirtualThreadPerTaskExecutor()) {
+            SwingUtilities.invokeAndWait(()-> {
+                var panel=new SftpPanel(icon->new ImageIcon(new java.awt.image.BufferedImage(16,16,2)));
+                holder[0]=new SftpController(root,workers,SwingUtilities::invokeLater,id->new CompletableFuture<>(),panel);
+                holder[0].onFollowRequested(requests::add);
+                holder[0].open(pane,identity,"",true);
+                assertThat(holder[0].following(pane)).isTrue();
+                assertThat(holder[0].following(other)).isFalse();
+                assertThat(requests).containsExactly(pane);
+                holder[0].manual("/tmp");
+                assertThat(holder[0].following(pane)).as("manual navigation stops following").isFalse();
+                holder[0].following(true);
+                assertThat(requests).containsExactly(pane,pane);
+                holder[0].visible(false);
+                assertThat(holder[0].following(pane)).as("hidden").isFalse();
+                holder[0].visible(true);
+                assertThat(requests).containsExactly(pane,pane,pane);
+                holder[0].notice(pane,DirectoryFollower.UNSUPPORTED);
+                holder[0].close();
+                assertThat(holder[0].following(pane)).isFalse();
+            });
+        }
+    }
+
     static void awaitRows(SftpPanel panel,String... names) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
         while(System.nanoTime()<deadline) { var rows=new ArrayList<String>();SwingUtilities.invokeAndWait(()-> { for(int i=0;i<panel.table().getRowCount();i++) rows.add(panel.table().getValueAt(i,0).toString()); });if(rows.equals(List.of(names))) return;Thread.sleep(10); }

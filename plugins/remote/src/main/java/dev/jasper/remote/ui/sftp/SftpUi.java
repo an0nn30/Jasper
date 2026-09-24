@@ -34,6 +34,7 @@ public final class SftpUi implements AutoCloseable {
     private final Map<UUID,View> views=new HashMap<>();
     private final Set<PluginDialog> dialogs=new HashSet<>();
     private final Map<UUID,CompletableFuture<ConnectionIdentity>> browsing=new HashMap<>();
+    private Consumer<UUID> followRequested=pane->{};
     private volatile boolean closed;
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Consumer<WindowHandle> showTransfers) {
@@ -48,6 +49,7 @@ public final class SftpUi implements AutoCloseable {
         var panel=new SftpPanel(context.appearance()::icon);var window=host.window();
         Function<ConnectionIdentity,CompletableFuture<FileEndpoint>> open=identity->endpoints.open(Optional.of(identity),window,status->{});
         var controller=new SftpController(context.dataDirectory().resolve("browser-cache"),background,ui,open,panel);
+        controller.onFollowRequested(pane->followRequested.accept(pane));
         var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,open,transfers.get().reservations(),panel::operationStatus,controller::refresh);
         var view=new View(host,panel,controller,operations);views.put(window.id(),view);
         controller.operations(new SftpController.Operations(()->upload(view,false),()->upload(view,true),()->download(view),()->newFolder(view),()->delete(view),()->copyPaths(view),()->copyHost(view),operations::cancel));
@@ -77,6 +79,11 @@ public final class SftpUi implements AutoCloseable {
     public void pane(WindowHandle window,PaneTarget pane) { cancelBrowse(window.id());var view=views.get(window.id());if(view!=null) view.controller().open(pane.pane(),pane.identity(),pane.directory(),false); }
     public void directory(UUID pane,String path) { for(var view:views.values()) view.controller().follow(pane,path); }
     public void forget(UUID pane) { for(var view:views.values()) view.controller().forget(pane); }
+    /** Receives the pane whose shell folder a view wants now: shown, focused, or follow turned back on. */
+    public void onFollowRequested(Consumer<UUID> listener) { followRequested=listener; }
+    /** True while any visible view follows {@code pane}. */
+    public boolean following(UUID pane) { return views.values().stream().anyMatch(view->view.controller().following(pane)); }
+    public void notice(UUID pane,String text) { for(var view:views.values()) view.controller().notice(pane,text); }
     private PluginDialog dialog(WindowHandle owner,String title) { var dialog=context.windows().dialog(new DialogSpec(title,owner,false));dialogs.add(dialog);dialog.onClosed(()->dialogs.remove(dialog));return dialog; }
     private void chooseHost(WindowHandle window) {
         var chooser=dialog(window,"Browse files on SSH host");var selection=new JComboBox<>(hosts.get().toArray(RemoteHost[]::new));selection.setRenderer(hostRenderer());
