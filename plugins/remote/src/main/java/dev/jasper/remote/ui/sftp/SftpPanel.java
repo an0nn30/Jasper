@@ -82,11 +82,18 @@ public class SftpPanel extends JPanel {
     }
     public void busy(boolean busy,String text) { cancel.setVisible(busy);table.setEnabled(!busy);path.setEnabled(!busy);buttons.get("Up").setEnabled(!busy && loaded && !path.getText().equals("/"));previous.setEnabled(!busy && offset>0);next.setEnabled(!busy && offset+entries.size()<total);message.setText(text);message.setToolTipText(text); }
     public void error(String text) { busy(false,text); }
+    /** Empties the view: no host, folder or rows, and nothing for file actions to act on. */
+    public void clear(String text) {
+        entries=List.of();offset=0;total=0;loaded=false;host.setText("Select an SSH host to browse files");path.setText("");model.fireTableDataChanged();pageLabel.setText("");
+        selectionChanged();busy(false,text);
+    }
     public void operationStatus(boolean running,String text) {
         operationResult.setText(running?"":text);operationResult.setToolTipText(running?null:text);operationResult.setVisible(!running && !text.isEmpty());
         busy(running,running?text:"");
     }
     String operationMessage() { return operationResult.getText(); }
+    String hostText() { return host.getText(); }
+    String messageText() { return message.getText(); }
     public void enableBrowsing(boolean enabled) { path.setEnabled(enabled);follow.setEnabled(enabled);buttons.get("Refresh").setEnabled(enabled); }
     private void activate() { if(actions==null) return;var selected=selection();if(selected.size()==1 && (selected.getFirst().kind()==FileEntry.Kind.DIRECTORY || selected.getFirst().kind()==FileEntry.Kind.LINK)) actions.navigate().accept(selected.getFirst().name()); }
     private void selectionChanged() { boolean selected=!selection().isEmpty();for(String name:List.of("Download selected","Delete selected","Copy paths")) buttons.get(name).setEnabled(selected);buttons.get("Upload files").setEnabled(loaded);buttons.get("New folder").setEnabled(loaded); }

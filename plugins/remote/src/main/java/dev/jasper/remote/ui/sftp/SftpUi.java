@@ -78,7 +78,8 @@ public final class SftpUi implements AutoCloseable {
     private void cancelBrowse(UUID window) { var request=browsing.remove(window);if(request!=null) request.cancel(true); }
     public void pane(WindowHandle window,PaneTarget pane) { cancelBrowse(window.id());var view=views.get(window.id());if(view!=null) view.controller().open(pane.pane(),pane.identity(),pane.directory(),false); }
     public void directory(UUID pane,String path) { for(var view:views.values()) view.controller().follow(pane,path); }
-    public void forget(UUID pane) { for(var view:views.values()) view.controller().forget(pane); }
+    /** {@code pane}'s SSH session ended (closed, exited or lost): views showing it disconnect and clear. */
+    public void ended(UUID pane) { for(var view:views.values()) view.controller().ended(pane); }
     /** Receives the pane whose shell folder a view wants now: shown, focused, or follow turned back on. */
     public void onFollowRequested(Consumer<UUID> listener) { followRequested=listener; }
     /** True while any visible view follows {@code pane}. */

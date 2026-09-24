@@ -77,6 +77,9 @@ you control for the following acceptance steps:
    sidebar to a different, manually chosen folder, click back into the terminal, then turn
    Follow on — the sidebar returns to the shell's actual folder instead of staying on the
    manually chosen one.
+10. Session end: with the SFTP sidebar showing a remote pane, type `exit` in that pane, then repeat by
+    closing the tab and by dropping the network. Each time the sidebar clears and shows "SSH session
+    closed", while a transfer started earlier keeps running. Reconnecting the pane browses it again.
 
 ## Boundaries
 

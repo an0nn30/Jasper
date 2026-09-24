@@ -78,6 +78,51 @@ class RemotePluginTest {
     static javax.swing.JMenuItem menuItem(javax.swing.JPopupMenu menu,String text) {
         return java.util.Arrays.stream(menu.getComponents()).filter(javax.swing.JMenuItem.class::isInstance).map(javax.swing.JMenuItem.class::cast).filter(item->item.getText().equals(text)).findFirst().orElseThrow();
     }
+    @Test void endingAPanesSessionClearsTheSftpView(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            Path files = java.nio.file.Files.createDirectories(dir.resolve("files"));
+            java.nio.file.Files.writeString(files.resolve("readme.txt"), "x");
+            server.server.setFileSystemFactory(new org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory(files.toRealPath()));
+            server.server.setSubsystemFactories(List.of(new org.apache.sshd.sftp.server.SftpSubsystemFactory()));
+            var vault = new FakeVault();
+            host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            RemotePlugin plugin = plugin(dir.resolve("ssh"));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            UUID credential = vault.password("deploy login", "deploy", "s3cret");
+            RemoteHost prod = RemoteHost.create("prod", "127.0.0.1", server.port(), "", new Auth.Vault(credential), "", Optional.empty()).withFollowDirectory(false);
+            plugin.store().put(prod);
+            settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            var handle = context.terminals().window(window).orElseThrow();
+            var panel = (dev.jasper.remote.ui.sftp.SftpPanel) host.openPanel(SftpUi.PANEL, window);
+            plugin.openHost(handle, prod); settle(host);
+            plugin.openHost(handle, prod); settle(host);
+            UUID first = host.terminalPanes().getFirst(), second = host.terminalPanes().getLast();
+
+            host.focusTerminalPane(first); host.flush();
+            awaitRowCount(host, panel, 1);
+            host.typeIntoSession(first, "q");
+            awaitRowCount(host, panel, 0);
+            assertThat(panel.directory()).as("the shell exited").isEmpty();
+
+            host.focusTerminalPane(second); host.flush();
+            awaitRowCount(host, panel, 1);
+            host.closeTerminalPane(second); host.flush();
+            awaitRowCount(host, panel, 0);
+            assertThat(panel.directory()).as("the pane closed").isEmpty();
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    static void awaitRowCount(FakePluginHost host, dev.jasper.remote.ui.sftp.SftpPanel panel, int count) throws Exception {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        while (panel.table().getRowCount() != count && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
+        assertThat(panel.table().getRowCount()).isEqualTo(count);
+    }
+
     static void settle(FakePluginHost host) { for (int i = 0; i < 20; i++) { host.runBackground(); host.flush(); } }
 
     @Test void registersItsSurfaceAndConnectsThroughSessionsToolbar(@TempDir Path dir) throws Exception {

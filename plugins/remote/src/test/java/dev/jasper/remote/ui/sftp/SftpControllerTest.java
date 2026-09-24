@@ -66,6 +66,30 @@ class SftpControllerTest {
         }
     }
 
+    @Test void endingTheShownPanesSessionClearsTheView() throws Exception {
+        root=root.toRealPath();Path a=Files.createDirectory(root.resolve("a"));Files.writeString(a.resolve("file"),"x");
+        var identity=host("A");var pane=UUID.randomUUID();var other=UUID.randomUUID();var holder=new SftpController[1];var panel=new SftpPanel[1];
+        try(var workers=Executors.newVirtualThreadPerTaskExecutor()) {
+            SwingUtilities.invokeAndWait(()-> { panel[0]=new SftpPanel(icon->new ImageIcon(new java.awt.image.BufferedImage(16,16,2)));holder[0]=new SftpController(root,workers,SwingUtilities::invokeLater,id->CompletableFuture.completedFuture(new LocalEndpoint()),panel[0]);holder[0].open(pane,identity,a.toString(),true); });
+            try {
+            awaitRows(panel[0],"file");
+            SwingUtilities.invokeAndWait(()-> {
+                holder[0].ended(other);
+                assertThat(panel[0].table().getRowCount()).as("another pane's session leaves this view").isEqualTo(1);
+                assertThat(holder[0].capture()).isPresent();
+                holder[0].ended(pane);
+                assertThat(panel[0].table().getRowCount()).isZero();
+                assertThat(panel[0].directory()).isEmpty();
+                assertThat(panel[0].hostText()).isEqualTo("Select an SSH host to browse files");
+                assertThat(panel[0].messageText()).isEqualTo("SSH session closed");
+                assertThat(holder[0].capture()).as("no captured folder for uploads or new folders").isEmpty();
+                assertThat(holder[0].following(pane)).isFalse();
+                holder[0].refresh();
+                assertThat(panel[0].messageText()).as("nothing left to refresh").isEqualTo("SSH session closed");
+            });
+            } finally { SwingUtilities.invokeAndWait(()->holder[0].close()); }
+        }
+    }
     static void awaitRows(SftpPanel panel,String... names) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
         while(System.nanoTime()<deadline) { var rows=new ArrayList<String>();SwingUtilities.invokeAndWait(()-> { for(int i=0;i<panel.table().getRowCount();i++) rows.add(panel.table().getValueAt(i,0).toString()); });if(rows.equals(List.of(names))) return;Thread.sleep(10); }

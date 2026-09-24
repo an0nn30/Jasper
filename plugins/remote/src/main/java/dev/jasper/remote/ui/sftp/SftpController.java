@@ -71,7 +71,12 @@ public final class SftpController implements AutoCloseable {
         var remembered=states.get(pane);if(remembered==null) return;remembered.reported=reported;
         if(remembered==state && remembered.follow && visible && !reported.isBlank() && !reported.equals(remembered.path)) { remembered.path=reported;load(reported,false); }
     }
-    public void forget(UUID pane) { states.remove(pane); }
+    /** {@code pane}'s SSH session ended: forget it, and if this view shows it, stop loading and clear the view. */
+    public void ended(UUID pane) {
+        states.remove(pane);
+        if(closed || state==null || !state.pane.equals(pane)) return;
+        cancel();state=null;displayed=null;submit(()-> { closeCache();cachedView=null; });panel.clear("SSH session closed");
+    }
     public void following(boolean follow) {
         if(state==null) return;state.follow=follow;panel.following(follow);
         if(follow && !state.reported.isBlank()) { state.path=state.reported;if(visible) load(state.path,false); }if(follow) requestFollow();

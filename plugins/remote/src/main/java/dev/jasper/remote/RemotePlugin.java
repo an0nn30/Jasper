@@ -192,7 +192,7 @@ public class RemotePlugin implements Plugin {
             event.paneId().ifPresent(id->{rememberPane(id);sftpFocused(id);}); refreshSplit();
         });
         context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> { rememberPane(event.paneId());sftpFocused(event.paneId()); });
-        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.forget(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
+        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
         context.events().subscribe(TerminalEvents.WINDOW_CLOSED, event -> {
             for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
         });
@@ -338,7 +338,8 @@ public class RemotePlugin implements Plugin {
         UUID paneId = pending.pane().id();
         panes.put(paneId, shell.hostId()); paneIdentities.put(paneId, shell.identity()); rememberPane(paneId);sftpFocused(paneId);
         shell.connection().exited().whenComplete((ignored, exit) -> ui.execute(() -> {
-            panes.remove(paneId); paneIdentities.remove(paneId); follower.forget(paneId); recentPanes.remove(paneId); refreshSplit(); if (!stopped) refreshPanels();
+            panes.remove(paneId); paneIdentities.remove(paneId); follower.forget(paneId); recentPanes.remove(paneId); refreshSplit();
+            if (!stopped) { sftpUi.ended(paneId); refreshPanels(); }
         }));
         pending.attach(shell.connection());
         RemoteHost authenticatedHost = shell.host();

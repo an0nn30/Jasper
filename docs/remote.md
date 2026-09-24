@@ -157,7 +157,9 @@ shell. For this, each pane of a host with **Track shell folder for SFTP follow**
 in the host editor) has its own SSH connection. Windows hosts are not followed. A host that
 refuses exec channels shows "This host does not report the shell's folder". Entering a path or
 navigating a folder turns following off; Refresh preserves it. Selecting a local terminal
-leaves the last remote browser available. Browsing and transfers hold their own SSH leases, so
+leaves the last remote browser available. When the SSH session of the pane the browser shows
+ends (its tab or pane closes, the shell exits or the connection drops), the browser disconnects
+and clears, showing "SSH session closed"; transfers already queued keep running. Browsing and transfers hold their own SSH leases, so
 closing the source terminal does not cancel a copy.
 
 - **Upload** opens the owning window's native file picker; the selection goes into the
