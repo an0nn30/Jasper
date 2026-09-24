@@ -186,8 +186,9 @@ are active.
 Pause retains partial files and checkpoints. Resume rechecks the source and destination
 prefixes before appending; a large retained prefix takes time to validate. Cancel stops new
 work and attempts to remove only verified, owned temporary files. Already published files
-remain. Cleanup failures stay visible with their partial path and reason in file Details, and can be retried. Clear removes queue history only;
-it requires acknowledgement when cleanup remains unresolved.
+remain. A cancelled transfer whose cleanup could not finish offers **Retry cleanup** on its row
+in the strip. **×** dismisses a finished or cancelled transfer; it removes queue history only, and
+asks first when cleanup remains unresolved.
 
 After a restart, unfinished jobs are **Paused**, with no automatic authentication or network
 reconnect. Resume is explicit. A changed saved host, login account or jump route requires

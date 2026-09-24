@@ -122,4 +122,22 @@ class TransferStripTest {
         assertThat(strip.order()).containsExactly(c, a, b);
         assertThat(strip.view(a).orElseThrow()).isSameAs(viewA);
     }
+
+    @Test void anUnchangedOrderKeepsTheSameComponentsAndOnlyUpdatesThem() {
+        var a = UUID.randomUUID();
+        var b = UUID.randomUUID();
+        strip.rows(List.of(row(a, "40%", Optional.empty(), false), row(b, "Queued", Optional.empty(), false)));
+        var list = (JPanel) SwingUtilities.getAncestorOfClass(JViewport.class, strip.view(a).orElseThrow()).getComponent(0);
+        var before = list.getComponents();
+        var removed = new ArrayList<java.awt.Component>();
+        list.addContainerListener(new java.awt.event.ContainerAdapter() {
+            @Override public void componentRemoved(java.awt.event.ContainerEvent event) { removed.add(event.getChild()); }
+        });
+        strip.rows(List.of(row(a, "41%", Optional.empty(), false), row(b, "Paused", Optional.of(TransferRows.Action.RESUME), false)));
+        assertThat(list.getComponents()).containsExactly(before);
+        assertThat(removed).as("never detached, so a focused button keeps focus").isEmpty();
+        assertThat(strip.view(a).orElseThrow().statusText()).isEqualTo("41%");
+        assertThat(strip.view(b).orElseThrow().statusText()).isEqualTo("Paused");
+        assertThat(strip.view(b).orElseThrow().actionButton().getText()).isEqualTo("Resume");
+    }
 }

@@ -154,6 +154,13 @@ public final class TransferStore implements AutoCloseable {
     public synchronized List<TransferEntry> pending(UUID job,int limit) throws IOException {
         page(0,limit); return entryQuery(ENTRIES+" WHERE job=? AND outcome='PENDING' AND (error='' OR (phase='PENDING' AND decision='ASK' AND kind=expected_kind AND EXISTS(SELECT 1 FROM jobs j WHERE j.id=entries.job AND ((kind='DIRECTORY' AND j.directory_policy IN ('MERGE','SKIP')) OR (kind!='DIRECTORY' AND j.file_policy IN ('REPLACE','SKIP')))))) ORDER BY id LIMIT ?",job,limit);
     }
+    public synchronized List<TransferEntry> failed(UUID job,long offset,int limit) throws IOException {
+        page(offset,limit); return entryQuery(ENTRIES+" WHERE job=? AND outcome='FAILED' ORDER BY id LIMIT ? OFFSET ?",job,limit,offset);
+    }
+    /** The first unfinished entry waiting for a decision, however far into the job it is. */
+    public synchronized Optional<TransferEntry> firstAttention(UUID job) throws IOException {
+        return entryQuery(ENTRIES+" WHERE job=? AND outcome='PENDING' AND trim(error)!='' ORDER BY id LIMIT 1",job).stream().findFirst();
+    }
     private List<TransferEntry> entryQuery(String sql,Object... args) throws IOException {
         var values=new ArrayList<TransferEntry>();
         try(var statement=prepare(sql,args);var result=statement.executeQuery()) { while(result.next()) values.add(readEntry(result)); return List.copyOf(values); }

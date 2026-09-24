@@ -27,12 +27,12 @@ public final class TransferRows {
         OptionalDouble fraction = job.state() == TransferState.COMPLETED ? OptionalDouble.of(1)
             : !indeterminate && job.totalBytes() > 0 ? OptionalDouble.of(Math.clamp((double) doneBytes / job.totalBytes(), 0, 1)) : OptionalDouble.empty();
         return new Row(job.id(), arrow, title, tooltip, status(job, doneBytes, bytesPerSecond), fraction, indeterminate, action(job),
-            job.state().terminal(), job.intent() == TransferJob.Intent.CANCEL);
+            job.state().terminal(), job.intent() == TransferJob.Intent.CANCEL && !job.state().terminal());
     }
 
     static Optional<Action> action(TransferJob job) {
         if (job.cleanupPending() > 0 && job.state().terminal()) return Optional.of(Action.RETRY_CLEANUP);
-        if (job.intent() == TransferJob.Intent.CANCEL) return Optional.empty();
+        if (job.intent() == TransferJob.Intent.CANCEL && !job.state().terminal()) return Optional.empty();
         return switch (job.state()) {
             case PAUSED, INTERRUPTED, FAILED -> Optional.of(Action.RESUME);
             case NEEDS_ATTENTION -> Optional.of(Action.RESOLVE);

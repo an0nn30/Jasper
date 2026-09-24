@@ -154,17 +154,57 @@ class RemotePluginTest {
             awaitRemote(host, files.resolve("fresh.txt"), "fresh");
             assertThat(host.windowContent("dev.jasper.remote", "Items already exist")).as("nothing existed, nothing asked").isEmpty();
 
+            java.nio.file.Files.writeString(fresh, "fresher");
+            var before = jobs(plugin);
             host.queuePathSelection(List.of(readme, fresh));
             button(panel, "Upload files").doClick();
-            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
-            while (host.windowContent("dev.jasper.remote", "Items already exist").isEmpty() && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
-            var ask = (dev.jasper.remote.ui.transfers.ExistingItemsPanel) host.windowContent("dev.jasper.remote", "Items already exist").orElseThrow();
+            var ask = awaitAsk(host);
             assertThat(find(ask, javax.swing.JLabel.class).orElseThrow().getText()).isEqualTo("2 of 2 items already exist in prod:" + panel.directory() + ".");
-            button(ask, "Replace").doClick();
+            button(ask, "Cancel").doClick();
+            settle(host);
+            assertThat(host.windowContent("dev.jasper.remote", "Items already exist")).isEmpty();
+            assertThat(jobs(plugin)).as("Cancel queues nothing").isSubsetOf(before);
+
+            host.queuePathSelection(List.of(readme, fresh));
+            button(panel, "Upload files").doClick();
+            button(awaitAsk(host), "Skip existing").doClick();
+            var skipped = awaitNewJob(host, plugin, before);
+            assertThat(skipped.skippedEntries()).isEqualTo(2);
+            assertThat(java.nio.file.Files.readString(files.resolve("readme.txt"))).as("Skip existing keeps the old file").isEqualTo("old");
+            assertThat(java.nio.file.Files.readString(files.resolve("fresh.txt"))).isEqualTo("fresh");
+
+            host.queuePathSelection(List.of(readme, fresh));
+            button(panel, "Upload files").doClick();
+            button(awaitAsk(host), "Replace").doClick();
             awaitRemote(host, files.resolve("readme.txt"), "new");
+            awaitRemote(host, files.resolve("fresh.txt"), "fresher");
             host.stopAll();
             assertThat(host.failures()).isEmpty();
         }
+    }
+
+    static dev.jasper.remote.ui.transfers.ExistingItemsPanel awaitAsk(FakePluginHost host) throws Exception {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        while (host.windowContent("dev.jasper.remote", "Items already exist").isEmpty() && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
+        return (dev.jasper.remote.ui.transfers.ExistingItemsPanel) host.windowContent("dev.jasper.remote", "Items already exist").orElseThrow();
+    }
+
+    static Set<UUID> jobs(RemotePlugin plugin) throws Exception {
+        var ids = new java.util.HashSet<UUID>();
+        for (var job : plugin.transfers().snapshot(0, 50).get(5, java.util.concurrent.TimeUnit.SECONDS).jobs()) ids.add(job.id());
+        return ids;
+    }
+
+    /** The one transfer queued since {@code before}, once it has finished. */
+    static dev.jasper.remote.transfer.TransferJob awaitNewJob(FakePluginHost host, RemotePlugin plugin, Set<UUID> before) throws Exception {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+        while (System.nanoTime() < deadline) {
+            settle(host);
+            for (var job : plugin.transfers().snapshot(0, 50).get(5, java.util.concurrent.TimeUnit.SECONDS).jobs())
+                if (!before.contains(job.id()) && job.state().terminal()) return job;
+            Thread.sleep(20);
+        }
+        throw new AssertionError("No new transfer finished");
     }
 
     static javax.swing.JButton button(java.awt.Container root, String name) {

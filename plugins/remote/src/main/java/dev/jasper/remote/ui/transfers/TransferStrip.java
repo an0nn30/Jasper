@@ -31,18 +31,24 @@ public final class TransferStrip extends JPanel {
         setVisible(false);
     }
 
+    /** Updates rows in place; components are only detached when the set or order of transfers changes, so focus and presses survive a refresh. */
     public void rows(List<TransferRows.Row> rows) {
+        boolean relayout = unavailable.isVisible();
         unavailable.setVisible(false);
-        list.removeAll();
-        var oldViews = new LinkedHashMap<>(views);
-        views.clear();
-        for (var row : rows) {
-            var view = oldViews.computeIfAbsent(row.id(), id -> new RowView(id, actions));
-            views.put(row.id(), view);
-            view.show(row);
-            list.add(view);
+        int height = visibleHeight();
+        if (!rows.stream().map(TransferRows.Row::id).toList().equals(List.copyOf(views.keySet()))) {
+            relayout = true;
+            list.removeAll();
+            var oldViews = new HashMap<>(views);
+            views.clear();
+            for (var row : rows) {
+                var view = oldViews.computeIfAbsent(row.id(), id -> new RowView(id, actions));
+                views.put(row.id(), view);
+                list.add(view);
+            }
         }
-        resize();
+        for (var row : rows) views.get(row.id()).show(row);
+        if (relayout || visibleHeight() != height) resize();
         setVisible(!rows.isEmpty());
     }
 
@@ -56,10 +62,14 @@ public final class TransferStrip extends JPanel {
         setVisible(true);
     }
 
-    private void resize() {
+    private int visibleHeight() {
         int height = 0, shown = 0;
         for (var view : views.values()) { if (shown++ == VISIBLE_ROWS) break; height += view.getPreferredSize().height; }
-        scroll.setPreferredSize(new Dimension(10, height));
+        return height;
+    }
+
+    private void resize() {
+        scroll.setPreferredSize(new Dimension(10, visibleHeight()));
         scroll.setVisible(!views.isEmpty());
         revalidate();
         repaint();

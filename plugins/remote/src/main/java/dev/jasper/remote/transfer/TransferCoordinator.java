@@ -45,7 +45,7 @@ public final class TransferCoordinator implements AutoCloseable {
         final UUID id;final WindowHandle owner;final TransferControl control=new TransferControl();
         final Set<Long> busy=new HashSet<>();
         final boolean validateIdentity;final ConcurrentMap<Long,Progress> progress=new ConcurrentHashMap<>();
-        volatile boolean activeScan;boolean finalizing,attention,cleanupOnly;
+        volatile boolean activeScan;boolean finalizing,attention,cleanupOnly,retryFailed;
         Long restartEntry;
         volatile PathReservations.Lease reservation;
         Run(UUID id,WindowHandle owner) { this(id,owner,false); }
@@ -105,6 +105,7 @@ public final class TransferCoordinator implements AutoCloseable {
     public CompletableFuture<TransferJob> job(UUID id) { return command(()->store.job(id)); }
     public CompletableFuture<List<TransferEntry>> entries(UUID id,long offset,int limit) { return command(()->store.entries(id,offset,limit)); }
     public CompletableFuture<TransferRequest> request(UUID id) { return command(()->store.request(id)); }
+    public CompletableFuture<Optional<TransferEntry>> firstAttention(UUID id) { return command(()->store.firstAttention(id)); }
     public CompletableFuture<Snapshot> snapshot(long offset,int limit) {
         return command(()-> {
             var progress=new ArrayList<Progress>();
@@ -156,7 +157,15 @@ public final class TransferCoordinator implements AutoCloseable {
             else store.decision(entryId,decision,target);
             if(remaining) store.policy(entry.jobId(),entry.sourceInfo().kind()==FileEntry.Kind.DIRECTORY,decision);return null; });
     }
-    public CompletableFuture<Void> retry(UUID id,WindowHandle owner) { return resume(id,owner); }
+    /** Queues a finished job's failed items again; deliberately skipped items stay skipped. */
+    public CompletableFuture<Void> retryFailed(UUID id,WindowHandle owner) {
+        return command(()-> { var job=store.job(id);
+            if(job.intent()==TransferJob.Intent.CANCEL || job.state()!=TransferState.COMPLETED_WITH_ISSUES) throw new IOException("This transfer cannot retry");
+            if(job.failedEntries()==0) throw new IOException("Nothing failed to retry");
+            if(runs.containsKey(id)) throw new IOException("Transfer has not stopped yet");if(runs.size()>=256) throw new IOException("The transfer admission queue is full");
+            var run=new Run(id,owner,true);run.retryFailed=true;
+            store.intent(id,TransferJob.Intent.RUN);store.state(id,TransferState.VALIDATING,"Checking failed items");runs.put(id,run);return null; });
+    }
     public CompletableFuture<Void> restart(long entryId,WindowHandle owner) {
         return command(()-> {
             var entry=store.entry(entryId);var job=store.job(entry.jobId());
@@ -177,13 +186,14 @@ public final class TransferCoordinator implements AutoCloseable {
             if(run.attention || !run.control.running() || run.finalizing) continue;
             var job=store.job(run.id);
             if(run.restartEntry!=null) { if(!run.activeScan && !scanning) dispatchRestart(run);continue; }
+            if(run.retryFailed) { if(!run.activeScan && !scanning) dispatchRetryFailed(run);continue; }
             if(run.cleanupOnly) { if(!run.activeScan && !scanning) dispatchScan(run,true);continue; }
             if(!job.scanned()) { if(!run.activeScan && !scanning) dispatchScan(run,false);continue; }
             if(run.activeScan) continue;
             var pending=store.pending(run.id,Math.min(200,8+run.busy.size()));
             if(pending.isEmpty() && run.busy.isEmpty()) {
                 if(job.totalEntries()>job.completedEntries()+job.skippedEntries()+job.failedEntries()) {
-                    store.intent(run.id,TransferJob.Intent.PAUSE);store.state(run.id,TransferState.NEEDS_ATTENTION,"Resolve unfinished entries in Details");release(run);runs.remove(run.id);
+                    store.intent(run.id,TransferJob.Intent.PAUSE);store.state(run.id,TransferState.NEEDS_ATTENTION,"Choose how to handle an existing item");release(run);runs.remove(run.id);
                 } else if(!scanning) finalizeDirectories(run);
                 continue;
             }
@@ -212,6 +222,24 @@ public final class TransferCoordinator implements AutoCloseable {
                 }
             } catch(Throwable problem) { failure=problem; }
             Throwable result=failure;completions.add(()-> { scanning=false;run.activeScan=false;run.restartEntry=null;finishWork(run,result); });
+        });
+    }
+    /** Re-reads each failed source, as Restart does, so a fixed item is copied as it is now. Items whose type cannot be retried stay failed. */
+    private void dispatchRetryFailed(Run run) {
+        scanning=true;run.activeScan=true;
+        scans.add(()-> {
+            Throwable failure=null;
+            try(var pair=open(run)) {
+                reserve(run,pair);long kept=0;
+                while(true) { var page=store.failed(run.id,kept,200);if(page.isEmpty()) break;
+                    for(var entry:page) {
+                        run.control.check();var current=pair.source.stat(entry.source());
+                        if((current.kind()!=entry.sourceInfo().kind() && entry.sourceInfo().kind()!=FileEntry.Kind.SPECIAL) || current.kind()==FileEntry.Kind.DIRECTORY) { kept++;continue; }
+                        TransferRecovery.cleanup(store,entry,pair.destination,run.control);store.reset(entry.id(),current);
+                    }
+                }
+            } catch(Throwable problem) { failure=problem; }
+            Throwable result=failure;completions.add(()-> { scanning=false;run.activeScan=false;run.retryFailed=false;finishWork(run,result); });
         });
     }
     private void dispatchScan(Run run,boolean cleanup) throws IOException {

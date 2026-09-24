@@ -11,6 +11,10 @@ host-to-host copies ask once before copying onto existing items
 [plan](superpowers/plans/2026-09-24-jasper-remote-transfer-strip.md)). The queue, durability and
 recovery are unchanged; the "Replace / Skip existing" choice is stored in the job's existing
 file/folder policies. A finish whose only issues are skipped items fades like a clean one.
+The final review added two queue operations: **Retry failed** (`TransferCoordinator.retryFailed`)
+re-reads each failed item's source on the scan lane and resets it with the same per-entry
+`TransferStore.reset` that Restart uses, leaving skipped items skipped; **Resolve…** finds the
+first entry needing a decision with `firstAttention`, however far into the job it is.
 GUI acceptance is item 11 of [remote-7c-verification](remote-7c-verification.md).
 
 ### SFTP directory follow probe — 2026-09-24

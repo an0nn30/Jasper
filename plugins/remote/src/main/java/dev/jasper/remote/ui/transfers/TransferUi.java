@@ -15,6 +15,7 @@ import javax.swing.*;
 public final class TransferUi implements AutoCloseable {
     public static final String SHOW = "dev.jasper.remote.transfers", CANCEL = SHOW + ".cancel";
     private static final int PAGE = 50;
+    private static final String GONE = "Transfer no longer exists";
     private final PluginContext context;
     private final TransferCoordinator coordinator;
     private final Executor ui;
@@ -22,7 +23,7 @@ public final class TransferUi implements AutoCloseable {
     private final LongSupplier clock;
     private final Map<UUID, TransferStrip> strips = new HashMap<>();
     private final Map<UUID, TransferRequest> requests = new HashMap<>();
-    private final Set<UUID> requesting = new HashSet<>(), clearing = new HashSet<>();
+    private final Set<UUID> requesting = new HashSet<>(), unreadable = new HashSet<>(), clearing = new HashSet<>();
     private final TransferPresentation presentation = new TransferPresentation();
     private final JobSpeeds speeds = new JobSpeeds();
     private final FinishedJobs finished = new FinishedJobs();
@@ -98,22 +99,25 @@ public final class TransferUi implements AutoCloseable {
             }
             speeds.retain(ids);
             requests.keySet().retainAll(ids);
+            unreadable.retainAll(ids);
             for (var strip : strips.values()) strip.rows(rows);
         }));
     }
 
     private void fetchRequest(UUID id) {
-        if (requests.containsKey(id) || !requesting.add(id)) return;
+        if (requests.containsKey(id) || unreadable.contains(id) || !requesting.add(id)) return;
         coordinator.request(id).whenComplete((request, error) -> ui.execute(() -> {
             requesting.remove(id);
-            if (request != null && !closed) requests.put(id, request);
+            if (closed) return;
+            if (request != null) requests.put(id, request);
+            else unreadable.add(id); // the row keeps its fallback title
         }));
     }
 
     private void act(WindowHandle window, UUID id, TransferRows.Action action) {
         switch (action) {
             case RESUME -> report(coordinator.resume(id, window));
-            case RETRY_FAILED -> report(coordinator.retry(id, window));
+            case RETRY_FAILED -> report(coordinator.retryFailed(id, window));
             case RETRY_CLEANUP -> report(coordinator.cleanup(id, window));
             case RESOLVE -> resolve(window, id);
         }
@@ -127,21 +131,31 @@ public final class TransferUi implements AutoCloseable {
         }));
     }
 
+    /** Clears a finished transfer; one that is already gone (say, the fade got there first) counts as cleared. */
+    private void clear(UUID id, boolean acknowledgeCleanup) {
+        if (!clearing.add(id)) return;
+        coordinator.clear(id, acknowledgeCleanup).whenComplete((ignored, error) -> ui.execute(() -> {
+            clearing.remove(id);
+            if (closed) return;
+            if (error != null && !GONE.equals(message(error))) context.notices().error(message(error));
+            refresh();
+        }));
+    }
+
     private void dismiss(WindowHandle window, UUID id) {
         var job = latest == null ? Optional.<TransferJob>empty() : latest.jobs().stream().filter(candidate -> candidate.id().equals(id)).findFirst();
         if (job.isEmpty()) return;
-        if (job.get().cleanupPending() == 0) { report(coordinator.clear(id, false)); return; }
+        if (job.get().cleanupPending() == 0) { clear(id, false); return; }
         var dialog = context.windows().dialog(new DialogSpec("Clear transfer history", window, false));
         dialog.setContent(new dev.jasper.remote.ui.ConfirmPanel("Unfinished cleanup will be forgotten. Partial files may remain. Clear this history?", "Clear history",
-            () -> { dialog.close(); report(coordinator.clear(id, true)); }, dialog::close));
+            () -> { dialog.close(); clear(id, true); }, dialog::close));
         dialog.show();
     }
 
     private void resolve(WindowHandle window, UUID id) {
-        coordinator.entries(id, 0, 200).whenComplete((entries, error) -> ui.execute(() -> {
+        coordinator.firstAttention(id).whenComplete((entry, error) -> ui.execute(() -> {
             if (closed) return;
             if (error != null) { context.notices().error(message(error)); return; }
-            var entry = entries.stream().filter(candidate -> candidate.outcome() == TransferEntry.Outcome.PENDING && !candidate.error().isBlank()).findFirst();
             if (entry.isEmpty()) { report(coordinator.resume(id, window)); return; }
             var target = entry.get();
             var dialog = context.windows().dialog(new DialogSpec("Resolve transfer", window, false));

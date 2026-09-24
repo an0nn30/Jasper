@@ -10,6 +10,10 @@ task 4's removal of the Transfers panel and its toggle action —
 `RemoteShortcutConfigTest.sftpAndTransferBindingsAreBlankByDefaultAndReloadThroughTheRemoteFile`
 (renamed `sftpBindingIsBlankByDefaultAndReloadsThroughTheRemoteFile`) still asserted a
 `dev.jasper.remote.transfers.toggle` binding; `./gradlew check` failed on these until fixed.
+The final whole-branch review changed the queue after all: `retryFailed` (Retry failed had been
+routed to `resume`, which rejects finished jobs) and `firstAttention` (Resolve… scanned only the
+first 200 entries). Retry failed resets entries one transaction each, after re-reading the source,
+rather than in one job-wide transaction, so a fixed item is copied as it is now.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

@@ -65,6 +65,21 @@ class TransferRowsTest {
         assertThat(TransferRows.row(job(TransferState.CANCELLED, "Local", "h", 1, 1, 0, 0, 0, 0, "", 0), Optional.empty(), 0, 0).finished()).isTrue();
     }
 
+    @Test void aCancelledTransferCanBeDismissedAndOffersCleanupRetry() {
+        var cancelled = new TransferJob(ID, "Local", "h", TransferState.CANCELLED, TransferJob.Intent.CANCEL, 0, 1, 1, 0, 0, 0, 0, true, "", 0);
+        var row = TransferRows.row(cancelled, Optional.empty(), 0, 0);
+        assertThat(row.cancelling()).as("× enabled").isFalse();
+        assertThat(row.finished()).isTrue();
+        assertThat(row.action()).isEmpty();
+        var dirty = new TransferJob(ID, "Local", "h", TransferState.CANCELLED, TransferJob.Intent.CANCEL, 0, 1, 1, 0, 0, 0, 0, true, "", 2);
+        var dirtyRow = TransferRows.row(dirty, Optional.empty(), 0, 0);
+        assertThat(dirtyRow.cancelling()).isFalse();
+        assertThat(dirtyRow.finished()).isTrue();
+        assertThat(dirtyRow.action()).contains(TransferRows.Action.RETRY_CLEANUP);
+        var stopping = new TransferJob(ID, "Local", "h", TransferState.CANCELLING, TransferJob.Intent.CANCEL, 0, 1, 1, 0, 0, 0, 0, true, "", 0);
+        assertThat(TransferRows.row(stopping, Optional.empty(), 0, 0).cancelling()).isTrue();
+    }
+
     @Test void remainingTimeReads() {
         assertThat(TransferRows.remaining(12)).isEqualTo("12 s");
         assertThat(TransferRows.remaining(61)).isEqualTo("2 min");

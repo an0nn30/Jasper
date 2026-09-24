@@ -81,10 +81,11 @@ you control for the following acceptance steps:
     closing the tab and by dropping the network. Each time the sidebar clears and shows "SSH session
     closed", while a transfer started earlier keeps running. Reconnecting the pane browses it again.
 11. Transfer strip (2026-09-24 amendment): upload a large file and a folder and watch the strip in
-    the SFTP sidebar (name → host:folder, percent, speed, time left); cancel one with ×; drop the
-    network during one and Resume it; upload onto existing files and choose Replace, then Skip
-    existing; a finished upload shows Done and leaves after about five seconds; the strip hides when
-    empty, appears in a second window with the same queue, and no Transfers panel exists any more.
+    the SFTP sidebar (name → host:folder, percent, speed, time left); cancel a transfer with ×, then
+    dismiss it with ×; drop the network during one and Resume it; upload onto existing files and
+    choose Replace, then Skip existing; a finished upload shows Done and leaves after about five
+    seconds; the strip hides when empty, appears in a second window with the same queue, and no
+    Transfers panel exists any more.
 
 ## Boundaries
 

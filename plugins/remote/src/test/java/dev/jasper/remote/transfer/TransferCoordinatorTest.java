@@ -229,6 +229,44 @@ class TransferCoordinatorTest {
             } finally { coordinator.close();coordinator.stopped().get(5,TimeUnit.SECONDS); }
         }
     }
+    @Test void retryFailedCopiesFixedItemsAndLeavesSkippedItemsSkipped() throws Exception {
+        root=root.toRealPath();Path source=Files.createDirectory(root.resolve("source")),dest=Files.createDirectories(root.resolve("dest/source")).getParent();
+        Files.writeString(source.resolve("fresh"),"fresh");Files.writeString(source.resolve("keep"),"new");Files.writeString(dest.resolve("source/keep"),"old");
+        fifo(source.resolve("pipe"));Path lone=root.resolve("lone");fifo(lone);
+        try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+            var coordinator=new TransferCoordinator(root.resolve("queue"),executor,Runnable::run,(ref,owner)->CompletableFuture.completedFuture(new LocalEndpoint()),()->2);
+            try {
+                var folder=coordinator.enqueue(new TransferRequest(EndpointRef.local(),List.of(source.toString()),EndpointRef.local(),dest.toString()).withExisting(ConflictDecision.SKIP),null).get(5,TimeUnit.SECONDS);
+                var failed=await(coordinator,folder,TransferState.COMPLETED_WITH_ISSUES);
+                assertThat(failed.failedEntries()).isEqualTo(1);assertThat(failed.skippedEntries()).isEqualTo(1);
+                assertThat(dest.resolve("source/pipe")).doesNotExist();
+                Files.delete(source.resolve("pipe"));Files.writeString(source.resolve("pipe"),"fixed");
+                coordinator.retryFailed(folder,null).get(5,TimeUnit.SECONDS);
+                var retried=awaitJob(coordinator,folder,job->job.state()==TransferState.COMPLETED_WITH_ISSUES && job.failedEntries()==0);
+                assertThat(Files.readString(dest.resolve("source/pipe"))).isEqualTo("fixed");
+                assertThat(Files.readString(dest.resolve("source/keep"))).as("skipped item stays skipped").isEqualTo("old");
+                assertThat(retried.skippedEntries()).isEqualTo(1);assertThat(retried.completedEntries()).isEqualTo(retried.totalEntries()-1);
+                assertThatThrownBy(()->coordinator.retryFailed(folder,null).get(5,TimeUnit.SECONDS)).hasMessageContaining("Nothing failed");
+                var single=coordinator.enqueue(new TransferRequest(EndpointRef.local(),List.of(lone.toString()),EndpointRef.local(),dest.toString()),null).get(5,TimeUnit.SECONDS);
+                assertThat(await(coordinator,single,TransferState.COMPLETED_WITH_ISSUES).failedEntries()).isEqualTo(1);
+                Files.delete(lone);Files.writeString(lone,"lone");
+                coordinator.retryFailed(single,null).get(5,TimeUnit.SECONDS);
+                var done=await(coordinator,single,TransferState.COMPLETED);
+                assertThat(done.failedEntries()).isZero();assertThat(Files.readString(dest.resolve("lone"))).isEqualTo("lone");
+            } finally { coordinator.close();coordinator.stopped().get(5,TimeUnit.SECONDS); }
+        }
+    }
+    static void fifo(Path path) throws Exception {
+        var process=new ProcessBuilder("mkfifo",path.toString()).inheritIO().start();
+        assertThat(process.waitFor()).isZero();
+    }
+    static TransferJob awaitJob(TransferCoordinator coordinator,UUID id,java.util.function.Predicate<TransferJob> done) throws Exception {
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);TransferJob last=null;
+        while(System.nanoTime()<deadline) { last=coordinator.job(id).get(3,TimeUnit.SECONDS);if(done.test(last)) return last;
+            if(last.state()==TransferState.FAILED || last.state()==TransferState.NEEDS_ATTENTION || last.state()==TransferState.INTERRUPTED) throw new AssertionError(last);
+            Thread.sleep(10); }
+        throw new AssertionError("Timed out: "+last);
+    }
     static TransferJob await(TransferCoordinator coordinator,UUID id,TransferState state) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);TransferJob last=null;
         while(System.nanoTime()<deadline) { last=coordinator.job(id).get(3,TimeUnit.SECONDS);if(last.state()==state) return last;

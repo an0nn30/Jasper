@@ -187,6 +187,24 @@ class TransferStoreTest {
             store.cleaned(entry);assertThat(store.entry(entry).error()).doesNotContain("Permission denied");
         }
     }
+    @Test void theFirstEntryNeedingAttentionIsFoundBeyondTheFirstPage() throws Exception {
+        try (var db = new TransferStore(root)) {
+            UUID id = db.create(request());
+            for (int offset=0;offset<300;offset+=150) {
+                var batch = new ArrayList<TransferStore.Discovered>();
+                for (int i=offset;i<offset+150;i++) batch.add(discovered(i));
+                db.discover(id,batch);
+            }
+            assertThat(db.firstAttention(id)).isEmpty();
+            var entries = new ArrayList<TransferEntry>();
+            for (long offset=0;offset<300;offset+=200) entries.addAll(db.entries(id,offset,200));
+            db.outcome(entries.get(10).id(), TransferEntry.Outcome.SKIPPED, "Skipped");
+            db.conflict(entries.get(250).id(), Optional.of(file("file-250",3)), "Destination already exists");
+            db.conflict(entries.get(280).id(), Optional.of(file("file-280",3)), "Destination already exists");
+            assertThat(db.firstAttention(id)).map(TransferEntry::id).contains(entries.get(250).id());
+            assertThat(db.firstAttention(id).orElseThrow().error()).isEqualTo("Destination already exists");
+        }
+    }
     @Test void anExistingItemsChoiceBecomesTheJobsPolicies() throws Exception {
         try (var db = new TransferStore(root)) {
             UUID asked = db.create(request());

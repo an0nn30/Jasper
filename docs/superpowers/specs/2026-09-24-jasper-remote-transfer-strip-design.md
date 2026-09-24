@@ -66,10 +66,10 @@ Each transfer occupies two lines:
 
   plus **×** at the end of line 1: it cancels an unfinished transfer (the existing Cancel
   semantics, never silently more than that transfer) and dismisses a finished one.
-- **Finishing:** a transfer that completes without issues shows `Done` for about five seconds,
-  then leaves the strip and the queue's visible history (clearing history never deletes
-  destination files). Completed-with-issues, cancelled and failed transfers stay until
-  dismissed with ×. Dismissing a transfer with cleanup pending asks first, as Clear does today.
+- **Finishing:** a transfer that completes without issues, or whose only issues are items skipped
+  by choice, shows `Done` for about five seconds, then leaves the strip and the queue's visible
+  history (clearing history never deletes destination files). Completed-with-issues transfers
+  that have failures or warnings, cancelled and failed transfers stay until dismissed with ×. Dismissing a transfer with cleanup pending asks first, as Clear does today.
 - **No Pause button, per-file table or paging.** Pause remains available internally (status
   cancel semantics, app shutdown, interruption); a paused transfer from an earlier run is resumed
   with Resume.
