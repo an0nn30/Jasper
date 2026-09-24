@@ -113,7 +113,9 @@ public final class TransferStrip extends JPanel {
             var top = new JPanel(new BorderLayout(4, 0));
             top.setOpaque(false);
             top.add(title, BorderLayout.CENTER);
-            top.add(close, BorderLayout.EAST);
+            var closeBar = new dev.jasper.remote.ui.FlatToolBar();
+            closeBar.add(close);
+            top.add(closeBar, BorderLayout.EAST);
             var middle = new JPanel(new BorderLayout(0, 2));
             middle.setOpaque(false);
             middle.add(progress, BorderLayout.NORTH);
@@ -121,7 +123,9 @@ public final class TransferStrip extends JPanel {
             var bottom = new JPanel(new BorderLayout(4, 0));
             bottom.setOpaque(false);
             bottom.add(middle, BorderLayout.CENTER);
-            bottom.add(action, BorderLayout.EAST);
+            var actionBar = new dev.jasper.remote.ui.FlatToolBar();
+            actionBar.add(action);
+            bottom.add(actionBar, BorderLayout.EAST);
             add(top, BorderLayout.NORTH);
             add(bottom, BorderLayout.CENTER);
             action.addActionListener(event -> { if (row != null) row.action().ifPresent(chosen -> actions.action().accept(id, chosen)); });

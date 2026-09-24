@@ -140,4 +140,16 @@ class TransferStripTest {
         assertThat(strip.view(b).orElseThrow().statusText()).isEqualTo("Paused");
         assertThat(strip.view(b).orElseThrow().actionButton().getText()).isEqualTo("Resume");
     }
+    @Test void rowButtonsAreFlatToolbarButtons() {
+        var id = UUID.randomUUID();
+        strip.rows(List.of(row(id, "Paused", Optional.of(TransferRows.Action.RESUME), false)));
+        var view = strip.view(id).orElseThrow();
+        for (var button : List.of(view.closeButton(), view.actionButton())) {
+            assertThat(button.getParent()).isInstanceOf(JToolBar.class);
+            var toolbar = (JToolBar) button.getParent();
+            assertThat(toolbar.isFloatable()).isFalse();
+            assertThat(toolbar.isRollover()).isTrue();
+            assertThat(toolbar.isBorderPainted()).isFalse();
+        }
+    }
 }

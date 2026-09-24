@@ -23,7 +23,7 @@ public class SftpPanel extends JPanel {
     private final JCheckBox follow=new JCheckBox("Follow terminal folder",true);
     private final Rows model=new Rows();
     private final FileTable table=new FileTable();
-    private final JButton previous=new JButton("Previous"),next=new JButton("Next"),cancel;
+    private final JButton previous=new JButton(new ChevronIcon(ChevronIcon.Direction.LEFT)),next=new JButton(new ChevronIcon(ChevronIcon.Direction.RIGHT)),cancel;
     private final Map<String,JButton> buttons=new LinkedHashMap<>();
     private final JPopupMenu popup=new JPopupMenu();
     private List<FileEntry> entries=List.of();
@@ -41,7 +41,7 @@ public class SftpPanel extends JPanel {
         super(new BorderLayout(0,6));this.icons=icons;setBorder(BorderFactory.createEmptyBorder(8,8,8,8));
         var north=new JPanel();north.setLayout(new BoxLayout(north,BoxLayout.Y_AXIS));
         host.setAlignmentX(LEFT_ALIGNMENT);north.add(host);north.add(Box.createVerticalStrut(6));
-        var toolbar=new JPanel(new GridLayout(1,7,2,0));
+        var toolbar=new dev.jasper.remote.ui.FlatToolBar();
         addButton(toolbar,"Up",IconName.UP,()->actions.up().run());addButton(toolbar,"Download selected",IconName.DOWNLOAD,()->actions.download().run());
         addButton(toolbar,"Upload files",IconName.UPLOAD,()->actions.upload().run());addButton(toolbar,"Refresh",IconName.REFRESH,()->actions.refresh().run());
         addButton(toolbar,"New folder",IconName.NEW_FOLDER,()->actions.newFolder().run());addButton(toolbar,"Delete selected",IconName.DELETE,()->actions.delete().run());addButton(toolbar,"Copy paths",IconName.COPY,()->actions.copyPath().run());
@@ -50,8 +50,8 @@ public class SftpPanel extends JPanel {
         table.getColumnModel().getColumn(0).setPreferredWidth(240);sizeColumn=table.getColumnModel().getColumn(1);modifiedColumn=table.getColumnModel().getColumn(2);sizeColumn.setPreferredWidth(70);modifiedColumn.setPreferredWidth(130);
         var scroll=new JScrollPane(table);scroll.setBorder(BorderFactory.createEmptyBorder());scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);add(scroll,BorderLayout.CENTER);
         var south=new JPanel();south.setLayout(new BoxLayout(south,BoxLayout.Y_AXIS));
-        var paging=new JPanel(new BorderLayout(4,0));var controls=new JPanel(new FlowLayout(FlowLayout.RIGHT,2,0));controls.add(previous);controls.add(next);paging.add(pageLabel,BorderLayout.CENTER);paging.add(controls,BorderLayout.EAST);south.add(paging);
-        var status=new JPanel(new BorderLayout(4,0));cancel=new JButton("Cancel",icons.apply(IconName.CLOSE));cancel.setVisible(false);status.add(message,BorderLayout.CENTER);status.add(cancel,BorderLayout.EAST);south.add(status);operationResult.setVisible(false);south.add(operationResult);south.add(follow);south.add(transfersSlot);add(south,BorderLayout.SOUTH);
+        var paging=new JPanel(new BorderLayout(4,0));var controls=new dev.jasper.remote.ui.FlatToolBar();for(var chevron:List.of(previous,next)) { String name=chevron==previous?"Previous page":"Next page";chevron.setToolTipText(name);chevron.getAccessibleContext().setAccessibleName(name);controls.add(chevron); }paging.add(pageLabel,BorderLayout.CENTER);paging.add(controls,BorderLayout.EAST);south.add(paging);
+        var status=new JPanel(new BorderLayout(4,0));cancel=new JButton("Cancel",icons.apply(IconName.CLOSE));cancel.setVisible(false);status.add(message,BorderLayout.CENTER);status.add(cancel,BorderLayout.EAST);south.add(status);operationResult.setVisible(false);south.add(operationResult);south.add(follow);south.add(transfersSlot);for(var row:south.getComponents()) ((JComponent)row).setAlignmentX(LEFT_ALIGNMENT);add(south,BorderLayout.SOUTH);
         path.addActionListener(event->{if(actions!=null) actions.navigate().accept(path.getText());});follow.addActionListener(event->{if(actions!=null) actions.follow().accept(follow.isSelected());});
         previous.addActionListener(event->{if(actions!=null) actions.page().accept(Math.max(0,offset-200));});next.addActionListener(event->{if(actions!=null) actions.page().accept(offset+200);});cancel.addActionListener(event->{if(actions!=null) actions.cancel().run();});
         table.getSelectionModel().addListSelectionListener(event->selectionChanged());
@@ -67,7 +67,7 @@ public class SftpPanel extends JPanel {
         addComponentListener(new ComponentAdapter() { @Override public void componentResized(ComponentEvent event) { columns(); } });selectionChanged();
     }
     private static JLabel label(String value) { var label=new JLabel(value);label.putClientProperty("html.disable",true);return label; }
-    private void addButton(JPanel bar,String name,IconName icon,Runnable action) {
+    private void addButton(JComponent bar,String name,IconName icon,Runnable action) {
         var button=new JButton(icons.apply(icon));button.setToolTipText(name);button.getAccessibleContext().setAccessibleName(name);button.setMargin(new Insets(4,4,4,4));button.addActionListener(event->{if(actions!=null) action.run();});buttons.put(name,button);bar.add(button);
     }
     private void item(String text,IconName name,Runnable action) { var item=new JMenuItem(text,icons.apply(name));item.addActionListener(event->{if(actions!=null) action.run();});popup.add(item); }
