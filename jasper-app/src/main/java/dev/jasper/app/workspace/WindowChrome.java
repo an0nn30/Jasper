@@ -41,9 +41,9 @@ final class WindowChrome {
 
     WindowChrome(WindowContent owner) {
         this.owner = owner;
-        toolbar = owner.retro() ? new RetroToolbar() : new ReferenceToolbar();
+        toolbar = owner.nativeChrome() ? new RetroToolbar() : new ReferenceToolbar();
         toolbar.setFloatable(false);
-        if (!owner.retro()) toolbar.setBorder(BorderFactory.createEmptyBorder());
+        if (!owner.nativeChrome()) toolbar.setBorder(BorderFactory.createEmptyBorder());
         JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
             ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
@@ -82,8 +82,9 @@ final class WindowChrome {
             @Override public void menuDeselected(MenuEvent event) {}
             @Override public void menuCanceled(MenuEvent event) {}
         });
-        if (owner.retro()) {
-            var note = new JMenuItem("Retro uses light Metal; change style in Settings and restart.");
+        if (owner.nativeChrome()) {
+            var note = new JMenuItem(owner.gtk() ? "GTK follows the desktop theme; change style in Settings and restart."
+                : "Retro uses light Metal; change style in Settings and restart.");
             note.setEnabled(false); appearance.addSeparator(); appearance.add(note);
         }
         view.add(appearance);
@@ -106,14 +107,14 @@ final class WindowChrome {
         addButton(ActionId.ZOOM_PANE, "maximize"); addButton(ActionId.FIND, "search");
         addToolbarSeparator();
         toolbar.add(toolbarGlue);
-        if (owner.retro()) {
+        if (owner.nativeChrome()) {
             addButton(ActionId.OPEN_SETTINGS, "settings");
             addButton(ActionId.QUIT, "exit");
         }
     }
 
     private void addToolbarSeparator() {
-        if (owner.retro()) toolbar.addSeparator(); else toolbar.add(new ToolbarSeparator());
+        if (owner.nativeChrome()) toolbar.addSeparator(); else toolbar.add(new ToolbarSeparator());
     }
 
     void connect(WindowContributions source) {
@@ -128,7 +129,7 @@ final class WindowChrome {
         button.putClientProperty("label", label);
         button.setIcon(icon != null ? AppIcons.forToolbar(icon) : AppIcons.toolbarIcon("command"));
         button.setFocusable(false);
-        if (owner.retro()) {
+        if (owner.nativeChrome()) {
             RetroToolbar.styleButton(button);
         } else {
             button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
@@ -136,7 +137,7 @@ final class WindowChrome {
         }
         button.getAccessibleContext().setAccessibleName(label);
         button.setToolTipText(label);
-        if (!owner.retro()) button.setFont(button.chromeFont());
+        if (!owner.nativeChrome()) button.setFont(button.chromeFont());
         return button;
     }
 
@@ -268,7 +269,7 @@ final class WindowChrome {
         ReferenceButton button = new ReferenceButton(owner.action(id), id);
         button.setText(label); button.putClientProperty("label", label);
         button.setIcon(AppIcons.toolbarIcon(icon)); button.setFocusable(false);
-        if (owner.retro()) {
+        if (owner.nativeChrome()) {
             RetroToolbar.styleButton(button);
         } else {
             button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
@@ -310,7 +311,7 @@ final class WindowChrome {
                 java.awt.font.TextAttribute.WEIGHT_SEMIBOLD)) : font;
         }
         @Override public Dimension getPreferredSize() {
-            if (dev.jasper.app.platform.SwingAppearance.retro()) return super.getPreferredSize();
+            if (dev.jasper.app.platform.SwingAppearance.nativeChrome()) return super.getPreferredSize();
             FontMetrics fm = getFontMetrics(chromeFont());
             int width = UIScale.scale(32);
             if (labels()) width += UIScale.scale(5) + fm.stringWidth(getText());
@@ -322,7 +323,7 @@ final class WindowChrome {
             return new Dimension(measuredWidth, UIScale.scale(30));
         }
         @Override protected void paintComponent(Graphics graphics) {
-            if (dev.jasper.app.platform.SwingAppearance.retro()) { super.paintComponent(graphics); return; }
+            if (dev.jasper.app.platform.SwingAppearance.nativeChrome()) { super.paintComponent(graphics); return; }
             var g = (Graphics2D) graphics.create();
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -438,17 +439,17 @@ final class WindowChrome {
     void refreshTheme() {
         Color toolbarBackground = UIManager.getColor("Jasper.titleBackground");
         // A plain Color tells Metal to fill chrome instead of painting its Ocean gradient.
-        toolbar.setBackground(owner.retro() ? new Color(toolbarBackground.getRGB()) : toolbarBackground);
+        toolbar.setBackground(owner.nativeChrome() ? new Color(toolbarBackground.getRGB()) : toolbarBackground);
         if (owner.retro()) {
             menuBar.setBackground(toolbar.getBackground());
             // Metal hides its default border beside a toolbar; retain an explicit separator.
             menuBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, UIManager.getColor("MenuBar.borderColor")));
         }
         for (Component child : toolbar.getComponents()) if (child instanceof JButton button) {
-            if (owner.retro()) RetroToolbar.styleButton(button);
+            if (owner.nativeChrome()) RetroToolbar.styleButton(button);
             else button.setFont(((ReferenceButton) button).chromeFont());
         }
-        status.setBackground(owner.retro() ? UIManager.getColor("Panel.background") : UIManager.getColor("Jasper.titleBackground"));
+        status.setBackground(owner.nativeChrome() ? UIManager.getColor("Panel.background") : UIManager.getColor("Jasper.titleBackground"));
         themeItems.forEach((theme, item) -> item.setSelected(owner.appearance() == theme));
     }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }

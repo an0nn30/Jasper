@@ -54,7 +54,7 @@ class RetroChromeTest {
                     var toolbar = owner.toolbar();
                     var buttons = java.util.Arrays.stream(toolbar.getComponents())
                         .filter(javax.swing.JButton.class::isInstance).map(javax.swing.JButton.class::cast).toList();
-                    if (style != ThemeStyle.RETRO) {
+                    if (!owner.nativeChrome()) {
                         assertThat(buttons).noneMatch(button -> button.getAction() == owner.action(dev.jasper.app.commands.ActionId.QUIT)
                             || button.getAction() == owner.action(dev.jasper.app.commands.ActionId.OPEN_SETTINGS));
                         continue;

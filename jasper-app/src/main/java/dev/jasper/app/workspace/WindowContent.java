@@ -159,8 +159,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
-        windowTabs = retro() ? null : new WindowTabs(this, animationClock);
-        retroTabs = retro() ? new RetroTabs(this) : null;
+        windowTabs = nativeChrome() ? null : new WindowTabs(this, animationClock);
+        retroTabs = nativeChrome() ? new RetroTabs(this) : null;
         var north = new JPanel(new BorderLayout());
         if (windowTabs != null) north.add(windowTabs, BorderLayout.NORTH);
         north.add(chrome.toolbar(), BorderLayout.CENTER);
@@ -403,6 +403,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     JTabbedPane tabStrip() { return tabs; }
     WindowTabs windowTabs() { return windowTabs; }
     boolean retro() { return themes.style() == dev.jasper.app.config.ThemeStyle.RETRO; }
+    boolean gtk() { return themes.style() == dev.jasper.app.config.ThemeStyle.GTK; }
+    /** Retro and GTK build standard Swing tabs, toolbar and title; modern builds Jasper's own. */
+    boolean nativeChrome() { return themes.style() != dev.jasper.app.config.ThemeStyle.MODERN; }
 private void refreshTabs() {
     if (retroTabs != null) retroTabs.refresh(); else windowTabs.refresh();
 }
@@ -597,7 +600,7 @@ private void refreshTabs() {
                 }
             }
             setBackground(theme.palette().background());
-            tabs.setBackground(retro() ? UIManager.getColor("TabbedPane.background") : theme.palette().background());
+            tabs.setBackground(nativeChrome() ? UIManager.getColor("TabbedPane.background") : theme.palette().background());
             chrome.status().applyPalette(theme.palette());
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();

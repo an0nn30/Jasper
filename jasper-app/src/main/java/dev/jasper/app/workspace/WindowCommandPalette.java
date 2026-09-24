@@ -182,7 +182,7 @@ final class WindowCommandPalette implements AutoCloseable {
             palette.setBounds(positioned(terminal, palette.getPreferredSize(), available, UIScale.scale(16)));
         }
         @Override protected void paintComponent(Graphics graphics) {
-            if (owner.retro()) return;
+            if (owner.nativeChrome()) return;
             if (!controller.isOpen()) return;
             var g = (Graphics2D) graphics.create();
             try {

@@ -48,7 +48,7 @@ final class WindowRail extends JPanel {
         button.setHideActionText(true);
         button.setText(null);
         button.setIcon(icon);
-        if (!dev.jasper.app.platform.SwingAppearance.retro()) {
+        if (!dev.jasper.app.platform.SwingAppearance.nativeChrome()) {
             button.putClientProperty("JButton.buttonType", "toolBarButton");
             button.setMargin(new Insets(0, 0, 0, 0));
         }

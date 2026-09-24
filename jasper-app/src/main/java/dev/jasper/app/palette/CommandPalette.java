@@ -30,6 +30,7 @@ import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.Icon;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -318,8 +319,17 @@ public final class CommandPalette extends JPanel {
         }
     }
 
-    private static boolean retro() { return dev.jasper.app.platform.SwingAppearance.retro(); }
-    private static int radius(int modern) { return retro() ? 0 : modern; }
+    private static boolean nativeChrome() { return dev.jasper.app.platform.SwingAppearance.nativeChrome(); }
+    private static int radius(int modern) { return nativeChrome() ? 0 : modern; }
+    /** GTK's synth delegates publish few defaults; a fresh control carries the installed look instead. */
+    private static javax.swing.border.Border fieldBorder() {
+        var border = UIManager.getBorder("TextField.border");
+        return border != null ? border : new JTextField().getBorder();
+    }
+    private static java.awt.Font font(String key, java.util.function.Supplier<? extends JComponent> sample) {
+        var font = UIManager.getFont(key);
+        return font != null ? font : sample.get().getFont();
+    }
 
     private void applyStepColors() {
         if (foregroundColor == null) return;
@@ -329,9 +339,9 @@ public final class CommandPalette extends JPanel {
             field.setCaretColor(accentColor);
             field.setSelectionColor(selectionColor);
             field.setSelectedTextColor(selectionForegroundColor);
-            if (retro()) {
-                field.setBorder(UIManager.getBorder("TextField.border"));
-                field.setFont(UIManager.getFont("TextField.font"));
+            if (nativeChrome()) {
+                field.setBorder(fieldBorder());
+                field.setFont(font("TextField.font", JTextField::new));
             } else field.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(borderColor, UIScale.scale(1), true),
                 BorderFactory.createEmptyBorder(0, UIScale.scale(6), 0, UIScale.scale(6))));
@@ -362,7 +372,7 @@ public final class CommandPalette extends JPanel {
         query.setSelectionColor(selection);
         query.setSelectedTextColor(selectionForeground);
         escape.setForeground(muted);
-        escape.setBorder(BorderFactory.createLineBorder(border, UIScale.scale(1), !retro()));
+        escape.setBorder(BorderFactory.createLineBorder(border, UIScale.scale(1), !nativeChrome()));
         chip.colors(accent, selection, border);
         sectionLabel.setForeground(muted);
         footer.setForeground(muted);
@@ -395,11 +405,11 @@ public final class CommandPalette extends JPanel {
         results.setSelectionBackground(selection);
         results.setSelectionForeground(selectionForeground);
         renderer.refreshTheme(foreground, muted, border, selection, selectionForeground);
-        if (retro()) {
-            query.setBorder(UIManager.getBorder("TextField.border"));
-            query.setFont(UIManager.getFont("TextField.font"));
-            chip.setFont(UIManager.getFont("Label.font"));
-            footer.setFont(UIManager.getFont("Label.font"));
+        if (nativeChrome()) {
+            query.setBorder(fieldBorder());
+            query.setFont(font("TextField.font", JTextField::new));
+            chip.setFont(font("Label.font", JLabel::new));
+            footer.setFont(font("Label.font", JLabel::new));
         }
         applyStepColors();
         revalidate(); repaint();

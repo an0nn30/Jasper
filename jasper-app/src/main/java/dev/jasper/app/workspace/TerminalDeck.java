@@ -9,11 +9,11 @@ import javax.swing.JTabbedPane;
 final class TerminalDeck extends JTabbedPane {
     TerminalDeck() {
         super(TOP, WRAP_TAB_LAYOUT);
-        setTabLayoutPolicy(SwingAppearance.retro() ? SCROLL_TAB_LAYOUT : WRAP_TAB_LAYOUT);
+        setTabLayoutPolicy(SwingAppearance.nativeChrome() ? SCROLL_TAB_LAYOUT : WRAP_TAB_LAYOUT);
         putClientProperty("html.disable", true);
     }
     @Override public void updateUI() {
-        if (SwingAppearance.retro()) { super.updateUI(); return; }
+        if (SwingAppearance.nativeChrome()) { super.updateUI(); return; }
         setUI(new FlatTabbedPaneUI() {
             @Override protected boolean hideTabArea() { return true; }
             @Override protected Insets getTabAreaInsets(int placement) { return new Insets(0, 0, 0, 0); }
