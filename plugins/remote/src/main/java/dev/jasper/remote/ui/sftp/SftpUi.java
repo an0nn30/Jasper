@@ -132,7 +132,7 @@ public final class SftpUi implements AutoCloseable {
         String where=identity.map(value->value.host().name()+":").orElse("")+queued.request().directory();
         var dialog=dialog(owner,"Items already exist");
         dialog.setContent(new dev.jasper.remote.ui.transfers.ExistingItemsPanel(dev.jasper.remote.ui.transfers.ExistingItemsPanel.message(existing,queued.names().size(),where),
-            choice-> { dialog.close();enqueue(queued.request().withExisting(choice),owner); },dialog::close));dialog.show();
+            choice-> { dialog.close();if(!closed && owner.isOpen()) enqueue(queued.request().withExisting(choice),owner); },dialog::close));dialog.show();
     }
     private void enqueue(TransferRequest request,WindowHandle owner) {
         transfers.get().enqueue(request,owner).whenComplete((id,error)->ui.execute(()-> { if(!closed && error!=null) context.notices().error(message(error)); }));
