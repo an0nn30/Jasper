@@ -168,7 +168,8 @@ final class FreedesktopIcons {
                 var directories = new ArrayList<Directory>();
                 for (String path : names) {
                     var values = sections.get(path);
-                    Integer size = values == null || path.contains("..") ? null : integer(values.get("Size"));
+                    Integer size = values == null || path.contains("..") || Path.of(path).isAbsolute()
+                        ? null : integer(values.get("Size"));
                     if (size == null) continue;
                     directories.add(new Directory(path, size, or(integer(values.get("Scale")), 1),
                         values.getOrDefault("Type", "Threshold"), or(integer(values.get("MinSize")), size),
@@ -199,8 +200,8 @@ final class FreedesktopIcons {
 
         private Path file(Directory directory, String icon) {
             for (Path root : roots) for (String extension : EXTENSIONS) {
-                Path file = root.resolve(directory.path()).resolve(icon + "." + extension);
-                if (Files.isRegularFile(file)) return file;
+                Path file = root.resolve(directory.path()).resolve(icon + "." + extension).normalize();
+                if (file.startsWith(root) && Files.isRegularFile(file)) return file;
             }
             return null;
         }

@@ -10,11 +10,14 @@ import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 class FreedesktopIconsTest {
     @TempDir Path root;
+    @TempDir Path outside;
     Path base() { return root.resolve("icons"); }
 
     @Test void chainFollowsInheritsDepthFirstIgnoringCyclesThenHicolor() throws Exception {
@@ -99,6 +102,19 @@ class FreedesktopIconsTest {
         var icons = icons("T");
         assertThat(icons.image(List.of("broken"), 16, Color.BLACK)).isEmpty();
         assertThat(icons.image(List.of("broken"), 16, Color.BLACK)).isEmpty();
+    }
+
+    @Test @DisabledOnOs(OS.WINDOWS) void absoluteDirectoriesOutsideTheThemeRootAreIgnored() throws Exception {
+        Path escape = Files.createDirectories(outside.resolve("escape"));
+        write(escape.resolve("secret.png"), 16, Color.RED);
+        Path dir = Files.createDirectories(base().resolve("T"));
+        Files.createDirectories(dir.resolve("16x16/a"));
+        png("T/16x16/a/safe.png", 16, Color.RED);
+        Files.writeString(dir.resolve("index.theme"), "[Icon Theme]\nName=T\nInherits=\nDirectories=" + escape + ",16x16/a\n\n"
+            + "[" + escape + "]\nSize=16\nType=Fixed\n[16x16/a]\nSize=16\nType=Fixed\n");
+        var icons = icons("T");
+        assertThat(icons.find(List.of("secret"), 16, 1)).isEmpty();
+        assertThat(icons.find(List.of("safe"), 16, 1)).hasValue(base().resolve("T/16x16/a/safe.png"));
     }
 
     @Test void environmentSelectsStandardBaseDirectories() {
