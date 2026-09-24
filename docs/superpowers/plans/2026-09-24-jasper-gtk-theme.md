@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Status: implemented on claude/gtk-theme; ./gradlew check green (tests=1804 failures=0 errors=0 skipped=3); Linux GUI verification pending (user).
+Status: implemented on claude/gtk-theme; ./gradlew check green (tests=1805 failures=0 errors=0 skipped=3); Linux GUI verification pending (user). Final-review fixes applied: GTK aliases for Metal-only keys, full-control ui.font, GTK rollback, notices after switching back, cached icon theme name.
 
 Deviations taken during execution:
 - The terminal `Palette` record has no selection foreground; only the selection background is derived from the sampled GTK text selection colour.

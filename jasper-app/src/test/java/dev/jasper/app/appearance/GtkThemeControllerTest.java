@@ -77,10 +77,36 @@ class GtkThemeControllerTest {
     @Test void fontReconfigurationKeepsTheGtkPalette() {
         var themes = GtkTestThemes.themes(GtkTestThemes.DARK);
         var palette = themes.current().palette();
+        var freshButtonFamily = UIManager.getFont("Button.font").getFamily();
         themes.configure(Appearance.DARK, new UiFontConfig("Serif", 18));
         assertThat(themes.current().palette()).isEqualTo(palette);
         assertThat(UIManager.getBoolean("Jasper.gtk")).isTrue();
         assertThat(UIManager.getFont("Label.font").getFamily()).isEqualTo("Serif");
+        // GTKLookAndFeel defines <Region>.font per synth region, not the form-control keys
+        // installFontDefaults rewrites; an explicit ui.font must still reach every control.
+        assertThat(UIManager.getFont("Button.font").getFamily()).isEqualTo("Serif");
+        assertThat(UIManager.getFont("Menu.font").getFamily()).isEqualTo("Serif");
+        themes.configure(Appearance.DARK, UiFontConfig.defaults());
+        assertThat(UIManager.getFont("Button.font").getFamily()).isEqualTo(freshButtonFamily);
+    }
+
+    @Test void failedGtkReinstallRestoresExactPreviousDefaults() {
+        var reject = new java.util.concurrent.atomic.AtomicBoolean();
+        var themes = new ThemeController(ThemeStyle.GTK, Appearance.DARK, theme -> {
+            if (theme != BuiltinTheme.GTK) return ThemeController.install(theme);
+            // A real GTK reinstall attempt replaces the LAF defaults outright before it can be judged to
+            // have failed, so on failure the defaults briefly hold none of Jasper's GTK aliases.
+            try { UIManager.setLookAndFeel(new javax.swing.plaf.metal.MetalLookAndFeel()); }
+            catch (javax.swing.UnsupportedLookAndFeelException failure) { throw new IllegalStateException(failure); }
+            if (!reject.get()) GtkDefaults.decorate(UIManager.getLookAndFeelDefaults(), GtkTestThemes.LIGHT::get);
+            return !reject.get();
+        });
+        var titleColor = UIManager.getColor("Jasper.titleBackground");
+        reject.set(true);
+        assertThatThrownBy(() -> themes.configure(Appearance.DARK, new UiFontConfig("Serif", 18)))
+            .isInstanceOf(ThemeController.InstallationFailure.class);
+        assertThat(UIManager.getBoolean("Jasper.gtk")).isTrue();
+        assertThat(UIManager.getColor("Jasper.titleBackground")).isEqualTo(titleColor);
     }
 
     @Test void otherStylesNeverReportAFallback() {

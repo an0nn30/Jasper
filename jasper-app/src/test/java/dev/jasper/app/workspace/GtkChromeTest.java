@@ -37,7 +37,7 @@ class GtkChromeTest {
             assertThat(owner.windowCommands().view("view.tab_height").isEnabled()).isFalse();
             assertThat(menuTexts(owner.menuBar())).contains("GTK follows the desktop theme; change style in Settings and restart.");
             assertThat(owner.theme().palette().background()).isEqualTo(Color.WHITE);
-            assertThat(owner.status().getBackground()).isEqualTo(javax.swing.UIManager.getColor("Panel.background"));
+            assertThat(owner.status().getBackground()).isEqualTo(new Color(0xf6f5f4));
         });
     }
 

@@ -14,6 +14,9 @@ final class DesktopIcons {
     static final String SOURCE_KEY = "Jasper.desktopIcons";
     static final int COMPACT = 16;
     static final int TOOLBAR = 24;
+    // A one-element holder caches a null result too, so a desktop with no configured icon theme is not
+    // re-probed (an EDT-blocking process launch under gsettings) on every LAF reinstall, e.g. font changes.
+    private static volatile String[] cachedThemeName;
     private DesktopIcons() {}
 
     static Icon app(String name, int size) {
@@ -34,7 +37,9 @@ final class DesktopIcons {
     /** One resolver per installed look and feel, created on first use from the live desktop. */
     static FreedesktopIcons source() {
         if (UIManager.get(SOURCE_KEY) instanceof FreedesktopIcons icons) return icons;
-        var created = FreedesktopIcons.fromEnvironment(IconThemeName.find(), System.getenv(), Path.of(System.getProperty("user.home")));
+        String[] cached = cachedThemeName;
+        if (cached == null) { cached = new String[]{IconThemeName.find()}; cachedThemeName = cached; }
+        var created = FreedesktopIcons.fromEnvironment(cached[0], System.getenv(), Path.of(System.getProperty("user.home")));
         UIManager.getLookAndFeelDefaults().put(SOURCE_KEY, created);
         return created;
     }

@@ -580,8 +580,8 @@ theme's text views; the 16 ANSI colours follow Jasper Dark or Jasper Light by th
 
 Where GTK is not available (macOS, Windows, or a Linux session whose Java runtime cannot load native GTK,
 which can include Wayland-native sessions), Jasper starts in the modern style and the status bar explains
-why. Explicit `ui.font` settings are applied through Swing's per-control font keys, which the GTK look and
-feel consults before its theme font; this still needs checking on a Linux desktop.
+why. Explicit `ui.font` settings replace the GTK theme font for Jasper's controls; this still needs
+checking on a Linux desktop.
 
 ### Interface typography
 

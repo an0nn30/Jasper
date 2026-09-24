@@ -54,8 +54,9 @@ public interface Appearance {
     /**
      * A 16 by 16 icon using the plugin's monochrome SVG in modern mode, bundled OldGNOME2 artwork in
      * retro mode, and the matching desktop icon-theme artwork (else the OldGNOME2 artwork) in GTK mode.
-     * Jasper adapts it to 28 pixels in retro host toolbars without resizing this shared icon. Both
-     * arguments are validated in both skins. Older implementations inherit the modern-only fallback.
+     * Jasper adapts it to 28 pixels in retro host toolbars and 24 pixels in GTK host toolbars, without
+     * resizing this shared icon. Both arguments are validated in every skin. Older implementations
+     * inherit the modern-only fallback.
      *
      * @param modernSvgResourcePath SVG classpath path in the plugin's jars, without a leading slash
      * @param retroIcon bundled retro artwork

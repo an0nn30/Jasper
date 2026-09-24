@@ -8,7 +8,10 @@ public enum BuiltinTheme {
     DARK("dark", "Dark", Palette.jasperDark()),
     LIGHT("light", "Light", Palette.jasperLight()),
     RETRO("retro", "Retro", RetroPalette.create()),
-    /** Its palette is a placeholder; the controller derives the real one from the installed GTK theme. */
+    /**
+     * Its palette is a placeholder; the controller derives the real one from the installed GTK theme.
+     * Its appearance() is a placeholder too; use ResolvedTheme.appearance(), which follows the derived palette.
+     */
     GTK("gtk", "GTK", Palette.jasperLight());
 
     private final String id;

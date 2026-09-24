@@ -12,7 +12,9 @@ message (the `InstallationFailure`'s direct cause) rather than the root cause, s
 shows the friendly text (fix commit 48651522); `FreedesktopIcons` rejects absolute `Directories=`
 entries and only returns files that stay inside their theme root (fix commit 506dfed5);
 `GtkDefaults.install()` splits the multi-catch into separate catch blocks (same semantics).
-`./gradlew check`: tests=1804 failures=0 errors=0 skipped=3. Not done:
+Final-review fixes: GTK aliases for Metal-only keys, full-control ui.font, GTK rollback, notices after
+switching back, cached icon theme name.
+`./gradlew check`: tests=1805 failures=0 errors=0 skipped=3. Not done:
 Linux GUI verification (Adwaita, Adwaita-dark, a third-party icon theme, explicit `ui.font`, Wayland
 fallback), merge, push.
 

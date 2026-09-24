@@ -17,7 +17,8 @@ class GtkDefaultsTest {
         "Jasper.titleSeparator", "Jasper.splitDivider", "Component.borderColor", "Jasper.paletteBorder",
         "Jasper.paletteAccent", "Component.focusedBorderColor", "Jasper.paletteSelectionBackground",
         "Jasper.paletteSelectionForeground", "Jasper.runningForeground", "Actions.Red", "Actions.Yellow", "Actions.Green",
-        "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground");
+        "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground",
+        "Panel.background", "TabbedPane.background", "Separator.foreground", "MenuBar.borderColor", "Label.disabledForeground");
 
     @Test void lightSamplesBecomeJasperAliasesAndLightStatusColors() {
         var defaults = new UIDefaults();

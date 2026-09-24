@@ -46,10 +46,13 @@ final class IconThemeName {
         Process process;
         try { process = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start(); }
         catch (IOException absent) { return null; }
-        try {
+        // Close stdin so the child never blocks waiting for input it will not receive, and always close
+        // stdout too (including on the timeout path below) so a forcibly destroyed process leaks no descriptors.
+        try (var stdout = process.getInputStream()) {
+            process.getOutputStream().close();
             if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) { process.destroyForcibly(); return null; }
             if (process.exitValue() != 0) return null;
-            return new String(process.getInputStream().readNBytes(4096), StandardCharsets.UTF_8);
+            return new String(stdout.readNBytes(4096), StandardCharsets.UTF_8);
         } catch (IOException failure) {
             return null;
         } catch (InterruptedException interrupted) {

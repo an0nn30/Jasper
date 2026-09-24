@@ -669,6 +669,10 @@ void retroStyleReloadKeepsALiveSessionAndAppliesFontChanges() throws Exception {
             .singleElement().satisfies(d -> assertThat(d.message()).contains("GTK is not available").doesNotContain("Restart"));
     });
     reload("ui.theme.style='modern'\n");
+    // Modern now matches the live style; no restart is needed and GTK's own fallback reason no longer
+    // applies to the (different) requested style, so there is no ui.theme.style diagnostic at all.
+    edt(() -> assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().equals("ui.theme.style")));
+    reload("ui.theme.style='retro'\n");
     edt(() -> assertThat(controller.shown().diagnostics()).filteredOn(d -> d.key().equals("ui.theme.style"))
         .extracting(d -> d.message()).anyMatch(message -> message.contains("Restart Jasper")));
 }

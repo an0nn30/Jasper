@@ -104,24 +104,28 @@ public final class ThemeController {
         boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
         boolean choiceChanged = style == ThemeStyle.MODERN && state.choice() != candidate.choice();
         if (chromeChanged) {
-            // Metal's app aliases and fonts live in its LAF defaults. Capture the exact
+            // Metal's and GTK's app aliases and fonts live in their LAF defaults. Capture the exact
             // previous values: restoring an existing LAF may rebuild its stock defaults.
-            UIDefaults previousRetroDefaults = null;
-            if (style == ThemeStyle.RETRO) {
-                previousRetroDefaults = new UIDefaults();
-                previousRetroDefaults.putAll(UIManager.getLookAndFeelDefaults());
+            UIDefaults previousNativeChromeDefaults = null;
+            if (style != ThemeStyle.MODERN) {
+                previousNativeChromeDefaults = new UIDefaults();
+                previousNativeChromeDefaults.putAll(UIManager.getLookAndFeelDefaults());
             }
             installFontDefaults(font);
             try {
                 installChrome(next.chrome());
                 if (style == ThemeStyle.RETRO) MetalDefaults.configureFonts(resolveFont(font), platformLabelSize);
+                // GTKLookAndFeel only defines <Region>.font per synth region, not the handful of form-control
+                // keys installFontDefaults rewrites; an explicit ui.font must still reach every control.
+                else if (style == ThemeStyle.GTK && !font.equals(UiFontConfig.defaults()))
+                    MetalDefaults.configureFonts(resolveFont(font), platformLabelSize);
             }
             catch (RuntimeException failure) {
                 installFontDefaults(uiFont);
-                if (previousRetroDefaults != null) {
+                if (previousNativeChromeDefaults != null) {
                     UIDefaults restored = UIManager.getLookAndFeelDefaults();
                     restored.clear();
-                    restored.putAll(previousRetroDefaults);
+                    restored.putAll(previousNativeChromeDefaults);
                 }
                 throw failure;
             }

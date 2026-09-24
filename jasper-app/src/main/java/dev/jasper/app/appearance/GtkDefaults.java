@@ -71,11 +71,14 @@ final class GtkDefaults {
         Color selectionForeground = orElse(sample.apply(LIST_SELECTION_FOREGROUND), Color.WHITE);
         defaults.put("Jasper.nativeChrome", true);
         defaults.put("Jasper.gtk", true);
-        put(defaults, panel, "Jasper.titleBackground", "Jasper.paletteBackground", "Jasper.tabSelectedBackground");
+        put(defaults, panel, "Jasper.titleBackground", "Jasper.paletteBackground", "Jasper.tabSelectedBackground",
+            "Panel.background", "TabbedPane.background");
         put(defaults, foreground, "Jasper.titleForeground", "Jasper.chromeForeground", "Jasper.tabSelectedForeground",
             "Jasper.paletteForeground");
-        put(defaults, muted, "Jasper.titleInactiveForeground", "Jasper.mutedForeground", "Jasper.paletteMutedForeground");
-        put(defaults, border, "Jasper.titleSeparator", "Jasper.splitDivider", "Component.borderColor", "Jasper.paletteBorder");
+        put(defaults, muted, "Jasper.titleInactiveForeground", "Jasper.mutedForeground", "Jasper.paletteMutedForeground",
+            "Label.disabledForeground");
+        put(defaults, border, "Jasper.titleSeparator", "Jasper.splitDivider", "Component.borderColor", "Jasper.paletteBorder",
+            "Separator.foreground", "MenuBar.borderColor");
         put(defaults, selection, "Jasper.paletteAccent", "Component.focusedBorderColor", "Jasper.paletteSelectionBackground");
         put(defaults, selectionForeground, "Jasper.paletteSelectionForeground");
         // Jasper Light / Jasper Dark status colours, so status text reads on either theme.

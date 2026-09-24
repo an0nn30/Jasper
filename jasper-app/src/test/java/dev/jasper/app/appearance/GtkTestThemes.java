@@ -3,6 +3,7 @@ package dev.jasper.app.appearance;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ThemeStyle;
 import java.awt.Color;
+import java.util.List;
 import java.util.Map;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
@@ -32,6 +33,11 @@ public final class GtkTestThemes {
             if (theme != BuiltinTheme.GTK) return ThemeController.install(theme);
             try { UIManager.setLookAndFeel(new MetalLookAndFeel()); }
             catch (UnsupportedLookAndFeelException failure) { throw new IllegalStateException(failure); }
+            // Strip Metal's own values for the keys GtkDefaults.decorate must alias itself, so a test
+            // fails if native-chrome code accidentally relies on Metal's shape instead of the alias.
+            for (String key : List.of("Panel.background", "TabbedPane.background", "Separator.foreground",
+                    "MenuBar.borderColor", "Label.disabledForeground"))
+                UIManager.getLookAndFeelDefaults().remove(key);
             GtkDefaults.decorate(UIManager.getLookAndFeelDefaults(), colors::get);
             return true;
         });
