@@ -106,6 +106,9 @@ Use the Remote plugin's pane-to-connection association to identify the endpoint.
 `Path`. Missing directory reports fall back to the SFTP user's home. An unavailable path
 leaves the last successful listing and an inline message. Nested SSH inside a shell is not
 a discoverable new Remote endpoint. No commands are injected to obtain a directory.
+*Amended 2026-09-24:* nothing is written to the user's shell, but a fixed read-only probe on a
+separate exec channel may read the directory; see the
+[directory probe amendment](2026-09-24-jasper-remote-directory-probe-design.md).
 
 Manual path entry, Up and opening a directory turn following off for that pane. Refresh
 does not. Re-enabling follows the latest reported path immediately. Switching to a local
