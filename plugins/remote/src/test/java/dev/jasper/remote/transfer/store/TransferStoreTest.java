@@ -187,5 +187,20 @@ class TransferStoreTest {
             store.cleaned(entry);assertThat(store.entry(entry).error()).doesNotContain("Permission denied");
         }
     }
+    @Test void anExistingItemsChoiceBecomesTheJobsPolicies() throws Exception {
+        try (var db = new TransferStore(root)) {
+            UUID asked = db.create(request());
+            assertThat(db.policy(asked, false)).isEqualTo(ConflictDecision.ASK);
+            assertThat(db.policy(asked, true)).isEqualTo(ConflictDecision.ASK);
+            UUID replace = db.create(request().withExisting(ConflictDecision.REPLACE));
+            assertThat(db.policy(replace, false)).isEqualTo(ConflictDecision.REPLACE);
+            assertThat(db.policy(replace, true)).isEqualTo(ConflictDecision.MERGE);
+            UUID skip = db.create(request().withExisting(ConflictDecision.SKIP));
+            assertThat(db.policy(skip, false)).isEqualTo(ConflictDecision.SKIP);
+            assertThat(db.policy(skip, true)).isEqualTo(ConflictDecision.MERGE);
+            assertThat(db.request(replace).existing()).as("the policy lives on the job, not the encoded request").isEqualTo(ConflictDecision.ASK);
+        }
+        assertThatThrownBy(() -> request().withExisting(ConflictDecision.RENAME)).isInstanceOf(IllegalArgumentException.class);
+    }
 
 }

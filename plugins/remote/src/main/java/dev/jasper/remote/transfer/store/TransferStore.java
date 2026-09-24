@@ -80,7 +80,8 @@ public final class TransferStore implements AutoCloseable {
     private void rollback() throws IOException { try { db.rollback(); db.setAutoCommit(true); } catch(SQLException e) { throw failure(e); } }
     public synchronized UUID create(TransferRequest request) throws IOException {
         var id=UUID.randomUUID(); String encoded=TransferCodec.request(request);
-        try { update("INSERT INTO jobs(id,request,source,destination,state,intent,created) VALUES(?,?,?,?,?,?,?)",id,encoded,request.source().label(),request.destination().label(),"QUEUED","RUN",System.currentTimeMillis()); return id; }
+        ConflictDecision files = request.existing(), folders = files == ConflictDecision.ASK ? ConflictDecision.ASK : ConflictDecision.MERGE;
+        try { update("INSERT INTO jobs(id,request,source,destination,state,intent,created,file_policy,directory_policy) VALUES(?,?,?,?,?,?,?,?,?)",id,encoded,request.source().label(),request.destination().label(),"QUEUED","RUN",System.currentTimeMillis(),files.name(),folders.name()); return id; }
         catch(SQLException e) { throw failure(e); }
     }
     public synchronized TransferRequest request(UUID job) throws IOException {

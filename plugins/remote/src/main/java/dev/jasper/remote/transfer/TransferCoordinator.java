@@ -104,6 +104,7 @@ public final class TransferCoordinator implements AutoCloseable {
     }
     public CompletableFuture<TransferJob> job(UUID id) { return command(()->store.job(id)); }
     public CompletableFuture<List<TransferEntry>> entries(UUID id,long offset,int limit) { return command(()->store.entries(id,offset,limit)); }
+    public CompletableFuture<TransferRequest> request(UUID id) { return command(()->store.request(id)); }
     public CompletableFuture<Snapshot> snapshot(long offset,int limit) {
         return command(()-> {
             var progress=new ArrayList<Progress>();

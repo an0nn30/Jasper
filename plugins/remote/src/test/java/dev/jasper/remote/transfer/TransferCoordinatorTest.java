@@ -208,6 +208,27 @@ class TransferCoordinatorTest {
             }finally {coordinator.close();released.countDown();coordinator.stopped().get(5,TimeUnit.SECONDS);}
         }
     }
+    @Test void anExistingItemsChoiceCoversConflictsInsideMergedFolders() throws Exception {
+        root=root.toRealPath();Path source=Files.createDirectories(root.resolve("source/sub")).getParent(),dest=Files.createDirectories(root.resolve("dest/source/sub")).getParent().getParent();
+        Files.writeString(source.resolve("sub/file"),"new");Files.writeString(source.resolve("fresh"),"fresh");Files.writeString(dest.resolve("source/sub/file"),"old");
+        try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+            var coordinator=new TransferCoordinator(root.resolve("queue"),executor,Runnable::run,(ref,owner)->CompletableFuture.completedFuture(new LocalEndpoint()),()->2);
+            try {
+                var request=new TransferRequest(EndpointRef.local(),List.of(source.toString()),EndpointRef.local(),dest.toString());
+                var replaced=coordinator.enqueue(request.withExisting(ConflictDecision.REPLACE),null).get(5,TimeUnit.SECONDS);
+                await(coordinator,replaced,TransferState.COMPLETED);
+                assertThat(Files.readString(dest.resolve("source/sub/file"))).isEqualTo("new");
+                assertThat(Files.readString(dest.resolve("source/fresh"))).isEqualTo("fresh");
+                assertThat(coordinator.request(replaced).get(5,TimeUnit.SECONDS).paths()).containsExactly(source.toString());
+                Files.writeString(source.resolve("sub/file"),"newer");
+                var skipped=coordinator.enqueue(request.withExisting(ConflictDecision.SKIP),null).get(5,TimeUnit.SECONDS);
+                var job=await(coordinator,skipped,TransferState.COMPLETED_WITH_ISSUES);
+                assertThat(Files.readString(dest.resolve("source/sub/file"))).as("existing file kept").isEqualTo("new");
+                assertThat(job.skippedEntries()).isGreaterThanOrEqualTo(1);
+                assertThat(job.failedEntries()).isZero();
+            } finally { coordinator.close();coordinator.stopped().get(5,TimeUnit.SECONDS); }
+        }
+    }
     static TransferJob await(TransferCoordinator coordinator,UUID id,TransferState state) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(15);TransferJob last=null;
         while(System.nanoTime()<deadline) { last=coordinator.job(id).get(3,TimeUnit.SECONDS);if(last.state()==state) return last;
