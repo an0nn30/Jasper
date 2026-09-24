@@ -41,7 +41,7 @@ class BundledSamplePluginTest {
                         assertThat(dropdown.title()).isEqualTo("Sessions");
                         assertThat(dropdown.actionIds()).containsExactly("dev.jasper.remote.sessions.manage");
                     }));
-            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel", "dev.jasper.remote.sftp.panel", "dev.jasper.remote.transfers.panel");
+            assertThat(contributions.panels()).extracting(panel -> panel.id()).containsExactlyInAnyOrder("dev.jasper.sample.panel", "dev.jasper.remote.panel", "dev.jasper.remote.sftp.panel");
             assertThat(contributions.railActions()).containsExactly("dev.jasper.sample.about");
             assertThat(contributions.menus()).anySatisfy(menu -> {
                 assertThat(menu.target()).isEqualTo(dev.jasper.app.contributions.MenuTarget.standard(
@@ -109,7 +109,7 @@ class BundledSamplePluginTest {
                 assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(retro ? 28 : 16);
                 assertThat(contributions.action("dev.jasper.remote.connect").orElseThrow().icon()).isSameAs(icon);
                 assertThat(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon()).isSameAs(icon);
-                assertThat(contributions.panels()).hasSize(3).allSatisfy(panel -> {
+                assertThat(contributions.panels()).hasSize(2).allSatisfy(panel -> {
                     assertThat(panel.icon()).isNotNull();
                     if(retro) assertThat(panel.icon()).isNotInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
                     else assertThat(panel.icon()).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);

@@ -100,18 +100,42 @@ public final class SftpUi implements AutoCloseable {
         var captured=view.controller().capture();if(captured.isEmpty() || closed) return;var target=captured.orElseThrow();WindowHandle owner=view.host().window();
         List<Path> paths=folder?context.windows().chooseDirectory(owner,"Upload folder",Optional.empty()).map(List::of).orElse(List.of()):context.windows().chooseFiles(owner,"Upload files",Optional.empty());
         if(paths.isEmpty() || closed || !owner.isOpen()) return;
-        background(()-> { var selected=new ArrayList<String>();for(Path path:paths) selected.add(canonicalSelection(path));return new TransferRequest(EndpointRef.local(),selected,EndpointRef.remote(target.identity()),target.directory()); },owner);
+        background(()-> { var selected=new ArrayList<String>();for(Path path:paths) selected.add(canonicalSelection(path));return new Queued(new TransferRequest(EndpointRef.local(),selected,EndpointRef.remote(target.identity()),target.directory()),selected.stream().map(value->Path.of(value).getFileName().toString()).toList()); },owner);
     }
     private void download(View view) {
         var selected=view.controller().capture();if(selected.isEmpty() || selected.orElseThrow().selection().isEmpty()) return;var source=selected.orElseThrow();var owner=view.host().window();
         var directory=context.windows().chooseDirectory(owner,"Download selected files to",Optional.empty());if(directory.isEmpty() || closed || !owner.isOpen()) return;
-        background(()->new TransferRequest(EndpointRef.remote(source.identity()),paths(source),EndpointRef.local(),directory.orElseThrow().toRealPath().toString()),owner);
+        background(()->new Queued(new TransferRequest(EndpointRef.remote(source.identity()),paths(source),EndpointRef.local(),directory.orElseThrow().toRealPath().toString()),source.selection().stream().map(FileEntry::name).toList()),owner);
     }
     private static String canonicalSelection(Path path) throws IOException { Path absolute=path.toAbsolutePath().normalize();return absolute.getParent()==null?absolute.toRealPath().toString():absolute.getParent().toRealPath().resolve(absolute.getFileName()).toString(); }
     private static List<String> paths(SftpController.Capture captured) throws IOException { var paths=new ArrayList<String>();for(var file:captured.selection()) paths.add(FilePaths.child(captured.directory(),file.name()));return List.copyOf(paths); }
-    private void background(Callable<TransferRequest> prepare,WindowHandle owner) {
-        background.execute(()-> { try { var request=prepare.call();ui.execute(()-> { if(closed || !owner.isOpen()) return;transfers.get().enqueue(request,owner).whenComplete((id,error)->ui.execute(()-> { if(error!=null) context.notices().error(message(error)); })); }); }
+    private record Queued(TransferRequest request,List<String> names) {}
+    private void background(Callable<Queued> prepare,WindowHandle owner) {
+        background.execute(()-> { try { var queued=prepare.call();var identity=queued.request().destination().identity();ui.execute(()->check(queued,identity,owner)); }
             catch(Exception failure) { ui.execute(()-> { if(!closed) context.notices().error(message(failure)); }); } });
+    }
+    /** Asks once before copying onto items that already exist; one stat per selected item, off the UI thread. */
+    private void check(Queued queued,Optional<ConnectionIdentity> identity,WindowHandle owner) {
+        if(closed || !owner.isOpen()) return;
+        endpoints.open(identity,owner,status->{}).whenComplete((endpoint,error)-> {
+            if(error!=null) { ui.execute(()-> { if(!closed) context.notices().error(message(error)); });return; }
+            background.execute(()-> { List<String> existing;
+                try { existing=ExistingItems.existing(endpoint,queued.request().directory(),queued.names()); }
+                catch(Exception failure) { ui.execute(()-> { if(!closed) context.notices().error(message(failure)); });return; }
+                finally { endpoint.abort(); }
+                ui.execute(()->decide(queued,identity,existing,owner)); });
+        });
+    }
+    private void decide(Queued queued,Optional<ConnectionIdentity> identity,List<String> existing,WindowHandle owner) {
+        if(closed || !owner.isOpen()) return;
+        if(existing.isEmpty()) { enqueue(queued.request(),owner);return; }
+        String where=identity.map(value->value.host().name()+":").orElse("")+queued.request().directory();
+        var dialog=dialog(owner,"Items already exist");
+        dialog.setContent(new dev.jasper.remote.ui.transfers.ExistingItemsPanel(dev.jasper.remote.ui.transfers.ExistingItemsPanel.message(existing,queued.names().size(),where),
+            choice-> { dialog.close();enqueue(queued.request().withExisting(choice),owner); },dialog::close));dialog.show();
+    }
+    private void enqueue(TransferRequest request,WindowHandle owner) {
+        transfers.get().enqueue(request,owner).whenComplete((id,error)->ui.execute(()-> { if(!closed && error!=null) context.notices().error(message(error)); }));
     }
     private void copyPaths(View view) {
         view.controller().capture().ifPresent(captured->{try { if(!captured.selection().isEmpty()) clipboard.accept(String.join("\n",paths(captured))); }
@@ -133,7 +157,7 @@ public final class SftpUi implements AutoCloseable {
         var pickerReference=new java.util.concurrent.atomic.AtomicReference<DestinationPanel>();
         var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,identity->endpoints.open(Optional.of(identity),owner,status->{}),transfers.get().reservations(),(busy,text)-> { var current=pickerReference.get();if(current!=null) current.status(busy,text); },()-> { var current=pickerReference.get();if(current!=null) current.refresh(); });
         var picker=new DestinationPanel(source.selection().size()+" items from "+source.identity().host().name()+":"+source.directory(),hosts.get(),context.dataDirectory().resolve("browser-cache"),background,ui,context.appearance()::icon,
-            id->connections.resolveIdentity(id,owner),identity->endpoints.open(Optional.of(identity),owner,status->{}),destination->{dialog.close();background(()->new TransferRequest(EndpointRef.remote(source.identity()),paths(source),EndpointRef.remote(destination.identity()),destination.directory()),owner);},
+            id->connections.resolveIdentity(id,owner),identity->endpoints.open(Optional.of(identity),owner,status->{}),destination->{dialog.close();background(()->new Queued(new TransferRequest(EndpointRef.remote(source.identity()),paths(source),EndpointRef.remote(destination.identity()),destination.directory()),source.selection().stream().map(FileEntry::name).toList()),owner);},
             destination->nameDialog(owner,destination,operations::mkdir),operations::cancel,dialog::close);
         pickerReference.set(picker);dialog.onClosed(()-> { picker.close();operations.close(); });dialog.setContent(picker);dialog.show();
     }

@@ -2,6 +2,17 @@
 
 ## Current state — 2026-09-23
 
+### Transfer strip — 2026-09-24
+
+The bottom Transfers panel (two paged tables, thirteen buttons) is replaced by a compact strip at
+the bottom of the SFTP sidebar with one contextual action per transfer, and uploads, downloads and
+host-to-host copies ask once before copying onto existing items
+([amendment](superpowers/specs/2026-09-24-jasper-remote-transfer-strip-design.md),
+[plan](superpowers/plans/2026-09-24-jasper-remote-transfer-strip.md)). The queue, durability and
+recovery are unchanged; the "Replace / Skip existing" choice is stored in the job's existing
+file/folder policies. A finish whose only issues are skipped items fades like a clean one.
+GUI acceptance is item 11 of [remote-7c-verification](remote-7c-verification.md).
+
 ### SFTP directory follow probe — 2026-09-24
 
 Follow terminal folder only followed OSC 7, which stock bash and zsh do not send over SSH. The

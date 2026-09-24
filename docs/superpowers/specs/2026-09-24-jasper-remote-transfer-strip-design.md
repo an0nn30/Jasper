@@ -1,7 +1,6 @@
 # Jasper Remote — transfer strip in the SFTP sidebar
 
-**Status:** Design approved in conversation 2026-09-24; written spec awaiting the user's review.
-No implementation has started.
+**Status:** Approved and implemented on `codex/remote-sftp`; GUI acceptance is the user's.
 
 **Base:** `codex/remote-sftp` at `e60d9979`.
 

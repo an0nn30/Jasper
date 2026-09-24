@@ -172,12 +172,16 @@ closing the source terminal does not cancel a copy.
   cancellable, but already deleted entries cannot be recovered. Links themselves are deleted;
   their targets are not traversed. Copy path writes plain paths to the clipboard.
 
-**SSH > Transfers** or **View > Transfers** opens the global queue in the bottom panel.
-It works without Buddy and can be viewed in multiple windows. Select a job to inspect its
-paged file list, issues and cleanup count, and to Pause, Resume, Cancel or Retry it. The status
-bar displays aggregate progress, confirmed-data speed and bytes remaining; scanning has an
-unknown total. Click it to open Transfers. Its cancel control cancels the sole active job, or
-opens the queue when several jobs are active.
+Transfers appear at the bottom of the SFTP sidebar, in every window: what is copying and where,
+a progress bar, speed and time left, and **×** to cancel. A transfer that needs you shows one
+button — **Resume** (paused or interrupted), **Resolve…**, **Retry failed** or **Retry cleanup**.
+A finished transfer shows "Done" for a few seconds and leaves; failed or cancelled ones stay until
+dismissed with ×. The strip hides when nothing is queued. Before copying onto items that already
+exist, Remote asks once: **Replace** (files replaced, folders merged), **Skip existing** or
+**Cancel**. **SSH > Transfers** shows the sidebar. The status bar displays aggregate progress,
+confirmed-data speed and bytes remaining; scanning has an unknown total. Click it to show the
+sidebar. Its cancel control cancels the sole active job, or shows the sidebar when several jobs
+are active.
 
 Pause retains partial files and checkpoints. Resume rechecks the source and destination
 prefixes before appending; a large retained prefix takes time to validate. Cancel stops new
@@ -217,7 +221,6 @@ Add these options to Remote's existing TOML tables (do not duplicate a table):
 [shortcuts]
 # Existing toggle_panel and open_palette entries may remain here.
 toggle_sftp = ""                 # e.g. "cmd+alt+f"
-toggle_transfers = ""            # e.g. "cmd+alt+t"
 
 [sftp]
 max_parallel_files = 2           # clamped to 1..8; at most two copies per endpoint
@@ -225,7 +228,7 @@ request_timeout_seconds = 30    # clamped to 1..300
 ```
 
 Shortcut changes apply live; app-level keybindings retain precedence. Actions are
-`dev.jasper.remote.sftp`, `.sftp.toggle`, `.transfers`, `.transfers.toggle` and
+`dev.jasper.remote.sftp`, `.sftp.toggle`, `.transfers` and
 `.transfers.cancel` (each suffix uses the `dev.jasper.remote` prefix). Controls inherit the
 app UI font and use SDK semantic icons for the selected skin. Native acceptance and the
 verified build commands are in [SFTP verification](remote-7c-verification.md).

@@ -66,8 +66,8 @@ you control for the following acceptance steps:
    ancestor without recursive traversal. Delete only disposable selections, cancelling partway.
 7. Deny destination cleanup or metadata permissions. Confirm a visible issue/warning, preserved
    copied content and explicit cleanup retry/acknowledgement before forgetting cleanup history.
-8. Set `toggle_sftp` and `toggle_transfers` in Remote's TOML; verify live changes and app override
-   precedence. Set copy concurrency and a short request timeout for a deliberately stalled host.
+8. Set `toggle_sftp` in Remote's TOML; verify live changes and app override precedence. Set copy
+   concurrency and a short request timeout for a deliberately stalled host.
 9. Directory follow without shell integration (2026-09-24 amendment): on the Mac host and a stock
    Linux bash host, open two panes each and `cd` in each; the sidebar follows the focused pane
    within about half a second. Check `bash` inside `zsh`, a program started in another folder,
@@ -80,6 +80,11 @@ you control for the following acceptance steps:
 10. Session end: with the SFTP sidebar showing a remote pane, type `exit` in that pane, then repeat by
     closing the tab and by dropping the network. Each time the sidebar clears and shows "SSH session
     closed", while a transfer started earlier keeps running. Reconnecting the pane browses it again.
+11. Transfer strip (2026-09-24 amendment): upload a large file and a folder and watch the strip in
+    the SFTP sidebar (name → host:folder, percent, speed, time left); cancel one with ×; drop the
+    network during one and Resume it; upload onto existing files and choose Replace, then Skip
+    existing; a finished upload shows Done and leaves after about five seconds; the strip hides when
+    empty, appears in a second window with the same queue, and no Transfers panel exists any more.
 
 ## Boundaries
 

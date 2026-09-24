@@ -1,5 +1,16 @@
 # Remote transfer strip — Implementation Plan
 
+**Status:** Executed on `codex/remote-sftp`. Deviations: task 5 also corrected
+`docs/remote-7c-verification.md` item 8, which still named the removed `toggle_transfers`
+setting (it now names only `toggle_sftp`); and fixed three `jasper-app` tests left stale by
+task 4's removal of the Transfers panel and its toggle action —
+`BundledSamplePluginTest.theStagedSampleLoadsFromItsJarAndItsActivityReachesBuddy` and
+`remoteLoadsWithoutVaultAndUsesHostIconsForEveryPlacement` still expected
+`dev.jasper.remote.transfers.panel`/a third panel, and
+`RemoteShortcutConfigTest.sftpAndTransferBindingsAreBlankByDefaultAndReloadThroughTheRemoteFile`
+(renamed `sftpBindingIsBlankByDefaultAndReloadsThroughTheRemoteFile`) still asserted a
+`dev.jasper.remote.transfers.toggle` binding; `./gradlew check` failed on these until fixed.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the bottom Transfers panel with a compact transfer strip at the bottom of the SFTP sidebar, and ask once before copying onto existing items.

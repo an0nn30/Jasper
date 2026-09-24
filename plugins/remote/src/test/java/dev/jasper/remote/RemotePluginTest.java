@@ -125,6 +125,71 @@ class RemotePluginTest {
 
     static void settle(FakePluginHost host) { for (int i = 0; i < 20; i++) { host.runBackground(); host.flush(); } }
 
+    @Test void uploadingOntoExistingFilesAsksOnceAndReplaceCopies(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            Path files = java.nio.file.Files.createDirectories(dir.resolve("files"));
+            java.nio.file.Files.writeString(files.resolve("readme.txt"), "old");
+            server.server.setFileSystemFactory(new org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory(files.toRealPath()));
+            server.server.setSubsystemFactories(List.of(new org.apache.sshd.sftp.server.SftpSubsystemFactory()));
+            Path local = java.nio.file.Files.createDirectories(dir.resolve("local"));
+            Path readme = java.nio.file.Files.writeString(local.resolve("readme.txt"), "new"), fresh = java.nio.file.Files.writeString(local.resolve("fresh.txt"), "fresh");
+            var vault = new FakeVault();
+            host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
+            RemotePlugin plugin = plugin(dir.resolve("ssh"));
+            var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
+            UUID credential = vault.password("deploy login", "deploy", "s3cret");
+            RemoteHost prod = RemoteHost.create("prod", "127.0.0.1", server.port(), "", new Auth.Vault(credential), "", Optional.empty()).withFollowDirectory(false);
+            plugin.store().put(prod);
+            settle(host);
+            new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
+            UUID window = host.addTerminalWindow();
+            host.activateTerminalWindow(window);
+            var panel = (dev.jasper.remote.ui.sftp.SftpPanel) host.openPanel(SftpUi.PANEL, window);
+            plugin.openHost(context.terminals().window(window).orElseThrow(), prod); settle(host);
+            host.focusTerminalPane(host.terminalPanes().getFirst()); host.flush();
+            awaitRowCount(host, panel, 1);
+
+            host.queuePathSelection(List.of(fresh));
+            button(panel, "Upload files").doClick();
+            awaitRemote(host, files.resolve("fresh.txt"), "fresh");
+            assertThat(host.windowContent("dev.jasper.remote", "Items already exist")).as("nothing existed, nothing asked").isEmpty();
+
+            host.queuePathSelection(List.of(readme, fresh));
+            button(panel, "Upload files").doClick();
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+            while (host.windowContent("dev.jasper.remote", "Items already exist").isEmpty() && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
+            var ask = (dev.jasper.remote.ui.transfers.ExistingItemsPanel) host.windowContent("dev.jasper.remote", "Items already exist").orElseThrow();
+            assertThat(find(ask, javax.swing.JLabel.class).orElseThrow().getText()).isEqualTo("2 of 2 items already exist in prod:" + panel.directory() + ".");
+            button(ask, "Replace").doClick();
+            awaitRemote(host, files.resolve("readme.txt"), "new");
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    static javax.swing.JButton button(java.awt.Container root, String name) {
+        return find(root, javax.swing.JButton.class, candidate -> name.equals(candidate.getText()) || name.equals(candidate.getToolTipText())).orElseThrow();
+    }
+
+    static <T> Optional<T> find(java.awt.Component component, Class<T> type) { return find(component, type, candidate -> true); }
+
+    static <T> Optional<T> find(java.awt.Component component, Class<T> type, java.util.function.Predicate<T> match) {
+        if (type.isInstance(component) && match.test(type.cast(component))) return Optional.of(type.cast(component));
+        if (component instanceof java.awt.Container container)
+            for (var child : container.getComponents()) { var found = find(child, type, match); if (found.isPresent()) return found; }
+        return Optional.empty();
+    }
+
+    static void awaitRemote(FakePluginHost host, Path file, String content) throws Exception {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+        while (System.nanoTime() < deadline) {
+            settle(host);
+            if (java.nio.file.Files.isRegularFile(file) && java.nio.file.Files.readString(file).equals(content)) return;
+            Thread.sleep(20);
+        }
+        throw new AssertionError(file + " never held " + content);
+    }
+
     @Test void registersItsSurfaceAndConnectsThroughSessionsToolbar(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
             var vault = new FakeVault();
