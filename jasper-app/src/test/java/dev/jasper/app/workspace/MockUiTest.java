@@ -27,6 +27,7 @@ class MockUiTest {
                 assertThat(title).isNotNull();
                 root.setSize(958, 958); layoutTree(root);
                 int toolbar = owner.toolbar().getHeight(), tabs = owner.windowTabs().getHeight();
+                assertThat(toolbar).isEqualTo(30);
                 assertThat(title.getHeight()).isEqualTo(28);
                 assertThat(tabs).isEqualTo(38);
                 assertThat(owner.status().getHeight()).isEqualTo(30);
@@ -116,18 +117,18 @@ class MockUiTest {
             var owner = content(launcher(pending)); owner.setSize(400, 500); layoutTree(owner);
             var buttons = java.util.Arrays.stream(owner.toolbar().getComponents()).filter(JButton.class::isInstance)
                 .map(JButton.class::cast).toList();
-            assertThat(buttons).hasSize(5);
+            assertThat(buttons).hasSize(6);
             assertThat(buttons).allSatisfy(button -> {
                 assertThat(button.getWidth()).isGreaterThanOrEqualTo(16);
                 assertThat(button.getX() + button.getWidth()).isLessThanOrEqualTo(400);
-                assertThat(button.getHeight()).isEqualTo(30);
+                assertThat(button.getHeight()).isEqualTo(24);
             });
             buttons.getFirst().doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
             owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(owner);
             assertThat(owner.currentPane().getHeight()).isEqualTo(432);
             owner.setToolbarMode(ToolbarMode.ICONS); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(390);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(402);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
         });
     }
