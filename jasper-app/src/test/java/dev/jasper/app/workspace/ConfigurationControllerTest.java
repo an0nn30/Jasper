@@ -658,4 +658,19 @@ void retroStyleReloadKeepsALiveSessionAndAppliesFontChanges() throws Exception {
     });
 }
 
+@Test void unavailableGtkReportsItsFallbackWithoutAPendingRestart() throws Exception {
+    Files.writeString(directory.resolve("config.toml"), "ui.theme.style='gtk'\n");
+    service = new ConfigService(directory.resolve("config.toml"), false);
+    edt(() -> {
+        themes = dev.jasper.app.appearance.GtkTestThemes.unavailable(dev.jasper.app.config.Appearance.DARK);
+        controller = new ConfigurationTestSupport(themes, service);
+        assertThat(themes.style()).isEqualTo(dev.jasper.app.config.ThemeStyle.MODERN);
+        assertThat(controller.shown().diagnostics()).filteredOn(d -> d.key().equals("ui.theme.style"))
+            .singleElement().satisfies(d -> assertThat(d.message()).contains("GTK is not available").doesNotContain("Restart"));
+    });
+    reload("ui.theme.style='modern'\n");
+    edt(() -> assertThat(controller.shown().diagnostics()).filteredOn(d -> d.key().equals("ui.theme.style"))
+        .extracting(d -> d.message()).anyMatch(message -> message.contains("Restart Jasper")));
+}
+
 }
