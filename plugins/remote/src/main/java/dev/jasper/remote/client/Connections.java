@@ -54,7 +54,8 @@ public final class Connections {
         });
     }
 
-    public record Shell(RemoteHost host, ConnectionIdentity identity, TerminalConnection connection) {
+    /** {@code folder} is present for a dedicated shell: its own connection, which SFTP follow may probe. */
+    public record Shell(RemoteHost host, ConnectionIdentity identity, TerminalConnection connection, Optional<ShellFolder> folder) {
         public UUID hostId() { return host.id(); }
     }
     private static final AttributeRepository.AttributeKey<HostKeyVerifier> VERIFY = new AttributeRepository.AttributeKey<>();
@@ -66,7 +67,13 @@ public final class Connections {
     private final BiFunction<WindowHandle, HostKeyVerifier.Question, CompletableFuture<HostKeyVerifier.Decision>> prompt;
     private final Executor background, ui;
     private final BiFunction<Duration, Runnable, Runnable> schedule;
-    private final Map<ConnectionIdentity, Shared> sessions = new HashMap<>();
+    /** A shared session is keyed by its identity alone; a dedicated one also by a token nobody else holds. */
+    private record Key(ConnectionIdentity identity, Object dedication) {
+        static Key shared(ConnectionIdentity identity) { return new Key(identity, null); }
+        static Key dedicated(ConnectionIdentity identity) { return new Key(identity, new Object()); }
+    }
+    private final Map<Key, Shared> sessions = new HashMap<>();
+    private final Map<TerminalConnection, Shared> shellSessions = new java.util.IdentityHashMap<>();
     private final java.util.Set<CompletableFuture<Prepared>> preparations = new java.util.HashSet<>();
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private SshClient plainClient, agentClient;
@@ -89,6 +96,7 @@ public final class Connections {
         }
     }
     private final class Shared {
+        final Key key;
         final RemoteHost host;
         final ConnectionIdentity identity;
         final Map<Object, WindowHandle> owners = new java.util.LinkedHashMap<>();
@@ -104,8 +112,8 @@ public final class Connections {
         int refs;
         boolean evicted;
         Runnable cancelLinger;
-        Shared(ConnectionIdentity identity, Consumer<String> status) {
-            this.identity = identity; this.host = identity.host();
+        Shared(Key key, Consumer<String> status) {
+            this.key = key; this.identity = key.identity(); this.host = identity.host();
             verifier = new HostKeyVerifier(trust, question -> {
                 var answer = new CompletableFuture<HostKeyVerifier.Decision>();
                 resources.add(() -> answer.cancel(true));
@@ -117,6 +125,7 @@ public final class Connections {
                 return answer;
             }, settings::authTimeout);
         }
+        boolean dedicated() { return key.dedication() != null; }
     }
     public Connections(Supplier<RemoteSettings> settings, KnownHosts trust, Optional<AgentClient> agent, Function<UUID, Optional<RemoteHost>> hosts,
                        Optional<Function<UUID, CompletableFuture<Optional<Credential>>>> credentials,
@@ -138,7 +147,7 @@ public final class Connections {
 
     /** Best-effort metadata on the existing transport, cached for its lifetime; never authenticates a new connection. */
     public CompletableFuture<HostInfo> inspect(Shell shell) {
-        Shared shared = sessions.get(shell.identity());
+        Shared shared = shellSessions.getOrDefault(shell.connection(), sessions.get(Key.shared(shell.identity())));
         if (closed || shared == null || shared.session == null || !shared.session.isOpen()) return CompletableFuture.completedFuture(HostInfo.EMPTY);
         if (shared.info != null) return shared.info;
         shared.refs++;
@@ -221,7 +230,7 @@ public final class Connections {
     /** UI-only: borrow an already authenticated route without opening connections or prompting. */
     public Optional<SessionLease> existingLease(ConnectionIdentity identity) {
         if(closed || !identity.resolved()) return Optional.empty();
-        Shared shared=sessions.get(identity);
+        Shared shared=sessions.get(Key.shared(identity));
         if(shared==null || shared.session==null || !shared.session.isOpen() || !shared.session.isAuthenticated()) return Optional.empty();
         shared.refs++;
         if(shared.cancelLinger!=null) { shared.cancelLinger.run();shared.cancelLinger=null; }
@@ -229,6 +238,9 @@ public final class Connections {
     }
 
     public CompletableFuture<SessionLease> lease(ConnectionIdentity identity, WindowHandle owner, Consumer<String> status) {
+        return lease(identity, owner, status, false);
+    }
+    private CompletableFuture<SessionLease> lease(ConnectionIdentity identity, WindowHandle owner, Consumer<String> status, boolean dedicated) {
         var result = new CompletableFuture<SessionLease>();
         if (closed) return CompletableFuture.failedFuture(new Failures.Failure("Remote is stopping"));
         var prepared = prepare(identity, owner);
@@ -237,7 +249,7 @@ public final class Connections {
             if (failure != null) { result.completeExceptionally(failure); return; }
             if (result.isDone() || closed) { value.close(); if (closed) result.cancel(true); return; }
             Shared shared;
-            try { shared = acquire(value.identity(), owner, status, value); }
+            try { shared = acquire(value.identity(), owner, status, value, dedicated); }
             catch (RuntimeException bad) { value.close(); result.completeExceptionally(bad); return; }
             value.close();
             Object token = new Object(); shared.owners.put(token, owner);
@@ -262,27 +274,39 @@ public final class Connections {
         return shell(id, null, columns, rows, status);
     }
     public CompletableFuture<Shell> shell(UUID id, WindowHandle owner, int columns, int rows, Consumer<String> status) {
+        return shell(id, owner, columns, rows, status, false);
+    }
+    /** A {@code dedicated} shell gets its own connection, never shared and closed with the shell, and a {@link ShellFolder}. */
+    public CompletableFuture<Shell> shell(UUID id, WindowHandle owner, int columns, int rows, Consumer<String> status, boolean dedicated) {
         var result = new CompletableFuture<Shell>();
         CompletableFuture<SessionLease> requested;
-        try { requested = lease(identity(id), owner, status); }
+        try { requested = lease(identity(id), owner, status, dedicated); }
         catch (RuntimeException bad) { return CompletableFuture.failedFuture(bad); }
         result.whenComplete((v, e) -> { if (result.isCancelled()) requested.cancel(true); });
         requested.whenComplete((lease, failure) -> ui.execute(() -> {
             if (failure != null) { result.completeExceptionally(failure); return; }
             if (result.isDone()) { lease.close(); return; }
             boolean[] counted = {false}, released = {false};
+            TerminalConnection[] opened = {null};
             Runnable release = () -> ui.execute(() -> {
                 if (released[0]) return; released[0] = true;
+                if (opened[0] != null) shellSessions.remove(opened[0]);
                 if (counted[0]) { channels--; notifyChanged(); } lease.close();
             });
             result.whenComplete((v, e) -> { if (result.isCancelled()) release.run(); });
             status.accept("Opening shell…");
-            onBackground(() -> ShellChannels.open(lease.session(), columns, rows, settings.get().connectTimeout(), release))
+            ShellFolder folder = dedicated ? new ShellFolder(lease.session()) : null;
+            Runnable entered = folder == null ? () -> { } : folder::entered;
+            onBackground(() -> ShellChannels.open(lease.session(), columns, rows, settings.get().connectTimeout(), entered, release))
                 .whenComplete((connection, problem) -> ui.execute(() -> {
                     if (problem != null) { release.run(); result.completeExceptionally(problem); return; }
                     if (result.isDone()) { connection.close().run(); return; }
-                    if (!released[0]) { counted[0] = true; channels++; notifyChanged(); }
-                    if (!result.complete(new Shell(lease.host(), lease.identity(), connection))) connection.close().run();
+                    if (!released[0]) {
+                        counted[0] = true; channels++; notifyChanged();
+                        opened[0] = connection;
+                        for (Shared candidate : sessions.values()) if (candidate.session == lease.session()) shellSessions.put(connection, candidate);
+                    }
+                    if (!result.complete(new Shell(lease.host(), lease.identity(), connection, Optional.ofNullable(folder)))) connection.close().run();
                 }));
         }));
         return result;
@@ -323,19 +347,19 @@ public final class Connections {
     private Failures.Failure failure(Shared shared, Throwable failure) {
         return new Failures.Failure(Failures.message(failure, shared.settings.connectTimeout(), shared.host.hostname()), failure);
     }
-    private Shared acquire(ConnectionIdentity identity, WindowHandle owner, Consumer<String> status, Prepared prepared) {
+    private Shared acquire(ConnectionIdentity identity, WindowHandle owner, Consumer<String> status, Prepared prepared, boolean dedicated) {
         RemoteHost host = identity.host();
-        Shared prior = sessions.get(identity);
+        Shared prior = dedicated ? null : sessions.get(Key.shared(identity));
         if (prior != null && prior.session != null && !prior.session.isOpen()) { evict(prior); prior = null; }
         if (prior != null) {
             prior.refs++;
             if (prior.cancelLinger != null) { prior.cancelLinger.run(); prior.cancelLinger = null; }
             return prior;
         }
-        Shared fresh = new Shared(identity, status); fresh.refs = 1; sessions.put(identity, fresh);
+        Shared fresh = new Shared(dedicated ? Key.dedicated(identity) : Key.shared(identity), status); fresh.refs = 1; sessions.put(fresh.key, fresh);
         List<Credential> captured = prepared.secrets.remove(host.id());
         if (captured != null) fresh.resources.add(() -> captured.forEach(Credential::close));
-        if (identity.parent() != null) fresh.parent = acquire(identity.parent(), owner, status, prepared);
+        if (identity.parent() != null) fresh.parent = acquire(identity.parent(), owner, status, prepared, false);
         CompletableFuture<ClientSession> via = fresh.parent == null ? CompletableFuture.completedFuture(null) : fresh.parent.ready;
         via.whenComplete((jump, failure) -> ui.execute(() -> {
             if (fresh.evicted) return;
@@ -504,13 +528,13 @@ public final class Connections {
     private void release(Shared shared) {
         if (shared.refs > 0) shared.refs--;
         if (shared.refs != 0 || shared.evicted) return;
-        if (!shared.ready.isDone()) { evict(shared); return; }
+        if (!shared.ready.isDone() || shared.dedicated()) { evict(shared); return; }
         if (shared.cancelLinger == null) shared.cancelLinger = schedule.apply(settings.get().linger(), () -> ui.execute(() -> { if (shared.refs == 0) evict(shared); }));
     }
     private void evict(Shared shared) {
         if (shared.evicted) return;
         shared.evicted = true;
-        sessions.remove(shared.identity, shared);
+        sessions.remove(shared.key, shared);
         if (shared.cancelLinger != null) { shared.cancelLinger.run(); shared.cancelLinger = null; }
         shared.ready.completeExceptionally(new Failures.Failure("connection lost"));
         shared.resources.close();

@@ -65,6 +65,26 @@ public final class LoopbackServer implements AutoCloseable {
         });
     }
 
+    /** Answers exactly {@code command} with {@code output} and {@code status}; any other command exits 1. */
+    public void execResult(String command, int status, byte[] output) {
+        server.setCommandFactory((channel, requested) -> {
+            execCommands.add(requested);
+            return new Command() {
+                OutputStream out;
+                ExitCallback exit;
+                @Override public void setInputStream(InputStream in) {}
+                @Override public void setOutputStream(OutputStream value) { out = value; }
+                @Override public void setErrorStream(OutputStream err) {}
+                @Override public void setExitCallback(ExitCallback value) { exit = value; }
+                @Override public void start(ChannelSession channel, Environment env) throws IOException {
+                    if (!requested.equals(command)) { exit.onExit(1); return; }
+                    out.write(output); out.flush(); exit.onExit(status);
+                }
+                @Override public void destroy(ChannelSession channel) {}
+            };
+        });
+    }
+
     static final class Echo implements Command {
         private InputStream in; private OutputStream out; private ExitCallback exit; private Thread thread;
 

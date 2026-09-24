@@ -35,6 +35,8 @@ import java.util.function.Function;
 import org.apache.sshd.common.config.keys.PublicKeyEntry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
@@ -90,6 +92,13 @@ class ConnectionsTest {
     }
 
     Connections.Shell shell(RemoteHost host) { return onUi(() -> connections.shell(host.id(), 100, 30, status -> { })).join(); }
+    Connections.Shell dedicatedShell(RemoteHost host) { return onUi(() -> connections.shell(host.id(), null, 100, 30, status -> { }, true)).join(); }
+
+    static void awaitSessions(LoopbackServer server, int count) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (server.server.getActiveSessions().size() != count && System.nanoTime() < deadline) Thread.sleep(20);
+        assertThat(server.server.getActiveSessions()).hasSize(count);
+    }
 
     static String readUntil(TerminalConnection connection, String marker) throws IOException {
         var out = new StringBuilder();
@@ -535,6 +544,93 @@ class ConnectionsTest {
             cache.put(shell.host(), info);
             assertThat(cache.get(original).os()).isEqualTo("macOS");
             assertThat(cache.get(changed).os()).isEmpty();
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void dedicatedShellsGetTheirOwnConnectionsAndCloseWithTheirShell(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("followed", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shared = shell(host);
+            var first = dedicatedShell(host);
+            var second = dedicatedShell(host);
+            awaitSessions(server, 3);
+            assertThat(shared.folder()).isEmpty();
+            assertThat(first.folder()).isPresent();
+            assertThat(readUntil(first.connection(), "\r\n")).startsWith("READY");
+            var lease = onUi(() -> connections.lease(shared.identity(), null, status -> { })).get(10, TimeUnit.SECONDS);
+            awaitSessions(server, 3);
+            lease.close();
+            first.connection().close().run();
+            awaitSessions(server, 2);
+            assertThat(onUi(() -> List.copyOf(scheduled))).as("a dedicated connection does not linger").isEmpty();
+            shared.connection().close().run();
+            Thread.sleep(200);
+            assertThat(server.server.getActiveSessions()).as("the shared connection lingers").hasSize(2);
+            onUi(() -> { var tasks = List.copyOf(scheduled); scheduled.clear(); tasks.forEach(Runnable::run); });
+            awaitSessions(server, 1);
+            second.connection().close().run();
+            awaitSessions(server, 0);
+        }
+    }
+
+    @Test void dedicatedShellProbesItsOwnSessionAndMapsExitStatuses(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("probe", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = dedicatedShell(host);
+            var folder = shell.folder().orElseThrow();
+            server.execResult("sh -s", 0, "/srv/app\0".getBytes(StandardCharsets.UTF_8));
+            assertThat(folder.read()).contains("/srv/app");
+            assertThat(server.execCommands).containsExactly("sh -s");
+            server.execResult("sh -s", 0, new byte[0]);
+            assertThat(folder.read()).isEmpty();
+            server.execResult("sh -s", 3, new byte[0]);
+            assertThatThrownBy(folder::read).isInstanceOf(ShellFolder.Unsupported.class);
+            server.execResult("sh -s", 1, new byte[0]);
+            assertThatThrownBy(folder::read).isInstanceOf(IOException.class).isNotInstanceOf(ShellFolder.Unsupported.class).hasMessage("Directory probe failed");
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void enterInTheShellSignalsItsFolder(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("enter", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = dedicatedShell(host);
+            var entered = new java.util.concurrent.CountDownLatch(1);
+            shell.folder().orElseThrow().onEnter(entered::countDown);
+            type(shell.connection(), "ls\r");
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(readUntil(shell.connection(), "ls\r")).as("the bytes still reach the shell").contains("ls\r");
+            shell.connection().close().run();
+        }
+    }
+
+    @Test void inspectionUsesTheDedicatedShellsOwnConnection(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.execReplies(Map.of("uname -s", "Darwin\n"));
+            connections(dir, Optional.empty());
+            var host = host("mac", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = dedicatedShell(host);
+            assertThat(onUi(() -> connections.inspect(shell)).get(5, TimeUnit.SECONDS).os()).isEqualTo("macOS");
+            awaitSessions(server, 1);
+            shell.connection().close().run();
+            awaitSessions(server, 0);
+        }
+    }
+
+    @Test @EnabledOnOs({OS.LINUX, OS.MAC}) void probeScriptRunsOverARealExecChannel(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            server.server.setCommandFactory(org.apache.sshd.server.shell.ProcessShellCommandFactory.INSTANCE);
+            connections(dir, Optional.empty());
+            var host = host("real", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var shell = dedicatedShell(host);
+            // The test JVM normally has no sshd ancestor, so the script finds no shell. What matters: the real
+            // `sh -s` received the whole script and its end of input, and exited 0 within the timeout.
+            var result = shell.folder().orElseThrow().read();
+            assertThat(result.isEmpty() || result.orElseThrow().startsWith("/")).isTrue();
             shell.connection().close().run();
         }
     }
