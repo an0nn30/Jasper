@@ -193,9 +193,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if (bar != null) bar.setTitle(display, content.tabStrip().getTabCount() <= 1);
         };
         if (bar != null) {
-            content.onThemeChanged = theme -> bar.setLight(theme.chrome().appearance() == Appearance.LIGHT);
+            content.onThemeChanged = theme -> bar.setLight(theme.appearance() == Appearance.LIGHT);
             content.onTabHeightChanged = bar::refreshHeight;
-            bar.setLight(content.theme().chrome().appearance() == Appearance.LIGHT);
+            bar.setLight(content.theme().appearance() == Appearance.LIGHT);
         }
         content.update();
         return bar;

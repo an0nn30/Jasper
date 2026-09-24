@@ -1,6 +1,5 @@
 package dev.jasper.app.application;
 
-import dev.jasper.app.appearance.BuiltinTheme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -145,8 +144,8 @@ public final class JasperApplication {
         this.shutdown = new ApplicationShutdown(() -> { relaunchIfRequested(); terminate.run(); });
         this.shellIntegrationDir = shellIntegrationDir;
         buddy = new BuddyIntegration(buddyStateFile, SystemFonts.system(java.awt.Font.PLAIN, 13f),
-            themes.current().chrome() == BuiltinTheme.DARK, this::raiseTerminal, this::toggleBuddy, this::owns);
-        buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome() == BuiltinTheme.DARK));
+            themes.current().dark(), this::raiseTerminal, this::toggleBuddy, this::owns);
+        buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
         configuration = service == null ? null : new ConfigurationController(themes, service);
@@ -308,7 +307,7 @@ public final class JasperApplication {
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
             Optional.empty(), invocation -> managePlugins());
         contributions.addMenuSection(MenuTarget.standard(MenuTarget.Slot.FILE)).set(List.of(new MenuEntry.Item("plugins.manage")));
-        plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome() == BuiltinTheme.DARK);
+        plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().dark());
         boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
         shortcutHelp = new dev.jasper.app.shortcuthelp.ShortcutHelp(auxiliary, contributions,
             () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).bindings(macOs),
@@ -319,7 +318,7 @@ public final class JasperApplication {
         boolean[] replayed = new boolean[1];
         // subscribe replays the current theme at once; plugins read the look on demand, so only later changes are events.
         pluginTheme = themes.subscribe((theme, chromeChanged) -> {
-            if (replayed[0] && chromeChanged) plugins.themeChanged(theme.chrome() == BuiltinTheme.DARK);
+            if (replayed[0] && chromeChanged) plugins.themeChanged(theme.dark());
             replayed[0] = true;
         });
         reportBindingProblems();

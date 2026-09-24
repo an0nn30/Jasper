@@ -117,7 +117,7 @@ public final class NativeShells {
             .filter(NativeShells::onSomeScreen).ifPresent(frame::setBounds);
         Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
             if (chromeChanged) SwingUtilities.updateComponentTreeUI(frame);
-            if (bar != null) bar.setLight(resolved.chrome().appearance() == dev.jasper.app.config.Appearance.LIGHT);
+            if (bar != null) bar.setLight(resolved.appearance() == dev.jasper.app.config.Appearance.LIGHT);
         });
         natives.put(surface, frame);
         return new AuxiliarySurface.Shell(() -> frame.setVisible(true), () -> {
@@ -148,7 +148,7 @@ public final class NativeShells {
         dialog.setLocationRelativeTo(owner);
         Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
             if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
-            if (bar != null) bar.setLight(resolved.chrome().appearance() == dev.jasper.app.config.Appearance.LIGHT);
+            if (bar != null) bar.setLight(resolved.appearance() == dev.jasper.app.config.Appearance.LIGHT);
         });
         natives.put(surface, dialog);
         return new AuxiliarySurface.Shell(() -> { dialog.pack(); dialog.setLocationRelativeTo(owner); dialog.setVisible(true); },

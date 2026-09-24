@@ -291,6 +291,7 @@ public final class CommandPalettePreview {
                 case DARK -> "dark";
                 case LIGHT -> "light";
                 case RETRO -> "retro";
+                case GTK -> "gtk";
             };
         }
 
