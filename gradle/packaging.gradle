@@ -19,6 +19,9 @@ def inputDirectory = packagingRoot.map { it.dir('input') }
 def imageDirectory = packagingRoot.map { it.dir('image') }
 def distributionDirectory = packagingRoot.map { it.dir('dist') }
 def markerFile = packagingRoot.map { it.file('image.complete') }
+// Shown by macOS's Local Network privacy prompt. Without the grant, connections to LAN addresses
+// fail with EHOSTUNREACH ("No route to host"), which is how Remote's SSH connections to them fail.
+def localNetworkUsage = 'Jasper connects to SSH hosts on your local network.'
 
 def normalizedHost = {
     String os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
@@ -132,10 +135,23 @@ def refreshLauncherSdk = { File image ->
         '-output', patched.absolutePath, stub.absolutePath], 'vtool -set-build-version')
     Files.move(patched.toPath(), stub.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
     stub.setExecutable(true, false)
-    // The same ad-hoc identity jpackage used; the nested runtime keeps its own signature.
-    executeNative(['/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements,requirements,flags',
-        image.absolutePath], 'codesign after vtool')
     logger.lifecycle("Launcher build version: SDK ${current.sdk} -> ${sdk} (minos ${current.minos})")
+}
+
+// jpackage puts every jar under --input on the application classpath, including the bundled plugins
+// staged in plugins/. Those must load only through their own PluginClassLoader: MINA sshd resolves
+// classes through the thread context class loader (the application loader), and an application-loader
+// copy of sshd or BouncyCastle then fails to cast to the plugin's copy (ExceptionInInitializerError).
+def removePluginClasspath = { File config ->
+    List<String> lines = config.readLines('UTF-8')
+    List<String> kept = lines.findAll { !(it.replace('\\', '/') ==~ /app\.classpath=.*\/plugins\/.*/) }
+    if (kept.size() != lines.size()) config.setText(kept.join('\n') + '\n', 'UTF-8')
+}
+
+// Re-signs after the bundle is edited: the same ad-hoc identity jpackage used; the nested runtime keeps its own signature.
+def resignImage = { File image ->
+    executeNative(['/usr/bin/codesign', '--force', '--sign', '-', '--preserve-metadata=entitlements,requirements,flags',
+        image.absolutePath], 'codesign after bundle edits')
 }
 
 def stage = tasks.register('stagePackage', Sync) {
@@ -159,6 +175,7 @@ def packageApp = tasks.register('packageApp') {
     inputs.file(nativeIcon).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.property('mainClass', app.mainClass)
     inputs.property('jvmArgs', providers.provider { app.applicationDefaultJvmArgs.collect { it.toString() } })
+    inputs.property('localNetworkUsage', localNetworkUsage)
     inputs.property('version', version)
     inputs.property('host', providers.provider { normalizedHost().toString() })
     inputs.property('toolchainHome', launcher.map { it.metadata.installationPath.asFile.absolutePath })
@@ -186,7 +203,16 @@ def packageApp = tasks.register('packageApp') {
         }
         try {
             executeNative(args, 'jpackage app-image')
-            if (context.host.os == 'macos') refreshLauncherSdk(new File(imageDir, 'Jasper.app'))
+            if (context.host.os == 'macos') {
+                File image = new File(imageDir, 'Jasper.app')
+                removePluginClasspath(new File(image, 'Contents/app/Jasper.cfg'))
+                executeNative(['/usr/bin/plutil', '-replace', 'NSLocalNetworkUsageDescription', '-string', localNetworkUsage,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil local network usage')
+                refreshLauncherSdk(image)
+                resignImage(image)
+            } else {
+                removePluginClasspath(new File(imageDir, 'Jasper/app/Jasper.cfg'))
+            }
             marker.text = "${context.version} ${context.host.os} ${context.host.architecture}\n"
         } catch (Exception failure) {
             delete(imageDir, marker)
@@ -235,6 +261,10 @@ def verifyPackage = tasks.register('verifyPackage') {
         configurations.runtimeClasspath.files.findAll { it.name.endsWith('.jar') }.each { dependency ->
             if (!normalizedCfg.contains("\$APPDIR/${dependency.name}")) throw new GradleException("Package verification failed: classpath omits ${dependency.name}")
         }
+        // Plugins bring private copies of their libraries; on the application classpath they shadow them
+        // through the context class loader (MINA's registrar lookup then fails with a ClassCastException).
+        def pluginEntries = (normalizedCfg =~ /(?m)^app\.classpath=.*\/plugins\/.*$/).collect { it }
+        if (pluginEntries) throw new GradleException("Package verification failed: plugin jars are on the application classpath\n${pluginEntries.join('\n')}")
         File release = new File(runtimeHome, 'release')
         String releaseText = release.getText('UTF-8')
         if (!(releaseText =~ /(?m)^JAVA_VERSION="25(?:\.|\")/)) {
@@ -263,6 +293,8 @@ def verifyPackage = tasks.register('verifyPackage') {
             def identifier = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist.absolutePath], 'plutil identifier').stdout.trim()
             def bundleVersion = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleShortVersionString', 'raw', '-o', '-', plist.absolutePath], 'plutil version').stdout.trim()
             if (identifier != 'dev.jasper.app' || bundleVersion != context.version) throw new GradleException("Package verification failed: plist identity/version is ${identifier}/${bundleVersion}")
+            def localNetwork = executeNative(['/usr/bin/plutil', '-extract', 'NSLocalNetworkUsageDescription', 'raw', '-o', '-', plist.absolutePath], 'plutil local network').stdout.trim()
+            if (localNetwork != localNetworkUsage) throw new GradleException("Package verification failed: plist local network usage description is '${localNetwork}'")
             String iconName = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIconFile', 'raw', '-o', '-', plist.absolutePath], 'plutil icon').stdout.trim()
             if (!iconName.endsWith('.icns')) iconName += '.icns'
             File packagedIcon = new File(image, "Contents/Resources/${iconName}")

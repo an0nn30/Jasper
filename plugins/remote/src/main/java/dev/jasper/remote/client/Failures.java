@@ -1,6 +1,7 @@
 package dev.jasper.remote.client;
 
 import java.net.ConnectException;
+import java.net.NoRouteToHostException;
 import java.net.UnknownHostException;
 import java.nio.channels.UnresolvedAddressException;
 import java.time.Duration;
@@ -29,6 +30,9 @@ public final class Failures {
         if (cause instanceof Failure ready) return ready.getMessage();
         if (hasCause(cause, UnknownHostException.class) || hasCause(cause, UnresolvedAddressException.class)) return "Could not resolve host " + hostname;
         String text = String.valueOf(cause.getMessage()).toLowerCase(Locale.ROOT);
+        // macOS reports a LAN address the app may not reach (Local Network privacy) as EHOSTUNREACH.
+        if (hasCause(cause, NoRouteToHostException.class) || text.contains("no route to host"))
+            return "No route to host " + hostname + ". On macOS, allow Jasper under System Settings > Privacy & Security > Local Network.";
         if (cause instanceof ConnectException || text.contains("connection refused")) return "Connection refused";
         if (cause instanceof TimeoutException || text.contains("timeout") || text.contains("timed out")) return "Timed out after " + connectTimeout.toSeconds() + " s";
         if (text.contains("connection lost") || text.contains("closed") || text.contains("reset")) return "Connection lost";
