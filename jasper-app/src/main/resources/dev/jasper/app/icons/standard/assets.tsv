@@ -1,7 +1,7 @@
 resource	source	sha256
-ADD.svg	repository:jasper-app/src/main/resources/dev/jasper/app/icons/title/plus.svg	7a964a0652ca641f0a3bf85003dbb458fab64c4cc9b3ad5fdb211b279a331ec2
-BOOKMARK.svg	repository:jasper-app/src/main/resources/dev/jasper/app/icons/bookmark.svg	0f87f71d0eb1b5831653a6a8ece4bfc061db677436e13f334da744d3c822dff4
-CLOSE.svg	repository:jasper-app/src/main/resources/dev/jasper/app/icons/title/x.svg	e5a4e6711c2bdf74e6c0d13e174c1e56577630b8e9719f53c6711b48cf0748c5
+ADD.svg	Tabler outline plus.svg at commit 6d128ed935d4546607b1e4d5d08c8b27bdbe7758, stroke #6e6e6e (formerly repository jasper-app/src/main/resources/dev/jasper/app/icons/title/plus.svg)	7a964a0652ca641f0a3bf85003dbb458fab64c4cc9b3ad5fdb211b279a331ec2
+BOOKMARK.svg	Tabler outline bookmark.svg at commit 6d128ed935d4546607b1e4d5d08c8b27bdbe7758, stroke #6e6e6e (formerly repository jasper-app/src/main/resources/dev/jasper/app/icons/bookmark.svg)	0f87f71d0eb1b5831653a6a8ece4bfc061db677436e13f334da744d3c822dff4
+CLOSE.svg	Tabler outline x.svg at commit 6d128ed935d4546607b1e4d5d08c8b27bdbe7758, stroke #6e6e6e (formerly repository jasper-app/src/main/resources/dev/jasper/app/icons/title/x.svg)	e5a4e6711c2bdf74e6c0d13e174c1e56577630b8e9719f53c6711b48cf0748c5
 CONNECT.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/plug-connected.svg	a264381bea6bc8bd583401520cf41212bbca0782ad76fd2a2f9d84107258a17a
 COPY.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/copy.svg	b38a178d5ee74073f95b57ea33e7dab0624e314c1cc835c85ff35f1d1e5517e1
 DELETE.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/trash.svg	28587eb685afab185034d3fe0e192000a38a4f384e5de8c5c6da2512991d89ff
@@ -9,15 +9,15 @@ DISCONNECT.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a
 EXECUTE.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/player-play.svg	0178cf0262ec89422d632f6122c6be34a8b57db32dd1aea38dd283bdeecbfc2f
 FOLDER.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/folder.svg	2dff6b74080049d05c695f75a443ffafa88fd7d3c94728f02d64451b2d9181eb
 HELP.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/help-circle.svg	0149afb36ec5442f4ab3fc4e37cd0639af9f794665bbce19a57de583bcb6bf24
-HISTORY.svg	repository:jasper-app/src/main/resources/dev/jasper/app/icons/history.svg	d53370c46c088acc443ec877407cad5f62df73afde8221f219637e90ee569d63
+HISTORY.svg	Tabler outline history.svg at commit 6d128ed935d4546607b1e4d5d08c8b27bdbe7758, stroke #6e6e6e (formerly repository jasper-app/src/main/resources/dev/jasper/app/icons/history.svg)	d53370c46c088acc443ec877407cad5f62df73afde8221f219637e90ee569d63
 INFO.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/info-circle.svg	8bb2ea8aa6e56cab6137f44a0b1a1eabeab526b7f96ea8be36d583868a737562
 KEY.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/key.svg	b36c19b63957f09c2925dbb9246a7ac652205390f2cc3753760a66f8e2d38088
 LOCK.svg	repository:plugins/vault/src/main/resources/dev/jasper/vault/lock.svg	ebeda1d98d57d797ff022df17791a12207a660a86d930c37576c8f89d59befe4
 NETWORK.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/network.svg	bc5ca95d7c1fdfb98dfb0cc91c87f3e2faccd9e8263c6d28f19120cd0fde8b3d
 PASTE.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/clipboard.svg	36d96e59a486c033ac825f27d64166c0e9e4fd3ecbb57f0275c36ec8132508d0
-REFRESH.svg	repository:jasper-app/src/main/resources/dev/jasper/app/icons/refresh.svg	72a5af917d6aa95f998a137d7b6b6f690317871958da3ef41e53654385c9cb85
+REFRESH.svg	Tabler outline refresh.svg at commit 6d128ed935d4546607b1e4d5d08c8b27bdbe7758, stroke #6e6e6e (formerly repository jasper-app/src/main/resources/dev/jasper/app/icons/refresh.svg)	72a5af917d6aa95f998a137d7b6b6f690317871958da3ef41e53654385c9cb85
 REMOVE.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/minus.svg	41b4d0e2e81757c0d8b8611208621aa0190280d5cffb25436f558a362474d0da
 SAVE.svg	https://raw.githubusercontent.com/tabler/tabler-icons/0239805680a36bab4e1070529b6744924402d804/icons/outline/device-floppy.svg	3d15c3ac1b682a4a0ec9878ea94ecb4c2144bc16f8be6ba4e6e4c8fd140f101b
-SEARCH.svg	repository:jasper-app/src/main/resources/dev/jasper/app/icons/search.svg	0d4097e3dfda56d18434b4ad74df9c68a86ff54f06392c55ec1476fc66eddc99
-SETTINGS.svg	repository:jasper-app/src/main/resources/dev/jasper/app/icons/settings.svg	1ebc021f026db74789acabd70f170b44bb5f97dedefd0d6c954d97b94de416d6
+SEARCH.svg	Tabler outline search.svg at commit 6d128ed935d4546607b1e4d5d08c8b27bdbe7758, stroke #6e6e6e (formerly repository jasper-app/src/main/resources/dev/jasper/app/icons/search.svg)	0d4097e3dfda56d18434b4ad74df9c68a86ff54f06392c55ec1476fc66eddc99
+SETTINGS.svg	Tabler outline settings.svg at commit 6d128ed935d4546607b1e4d5d08c8b27bdbe7758, stroke #6e6e6e (formerly repository jasper-app/src/main/resources/dev/jasper/app/icons/settings.svg)	1ebc021f026db74789acabd70f170b44bb5f97dedefd0d6c954d97b94de416d6
 UNLOCK.svg	repository:plugins/vault/src/main/resources/dev/jasper/vault/lock-open.svg	cb6a6cf10c1d7dcebab9a6b806e3ea5b7a88eac6300936d276e12df21223a0b8

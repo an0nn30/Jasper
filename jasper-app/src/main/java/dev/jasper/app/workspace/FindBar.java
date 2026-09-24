@@ -8,6 +8,7 @@ import dev.jasper.terminal.search.FindResult;
 import dev.jasper.terminal.search.SearchQuery;
 import dev.jasper.terminal.view.TerminalView;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.event.ActionEvent;
@@ -34,7 +35,7 @@ final class FindBar extends JPanel {
     private boolean disposed;
     private boolean searching;
     private boolean dirty;
-    private volatile boolean missing;
+    private boolean missing;
     private long generation;
     private long pendingNavigation;
 
@@ -243,7 +244,10 @@ final class FindBar extends JPanel {
         missing = value;
         if (!modern) return;
         query.putClientProperty(FlatClientProperties.OUTLINE, value ? FlatClientProperties.OUTLINE_ERROR : null);
-        query.setBackground(UIManager.getColor(value ? "Jasper.findErrorBackground" : "TextField.background"));
+        // The tint is a plain Color so the field's own updateUI keeps it; the default stays a
+        // UIResource so a theme switch restores the new theme's background.
+        Color error = UIManager.getColor("Jasper.findErrorBackground");
+        query.setBackground(value && error != null ? new Color(error.getRGB(), true) : UIManager.getColor("TextField.background"));
     }
 
     private void remember() {

@@ -13,6 +13,8 @@ import javax.swing.*;
 /** IntelliJ-style editor tabs over WindowContent's retained Swing selection model. */
 final class WindowTabs extends JPanel implements AutoCloseable {
     private static final int MIN_TAB = 80, MAX_TAB = 240, LIST_WIDTH = 24, EDGE = 8, GAP = 6, UNDERLINE = 3;
+    /** Titles come from remote programs; tooltips and the tab list show at most this many characters. */
+    private static final int TITLE_LIMIT = 200;
     private final WindowContent owner;
     private final IdentityHashMap<TerminalTab, Entry> entries = new IdentityHashMap<>();
     private final List<TerminalTab> order = new ArrayList<>();
@@ -50,7 +52,11 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         }
         if (selected != owner.currentTab()) { selected = owner.currentTab(); revealSelection = true; }
         setBackground(UIManager.getColor("Jasper.titleBackground"));
-        for (TerminalTab tab : order) entries.get(tab).refresh();
+        boolean retitled = false;
+        for (TerminalTab tab : order) retitled |= entries.get(tab).refresh();
+        // A tab that grows can push the selected tab out; keep it shown if it was shown.
+        Entry current = entries.get(selected);
+        if (retitled && current != null && current.isVisible()) revealSelection = true;
         list.setEnabled(!disposed);
         revalidate(); repaint();
     }
@@ -68,7 +74,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     JPopupMenu tabList() {
         var menu = new JPopupMenu();
         for (TerminalTab tab : order) {
-            var item = new JCheckBoxMenuItem(tab.title(), tab.icon(), tab == selected);
+            var item = new JCheckBoxMenuItem(capped(tab.title()), tab.icon(), tab == selected);
             item.putClientProperty("html.disable", true);
             item.addActionListener(event -> { if (!disposed) owner.selectTab(tab); });
             menu.add(item);
@@ -111,6 +117,13 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         list.setBounds(width - listWidth, 0, listWidth, height);
     }
 
+    private static String capped(String title) {
+        if (title.length() <= TITLE_LIMIT) return title;
+        int end = TITLE_LIMIT - 1;
+        if (Character.isHighSurrogate(title.charAt(end - 1))) end--; // never split an emoji
+        return title.substring(0, end) + "\u2026";
+    }
+
     private static int sum(int[] values, int from, int to) {
         int total = 0;
         for (int i = from; i < to; i++) total += values[i];
@@ -133,7 +146,16 @@ final class WindowTabs extends JPanel implements AutoCloseable {
 
     private final class Entry extends JPanel {
         private final TerminalTab tab;
-        private final JButton select = new JButton(), close = new JButton();
+        private final JButton close = new JButton();
+        private final JButton select = new JButton() {
+            // Swing creates a fresh tip that does not inherit html.disable from its component.
+            @Override public JToolTip createToolTip() {
+                var tip = new JToolTip();
+                tip.putClientProperty("html.disable", true);
+                tip.setComponent(this);
+                return tip;
+            }
+        };
         private boolean hovered;
         private Point origin;
 
@@ -193,20 +215,24 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             return Math.max(UIScale.scale(MIN_TAB), Math.min(UIScale.scale(MAX_TAB), content));
         }
 
-        void refresh() {
+        /** Returns whether the title changed. */
+        boolean refresh() {
             String text = tab.title();
-            if (!text.equals(select.getText())) {
+            boolean retitled = !text.equals(select.getText());
+            if (retitled) {
                 select.setText(text); select.getAccessibleContext().setAccessibleName(text);
                 select.setName("select:" + text); close.setName("close:" + text);
             }
             String shortcut = owner.tabShortcut(order.indexOf(tab));
-            select.setToolTipText(shortcut.isEmpty() ? text : text + " (" + shortcut + ")");
+            String tip = capped(text);
+            select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
             select.setIcon(tab.icon());
             select.setSelected(tab == selected);
             select.setFont(SystemFonts.ui(Font.PLAIN, 13f));
             select.setForeground(UIManager.getColor(!active ? "Jasper.titleInactiveForeground"
                 : tab == selected ? "Jasper.tabSelectedForeground" : "Jasper.titleForeground"));
             close.setVisible(tab == selected || hovered);
+            return retitled;
         }
 
         @Override public void doLayout() {

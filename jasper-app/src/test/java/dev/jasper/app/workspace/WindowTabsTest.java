@@ -9,6 +9,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
 import java.util.Map;
 import javax.swing.*;
+import javax.swing.plaf.basic.BasicHTML;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
@@ -110,6 +111,42 @@ class WindowTabsTest {
             assertThat(control.getClientProperty("html.disable")).isEqualTo(true);
             assertThat(control.getToolTipText()).startsWith("<html>literal title");
             assertThat(owner.currentTab()).isSameAs(second);
+        });
+    }
+
+    @Test void tooltipsAndTheTabListStayLiteralAndBounded() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            String title = "<html><img src=http://example.invalid/x.png>" + "x".repeat(1000);
+            owner.currentTab().rename(title); owner.update();
+            var strip = owner.windowTabs();
+            var select = named(strip, "select:" + title);
+            JToolTip tip = select.createToolTip();
+            tip.setTipText(select.getToolTipText());
+            assertThat(tip.getClientProperty(BasicHTML.propertyKey)).as("the tip renders the title literally").isNull();
+            assertThat(select.getToolTipText()).hasSizeLessThanOrEqualTo(210).startsWith("<html><img").contains("\u2026");
+            var item = (JMenuItem) strip.tabList().getComponent(0);
+            assertThat(item.getText()).hasSizeLessThanOrEqualTo(201).startsWith("<html><img").endsWith("\u2026");
+            owner.currentTab().rename("short"); owner.update();
+            assertThat(select.getToolTipText()).isEqualTo("short (\u23181)");
+            assertThat(((JMenuItem) strip.tabList().getComponent(0)).getText()).isEqualTo("short");
+        });
+    }
+
+    @Test void aGrowingSelectedTitleStaysVisibleInOverflow() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var strip = owner.windowTabs();
+            owner.currentTab().rename("a");
+            for (String name : new String[] {"b", "c", "d", "e"}) { owner.newTab(HOME); owner.currentTab().rename(name); }
+            owner.invoke(ActionId.SELECT_TAB_3); owner.update();
+            layout(strip, 330, 38);
+            var selected = owner.currentTab();
+            assertThat(named(strip, "select:c").getParent().isVisible()).as("c is the rightmost visible tab").isTrue();
+            assertThat(named(strip, "select:d").getParent().isVisible()).isFalse();
+            selected.rename("vim somefile.txt with a much longer title than before"); owner.update();
+            layout(strip, 330, 38);
+            assertThat(named(strip, "select:" + selected.title()).getParent().isVisible()).isTrue();
         });
     }
 

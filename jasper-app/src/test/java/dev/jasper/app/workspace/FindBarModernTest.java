@@ -82,12 +82,17 @@ class FindBarModernTest {
                 assertThat(query.getClientProperty(FlatClientProperties.OUTLINE)).isEqualTo(FlatClientProperties.OUTLINE_ERROR);
                 assertThat(query.getBackground()).isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
                 assertThat(bar[0].countLabel().getText()).isEqualTo("0 results");
+                SwingUtilities.updateComponentTreeUI(bar[0]);
+                assertThat(query.getBackground()).as("a theme switch keeps the no-match tint")
+                    .isEqualTo(UIManager.getColor("Jasper.findErrorBackground"));
                 bar[0].caseButton().doClick();
             });
             until(() -> bar[0].result().count() == 2);
             edt(() -> {
                 assertThat(bar[0].missing()).isFalse();
                 assertThat(bar[0].queryField().getClientProperty(FlatClientProperties.OUTLINE)).isNull();
+                SwingUtilities.updateComponentTreeUI(bar[0]);
+                assertThat(bar[0].queryField().getBackground()).isEqualTo(UIManager.getColor("TextField.background"));
                 assertThat(bar[0].countLabel().getText()).isEqualTo("2/2");
                 bar[0].next();
                 bar[0].queryField().setText("beta");

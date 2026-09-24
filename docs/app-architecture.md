@@ -192,4 +192,5 @@ pane, plugin and right-pinned Find/Settings groups; tooltips carry live shortcut
 `WindowTabs`, IntelliJ editor tabs sized to content with a 3 px selection underline, wheel
 scrolling and a ▾ list of all tabs. Each pane's `FindBar` is IntelliJ's single-line find row.
 Retro keeps its Metal toolbar, `RetroTabs`, text-button find bar and 32 px title row. App icons
-resolve from bundled assets, while plugin-supplied SVGs preserve their existing contract.
+resolve from bundled assets. Since SDK 0.7.5, plugin-supplied SVGs draw as authored and are no
+longer recoloured to the chrome foreground (see [SDK architecture](sdk-architecture.md)).

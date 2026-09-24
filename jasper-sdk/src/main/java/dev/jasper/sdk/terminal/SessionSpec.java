@@ -11,7 +11,8 @@ import javax.swing.Icon;
  * {@link PendingSession}. It must not block: start the connection on {@code context.background()}.
  *
  * @param title the pane's title until the remote program sets one
- * @param icon the tab's icon (since 0.7.5); empty shows Jasper's terminal icon
+ * @param icon the tab's icon (since 0.7.5), drawn in a 16 &times; 16 logical-pixel slot; empty shows
+ *     Jasper's terminal icon
  * @param onExit what happens to the pane when the session ends
  * @param connector starts one connection attempt
  */

@@ -14,7 +14,8 @@ Jasper owns both images and chooses the running skin. Plugins supply no paths an
 no style detection. Modern icons are IntelliJ classic-UI artwork whose palette colours follow
 the live light/dark theme (KEY, LOCK, UNLOCK, CONNECT, DISCONNECT and DELETE keep tinted
 monochrome outlines); retro icons retain OldGNOME2 colors. Vault uses these calls for its status/menu icon and manager lock/unlock
-controls. Remote uses `IconName.NETWORK` for its Sessions toolbar, actions, host panel and status icon. Its modern lock/unlock resources are identical copies of its original SVG artwork.
+controls. Remote uses `IconName.NETWORK` for its Sessions toolbar, actions, host panel and status icon, and
+`IconName.SERVER` for its session tab icons. Its modern lock/unlock resources are identical copies of its original SVG artwork.
 
 Use the same icon for actions, toolbar dropdowns, menus, rail/panels, status items, palette
 rows and ordinary Swing components. Returned icons are 16 logical pixels. Retro host

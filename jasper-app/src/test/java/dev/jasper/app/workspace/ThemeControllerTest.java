@@ -85,7 +85,9 @@ class ThemeControllerTest {
             assertThat(themes[0].current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
             for (TerminalPane pane : retained[0].panes()) {
                 assertThat(pane.view().palette().background()).isEqualTo(new Color(0xfafafa));
-                assertThat(pane.findBar().queryField().getBackground()).isEqualTo(UIManager.getColor("TextField.background"));
+                // The invalid pattern keeps its no-match tint, in the new theme's colour.
+                assertThat(pane.findBar().queryField().getBackground()).isEqualTo(UIManager.getColor(
+                    pane == first[0] ? "Jasper.findErrorBackground" : "TextField.background"));
             }
             assertThat(first[0].session()).isSameAs(session[0]);
             assertThat(first[0].view().fontSize()).isEqualTo(23);
