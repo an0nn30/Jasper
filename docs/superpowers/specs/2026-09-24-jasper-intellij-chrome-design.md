@@ -1,6 +1,6 @@
 # IntelliJ-style modern chrome and colour icons
 
-**Status:** Design approved section by section by the user on 2026-09-24. Written specification approved on 2026-09-24. On 2026-09-24, during planning, the user trimmed the new SDK icon names from ten to four (SPLIT, ZOOM, TERMINAL, SERVER), because the repository has no suitable retro rasters for the rest.
+**Status:** Implemented on `claude/intellij-chrome`; visual acceptance pending. Design approved section by section by the user on 2026-09-24. Written specification approved on 2026-09-24. On 2026-09-24, during planning, the user trimmed the new SDK icon names from ten to four (SPLIT, ZOOM, TERMINAL, SERVER), because the repository has no suitable retro rasters for the rest.
 
 ## Purpose and scope
 

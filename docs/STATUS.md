@@ -2,6 +2,19 @@
 
 ## Current state — 2026-09-23
 
+- **IntelliJ-style modern chrome** (branch `claude/intellij-chrome`, plan
+  `docs/superpowers/plans/2026-09-24-jasper-intellij-chrome.md`): title-only title row, IntelliJ
+  toolbar, editor tabs and find bar with vendored IntelliJ icons; SDK 0.7.5 adds
+  SPLIT/ZOOM/TERMINAL/SERVER, draws plugin SVGs as authored and uses `SessionSpec.icon` as the tab
+  icon. Planning decisions (tab height setting kept, toolbar default mode kept, no toolbar
+  overflow menu, tab animation removed) are listed in the plan. Visual acceptance in modern
+  light, modern dark and retro is user-run. Not merged, not pushed.
+  Rulings: the vendored icon `LICENSE.txt` under `icons/intellij/` is the canonical Apache-2.0
+  text (the upstream root `LICENSE.txt` in the source tree is JetBrains' IDE build terms, not the
+  artwork's license); one `RetroChromeTest` assertion that pinned "no Settings in modern" was
+  narrowed to match the new modern chrome, with all other retro assertions unchanged.
+  `./gradlew check` passed: 1,771 tests, 0 failures, 0 errors, 3 skipped.
+
 Configuration documentation follow-up: the example and settings reference now include
 explicit `ui.theme.style = "modern"` and `ui.font.family = "system"`, with optional
 UI sizing, portable fallback, full-restart behavior and retro's retained-but-ignored

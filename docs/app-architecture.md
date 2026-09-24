@@ -184,7 +184,12 @@ reports light chrome and owns a separate black terminal palette.
 Style stays fixed for the process lifetime. `ConfigurationController` derives a restart
 warning when saved and running styles differ, and removes it when they match; ordinary
 live settings still apply. New windows, hidden panels and plugin factories use the running
-style. No SDK signatures or plugin lifecycle change. Retro uses the existing tab/session
-model with Metal tab delegates, compact icon-only close controls and a flat 24-pixel GNOME
-toolbar; form buttons remain stock Metal. App icons resolve from bundled assets, while
-plugin-supplied SVGs preserve their existing contract. Native title bars remain native.
+style. No SDK signatures or plugin lifecycle change.
+
+Modern windows stack three rows: `MacTitleBar` (macOS only) is a title-only 28 px row with the
+native controls and a centred bold title; `WindowChrome`'s IntelliJ-style toolbar (tab/window,
+pane, plugin and right-pinned Find/Settings groups; tooltips carry live shortcuts); and
+`WindowTabs`, IntelliJ editor tabs sized to content with a 3 px selection underline, wheel
+scrolling and a ▾ list of all tabs. Each pane's `FindBar` is IntelliJ's single-line find row.
+Retro keeps its Metal toolbar, `RetroTabs`, text-button find bar and 32 px title row. App icons
+resolve from bundled assets, while plugin-supplied SVGs preserve their existing contract.

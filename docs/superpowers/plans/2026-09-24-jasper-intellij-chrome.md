@@ -13,7 +13,7 @@
 
 **Spec:** [2026-09-24-jasper-intellij-chrome-design.md](../specs/2026-09-24-jasper-intellij-chrome-design.md) (approved; trimmed to four new icon names on 2026-09-24).
 
-**Status:** Not started. Branch `claude/intellij-chrome`; worktree `/Users/RQ7RQVF/projects/moray/.worktrees/intellij-chrome`. Another session is committing GTK work in the main checkout (`claude/gtk-theme`): never run git commands against `/Users/RQ7RQVF/projects/moray` itself.
+**Status:** All tasks complete; `./gradlew check` passed (1,771 tests, 0 failures, 0 errors, 3 skipped), with the counts from Step 2. Branch `claude/intellij-chrome`; worktree `/Users/RQ7RQVF/projects/moray/.worktrees/intellij-chrome`. Another session is committing GTK work in the main checkout (`claude/gtk-theme`): never run git commands against `/Users/RQ7RQVF/projects/moray` itself.
 
 ### Decisions made while planning (the user must confirm at plan review)
 

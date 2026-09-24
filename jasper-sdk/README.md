@@ -22,7 +22,7 @@ Start with the [authoring guide](../docs/plugin-authoring.md); the
 [architecture](../docs/sdk-architecture.md) explains loading, threading and lifetimes.
 Unit-test a plugin with `dev.jasper.sdk.testing.FakePluginHost` from `jasper-sdk-testkit`.
 
-## Icons for both skins (0.7.4)
+## Icons for both skins (0.7.4; 0.7.5 adds SPLIT/ZOOM/TERMINAL/SERVER)
 
 ```java
 var lock = context.appearance().icon(IconName.LOCK);
@@ -31,7 +31,9 @@ var unlock = context.appearance().icon(IconName.UNLOCK);
 
 Import `dev.jasper.sdk.ui.IconName`. Jasper supplies both modern and retro artwork; plugins
 request only the meaning, without image paths or skin checks. Compact icons stay 16px;
-retro host toolbars use an independent 28px variant. Declare SDK `>=0.7.4, <0.8` for named icons.
+retro host toolbars use an independent 28px variant. Declare SDK `>=0.7.4, <0.8` for named icons,
+or `>=0.7.5, <0.8` for `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Since 0.7.5, modern artwork is
+IntelliJ classic-UI SVG drawn as authored, with palette colours following the running theme.
 The existing custom SVG and SVG/OldGnomeIcon overloads remain supported. Custom older hosts
 inherit UnsupportedOperationException for named requests until they implement the new catalog.
 See the [catalog, size rules and testkit example](../docs/sdk-icons.md).

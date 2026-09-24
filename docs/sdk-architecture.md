@@ -248,6 +248,18 @@ remain supported. Vault uses semantic LOCK/UNLOCK in its status/menu and manager
 The fake returns inspectable FakeNamedIcon(name, retro); older custom Appearance implementations
 inherit an explicit UnsupportedOperationException for this method until they implement it.
 
+### Chrome icons and session tab icons (SDK 0.7.5)
+
+- `IconName` and `OldGnomeIcon` gain `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Retro artwork copies
+  existing GNOME2/OldGNOME2 rasters; modern artwork is IntelliJ classic-UI SVG vendored under
+  `jasper-app/.../icons/intellij/` (Apache-2.0, hash-pinned in `assets.tsv`).
+- Behaviour change: `Appearance.icon(String)` and the modern half of `icon(String, OldGnomeIcon)`
+  no longer recolour to the chrome foreground. They draw the SVG as authored; FlatLaf's global
+  colour filter maps IntelliJ light-palette colours to the running theme. Grey `#6E6E6E` artwork
+  looks as before.
+- `SessionSpec.icon` is no longer reserved: it is the tab icon. Empty shows `IconName.TERMINAL`.
+  Inside the app the icon travels opaquely on `SessionRequest`.
+
 SDK 0.7.2 adds `Panels.toggle(panelId, window)` for a plugin's own registered panel.
 It dispatches the same per-window lazy toggle as the rail; the app and testkit both
 reuse the panel instance after hiding it. Remote requires this version so its SSH
