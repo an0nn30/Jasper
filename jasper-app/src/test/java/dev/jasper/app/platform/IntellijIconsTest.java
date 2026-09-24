@@ -48,6 +48,11 @@ class IntellijIconsTest {
         for (String name : REQUIRED) assertThat(listed).contains(name + ".svg");
         for (String file : new String[]{"LICENSE.txt", "NOTICE.txt", "SOURCE.md"})
             try (var in = getClass().getResourceAsStream("/" + BASE + file)) { assertThat(in).as(file).isNotNull(); }
+        try (var in = getClass().getResourceAsStream("/" + BASE + "LICENSE.txt")) {
+            String license = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            assertThat(license.stripLeading()).startsWith("Apache License");
+            assertThat(license).contains("Version 2.0, January 2004");
+        }
     }
 
     @Test void everyRequiredIconParsesAndPaintsAtSixteenPixels() {

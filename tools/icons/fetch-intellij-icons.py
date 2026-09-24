@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Vendors Jasper's IntelliJ classic-UI icons at a pinned intellij-community commit.
 
-Run from the repository root. Rewrites icons/intellij/*.svg, assets.tsv, LICENSE.txt and NOTICE.txt.
+Run from the repository root. Rewrites icons/intellij/*.svg, assets.tsv and NOTICE.txt.
+It does not touch LICENSE.txt: upstream's root LICENSE.txt is JetBrains' "OPEN-SOURCE BUILD
+TERMS" for its IDE binaries, not the Apache License 2.0 that actually covers these SVGs (each
+SVG header cites Apache 2.0). LICENSE.txt here is the canonical Apache-2.0 text instead, vendored
+by hand; update it manually if it ever needs to move.
 A missing file (HTTP 404) fails the run: update ICONS instead of skipping silently.
 """
 import hashlib
@@ -58,6 +62,5 @@ for local, (upstream, dark) in sorted(ICONS.items()):
         (OUT / (local + suffix)).write_bytes(data)
         rows.append(f"{local}{suffix}\t{upstream}{suffix}\t{hashlib.sha256(data).hexdigest()}")
 (OUT / "assets.tsv").write_text("\n".join(rows) + "\n", encoding="utf-8")
-(OUT / "LICENSE.txt").write_bytes(fetch("LICENSE.txt"))
 (OUT / "NOTICE.txt").write_bytes(fetch("NOTICE.txt"))
 print(f"{len(rows) - 1} files from {SHA}")
