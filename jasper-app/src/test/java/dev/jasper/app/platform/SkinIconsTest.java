@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class SkinIconsTest {
-    private static final String SVG = "dev/jasper/app/icons/search.svg";
+    private static final String SVG = "dev/jasper/app/icons/intellij/find.svg";
     @Test void modernRecolorsLiveWhileRetroSelectionStaysCaptured() {
         var theme = new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
         try {

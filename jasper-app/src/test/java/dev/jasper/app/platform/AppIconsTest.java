@@ -1,51 +1,53 @@
 package dev.jasper.app.platform;
 
-import dev.jasper.app.appearance.BuiltinTheme;
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.config.Appearance;
+import dev.jasper.app.config.ThemeStyle;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
-import java.awt.image.BufferedImage;
-import javax.swing.UIManager;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
 
 class AppIconsTest {
-    private static final String[] ICONS = {"square-plus", "app-window", "columns-2", "maximize", "search", "settings", "refresh"};
+    private static final String[] ICONS = {"square-plus", "app-window", "columns-2", "maximize", "search", "settings",
+        "refresh", "command", "history", "bookmark", "close", "exit"};
 
-    @Test void toolbarIconsPaintNeutralOutlinesWithoutFilledFields() throws Exception {
+    @Test void modernApplicationIconsAreUntintedIntellijArtwork() throws Exception {
         edt(() -> {
-            new ThemeController();
-            for (String name : ICONS) {
-                FlatSVGIcon icon = (FlatSVGIcon) AppIcons.icon(name);
-                assertThat(icon.hasFound()).as(name).isTrue();
-                assertThat(icon.getIconWidth()).isEqualTo(16);
-                BufferedImage image = paint(icon);
-                assertThat(image.getRGB(2, 30) >>> 24).as(name + " no soft field").isZero();
-                assertThat(hasColor(image, 0xd3d7df)).as(name + " neutral stroke").isTrue();
-            }
+            new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+            try {
+                for (String name : ICONS) {
+                    FlatSVGIcon icon = (FlatSVGIcon) AppIcons.icon(name);
+                    assertThat(icon.hasFound()).as(name).isTrue();
+                    assertThat(icon.getName()).as(name).startsWith("dev/jasper/app/icons/intellij/");
+                    assertThat(icon.getIconWidth()).isEqualTo(16);
+                    assertThat(icon.getColorFilter()).as(name + " keeps its authored colours").isNull();
+                }
+                assertThat(Arrays.stream(IntellijIconsTest.pixels(AppIcons.icon("search")))
+                    .anyMatch(pixel -> pixel == 0xff6e6e6e)).as("IntelliJ light grey").isTrue();
+            } finally { new ThemeController(); }
         });
     }
 
-    @Test void existingOutlineRecolorsOnThemeChange() throws Exception {
+    @Test void theSameHostIconFollowsALiveDarkSwitch() throws Exception {
         edt(() -> {
-            var themes = new ThemeController();
-            FlatSVGIcon icon = (FlatSVGIcon) AppIcons.icon("square-plus");
-            assertThat(hasColor(paint(icon), 0xd3d7df)).isTrue();
-            themes.select(BuiltinTheme.LIGHT);
-            assertThat(hasColor(paint(icon), 0x383a42)).isTrue();
-            assertThat(hasColor(paint(icon), 0xd3d7df)).isFalse();
+            var themes = new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+            try {
+                var icon = AppIcons.icon("search");
+                int[] light = IntellijIconsTest.pixels(icon);
+                themes.selectAppearance(Appearance.DARK);
+                int[] dark = IntellijIconsTest.pixels(icon);
+                assertThat(dark).isNotEqualTo(light);
+                assertThat(Arrays.stream(dark).anyMatch(pixel -> pixel == 0xff6e6e6e)).isFalse();
+            } finally { new ThemeController(); }
         });
     }
 
-    private static BufferedImage paint(FlatSVGIcon icon) {
-        var image = new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB);
-        var g = image.createGraphics();
-        try { g.scale(2, 2); icon.paintIcon(null, g, 0, 0); } finally { g.dispose(); }
-        return image;
-    }
-    private static boolean hasColor(BufferedImage image, int color) {
-        for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++)
-            if (image.getRGB(x, y) == (0xff000000 | color)) return true;
-        return false;
+    @Test void chromeResolvesIntellijNamesAndRejectsUnknownOnes() throws Exception {
+        edt(() -> {
+            assertThat(AppIcons.chrome("closeHovered").getIconWidth()).isEqualTo(16);
+            assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.chrome("absent")).withMessageContaining("absent");
+        });
     }
 }

@@ -127,7 +127,7 @@ class WindowChromeContributionsTest {
             var theme = new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
                 : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
             try {
-                var icon = dev.jasper.app.platform.AppIcons.skin(getClass().getClassLoader(), "dev/jasper/app/icons/search.svg", "LOCK");
+                var icon = dev.jasper.app.platform.AppIcons.skin(getClass().getClassLoader(), "dev/jasper/app/icons/intellij/find.svg", "LOCK");
                 var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(19,19,java.awt.image.BufferedImage.TYPE_INT_ARGB));
                 var model = new Contributions();
                 model.addAction("dev.x.lock", "Lock", icon, List.of(), Optional.empty(), event -> {});

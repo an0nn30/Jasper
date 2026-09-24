@@ -3,35 +3,44 @@ package dev.jasper.app.platform;
 import java.util.Map;
 import java.util.Set;
 
-/** App-owned modern resources for semantic SDK icon names. */
+/**
+ * App-owned modern resources for semantic SDK icon names: IntelliJ artwork, or the tinted Tabler
+ * outline where IntelliJ has no equivalent. LOCK and UNLOCK stay a Tabler pair shared with Vault.
+ */
 final class NamedIcons {
+    private static final String INTELLIJ = "dev/jasper/app/icons/intellij/";
+    private static final String STANDARD = "dev/jasper/app/icons/standard/";
     private static final Map<String, String> MODERN = Map.ofEntries(
-        Map.entry("ADD", "dev/jasper/app/icons/standard/ADD.svg"),
-        Map.entry("BOOKMARK", "dev/jasper/app/icons/standard/BOOKMARK.svg"),
-        Map.entry("CLOSE", "dev/jasper/app/icons/standard/CLOSE.svg"),
-        Map.entry("CONNECT", "dev/jasper/app/icons/standard/CONNECT.svg"),
-        Map.entry("COPY", "dev/jasper/app/icons/standard/COPY.svg"),
-        Map.entry("DELETE", "dev/jasper/app/icons/standard/DELETE.svg"),
-        Map.entry("DISCONNECT", "dev/jasper/app/icons/standard/DISCONNECT.svg"),
-        Map.entry("EXECUTE", "dev/jasper/app/icons/standard/EXECUTE.svg"),
-        Map.entry("FOLDER", "dev/jasper/app/icons/standard/FOLDER.svg"),
-        Map.entry("HELP", "dev/jasper/app/icons/standard/HELP.svg"),
-        Map.entry("HISTORY", "dev/jasper/app/icons/standard/HISTORY.svg"),
-        Map.entry("INFO", "dev/jasper/app/icons/standard/INFO.svg"),
-        Map.entry("KEY", "dev/jasper/app/icons/standard/KEY.svg"),
-        Map.entry("LOCK", "dev/jasper/app/icons/standard/LOCK.svg"),
-        Map.entry("NETWORK", "dev/jasper/app/icons/standard/NETWORK.svg"),
-        Map.entry("PASTE", "dev/jasper/app/icons/standard/PASTE.svg"),
-        Map.entry("REFRESH", "dev/jasper/app/icons/standard/REFRESH.svg"),
-        Map.entry("REMOVE", "dev/jasper/app/icons/standard/REMOVE.svg"),
-        Map.entry("SAVE", "dev/jasper/app/icons/standard/SAVE.svg"),
-        Map.entry("SEARCH", "dev/jasper/app/icons/standard/SEARCH.svg"),
-        Map.entry("SETTINGS", "dev/jasper/app/icons/standard/SETTINGS.svg"),
-        Map.entry("UNLOCK", "dev/jasper/app/icons/standard/UNLOCK.svg"));
+        Map.entry("ADD", INTELLIJ + "add.svg"),
+        Map.entry("BOOKMARK", INTELLIJ + "bookmark.svg"),
+        Map.entry("CLOSE", INTELLIJ + "close.svg"),
+        Map.entry("CONNECT", STANDARD + "CONNECT.svg"),
+        Map.entry("COPY", INTELLIJ + "copy.svg"),
+        Map.entry("DELETE", STANDARD + "DELETE.svg"),
+        Map.entry("DISCONNECT", STANDARD + "DISCONNECT.svg"),
+        Map.entry("EXECUTE", INTELLIJ + "execute.svg"),
+        Map.entry("FOLDER", INTELLIJ + "folder.svg"),
+        Map.entry("HELP", INTELLIJ + "help.svg"),
+        Map.entry("HISTORY", INTELLIJ + "history.svg"),
+        Map.entry("INFO", INTELLIJ + "information.svg"),
+        Map.entry("KEY", STANDARD + "KEY.svg"),
+        Map.entry("LOCK", STANDARD + "LOCK.svg"),
+        Map.entry("NETWORK", INTELLIJ + "web.svg"),
+        Map.entry("PASTE", INTELLIJ + "menu-paste.svg"),
+        Map.entry("REFRESH", INTELLIJ + "refresh.svg"),
+        Map.entry("REMOVE", INTELLIJ + "remove.svg"),
+        Map.entry("SAVE", INTELLIJ + "menu-saveall.svg"),
+        Map.entry("SEARCH", INTELLIJ + "find.svg"),
+        Map.entry("SETTINGS", INTELLIJ + "gearPlain.svg"),
+        Map.entry("UNLOCK", STANDARD + "UNLOCK.svg"));
     static final Set<String> NAMES = MODERN.keySet();
     private NamedIcons() { }
+
     static String resource(String name) {
         if (name == null || !NAMES.contains(name)) throw new IllegalArgumentException("Unknown icon name: " + name);
         return MODERN.get(name);
     }
+
+    /** True for the Tabler fallback, which is recoloured to the chrome foreground. */
+    static boolean tinted(String name) { return resource(name).startsWith(STANDARD); }
 }
