@@ -156,7 +156,7 @@ class RemotePluginTest {
 
     @Test void followedPanesGetTheirOwnConnectionAndProbeTheirFolder(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
-            server.execReplies(Map.of("uname -s", "Linux\n", "cat /etc/os-release", "", "sh -s", "/srv/app\0"));
+            server.execReplies(Map.of("uname -s", "Linux\n", "cat /etc/os-release", "", "sh -s", "jasper-cwd\0/srv/app\0"));
             var vault = new FakeVault();
             host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
             RemotePlugin plugin = plugin(dir.resolve("ssh"));

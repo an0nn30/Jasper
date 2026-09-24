@@ -1,8 +1,11 @@
 # Jasper Remote directory probe. Fixed and read-only; Remote runs it as `sh -s` on an exec channel of
-# a pane's dedicated SSH connection. It prints the working directory of the foreground process of that
-# connection's only terminal shell, followed by NUL, and prints nothing when it cannot tell.
-# Exit 0, or 3 on a system that is neither Linux nor macOS. JASPER_PROBE_ANCESTOR (tests) names the
-# ancestor process instead of sshd.
+# a pane's dedicated SSH connection. It prints a `jasper-cwd` marker field, NUL, then the working
+# directory of the foreground process of that connection's only terminal shell, followed by NUL; it
+# prints nothing when it cannot tell. Anything the remote user's own startup files print before this
+# runs cannot be mistaken for the marker, so the caller reads the field after the LAST marker.
+# Exit 0, or 3 on a system that is neither Linux nor macOS. JASPER_PROBE_ANCESTOR is a test-only hook:
+# it only redirects this invocation's own probe (never anyone else's) to name the ancestor process
+# instead of sshd.
 LC_ALL=C
 export LC_ALL
 case $(uname -s) in
@@ -61,6 +64,6 @@ case $target in
 esac
 [ -n "$directory" ] || directory=$(cwd_of "$shell")
 case $directory in
-/*) printf '%s\0' "$directory" ;;
+/*) printf 'jasper-cwd\0%s\0' "$directory" ;;
 esac
 exit 0

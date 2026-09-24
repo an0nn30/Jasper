@@ -581,7 +581,7 @@ class ConnectionsTest {
             var host = host("probe", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
             var shell = dedicatedShell(host);
             var folder = shell.folder().orElseThrow();
-            server.execResult("sh -s", 0, "/srv/app\0".getBytes(StandardCharsets.UTF_8));
+            server.execResult("sh -s", 0, "jasper-cwd\0/srv/app\0".getBytes(StandardCharsets.UTF_8));
             assertThat(folder.read()).contains("/srv/app");
             assertThat(server.execCommands).containsExactly("sh -s");
             server.execResult("sh -s", 0, new byte[0]);
