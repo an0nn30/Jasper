@@ -31,8 +31,12 @@ final class NamedIcons {
         Map.entry("REMOVE", INTELLIJ + "remove.svg"),
         Map.entry("SAVE", INTELLIJ + "menu-saveall.svg"),
         Map.entry("SEARCH", INTELLIJ + "find.svg"),
+        Map.entry("SERVER", INTELLIJ + "server.svg"),
         Map.entry("SETTINGS", INTELLIJ + "gearPlain.svg"),
-        Map.entry("UNLOCK", STANDARD + "UNLOCK.svg"));
+        Map.entry("SPLIT", INTELLIJ + "splitVertically.svg"),
+        Map.entry("TERMINAL", INTELLIJ + "console.svg"),
+        Map.entry("UNLOCK", STANDARD + "UNLOCK.svg"),
+        Map.entry("ZOOM", INTELLIJ + "expandComponent.svg"));
     static final Set<String> NAMES = MODERN.keySet();
     private NamedIcons() { }
 

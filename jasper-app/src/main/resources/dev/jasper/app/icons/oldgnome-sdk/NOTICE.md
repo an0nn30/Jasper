@@ -19,3 +19,10 @@ PNG; all supplied image bytes for this subset are distributed here.
 
 This subset provides the SDK OldGnomeIcon catalog. It uses original OldGNOME2
 artwork independently of the application toolbar's separate Tango collection.
+
+## SDK 0.7.5 chrome names
+
+SPLIT, ZOOM and TERMINAL are byte-identical copies of this collection's `stock_table-split`,
+`view-fullscreen` and `gtk-execute` artwork already bundled in `../gnome2/`; SERVER copies this
+directory's NETWORK artwork. They share this notice and license. assets.tsv records each original
+collection path and hash.

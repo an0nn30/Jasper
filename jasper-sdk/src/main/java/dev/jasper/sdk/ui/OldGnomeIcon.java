@@ -48,5 +48,25 @@ public enum OldGnomeIcon {
     /** Help. */
     HELP,
     /** Close. */
-    CLOSE;
+    CLOSE,
+    /**
+     * Split the current pane.
+     * @since 0.7.5
+     */
+    SPLIT,
+    /**
+     * Enlarge the current pane to fill its tab.
+     * @since 0.7.5
+     */
+    ZOOM,
+    /**
+     * A local terminal session.
+     * @since 0.7.5
+     */
+    TERMINAL,
+    /**
+     * A remote host or server session.
+     * @since 0.7.5
+     */
+    SERVER;
 }

@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.*;
 @ExtendWith(EdtTestExtension.class)
 class OldGnomeCatalogTest {
     @Test void allCatalogChoicesPaintAtBothSizesAndScales() {
-        assertThat(OldGnomeCatalog.NAMES).hasSize(22);
+        assertThat(OldGnomeCatalog.NAMES).hasSize(26);
         for (String key : OldGnomeCatalog.NAMES) for (int size : new int[]{16, 28}) {
             var icon = OldGnomeCatalog.icon(key, size);
             assertThat(OldGnomeCatalog.icon(key, size)).isSameAs(icon);

@@ -22,7 +22,7 @@ class NamedIconsTest {
         try {
             for (boolean retro : new boolean[]{false, true}) {
                 new ThemeController(retro ? ThemeStyle.RETRO : ThemeStyle.MODERN, Appearance.LIGHT);
-                assertThat(NamedIcons.NAMES).hasSize(22);
+                assertThat(NamedIcons.NAMES).hasSize(26);
                 for (String name : NamedIcons.NAMES) {
                     var icon = AppIcons.named(name);
                     assertThat(icon.getIconWidth()).isEqualTo(16);
