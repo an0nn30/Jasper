@@ -1,45 +1,54 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.terminal.search.SearchQuery;
-
+import com.formdev.flatlaf.FlatClientProperties;
+import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.platform.SwingAppearance;
 import dev.jasper.terminal.search.FindResult;
+import dev.jasper.terminal.search.SearchQuery;
 import dev.jasper.terminal.view.TerminalView;
+import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.Graphics;
 import java.awt.event.ActionEvent;
 import java.awt.event.HierarchyEvent;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 /** A pane-local, debounced search UI. Matching and generation checks belong to TerminalView. */
 final class FindBar extends JPanel {
+    private static final int RECENT_LIMIT = 10;
     private final TerminalView view;
+    private final boolean modern = !SwingAppearance.retro();
     private final JTextField query = new JTextField(18);
-    private final JToggleButton regex = new JToggleButton("Regex");
-    private final JToggleButton caseSensitive = new JToggleButton("Case");
-    private final JLabel count = new JLabel("0 / 0");
+    private final JToggleButton regex = new JToggleButton(modern ? null : "Regex");
+    private final JToggleButton caseSensitive = new JToggleButton(modern ? null : "Case");
+    private final JLabel count = new JLabel(modern ? "" : "0 / 0");
+    private final JButton clear = new JButton();
+    private final Deque<String> recent = new ArrayDeque<>();
     private final Timer debounce;
     private FindResult result = new FindResult(0, 0, null);
     private boolean disposed;
     private boolean searching;
     private boolean dirty;
+    private volatile boolean missing;
     private long generation;
     private long pendingNavigation;
 
     FindBar(TerminalView view) {
-        super(new FlowLayout(FlowLayout.LEADING, 4, 3));
         this.view = view;
         debounce = new Timer(180, event -> search());
         debounce.setRepeats(false);
         query.getAccessibleContext().setAccessibleName("Find in terminal");
         query.setToolTipText("Search each terminal row; matches do not span wrapped rows");
-        add(new JLabel("Find:")); add(query);
-        add(button("Previous", this::previous)); add(button("Next", this::next));
-        add(caseSensitive); add(regex); add(count); add(button("Close", this::close));
+        if (modern) buildModern(); else buildRetro();
         query.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent event) { schedule(); }
-            public void removeUpdate(DocumentEvent event) { schedule(); }
-            public void changedUpdate(DocumentEvent event) { schedule(); }
+            public void insertUpdate(DocumentEvent event) { edited(); }
+            public void removeUpdate(DocumentEvent event) { edited(); }
+            public void changedUpdate(DocumentEvent event) { edited(); }
         });
         regex.addActionListener(event -> schedule());
         caseSensitive.addActionListener(event -> schedule());
@@ -51,12 +60,48 @@ final class FindBar extends JPanel {
         });
         view.setFindResultListener(found -> {
             invalidateSearch(); dirty = true;
-            if (result.error() == null) showResult(found);
+            if (result.error() == null) { miss(found.count() == 0 && !query.getText().isEmpty()); showResult(found); }
         });
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0) refreshShowing();
         });
         setVisible(false);
+    }
+
+    private void buildRetro() {
+        setLayout(new FlowLayout(FlowLayout.LEADING, 4, 3));
+        add(new JLabel("Find:")); add(query);
+        add(button("Previous", this::previous)); add(button("Next", this::next));
+        add(caseSensitive); add(regex); add(count); add(button("Close", this::close));
+    }
+
+    /** IntelliJ's find row: history and toggles inside the field, then count, arrows and a far-right close. */
+    private void buildModern() {
+        setLayout(new BorderLayout(UIScale.scale(6), 0));
+        setBorder(BorderFactory.createEmptyBorder(UIScale.scale(2), UIScale.scale(6), UIScale.scale(3), UIScale.scale(6)));
+        JButton history = iconButton("findHistory", "Recent searches", "Recent searches", "searchWithHistory", null);
+        history.addActionListener(event -> recentMenu().show(history, 0, history.getHeight()));
+        configure(clear, "clearFind", "Clear search", "Clear search", "close");
+        clear.addActionListener(event -> { query.setText(""); query.requestFocusInWindow(); });
+        clear.setVisible(false);
+        configure(caseSensitive, "caseSensitive", "Case sensitive", "Match case", "matchCase");
+        configure(regex, "regex", "Regular expression", "Regular expression", "regex");
+        var trailing = new JToolBar();
+        trailing.setFloatable(false); trailing.setOpaque(false); trailing.setBorder(BorderFactory.createEmptyBorder());
+        trailing.add(clear); trailing.addSeparator(); trailing.add(caseSensitive); trailing.add(regex);
+        query.putClientProperty(FlatClientProperties.TEXT_FIELD_LEADING_COMPONENT, history);
+        query.putClientProperty(FlatClientProperties.TEXT_FIELD_TRAILING_COMPONENT, trailing);
+        query.putClientProperty(FlatClientProperties.STYLE, "borderWidth: 0; focusWidth: 0; innerFocusWidth: 0");
+        count.setName("findCount");
+        var controls = new JPanel(new FlowLayout(FlowLayout.LEADING, UIScale.scale(4), 0));
+        controls.setOpaque(false);
+        controls.add(count);
+        controls.add(iconButton("previousMatch", "Previous", "Previous match (Shift+Enter)", "previousOccurence", this::previous));
+        controls.add(iconButton("nextMatch", "Next", "Next match (Enter)", "nextOccurence", this::next));
+        controls.add(Box.createHorizontalStrut(UIScale.scale(16)));
+        controls.add(iconButton("closeFind", "Close", "Close (Escape)", "close", this::close));
+        add(query, BorderLayout.CENTER);
+        add(controls, BorderLayout.EAST);
     }
 
     private static JButton button(String label, Runnable task) {
@@ -65,11 +110,42 @@ final class FindBar extends JPanel {
         return button;
     }
 
+    private static JButton iconButton(String name, String accessible, String tooltip, String artwork, Runnable task) {
+        JButton button = new JButton();
+        configure(button, name, accessible, tooltip, artwork);
+        if (task != null) button.addActionListener(event -> task.run());
+        return button;
+    }
+
+    private static void configure(AbstractButton button, String name, String accessible, String tooltip, String artwork) {
+        button.setName(name);
+        // AbstractButton normalizes a constructor-supplied null to "" but honors an explicit setText(null).
+        button.setText(null);
+        button.setIcon(AppIcons.chrome(artwork));
+        button.setToolTipText(tooltip);
+        button.getAccessibleContext().setAccessibleName(accessible);
+        button.setFocusable(false);
+        button.putClientProperty(FlatClientProperties.BUTTON_TYPE, FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+    }
+
     private static void bind(JComponent component, KeyStroke stroke, String name, Runnable task) {
         component.getInputMap().put(stroke, name);
         component.getActionMap().put(name, new AbstractAction() {
             public void actionPerformed(ActionEvent event) { task.run(); }
         });
+    }
+
+    @Override public void updateUI() {
+        super.updateUI();
+        // A theme change replaces UIResource colours; keep the no-match tint.
+        if (query != null) miss(missing);
+    }
+
+    @Override protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        if (!modern) return;
+        g.setColor(UIManager.getColor("Jasper.titleSeparator"));
+        g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
     }
 
     @Override public void removeNotify() {
@@ -97,11 +173,16 @@ final class FindBar extends JPanel {
         setVisible(true); query.requestFocusInWindow(); query.selectAll(); schedule();
     }
 
+    private void edited() {
+        if (modern) clear.setVisible(!query.getText().isEmpty());
+        schedule();
+    }
+
     private void schedule() {
         if (isVisible() && !disposed) {
             // Cancel old matching immediately, including during the debounce interval.
             invalidateSearch(); dirty = true;
-            view.clearFind(); showResult(new FindResult(0, 0, null));
+            view.clearFind(); miss(false); showResult(new FindResult(0, 0, null));
             if (isShowing()) debounce.restart();
         }
     }
@@ -120,6 +201,7 @@ final class FindBar extends JPanel {
                 while (steps < 0) { navigated = view.findPrevious(); steps++; }
             }
             pendingNavigation = 0;
+            miss(navigated.error() != null || navigated.count() == 0 && !query.getText().isEmpty());
             showResult(navigated);
         });
     }
@@ -129,6 +211,7 @@ final class FindBar extends JPanel {
 
     private void navigate(int direction) {
         if (disposed) return;
+        remember();
         if (dirty || searching) {
             pendingNavigation += direction;
             if (!searching) { debounce.stop(); search(); }
@@ -147,18 +230,55 @@ final class FindBar extends JPanel {
 
     private void showResult(FindResult found) {
         result = found;
-        count.setText(found.error() == null ? found.current() + " / " + found.count() : "Invalid regex");
+        if (!modern) count.setText(found.error() == null ? found.current() + " / " + found.count() : "Invalid regex");
+        else if (found.error() != null) count.setText("Invalid regex");
+        else if (found.count() > 0) count.setText(found.current() + "/" + found.count());
+        else count.setText(missing ? "0 results" : "");
         count.setToolTipText(found.error());
         count.getAccessibleContext().setAccessibleDescription(found.error());
     }
 
+    /** IntelliJ tints the field when nothing matches or the pattern is invalid. */
+    private void miss(boolean value) {
+        missing = value;
+        if (!modern) return;
+        query.putClientProperty(FlatClientProperties.OUTLINE, value ? FlatClientProperties.OUTLINE_ERROR : null);
+        query.setBackground(UIManager.getColor(value ? "Jasper.findErrorBackground" : "TextField.background"));
+    }
+
+    private void remember() {
+        String text = query.getText();
+        if (text.isBlank()) return;
+        recent.remove(text); recent.addFirst(text);
+        while (recent.size() > RECENT_LIMIT) recent.removeLast();
+    }
+
+    /** This pane's recent queries, newest first; held in memory only. */
+    JPopupMenu recentMenu() {
+        var menu = new JPopupMenu();
+        if (recent.isEmpty()) {
+            var none = new JMenuItem("No recent searches"); none.setEnabled(false); menu.add(none);
+        }
+        for (String text : recent) {
+            var item = new JMenuItem(text);
+            item.putClientProperty("html.disable", true);
+            item.addActionListener(event -> { query.setText(text); query.requestFocusInWindow(); });
+            menu.add(item);
+        }
+        return menu;
+    }
+
     void close() {
-        invalidateSearch(); dirty = true; view.clearFind(); showResult(new FindResult(0, 0, null));
+        remember();
+        invalidateSearch(); dirty = true; view.clearFind(); miss(false); showResult(new FindResult(0, 0, null));
         setVisible(false); view.requestFocusInWindow();
     }
 
     void dispose() { close(); disposed = true; view.setFindResultListener(null); }
     JTextField queryField() { return query; }
     JToggleButton regexButton() { return regex; }
+    JToggleButton caseButton() { return caseSensitive; }
+    JLabel countLabel() { return count; }
+    boolean missing() { return missing; }
     FindResult result() { return result; }
 }
