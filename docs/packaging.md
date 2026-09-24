@@ -57,6 +57,29 @@ the image keeps the legacy controls; with an older SDK `verifyPackage` warns. On
 packaged app benefits: `./gradlew :jasper-app:run` and `installDist` launch the runtime's
 own `java` binary, which keeps the legacy controls.
 
+## Bundled plugins stay off the classpath
+
+jpackage adds every jar under its `--input` directory to the application classpath in
+`Jasper.cfg`, including the bundled plugins staged in `app/plugins/`. Plugins must load only
+through their own `PluginClassLoader`: MINA sshd resolves classes through the thread context
+class loader, which is the application loader, so an application-loader copy of sshd or
+BouncyCastle fails to cast to the plugin's copy, and every SSH connection in the packaged app
+failed with `ExceptionInInitializerError`. `packageApp` removes the `plugins/` entries from
+`Jasper.cfg` (then re-signs on macOS), and `verifyPackage` fails if any remain.
+`./gradlew :jasper-app:run` never had them on the classpath.
+
+## macOS Local Network access
+
+macOS asks the user before an app may connect to hosts on the local network. Until the
+user allows it, connections to LAN addresses fail with `EHOSTUNREACH`, so Remote reports
+"No route to host" for a host that `ssh` in Terminal reaches. The Tailscale 100.x range
+and public addresses are not affected. `packageApp` adds `NSLocalNetworkUsageDescription`
+to `Info.plist` so the prompt explains why Jasper asks, and `verifyPackage` checks it. The
+grant belongs to the code signature. Development images carry only an ad-hoc signature,
+which changes with every build, so macOS may ask again or forget an earlier grant after a
+rebuild. A stable signing identity avoids this. `./gradlew :jasper-app:run` runs the JBR's
+own `java`, which needs its own grant under System Settings > Privacy & Security > Local Network.
+
 ## Linux icon assets
 
 Linux windows and taskbar integration use the dedicated Linux PNG set. Portable
@@ -91,6 +114,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm split, close, zoom, pane navigation, search, and prompt navigation.
 - [ ] Confirm links, working-directory status, config live reload, and broken-config reporting.
 - [ ] Confirm the packaged app runs without a separately installed Java runtime.
+- [ ] Connect a Remote SSH host by Vault key, by agent and on a LAN address; the first LAN connection shows the Local Network prompt, and after allowing it the host connects.
 - [ ] With `[background] enabled = true`, confirm `~/Library/LaunchAgents/dev.jasper.background.plist` appears, log out and back in, and confirm Jasper is running with no windows.
 - [ ] Confirm the Dock icon is present with no windows open and that clicking it produces a window noticeably faster than a cold start; record both times.
 - [ ] Confirm Cmd+Q exits completely and that the next launch is cold.
