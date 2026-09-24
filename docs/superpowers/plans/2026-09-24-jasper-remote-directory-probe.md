@@ -1,6 +1,10 @@
 # Remote shell directory probe — Implementation Plan
 
-**Status:** Executed on `codex/remote-sftp`. No deviations from the plan text.
+**Status:** Executed on `codex/remote-sftp`. Deviation from the final review fix wave (2026-09-24):
+`DirectoryFollower.request` (an explicit ask — focus, panel shown, follow turned back on) now
+always delivers its next result, even one equal to the last delivered path, instead of dropping
+unchanged results. Enter-triggered results are still delivered only when they differ from the
+last delivered path.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

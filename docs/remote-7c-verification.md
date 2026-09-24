@@ -73,7 +73,10 @@ you control for the following acceptance steps:
    within about half a second. Check `bash` inside `zsh`, a program started in another folder,
    `sudo -s` (falls back to the login shell's folder), a Windows host (no following, otherwise
    unchanged), the host setting off (panes share one connection, no following), and that the
-   prompt, MOTD and shell history show nothing Remote ran.
+   prompt, MOTD and shell history show nothing Remote ran. Also: with Follow off, browse the
+   sidebar to a different, manually chosen folder, click back into the terminal, then turn
+   Follow on — the sidebar returns to the shell's actual folder instead of staying on the
+   manually chosen one.
 
 ## Boundaries
 

@@ -114,8 +114,9 @@ A `DirectoryFollower` in the Remote plugin owns probing for panes:
   folder" while it follows that pane. A new pane starts fresh.
 
 A result is delivered on the UI thread through `SftpUi.directory(pane, path)`, the same entry
-point OSC 7 reports use, and only when it differs from the last delivered path. Absolute paths
-only; anything else is dropped.
+point OSC 7 reports use. Enter-triggered results are delivered only when they differ from the
+last delivered path; a view's explicit request (focus, panel shown, follow turned back on)
+always delivers. Absolute paths only; anything else is dropped.
 
 ### 3.4 Boundaries
 

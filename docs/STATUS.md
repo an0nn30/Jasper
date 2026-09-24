@@ -13,6 +13,16 @@ environments). Automated tests cover the script against real local processes, de
 the follower policy and the plugin wiring. The GUI acceptance steps in
 [remote-7c-verification](remote-7c-verification.md) are the user's.
 
+Final review fix wave (2026-09-24): `DirectoryFollower.request` (an explicit ask — focus, panel
+shown, follow turned back on) now resets the last-delivered path before probing, so its result
+always delivers even when unchanged; this closes a gap where re-enabling Follow after a manual
+sidebar navigation could leave the sidebar stuck on the manually chosen folder. Enter-triggered
+results are still delivered only when they differ from the last delivered path. The probe script
+now prints a `jasper-cwd` marker field before the directory so remote-user startup-file output
+cannot be mistaken for the path; `DirectoryProbe.parse` takes the field after the last marker.
+`DirectoryProbe.read` now takes one deadline shared between channel-open and waitFor instead of
+applying the 2 s timeout to each.
+
 ### SFTP phase 1 — implemented, reviewed and verified
 
 The [SFTP design](superpowers/specs/2026-09-23-jasper-remote-sftp-design.md) is approved

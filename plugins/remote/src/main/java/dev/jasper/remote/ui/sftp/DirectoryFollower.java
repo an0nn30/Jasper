@@ -66,10 +66,10 @@ public final class DirectoryFollower implements AutoCloseable {
         state.cancelDelay = schedule.apply(ENTER_DELAY, () -> ui.execute(() -> fire(pane, state)));
     }
 
-    /** A view wants the pane's folder now. */
+    /** A view wants the pane's folder now: the next result always delivers, even if unchanged. */
     public synchronized void request(UUID pane) {
         var state = panes.get(pane);
-        if (state != null) start(pane, state);
+        if (state != null) { state.delivered = null; start(pane, state); }
     }
 
     /** The pane sent OSC 7: its own reports win, and it is never probed again. */

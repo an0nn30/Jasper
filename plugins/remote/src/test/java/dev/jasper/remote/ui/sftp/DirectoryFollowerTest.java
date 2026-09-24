@@ -84,6 +84,18 @@ class DirectoryFollowerTest {
         assertThat(notices).as("shown again when the view asks").hasSize(2);
     }
 
+    @Test void anExplicitRequestAlwaysDeliversEvenTheSamePath() {
+        wanted.add(pane); follower.track(pane, probe());
+        follower.request(pane); probes.get(0).complete(Optional.of("/a"));
+        assertThat(delivered).containsExactly(pane + " /a");
+        follower.request(pane); probes.get(1).complete(Optional.of("/a"));
+        assertThat(delivered).as("an explicit request always delivers, even the same path")
+            .containsExactly(pane + " /a", pane + " /a");
+        follower.enter(pane); runScheduled(); probes.get(2).complete(Optional.of("/a"));
+        assertThat(delivered).as("an Enter-triggered result that is unchanged is still not delivered twice")
+            .containsExactly(pane + " /a", pane + " /a");
+    }
+
     @Test void unsupportedStopsAtOnce() {
         wanted.add(pane); follower.track(pane, probe());
         follower.request(pane);
