@@ -123,12 +123,13 @@ public final class ConfigTemplate {
             # size = 14
 
             [ui.theme]
-            # Application style: "modern" or "retro" (stock light Java Metal).
+            # Application style: "modern", "retro" (stock light Java Metal) or "gtk" (Linux GTK desktop theme).
             # Set style to "retro" for Metal controls, classic icons and a high-contrast terminal.
+            # Set style to "gtk" to follow the desktop's GTK theme, icon theme and text colors; other systems use modern.
             # Restart required: fully quit and relaunch, including with background residency enabled.
             # Reload reports the pending style change; existing windows keep their current style.
             # style = "modern"
-            # Variant applies only to modern; retro always uses light controls and a dark terminal.
+            # Variant applies only to modern; retro and gtk ignore it.
             # Theme variant: "dark" or "light"; switches chrome and terminal colors live across windows.
             # variant = "dark"
 

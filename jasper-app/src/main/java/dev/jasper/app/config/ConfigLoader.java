@@ -222,7 +222,7 @@ public final class ConfigLoader {
             case "font.ligatures" -> ligatures = bool(path, value, ligatures);
             case "font.line_height" -> lineHeight = number(path, value, 1, 3, lineHeight);
             case "ui.theme.style" -> style = choice(path, value, Map.of(
-    "modern", ThemeStyle.MODERN, "retro", ThemeStyle.RETRO), style);
+    "modern", ThemeStyle.MODERN, "retro", ThemeStyle.RETRO, "gtk", ThemeStyle.GTK), style);
             case "ui.theme.variant" -> variant = choice(path, value, Map.of(
                 "light", Appearance.LIGHT, "dark", Appearance.DARK), variant);
             case "terminal.shell.program" -> program = string(path, value,

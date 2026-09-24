@@ -82,7 +82,7 @@ family = "system"
 # size = 14.0
 
 [ui.theme]
-# "modern" or "retro"; fully quit and relaunch after changing style.
+# "modern", "retro" or "gtk"; fully quit and relaunch after changing style.
 style = "modern"
 # Modern only: "dark" or "light"; chrome and terminal colors switch together.
 variant = "dark"
@@ -121,8 +121,8 @@ variant = "dark"
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
-| `ui.theme.style` | `"modern"` | `"modern"`, `"retro"` | Full process restart |
-| `ui.theme.variant` | `"dark"` | `"dark"`, `"light"` | Live in modern mode; retained but ignored in retro |
+| `ui.theme.style` | `"modern"` | `"modern"`, `"retro"`, `"gtk"` | Full process restart |
+| `ui.theme.variant` | `"dark"` | `"dark"`, `"light"` | Live in modern mode; retained but ignored in retro and gtk |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy

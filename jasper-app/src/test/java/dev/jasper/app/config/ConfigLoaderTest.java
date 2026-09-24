@@ -347,6 +347,16 @@ class ConfigLoaderTest {
     assertThat(parse("").snapshot().style()).isEqualTo(ThemeStyle.MODERN);
 }
 
+@Test void gtkStyleParsesAndKeepsTheSavedVariant() {
+    var result = parse("[ui.theme]\nstyle='gtk'\nvariant='light'\n");
+    assertThat(result.rejected()).isFalse();
+    assertThat(result.diagnostics()).isEmpty();
+    assertThat(result.snapshot().style()).isEqualTo(ThemeStyle.GTK);
+    assertThat(result.snapshot().variant()).isEqualTo(Appearance.LIGHT);
+    assertThat(parse("[ui.theme]\nstyle='GTK'\n").diagnostics()).singleElement()
+        .satisfies(d -> assertThat(d.message()).contains("gtk, modern, retro"));
+}
+
 @Test void invalidStyleUsesTheExistingPerFieldDiagnosticPolicy() {
     for (String value : java.util.List.of("'private-value'", "7", "true")) {
         var result = parse("[ui.theme]\nstyle=" + value + "\nvariant='light'\n");
