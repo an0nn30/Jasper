@@ -183,9 +183,11 @@ public final class ThemeController {
         if (theme == BuiltinTheme.GTK) gtkPalette = GtkPalette.from(UIManager::getColor);
     }
 
-    private static String reason(Throwable failure) {
-        Throwable cause = failure;
-        while (cause.getCause() != null) cause = cause.getCause();
+    private static String reason(InstallationFailure failure) {
+        // The installer's own failure carries the friendly message; only walk deeper (into, say, a
+        // ClassNotFoundException's raw class name) when it left none.
+        Throwable cause = failure.getCause() != null ? failure.getCause() : failure;
+        while ((cause.getMessage() == null || cause.getMessage().isBlank()) && cause.getCause() != null) cause = cause.getCause();
         String message = cause.getMessage();
         return message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
     }

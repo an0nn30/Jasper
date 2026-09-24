@@ -58,8 +58,20 @@ class GtkThemeControllerTest {
             assertThat(themes.fallbackReason()).isEmpty();
         } else {
             assertThat(themes.style()).isEqualTo(ThemeStyle.MODERN);
-            assertThat(themes.fallbackReason()).isPresent();
+            assertThat(themes.fallbackReason()).hasValueSatisfying(reason -> assertThat(reason).doesNotContain("com.sun"));
         }
+    }
+
+    @Test void fallbackReasonUsesTheInstallersOwnFriendlyMessageNotTheRawCause() {
+        var themes = new ThemeController(ThemeStyle.GTK, Appearance.LIGHT, theme -> {
+            if (theme == BuiltinTheme.GTK) {
+                throw new IllegalStateException("this Java runtime has no GTK look and feel",
+                    new ClassNotFoundException(GtkDefaults.LOOK_AND_FEEL));
+            }
+            return ThemeController.install(theme);
+        });
+        assertThat(themes.fallbackReason()).hasValueSatisfying(reason ->
+            assertThat(reason).contains("this Java runtime has no GTK look and feel").doesNotContain("com.sun"));
     }
 
     @Test void fontReconfigurationKeepsTheGtkPalette() {
