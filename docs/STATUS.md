@@ -122,6 +122,30 @@ is merged at `17c0476`. The Credential Vault design
 is being continued in `.worktrees/vault-6b` on `claude/vault-6b`, then the SSH plugin spec. A development launch keeps its own home under
 `jasper-app/build/dev-home` (`jasper.home`, merged at `8d5566e`).
 
+### Packaged SSH failures — 2026-09-24
+
+The packaged app failed every Remote SSH connection with `ExceptionInInitializerError`;
+`./gradlew :jasper-app:run` connected. Cause, reproduced with the bundled runtime and the
+image's own `Jasper.cfg` classpath: jpackage had put every bundled plugin jar (sshd,
+BouncyCastle, slf4j-jdk14, …) on the application classpath. MINA looks up its
+`SecurityProviderRegistrar` through the thread context class loader, got the application
+loader's copy, and the cast to the plugin's copy threw `ClassCastException` inside
+`KeyPairProvider.<clinit>`. `packageApp` now strips `plugins/` entries from `Jasper.cfg` and
+re-signs once after every bundle edit (the vtool step no longer signs); `verifyPackage`
+rejects plugin classpath entries. With the fixed classpath, the same reproduction completes
+key exchange and authentication.
+
+A LAN host (192.168.1.120) failed with "No route to host" even from `gradle run`, while
+`ssh` reached it. From one shell, `nc`, Apple's `python3` and a Microsoft-signed JDK 17
+connected, but the ad-hoc-signed bundled `java` got `NoRouteToHostException` over the same
+en0 route. Cause: macOS Local Network privacy, which keys the grant to the code signature.
+`packageApp` adds `NSLocalNetworkUsageDescription` (verified), and Remote now says "No route to
+host <host>. On macOS, allow Jasper under System Settings > Privacy & Security > Local Network."
+instead of MINA's raw future text (`FailuresTest`). Ad-hoc signatures change with each build,
+so the grant may not persist across rebuilds until a stable signing identity exists. The
+`gradle run` JBR `java` needs its own grant. Native confirmation of the prompt is a user GUI
+check; see [packaging](packaging.md#macos-local-network-access).
+
 ### Self-contained SSH import — implemented and verified
 
 The approved [design](superpowers/specs/2026-09-23-jasper-vault-backed-ssh-import-design.md)
