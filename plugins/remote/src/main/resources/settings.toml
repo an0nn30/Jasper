@@ -14,7 +14,6 @@ toggle_panel = "cmd+shift+s"
 open_palette = "cmd+shift+h"
 
 toggle_sftp = ""
-toggle_transfers = ""
 
 [sftp]
 max_parallel_files = 2           # 1..8 globally; at most two files per endpoint

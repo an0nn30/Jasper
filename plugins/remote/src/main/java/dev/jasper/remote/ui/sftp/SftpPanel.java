@@ -32,6 +32,9 @@ public class SftpPanel extends JPanel {
     private boolean loaded;
     private Runnable onLoaded=()->{};
     public void onLoaded(Runnable listener) { onLoaded=listener; }
+    private final JPanel transfersSlot=new JPanel(new BorderLayout());
+    /** The window's transfer strip, shown at the bottom of the sidebar. */
+    public void transfers(JComponent strip) { transfersSlot.removeAll();transfersSlot.add(strip,BorderLayout.CENTER);transfersSlot.revalidate(); }
     private final TableColumn sizeColumn,modifiedColumn;
     private boolean details=true;
     public SftpPanel(Function<IconName,Icon> icons) {
@@ -48,7 +51,7 @@ public class SftpPanel extends JPanel {
         var scroll=new JScrollPane(table);scroll.setBorder(BorderFactory.createEmptyBorder());scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);add(scroll,BorderLayout.CENTER);
         var south=new JPanel();south.setLayout(new BoxLayout(south,BoxLayout.Y_AXIS));
         var paging=new JPanel(new BorderLayout(4,0));var controls=new JPanel(new FlowLayout(FlowLayout.RIGHT,2,0));controls.add(previous);controls.add(next);paging.add(pageLabel,BorderLayout.CENTER);paging.add(controls,BorderLayout.EAST);south.add(paging);
-        var status=new JPanel(new BorderLayout(4,0));cancel=new JButton("Cancel",icons.apply(IconName.CLOSE));cancel.setVisible(false);status.add(message,BorderLayout.CENTER);status.add(cancel,BorderLayout.EAST);south.add(status);operationResult.setVisible(false);south.add(operationResult);south.add(follow);add(south,BorderLayout.SOUTH);
+        var status=new JPanel(new BorderLayout(4,0));cancel=new JButton("Cancel",icons.apply(IconName.CLOSE));cancel.setVisible(false);status.add(message,BorderLayout.CENTER);status.add(cancel,BorderLayout.EAST);south.add(status);operationResult.setVisible(false);south.add(operationResult);south.add(follow);south.add(transfersSlot);add(south,BorderLayout.SOUTH);
         path.addActionListener(event->{if(actions!=null) actions.navigate().accept(path.getText());});follow.addActionListener(event->{if(actions!=null) actions.follow().accept(follow.isSelected());});
         previous.addActionListener(event->{if(actions!=null) actions.page().accept(Math.max(0,offset-200));});next.addActionListener(event->{if(actions!=null) actions.page().accept(offset+200);});cancel.addActionListener(event->{if(actions!=null) actions.cancel().run();});
         table.getSelectionModel().addListSelectionListener(event->selectionChanged());

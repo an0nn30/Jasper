@@ -156,8 +156,8 @@ public class RemotePlugin implements Plugin {
                 return validateResumeIdentity(expected,connections.resolveIdentity(ref.hostId().orElseThrow(),owner));
             }catch(Exception failure) { return CompletableFuture.failedFuture(failure); }
         });
-        transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui);
-        sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::show);
+        transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui,window->sftpUi.reveal(window));
+        sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::strip,transferUi::release);
         follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id),sftpUi::directory,sftpUi::notice);
         sftpUi.onFollowRequested(follower::request);
         context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp","files","browse","remote")),invoked->{
@@ -171,7 +171,7 @@ public class RemotePlugin implements Plugin {
         PluginMenu menu = context.menus().create(MENU, "SSH");
         menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(IMPORT);
         menu.addSeparator();menu.add(SFTP);menu.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
-        context.menus().standard(StandardMenu.VIEW).add(SFTP_TOGGLE);context.menus().standard(StandardMenu.VIEW).add(dev.jasper.remote.ui.transfers.TransferUi.TOGGLE);
+        context.menus().standard(StandardMenu.VIEW).add(SFTP_TOGGLE);
         context.menus().standard(StandardMenu.VIEW).add(HOSTS);
 
         scope = new RemoteScope(store::hosts, store::error, this::openHost, this::splitHost, (window, host) -> editHost(window, Optional.of(host)));
@@ -226,7 +226,6 @@ public class RemotePlugin implements Plugin {
             if(sftpToggle!=null)sftpToggle.close();
             sftpToggle=context.actions().register(ActionSpec.of(SFTP_TOGGLE,"SFTP panel").withDefaultBinding(next.toggleSftp().orElse(null)),invoked->sftpUi.toggle(invoked.window()));
         }
-        if(shortcuts==null || !next.toggleTransfers().equals(shortcuts.toggleTransfers())) transferUi.configureBinding(next.toggleTransfers().orElse(null));
         shortcuts = next;
     }
 

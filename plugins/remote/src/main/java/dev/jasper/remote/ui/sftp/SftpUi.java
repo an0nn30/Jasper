@@ -29,7 +29,8 @@ public final class SftpUi implements AutoCloseable {
     private final Supplier<TransferCoordinator> transfers;
     private final Supplier<List<RemoteHost>> hosts;
     private final Function<WindowHandle,Optional<PaneTarget>> activePane;
-    private final Consumer<WindowHandle> showTransfers;
+    private final Function<WindowHandle,JComponent> transferStrip;
+    private final Consumer<WindowHandle> releaseStrip;
     private final Consumer<String> clipboard;
     private final Map<UUID,View> views=new HashMap<>();
     private final Set<PluginDialog> dialogs=new HashSet<>();
@@ -37,16 +38,17 @@ public final class SftpUi implements AutoCloseable {
     private Consumer<UUID> followRequested=pane->{};
     private volatile boolean closed;
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
-                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Consumer<WindowHandle> showTransfers) {
-        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,showTransfers,text->Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text),null));
+                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,JComponent> transferStrip,Consumer<WindowHandle> releaseStrip) {
+        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,transferStrip,releaseStrip,text->Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text),null));
     }
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
-                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Consumer<WindowHandle> showTransfers,Consumer<String> clipboard) {
-        this.context=context;this.ui=ui;this.background=background;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.showTransfers=showTransfers;this.clipboard=clipboard;
+                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,JComponent> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard) {
+        this.context=context;this.ui=ui;this.background=background;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.transferStrip=transferStrip;this.releaseStrip=releaseStrip;this.clipboard=clipboard;
         context.panels().register(new PanelSpec(PANEL,"SFTP",context.appearance().icon(IconName.FOLDER),Anchor.LEFT),this::create);
     }
     private JComponent create(PanelHost host) {
         var panel=new SftpPanel(context.appearance()::icon);var window=host.window();
+        panel.transfers(transferStrip.apply(window));
         Function<ConnectionIdentity,CompletableFuture<FileEndpoint>> open=identity->endpoints.open(Optional.of(identity),window,status->{});
         var controller=new SftpController(context.dataDirectory().resolve("browser-cache"),background,ui,open,panel);
         controller.onFollowRequested(pane->followRequested.accept(pane));
@@ -55,7 +57,7 @@ public final class SftpUi implements AutoCloseable {
         controller.operations(new SftpController.Operations(()->upload(view,false),()->upload(view,true),()->download(view),()->newFolder(view),()->delete(view),()->copyPaths(view),()->copyHost(view),operations::cancel));
         controller.visible(host.visible());
         host.onVisibility(visible->{controller.visible(visible);if(visible) activePane.apply(window).ifPresent(pane->controller.open(pane.pane(),pane.identity(),pane.directory(),false));});
-        host.onClosed(()-> { cancelBrowse(window.id());views.remove(window.id());controller.close();operations.close(); });return panel;
+        host.onClosed(()-> { releaseStrip.accept(window);cancelBrowse(window.id());views.remove(window.id());controller.close();operations.close(); });return panel;
     }
     private View showView(WindowHandle window) {
         var view=views.get(window.id());if(view==null) { context.panels().toggle(PANEL,window);view=views.get(window.id()); }else view.host().show();return view;
@@ -70,6 +72,8 @@ public final class SftpUi implements AutoCloseable {
         if(closed)return;var view=showView(window);if(view!=null)view.controller().open(pane.pane(),pane.identity(),pane.directory(),true);
     }
     public void toggle(WindowHandle window) { if(!closed) context.panels().toggle(PANEL,window); }
+    /** Shows the window's SFTP sidebar without choosing a host. */
+    public void reveal(WindowHandle window) { if(!closed) showView(window); }
     public void browse(WindowHandle window,RemoteHost host) {
         if(closed) return;var view=showView(window);if(view==null) return;view.panel().busy(true,"Connecting…");
         cancelBrowse(window.id());var request=connections.resolveIdentity(host.id(),window);browsing.put(window.id(),request);
@@ -106,7 +110,7 @@ public final class SftpUi implements AutoCloseable {
     private static String canonicalSelection(Path path) throws IOException { Path absolute=path.toAbsolutePath().normalize();return absolute.getParent()==null?absolute.toRealPath().toString():absolute.getParent().toRealPath().resolve(absolute.getFileName()).toString(); }
     private static List<String> paths(SftpController.Capture captured) throws IOException { var paths=new ArrayList<String>();for(var file:captured.selection()) paths.add(FilePaths.child(captured.directory(),file.name()));return List.copyOf(paths); }
     private void background(Callable<TransferRequest> prepare,WindowHandle owner) {
-        background.execute(()-> { try { var request=prepare.call();ui.execute(()-> { if(closed || !owner.isOpen()) return;transfers.get().enqueue(request,owner).whenComplete((id,error)->ui.execute(()-> { if(closed) return;if(error!=null) context.notices().error(message(error));else if(owner.isOpen()) showTransfers.accept(owner); })); }); }
+        background.execute(()-> { try { var request=prepare.call();ui.execute(()-> { if(closed || !owner.isOpen()) return;transfers.get().enqueue(request,owner).whenComplete((id,error)->ui.execute(()-> { if(error!=null) context.notices().error(message(error)); })); }); }
             catch(Exception failure) { ui.execute(()-> { if(!closed) context.notices().error(message(failure)); }); } });
     }
     private void copyPaths(View view) {
