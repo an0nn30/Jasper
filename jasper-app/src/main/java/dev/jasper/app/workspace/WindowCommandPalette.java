@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.palette.CommandPalette;
 import dev.jasper.app.palette.PaletteController;
 import dev.jasper.app.palette.PaletteTarget;

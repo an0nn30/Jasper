@@ -1,7 +1,6 @@
 package dev.jasper.app.windows;
 
 import com.formdev.flatlaf.util.SystemInfo;
-import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.persistence.UiState;
