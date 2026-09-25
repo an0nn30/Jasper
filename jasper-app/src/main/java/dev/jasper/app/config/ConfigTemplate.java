@@ -54,7 +54,7 @@ public final class ConfigTemplate {
             # enabled = false
 
             [palette]
-            # Rows the command palette shows in every scope, 1-20; updates live. Cmd/Ctrl+1-5 still number the first five.
+            # Rows each palette scope shows, and the All tab shows per scope, 1-20; updates live.
             # max_results = 5
 
             [font]

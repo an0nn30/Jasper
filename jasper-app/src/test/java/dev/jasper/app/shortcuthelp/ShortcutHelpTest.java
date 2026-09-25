@@ -48,6 +48,15 @@ class ShortcutHelpTest {
         });
     }
 
+    @Test void catalogDropsResultShortcutsAndDescribesTabAsSwitchingTabs() throws Exception {
+        edt(() -> {
+            var rows = ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true);
+            assertThat(rows).noneMatch(row -> row.id().startsWith("palette.result"));
+            assertThat(rows).filteredOn(row -> row.id().equals("palette.tab")).singleElement()
+                .satisfies(row -> assertThat(row.name()).isEqualTo("Next tab or next field"));
+        });
+    }
+
     @Test void contextualKeysAreLabeledAndBundledPluginKeysDisappearWithTheirActions() throws Exception {
         edt(() -> {
             var c = new Contributions();

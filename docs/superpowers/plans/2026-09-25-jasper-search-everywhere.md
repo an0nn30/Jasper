@@ -2,7 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Plan written 2026-09-25, awaiting user review. Not started. It runs after `2026-09-25-jasper-theme-engine.md` and uses its `Theme`, `ThemeTestSupport.install(Theme)` and `SearchEverywhere.*` keys.
+**Status:** Executed 2026-09-25 on branch `claude/theme-engine`, subagent-driven (Tasks 1–4), after `2026-09-25-jasper-theme-engine.md`, whose `Theme`, `ThemeTestSupport.install(Theme)` and `SearchEverywhere.*` keys it uses. Deviations from the task text, from the task reviews:
+- Task 2: View → Command Palette and its root key binding open All as well (`WorkspaceActions`), matching Cmd/Ctrl+K.
+- Task 2: a step opened from an All row closes the palette when its scope is removed, as a scope tab's step already did.
+- Task 2: rows drop the tag before cutting the detail, and unselected tabs use `Label.foreground` (spec §1).
+- Task 2: All budgets its rows to 200 in total (`PaletteResults.MAX_ROWS`); scopes past the budget get no section.
+- Task 2: the overlay shadow takes its colour from `Popup.dropShadowColor`.
+- Task 4: the shortcut reference drops the Cmd+1–5 rows and describes Tab as switching tabs; the config template's `[palette]` comment drops Cmd+1–5.
+Not done: visual acceptance (user-run), merge and push.
 
 **Goal:** Rebuild the command palette as classic IntelliJ's Search Everywhere:
 - a tab row (All, then one tab per scope);

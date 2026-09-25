@@ -160,7 +160,9 @@ and routes a `PaletteRequest` for its window to `WindowCommandPalette.open(scope
 `shortcutActionId`, only while the palette is open; closed, the plugin's own action handler runs
 and calls `Palette.open`. `plugins.HostedPalette` adapts an SDK scope: contained calls, a
 `PaletteQuery` built from the target's window and pane ids through the plugin's own handles, and
-the plugin's row kept as the app row's token so it comes back unchanged. `HostedContext.notices()`
+the plugin's row kept as the app row's token so it comes back unchanged. Every scope gets a tab;
+`ScopeSpec.inAll` (SDK 0.8.0, `withInAll(false)` to opt out) decides whether the All tab searches it
+too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `HostedContext.notices()`
 reaches the last active window's error handler; `platform().openInEditor` runs the application's
 `ConfigEditor` on the plugin's executor and reports failure as a notice. `PaneInfo.shell` is
 `PaneSnapshot.shell`, the pane's launcher label. The bundled History and Snippets plugins are the first

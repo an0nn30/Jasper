@@ -1,5 +1,10 @@
 # Command palette verification
 
+Regenerated on 2026-09-25 for the Search Everywhere palette (All and scope tabs, IntelliJ Light and
+Jasper Dark). The Recents, `pane`, No match and Long labels states now render the All tab. The
+History and Snippets images, and the notes about the chip, the `>` picker and numbered badges
+further down, record the earlier palette.
+
 These images render the real `WindowContent`, `JRootPane`, terminal component,
 command registry, in-memory history, and palette overlay. The fixture creates no
 `JFrame` and never starts the user's login shell. On macOS and Linux it runs the
@@ -28,7 +33,7 @@ the rest carry no directory. Every third synthetic entry is bash and the rest ar
 | Long labels, 360×500 | [1×](long-labels-narrow-dark-360x500-1x.png) / [2×](long-labels-narrow-dark-360x500-2x.png) | [1×](long-labels-narrow-light-360x500-1x.png) / [2×](long-labels-narrow-light-360x500-2x.png) |
 | History, most recent (15 entries, the newest 5 shown) | [1×](history-recent-dark-900x600-1x.png) / [2×](history-recent-dark-900x600-2x.png) | [1×](history-recent-light-900x600-1x.png) / [2×](history-recent-light-900x600-2x.png) |
 | History, `git` query, two results | [1×](history-query-dark-900x600-1x.png) / [2×](history-query-dark-900x600-2x.png) | [1×](history-query-light-900x600-1x.png) / [2×](history-query-light-900x600-2x.png) |
-| Scope picker (`>`) | [1×](scope-picker-dark-900x600-1x.png) / [2×](scope-picker-dark-900x600-2x.png) | [1×](scope-picker-light-900x600-1x.png) / [2×](scope-picker-light-900x600-2x.png) |
+| Commands tab, `pane` | [1×](commands-tab-dark-900x600-1x.png) / [2×](commands-tab-dark-900x600-2x.png) | [1×](commands-tab-light-900x600-1x.png) / [2×](commands-tab-light-900x600-2x.png) |
 | Snippets, five of six shown | [1×](snippets-dark-900x600-1x.png) / [2×](snippets-dark-900x600-2x.png) | [1×](snippets-light-900x600-1x.png) / [2×](snippets-light-900x600-2x.png) |
 | Snippet fill-in step (`Deploy`, two fields) | [1×](snippet-fill-in-dark-900x600-1x.png) / [2×](snippet-fill-in-dark-900x600-2x.png) | [1×](snippet-fill-in-light-900x600-1x.png) / [2×](snippet-fill-in-light-900x600-2x.png) |
 | History save-name step (`npm run dev`) | [1×](history-save-name-dark-900x600-1x.png) / [2×](history-save-name-dark-900x600-2x.png) | [1×](history-save-name-light-900x600-1x.png) / [2×](history-save-name-light-900x600-2x.png) |

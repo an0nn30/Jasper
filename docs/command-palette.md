@@ -1,27 +1,21 @@
 # Command palette
 
-The palette holds more than one kind of searchable thing, called a **scope**.
-Cmd+K on macOS or Ctrl+K on Windows and Linux (or View → Command Palette) always
-opens the **Commands** scope; Cmd+R on macOS or Ctrl+Shift+R elsewhere always
-opens the **History** scope; Cmd+J on macOS or Ctrl+Shift+J elsewhere always
-opens the **Snippets** scope. Pressing the shortcut for the scope that is already
-active dismisses the palette instead of reopening it. Each scope shows a chip —
-its icon and label — at the left of the input; type `>` at the start of an empty
-query to open the scope picker (or type `>snip` to jump straight to Snippets), use
-Tab or Enter to switch to the highlighted scope, and Escape to leave the picker
-and keep the previous scope. Clicking the chip opens the picker too.
+The palette works like IntelliJ's Search Everywhere. A row of tabs sits above the search field:
+**All** first, then one tab per **scope** (Commands, History, Snippets, SSH and any a plugin adds).
+Cmd+K on macOS or Ctrl+K on Windows and Linux (or View → Command Palette) opens **All**, which
+searches every scope at once and groups the matches under each scope's name, at most
+`palette.max_results` per scope; when a scope has more, a "More in <Scope>…" row opens that scope's
+tab with the query kept. Vault's secrets stay out of All; its tab searches them. Each scope's own
+shortcut opens its tab: Cmd+R (Ctrl+Shift+R elsewhere) History, Cmd+J (Ctrl+Shift+J) Snippets.
+Pressing the shortcut of the tab already showing closes the palette. Tab and Shift+Tab move between
+tabs, keeping the query; clicking a tab does the same.
 
-Within a scope, Enter runs the first verb, Cmd+Enter (Ctrl+Enter elsewhere) runs
-the second verb, and Shift+Enter runs the third verb where a scope has one; all
-three are shown as a footer hint whenever a scope has more than one verb.
-Commands has one verb, Run, so its footer stays hidden, as before. History has
-three: Enter pastes, Cmd+Enter pastes and runs, Shift+Enter opens a step to save
-the selected command as a snippet. Snippets also has three: Enter pastes,
-Cmd+Enter pastes and runs, Shift+Enter opens `snippets.toml` in the OS editor.
-Escape, the active scope's own opening shortcut again, or an outside click closes
-the palette (Escape first leaves an open step, keeping the list underneath). Use
-Up/Down and Enter, or Cmd+1–5 / Ctrl+1–5 to act on a numbered result; plain
-digits are search text.
+Rows are one line: an icon, the title, a grey detail and a right-aligned tag. Up and Down move
+between rows, skipping the section headers. Enter runs a row's first verb, Cmd+Enter (Ctrl+Enter
+elsewhere) its second and Shift+Enter its third. The hint bar under the list shows the selected
+row's detail and its other verbs with their keys; click one to run it. Escape leaves an open step,
+keeping the list underneath, and otherwise closes the palette, as does an outside click. Plain
+digits are search text. Every colour comes from the installed theme.
 
 | Scope | Enter | Cmd/Ctrl+Enter | Shift+Enter |
 |---|---|---|---|
@@ -188,7 +182,7 @@ can refuse a verb per row, for example when its target is no longer live), and
 final class FakeFeatureScope implements PaletteScope {
     @Override public String id() { return "jasper.fake-feature"; }
     @Override public String label() { return "Fake Feature"; }
-    @Override public String placeholder() { return "Search fake feature, or > to switch scope"; }
+    @Override public String placeholder() { return "Search fake feature"; }
     @Override public List<PaletteVerb> verbs() {
         return List.of(new PaletteVerb("open", "Open"), new PaletteVerb("open_pinned", "Open pinned"));
     }
@@ -219,7 +213,7 @@ contract makes no compatibility promise for a future plugin API. No plugin loadi
 or discovery exists; Jasper ships Commands, History and Snippets.
 
 `WindowCommandPalette` captures the origin tab/pane and restores focus; changing
-scopes retains that target. `PaletteController` owns query, picker and step state.
+tabs retains that target. `PaletteController` owns the open tab, query and step state.
 Completion callbacks are marshalled to EDT and recheck generation, step identity,
 registered scope and origin validity before publishing. Dismissal, scope changes,
 step cancellation, pane/tab changes and window closure invalidate stale results.
@@ -275,8 +269,8 @@ locking.
 
 The [actual Swing renders, pure-search and shell-history-search measurements, and
 reproduction commands](design/command-palette/README.md) cover the headless
-verification, including scopes, the picker, History rows, the Snippets list and
-its fill-in and name steps. Native focus, input methods, accessibility, chip
+verification, including the All tab, scope tabs, History rows, the Snippets list and
+its fill-in and name steps. Native focus, input methods, accessibility, tab
 rendering on the real title-bar theme, physical-display placement and editing
 `snippets.toml` in the real OS editor remain in the [manual acceptance
 checklist](superpowers/plans/2026-09-12-jasper-command-palette-manual-check.md).

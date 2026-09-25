@@ -33,6 +33,21 @@
 
     The plan's status has the full list.
   - **Not done:** visual acceptance of Light and Dark (user-run), merge and push.
+- **Search Everywhere palette** (branch `claude/theme-engine`, plan
+  `docs/superpowers/plans/2026-09-25-jasper-search-everywhere.md`):
+  - **Tabs:** All first (Cmd/Ctrl+K), then one tab per scope.
+  - **All tab:** groups each participating scope's matches, capped per scope, with a "More in…"
+    row. SDK 0.8.0 adds `ScopeSpec.withInAll`; Vault opts out.
+  - **Rows:** one line, with a hint bar showing the other verbs. Tab and Shift+Tab switch tabs.
+  - **Colours** come from the theme's `SearchEverywhere.*`, `List.*`, `Popup.borderColor`,
+    `Popup.dropShadowColor` and `Component.linkColor`.
+  - **Removed:** the `>` picker, scope aliases, the Cmd+1–5 row shortcuts and the `Jasper.palette*`
+    keys.
+  - **Deviations:** View → Command Palette opens All too; a step from All closes with its scope;
+    the tag drops before the detail; All caps at 200 rows; the shortcut reference and config
+    template drop Cmd+1–5. Details in the plan's status banner.
+  - **Planning decisions:** listed in the plan header.
+  - **Not done:** visual acceptance (user-run), merge and push.
 
 ### IntelliJ-style chrome and follow-ups — merged 2026-09-25
 

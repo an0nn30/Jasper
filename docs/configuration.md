@@ -186,10 +186,9 @@ acted on.
 
 ### Palette
 
-`palette.max_results` is the hard cap on rows the command palette lists, in every scope: Commands shows the
-best `max_results` matches and History the most recent or best-matching `max_results` commands, with no
-scrolling. Cmd/Ctrl+1–5 always act on the first five rows, so a larger cap only adds rows you reach with the
-arrow keys. Changes apply live, including to an open palette.
+`palette.max_results` is the cap on rows each scope contributes: a scope's tab lists at most that
+many, and the All tab shows at most that many per scope, with a "More in <Scope>…" row when there
+are more. Changes apply live, including to an open palette.
 
 ### Finished-command notifications
 
@@ -305,7 +304,7 @@ configuration is reported as moved and ignored.
 
 ### Snippets
 
-The Snippets scope (Cmd+J on macOS, Ctrl+Shift+J elsewhere; `>snip` from the picker) is the
+The Snippets scope (Cmd+J on macOS, Ctrl+Shift+J elsewhere, or its tab in the palette) is the
 bundled `dev.jasper.snippets` plugin. It reads and appends `snippets.toml` in the plugin's data
 directory, `<Jasper home>/plugins/dev.jasper.snippets/data/`; a `snippets.toml` in the Jasper home
 from before the plugin is moved there on first launch. It is a separate file: it is not part of the
@@ -483,9 +482,8 @@ The [command palette](command-palette.md) opens with Cmd+K on macOS and Ctrl+K o
 Windows/Linux. Clear Scrollback uses Cmd+Shift+K on macOS and Ctrl+Shift+K
 elsewhere. The bundled plugins add Search Shell History (`"dev.jasper.history.open"`, Cmd+R on
 macOS and Ctrl+Shift+R elsewhere) and Snippets (`"dev.jasper.snippets.open"`, Cmd+J and
-Ctrl+Shift+J), rebindable by their quoted ids. While
-the palette is open, Cmd/Ctrl+1–5 runs the corresponding visible result; plain digits
-continue to edit the search field.
+Ctrl+Shift+J), rebindable by their quoted ids. Cmd+K opens the All tab. While the palette is
+open, Tab and Shift+Tab switch tabs; plain digits edit the search field.
 
 On macOS, keep Cmd+K for Clear Scrollback and move the palette to Cmd+P:
 
