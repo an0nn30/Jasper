@@ -1,6 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
@@ -17,7 +17,7 @@ class ConfigurationStatusTest {
     @Test void statusKeepsConfigAndMetadataBoundedAndReadableInBothThemes() throws Exception {
         edt(() -> {
             var themes = new ThemeController();
-            for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
+            for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                 themes.select(theme);
                 var status = new WindowStatusBar();
                 status.applyPalette(theme.palette());
@@ -46,14 +46,14 @@ class ConfigurationStatusTest {
         edt(() -> {
             var themes = new ThemeController();
             var status = new WindowStatusBar();
-            for (var theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
+            for (var theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                 themes.select(theme);
                 status.applyPalette(theme.palette());
                 status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));
                 assertThat(status.getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
                 assertThat(contrast(status.configButton().getForeground(), status.getBackground())).isGreaterThanOrEqualTo(3);
             }
-            themes.select(BuiltinTheme.DARK);
+            themes.select(Theme.DARK);
         });
     }
 

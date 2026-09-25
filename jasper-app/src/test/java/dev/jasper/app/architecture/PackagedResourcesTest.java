@@ -53,17 +53,17 @@ class PackagedResourcesTest {
                 "dev/jasper/app/shell-integration/zsh/.zprofile",
                 "dev/jasper/app/shell-integration/zsh/.zshenv",
                 "dev/jasper/app/shell-integration/zsh/.zshrc",
-                "dev/jasper/app/themes/FlatDarkLaf.properties",
-                "dev/jasper/app/themes/FlatLaf.properties",
-                "dev/jasper/app/themes/FlatLightLaf.properties"
+                "dev/jasper/app/themes/intellij/Light.theme.json",
+                "dev/jasper/app/themes/intellij/intellijlaf.theme.json",
+                "dev/jasper/app/themes/intellij/darcula.theme.json",
+                "dev/jasper/app/themes/intellij/LICENSE.txt",
+                "dev/jasper/app/themes/jasper-dark.theme.json"
             )) assertThat(jar.getJarEntry(name)).as(name).isNotNull();
             var names = jar.stream().filter(entry -> !entry.isDirectory()).map(java.util.jar.JarEntry::getName).toList();
             assertThat(names).noneMatch(n -> n.startsWith("dev/jasper/buddy/") || n.startsWith("dev/jasper/app/buddy/")
                 || n.contains("TestSupport") || n.contains("Preview.class") || n.contains("ControlledSessionChild"));
-            var defaults = jar.getJarEntry("dev/jasper/app/themes/FlatLaf.properties");
-            var values = new java.util.Properties();
-            try (var stream = jar.getInputStream(defaults)) { values.load(stream); }
-            String border = values.getProperty("SplitPaneDivider.border");
+            assertThat(jar.getJarEntry("dev/jasper/app/themes/FlatLaf.properties")).isNull();
+            String border = dev.jasper.app.appearance.ThemeManager.APP_DEFAULTS.get("SplitPaneDivider.border");
             assertThat(jar.getJarEntry(border.replace('.', '/') + ".class")).isNotNull();
         }
     }

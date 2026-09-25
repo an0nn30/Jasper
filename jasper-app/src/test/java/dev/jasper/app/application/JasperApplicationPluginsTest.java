@@ -268,7 +268,7 @@ class JasperApplicationPluginsTest {
                 assertThat(com.formdev.flatlaf.FlatLaf.isLafDark()).isFalse();
             });
             assertThat(dirs.plugins().resolve("dev.example.look/data/appearance")).hasContent(
-                "LIGHT\ncom.formdev.flatlaf.FlatLightLaf\ndev.jasper.app.appearance.BrandedButtonUI");
+                "LIGHT\ncom.formdev.flatlaf.IntelliJTheme$ThemeLaf\ncom.formdev.flatlaf.ui.FlatButtonUI");
         } finally {
             if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
             service.close();

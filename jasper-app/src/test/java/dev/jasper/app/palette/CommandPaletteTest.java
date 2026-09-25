@@ -1,7 +1,7 @@
 package dev.jasper.app.palette;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.Command;
 import com.formdev.flatlaf.util.UIScale;
@@ -206,7 +206,7 @@ class CommandPaletteTest {
 
     @Test void geometryPaintingAndThemeRefreshKeepInputAndSelection() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            ThemeTestSupport.install(BuiltinTheme.DARK);
+            ThemeTestSupport.install(Theme.DARK);
             var first = PaletteRow.of("test.first", "First");
             var second = PaletteRow.of("test.second", "Second");
             var palette = new CommandPalette(true, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
@@ -230,7 +230,7 @@ class CommandPaletteTest {
             assertThat(new Color(image.getRGB(palette.getWidth() / 2, UIScale.scale(10)), true))
                 .isEqualTo(UIManager.getColor("Jasper.paletteBackground"));
 
-            for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
+            for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                 ThemeTestSupport.install(theme);
                 for (String key : List.of("Jasper.paletteBackground", "Jasper.paletteForeground",
                     "Jasper.paletteMutedForeground", "Jasper.paletteBorder", "Jasper.paletteAccent",
@@ -242,7 +242,7 @@ class CommandPaletteTest {
                 assertThat(palette.queryField().getText()).isEqualTo("fir");
                 assertThat(palette.resultList().getSelectedValue()).isSameAs(second);
             }
-            ThemeTestSupport.install(BuiltinTheme.DARK);
+            ThemeTestSupport.install(Theme.DARK);
         });
     }
 

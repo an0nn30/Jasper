@@ -1,6 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
@@ -554,8 +554,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     Appearance appearance() { return themes.choice(); }
 
-    void selectTheme(BuiltinTheme theme) {
-        selectAppearance(theme == BuiltinTheme.LIGHT ? Appearance.LIGHT : Appearance.DARK);
+    void selectTheme(Theme theme) {
+        selectAppearance(theme == Theme.LIGHT ? Appearance.LIGHT : Appearance.DARK);
     }
 
     void selectAppearance(Appearance appearance) {

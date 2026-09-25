@@ -26,9 +26,9 @@ class UiTypographyTest {
             var themes = new ThemeController();
             String platformFamily = UIManager.getFont("Label.font").getFamily();
             try {
-                themes.select(BuiltinTheme.LIGHT);
+                themes.select(Theme.LIGHT);
                 themes.configure(Appearance.DARK, new UiFontConfig("NonexistentJasperFont394", 17));
-                assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+                assertThat(themes.current().chrome()).isEqualTo(Theme.LIGHT);
                 assertThat(new JLabel().getFont().getFamily()).isEqualTo(platformFamily);
                 assertThat(new JLabel().getFont().getSize2D()).isEqualTo(17);
             } finally { themes.configure(Appearance.DARK, UiFontConfig.defaults()); }
@@ -51,7 +51,7 @@ class UiTypographyTest {
                     assertThat(component.getFont().getFamily()).isEqualTo(Font.SERIF);
                     assertThat(component.getFont().getSize2D()).isEqualTo(18);
                 }
-                themes.select(BuiltinTheme.LIGHT);
+                themes.select(Theme.LIGHT);
                 assertThat(label.getFont().getFamily()).isEqualTo(Font.SERIF);
                 assertThat(label.getFont().getSize2D()).isEqualTo(18);
                 themes.configure(Appearance.LIGHT, UiFontConfig.defaults());

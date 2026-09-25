@@ -5,8 +5,6 @@ import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ToolbarMode;
 
-import com.formdev.flatlaf.FlatDarkLaf;
-import com.formdev.flatlaf.FlatLightLaf;
 import java.util.ArrayDeque;
 import java.util.List;
 import javax.swing.*;
@@ -29,13 +27,13 @@ class WindowChromeTest {
                 JMenu firstAppearance = appearance(first);
                 JMenu secondAppearance = appearance(second);
                 firstAppearance.getItem(0).doClick();
-                assertThat(UIManager.getLookAndFeel()).isInstanceOf(FlatLightLaf.class);
+                assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("IntelliJ Light");
                 secondAppearance.setSelected(true);
                 assertThat(secondAppearance.getItem(0).isSelected()).isTrue();
                 assertThat(secondAppearance.getItem(1).isSelected()).isFalse();
                 secondAppearance.setSelected(false);
                 firstAppearance.getItem(1).doClick();
-                assertThat(UIManager.getLookAndFeel()).isInstanceOf(FlatDarkLaf.class);
+                assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Jasper Dark");
                 secondAppearance.setSelected(true);
                 assertThat(secondAppearance.getItem(1).isSelected()).isTrue();
                 assertThat(secondAppearance.getItem(0).isSelected()).isFalse();

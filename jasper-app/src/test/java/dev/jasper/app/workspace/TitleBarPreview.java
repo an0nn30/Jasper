@@ -1,6 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.platform.MacTitleBar;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -21,7 +21,7 @@ public final class TitleBarPreview {
                 var owner = content(launcher(new ArrayDeque<>()));
                 var root = new JRootPane();
                 try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
-                    for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
+                    for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                         owner.selectTheme(theme);
                         while (owner.tabStrip().getTabCount() > 1) owner.closeTab(owner.currentTab());
                         owner.currentTab().rename("~ (-zsh)");
@@ -40,7 +40,7 @@ public final class TitleBarPreview {
         System.out.println(output);
     }
 
-    private static void render(MacTitleBar bar, Path output, BuiltinTheme theme, String name, int width) {
+    private static void render(MacTitleBar bar, Path output, Theme theme, String name, int width) {
         WindowTabsTest.layout(bar, width, 28);
         var image = new BufferedImage(width * 2, 76, BufferedImage.TYPE_INT_RGB);
         var graphics = image.createGraphics();

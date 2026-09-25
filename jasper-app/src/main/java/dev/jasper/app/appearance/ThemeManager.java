@@ -25,15 +25,6 @@ import javax.swing.plaf.ColorUIResource;
  */
 public final class ThemeManager {
     private static final String BASE = "dev/jasper/app/themes/";
-    /**
-     * {@code ThemeController}'s legacy custom-defaults-source package (registered once, globally, by
-     * {@code FlatLaf.registerCustomDefaultsSource}). FlatLaf merges any registered source into every
-     * FlatLaf-based look and feel it builds, {@code IntelliJTheme}-derived ones included, so left alone it
-     * would overwrite this class's own IntelliJ colours with the pre-engine {@code Jasper.*} properties.
-     * Retired with {@code ThemeController} in a later task; until then this brackets every install so it
-     * never leaks in, while leaving it registered for {@code ThemeController}'s own installs.
-     */
-    private static final String LEGACY_DEFAULTS_SOURCE = "dev.jasper.app.themes";
     /** Each theme {@code name} a {@code parentTheme} may name, with its file under {@link #BASE}. */
     private static final Map<String, String> FILES = Map.of(
         "IntelliJ Light", "intellij/Light.theme.json",
@@ -64,11 +55,7 @@ public final class ThemeManager {
         try { laf = IntelliJTheme.createLaf(new ByteArrayInputStream(resolved.json().getBytes(StandardCharsets.UTF_8))); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
         laf.setExtraDefaults(APP_DEFAULTS);
-        boolean installed;
-        FlatLaf.unregisterCustomDefaultsSource(LEGACY_DEFAULTS_SOURCE);
-        try { installed = FlatLaf.setup(laf); }
-        finally { FlatLaf.registerCustomDefaultsSource(LEGACY_DEFAULTS_SOURCE); }
-        if (!installed) return false;
+        if (!FlatLaf.setup(laf)) return false;
         UIDefaults defaults = UIManager.getLookAndFeelDefaults();
         var extra = new LinkedHashMap<>(APP_DEFAULTS);
         resolved.colors().forEach((key, color) -> {

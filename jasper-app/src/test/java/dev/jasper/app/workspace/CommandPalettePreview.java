@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.palette.*;
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.config.KeyBindings;
@@ -191,7 +191,7 @@ public final class CommandPalettePreview {
                 .append("Swing UI scale: ").append(UIScale.getUserScaleFactor()).append("\n")
                 .append("Pixel output scales: 1x, 2x\n\n");
             for (Scenario scenario : Scenario.values()) {
-                for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
+                for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                     configure(scenario, theme);
                     assertScenario(scenario);
                     for (int pixelScale : List.of(1, 2)) {
@@ -207,7 +207,7 @@ public final class CommandPalettePreview {
             Files.writeString(output.resolve("render-manifest.txt"), manifest.toString());
         }
 
-        private void configure(Scenario scenario, BuiltinTheme theme) throws Exception {
+        private void configure(Scenario scenario, Theme theme) throws Exception {
             SwingUtilities.invokeAndWait(() -> {
                 themes.configure(theme.appearance());
                 while (owner.commandPalette().stepOpen()) owner.commandPalette().escape();
@@ -240,7 +240,7 @@ public final class CommandPalettePreview {
         }
 
         void verifyUiScale(Path output, int expectedScale) throws Exception {
-            configure(Scenario.LONG_LABELS, BuiltinTheme.DARK);
+            configure(Scenario.LONG_LABELS, Theme.DARK);
             SwingUtilities.invokeAndWait(() -> {
                 int actualUnit = UIScale.scale(1);
                 var palette = owner.commandPalette().component();
@@ -286,11 +286,8 @@ public final class CommandPalettePreview {
             System.out.print(report);
         }
 
-        private static String themeSlug(BuiltinTheme theme) {
-            return switch (theme) {
-                case DARK -> "dark";
-                case LIGHT -> "light";
-            };
+        private static String themeSlug(Theme theme) {
+            return theme.dark() ? "dark" : "light";
         }
 
         @Override public void close() {

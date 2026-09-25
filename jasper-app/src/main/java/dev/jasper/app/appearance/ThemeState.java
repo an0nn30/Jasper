@@ -37,11 +37,11 @@ record ThemeState(Appearance saved, Appearance override, TerminalColors terminal
     TerminalColors terminalChoice() { return terminalOverride == null ? terminalSaved : terminalOverride; }
 
     ResolvedTheme resolve() {
-        BuiltinTheme theme = BuiltinTheme.of(choice());
+        Theme theme = Theme.of(choice());
         Palette palette = switch (terminalChoice()) {
             case MATCH -> theme.palette();
-            case LIGHT -> BuiltinTheme.LIGHT.palette();
-            case DARK -> BuiltinTheme.DARK.palette();
+            case LIGHT -> Theme.LIGHT.palette();
+            case DARK -> Theme.DARK.palette();
         };
         return new ResolvedTheme(theme, palette);
     }

@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class TerminalColorsThemeTest {
     @Test void aTerminalOnlyChangeNotifiesOnceWithoutReinstallingTheLookAndFeel() {
-        var installs = new ArrayList<BuiltinTheme>();
+        var installs = new ArrayList<Theme>();
         var themes = new ThemeController(Appearance.LIGHT, theme -> { installs.add(theme); return ThemeTestSupport.install(theme); });
         try {
             var chromeFlags = new ArrayList<Boolean>();
@@ -24,7 +24,7 @@ class TerminalColorsThemeTest {
             assertThat(installs).isEmpty();
             assertThat(chromeFlags).containsExactly(false);
             assertThat(palettes).containsExactly(Palette.jasperDark());
-            assertThat(themes.current()).isEqualTo(new ResolvedTheme(BuiltinTheme.LIGHT, Palette.jasperDark()));
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperDark()));
             assertThat(themes.terminalColors()).isEqualTo(TerminalColors.DARK);
             themes.selectTerminalColors(TerminalColors.DARK);
             assertThat(chromeFlags).as("repeating the same choice is quiet").hasSize(1);
@@ -39,13 +39,13 @@ class TerminalColorsThemeTest {
             themes.subscribe((theme, chromeChanged) -> chromeFlags.add(chromeChanged));
             chromeFlags.clear();
             themes.configure(Appearance.LIGHT, TerminalColors.DARK, UiFontConfig.defaults());
-            assertThat(themes.current()).isEqualTo(new ResolvedTheme(BuiltinTheme.LIGHT, Palette.jasperDark()));
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperDark()));
             assertThat(chromeFlags).containsExactly(true);
             themes.selectAppearance(Appearance.DARK);
-            assertThat(themes.current()).isEqualTo(new ResolvedTheme(BuiltinTheme.DARK, Palette.jasperDark()));
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.DARK, Palette.jasperDark()));
             themes.configure(Appearance.LIGHT, TerminalColors.MATCH, UiFontConfig.defaults());
             assertThat(themes.current()).as("MATCH follows the effective chrome, including the View override")
-                .isEqualTo(new ResolvedTheme(BuiltinTheme.DARK, Palette.jasperDark()));
+                .isEqualTo(new ResolvedTheme(Theme.DARK, Palette.jasperDark()));
         } finally { new ThemeController(); }
     }
 

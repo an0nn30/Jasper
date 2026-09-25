@@ -62,7 +62,7 @@ class ApplicationActionsTest {
         Queue<Runnable> pending = new ArrayDeque<>();
         edt(() -> {
             var original = UIManager.getLookAndFeel();
-            com.formdev.flatlaf.FlatDarkLaf.setup();
+            dev.jasper.app.appearance.ThemeTestSupport.install(dev.jasper.app.appearance.Theme.DARK);
             try {
                 WindowContent owner = content(launcher(pending));
                 BindingRoot root = new BindingRoot(); root.setContentPane(owner);

@@ -1,6 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.KeyBindings;
 import java.awt.*;
@@ -91,7 +91,7 @@ class WindowTabsTest {
             assertThat(pixel(other, 36)).isNotEqualTo(UIManager.getColor("Jasper.tabUnderline"));
             owner.setActive(false);
             assertThat(pixel(selected, 36)).isEqualTo(UIManager.getColor("Jasper.tabUnderlineInactive"));
-            owner.setActive(true); owner.selectTheme(BuiltinTheme.LIGHT); layout(strip, 800, 38);
+            owner.setActive(true); owner.selectTheme(Theme.LIGHT); layout(strip, 800, 38);
             assertThat(pixel(selected, 36)).isEqualTo(UIManager.getColor("Jasper.tabUnderline"));
         });
     }
@@ -106,7 +106,7 @@ class WindowTabsTest {
             owner.reorderTab(1, 0);
             assertThat(owner.currentTab()).isSameAs(second);
             first.rename("<html>literal title"); owner.update();
-            owner.selectTheme(BuiltinTheme.LIGHT);
+            owner.selectTheme(Theme.LIGHT);
             assertThat(named(strip, "select:<html>literal title")).isSameAs(control);
             assertThat(control.getClientProperty("html.disable")).isEqualTo(true);
             assertThat(control.getToolTipText()).startsWith("<html>literal title");

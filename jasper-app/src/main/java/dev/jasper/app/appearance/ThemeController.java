@@ -5,9 +5,6 @@ import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.UiFontConfig;
 import java.awt.Font;
 import javax.swing.plaf.FontUIResource;
-import com.formdev.flatlaf.FlatDarkLaf;
-import com.formdev.flatlaf.FlatLaf;
-import com.formdev.flatlaf.FlatLightLaf;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -21,24 +18,24 @@ import javax.swing.*;
 public final class ThemeController {
 
     public static final class InstallationFailure extends IllegalStateException {
-        InstallationFailure(BuiltinTheme theme, RuntimeException cause) {
-            super("Could not apply theme: " + theme.label(), cause);
+        InstallationFailure(Theme theme, RuntimeException cause) {
+            super("Could not apply theme: " + theme.name(), cause);
         }
     }
 
     private final Set<BiConsumer<ResolvedTheme, Boolean>> listeners = new LinkedHashSet<>();
-    private final Predicate<BuiltinTheme> installer;
+    private final Predicate<Theme> installer;
     private ThemeState state = ThemeState.defaults();
     private UiFontConfig uiFont = UiFontConfig.defaults();
     private final Font platformFont;
     private final float platformLabelSize;
     private static final List<String> FORM_FONTS = List.of("Label.font", "List.font", "TextField.font",
-        "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font");
+        "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font", "Button.font");
 
     public ThemeController() { this(Appearance.DARK); }
-    public ThemeController(Appearance saved) { this(saved, ThemeController::install); }
-    public ThemeController(Predicate<BuiltinTheme> installer) { this(Appearance.DARK, installer); }
-    ThemeController(Appearance saved, Predicate<BuiltinTheme> installer) {
+    public ThemeController(Appearance saved) { this(saved, ThemeManager::install); }
+    public ThemeController(Predicate<Theme> installer) { this(Appearance.DARK, installer); }
+    ThemeController(Appearance saved, Predicate<Theme> installer) {
         requireEdt();
         this.installer = Objects.requireNonNull(installer);
         this.state = ThemeState.defaults().configure(Objects.requireNonNull(saved));
@@ -70,7 +67,7 @@ public final class ThemeController {
         apply(state.configure(Objects.requireNonNull(saved)).configureTerminal(Objects.requireNonNull(terminal)),
             Objects.requireNonNull(font));
     }
-    public void select(BuiltinTheme theme) { selectAppearance(Objects.requireNonNull(theme).appearance()); }
+    public void select(Theme theme) { selectAppearance(Objects.requireNonNull(theme).appearance()); }
     private void apply(ThemeState candidate) { apply(candidate, uiFont); }
     private void apply(ThemeState candidate, UiFontConfig font) {
         ResolvedTheme previous = state.resolve(), next = candidate.resolve();
@@ -116,10 +113,10 @@ public final class ThemeController {
         return new Subscription(() -> { requireEdt(); listeners.remove(listener); });
     }
 
-    private void installOrThrow(BuiltinTheme theme) {
+    private void installOrThrow(Theme theme) {
         LookAndFeel previous = UIManager.getLookAndFeel();
         try {
-            if (!installer.test(theme)) throw new IllegalStateException("Could not apply theme: " + theme.label());
+            if (!installer.test(theme)) throw new IllegalStateException("Could not apply theme: " + theme.name());
         } catch (RuntimeException failure) {
             // A failed setup may have installed a LAF before one of its initialization hooks failed.
             if (UIManager.getLookAndFeel() != previous) {
@@ -128,16 +125,6 @@ public final class ThemeController {
             }
             throw new InstallationFailure(theme, failure);
         }
-    }
-
-    private static boolean defaultsRegistered;
-    static boolean install(BuiltinTheme theme) {
-        requireEdt();
-        if (!defaultsRegistered) {
-            FlatLaf.registerCustomDefaultsSource("dev.jasper.app.themes");
-            defaultsRegistered = true;
-        }
-        return theme == BuiltinTheme.LIGHT ? FlatLightLaf.setup() : FlatDarkLaf.setup();
     }
 
     private static void requireEdt() {
