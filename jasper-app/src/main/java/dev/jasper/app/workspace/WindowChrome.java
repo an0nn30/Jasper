@@ -271,7 +271,7 @@ final class WindowChrome {
             height.commitEdit();
             owner.setTabHeight(((Number) height.getValue()).intValue());
         } catch (java.text.ParseException | IllegalArgumentException failure) {
-            owner.onError.accept("Enter a tab height between 28 and 72 pixels.");
+            owner.onError.accept("Enter a tab height between 20 and 72 pixels.");
         }
     }
 

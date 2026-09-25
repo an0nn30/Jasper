@@ -22,7 +22,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             throw new IllegalArgumentException("Long-command seconds must be 0\u20133600.");
         if (maxResults < PaletteSettings.MIN_MAX_RESULTS || maxResults > PaletteSettings.MAX_MAX_RESULTS)
             throw new IllegalArgumentException("Max results must be 1\u201320.");
-        if (tabHeight < 28 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 28–72.");
+        if (tabHeight < 20 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 20–72.");
         if (columns < 5 || columns > 500) throw new IllegalArgumentException("Columns must be 5–500.");
         if (lines < 2 || lines > 200) throw new IllegalArgumentException("Lines must be 2–200.");
         Objects.requireNonNull(font, "font");
@@ -136,7 +136,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     }
 
     public static ConfigSnapshot defaults() {
-        return new ConfigSnapshot(38, ToolbarMode.ICONS_AND_LABELS, true,
+        return new ConfigSnapshot(30, ToolbarMode.ICONS_AND_LABELS, true,
             FontConfig.defaults(), Appearance.DARK, Map.of(), 150, 45, TerminalConfig.defaults());
     }
 

@@ -23,8 +23,8 @@ public final class ConfigTemplate {
             # Invalid syntax or types keep the last valid settings; diagnostics explain errors.
 
             [window]
-            # Tab height in logical pixels, 28-72; updates all open windows live.
-            # tab_height = 38
+            # Tab height in logical pixels, 20-72; out-of-range values use the nearest limit. Updates live.
+            # tab_height = 30
             # Toolbar: "icons_and_labels", "icons", or "hidden"; updates live.
             # toolbar = "icons_and_labels"
             # Show the status bar; updates live.

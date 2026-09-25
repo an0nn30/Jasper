@@ -59,7 +59,7 @@ public final class ConfigLoader {
     private final boolean macOs;
     private final List<ConfigDiagnostic> diagnostics = new ArrayList<>();
     private boolean rejected;
-    private int tabHeight = 38;
+    private int tabHeight = 30;
     private ToolbarMode toolbar = ToolbarMode.ICONS_AND_LABELS;
     private boolean statusBar = true;
     private boolean buddyEnabled = true;
@@ -201,7 +201,7 @@ public final class ConfigLoader {
 
     private void readField(String name, List<String> path, Object value) {
         switch (name) {
-            case "window.tab_height" -> tabHeight = integer(path, value, 28, 72, tabHeight);
+            case "window.tab_height" -> tabHeight = clampedInteger(path, value, 20, 72, tabHeight);
             case "window.columns" -> columns = integer(path, value, 5, 500, columns);
             case "window.lines" -> lines = integer(path, value, 2, 200, lines);
             case "window.toolbar" -> toolbar = choice(path, value, Map.of(
@@ -257,6 +257,17 @@ public final class ConfigLoader {
         else if (number < min || number > max) valueError(path, "Use an integer from " + min + "–" + max + "; using the default.");
         else return number.intValue();
         return defaultValue;
+    }
+
+    /** An out-of-range integer uses the nearest bound, with a warning, so a smaller value never yields a larger one. */
+    private int clampedInteger(List<String> path, Object value, int min, int max, int defaultValue) {
+        if (!(value instanceof Long number)) { typeError(path, "an integer"); return defaultValue; }
+        if (number < min || number > max) {
+            int bound = number < min ? min : max;
+            diagnostic(ConfigDiagnostic.Severity.WARNING, path, "Use an integer from " + min + "–" + max + "; using " + bound + ".");
+            return bound;
+        }
+        return number.intValue();
     }
 
     private float number(List<String> path, Object value, double min, double max, float defaultValue) {

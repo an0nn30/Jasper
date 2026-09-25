@@ -77,7 +77,7 @@ class ConfigTemplateTest {
             var all = ConfigLoader.parse(directory.resolve("config.toml"), uncommented, macOs);
             assertThat(all.rejected()).isFalse();
             assertThat(all.diagnostics()).isEmpty();
-            assertThat(all.snapshot().tabHeight()).isEqualTo(38);
+            assertThat(all.snapshot().tabHeight()).isEqualTo(30);
             assertThat(all.snapshot().toolbar()).isEqualTo(ToolbarMode.ICONS_AND_LABELS);
             assertThat(all.snapshot().statusBar()).isTrue();
             assertThat(all.snapshot().buddyEnabled()).isTrue();

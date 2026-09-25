@@ -74,8 +74,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Subscription themeRegistration;
     private JRootPane bindingRoot;
     Runnable onMinimumSizeChanged = () -> {};
-    static final int DEFAULT_TAB_HEIGHT = 38;
-    static final int MIN_TAB_HEIGHT = 28;
+    static final int DEFAULT_TAB_HEIGHT = 30;
+    static final int MIN_TAB_HEIGHT = 20;
     static final int MAX_TAB_HEIGHT = 72;
     private int tabHeight = DEFAULT_TAB_HEIGHT;
     Runnable onTabHeightChanged = () -> {};
@@ -612,7 +612,7 @@ private void refreshTabs() {
 
     void setTabHeight(int height) {
         if (height < MIN_TAB_HEIGHT || height > MAX_TAB_HEIGHT)
-            throw new IllegalArgumentException("Tab height must be between 28 and 72 pixels");
+            throw new IllegalArgumentException("Tab height must be between 20 and 72 pixels");
         if (closed || tabHeight == height) return;
         tabHeight = height;
         if (windowTabs != null) { windowTabs.revalidate(); windowTabs.repaint(); }

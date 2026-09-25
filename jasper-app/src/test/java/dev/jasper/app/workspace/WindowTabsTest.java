@@ -23,7 +23,7 @@ class WindowTabsTest {
             var owner = content(launcher(new ArrayDeque<>()));
             JComponent strip = named(owner, "windowTabs");
             assertThat(strip).isNotNull();
-            assertThat(strip.getPreferredSize().height).isEqualTo(38);
+            assertThat(strip.getPreferredSize().height).isEqualTo(30);
             assertThat(strip.isVisible()).as("a lone tab still shows, as in IntelliJ").isTrue();
             var first = owner.currentTab(); first.rename("first"); owner.newTab(HOME);
             var second = owner.currentTab(); second.rename("second"); owner.update();

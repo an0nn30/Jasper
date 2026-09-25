@@ -29,7 +29,7 @@ class MockUiTest {
                 int toolbar = owner.toolbar().getHeight(), tabs = owner.windowTabs().getHeight();
                 assertThat(toolbar).isEqualTo(30);
                 assertThat(title.getHeight()).isEqualTo(28);
-                assertThat(tabs).isEqualTo(38);
+                assertThat(tabs).isEqualTo(30);
                 assertThat(owner.status().getHeight()).isEqualTo(30);
                 assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 958 - 28 - toolbar - tabs - 30));
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
@@ -126,9 +126,9 @@ class MockUiTest {
             buttons.getFirst().doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
             owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(432);
+            assertThat(owner.currentPane().getHeight()).as("default 30px tabs").isEqualTo(440);
             owner.setToolbarMode(ToolbarMode.ICONS); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(402);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(410);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
         });
     }

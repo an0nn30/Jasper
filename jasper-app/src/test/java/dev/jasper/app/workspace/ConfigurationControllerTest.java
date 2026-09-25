@@ -110,7 +110,7 @@ class ConfigurationControllerTest {
             assertThat(first.tabHeight()).isEqualTo(60); assertThat(first.toolbar().isVisible()).isFalse();
             assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
             assertThat(first.currentPane().view().fontSize()).isEqualTo(28);
-            var next = owner(); assertThat(next.tabHeight()).isEqualTo(38);
+            var next = owner(); assertThat(next.tabHeight()).isEqualTo(30);
             assertThat(next.toolbar().isVisible()).isTrue(); assertThat(next.status().isVisible()).isTrue();
             assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
         }); launchAll();

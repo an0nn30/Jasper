@@ -26,7 +26,7 @@ class TabHeightTest {
             try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 root.setSize(958, 958); LayoutTestSupport.layoutTree(root);
                 assertThat(header.getHeight()).isEqualTo(28);
-                assertThat(owner.windowTabs().getHeight()).isEqualTo(38);
+                assertThat(owner.windowTabs().getHeight()).isEqualTo(30);
                 int originalMinimum = root.getMinimumSize().height;
                 var changes = new AtomicInteger(); owner.onMinimumSizeChanged = changes::incrementAndGet;
                 owner.setTabHeight(44); LayoutTestSupport.layoutTree(root);
@@ -34,14 +34,14 @@ class TabHeightTest {
                 assertThat(owner.tabHeight()).isEqualTo(44);
                 assertThat(header.getHeight()).isEqualTo(28);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(44);
-                assertThat(root.getMinimumSize().height).isEqualTo(originalMinimum + 6);
+                assertThat(root.getMinimumSize().height).isEqualTo(originalMinimum + 14);
                 owner.selectTheme(BuiltinTheme.LIGHT); LayoutTestSupport.layoutTree(root);
                 assertThat(header.getHeight()).isEqualTo(28);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(44);
                 assertThat(owner.currentTab()).isSameAs(tab);
                 assertThat(owner.currentPane().session()).isSameAs(session);
                 assertThat(pane.view().fontSize()).isEqualTo(19);
-                assertThat(content(launcher(new ArrayDeque<>())).tabHeight()).isEqualTo(38);
+                assertThat(content(launcher(new ArrayDeque<>())).tabHeight()).isEqualTo(30);
             }
         });
     }
@@ -52,14 +52,14 @@ class TabHeightTest {
             WindowContent.installTitleBar(root, owner, false, title -> {}); root.setSize(958, 958);
             assertThat(owner.windowTabs().isVisible()).isTrue();
             owner.newTab(HOME);
-            for (int height : new int[]{28, 72, 38}) {
+            for (int height : new int[]{20, 72, 30}) {
                 owner.setTabHeight(height); LayoutTestSupport.layoutTree(root);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(height);
                 assertThat(owner.windowTabs().getMinimumSize().height).isEqualTo(height);
             }
-            for (int height : new int[]{27, 73, Integer.MIN_VALUE, Integer.MAX_VALUE}) {
+            for (int height : new int[]{19, 73, Integer.MIN_VALUE, Integer.MAX_VALUE}) {
                 assertThatIllegalArgumentException().isThrownBy(() -> owner.setTabHeight(height));
-                assertThat(owner.tabHeight()).isEqualTo(38);
+                assertThat(owner.tabHeight()).isEqualTo(30);
             }
         });
     }
@@ -71,7 +71,7 @@ class TabHeightTest {
             owner.confirmTabHeight = panel -> {
                 JSpinner spinner = spinner(panel);
                 assertThat(spinner.getValue()).isEqualTo(47);
-                assertThat(((SpinnerNumberModel) spinner.getModel()).getMinimum()).isEqualTo(28);
+                assertThat(((SpinnerNumberModel) spinner.getModel()).getMinimum()).isEqualTo(20);
                 assertThat(((SpinnerNumberModel) spinner.getModel()).getMaximum()).isEqualTo(72);
                 ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().setText("52");
                 return JOptionPane.OK_OPTION;
@@ -84,18 +84,18 @@ class TabHeightTest {
             item.doClick(); assertThat(owner.tabHeight()).isEqualTo(52);
             owner.confirmTabHeight = panel -> {
                 ((JButton) WindowTabsTest.named(panel, "resetTabHeight")).doClick();
-                assertThat(spinner(panel).getValue()).isEqualTo(38);
+                assertThat(spinner(panel).getValue()).isEqualTo(30);
                 return JOptionPane.OK_OPTION;
             };
-            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(38);
+            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(30);
             owner.confirmTabHeight = panel -> { spinner(panel).setValue(65); return JOptionPane.CLOSED_OPTION; };
-            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(38);
+            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(30);
             owner.onError = message -> {};
             owner.confirmTabHeight = panel -> {
                 ((JSpinner.DefaultEditor) spinner(panel).getEditor()).getTextField().setText("99");
                 return JOptionPane.OK_OPTION;
             };
-            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(38);
+            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(30);
         });
     }
 
