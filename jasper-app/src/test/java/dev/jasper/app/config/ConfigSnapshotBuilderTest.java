@@ -23,4 +23,10 @@ class ConfigSnapshotBuilderTest {
     assertThat(ConfigSnapshot.defaults().style()).isEqualTo(ThemeStyle.MODERN);
 }
 
+    @Test void terminalColorsRoundTripThroughTheBuilderAndDefaultToMatch() {
+        assertThat(ConfigSnapshot.defaults().terminalColors()).isEqualTo(TerminalColors.MATCH);
+        var dark = ConfigSnapshot.builder().terminalColors(TerminalColors.DARK).build();
+        assertThat(dark.terminalColors()).isEqualTo(TerminalColors.DARK);
+        assertThat(dark.toBuilder().tabHeight(40).build().terminalColors()).isEqualTo(TerminalColors.DARK);
+    }
 }

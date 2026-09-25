@@ -129,8 +129,11 @@ public final class ConfigTemplate {
             # Reload reports the pending style change; existing windows keep their current style.
             # style = "modern"
             # Variant applies only to modern; retro always uses light controls and a dark terminal.
-            # Theme variant: "dark" or "light"; switches chrome and terminal colors live across windows.
+            # Theme variant: "dark" or "light"; switches chrome colors live across windows.
             # variant = "dark"
+            # Terminal colors: "match" follows the variant; "light" or "dark" keeps the terminal
+            # independent of the UI. Switches live; ignored in retro.
+            # terminal = "match"
 
             [keybindings]
             # Shortcuts update live. Use "none" to disable an action; shortcuts must be unique.

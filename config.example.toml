@@ -105,8 +105,10 @@ family = "system"
 # Reload reports the pending style change; existing windows keep their current style.
 style = "modern"
 # Variant applies only to modern; retro always uses light controls and a dark terminal.
-# Live across open windows. Options: "dark" or "light"; each pairs FlatLaf chrome with its terminal palette.
+# Live across open windows. Options: "dark" or "light" for the FlatLaf chrome.
 variant = "dark"
+# Terminal colors, live and modern only: "match" follows variant; "light" or "dark" is independent of the UI.
+terminal = "match"
 
 [keybindings]
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.

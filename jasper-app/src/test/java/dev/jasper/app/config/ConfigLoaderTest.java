@@ -362,5 +362,27 @@ class ConfigLoaderTest {
     }
 }
 
+    @Test void terminalColorsDefaultToMatchAndAcceptEveryChoice() {
+        assertThat(parse("").snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
+        for (var choice : TerminalColors.values())
+            assertThat(parse("[ui.theme]\nterminal = '" + choice.name().toLowerCase(java.util.Locale.ROOT) + "'\n")
+                .snapshot().terminalColors()).isEqualTo(choice);
+        var mixed = parse("ui.theme.terminal = 'dark'\nui.theme.variant = 'light'\n").snapshot();
+        assertThat(mixed.variant()).isEqualTo(Appearance.LIGHT);
+        assertThat(mixed.terminalColors()).isEqualTo(TerminalColors.DARK);
+    }
 
+    @Test void invalidTerminalColorsUseTheExistingPerFieldDiagnosticPolicy() {
+        for (String value : java.util.List.of("'private-value'", "7", "true")) {
+            var result = parse("[ui.theme]\nterminal=" + value + "\nvariant='light'\n");
+            assertThat(result.rejected()).isEqualTo(!value.startsWith("'"));
+            assertThat(result.snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
+            assertThat(result.snapshot().variant()).isEqualTo(Appearance.LIGHT);
+            assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
+                assertThat(problem.key()).isEqualTo("ui.theme.terminal");
+                assertThat(problem.line()).isEqualTo(2);
+                assertThat(problem.message()).doesNotContain("private-value");
+            });
+        }
+    }
 }
