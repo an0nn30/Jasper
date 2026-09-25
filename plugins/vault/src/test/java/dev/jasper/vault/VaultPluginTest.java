@@ -262,9 +262,7 @@ class VaultPluginTest {
     }
 
     @Test void requestsBothIconFamiliesForEitherSkin() {
-        for (boolean retro : new boolean[]{false, true}) try (var host = new FakePluginHost()) {
-            host.setRetroIcons(retro);
-
+        try (var host = new FakePluginHost()) {
             var delegate = plugin();
             var icons = new java.util.ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
             host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
@@ -289,7 +287,7 @@ class VaultPluginTest {
             });
             assertThat(host.failures()).isEmpty();
             assertThat(icons).extracting(dev.jasper.sdk.testing.FakeNamedIcon::name).containsExactly(dev.jasper.sdk.ui.IconName.LOCK, dev.jasper.sdk.ui.IconName.UNLOCK);
-            assertThat(icons).allSatisfy(icon -> assertThat(icon.retro()).isEqualTo(retro));
+            assertThat(icons).allSatisfy(icon -> assertThat(icon.retro()).isEqualTo(false));
         }
     }
 }

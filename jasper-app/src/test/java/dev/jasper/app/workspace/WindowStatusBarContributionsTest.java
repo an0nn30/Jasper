@@ -15,11 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(EdtTestExtension.class)
 class WindowStatusBarContributionsTest {
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-    void itemsRenderInPriorityOrderOnTheirSideAndClickTheirAction(boolean retro) throws Exception {
-        javax.swing.SwingUtilities.invokeAndWait(() -> {
-        new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
+    @Test void itemsRenderInPriorityOrderOnTheirSideAndClickTheirAction() {
+        new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
         var model = new Contributions();
         List<String> clicks = new ArrayList<>();
         Action run = new AbstractAction("Run") {
@@ -44,10 +41,6 @@ class WindowStatusBarContributionsTest {
         assertThat(bar.contributedItems(true)).extracting(JButton::getText).containsExactly("example.org");
         JButton locked = bar.contributedItems(false).get(1);
         assertThat(locked.getToolTipText()).isEqualTo("Vault is locked");
-        if (retro) {
-            assertThat(locked.isContentAreaFilled()).isFalse();
-            assertThat(locked.getInsets()).isEqualTo(new java.awt.Insets(0, 0, 0, 0));
-        }
         locked.doClick();
         bar.contributedItems(false).get(0).doClick();
         assertThat(clicks).containsExactly("run");
@@ -59,7 +52,6 @@ class WindowStatusBarContributionsTest {
         assertThat(bar.contributedItems(false)).isEmpty();
         assertThat(bar.contributedItems(true)).isEmpty();
         new dev.jasper.app.appearance.ThemeController();
-        });
     }
 
     @Test void progressUpdatesInPlaceAndInvokesCurrentActions() {
@@ -95,25 +87,23 @@ class WindowStatusBarContributionsTest {
 
     @Test void progressFitsNarrowBarsAndLargerUiFontsInBothSkins() {
         try {
-            for (boolean retro : new boolean[]{false, true}) {
-                new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
-                    : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
-                for (int size : new int[]{12, 18, 32}) {
-                    javax.swing.UIManager.put("Label.font", new java.awt.Font("Dialog", java.awt.Font.PLAIN, size));
-                    var view = new StatusProgressView();
-                    Action cancel = new AbstractAction("Cancel") { public void actionPerformed(java.awt.event.ActionEvent e) {} };
-                    view.update(new dev.jasper.app.contributions.ProgressState("Copying", "1 GiB left", "Copying one file",
-                        java.util.OptionalDouble.of(.25), "open", "cancel"), id -> cancel);
-                    for (int width : new int[]{0, 20, 100, 320, 500}) {
-                        view.setSize(width, view.getPreferredSize().height); view.doLayout();
-                        for (var child : view.getComponents()) {
-                            assertThat(child.getX()).isGreaterThanOrEqualTo(0);
-                            assertThat(child.getX() + child.getWidth()).isLessThanOrEqualTo(width);
-                            assertThat(child.getY() + child.getHeight()).isLessThanOrEqualTo(view.getHeight());
-                        }
-                        var image = new java.awt.image.BufferedImage(Math.max(1, width), view.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                        var g = image.createGraphics(); try { view.paint(g); } finally { g.dispose(); }
+            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN,
+                dev.jasper.app.config.Appearance.LIGHT);
+            for (int size : new int[]{12, 18, 32}) {
+                javax.swing.UIManager.put("Label.font", new java.awt.Font("Dialog", java.awt.Font.PLAIN, size));
+                var view = new StatusProgressView();
+                Action cancel = new AbstractAction("Cancel") { public void actionPerformed(java.awt.event.ActionEvent e) {} };
+                view.update(new dev.jasper.app.contributions.ProgressState("Copying", "1 GiB left", "Copying one file",
+                    java.util.OptionalDouble.of(.25), "open", "cancel"), id -> cancel);
+                for (int width : new int[]{0, 20, 100, 320, 500}) {
+                    view.setSize(width, view.getPreferredSize().height); view.doLayout();
+                    for (var child : view.getComponents()) {
+                        assertThat(child.getX()).isGreaterThanOrEqualTo(0);
+                        assertThat(child.getX() + child.getWidth()).isLessThanOrEqualTo(width);
+                        assertThat(child.getY() + child.getHeight()).isLessThanOrEqualTo(view.getHeight());
                     }
+                    var image = new java.awt.image.BufferedImage(Math.max(1, width), view.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    var g = image.createGraphics(); try { view.paint(g); } finally { g.dispose(); }
                 }
             }
         } finally { new dev.jasper.app.appearance.ThemeController(); }

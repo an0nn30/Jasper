@@ -36,11 +36,8 @@ class RemotePluginTest {
         return new TestRemotePlugin(Runnable::run, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-    void hostSelectsNetworkArtworkForEitherSkin(boolean retro, @TempDir Path dir) {
+    @Test void hostSelectsNetworkArtworkForEitherSkin(@TempDir Path dir) {
         try (var host = new FakePluginHost()) {
-            host.setRetroIcons(retro);
             var delegate = plugin(dir.resolve("ssh"));
             var icons = new ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
             host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
@@ -70,7 +67,7 @@ class RemotePluginTest {
             assertThat(host.failures()).isEmpty();
             assertThat(icons).anyMatch(icon->icon.name()==dev.jasper.sdk.ui.IconName.NETWORK);
             assertThat(icons).as("session tab icon").anyMatch(icon->icon.name()==dev.jasper.sdk.ui.IconName.SERVER);
-            assertThat(icons).allSatisfy(icon->assertThat(icon.retro()).isEqualTo(retro));
+            assertThat(icons).allSatisfy(icon->assertThat(icon.retro()).isEqualTo(false));
             assertThat(host.toolbar()).anyMatch(item -> item.contains("Sessions"));
             assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT","dev.jasper.remote.panel|SSH hosts|LEFT");
         }

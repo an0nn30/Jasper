@@ -136,17 +136,17 @@ final class WindowStatusBar extends JPanel {
     void applyPalette(Palette next) { palette = java.util.Objects.requireNonNull(next); refreshTheme(); }
     private static java.awt.Font statusFont() {
         var font = UIManager.getFont("Label.font");
-        return dev.jasper.app.platform.SwingAppearance.retro() ? font : font.deriveFont(font.getSize2D() - UIScale.scale(2f));
+        return font.deriveFont(font.getSize2D() - UIScale.scale(2f));
     }
 
     private Color muted() { return UIManager.getColor("Jasper.mutedForeground"); }
     void refreshTheme() {
-        setBackground(dev.jasper.app.platform.SwingAppearance.retro() ? UIManager.getColor("Panel.background") : UIManager.getColor("Jasper.titleBackground"));
+        setBackground(UIManager.getColor("Jasper.titleBackground"));
         left.refreshTheme(); right.refreshTheme();
         for (Box row : new Box[]{leftItems, rightItems})
             for (Component child : row.getComponents()) if (child instanceof JButton item) {
                 item.setForeground(muted());
-                item.setFont(dev.jasper.app.platform.SwingAppearance.retro() ? UIManager.getFont("Button.font") : statusFont());
+                item.setFont(statusFont());
             } else if (child instanceof StatusProgressView progress) progress.refreshTheme();
         configButton.setForeground(UIManager.getColor(configColor));
     }
@@ -169,7 +169,7 @@ final class WindowStatusBar extends JPanel {
         void refreshTheme() {
             for (JComponent label : new JComponent[]{first, slash, last}) {
                 label.setForeground(label == slash ? UIManager.getColor("Separator.foreground") : muted());
-                label.setFont(dev.jasper.app.platform.SwingAppearance.retro() && label instanceof JButton ? UIManager.getFont("Button.font") : statusFont());
+                label.setFont(statusFont());
             }
         }
         @Override public Dimension getPreferredSize() {

@@ -78,15 +78,6 @@ class TerminalColorsTest {
         });
     }
 
-    @Test void retroShowsTheTerminalChoicesDisabled() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()), new ThemeController(ThemeStyle.RETRO, Appearance.LIGHT));
-            owner.updateActions();
-            assertThat(terminalItems(appearance(owner))).hasSize(3).noneMatch(JMenuItem::isEnabled);
-            assertThat(owner.terminalColors()).isEqualTo(TerminalColors.MATCH);
-        });
-    }
-
     private static void open(JMenu menu) {
         for (var listener : menu.getMenuListeners()) listener.menuSelected(new MenuEvent(menu));
     }

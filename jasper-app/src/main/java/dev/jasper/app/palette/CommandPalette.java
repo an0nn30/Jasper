@@ -318,9 +318,6 @@ public final class CommandPalette extends JPanel {
         }
     }
 
-    private static boolean retro() { return dev.jasper.app.platform.SwingAppearance.retro(); }
-    private static int radius(int modern) { return retro() ? 0 : modern; }
-
     private void applyStepColors() {
         if (foregroundColor == null) return;
         for (JLabel label : stepLabels) { label.setForeground(mutedColor); label.setFont(footer.getFont()); }
@@ -329,10 +326,7 @@ public final class CommandPalette extends JPanel {
             field.setCaretColor(accentColor);
             field.setSelectionColor(selectionColor);
             field.setSelectedTextColor(selectionForegroundColor);
-            if (retro()) {
-                field.setBorder(UIManager.getBorder("TextField.border"));
-                field.setFont(UIManager.getFont("TextField.font"));
-            } else field.setBorder(BorderFactory.createCompoundBorder(
+            field.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(borderColor, UIScale.scale(1), true),
                 BorderFactory.createEmptyBorder(0, UIScale.scale(6), 0, UIScale.scale(6))));
         }
@@ -362,7 +356,7 @@ public final class CommandPalette extends JPanel {
         query.setSelectionColor(selection);
         query.setSelectedTextColor(selectionForeground);
         escape.setForeground(muted);
-        escape.setBorder(BorderFactory.createLineBorder(border, UIScale.scale(1), !retro()));
+        escape.setBorder(BorderFactory.createLineBorder(border, UIScale.scale(1), true));
         chip.colors(accent, selection, border);
         sectionLabel.setForeground(muted);
         footer.setForeground(muted);
@@ -395,12 +389,6 @@ public final class CommandPalette extends JPanel {
         results.setSelectionBackground(selection);
         results.setSelectionForeground(selectionForeground);
         renderer.refreshTheme(foreground, muted, border, selection, selectionForeground);
-        if (retro()) {
-            query.setBorder(UIManager.getBorder("TextField.border"));
-            query.setFont(UIManager.getFont("TextField.font"));
-            chip.setFont(UIManager.getFont("Label.font"));
-            footer.setFont(UIManager.getFont("Label.font"));
-        }
         applyStepColors();
         revalidate(); repaint();
     }
@@ -444,7 +432,7 @@ public final class CommandPalette extends JPanel {
     }
 
     @Override protected void paintComponent(Graphics graphics) {
-        paintSurface(graphics, getWidth(), getHeight(), getBackground(), surfaceBorder, radius(12));
+        paintSurface(graphics, getWidth(), getHeight(), getBackground(), surfaceBorder, 12);
     }
 
     static void paintSurface(Graphics graphics, int width, int height, Color background, Color border, int radius) {
@@ -518,7 +506,7 @@ public final class CommandPalette extends JPanel {
             var g = (Graphics2D) graphics.create();
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                int arc = radius(UIScale.scale(12));
+                int arc = UIScale.scale(12);
                 if (fill != null) { g.setColor(fill); g.fillRoundRect(0, 0, getWidth(), getHeight(), arc, arc); }
                 if (outline != null) { g.setColor(outline); g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc); }
             } finally { g.dispose(); }
@@ -628,7 +616,7 @@ public final class CommandPalette extends JPanel {
                 try {
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     g.setColor(selection);
-                    int insetX = UIScale.scale(4), insetY = UIScale.scale(2), arc = radius(UIScale.scale(12));
+                    int insetX = UIScale.scale(4), insetY = UIScale.scale(2), arc = UIScale.scale(12);
                     g.fillRoundRect(insetX, insetY, Math.max(0, getWidth() - insetX * 2),
                         Math.max(0, getHeight() - insetY * 2), arc, arc);
                 } finally { g.dispose(); }
@@ -661,7 +649,7 @@ public final class CommandPalette extends JPanel {
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g.setColor(border);
-                int arc = radius(UIScale.scale(8));
+                int arc = UIScale.scale(8);
                 g.drawRoundRect(0, 0, Math.max(0, getWidth() - 1), Math.max(0, getHeight() - 1), arc, arc);
             } finally { g.dispose(); }
             super.paintComponent(graphics);

@@ -44,9 +44,9 @@ final class WindowChrome {
 
     WindowChrome(WindowContent owner) {
         this.owner = owner;
-        toolbar = owner.retro() ? new RetroToolbar() : new ReferenceToolbar();
+        toolbar = new ReferenceToolbar();
         toolbar.setFloatable(false);
-        if (!owner.retro()) toolbar.setBorder(BorderFactory.createEmptyBorder());
+        toolbar.setBorder(BorderFactory.createEmptyBorder());
         JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
             ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
@@ -92,32 +92,15 @@ final class WindowChrome {
             @Override public void menuDeselected(MenuEvent event) {}
             @Override public void menuCanceled(MenuEvent event) {}
         });
-        if (owner.retro()) {
-            var note = new JMenuItem("Retro uses light Metal; change style in Settings and restart.");
-            note.setEnabled(false); appearance.addSeparator(); appearance.add(note);
-        }
         view.add(appearance);
         JMenuItem tabHeight = new JMenuItem(owner.windowCommands().view("view.tab_height"));
         view.add(tabHeight);
         pluginSeparator.setName("pluginSeparator");
-        if (owner.retro()) buildRetroToolbar(); else buildModernToolbar();
-    }
-
-    /** Metal's labelled row, unchanged: plugin items sit before the glue, then Settings and Exit. */
-    private void buildRetroToolbar() {
-        addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
-        addToolbarSeparator();
-        addSplitButton();
-        toolbar.add(Box.createHorizontalStrut(UIScale.scale(4)));
-        addButton(ActionId.ZOOM_PANE, "maximize"); addButton(ActionId.FIND, "search");
-        addToolbarSeparator();
-        toolbar.add(toolbarGlue);
-        addButton(ActionId.OPEN_SETTINGS, "settings");
-        addButton(ActionId.QUIT, "exit");
+        buildToolbar();
     }
 
     /** IntelliJ grouping: tab and window, pane, plugin items, then Find and Settings pinned right. */
-    private void buildModernToolbar() {
+    private void buildToolbar() {
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
         toolbar.add(new ToolbarSeparator());
         addSplitButton();
@@ -143,10 +126,6 @@ final class WindowChrome {
         });
     }
 
-    private void addToolbarSeparator() {
-        if (owner.retro()) toolbar.addSeparator(); else toolbar.add(new ToolbarSeparator());
-    }
-
     void connect(WindowContributions source) {
         contributions = source;
         renderContributedToolbar();
@@ -159,15 +138,11 @@ final class WindowChrome {
         button.putClientProperty("label", label);
         button.setIcon(icon != null ? AppIcons.forToolbar(icon) : AppIcons.toolbarIcon("command"));
         button.setFocusable(false);
-        if (owner.retro()) {
-            RetroToolbar.styleButton(button);
-        } else {
-            button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
-            button.setIconTextGap(UIScale.scale(4));
-        }
+        button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
+        button.setIconTextGap(UIScale.scale(4));
         button.getAccessibleContext().setAccessibleName(label);
         button.setToolTipText(label);
-        if (!owner.retro()) button.setFont(button.chromeFont());
+        button.setFont(button.chromeFont());
         return button;
     }
 
@@ -300,12 +275,8 @@ final class WindowChrome {
         ReferenceButton button = new ReferenceButton(owner.action(id), id);
         button.setText(label); button.putClientProperty("label", label);
         button.setIcon(AppIcons.toolbarIcon(icon)); button.setFocusable(false);
-        if (owner.retro()) {
-            RetroToolbar.styleButton(button);
-        } else {
-            button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
-            button.setIconTextGap(UIScale.scale(4));
-        }
+        button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
+        button.setIconTextGap(UIScale.scale(4));
         button.getAccessibleContext().setAccessibleName(id.label());
         button.setToolTipText(id.label());
         toolbar.add(button);
@@ -351,7 +322,6 @@ final class WindowChrome {
         }
 
         @Override public Dimension getPreferredSize() {
-            if (dev.jasper.app.platform.SwingAppearance.retro()) return super.getPreferredSize();
             int width = UIScale.scale(24);
             if (labels()) width += UIScale.scale(4) + getFontMetrics(chromeFont()).stringWidth(getText());
             if (menu()) width += UIScale.scale(10);
@@ -359,7 +329,6 @@ final class WindowChrome {
         }
 
         @Override protected void paintComponent(Graphics graphics) {
-            if (dev.jasper.app.platform.SwingAppearance.retro()) { super.paintComponent(graphics); return; }
             var g = (Graphics2D) graphics.create();
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -470,23 +439,13 @@ final class WindowChrome {
         for (var component : toolbar.getComponents()) if (component instanceof JButton button) {
             button.setText(mode == ToolbarMode.ICONS ? null : (String) button.getClientProperty("label"));
         }
-        if (toolbar instanceof RetroToolbar retro) retro.labels(mode == ToolbarMode.ICONS_AND_LABELS);
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
-        Color toolbarBackground = UIManager.getColor("Jasper.titleBackground");
-        // A plain Color tells Metal to fill chrome instead of painting its Ocean gradient.
-        toolbar.setBackground(owner.retro() ? new Color(toolbarBackground.getRGB()) : toolbarBackground);
-        if (owner.retro()) {
-            menuBar.setBackground(toolbar.getBackground());
-            // Metal hides its default border beside a toolbar; retain an explicit separator.
-            menuBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, UIManager.getColor("MenuBar.borderColor")));
-        }
-        for (Component child : toolbar.getComponents()) if (child instanceof JButton button) {
-            if (owner.retro()) RetroToolbar.styleButton(button);
-            else button.setFont(((ReferenceButton) button).chromeFont());
-        }
-        status.setBackground(owner.retro() ? UIManager.getColor("Panel.background") : UIManager.getColor("Jasper.titleBackground"));
+        toolbar.setBackground(UIManager.getColor("Jasper.titleBackground"));
+        for (Component child : toolbar.getComponents())
+            if (child instanceof ReferenceButton button) button.setFont(button.chromeFont());
+        status.setBackground(UIManager.getColor("Jasper.titleBackground"));
         themeItems.forEach((theme, item) -> item.setSelected(owner.appearance() == theme));
         terminalItems.forEach((colors, item) -> item.setSelected(owner.terminalColors() == colors));
     }

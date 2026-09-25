@@ -259,12 +259,10 @@ class PaletteScopesTest {
         });
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-    void aStepReplacesTheListCompletesWithValuesAndReopensWhereTheScopeAsks(boolean retro) throws Exception {
+    @Test void aStepReplacesTheListCompletesWithValuesAndReopensWhereTheScopeAsks() throws Exception {
         edt(() -> {
             try (var owner = new WindowContent(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
-                new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT),
+                new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT),
                 dev.jasper.app.config.KeyBindings.defaults(true), new dev.jasper.app.commands.CommandHistory(), true)) {
                 var root = install(owner); var fake = new FakeScope(); owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();
@@ -308,12 +306,10 @@ class PaletteScopesTest {
         });
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-    void escapeLeavesAStepWithTheQueryIntactAndScopeShortcutsOrDoneDismissIt(boolean retro) throws Exception {
+    @Test void escapeLeavesAStepWithTheQueryIntactAndScopeShortcutsOrDoneDismissIt() throws Exception {
         edt(() -> {
             try (var owner = new WindowContent(DesktopTestSupport.launcher(new java.util.ArrayDeque<>()), DesktopTestSupport.HOME, path -> {}, () -> {}, () -> {},
-                new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT),
+                new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT),
                 dev.jasper.app.config.KeyBindings.defaults(true), new dev.jasper.app.commands.CommandHistory(), true)) {
                 install(owner); var fake = new FakeScope(); owner.scopes().register(fake);
                 var palette = owner.commandPalette(); var card = palette.component();

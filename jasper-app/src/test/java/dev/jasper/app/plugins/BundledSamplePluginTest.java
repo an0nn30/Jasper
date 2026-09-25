@@ -74,9 +74,7 @@ class BundledSamplePluginTest {
         onEdt(() -> pending.set(runtime.get().stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
     }
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-    void remoteLoadsWithoutVaultAndUsesHostIconsForEveryPlacement(boolean retro) throws Exception {
+    @Test void remoteLoadsWithoutVaultAndUsesHostIconsForEveryPlacement() throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
         Path remoteOnly = java.nio.file.Files.createDirectories(root.resolve("remote-only"));
         Path source = staged.resolve("dev.jasper.remote");
@@ -91,8 +89,7 @@ class BundledSamplePluginTest {
         var deck = new BuddyTestSupport();
         var contributions = new dev.jasper.app.contributions.Contributions();
         onEdt(() -> {
-            new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
-                : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
+            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
             runtime.set(new PluginRuntime(new PluginRuntime.Options(remoteOnly, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> {}),
                 (key, message) -> {}, contributions, AppContractTest.headlessWindows(),
@@ -104,15 +101,13 @@ class BundledSamplePluginTest {
             onEdt(() -> {
                 var icon = contributions.action("dev.jasper.remote.hosts").orElseThrow().icon();
                 assertThat(icon.getIconWidth()).isEqualTo(16);
-                if (retro) assertThat(icon).isNotInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
-                else assertThat(icon).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
-                assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(retro ? 28 : 16);
+                assertThat(icon).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
+                assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(16);
                 assertThat(contributions.action("dev.jasper.remote.connect").orElseThrow().icon()).isSameAs(icon);
                 assertThat(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon()).isSameAs(icon);
                 assertThat(contributions.panels()).hasSize(2).allSatisfy(panel -> {
                     assertThat(panel.icon()).isNotNull();
-                    if(retro) assertThat(panel.icon()).isNotInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
-                    else assertThat(panel.icon()).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
+                    assertThat(panel.icon()).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
                 });
                 assertThat(contributions.status()).hasSize(2).anySatisfy(status -> assertThat(status.icon()).isSameAs(icon));
                 assertThat(contributions.toolbar()).singleElement().isInstanceOfSatisfying(

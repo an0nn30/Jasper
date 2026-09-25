@@ -45,7 +45,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Runnable onEmpty;
     private final JTabbedPane tabs = new TerminalDeck();
     private final WindowTabs windowTabs;
-    private final RetroTabs retroTabs;
     private final WorkspaceActions workspaceActions;
     private final CommandRegistry commands = new CommandRegistry();
     private final WindowCommands windowCommands;
@@ -154,8 +153,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
-        windowTabs = retro() ? null : new WindowTabs(this);
-        retroTabs = retro() ? new RetroTabs(this) : null;
+        windowTabs = new WindowTabs(this);
         var north = new JPanel(new BorderLayout());
         north.add(chrome.toolbar(), BorderLayout.NORTH);
         if (windowTabs != null) north.add(windowTabs, BorderLayout.SOUTH);
@@ -395,10 +393,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     JMenuBar menuBar() { return chrome.menuBar(); }
     JTabbedPane tabStrip() { return tabs; }
     WindowTabs windowTabs() { return windowTabs; }
-    boolean retro() { return themes.style() == dev.jasper.app.config.ThemeStyle.RETRO; }
-private void refreshTabs() {
-    if (retroTabs != null) retroTabs.refresh(); else windowTabs.refresh();
-}
+    private void refreshTabs() { windowTabs.refresh(); }
 
     public TerminalTab currentTab() { return (TerminalTab) tabs.getSelectedComponent(); }
     public TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
@@ -599,7 +594,7 @@ private void refreshTabs() {
                 }
             }
             setBackground(theme.palette().background());
-            tabs.setBackground(retro() ? UIManager.getColor("TabbedPane.background") : theme.palette().background());
+            tabs.setBackground(theme.palette().background());
             chrome.status().applyPalette(theme.palette());
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
@@ -645,7 +640,6 @@ private void refreshTabs() {
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};
         if (windowTabs != null) windowTabs.close();
-        if (retroTabs != null) retroTabs.close();
         themeRegistration.close();
         Runnable closeTabs = () -> {
             for (TerminalTab tab : terminalTabs()) { tab.close(); if (terminals != null) terminals.tabClosed(tab); }

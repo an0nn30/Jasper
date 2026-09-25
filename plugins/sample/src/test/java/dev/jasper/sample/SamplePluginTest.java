@@ -183,8 +183,7 @@ class SamplePluginTest {
         }
 
     @Test void requestsBothIconFamiliesForEitherSkin() {
-        for (boolean retro : new boolean[]{false, true}) try (var host = new FakePluginHost()) {
-            host.setRetroIcons(retro);
+        try (var host = new FakePluginHost()) {
             host.setConfig("dev.jasper.sample", Map.of("demo_ui", true));
             var delegate = new SamplePlugin();
             var icons = new java.util.ArrayList<dev.jasper.sdk.testing.FakeSkinIcon>();
@@ -210,7 +209,7 @@ class SamplePluginTest {
             });
             assertThat(host.failures()).isEmpty();
             assertThat(icons).extracting(dev.jasper.sdk.testing.FakeSkinIcon::retroIcon).containsExactly(dev.jasper.sdk.ui.OldGnomeIcon.EXECUTE, dev.jasper.sdk.ui.OldGnomeIcon.EXECUTE);
-            assertThat(icons).allSatisfy(icon -> assertThat(icon.retro()).isEqualTo(retro));
+            assertThat(icons).allSatisfy(icon -> assertThat(icon.retro()).isEqualTo(false));
         }
     }
 }

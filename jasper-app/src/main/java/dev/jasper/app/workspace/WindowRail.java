@@ -48,10 +48,8 @@ final class WindowRail extends JPanel {
         button.setHideActionText(true);
         button.setText(null);
         button.setIcon(icon);
-        if (!dev.jasper.app.platform.SwingAppearance.retro()) {
-            button.putClientProperty("JButton.buttonType", "toolBarButton");
-            button.setMargin(new Insets(0, 0, 0, 0));
-        }
+        button.putClientProperty("JButton.buttonType", "toolBarButton");
+        button.setMargin(new Insets(0, 0, 0, 0));
         button.setFocusable(false);
         button.setToolTipText(name);
         button.getAccessibleContext().setAccessibleName(name);

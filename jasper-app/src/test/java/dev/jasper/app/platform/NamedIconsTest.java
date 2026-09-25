@@ -20,24 +20,22 @@ import static org.assertj.core.api.Assertions.*;
 class NamedIconsTest {
     @Test void catalogRendersEveryNameAndDistinctLockStatesInBothSkins() {
         try {
-            for (boolean retro : new boolean[]{false, true}) {
-                new ThemeController(retro ? ThemeStyle.RETRO : ThemeStyle.MODERN, Appearance.LIGHT);
-                assertThat(NamedIcons.NAMES).contains("FILE", "LINK", "UPLOAD", "DOWNLOAD", "UP", "NEW_FOLDER", "PAUSE", "RESUME",
-                    "SPLIT", "ZOOM", "TERMINAL", "SERVER");
-                assertThat(OldGnomeCatalog.NAMES).containsExactlyInAnyOrderElementsOf(NamedIcons.NAMES);
-                for (String name : NamedIcons.NAMES) {
-                    var icon = AppIcons.named(name);
-                    assertThat(icon.getIconWidth()).isEqualTo(16);
-                    var toolbar = AppIcons.forToolbar(icon);
-                    assertThat(toolbar.getIconWidth()).isEqualTo(retro ? 28 : 16);
-                    for (int scale : new int[]{1,2}) {
-                        assertThat(java.util.Arrays.stream(pixels(icon, scale)).anyMatch(pixel -> (pixel >>> 24) != 0)).as(name).isTrue();
-                        assertThat(java.util.Arrays.stream(pixels(toolbar, scale)).anyMatch(pixel -> (pixel >>> 24) != 0)).isTrue();
-                    }
+            new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+            assertThat(NamedIcons.NAMES).contains("FILE", "LINK", "UPLOAD", "DOWNLOAD", "UP", "NEW_FOLDER", "PAUSE", "RESUME",
+                "SPLIT", "ZOOM", "TERMINAL", "SERVER");
+            assertThat(OldGnomeCatalog.NAMES).containsExactlyInAnyOrderElementsOf(NamedIcons.NAMES);
+            for (String name : NamedIcons.NAMES) {
+                var icon = AppIcons.named(name);
+                assertThat(icon.getIconWidth()).isEqualTo(16);
+                var toolbar = AppIcons.forToolbar(icon);
+                assertThat(toolbar.getIconWidth()).isEqualTo(16);
+                for (int scale : new int[]{1,2}) {
+                    assertThat(java.util.Arrays.stream(pixels(icon, scale)).anyMatch(pixel -> (pixel >>> 24) != 0)).as(name).isTrue();
+                    assertThat(java.util.Arrays.stream(pixels(toolbar, scale)).anyMatch(pixel -> (pixel >>> 24) != 0)).isTrue();
                 }
-                assertThat(pixels(AppIcons.named("LOCK"),1)).isNotEqualTo(pixels(AppIcons.named("UNLOCK"),1));
-                assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.named("invalid"));
             }
+            assertThat(pixels(AppIcons.named("LOCK"),1)).isNotEqualTo(pixels(AppIcons.named("UNLOCK"),1));
+            assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.named("invalid"));
         } finally { new ThemeController(); }
     }
 

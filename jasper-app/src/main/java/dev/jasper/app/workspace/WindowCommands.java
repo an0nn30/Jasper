@@ -111,14 +111,14 @@ final class WindowCommands implements AutoCloseable {
 for (var appearance : Appearance.values()) {
     var action = view("view.appearance." + appearance.name().toLowerCase(java.util.Locale.ROOT));
     action.putValue(Action.SELECTED_KEY, owner.appearance() == appearance);
-    action.setEnabled(!owner.retro());
+    action.setEnabled(true);
 }
         for (var colors : TerminalColors.values()) {
             var action = view("view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT));
             action.putValue(Action.SELECTED_KEY, owner.terminalColors() == colors);
-            action.setEnabled(!owner.retro());
+            action.setEnabled(true);
         }
-view("view.tab_height").setEnabled(!owner.retro());
+view("view.tab_height").setEnabled(true);
 
     }
 

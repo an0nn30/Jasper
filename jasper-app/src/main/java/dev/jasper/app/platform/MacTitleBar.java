@@ -12,12 +12,9 @@ import javax.swing.*;
 
 /** A centred window title over macOS's native controls; toolbar and tabs live in the window content. */
 public final class MacTitleBar extends JPanel implements AutoCloseable {
-    /** Unscaled height of the modern title row. */
-    public static final int MODERN_HEIGHT = 28;
-    /** Unscaled height of the retro title row. */
-    public static final int RETRO_HEIGHT = 32;
+    /** Unscaled height of the title row. */
+    public static final int HEIGHT = 28;
     private final JRootPane root;
-    private final boolean retro;
     private final Runnable minimumSizeChanged;
     private final JLabel title = new JLabel("Jasper", SwingConstants.CENTER);
     private final PropertyChangeListener boundsChanged;
@@ -37,11 +34,8 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
             SwingUtilities.invokeLater(this::refreshNativeGeometry);
     };
 
-    /** Retro requires JBR's native-control geometry; other platforms retain native decorations. */
-    public static boolean isSupported() {
-        return SystemInfo.isMacFullWindowContentSupported
-            && (!SwingAppearance.retro() || JBR.isWindowDecorationsSupported());
-    }
+    /** Full-window content with transparent title; other platforms retain native decorations. */
+    public static boolean isSupported() { return SystemInfo.isMacFullWindowContentSupported; }
 
     /** Called before pack; the host owns its component and notification wiring. */
     public static MacTitleBar install(JRootPane root, JComponent content, Runnable minimumSizeChanged, boolean supported) {
@@ -59,7 +53,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
 
     private MacTitleBar(JRootPane root, Runnable minimumSizeChanged) {
         super(null);
-        this.root = root; this.retro = SwingAppearance.retro();
+        this.root = root;
         this.minimumSizeChanged = minimumSizeChanged;
         boundsChanged = event -> { revalidate(); repaint(); minimumSizeChanged.run(); };
         title.putClientProperty("html.disable", true);
@@ -68,18 +62,10 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         root.addPropertyChangeListener(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, boundsChanged);
     }
 
-    /** Places in-window retro menus below the native title region; modern menus retain root ownership. */
+    /** Menus stay on the root, which the macOS screen menu bar displays. */
     public void setMenuBar(JMenuBar menuBar) {
         if (closed) return;
-        if (!retro) { root.setJMenuBar(menuBar); return; }
-        root.setJMenuBar(null);
-        var heading = new JPanel(new BorderLayout());
-        heading.add(this, BorderLayout.NORTH);
-        menuBar.setBackground(new Color(UIManager.getColor("Panel.background").getRGB()));
-        menuBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, UIManager.getColor("MenuBar.borderColor")));
-        heading.add(menuBar, BorderLayout.CENTER);
-        root.getContentPane().add(heading, BorderLayout.NORTH);
-        root.revalidate();
+        root.setJMenuBar(menuBar);
     }
 
     /** Updates metadata independently of the window's workspace model. */
@@ -128,7 +114,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         return Math.max(UIScale.scale(120), Math.max(nativeLeft, controlsEnd) + UIScale.scale(8));
     }
 
-    private int titleHeight() { return UIScale.scale(retro ? RETRO_HEIGHT : MODERN_HEIGHT); }
+    private int titleHeight() { return UIScale.scale(HEIGHT); }
 
     @Override public Dimension getMinimumSize() {
         return new Dimension(2 * Math.max(safeInset(), nativeRight) + UIScale.scale(64), titleHeight());
@@ -152,16 +138,15 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     public void setActive(boolean active) { this.active = active; refreshColors(); }
 
     private void refreshColors() {
-        setBackground(UIManager.getColor(retro ? "Jasper.retroTitleBackground" : "Jasper.titleBackground"));
-        title.setFont(retro ? UIManager.getFont("Label.font").deriveFont(Font.PLAIN, UIManager.getFont("Label.font").getSize2D() + UIScale.scale(1f))
-            : SystemFonts.ui(Font.BOLD, 13f));
+        setBackground(UIManager.getColor("Jasper.titleBackground"));
+        title.setFont(SystemFonts.ui(Font.BOLD, 13f));
         title.setForeground(UIManager.getColor(active ? "Jasper.titleForeground" : "Jasper.titleInactiveForeground"));
         repaint();
     }
 
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(UIManager.getColor(retro ? "MenuBar.borderColor" : "Jasper.titleSeparator"));
+        g.setColor(UIManager.getColor("Jasper.titleSeparator"));
         g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
     }
 

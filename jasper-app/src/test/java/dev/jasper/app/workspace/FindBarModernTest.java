@@ -109,23 +109,6 @@ class FindBarModernTest {
         }
     }
 
-    @Test void retroKeepsTheTextButtonRow() throws Exception {
-        try (TerminalSession session = shell(HOME)) {
-            edt(() -> {
-                new ThemeController(ThemeStyle.RETRO, Appearance.LIGHT);
-                var bar = new FindBar(new TerminalView(session, TerminalOptions.defaults()));
-                List<String> texts = new ArrayList<>();
-                for (Component child : bar.getComponents()) {
-                    if (child instanceof AbstractButton button) texts.add(button.getText());
-                    else if (child instanceof JLabel label) texts.add(label.getText());
-                    else if (child instanceof JTextField) texts.add("[field]");
-                }
-                assertThat(texts).containsExactly("Find:", "[field]", "Previous", "Next", "Case", "Regex", "0 / 0", "Close");
-                bar.dispose();
-            });
-        }
-    }
-
     private static FindBar attached(TerminalView view) {
         var bar = new FindBar(view);
         // Search runs only while showing; keep the root lightweight and omit native caret location queries.
