@@ -28,7 +28,7 @@ Out of scope:
 
 ## 1. Layout
 
-Top to bottom, in a square-cornered popup with a 1 px `Popup.borderColor` border and a drop shadow. It is about 680 logical px wide.
+Top to bottom, in a square-cornered popup with a drop shadow and a 1 px border in `Popup.borderColor`, falling back to FlatLaf's `PopupMenu.borderColor`. `Popup.borderColor` is an IntelliJ key that FlatLaf lacks. It is 680 logical px wide (560 today).
 
 1. **Header:** background `SearchEverywhere.Header.background`, holding a row of tabs (**All**, then the registered scopes in registration order).
    - A tab is its label, with its scope icon when the scope has one.
@@ -42,15 +42,15 @@ Top to bottom, in a square-cornered popup with a 1 px `Popup.borderColor` border
    - the title in `List.foreground`, plus the row's detail in `SearchEverywhere.SearchField.infoForeground`, on the same line after the title;
    - the row's tag, right-aligned in `infoForeground`.
 
-   Title and detail are cut with an ellipsis, and the tag is dropped first when space runs out. Selected and hovered rows use `List.selectionBackground`/`selectionForeground` and `List.hoverBackground`.
+   Title and detail are cut with an ellipsis, and the tag is dropped first when space runs out. Selected rows use `List.selectionBackground` and `List.selectionForeground`. Hovered rows use `List.hoverBackground`, which both built-in themes set; a theme without it shows no hover highlight.
    - **In All:** each participating scope with matches gets a section header, the scope label in `SearchEverywhere.List.separatorForeground` over a `SearchEverywhere.List.separatorColor` rule. Up to `palette.max_results` rows follow. When the scope reports more matches than shown, the section ends in a selectable "More in <Scope>…" row, and choosing it selects that scope's tab with the query kept.
    - **In a scope tab:** that scope's rows as today, up to its limit. Empty and step states are as today, drawn in the same colours.
 4. **Hint bar:** background `SearchEverywhere.Advertiser.background`, text `SearchEverywhere.Advertiser.foreground`.
    - The left side shows the selected row's detail (its shortcut, snippet text or host address).
-   - The right side shows the row's scope's secondary verbs as link-coloured (`Link.activeForeground`) clickable text with their keys, for example "Paste and run ⌘⏎   Save as snippet ⇧⏎".
+   - The right side shows the row's scope's secondary verbs as link-coloured clickable text (`Component.linkColor`, which FlatLaf fills from the theme's `Link.activeForeground`) with their keys, for example "Paste and run ⌘⏎   Save as snippet ⇧⏎".
    - It is hidden in a step form.
 
-No colour, border or background in the palette may come from a literal colour or a `Jasper.palette*` key. Those keys are removed.
+No colour, border or background in the palette may come from a literal colour or a `Jasper.palette*` key. Those keys and their derivation rows (part 2a) are removed. The `SearchEverywhere.*` keys are available because part 2a puts back the keys FlatLaf skips.
 
 ## 2. Keyboard and behaviour
 
@@ -79,8 +79,8 @@ No colour, border or background in the palette may come from a literal colour or
 
 ## 4. Testing
 
-- **Layout:** the header, field, results and hint bar are in order; the tabs are All plus every registered scope in registration order; the width is about 680.
-- **Theme colours:** under IntelliJ Light and Jasper Dark, every palette surface's colour equals its `SearchEverywhere.*` or `List.*` source key. This covers the header, selected tab, field, separator, selection, advertiser and link.
+- **Layout:** the header, field, results and hint bar are in order; the tabs are All plus every registered scope in registration order; the width is 680 logical px.
+- **Theme colours:** under IntelliJ Light and Jasper Dark, every palette surface's colour equals its source key (`SearchEverywhere.*`, `List.*`, `Popup.borderColor` or `Component.linkColor`). This covers the header, selected tab, field, separator, selection, advertiser and link.
 - **Behaviour:**
   - Cmd/Ctrl+K opens All, and each scope shortcut opens its tab. The same shortcut closes; the other shortcut switches.
   - Tab and Shift+Tab cycle through the tabs and keep the query.
