@@ -97,6 +97,8 @@ Jasper Dark. Form text, button labels included, uses the 12-point form font and 
 changes. Plugin side panels paint the theme's tool window colour (`ToolWindow.background`) behind
 plain containers; a background a plugin sets itself is kept. Toolbar button geometry stays
 independent (30-pixel height, 12-pixel arc).
+Small app-owned toolbar/rail/status controls keep their existing geometry. The SDK's ordinary-Swing
+component contract remains unchanged; plugin authors do not need a button factory.
 
 SDK 0.7.1 adds `WindowSurface.chooseFile(title, initialPath)`: a synchronous native existing-file
 chooser over the shown window or dialog. `HostedUi` checks the plugin lifetime and UI thread;
