@@ -39,7 +39,8 @@ class ChromeKeysTest {
         assertThat(defaults.getColor("Jasper.tabHoverBackground")).isEqualTo(new Color(0xd9d9d9));
         assertThat(defaults.getColor("Jasper.tabUnderline")).isEqualTo(new Color(0x4083c9));
         assertThat(defaults.getColor("Jasper.findErrorBackground")).isEqualTo(ChromeKeys.mix(new Color(0xdb5860), Color.WHITE, .12));
-        assertThat(defaults.getColor("Jasper.paletteSelectionBackground")).isEqualTo(new Color(0x2675bf));
+        assertThat(ChromeKeys.KEYS).noneMatch(key -> key.startsWith("Jasper.palette"));
+        assertThat(defaults.getColor("Jasper.paletteSelectionBackground")).as("the palette reads the theme's own keys").isNull();
     }
 
     @Test void intellijKeysWinOverFlatLafFallbacks() {

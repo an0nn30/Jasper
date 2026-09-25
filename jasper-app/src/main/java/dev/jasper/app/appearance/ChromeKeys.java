@@ -18,9 +18,7 @@ final class ChromeKeys {
         "Jasper.titleInactiveForeground", "Jasper.titleSeparator", "Jasper.chromeForeground", "Jasper.mutedForeground",
         "Jasper.tabSelectedBackground", "Jasper.tabSelectedForeground", "Jasper.tabHoverBackground", "Jasper.tabUnderline",
         "Jasper.tabUnderlineInactive", "Jasper.splitDivider", "Jasper.findErrorBackground", "Jasper.runningForeground",
-        "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground",
-        "Jasper.paletteBackground", "Jasper.paletteForeground", "Jasper.paletteMutedForeground", "Jasper.paletteBorder",
-        "Jasper.paletteAccent", "Jasper.paletteSelectionBackground", "Jasper.paletteSelectionForeground");
+        "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground");
 
     private ChromeKeys() {}
 
@@ -54,14 +52,6 @@ final class ChromeKeys {
         put(defaults, added, "Jasper.configSuccessForeground", readable(first(defaults, "Actions.Green"), status, 4.5, foreground));
         put(defaults, added, "Jasper.configWarningForeground", readable(first(defaults, "Actions.Yellow"), status, 4.5, foreground));
         put(defaults, added, "Jasper.configErrorForeground", readable(first(defaults, "Actions.Red"), status, 4.5, foreground));
-        // Until the Search Everywhere palette reads the theme's own keys (part 2b).
-        put(defaults, added, "Jasper.paletteBackground", defaults.getColor("Jasper.tabSelectedBackground"));
-        put(defaults, added, "Jasper.paletteForeground", defaults.getColor("Jasper.chromeForeground"));
-        put(defaults, added, "Jasper.paletteMutedForeground", defaults.getColor("Jasper.mutedForeground"));
-        put(defaults, added, "Jasper.paletteBorder", first(defaults, "Component.borderColor"));
-        put(defaults, added, "Jasper.paletteAccent", first(defaults, "Component.focusedBorderColor"));
-        put(defaults, added, "Jasper.paletteSelectionBackground", first(defaults, "List.selectionBackground"));
-        put(defaults, added, "Jasper.paletteSelectionForeground", first(defaults, "List.selectionForeground"));
         return added;
     }
 
