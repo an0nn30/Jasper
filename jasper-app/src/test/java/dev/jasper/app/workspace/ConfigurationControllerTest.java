@@ -1,5 +1,7 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ResolvedTheme;
+import dev.jasper.terminal.config.Palette;
 import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.application.ConfigurationTestSupport;
@@ -658,4 +660,13 @@ void retroStyleReloadKeepsALiveSessionAndAppliesFontChanges() throws Exception {
     });
 }
 
+    @Test void savedTerminalColorsApplyLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
+        start("[ui.theme]\nvariant='light'\nterminal='dark'\n");
+        edt(() -> assertThat(themes.current()).isEqualTo(new ResolvedTheme(BuiltinTheme.LIGHT, Palette.jasperDark())));
+        reload("[ui.theme]\nvariant='light'\nterminal='match'\n");
+        edt(() -> {
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(BuiltinTheme.LIGHT, Palette.jasperLight()));
+            assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.theme"));
+        });
+    }
 }

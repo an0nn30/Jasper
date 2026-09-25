@@ -1,6 +1,7 @@
 package dev.jasper.app.appearance;
 
 import dev.jasper.app.config.Appearance;
+import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ThemeStyle;
 import dev.jasper.app.config.UiFontConfig;
 import java.awt.Font;
@@ -67,20 +68,33 @@ public final class ThemeController {
     public Appearance choice() {
         requireEdt(); return style == ThemeStyle.RETRO ? Appearance.LIGHT : state.choice();
     }
+    /** The effective terminal colours; retro always reports MATCH because its palette is fixed. */
+    public TerminalColors terminalColors() {
+        requireEdt(); return style == ThemeStyle.RETRO ? TerminalColors.MATCH : state.terminalChoice();
+    }
     public void selectAppearance(Appearance choice) {
         requireEdt(); Objects.requireNonNull(choice);
         if (style == ThemeStyle.MODERN) apply(state.choose(choice));
     }
+    /** A temporary View choice for every window; retro ignores it. */
+    public void selectTerminalColors(TerminalColors choice) {
+        requireEdt(); Objects.requireNonNull(choice);
+        if (style == ThemeStyle.MODERN) apply(state.chooseTerminal(choice));
+    }
     public void configure(Appearance saved) { configure(saved, uiFont); }
-    public void configure(Appearance saved, UiFontConfig font) {
-        requireEdt(); apply(state.configure(Objects.requireNonNull(saved)), Objects.requireNonNull(font));
+    public void configure(Appearance saved, UiFontConfig font) { configure(saved, state.terminalSaved(), font); }
+    public void configure(Appearance saved, TerminalColors terminal, UiFontConfig font) {
+        requireEdt();
+        apply(state.configure(Objects.requireNonNull(saved)).configureTerminal(Objects.requireNonNull(terminal)),
+            Objects.requireNonNull(font));
     }
     public void select(BuiltinTheme theme) { selectAppearance(Objects.requireNonNull(theme).appearance()); }
     private void apply(ThemeState candidate) { apply(candidate, uiFont); }
     private void apply(ThemeState candidate, UiFontConfig font) {
         ResolvedTheme previous = resolve(state), next = resolve(candidate);
         boolean chromeChanged = previous.chrome() != next.chrome() || !uiFont.equals(font);
-        boolean choiceChanged = style == ThemeStyle.MODERN && state.choice() != candidate.choice();
+        boolean choiceChanged = style == ThemeStyle.MODERN && (state.choice() != candidate.choice()
+            || state.terminalChoice() != candidate.terminalChoice());
         if (chromeChanged) {
             // Metal's app aliases and fonts live in its LAF defaults. Capture the exact
             // previous values: restoring an existing LAF may rebuild its stock defaults.
