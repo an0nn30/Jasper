@@ -92,11 +92,11 @@ public final class CommandPalettePreview {
     }
 
     private enum Scenario {
-        RECENTS("recents", "", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID),
-        PANE_QUERY("pane-query", "pane", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID),
-        NO_MATCH("no-match", "quasar never", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID),
-        LONG_LABELS("long-labels-narrow", "preview fixture", NARROW_WIDTH, NARROW_HEIGHT, PaletteScope.COMMANDS_ID),
-        SCOPE_PICKER("scope-picker", ">", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID);
+        RECENTS("recents", "", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.ALL_ID),
+        PANE_QUERY("pane-query", "pane", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.ALL_ID),
+        NO_MATCH("no-match", "quasar never", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.ALL_ID),
+        LONG_LABELS("long-labels-narrow", "preview fixture", NARROW_WIDTH, NARROW_HEIGHT, PaletteScope.ALL_ID),
+        COMMANDS_TAB("commands-tab", "pane", LARGE_WIDTH, LARGE_HEIGHT, PaletteScope.COMMANDS_ID);
 
         final String slug;
         final String query;
@@ -219,20 +219,19 @@ public final class CommandPalettePreview {
         private void assertScenario(Scenario scenario) throws Exception {
             SwingUtilities.invokeAndWait(() -> {
                 var palette = owner.commandPalette().component();
-                int count = dev.jasper.app.palette.PaletteTestSupport.resultList(palette).getModel().getSize();
+                int count = dev.jasper.app.palette.PaletteTestSupport.rowCount(palette);
                 int expected = switch (scenario) {
                     case RECENTS -> 3;
                     case PANE_QUERY, LONG_LABELS -> 5;
                     case NO_MATCH -> 0;
-                    // The application alone contributes Commands; History and Snippets are plugins.
-                    case SCOPE_PICKER -> 1;
+                    case COMMANDS_TAB -> 5;
                 };
                 if (count != expected) {
                     throw new AssertionError(scenario.slug + " expected " + expected + " rows, got " + count);
                 }
                 if (scenario == Scenario.PANE_QUERY) {
                     for (int i = 0; i < count; i++) {
-                        String id = dev.jasper.app.palette.PaletteTestSupport.resultList(palette).getModel().getElementAt(i).id();
+                        String id = dev.jasper.app.palette.PaletteTestSupport.rowAt(palette, i).id();
                         if (id.startsWith("preview.")) throw new AssertionError("Pane query used synthetic command " + id);
                     }
                 }
@@ -246,17 +245,17 @@ public final class CommandPalettePreview {
                 var palette = owner.commandPalette().component();
                 Dimension preferred = palette.getPreferredSize();
                 int inputHeight = palette.queryField().getParent().getPreferredSize().height;
-                int rowHeight = dev.jasper.app.palette.PaletteTestSupport.resultList(palette).getFixedCellHeight();
+                int rowHeight = dev.jasper.app.palette.PaletteTestSupport.itemHeight(palette);
                 if (actualUnit != expectedScale) {
                     throw new AssertionError("Expected UIScale " + expectedScale + "x, got " + actualUnit + "x");
                 }
-                if (preferred.width != 560 * expectedScale) {
+                if (preferred.width != 680 * expectedScale) {
                     throw new AssertionError("Palette width scaled more or less than once: " + preferred.width);
                 }
-                if (inputHeight != 56 * expectedScale) {
+                if (inputHeight != 40 * expectedScale) {
                     throw new AssertionError("Input height scaled more or less than once: " + inputHeight);
                 }
-                if (rowHeight != 40 * expectedScale) {
+                if (rowHeight != 24 * expectedScale) {
                     throw new AssertionError("Row height scaled more or less than once: " + rowHeight);
                 }
             });
@@ -271,16 +270,16 @@ public final class CommandPalettePreview {
                 bounds[1] = palette.getY();
                 bounds[2] = palette.getWidth();
                 bounds[3] = palette.getHeight();
-                if (palette.getWidth() != 560 * expectedScale) {
+                if (palette.getWidth() != 680 * expectedScale) {
                     throw new AssertionError("Laid-out palette width scaled more or less than once: " + palette.getWidth());
                 }
             });
             String report = "actual UIScale=" + expectedScale + "x\n"
                 + "root=" + width + "x" + height + "\n"
                 + "palette=" + bounds[0] + "," + bounds[1] + " " + bounds[2] + "x" + bounds[3] + "\n"
-                + "preferredWidth=" + (560 * expectedScale) + "\n"
-                + "inputHeight=" + (56 * expectedScale) + "\n"
-                + "rowHeight=" + (40 * expectedScale) + "\n";
+                + "preferredWidth=" + (680 * expectedScale) + "\n"
+                + "inputHeight=" + (40 * expectedScale) + "\n"
+                + "rowHeight=" + (24 * expectedScale) + "\n";
             Files.writeString(output.resolve("actual-ui-scale-" + expectedScale + "x.txt"), report);
             System.out.println(image);
             System.out.print(report);

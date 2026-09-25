@@ -19,6 +19,7 @@ public final class ScopeRegistry implements AutoCloseable {
         CommandRegistry.requireEdt();
         if (closed) throw new IllegalStateException("Registry is closed");
         String id = PaletteScope.requireValidId(scope.id());
+        if (PaletteScope.ALL_ID.equals(id)) throw new IllegalArgumentException("Reserved scope ID: " + id);
         if (scopes.containsKey(id)) throw new IllegalArgumentException("Duplicate scope: " + id);
         if (scope.verbs().isEmpty()) throw new IllegalArgumentException("Scope needs at least one verb: " + id);
         scopes.put(id, scope);

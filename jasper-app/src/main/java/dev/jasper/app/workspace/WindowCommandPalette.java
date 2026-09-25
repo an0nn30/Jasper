@@ -103,14 +103,11 @@ final class WindowCommandPalette implements AutoCloseable {
     void setMaxResults(int value) { controller.setMaxResults(value); }
     int maxResults() { return controller.maxResults(); }
     void dismiss() { controller.dismiss(); }
-    void openPicker() { controller.openPicker(); }
     boolean isOpen() { return controller.isOpen(); }
-    boolean pickerOpen() { return controller.pickerOpen(); }
     String activeScopeId() { return controller.activeScopeId(); }
     boolean composing() { return controller.composing(); }
     CommandPalette component() { return controller.component(); }
     void enterPressed(int verb) { controller.enterPressed(verb); }
-    void executeNumber(int number) { controller.executeNumber(number); }
     void moveSelection(int delta) { controller.moveSelection(delta); }
     boolean stepOpen() { return controller.stepOpen(); }
     void escape() { controller.escape(); }
@@ -186,11 +183,10 @@ final class WindowCommandPalette implements AutoCloseable {
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 Rectangle card = palette.getBounds();
-                g.setColor(new Color(0, 0, 0, owner.theme().chrome().appearance() == dev.jasper.app.config.Appearance.LIGHT ? 2 : 4));
+                g.setColor(new Color(0, 0, 0, owner.theme().chrome().dark() ? 4 : 2));
                 for (int i = 12; i >= 1; i--) {
-                    int expansion = UIScale.scale(i), arc = UIScale.scale(24) + expansion * 2;
-                    g.fillRoundRect(card.x - expansion, card.y - expansion, card.width + expansion * 2,
-                        card.height + expansion * 2, arc, arc);
+                    int expansion = UIScale.scale(i);
+                    g.fillRect(card.x - expansion, card.y - expansion, card.width + expansion * 2, card.height + expansion * 2);
                 }
             } finally { g.dispose(); }
         }

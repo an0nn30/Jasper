@@ -152,7 +152,7 @@ class WindowContributionsTest {
                 assertThat(palette.isOpen()).isTrue();
                 assertThat(palette.activeScopeId()).isEqualTo("dev.x.scope");
                 assertThat(palette.component().queryField().getText()).isEqualTo("al");
-                assertThat(PaletteTestSupport.resultList(palette.component()).getSelectedValue().id()).isEqualTo("beta");
+                assertThat(PaletteTestSupport.selectedRow(palette.component()).id()).isEqualTo("beta");
                 model.requestPalette(new Contributions.PaletteRequest(owner.id(), "dev.x.scope", Optional.of("x"), Optional.empty()));
                 assertThat(palette.isOpen()).as("a request for the showing scope dismisses").isFalse();
 

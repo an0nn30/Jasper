@@ -145,7 +145,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         chrome = new WindowChrome(this);
         commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
         scopes.register(commandsScope);
-        commandPalette = new WindowCommandPalette(this, scopes, PaletteScope.COMMANDS_ID, macOs);
+        commandPalette = new WindowCommandPalette(this, scopes, PaletteScope.ALL_ID, macOs);
         paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
             source -> !closed && active && bindingRoot != null && source != null
                 && SwingUtilities.isDescendingFrom(this, bindingRoot)
@@ -321,10 +321,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void dispatchCommand(Command command) {
         command.action().actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, command.id()));
     }
-    /** The application shortcut that opens a scope directly, for the picker's trailing tag; null when none. */
+    /** The application shortcut that opens a scope directly, shown in its tab's tooltip; null when none. */
     String scopeShortcut(String scopeId) {
         ActionId id = switch (scopeId) {
-            case PaletteScope.COMMANDS_ID -> ActionId.COMMAND_PALETTE;
+            case PaletteScope.ALL_ID -> ActionId.COMMAND_PALETTE;
             default -> null;
         };
         return id == null ? null : CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
