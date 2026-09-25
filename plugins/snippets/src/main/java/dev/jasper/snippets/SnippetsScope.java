@@ -35,8 +35,8 @@ final class SnippetsScope implements PaletteScope {
     }
 
     @Override public ScopeSpec spec() {
-        return ScopeSpec.of(SnippetService.SCOPE_ID, "Snippets", "Search snippets, or > to switch scope", List.of(PASTE, PASTE_RUN, EDIT))
-            .withDescription("Paste or run a saved command").withAliases(List.of("snip", "snippets")).withShortcutActionId(openActionId);
+        return ScopeSpec.of(SnippetService.SCOPE_ID, "Snippets", "Search snippets", List.of(PASTE, PASTE_RUN, EDIT))
+            .withDescription("Paste or run a saved command").withShortcutActionId(openActionId);
     }
 
     @Override public void activated(PaletteQuery context) { store.refresh(); }

@@ -35,7 +35,8 @@ class RemoteScopeTest {
 
     @Test void rowsVerbsAndErrors() {
         assertThat(scope.spec().id()).isEqualTo(RemoteScope.ID);
-        assertThat(scope.spec().aliases()).containsExactly("ssh", "remote", "hosts");
+        assertThat(scope.spec().inAll()).isTrue();
+        assertThat(scope.spec().placeholder()).isEqualTo("Search saved hosts");
         assertThat(scope.spec().shortcutActionId()).contains("dev.jasper.remote.connect");
         List<PaletteRow> rows = scope.search("", query).rows();
         assertThat(rows).extracting(PaletteRow::title).as("favorites first").containsExactly("prod", "nas");

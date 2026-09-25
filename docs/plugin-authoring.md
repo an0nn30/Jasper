@@ -332,11 +332,12 @@ private static void connectEcho(PendingSession pending, long stepMillis) {
 ## Palette scopes
 
 A scope is one kind of searchable thing in the command palette, beside Commands. Declare
-`palette.contribute`, register a `PaletteScope` through `context.palette()`, and the scope appears in
-every window's scope picker under its label and `>alias`. The spec is read once; its id must start
+`palette.contribute`, register a `PaletteScope` through `context.palette()`, and the scope gets a tab
+in every window's palette and a section in its All tab (`withInAll(false)` keeps a scope, such as
+Vault's secrets, out of All). The spec is read once; its id must start
 with your plugin id. Search, `available`, `step` and `execute` run on the UI thread and must do no
 I/O: keep an index, refresh it in the background and tell the palette through the `onChanged`
-listener. The palette shows at most `maxResults` rows and never scrolls. A verb may return a
+listener. Return at most `maxResults` rows. A verb may return a
 `PaletteStep` (a small form) instead of running at once; its completion answers `done()`,
 `error(message)` (keeps the form open) or `reopen(scopeId, rowId, query)`, which dismisses and
 reopens the palette elsewhere, in any registered scope. `Palette.open` does the same from an action;
@@ -379,9 +380,9 @@ private static void installPaletteDemo(PluginContext context) {
     List<String> greetings = List.of("good morning", "hello", "hi there");
     context.palette().register(new PaletteScope() {
         @Override public ScopeSpec spec() {
-            return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings, or > to switch scope",
+            return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings",
                     List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run")))
-                .withAliases(List.of("greet")).withShortcutActionId(GREETINGS_OPEN);
+                .withShortcutActionId(GREETINGS_OPEN);
         }
         // Search runs on the UI thread for every keystroke: rank what is already in memory, never read files here.
         @Override public PaletteResults search(String query, PaletteQuery palette) {

@@ -847,6 +847,11 @@ public final class FakePluginHost implements AutoCloseable {
                 + String.join(",", registered.spec().verbs().stream().map(PaletteVerb::id).toList())).toList();
         }
 
+        /** The ids of registered scopes the palette's All tab searches, in registration order. */
+        public List<String> scopesInAll() {
+            return scopes.values().stream().filter(registered -> registered.spec().inAll()).map(registered -> registered.spec().id()).toList();
+        }
+
         private FakePalette.Registered scope(String scopeId) {
             FakePalette.Registered registered = scopes.get(scopeId);
             if (registered == null) throw new IllegalArgumentException("No such scope: " + scopeId);

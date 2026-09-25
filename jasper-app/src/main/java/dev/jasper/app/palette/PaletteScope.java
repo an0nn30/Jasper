@@ -22,6 +22,8 @@ public interface PaletteScope {
     /** One to three verbs, bound in order to Enter, Cmd/Ctrl+Enter and Shift+Enter. */
     List<PaletteVerb> verbs();
     default boolean monospaceRows() { return false; }
+    /** Whether the palette's All tab searches this scope too; true unless the scope opts out. */
+    default boolean inAll() { return true; }
 
         /**
          * A contributed action whose shortcut, while the palette is open, switches to or dismisses this

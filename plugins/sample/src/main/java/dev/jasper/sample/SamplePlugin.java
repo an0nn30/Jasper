@@ -213,9 +213,9 @@ public final class SamplePlugin implements Plugin {
         List<String> greetings = List.of("good morning", "hello", "hi there");
         context.palette().register(new PaletteScope() {
             @Override public ScopeSpec spec() {
-                return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings, or > to switch scope",
+                return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings",
                         List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run")))
-                    .withAliases(List.of("greet")).withShortcutActionId(GREETINGS_OPEN);
+                    .withShortcutActionId(GREETINGS_OPEN);
             }
             // Search runs on the UI thread for every keystroke: rank what is already in memory, never read files here.
             @Override public PaletteResults search(String query, PaletteQuery palette) {

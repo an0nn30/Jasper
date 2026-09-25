@@ -98,9 +98,9 @@ final class HostedPalette implements Palette {
         @Override public Icon icon() { return spec.icon().orElse(null); }
         @Override public String description() { return spec.description(); }
         @Override public String placeholder() { return spec.placeholder(); }
-        @Override public List<String> aliases() { return spec.aliases(); }
         @Override public List<dev.jasper.app.palette.PaletteVerb> verbs() { return verbs; }
         @Override public boolean monospaceRows() { return spec.monospaceRows(); }
+        @Override public boolean inAll() { return spec.inAll(); }
         @Override public Optional<String> shortcutActionId() { return spec.shortcutActionId(); }
 
         private Optional<PaletteVerb> own(dev.jasper.app.palette.PaletteVerb verb) {

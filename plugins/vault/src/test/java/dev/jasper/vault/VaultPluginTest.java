@@ -85,6 +85,7 @@ class VaultPluginTest {
             assertThat(host.failures()).isEmpty();
             assertThat(host.actions()).contains("dev.jasper.vault.open|Open Vault...|true", "dev.jasper.vault.lock|Lock Vault|false");
             assertThat(host.scopes()).containsExactly("dev.jasper.vault.scope|Vault|copy_password,copy_username,open");
+            assertThat(host.scopesInAll()).as("secrets stay out of the All tab").isEmpty();
             UUID window = host.addTerminalWindow();
             assertThat(api.get().lockState()).isEqualTo(LockState.NO_VAULT);
             assertThat(host.invoke(VaultPlugin.OPEN, window, null)).isTrue();
