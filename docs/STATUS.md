@@ -9,6 +9,19 @@
   deviation: the title-row constant is `MacTitleBar.TITLE_HEIGHT` (`HEIGHT` hid
   `ImageObserver.HEIGHT`). Next: the theme engine with IntelliJ-format themes and IntelliJ
   Light (part 2). Not merged, not pushed.
+- **Theme engine** (branch `claude/theme-engine`, plan
+  `docs/superpowers/plans/2026-09-25-jasper-theme-engine.md`):
+  - **Themes:** every theme is an IntelliJ-format `.theme.json` installed by `ThemeManager`. Light
+    is classic IntelliJ Light, vendored from intellij-community at `f7377708`. Dark is
+    `jasper-dark.theme.json`, keeping today's colours.
+  - **Keys:** `ChromeKeys` derives the `Jasper.*` chrome keys a theme leaves unset.
+  - **Surfaces:** side panels paint `ToolWindow.background`, and the status bar paints `StatusBar.*`
+    under a 1-px rule.
+  - **Removed:** the FlatLaf properties overrides, `BrandedButtonUI` and `BuiltinTheme`.
+  - **Planning decisions:** listed in the plan header. They cover the rail staying chrome, contrast
+    floors for derived text, FlatLaf form-control heights, and Jasper Dark menus using the list
+    selection.
+  - **Not done:** visual acceptance of Light and Dark (user-run), merge and push.
 
 ### IntelliJ-style chrome and follow-ups — merged 2026-09-25
 

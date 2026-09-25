@@ -187,6 +187,17 @@ these recipes when signatures change, and document any native acceptance still n
 Use patterns where an actual responsibility needs them. Future SDK work can adapt these
 boundaries; this refactor promises no plugin loading, binary compatibility or permissions.
 
+## Themes
+
+To change Jasper Dark, edit `jasper-app/src/main/resources/dev/jasper/app/themes/jasper-dark.theme.json`
+using IntelliJ keys; `Jasper.*` keys set there win over derivation. To refresh the vendored IntelliJ
+themes, change `SHA` in `tools/themes/fetch-intellij-themes.py` and rerun it from the repository
+root, then update the pinned hashes in `IntellijThemesTest`. To add a chrome key, add it to
+`ChromeKeys.KEYS` and `ChromeKeys.derive` with a fallback FlatLaf always defines, and cover it in
+`ChromeKeysTest`. Run `ThemeLoaderTest`, `ChromeKeysTest`, `ThemeManagerTest` (IntelliJ Light
+values and Jasper Dark parity) and `ThemeButtonsTest`, then `check`. Light and dark visual
+acceptance is a user check.
+
 ## Maintaining SDK icons
 
 `IconName` artwork lives in `NamedIcons`: an IntelliJ SVG, or a tinted Tabler SVG under

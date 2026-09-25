@@ -91,15 +91,12 @@ use `MacTitleBar`; dialogs retain their modal ownership, close guards and normal
 Title-only surfaces hide the unused tab component so the entire header uses `Jasper.titleBackground`.
 The rail and toolbar use that same semantic color in both themes. Dialogs are parented through
 `WindowOwner`, so an SDK type never exposes a frame or needs its own chrome API.
-The application's look and feel supplies `BrandedButtonUI` for ordinary Swing buttons in any
-plugin layout, including content added later. It retains FlatLaf interaction and border painting,
-uses TermLab form sizing (24-pixel minimum height, 72-pixel minimum text-button width,
-12-point labels) and follows UI refreshes. Gray secondary and blue default buttons use the
-ported dark/light palette; dark secondary text retains Jasper's contrast threshold.
-Text fields, password fields, formatted fields, text areas and dropdowns share the form styling.
-Toolbar button geometry stays independent (30-pixel height, 12-pixel arc).
-Small app-owned toolbar/rail/status controls keep their existing geometry. The SDK's ordinary-Swing
-component contract remains unchanged; plugin authors do not need a button factory.
+Ordinary Swing buttons, fields, lists and dropdowns in any plugin layout, including content
+added later, are drawn by FlatLaf in the installed theme's colours: classic IntelliJ Light or
+Jasper Dark. Form text, button labels included, uses the 12-point form font and follows UI font
+changes. Plugin side panels paint the theme's tool window colour (`ToolWindow.background`) behind
+plain containers; a background a plugin sets itself is kept. Toolbar button geometry stays
+independent (30-pixel height, 12-pixel arc).
 
 SDK 0.7.1 adds `WindowSurface.chooseFile(title, initialPath)`: a synchronous native existing-file
 chooser over the shown window or dialog. `HostedUi` checks the plugin lifetime and UI thread;

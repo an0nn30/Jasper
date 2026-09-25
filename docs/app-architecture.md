@@ -162,8 +162,8 @@ list is documented in each package-info file and verified from compiled bytecode
 
 ## Resources and verification
 
-FlatLaf defaults and shell scripts keep their existing classpath paths. Reflection-based
-class references in theme properties must track package moves. Icons use absolute paths;
+Theme files and shell scripts keep their classpath paths. `ThemeManager.APP_DEFAULTS` names
+`SplitDividerBorder` by class name, so it must track package moves. Icons use absolute paths;
 Buddy loads its sprite relative to BuddySprite in its own jar. Artifact tests open actual
 jars, decode the PNG, resolve the configured divider class and reject test fixtures.
 
@@ -183,3 +183,22 @@ sized to content with a 3 px selection underline, wheel scrolling and a ▾ list
 Each pane's `FindBar` is IntelliJ's single-line find row. App icons resolve from bundled
 assets. Since SDK 0.7.6, plugin-supplied SVGs draw as authored and are no longer recoloured
 to the chrome foreground (see [SDK architecture](sdk-architecture.md)).
+
+## Themes
+
+Every theme is an IntelliJ-format `.theme.json` under `dev/jasper/app/themes/`, installed by one
+path in `ThemeManager`:
+1. `ThemeLoader` resolves the `parentTheme` chain (parent entries first, the child's replacing
+   them in its order, so FlatLaf's in-order wildcards match IntelliJ's precedence), resolves the
+   `colors` table and drops IntelliJ implementation classes.
+2. FlatLaf's `IntelliJTheme` builds the look and feel with `ThemeManager.APP_DEFAULTS` (form
+   typography, split divider) as extra defaults.
+3. The manager puts back the explicit colours FlatLaf skips (IntelliJ-only namespaces such as
+   `SearchEverywhere.*`, `EditorTabs.*`, `ToolWindow.*`, `StatusBar.*`).
+4. `ChromeKeys` fills each `Jasper.*` chrome key the theme did not set from IntelliJ keys, with
+   contrast floors for derived text.
+
+Restored and derived keys are also recorded as the instance's extra defaults, so a rollback to it
+keeps them. The built-ins are `Theme.LIGHT` (classic IntelliJ Light, vendored from
+intellij-community with provenance under `themes/intellij/`) and `Theme.DARK` (`jasper-dark.theme.json`).
+Side panels paint `ToolWindow.background` through `ToolWindowSurface`; the rail stays chrome.

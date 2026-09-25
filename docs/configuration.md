@@ -530,11 +530,12 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme variant
 
-`ui.theme.variant` selects one of the two bundled themes. `"dark"` (the default) selects
-FlatLaf Dark chrome and `"light"` FlatLaf Light chrome; by default the terminal uses the matching
-Jasper Dark or Jasper Light palette (see [Terminal colors](#terminal-colors)). Jasper reads no
-custom theme files. An unrecognized variant produces an error diagnostic and keeps the default;
-a non-string value rejects the configuration.
+`ui.theme.variant` selects one of the two bundled themes. `"dark"` (the default) selects Jasper
+Dark and `"light"` classic IntelliJ Light, the theme IntelliJ IDEA ships for its classic UI. By
+default the terminal uses the matching Jasper Dark or Jasper Light palette (see [Terminal
+colors](#terminal-colors)). Both are IntelliJ-format `.theme.json` files installed through one
+theme engine; Jasper does not yet read theme files of your own. An unrecognized variant produces
+an error diagnostic and keeps the default; a non-string value rejects the configuration.
 
 View → Appearance offers Light and Dark across all windows as a temporary choice that never
 rewrites the configuration. The choice survives unrelated reloads and clears when the saved
