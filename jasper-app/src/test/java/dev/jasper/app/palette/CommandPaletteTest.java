@@ -416,6 +416,37 @@ class CommandPaletteTest {
         });
     }
 
+    @Test void theAccessibleDescriptionCarriesTheCountAndTheSelectedScopesVerbsWithTheirKeys() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var palette = palette(new ArrayList<>());
+            palette.setEntries(List.of(new PaletteEntry.Item(HISTORY, new PaletteRow("ls", "ls -la", "in ~/src", null, null, true, null)),
+                new PaletteEntry.Item(COMMANDS, new PaletteRow("new_tab", "New Tab", null, "⌘T", null, true, null)),
+                new PaletteEntry.More(HISTORY)), null, null);
+            assertThat(palette.entryList().getAccessibleContext().getAccessibleDescription())
+                .as("a three-verb scope's row carries every verb with its key")
+                .isEqualTo("2 results; ⏎ Paste  ⌘⏎ Paste and run  ⇧⏎ Save as snippet…");
+            palette.selectRelative(1);
+            assertThat(palette.entryList().getAccessibleContext().getAccessibleDescription())
+                .as("a single-verb scope adds nothing beyond the count").isEqualTo("2 results");
+            palette.selectRelative(1);
+            assertThat(palette.entryList().getAccessibleContext().getAccessibleDescription())
+                .as("a selected \"More in\" row describes what Enter does there")
+                .isEqualTo("2 results; ⏎ Show every match in History");
+            palette.selectRelative(-2);
+            assertThat(palette.entryList().getAccessibleContext().getAccessibleDescription())
+                .as("switching back to a three-verb scope restores its verbs")
+                .isEqualTo("2 results; ⏎ Paste  ⌘⏎ Paste and run  ⇧⏎ Save as snippet…");
+            var elsewhere = new CommandPalette(false, query -> { }, (entry, verb) -> { }, id -> { });
+            elsewhere.setEntries(List.of(item(HISTORY, "ls")), null, null);
+            assertThat(elsewhere.entryList().getAccessibleContext().getAccessibleDescription())
+                .as("the other platform's key symbols")
+                .isEqualTo("1 results; Enter Paste  Ctrl+Enter Paste and run  Shift+Enter Save as snippet…");
+            elsewhere.setEntries(List.of(), null, "Nothing found");
+            assertThat(elsewhere.entryList().getAccessibleContext().getAccessibleDescription())
+                .as("nothing selected keeps only the count").isEqualTo("0 results");
+        });
+    }
+
     @Test void aStepReplacesTheListAndHidesTheHintBar() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             new ThemeController(Appearance.LIGHT);

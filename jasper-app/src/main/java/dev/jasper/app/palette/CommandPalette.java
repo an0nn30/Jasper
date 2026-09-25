@@ -93,6 +93,7 @@ public final class CommandPalette extends JPanel {
     private final JPanel hintActions = new JPanel(new FlowLayout(FlowLayout.TRAILING, 0, 0));
     private final List<Integer> hintVerbs = new ArrayList<>();
     private String listCard = "empty";
+    private long resultCount;
     private int stepFocus = -1;
     private int hover = -1;
     private boolean composing;
@@ -108,6 +109,12 @@ public final class CommandPalette extends JPanel {
         this.tabSelected = Objects.requireNonNull(tabSelected);
         Objects.requireNonNull(queryChanged);
         setOpaque(true);
+        // AWT retargets a press to the nearest ancestor that has mouse listeners. Without one here, a
+        // press in the tab-strip gap, the hint bar's detail text or the field row's padding would bubble
+        // past the palette to the overlay behind it, which dismisses on any press it receives.
+        var swallowClicks = new MouseAdapter() { };
+        addMouseListener(swallowClicks);
+        addMouseMotionListener(swallowClicks);
 
         tabStrip.setLayout(new FlowLayout(FlowLayout.LEADING, 0, 0));
         query.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Search everywhere");
@@ -215,7 +222,7 @@ public final class CommandPalette extends JPanel {
         if (selected < 0) list.clearSelection(); else list.setSelectedIndex(selected);
         listCard = first < 0 ? "empty" : "results";
         if (!stepShowing()) cardLayout.show(cards, listCard);
-        list.getAccessibleContext().setAccessibleDescription(rows + " results");
+        resultCount = rows;
         updateHint();
         revalidate();
         if (selected >= 0) {
@@ -436,11 +443,13 @@ public final class CommandPalette extends JPanel {
         hintActions.removeAll();
         hintVerbs.clear();
         String text = "";
+        String verbsDescription = "";
         PaletteEntry entry = list.getSelectedValue();
         if (entry instanceof PaletteEntry.Item item) {
             PaletteRow row = item.row();
             text = row.detail() != null ? row.detail() : row.tag() != null ? row.tag() : "";
             List<PaletteVerb> verbs = item.scope().verbs();
+            verbsDescription = verbsDescription(verbs);
             for (int verb = 1; verb < Math.min(3, verbs.size()); verb++) {
                 int chosen = verb;
                 var action = new SizedLabel(verbs.get(verb).label() + " " + keys(verb), HINT_HEIGHT - 1);
@@ -454,11 +463,25 @@ public final class CommandPalette extends JPanel {
             }
         } else if (entry instanceof PaletteEntry.More more) {
             text = "Show every match in " + more.scope().label();
+            verbsDescription = keys(0) + " " + text;
         }
         hint.setText(text);
+        list.getAccessibleContext().setAccessibleDescription(
+            resultCount + " results" + (verbsDescription.isEmpty() ? "" : "; " + verbsDescription));
         applyHintColors();
         hintActions.revalidate();
         hintActions.repaint();
+    }
+
+    /** Every verb, primary through third, in the base card's format: {@code key label  key label}. */
+    private String verbsDescription(List<PaletteVerb> verbs) {
+        if (verbs.size() < 2) return "";
+        var text = new StringBuilder();
+        for (int verb = 0; verb < Math.min(3, verbs.size()); verb++) {
+            if (verb > 0) text.append("  ");
+            text.append(keys(verb)).append(' ').append(verbs.get(verb).label());
+        }
+        return text.toString();
     }
 
     private String keys(int verb) {

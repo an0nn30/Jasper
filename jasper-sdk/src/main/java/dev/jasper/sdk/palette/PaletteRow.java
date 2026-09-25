@@ -11,7 +11,7 @@ import javax.swing.Icon;
  *
  * @param id      unique within one result list, at most 256 characters; a step's {@code reopen} names it
  * @param title   the main text
- * @param detail  secondary text under the title, such as a directory
+ * @param detail  text shown after the title on the same line, such as a directory
  * @param tag     a short right-aligned marker, such as a shortcut or "2 fields"
  * @param icon    a row icon
  * @param enabled false paints the row dimmed and makes it unavailable

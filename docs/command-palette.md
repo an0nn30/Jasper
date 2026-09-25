@@ -160,9 +160,9 @@ the field, keeping focus so you can pick a different name; a write failure shows
 the same way. Escape returns to the History list.
 
 Snippets rows are capped at `palette.max_results` like every other scope (see
-[configuration](configuration.md#palette)), with no scrolling; each row's tag shows its
-placeholder count ("1 field", "2 fields") when nonzero, and the command itself shows as a
-muted detail line under the name. If `snippets.toml` fails to parse, the last good snapshot
+[configuration](configuration.md#palette)); each row's tag shows its
+placeholder count ("1 field", "2 fields") when nonzero, and the command itself shows in
+grey after the name, on the same line. If `snippets.toml` fails to parse, the last good snapshot
 keeps working but the scope's list also shows an error row, "Snippets file has errors", until
 you fix the file and Reload Config.
 
@@ -176,7 +176,7 @@ One shared renderer paints every scope's rows, and a scope's `search` and
 `execute` methods see only a `PaletteContext`, never a window or pane. Two more
 hooks are optional: `available` is rechecked right before a verb runs (a scope
 can refuse a verb per row, for example when its target is no longer live), and
-`step` can show a small form in the card instead of running the verb directly:
+`step` can show a small form in the palette instead of running the verb directly:
 
 ```java
 final class FakeFeatureScope implements PaletteScope {

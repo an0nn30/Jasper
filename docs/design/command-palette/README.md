@@ -41,8 +41,8 @@ the rest carry no directory. Every third synthetic entry is bash and the rest ar
 The 1×/2× labels above describe output pixels: both paint the same logical Swing
 geometry. A separate fresh JVM with `flatlaf.uiScale=2x` produced the
 [actual UI-scale render](actual-ui-scale-2x.png) and [dimension record](actual-ui-scale-2x.txt).
-The assertions measured a 1120px preferred card width, 112px input row and 80px
-result row, exactly twice the 560/56/40 logical geometry and therefore scaled once.
+The assertions measured a 1360px preferred card width, 80px input row and 48px
+result row, exactly twice the 680/40/24 logical geometry and therefore scaled once.
 
 All 28 matrix PNGs and the UI-scale image were inspected with the image tool. The
 controller independently inspected a cross-theme/state subset. The first render

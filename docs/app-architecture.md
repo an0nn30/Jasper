@@ -137,7 +137,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
 | `workspace` | EDT windows, tabs, splits, panes, panel regions and the rail, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions. WindowContent closes subscriptions/panes; each pane closes its session. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
-| `palette` | EDT scope/query/step state, keyboard routing, the Swing card and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
+| `palette` | EDT scope/query/step state, keyboard routing, the Swing palette popup and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
 | `config` | Immutable values and pure parsing; ConfigService owns background watch/reload work and marshals delivery to EDT. Application closes the service. |
 | `contributions` | EDT model of what extensions contribute to the chrome, in app-native types. Application owns the single instance; the plugin runtime writes it and every window renders it. |
 | `appearance` | EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles. |

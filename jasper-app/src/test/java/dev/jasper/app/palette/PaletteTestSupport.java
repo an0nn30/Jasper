@@ -75,6 +75,8 @@ public final class PaletteTestSupport {
     public static void clickTab(CommandPalette palette, String id) { palette.clickTab(id); }
     public static String placeholder(CommandPalette palette) { return (String) palette.queryField().getClientProperty("JTextField.placeholderText"); }
     public static JPanel hintBar(CommandPalette palette) { return palette.hintBar(); }
+    public static JPanel tabStrip(CommandPalette palette) { return palette.tabStrip(); }
+    public static JPanel fieldRow(CommandPalette palette) { return (JPanel) palette.queryField().getParent(); }
     public static String hint(CommandPalette palette) { return palette.hintText(); }
     public static List<String> hintActions(CommandPalette palette) { return palette.hintActionTexts(); }
     public static void clickHintAction(CommandPalette palette, int index) { palette.clickHintAction(index); }

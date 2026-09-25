@@ -199,6 +199,59 @@ class WindowCommandPaletteTest {
             }
         });
     }
+    @Test void pressesInThePalettesEmptyAreasStopAtThePaletteAndKeepItOpen() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var root = install(owner);
+                var fake = new PaletteScopesTest.FakeScope();
+                fake.rows = List.of(new PaletteRow("alpha", "Alpha", "a detail", null, null, true, null));
+                owner.scopes().register(fake);
+                owner.commandPalette().open(fake.id());
+                LayoutTestSupport.layoutTree(root);
+                var palette = owner.commandPalette().component();
+                var overlay = (JComponent) palette.getParent();
+
+                var tabStrip = dev.jasper.app.palette.PaletteTestSupport.tabStrip(palette);
+                var tabStripBounds = SwingUtilities.convertRectangle(tabStrip.getParent(), tabStrip.getBounds(), palette);
+                var fieldRow = dev.jasper.app.palette.PaletteTestSupport.fieldRow(palette);
+                var fieldRowBounds = SwingUtilities.convertRectangle(fieldRow.getParent(), fieldRow.getBounds(), palette);
+                var hintBar = dev.jasper.app.palette.PaletteTestSupport.hintBar(palette);
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.hint(palette)).as("a detail is showing to click on").isEqualTo("a detail");
+
+                // The tab-strip gap right of the last tab, the hint bar's detail text and the field
+                // row's padding: three places AWT could otherwise retarget a press straight to the
+                // overlay behind the palette, dismissing it and losing the query.
+                var points = List.of(
+                    new Point(tabStripBounds.x + tabStripBounds.width - 4, tabStripBounds.y + tabStripBounds.height / 2),
+                    new Point(hintBar.getX() + 10, hintBar.getY() + hintBar.getHeight() / 2),
+                    new Point(fieldRowBounds.x + 2, fieldRowBounds.y + 2));
+
+                for (Point point : points) {
+                    var overlayPoint = SwingUtilities.convertPoint(palette, point, overlay);
+                    Component deepest = SwingUtilities.getDeepestComponentAt(overlay, overlayPoint.x, overlayPoint.y);
+                    // AWT retargets a press to the nearest ancestor that "wants" mouse events, i.e. has a listener.
+                    Component target = deepest;
+                    while (target != null && target.getMouseListeners().length == 0) target = target.getParent();
+                    assertThat(target).as("nearest mouse-listening ancestor of %s", point).isNotSameAs(overlay);
+                    assertThat(target == palette || SwingUtilities.isDescendingFrom(target, palette))
+                        .as("point %s resolves inside the palette, not the overlay", point).isTrue();
+                    var local = SwingUtilities.convertPoint(overlay, overlayPoint, target);
+                    target.dispatchEvent(new MouseEvent(target, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(),
+                        0, local.x, local.y, 1, false, MouseEvent.BUTTON1));
+                    assertThat(owner.commandPalette().isOpen()).as("point %s keeps the palette open", point).isTrue();
+                }
+
+                // A control point clearly outside the card still dismisses (the existing outside-click
+                // test covers this path in full; this only proves the fix above did not disable it).
+                var outside = new Point(2, 2);
+                assertThat(palette.getBounds().contains(SwingUtilities.convertPoint(overlay, outside, palette))).isFalse();
+                overlay.dispatchEvent(new MouseEvent(overlay, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(),
+                    0, outside.x, outside.y, 1, false, MouseEvent.BUTTON1));
+                assertThat(owner.commandPalette().isOpen()).isFalse();
+            }
+        });
+    }
+
     @Test void lastWindowAndQuitDispatchAreRecordedBeforeDeferredHistoryClose(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
         for (boolean quit : new boolean[]{false, true}) {
             CommandHistory[] history = new CommandHistory[1];
