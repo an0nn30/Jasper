@@ -169,7 +169,7 @@ class HostedUiTest {
         assertThat(changes).containsExactly(Variant.LIGHT);
         watching.close();
         assertThat(themeHandlers).isEmpty();
-        assertThat(ui.appearance().icon("dev/jasper/app/icons/search.svg").getIconWidth()).isPositive();
+        assertThat(ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg").getIconWidth()).isPositive();
         assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon("nope.svg"));
     }
 
@@ -282,7 +282,7 @@ class HostedUiTest {
     try {
         variant = Variant.LIGHT;
         assertThat(ui.appearance().variant()).isEqualTo(Variant.LIGHT);
-        var icon = ui.appearance().icon("dev/jasper/app/icons/search.svg");
+        var icon = ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg");
         var image = new java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB);
         var graphics = image.createGraphics();
         try { graphics.scale(2, 2); icon.paintIcon(new javax.swing.JLabel(), graphics, 0, 0); }
@@ -303,7 +303,7 @@ class HostedUiTest {
             : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
         try {
             for (var choice : dev.jasper.sdk.ui.OldGnomeIcon.values()) {
-                var icon = ui.appearance().icon("dev/jasper/app/icons/search.svg", choice);
+                var icon = ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg", choice);
                 assertThat(icon.getIconWidth()).isEqualTo(16);
                 assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(retro ? 28 : 16);
                 if (retro) {
@@ -322,8 +322,8 @@ class HostedUiTest {
             }
             assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon("missing.svg", dev.jasper.sdk.ui.OldGnomeIcon.LOCK));
             assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon(null, dev.jasper.sdk.ui.OldGnomeIcon.LOCK));
-            assertThatNullPointerException().isThrownBy(() -> ui.appearance().icon("dev/jasper/app/icons/search.svg", null));
-            var legacy = ui.appearance().icon("dev/jasper/app/icons/search.svg");
+            assertThatNullPointerException().isThrownBy(() -> ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg", null));
+            var legacy = ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg");
             assertThat(dev.jasper.app.platform.AppIcons.forToolbar(legacy)).isSameAs(legacy);
         } finally { new dev.jasper.app.appearance.ThemeController(); }
         }
@@ -344,7 +344,7 @@ class HostedUiTest {
                     assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(retro ? 28 : 16);
                 }
                 assertThatNullPointerException().isThrownBy(() -> isolated.appearance().icon((dev.jasper.sdk.ui.IconName) null));
-                assertThatIllegalArgumentException().isThrownBy(() -> isolated.appearance().icon("dev/jasper/app/icons/search.svg"));
+                assertThatIllegalArgumentException().isThrownBy(() -> isolated.appearance().icon("dev/jasper/app/icons/intellij/find.svg"));
             }
         } finally { isolated.closeAll(); new dev.jasper.app.appearance.ThemeController(); }
     }

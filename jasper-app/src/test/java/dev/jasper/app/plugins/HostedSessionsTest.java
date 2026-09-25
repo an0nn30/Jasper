@@ -124,4 +124,12 @@ class HostedSessionsTest {
         runCleanup();
         assertThat(closes).hasValue(2);
     }
+
+    @Test void theSpecIconBecomesTheRequestIconAndAnAbsentIconMeansTheHostDefault() {
+        terminals(Capabilities.SESSION_PROVIDE);
+        var icon = new javax.swing.ImageIcon();
+        assertThat(sessions.request(new SessionSpec("build-host", Optional.of(icon), ExitPolicy.KEEP_OPEN, pendings::add)).icon())
+            .isSameAs(icon);
+        assertThat(sessions.request(SessionSpec.of("build-host", pendings::add)).icon()).isNull();
+    }
 }

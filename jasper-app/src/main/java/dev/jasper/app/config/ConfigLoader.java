@@ -48,7 +48,7 @@ public final class ConfigLoader {
         Map.entry(List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height")),
         Map.entry(List.of("ui"), Set.of("theme", "font")),
         Map.entry(List.of("ui", "font"), Set.of("family", "size")),
-        Map.entry(List.of("ui", "theme"), Set.of("variant", "style")),
+        Map.entry(List.of("ui", "theme"), Set.of("variant", "style", "terminal")),
         Map.entry(List.of("terminal"), Set.of("shell", "env", "scrollback", "option_as_meta", "cursor",
             "dim_inactive_panes", "copy_on_select", "bell", "on_exit", "shell_integration")),
         Map.entry(List.of("terminal", "shell"), Set.of("program", "args")),
@@ -59,7 +59,7 @@ public final class ConfigLoader {
     private final boolean macOs;
     private final List<ConfigDiagnostic> diagnostics = new ArrayList<>();
     private boolean rejected;
-    private int tabHeight = 38;
+    private int tabHeight = 30;
     private ToolbarMode toolbar = ToolbarMode.ICONS_AND_LABELS;
     private boolean statusBar = true;
     private boolean buddyEnabled = true;
@@ -89,6 +89,7 @@ public final class ConfigLoader {
     private ShellIntegrationMode shellIntegration = ShellIntegrationMode.AUTO;
     private Appearance variant = Appearance.DARK;
     private ThemeStyle style = ThemeStyle.MODERN;
+    private TerminalColors terminalColors = TerminalColors.MATCH;
     private Map<String, String> keybindings = Map.of();
     private Map<String, Map<String, Object>> plugins = Map.of();
     private static final java.util.regex.Pattern PLUGIN_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
@@ -116,7 +117,7 @@ public final class ConfigLoader {
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, style, new UiFontConfig(uiFontFamily, uiFontSize));
+                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, style, new UiFontConfig(uiFontFamily, uiFontSize), terminalColors);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -200,7 +201,7 @@ public final class ConfigLoader {
 
     private void readField(String name, List<String> path, Object value) {
         switch (name) {
-            case "window.tab_height" -> tabHeight = integer(path, value, 28, 72, tabHeight);
+            case "window.tab_height" -> tabHeight = clampedInteger(path, value, 20, 72, tabHeight);
             case "window.columns" -> columns = integer(path, value, 5, 500, columns);
             case "window.lines" -> lines = integer(path, value, 2, 200, lines);
             case "window.toolbar" -> toolbar = choice(path, value, Map.of(
@@ -220,11 +221,13 @@ public final class ConfigLoader {
             case "font.size" -> fontSize = number(path, value, 6, 72, fontSize);
             case "font.fallback" -> fallback = strings(path, value, ConfigLoader::fontName, fallback);
             case "font.ligatures" -> ligatures = bool(path, value, ligatures);
-            case "font.line_height" -> lineHeight = number(path, value, 1, 3, lineHeight);
+            case "font.line_height" -> lineHeight = number(path, value, .5, 3, lineHeight);
             case "ui.theme.style" -> style = choice(path, value, Map.of(
     "modern", ThemeStyle.MODERN, "retro", ThemeStyle.RETRO), style);
             case "ui.theme.variant" -> variant = choice(path, value, Map.of(
                 "light", Appearance.LIGHT, "dark", Appearance.DARK), variant);
+            case "ui.theme.terminal" -> terminalColors = choice(path, value, Map.of(
+                "match", TerminalColors.MATCH, "light", TerminalColors.LIGHT, "dark", TerminalColors.DARK), terminalColors);
             case "terminal.shell.program" -> program = string(path, value,
                 text -> (text.isEmpty() || !text.isBlank()) && noNul(text),
                 "Use an empty or nonblank executable name without NUL; using the default.", program);
@@ -256,15 +259,31 @@ public final class ConfigLoader {
         return defaultValue;
     }
 
-    private float number(List<String> path, Object value, int min, int max, float defaultValue) {
+    /** An out-of-range integer uses the nearest bound, with a warning, so a smaller value never yields a larger one. */
+    private int clampedInteger(List<String> path, Object value, int min, int max, int defaultValue) {
+        if (!(value instanceof Long number)) { typeError(path, "an integer"); return defaultValue; }
+        if (number < min || number > max) {
+            int bound = number < min ? min : max;
+            diagnostic(ConfigDiagnostic.Severity.WARNING, path, "Use an integer from " + min + "–" + max + "; using " + bound + ".");
+            return bound;
+        }
+        return number.intValue();
+    }
+
+    private float number(List<String> path, Object value, double min, double max, float defaultValue) {
         if (!(value instanceof Long) && !(value instanceof Double)) typeError(path, "a number");
         else {
             double number = ((Number) value).doubleValue();
             if (!Double.isFinite(number) || number < min || number > max) {
-                valueError(path, "Use a finite number from " + min + "–" + max + "; using the default.");
+                valueError(path, "Use a finite number from " + bound(min) + "–" + bound(max) + "; using the default.");
             } else return (float) number;
         }
         return defaultValue;
+    }
+
+    /** Whole bounds print without a fraction, so existing messages read "6–72". */
+    private static String bound(double value) {
+        return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
     }
 
     private boolean bool(List<String> path, Object value, boolean defaultValue) {

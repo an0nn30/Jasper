@@ -64,5 +64,25 @@ public enum IconName {
     /** Pause. @since 0.7.5 */
     PAUSE,
     /** Resume. @since 0.7.5 */
-    RESUME;
+    RESUME,
+    /**
+     * Split the current pane.
+     * @since 0.7.6
+     */
+    SPLIT,
+    /**
+     * Enlarge the current pane to fill its tab.
+     * @since 0.7.6
+     */
+    ZOOM,
+    /**
+     * A local terminal session.
+     * @since 0.7.6
+     */
+    TERMINAL,
+    /**
+     * A remote host or server session.
+     * @since 0.7.6
+     */
+    SERVER;
 }

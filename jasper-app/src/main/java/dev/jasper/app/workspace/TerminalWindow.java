@@ -39,7 +39,7 @@ public final class TerminalWindow implements AutoCloseable {
         this.callbacks = callbacks;
         frame.setIconImages(ApplicationIcon.images());
         content = new WindowContent(launcher, directory, callbacks.newWindow(), callbacks.quit(), this::close, themes,
-            KeyBindings.defaults(SystemInfo.isMacOS), System::nanoTime, history, SystemInfo.isMacOS);
+            KeyBindings.defaults(SystemInfo.isMacOS), history, SystemInfo.isMacOS);
         if (initial != null) {
             content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(initial));
             content.applyConfiguration(initial, SystemInfo.isMacOS);

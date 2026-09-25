@@ -1,5 +1,7 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ResolvedTheme;
+import dev.jasper.terminal.config.Palette;
 import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.application.ConfigurationTestSupport;
@@ -108,7 +110,7 @@ class ConfigurationControllerTest {
             assertThat(first.tabHeight()).isEqualTo(60); assertThat(first.toolbar().isVisible()).isFalse();
             assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
             assertThat(first.currentPane().view().fontSize()).isEqualTo(28);
-            var next = owner(); assertThat(next.tabHeight()).isEqualTo(38);
+            var next = owner(); assertThat(next.tabHeight()).isEqualTo(30);
             assertThat(next.toolbar().isVisible()).isTrue(); assertThat(next.status().isVisible()).isTrue();
             assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
         }); launchAll();
@@ -658,4 +660,13 @@ void retroStyleReloadKeepsALiveSessionAndAppliesFontChanges() throws Exception {
     });
 }
 
+    @Test void savedTerminalColorsApplyLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
+        start("[ui.theme]\nvariant='light'\nterminal='dark'\n");
+        edt(() -> assertThat(themes.current()).isEqualTo(new ResolvedTheme(BuiltinTheme.LIGHT, Palette.jasperDark())));
+        reload("[ui.theme]\nvariant='light'\nterminal='match'\n");
+        edt(() -> {
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(BuiltinTheme.LIGHT, Palette.jasperLight()));
+            assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.theme"));
+        });
+    }
 }

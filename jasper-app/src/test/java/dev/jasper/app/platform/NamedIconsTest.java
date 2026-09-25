@@ -22,7 +22,8 @@ class NamedIconsTest {
         try {
             for (boolean retro : new boolean[]{false, true}) {
                 new ThemeController(retro ? ThemeStyle.RETRO : ThemeStyle.MODERN, Appearance.LIGHT);
-                assertThat(NamedIcons.NAMES).contains("FILE", "LINK", "UPLOAD", "DOWNLOAD", "UP", "NEW_FOLDER", "PAUSE", "RESUME");
+                assertThat(NamedIcons.NAMES).contains("FILE", "LINK", "UPLOAD", "DOWNLOAD", "UP", "NEW_FOLDER", "PAUSE", "RESUME",
+                    "SPLIT", "ZOOM", "TERMINAL", "SERVER");
                 assertThat(OldGnomeCatalog.NAMES).containsExactlyInAnyOrderElementsOf(NamedIcons.NAMES);
                 for (String name : NamedIcons.NAMES) {
                     var icon = AppIcons.named(name);
@@ -66,7 +67,9 @@ class NamedIconsTest {
         try (var in=getClass().getResourceAsStream(base+"assets.tsv")) {
             assertThat(in).isNotNull();
             var rows=new String(in.readAllBytes(),StandardCharsets.UTF_8).lines().skip(1).toList();
-            assertThat(rows).hasSize(NamedIcons.NAMES.size());
+            var listed=rows.stream().map(row -> row.split("\\t")[0]).toList();
+            for (String name : NamedIcons.NAMES)
+                if (NamedIcons.tinted(name)) assertThat(listed).as("standard artwork for %s", name).contains(name + ".svg");
             for(String row:rows) {
                 var fields=row.split("\\t");
                 try(var asset=getClass().getResourceAsStream(base+fields[0])) {

@@ -59,7 +59,9 @@ class WindowChromeContributionsTest {
             model.addToolbar(new ToolbarEntry.Button("dev.x.never-registered"));
 
             List<String> after = buttons(owner);
-            assertThat(after).containsSubsequence("Find", "Run Tool", "Tool");
+            if (retro) assertThat(after).containsSubsequence("Find", "Run Tool", "Tool");
+            else assertThat(after).endsWith("Zoom pane", "Run Tool", "Tool", "Find", "Settings");
+            if (!retro) assertThat(WindowTabsTest.named(owner.toolbar(), "pluginSeparator").isVisible()).isTrue();
             assertThat(after).hasSize(before.size() + 2);
             if (retro) assertThat(after).endsWith("Run Tool", "Tool", "Settings", "Exit");
             JButton button = null;
@@ -81,6 +83,21 @@ class WindowChromeContributionsTest {
             assertThat(buttons(owner)).contains("Run It").doesNotContain("Run Tool");
             run.close();
             assertThat(buttons(owner)).doesNotContain("Run It").contains("Tool");
+        });
+    }
+
+    @Test void modernPluginSeparatorAppearsOnlyWhileThePluginGroupHasItems() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.connectContributions(model);
+            var separator = WindowTabsTest.named(owner.toolbar(), "pluginSeparator");
+            assertThat(separator.isVisible()).isFalse();
+            ActionEntry run = model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), invocation -> {});
+            model.addToolbar(new ToolbarEntry.Button("dev.x.run"));
+            assertThat(separator.isVisible()).isTrue();
+            run.close();
+            assertThat(separator.isVisible()).isFalse();
         });
     }
 
@@ -127,7 +144,7 @@ class WindowChromeContributionsTest {
             var theme = new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
                 : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
             try {
-                var icon = dev.jasper.app.platform.AppIcons.skin(getClass().getClassLoader(), "dev/jasper/app/icons/search.svg", "LOCK");
+                var icon = dev.jasper.app.platform.AppIcons.skin(getClass().getClassLoader(), "dev/jasper/app/icons/intellij/find.svg", "LOCK");
                 var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(19,19,java.awt.image.BufferedImage.TYPE_INT_ARGB));
                 var model = new Contributions();
                 model.addAction("dev.x.lock", "Lock", icon, List.of(), Optional.empty(), event -> {});

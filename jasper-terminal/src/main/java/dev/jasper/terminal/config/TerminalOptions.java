@@ -16,7 +16,7 @@ import java.util.Objects;
  * @param optionAsMeta which macOS Option keys send Meta
  * @param scrollback new-session history capacity, 0–1,000,000 lines
  * @param copyOnSelect whether completing a selection copies it
- * @param lineHeight cell-height multiplier, 1–3
+ * @param lineHeight cell-height multiplier, 0.5–3; below 1 rows are tighter and glyphs may overlap neighbouring rows
  * @param bell visual, sound or disabled bell behavior
  */
 public record TerminalOptions(String fontFamily, float fontSize, List<String> fallbackFonts, boolean ligatures,
@@ -37,8 +37,8 @@ public record TerminalOptions(String fontFamily, float fontSize, List<String> fa
         if (!Float.isFinite(fontSize) || fontSize < 6f || fontSize > 72f) {
             throw new IllegalArgumentException("fontSize must be finite and within 6–72");
         }
-        if (!Float.isFinite(lineHeight) || lineHeight < 1f || lineHeight > 3f) {
-            throw new IllegalArgumentException("lineHeight must be finite and within 1–3");
+        if (!Float.isFinite(lineHeight) || lineHeight < .5f || lineHeight > 3f) {
+            throw new IllegalArgumentException("lineHeight must be finite and within 0.5–3");
         }
         if (scrollback < 0 || scrollback > 1_000_000) {
             throw new IllegalArgumentException("scrollback must be within 0–1000000");

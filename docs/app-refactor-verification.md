@@ -105,8 +105,6 @@ without exemptions and are wired into check.
 Baseline application resource entries:
 
 - `dev/jasper/app/buddy/jasper-buddy.png`
-- `dev/jasper/app/icons/LICENSE.txt`
-- `dev/jasper/app/icons/SOURCE.txt`
 - `dev/jasper/app/icons/app/macos/icon-1024.png`
 - `dev/jasper/app/icons/app/macos/icon-128.png`
 - `dev/jasper/app/icons/app/macos/icon-16.png`
@@ -129,20 +127,11 @@ Baseline application resource entries:
 - `dev/jasper/app/icons/app/windows/icon-72.png`
 - `dev/jasper/app/icons/app/windows/icon-80.png`
 - `dev/jasper/app/icons/app/windows/icon-96.png`
-- `dev/jasper/app/icons/app-window.svg`
-- `dev/jasper/app/icons/bookmark.svg`
-- `dev/jasper/app/icons/columns-2.svg`
-- `dev/jasper/app/icons/command.svg`
-- `dev/jasper/app/icons/history.svg`
-- `dev/jasper/app/icons/maximize.svg`
-- `dev/jasper/app/icons/refresh.svg`
-- `dev/jasper/app/icons/search.svg`
-- `dev/jasper/app/icons/settings.svg`
-- `dev/jasper/app/icons/square-plus.svg`
-- `dev/jasper/app/icons/title/SOURCE.txt`
-- `dev/jasper/app/icons/title/plus.svg`
-- `dev/jasper/app/icons/title/terminal-2.svg`
-- `dev/jasper/app/icons/title/x.svg`
+- `dev/jasper/app/icons/intellij/LICENSE.txt`
+- `dev/jasper/app/icons/intellij/NOTICE.txt`
+- `dev/jasper/app/icons/intellij/SOURCE.md`
+- `dev/jasper/app/icons/intellij/assets.tsv`
+- `dev/jasper/app/icons/intellij/*.svg` (IntelliJ toolbar, tab and find-bar artwork, light and `_dark` variants)
 - `dev/jasper/app/shell-integration/bash/rc.bash`
 - `dev/jasper/app/shell-integration/fish/fish/vendor_conf.d/jasper.fish`
 - `dev/jasper/app/shell-integration/jasper.bash`

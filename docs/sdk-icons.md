@@ -1,6 +1,6 @@
 # Plugin icons for both skins
 
-Prefer semantic names in SDK 0.7.4 (`sdk = ">=0.7.4, <0.8"` in plugin.toml):
+Prefer semantic names (SDK 0.7.4; SDK 0.7.5 adds the SFTP file and transfer names; SDK 0.7.6 adds SPLIT, ZOOM, TERMINAL and SERVER):
 
 ```java
 import dev.jasper.sdk.ui.IconName;
@@ -11,9 +11,11 @@ button.setIcon(lock);
 ```
 
 Jasper owns both images and chooses the running skin. Plugins supply no paths and perform
-no style detection. Modern icons follow the live light/dark foreground; retro icons retain
-OldGNOME2 colors. Vault uses these calls for its status/menu icon and manager lock/unlock
-controls. Remote uses `IconName.NETWORK` for its Sessions toolbar, actions, host panel and status icon. Its modern lock/unlock resources are identical copies of its original SVG artwork.
+no style detection. Modern icons are IntelliJ classic-UI artwork whose palette colours follow
+the live light/dark theme (KEY, LOCK, UNLOCK, CONNECT, DISCONNECT and DELETE keep tinted
+monochrome outlines); retro icons retain OldGNOME2 colors. Vault uses these calls for its status/menu icon and manager lock/unlock
+controls. Remote uses `IconName.NETWORK` for its Sessions toolbar, actions, host panel and status icon, and
+`IconName.SERVER` for its session tab icons. Its modern lock/unlock resources are identical copies of its original SVG artwork.
 
 Use the same icon for actions, toolbar dropdowns, menus, rail/panels, status items, palette
 rows and ordinary Swing components. Returned icons are 16 logical pixels. Retro host
@@ -21,7 +23,7 @@ toolbars obtain a separate 28px variant, without changing shared compact icons. 
 changes take effect after restarting Jasper. Application resources load through the host's
 class loader; a plugin does not need any image assets to use semantic icons.
 
-`IconName` contains all 22 meanings shown below. Jasper maps each to its own modern SVG
+`IconName` contains all 34 meanings shown below. Jasper maps each to its own modern SVG
 and retro artwork. Existing `Appearance` implementations inherit a default method that
 throws UnsupportedOperationException until they implement this new catalog; Jasper and
 the testkit implement every name. Null names throw NullPointerException.
@@ -79,6 +81,10 @@ Original paths are relative to a source size directory in the supplied collectio
 | `INFO` | `actions/gtk-info.png` |
 | `HELP` | `actions/gtk-help.png` |
 | `CLOSE` | `stock/generic/stock_close.png` |
+| `SPLIT` | `stock/table/stock_table-split.png` |
+| `ZOOM` | `actions/view-fullscreen.png` |
+| `TERMINAL` | `actions/gtk-execute.png` |
+| `SERVER` | `filesystems/gnome-fs-network.png` |
 
 ## Test selection without a GUI
 

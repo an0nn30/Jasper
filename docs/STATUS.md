@@ -2,6 +2,33 @@
 
 ## Current state — 2026-09-23
 
+### IntelliJ-style chrome and follow-ups — merged 2026-09-25
+
+- **IntelliJ-style modern chrome** (branch `claude/intellij-chrome`, plan
+  `docs/superpowers/plans/2026-09-24-jasper-intellij-chrome.md`): title-only title row, IntelliJ
+  toolbar, editor tabs and find bar with vendored IntelliJ icons; SDK 0.7.6 adds
+  SPLIT/ZOOM/TERMINAL/SERVER, draws plugin SVGs as authored and uses `SessionSpec.icon` as the tab
+  icon. Planning decisions (tab height setting kept, toolbar default mode kept, no toolbar
+  overflow menu, tab animation removed) are listed in the plan. Visual acceptance in modern
+  light, modern dark and retro is user-run. Merged into `main` on 2026-09-25; not pushed.
+  Rulings: the vendored icon `LICENSE.txt` under `icons/intellij/` is the canonical Apache-2.0
+  text (the upstream root `LICENSE.txt` in the source tree is JetBrains' IDE build terms, not the
+  artwork's license); one `RetroChromeTest` assertion that pinned "no Settings in modern" was
+  narrowed to match the new modern chrome, with all other retro assertions unchanged.
+  `./gradlew check` passed: 1,771 tests, 0 failures, 0 errors, 3 skipped.
+- **Terminal colours independent of the UI** (same branch, plan
+  `docs/superpowers/plans/2026-09-25-jasper-terminal-colors.md`): `ui.theme.terminal =
+  "match" | "light" | "dark"` and View → Appearance Terminal choices; live, retro ignores it, SDK
+  unchanged. Visual acceptance of the six light/dark combinations and retro is user-run.
+- **Font line height below 1.0:** `font.line_height` accepts 0.5–3.0; below 1.0 rows are tighter
+  than the font and glyphs may overlap neighbouring rows (supersedes the 2026-09-12 ruling that kept
+  the minimum at 1 to avoid overlap).
+- **Tab height:** `window.tab_height` is 20–72 logical pixels, default 30; out-of-range values clamp
+  to the nearest limit with a warning instead of falling back to the default.
+- **SDK version on merge:** `main` had already claimed SDK 0.7.5 for the Remote SFTP icons (FILE,
+  LINK, UPLOAD, DOWNLOAD, UP, NEW_FOLDER, PAUSE, RESUME), so the chrome names moved to 0.7.6 and
+  Remote requires `>=0.7.6`.
+
 ### Transfer strip — 2026-09-24
 
 The bottom Transfers panel (two paged tables, thirteen buttons) is replaced by a compact strip at

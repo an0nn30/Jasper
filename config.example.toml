@@ -3,8 +3,8 @@
 # All active values below are Jasper's built-in defaults.
 
 [window]
-# Live across open windows. Range: 28-72 logical pixels.
-tab_height = 38
+# Live across open windows. Range: 20-72 logical pixels; out-of-range values use the nearest limit.
+tab_height = 30
 # Live across open windows. Options: "icons_and_labels", "icons", or "hidden".
 toolbar = "icons_and_labels"
 # Live across open windows.
@@ -44,7 +44,7 @@ size = 16.0
 fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
 # Live across existing and new panes.
 ligatures = true
-# Live multiplier from 1.0-3.0. It changes cell height without changing cell width.
+# Live multiplier from 0.5-3.0. It changes cell height without changing cell width; below 1.0 glyphs may overlap neighbouring rows.
 line_height = 1.0
 
 [terminal]
@@ -105,8 +105,10 @@ family = "system"
 # Reload reports the pending style change; existing windows keep their current style.
 style = "modern"
 # Variant applies only to modern; retro always uses light controls and a dark terminal.
-# Live across open windows. Options: "dark" or "light"; each pairs FlatLaf chrome with its terminal palette.
+# Live across open windows. Options: "dark" or "light" for the FlatLaf chrome.
 variant = "dark"
+# Terminal colors, live and modern only: "match" follows variant; "light" or "dark" is independent of the UI.
+terminal = "match"
 
 [keybindings]
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.

@@ -42,8 +42,11 @@ public interface Appearance {
     }
 
     /**
-     * A 16 by 16 icon from an SVG in the plugin's own jars, recolored to the chrome's foreground so it
-     * follows the theme without being reloaded. Use monochrome artwork.
+     * A 16 by 16 icon from an SVG in the plugin's own jars, drawn with its authored colours. Colours
+     * from the IntelliJ light icon palette (grey {@code #6E6E6E}, blue {@code #389FD6}, green
+     * {@code #59A869}, red {@code #DB5860}, yellow {@code #EDA200}) follow dark and light themes
+     * without reloading; other colours are drawn as they are. Since 0.7.6 the icon is no longer
+     * recoloured to the chrome foreground.
      *
      * @param svgResourcePath classpath path without a leading slash, for example {@code dev/example/tool/run.svg}
      * @return the icon
@@ -51,8 +54,8 @@ public interface Appearance {
      */
     Icon icon(String svgResourcePath);
     /**
-     * A 16 by 16 icon using the plugin's monochrome SVG in modern mode and bundled
-     * OldGNOME2 artwork in retro mode. Jasper adapts it to 28 pixels in retro host
+     * A 16 by 16 icon using the plugin's SVG in modern mode, drawn as {@link #icon(String)} draws it,
+     * and bundled OldGNOME2 artwork in retro mode. Jasper adapts it to 28 pixels in retro host
      * toolbars without resizing this shared icon. Both arguments are validated in both skins.
      * Older implementations inherit the modern-only fallback.
      *

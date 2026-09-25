@@ -85,10 +85,22 @@ class ConfigLoaderTest {
     }
 
     @Test void acceptsNumericBoundariesAndEveryToolbarChoice() {
-        for (int height : new int[]{28, 72}) assertThat(parse("window.tab_height=" + height).snapshot().tabHeight()).isEqualTo(height);
+        for (int height : new int[]{20, 30, 72}) assertThat(parse("window.tab_height=" + height).snapshot().tabHeight()).isEqualTo(height);
         for (float size : new float[]{6f, 72f, 13.5f}) assertThat(parse("font.size=" + size).snapshot().fontSize()).isEqualTo(size);
         assertThat(parse("window.toolbar='hidden'").snapshot().toolbar()).isEqualTo(ToolbarMode.HIDDEN);
         assertThat(parse("window.toolbar='icons_and_labels'").diagnostics()).isEmpty();
+    }
+
+    @Test void tabHeightDefaultsToThirtyAndClampsOutOfRangeValuesWithAWarning() {
+        assertThat(parse("").snapshot().tabHeight()).isEqualTo(30);
+        assertThat(ConfigSnapshot.defaults().tabHeight()).isEqualTo(30);
+        for (int[] example : new int[][]{{12, 20}, {19, 20}, {73, 72}, {100, 72}}) {
+            var result = parse("[window]\ntab_height = " + example[0] + "\n");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().tabHeight()).as("tab_height = %d", example[0]).isEqualTo(example[1]);
+            assertDiagnostic(result, "window.tab_height", 2, 1, ConfigDiagnostic.Severity.WARNING);
+            assertThat(result.diagnostics().getFirst().message()).contains(String.valueOf(example[1]));
+        }
     }
 
     @Test void invalidValuesDefaultOnlyTheirKeyWithExactPosition() {
@@ -97,7 +109,7 @@ class ConfigLoaderTest {
         assertThat(result.snapshot().tabHeight()).isEqualTo(44);
         assertThat(result.snapshot().fontSize()).isEqualTo(16f);
         assertDiagnostic(result, "font.size", 4, 3, ConfigDiagnostic.Severity.ERROR);
-        for (String text : new String[]{"window.tab_height=27", "window.tab_height=73", "font.size=5.9",
+        for (String text : new String[]{"font.size=5.9",
                 "font.size=72.1", "font.size=nan", "font.size=inf", "font.size=-inf",
                 "window.toolbar='secret-value'"}) {
             var invalid = parse(text);
@@ -217,7 +229,7 @@ class ConfigLoaderTest {
     }
 
     @Test void directSnapshotsRejectInvalidScalarFieldsAndBindings() {
-        for (int height : new int[]{0, 27, 73}) assertThatIllegalArgumentException().isThrownBy(() ->
+        for (int height : new int[]{0, 19, 73}) assertThatIllegalArgumentException().isThrownBy(() ->
             new ConfigSnapshot(height, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), BuiltinTheme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
         for (float size : new float[]{0, 5.9f, 72.1f, Float.NaN, Float.POSITIVE_INFINITY}) assertThatIllegalArgumentException().isThrownBy(() ->
             new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(size), BuiltinTheme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
@@ -362,5 +374,27 @@ class ConfigLoaderTest {
     }
 }
 
+    @Test void terminalColorsDefaultToMatchAndAcceptEveryChoice() {
+        assertThat(parse("").snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
+        for (var choice : TerminalColors.values())
+            assertThat(parse("[ui.theme]\nterminal = '" + choice.name().toLowerCase(java.util.Locale.ROOT) + "'\n")
+                .snapshot().terminalColors()).isEqualTo(choice);
+        var mixed = parse("ui.theme.terminal = 'dark'\nui.theme.variant = 'light'\n").snapshot();
+        assertThat(mixed.variant()).isEqualTo(Appearance.LIGHT);
+        assertThat(mixed.terminalColors()).isEqualTo(TerminalColors.DARK);
+    }
 
+    @Test void invalidTerminalColorsUseTheExistingPerFieldDiagnosticPolicy() {
+        for (String value : java.util.List.of("'private-value'", "7", "true")) {
+            var result = parse("[ui.theme]\nterminal=" + value + "\nvariant='light'\n");
+            assertThat(result.rejected()).isEqualTo(!value.startsWith("'"));
+            assertThat(result.snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
+            assertThat(result.snapshot().variant()).isEqualTo(Appearance.LIGHT);
+            assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
+                assertThat(problem.key()).isEqualTo("ui.theme.terminal");
+                assertThat(problem.line()).isEqualTo(2);
+                assertThat(problem.message()).doesNotContain("private-value");
+            });
+        }
+    }
 }

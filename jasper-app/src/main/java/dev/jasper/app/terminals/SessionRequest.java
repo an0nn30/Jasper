@@ -3,6 +3,7 @@ package dev.jasper.app.terminals;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
+import javax.swing.Icon;
 
 /**
  * A pane whose session somebody else provides. The pane appears first; {@code connector} is called on the EDT
@@ -14,12 +15,20 @@ import java.util.function.Consumer;
  * @param closeOnExit close the pane when the session ends instead of offering Reconnect
  * @param connector starts one connection attempt
  * @param cleanup where closes and cancellation handlers run
+ * @param icon the provider's tab icon, or {@code null} for the host terminal icon; carried, never painted here
  */
-public record SessionRequest(String providerId, String title, boolean closeOnExit, Consumer<SessionAttempt> connector, Executor cleanup) {
+public record SessionRequest(String providerId, String title, boolean closeOnExit, Consumer<SessionAttempt> connector,
+                             Executor cleanup, Icon icon) {
     public SessionRequest {
         Objects.requireNonNull(providerId, "providerId");
         Objects.requireNonNull(title, "title");
         Objects.requireNonNull(connector, "connector");
         Objects.requireNonNull(cleanup, "cleanup");
+    }
+
+    /** A request whose tab shows the host terminal icon. */
+    public SessionRequest(String providerId, String title, boolean closeOnExit, Consumer<SessionAttempt> connector,
+                          Executor cleanup) {
+        this(providerId, title, closeOnExit, connector, cleanup, null);
     }
 }

@@ -97,6 +97,7 @@ public class RemotePlugin implements Plugin {
     private SessionsToolbar sessionsToolbar;
     private Timer poll;
     private Icon icon;
+    private Icon serverIcon;
     private boolean stopped;
     private final Set<CompletableFuture<HostKeyVerifier.Decision>> questions = new java.util.HashSet<>();
     private final Map<UUID, HostsPanel> panels = new HashMap<>();
@@ -142,6 +143,7 @@ public class RemotePlugin implements Plugin {
             credentialSource, this::askHostKey, context.background(), ui, schedule);
         connections.onChanged(this::refreshStatus);
         icon = context.appearance().icon(dev.jasper.sdk.ui.IconName.NETWORK);
+        serverIcon = context.appearance().icon(dev.jasper.sdk.ui.IconName.SERVER);
 
         sftpSettings=RemoteSettings.sftp(context.config());
         Executor transferBackground=transferExecutor.apply(context);
@@ -315,7 +317,7 @@ public class RemotePlugin implements Plugin {
         final ConnectAttempt attempt;
         try { attempt = new ConnectAttempt(window, host, shell -> {
             var ready = new java.util.concurrent.atomic.AtomicReference<>(shell);
-            SessionSpec spec = SessionSpec.of(host.name(), pending -> {
+            SessionSpec spec = new SessionSpec(host.name(), java.util.Optional.of(serverIcon), dev.jasper.sdk.terminal.ExitPolicy.KEEP_OPEN, pending -> {
                 Connections.Shell first = ready.getAndSet(null);
                 if (first == null) connect(pending, host.id());
                 else ui.execute(() -> attach(pending, first));

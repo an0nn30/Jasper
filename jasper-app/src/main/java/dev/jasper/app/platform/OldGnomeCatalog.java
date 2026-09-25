@@ -45,7 +45,11 @@ final class OldGnomeCatalog {
         Map.entry("NETWORK", java.util.List.of(16, 24, 32, 48)),
         Map.entry("INFO", java.util.List.of(16, 24)),
         Map.entry("HELP", java.util.List.of(16, 24)),
-        Map.entry("CLOSE", java.util.List.of(16, 24)));
+        Map.entry("CLOSE", java.util.List.of(16, 24)),
+        Map.entry("SPLIT", java.util.List.of(16, 24)),
+        Map.entry("ZOOM", java.util.List.of(16, 24)),
+        Map.entry("TERMINAL", java.util.List.of(16, 24)),
+        Map.entry("SERVER", java.util.List.of(16, 24, 32, 48)));
     static final Set<String> NAMES = SOURCES.keySet();
     private static final Map<String, ImageIcon> CACHE = new ConcurrentHashMap<>();
     private OldGnomeCatalog() { }

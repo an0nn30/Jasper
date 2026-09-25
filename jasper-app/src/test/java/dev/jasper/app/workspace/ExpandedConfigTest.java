@@ -138,7 +138,7 @@ class ExpandedConfigTest {
     @Test void invalidExpandedValuesDefaultOnlyTheirField() {
         for (String assignment : List.of("window.columns=4", "window.columns=501", "window.lines=1", "window.lines=201",
                 "font.family=''", "font.family='  '", "font.family=\"bad\\u0000name\"", "font.fallback=['ok', '  ']",
-                "font.fallback=[\"bad\\u0000name\"]", "font.line_height=0.9", "font.line_height=3.1", "font.line_height=nan",
+                "font.fallback=[\"bad\\u0000name\"]", "font.line_height=0.4", "font.line_height=3.1", "font.line_height=nan",
                 "font.line_height=inf", "terminal.shell.program='  '", "terminal.shell.program=\"bad\\u0000program\"",
                 "terminal.shell.args=['secret', \"bad\\u0000arg\"]", "terminal.scrollback=-1", "terminal.scrollback=1000001",
                 "terminal.option_as_meta='secret'", "terminal.cursor.shape='secret'", "terminal.dim_inactive_panes=-0.1",
@@ -236,7 +236,7 @@ class ExpandedConfigTest {
         for (int columns : new int[]{5, 500}) assertThat(parse("window.columns=" + columns).snapshot().columns()).isEqualTo(columns);
         for (int lines : new int[]{2, 200}) assertThat(parse("window.lines=" + lines).snapshot().lines()).isEqualTo(lines);
         for (int scrollback : new int[]{0, 1000000}) assertThat(parse("terminal.scrollback=" + scrollback).snapshot().terminal().scrollback()).isEqualTo(scrollback);
-        for (float height : new float[]{1, 3}) assertThat(parse("font.line_height=" + height).snapshot().font().lineHeight()).isEqualTo(height);
+        for (float height : new float[]{.5f, .6f, .7f, .8f, .9f, 1, 3}) assertThat(parse("font.line_height=" + height).snapshot().font().lineHeight()).isEqualTo(height);
         for (float dim : new float[]{0, 1}) assertThat(parse("terminal.dim_inactive_panes=" + dim).snapshot().terminal().dimInactivePanes()).isEqualTo(dim);
         for (var entry : Map.of("left", OptionAsMeta.LEFT, "right", OptionAsMeta.RIGHT, "both", OptionAsMeta.BOTH, "none", OptionAsMeta.NONE).entrySet()) {
             assertThat(parse("terminal.option_as_meta='" + entry.getKey() + "'").snapshot().terminal().optionAsMeta()).isEqualTo(entry.getValue());

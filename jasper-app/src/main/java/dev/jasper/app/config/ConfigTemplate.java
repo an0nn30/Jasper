@@ -23,8 +23,8 @@ public final class ConfigTemplate {
             # Invalid syntax or types keep the last valid settings; diagnostics explain errors.
 
             [window]
-            # Tab height in logical pixels, 28-72; updates all open windows live.
-            # tab_height = 38
+            # Tab height in logical pixels, 20-72; out-of-range values use the nearest limit. Updates live.
+            # tab_height = 30
             # Toolbar: "icons_and_labels", "icons", or "hidden"; updates live.
             # toolbar = "icons_and_labels"
             # Show the status bar; updates live.
@@ -63,7 +63,7 @@ public final class ConfigTemplate {
             # fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
             # Fallback names must be nonblank; an empty fallback list is allowed.
             # ligatures = true
-            # Line height multiplier, 1.0-3.0; updates live.
+            # Line height multiplier, 0.5-3.0; updates live. Below 1.0 rows are tighter and glyphs may overlap.
             # line_height = 1.0
             # Font size in points, 6-72; changes update all panes live.
             # Reset Font Size restores this saved default.
@@ -129,8 +129,11 @@ public final class ConfigTemplate {
             # Reload reports the pending style change; existing windows keep their current style.
             # style = "modern"
             # Variant applies only to modern; retro always uses light controls and a dark terminal.
-            # Theme variant: "dark" or "light"; switches chrome and terminal colors live across windows.
+            # Theme variant: "dark" or "light"; switches chrome colors live across windows.
             # variant = "dark"
+            # Terminal colors: "match" follows the variant; "light" or "dark" keeps the terminal
+            # independent of the UI. Switches live; ignored in retro.
+            # terminal = "match"
 
             [keybindings]
             # Shortcuts update live. Use "none" to disable an action; shortcuts must be unique.

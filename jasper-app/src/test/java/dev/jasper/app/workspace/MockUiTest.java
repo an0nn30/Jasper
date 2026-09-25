@@ -26,14 +26,17 @@ class MockUiTest {
             try (var title = WindowContent.installTitleBar(root, owner, true, value -> {})) {
                 assertThat(title).isNotNull();
                 root.setSize(958, 958); layoutTree(root);
-                assertThat(owner.toolbar().getHeight()).isEqualTo(42);
+                int toolbar = owner.toolbar().getHeight(), tabs = owner.windowTabs().getHeight();
+                assertThat(toolbar).isEqualTo(30);
+                assertThat(title.getHeight()).isEqualTo(28);
+                assertThat(tabs).isEqualTo(30);
                 assertThat(owner.status().getHeight()).isEqualTo(30);
-                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 848));
-                assertThat(root.getContentPane().getPreferredSize()).isEqualTo(new Dimension(958, 931));
+                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 958 - 28 - toolbar - tabs - 30));
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
-                assertThat(image.getRGB(650, 37) & 0xffffff).isEqualTo(0x313439);
-                assertThat(image.getRGB(650, 70) & 0xffffff).isEqualTo(0x23262c);
+                assertThat(image.getRGB(650, 27) & 0xffffff).as("title separator").isEqualTo(0x313439);
+                assertThat(image.getRGB(650, 28 + toolbar / 2) & 0xffffff).as("toolbar surface").isEqualTo(0x23262c);
+                assertThat(image.getRGB(650, 28 + toolbar + tabs - 1) & 0xffffff).as("tab strip separator").isEqualTo(0x313439);
                 assertThat(new Color(image.getRGB(500, 940))).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             }
         });
@@ -114,18 +117,18 @@ class MockUiTest {
             var owner = content(launcher(pending)); owner.setSize(400, 500); layoutTree(owner);
             var buttons = java.util.Arrays.stream(owner.toolbar().getComponents()).filter(JButton.class::isInstance)
                 .map(JButton.class::cast).toList();
-            assertThat(buttons).hasSize(5);
+            assertThat(buttons).hasSize(6);
             assertThat(buttons).allSatisfy(button -> {
                 assertThat(button.getWidth()).isGreaterThanOrEqualTo(16);
                 assertThat(button.getX() + button.getWidth()).isLessThanOrEqualTo(400);
-                assertThat(button.getHeight()).isEqualTo(30);
+                assertThat(button.getHeight()).isEqualTo(24);
             });
             buttons.getFirst().doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
             owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(432);
+            assertThat(owner.currentPane().getHeight()).as("default 30px tabs").isEqualTo(440);
             owner.setToolbarMode(ToolbarMode.ICONS); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(390);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(410);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
         });
     }

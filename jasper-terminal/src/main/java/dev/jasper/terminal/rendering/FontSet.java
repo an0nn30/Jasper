@@ -49,7 +49,8 @@ public final class FontSet {
         LineMetrics metrics = primary.getLineMetrics("Mg", FRC);
         int naturalAscent = (int) Math.ceil(metrics.getAscent());
         int naturalHeight = Math.max(1, (int) Math.ceil(metrics.getAscent() + metrics.getDescent() + metrics.getLeading()));
-        cellHeight = Math.max(naturalHeight, (int) Math.ceil(naturalHeight * lineHeight));
+        // Below 1 the cell is shorter than the font: the baseline shifts up so glyphs stay centred and may overlap neighbours.
+        cellHeight = Math.max(1, (int) Math.ceil(naturalHeight * lineHeight));
         ascent = naturalAscent + (cellHeight - naturalHeight) / 2;
     }
 

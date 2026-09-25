@@ -8,6 +8,7 @@ import dev.jasper.app.contributions.MenuTarget;
 import dev.jasper.app.contributions.ToolbarEntry;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
 
 import java.awt.*;
@@ -28,6 +29,7 @@ final class WindowChrome {
     private final WindowStatusBar status = new WindowStatusBar();
     private final JMenuBar menuBar = new JMenuBar();
     private final java.util.EnumMap<Appearance, JRadioButtonMenuItem> themeItems = new java.util.EnumMap<>(Appearance.class);
+    private final java.util.EnumMap<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.EnumMap<>(TerminalColors.class);
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
     private final JCheckBoxMenuItem buddyVisible = new JCheckBoxMenuItem("Show Jasper", false);
@@ -37,6 +39,7 @@ final class WindowChrome {
     private final List<Component> contributedToolbar = new ArrayList<>();
     private final Map<JMenu, List<Component>> contributedSections = new LinkedHashMap<>();
     private final List<JMenu> contributedMenus = new ArrayList<>();
+    private final ToolbarSeparator pluginSeparator = new ToolbarSeparator();
     private WindowContributions contributions;
 
     WindowChrome(WindowContent owner) {
@@ -77,6 +80,13 @@ final class WindowChrome {
                 owner.windowCommands().view("view.appearance." + theme.name().toLowerCase(java.util.Locale.ROOT)));
             themeItems.put(theme, item); themes.add(item); appearance.add(item);
         }
+        appearance.addSeparator();
+        ButtonGroup terminalGroup = new ButtonGroup();
+        for (TerminalColors colors : TerminalColors.values()) {
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(owner.windowCommands().view(
+                "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT)));
+            terminalItems.put(colors, item); terminalGroup.add(item); appearance.add(item);
+        }
         appearance.addMenuListener(new MenuListener() {
             @Override public void menuSelected(MenuEvent event) { refreshTheme(); }
             @Override public void menuDeselected(MenuEvent event) {}
@@ -89,8 +99,37 @@ final class WindowChrome {
         view.add(appearance);
         JMenuItem tabHeight = new JMenuItem(owner.windowCommands().view("view.tab_height"));
         view.add(tabHeight);
+        pluginSeparator.setName("pluginSeparator");
+        if (owner.retro()) buildRetroToolbar(); else buildModernToolbar();
+    }
+
+    /** Metal's labelled row, unchanged: plugin items sit before the glue, then Settings and Exit. */
+    private void buildRetroToolbar() {
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
         addToolbarSeparator();
+        addSplitButton();
+        toolbar.add(Box.createHorizontalStrut(UIScale.scale(4)));
+        addButton(ActionId.ZOOM_PANE, "maximize"); addButton(ActionId.FIND, "search");
+        addToolbarSeparator();
+        toolbar.add(toolbarGlue);
+        addButton(ActionId.OPEN_SETTINGS, "settings");
+        addButton(ActionId.QUIT, "exit");
+    }
+
+    /** IntelliJ grouping: tab and window, pane, plugin items, then Find and Settings pinned right. */
+    private void buildModernToolbar() {
+        addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
+        toolbar.add(new ToolbarSeparator());
+        addSplitButton();
+        addButton(ActionId.ZOOM_PANE, "maximize");
+        pluginSeparator.setVisible(false);
+        toolbar.add(pluginSeparator);
+        toolbar.add(toolbarGlue);
+        addButton(ActionId.FIND, "search");
+        addButton(ActionId.OPEN_SETTINGS, "settings");
+    }
+
+    private void addSplitButton() {
         JButton split = addButton(ActionId.SPLIT_RIGHT, "columns-2");
         split.setAction(null); split.setText("Split"); split.setIcon(AppIcons.toolbarIcon("columns-2"));
         split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");
@@ -102,14 +141,6 @@ final class WindowChrome {
         owner.action(ActionId.SPLIT_RIGHT).addPropertyChangeListener(event -> {
             if (event.getPropertyName().equals("enabled")) split.setEnabled(owner.action(ActionId.SPLIT_RIGHT).isEnabled());
         });
-        toolbar.add(Box.createHorizontalStrut(UIScale.scale(4)));
-        addButton(ActionId.ZOOM_PANE, "maximize"); addButton(ActionId.FIND, "search");
-        addToolbarSeparator();
-        toolbar.add(toolbarGlue);
-        if (owner.retro()) {
-            addButton(ActionId.OPEN_SETTINGS, "settings");
-            addButton(ActionId.QUIT, "exit");
-        }
     }
 
     private void addToolbarSeparator() {
@@ -132,7 +163,7 @@ final class WindowChrome {
             RetroToolbar.styleButton(button);
         } else {
             button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
-            button.setIconTextGap(UIScale.scale(8));
+            button.setIconTextGap(UIScale.scale(4));
         }
         button.getAccessibleContext().setAccessibleName(label);
         button.setToolTipText(label);
@@ -171,6 +202,7 @@ final class WindowChrome {
             int index = toolbar.getComponentIndex(toolbarGlue);
             for (Component control : contributedToolbar) toolbar.add(control, index++);
         }
+        pluginSeparator.setVisible(!contributedToolbar.isEmpty());
         toolbar.revalidate(); toolbar.repaint();
     }
 
@@ -239,7 +271,7 @@ final class WindowChrome {
             height.commitEdit();
             owner.setTabHeight(((Number) height.getValue()).intValue());
         } catch (java.text.ParseException | IllegalArgumentException failure) {
-            owner.onError.accept("Enter a tab height between 28 and 72 pixels.");
+            owner.onError.accept("Enter a tab height between 20 and 72 pixels.");
         }
     }
 
@@ -272,25 +304,33 @@ final class WindowChrome {
             RetroToolbar.styleButton(button);
         } else {
             button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
-            button.setIconTextGap(UIScale.scale(8));
+            button.setIconTextGap(UIScale.scale(4));
         }
         button.getAccessibleContext().setAccessibleName(id.label());
-        if (button.getToolTipText() == null) button.setToolTipText(id.label());
+        button.setToolTipText(id.label());
         toolbar.add(button);
         return button;
     }
 
-    /** Actual action buttons with a secondary shortcut hint and reference spacing. */
+    /** An IntelliJ toolbar button: transparent at rest, a rounded fill on hover or press, a small arrow for menus. */
     private static final class ReferenceButton extends JButton {
         private final ActionId id;
         private boolean compact;
         private boolean chevron;
-        ReferenceButton(Action action, ActionId id) { super(action); this.id = id; }
+        ReferenceButton(Action action, ActionId id) { super(action); this.id = id; setRolloverEnabled(true); }
         private boolean labels() { return getText() != null && !compact; }
-        private String hint() {
-            if (id != ActionId.NEW_TAB || !labels()) return "";
+        private boolean menu() { return id == ActionId.SPLIT_RIGHT || chevron; }
+
+        /** The tooltip names the action and, while one is bound, its live shortcut. */
+        @Override public String getToolTipText() {
+            String base = super.getToolTipText();
+            if (base == null || getAction() == null) return base;
             Object value = getAction().getValue(Action.ACCELERATOR_KEY);
-            if (!(value instanceof KeyStroke stroke)) return "";
+            String shortcut = value instanceof KeyStroke stroke ? shortcutText(stroke) : "";
+            return shortcut.isEmpty() ? base : base + " (" + shortcut + ")";
+        }
+
+        static String shortcutText(KeyStroke stroke) {
             int modifiers = stroke.getModifiers();
             String key = KeyEvent.getKeyText(stroke.getKeyCode());
             if ((modifiers & InputEvent.META_DOWN_MASK) != 0) {
@@ -304,55 +344,50 @@ final class WindowChrome {
                 (InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
             return prefix.isEmpty() ? key : prefix + "+" + key;
         }
+
         private Font chromeFont() {
-            Font font = UIManager.getFont("Label.font").deriveFont(Font.PLAIN, UIManager.getFont("Label.font").getSize2D() - UIScale.scale(.5f));
-            return id == ActionId.NEW_TAB ? font.deriveFont(java.util.Map.of(java.awt.font.TextAttribute.WEIGHT,
-                java.awt.font.TextAttribute.WEIGHT_SEMIBOLD)) : font;
+            Font font = UIManager.getFont("Label.font");
+            return font.deriveFont(Font.PLAIN, font.getSize2D() - UIScale.scale(.5f));
         }
+
         @Override public Dimension getPreferredSize() {
             if (dev.jasper.app.platform.SwingAppearance.retro()) return super.getPreferredSize();
-            FontMetrics fm = getFontMetrics(chromeFont());
-            int width = UIScale.scale(32);
-            if (labels()) width += UIScale.scale(5) + fm.stringWidth(getText());
-            if (!hint().isEmpty()) width += UIScale.scale(8) + getFontMetrics(chromeFont().deriveFont(chromeFont().getSize2D() - UIScale.scale(1.5f))).stringWidth(hint());
-            if ((id == ActionId.SPLIT_RIGHT || chevron) && labels()) width += UIScale.scale(16);
-            int trim = labels() && id != null ? switch (id) { case NEW_TAB -> 6; case NEW_WINDOW -> 3; case FIND -> 4; default -> 0; } : 0;
-            int measuredWidth = width - UIScale.scale(trim);
-            if (id == ActionId.NEW_TAB && labels()) measuredWidth = Math.max(UIScale.scale(104), measuredWidth);
-            return new Dimension(measuredWidth, UIScale.scale(30));
+            int width = UIScale.scale(24);
+            if (labels()) width += UIScale.scale(4) + getFontMetrics(chromeFont()).stringWidth(getText());
+            if (menu()) width += UIScale.scale(10);
+            return new Dimension(width, UIScale.scale(24));
         }
+
         @Override protected void paintComponent(Graphics graphics) {
             if (dev.jasper.app.platform.SwingAppearance.retro()) { super.paintComponent(graphics); return; }
             var g = (Graphics2D) graphics.create();
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                int arc = UIScale.scale(12);
-                if (id == ActionId.NEW_TAB || getModel().isRollover() && isEnabled() || getModel().isPressed()) {
-                    g.setColor(UIManager.getColor(getModel().isPressed() ? "Button.toolbar.pressedBackground" :
-                        id == ActionId.NEW_TAB ? "Jasper.primaryBackground" : "Button.toolbar.hoverBackground"));
+                ButtonModel model = getModel();
+                if (isEnabled() && (model.isRollover() || model.isPressed() || model.isSelected())) {
+                    g.setColor(UIManager.getColor(model.isPressed() || model.isSelected()
+                        ? "Button.toolbar.pressedBackground" : "Button.toolbar.hoverBackground"));
+                    int arc = UIScale.scale(6);
                     g.fillRoundRect(0, 0, getWidth(), getHeight(), arc, arc);
-                    if (id == ActionId.NEW_TAB) {
-                        g.setColor(UIManager.getColor("Jasper.primaryBorder"));
-                        g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc);
-                    }
                 }
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.38f));
-                int x = labels() ? UIScale.scale(id == ActionId.NEW_WINDOW ? 11 : 8) : (getWidth() - getIcon().getIconWidth()) / 2;
-                getIcon().paintIcon(this, g, x, (getHeight() - getIcon().getIconHeight()) / 2);
-                if (!labels()) return;
-                x += getIcon().getIconWidth() + UIScale.scale(5);
-                g.setFont(chromeFont()); g.setColor(UIManager.getColor("Jasper.chromeForeground"));
-                FontMetrics fm = g.getFontMetrics(); int baseline = (getHeight() - fm.getHeight()) / 2 + fm.getAscent();
-                g.drawString(getText(), x, baseline); x += fm.stringWidth(getText());
-                if (!hint().isEmpty()) {
-                    g.setFont(chromeFont().deriveFont(chromeFont().getSize2D() - UIScale.scale(1.5f))); g.setColor(UIManager.getColor("Jasper.mutedForeground"));
-                    g.drawString(hint(), x + UIScale.scale(8), baseline);
+                Icon icon = getIcon();
+                int x = labels() || menu() ? UIScale.scale(4) : (getWidth() - icon.getIconWidth()) / 2;
+                icon.paintIcon(this, g, x, (getHeight() - icon.getIconHeight()) / 2);
+                x += icon.getIconWidth();
+                if (labels()) {
+                    x += UIScale.scale(4);
+                    g.setFont(chromeFont()); g.setColor(UIManager.getColor("Jasper.chromeForeground"));
+                    FontMetrics fm = g.getFontMetrics();
+                    g.drawString(getText(), x, (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+                    x += fm.stringWidth(getText());
                 }
-                if (id == ActionId.SPLIT_RIGHT || chevron) {
-                    x += UIScale.scale(8); int y = getHeight() / 2;
-                    g.setStroke(new BasicStroke(UIScale.scale(1f)));
-                    g.drawLine(x, y - 2, x + 3, y + 1); g.drawLine(x + 3, y + 1, x + 6, y - 2);
+                if (menu()) {
+                    x += UIScale.scale(3);
+                    int y = getHeight() / 2 - UIScale.scale(1), w = UIScale.scale(5), h = UIScale.scale(3);
+                    g.setColor(UIManager.getColor("Jasper.mutedForeground"));
+                    g.fillPolygon(new int[]{x, x + w, x + w / 2}, new int[]{y, y, y + h}, 3);
                 }
             } finally { g.dispose(); }
         }
@@ -366,35 +401,38 @@ final class WindowChrome {
         }
     }
 
-    /** Shrinks to icon controls before any action can disappear at ordinary narrow widths. */
+    /** A 30 px IntelliJ row; shrinks to icon controls before any action can disappear at narrow widths. */
     private static final class ReferenceToolbar extends JToolBar {
-        @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(42)); }
-        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(42)); }
+        @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(30)); }
+        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(30)); }
         @Override public void doLayout() {
-            int available = Math.max(0, getWidth() - UIScale.scale(30));
+            int available = Math.max(0, getWidth() - UIScale.scale(16));
             int preferred = 0;
             for (Component child : getComponents()) {
+                if (!child.isVisible()) continue;
                 if (child instanceof ReferenceButton button) { button.compact = false; preferred += button.getPreferredSize().width; }
-                else if (child instanceof JSeparator) preferred += UIScale.scale(16);
+                else if (child instanceof JSeparator) preferred += UIScale.scale(9);
                 else preferred += child.getPreferredSize().width;
             }
             boolean compact = preferred > available;
             int fixed = 0;
             for (Component child : getComponents()) {
+                if (!child.isVisible()) continue;
                 if (child instanceof ReferenceButton button) { button.compact = compact; fixed += button.getPreferredSize().width; }
-                else if (child instanceof JSeparator) fixed += UIScale.scale(16);
+                else if (child instanceof JSeparator) fixed += UIScale.scale(9);
                 else fixed += child.getPreferredSize().width;
             }
             // At extreme widths compress spacing/buttons together; menus retain the same actions.
             double ratio = Math.min(1, available / (double) Math.max(1, fixed));
-            int x = UIScale.scale(15), y = (getHeight() - UIScale.scale(30)) / 2;
+            int x = UIScale.scale(8), y = (getHeight() - UIScale.scale(24)) / 2;
             for (Component child : getComponents()) {
+                if (!child.isVisible()) continue;
                 int width;
                 if (child instanceof JButton) {
                     width = (int) Math.floor(child.getPreferredSize().width * ratio);
-                    child.setBounds(x, y, width, UIScale.scale(30));
+                    child.setBounds(x, y, width, UIScale.scale(24));
                 } else if (child instanceof JSeparator) {
-                    width = (int) Math.floor(UIScale.scale(16) * ratio);
+                    width = (int) Math.floor(UIScale.scale(9) * ratio);
                     child.setBounds(x + width / 2, (getHeight() - UIScale.scale(16)) / 2, UIScale.scale(1), UIScale.scale(16));
                 } else {
                     width = child.getPreferredSize().width > 0 ? (int) Math.floor(child.getPreferredSize().width * ratio) : Math.max(0, available - fixed);
@@ -450,6 +488,7 @@ final class WindowChrome {
         }
         status.setBackground(owner.retro() ? UIManager.getColor("Panel.background") : UIManager.getColor("Jasper.titleBackground"));
         themeItems.forEach((theme, item) -> item.setSelected(owner.appearance() == theme));
+        terminalItems.forEach((colors, item) -> item.setSelected(owner.terminalColors() == colors));
     }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }
     JToolBar toolbar() { return toolbar; }

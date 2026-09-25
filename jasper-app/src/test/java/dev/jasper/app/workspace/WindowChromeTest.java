@@ -55,7 +55,7 @@ class WindowChromeTest {
                 .filter(JButton.class::isInstance).map(JButton.class::cast).toList();
 
             assertThat(buttons).extracting(JButton::getText)
-                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find");
+                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find", "Settings");
             assertThat(buttons).allSatisfy(button -> {
                 assertThat(button.getIcon().getIconWidth()).isEqualTo(16);
                 assertThat(button.getIcon().getIconHeight()).isEqualTo(16);
@@ -74,7 +74,29 @@ class WindowChromeTest {
             owner.setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
             assertThat(owner.toolbar().isVisible()).isTrue();
             assertThat(buttons).extracting(JButton::getText)
-                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find");
+                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find", "Settings");
+        });
+    }
+
+    @Test void modernToolbarGroupsActionsPinsFindAndSettingsRightAndHidesTheEmptyPluginGroup() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var toolbar = owner.toolbar();
+            toolbar.setSize(1000, 30); toolbar.doLayout();
+            List<String> shape = new java.util.ArrayList<>();
+            for (var child : toolbar.getComponents()) {
+                if (child instanceof JButton button) shape.add((String) button.getClientProperty("label"));
+                else if (child instanceof JSeparator separator) shape.add(separator.isVisible() ? "|" : "(|)");
+                else if (child instanceof Box.Filler) shape.add("->");
+            }
+            assertThat(shape).containsExactly("New tab", "New window", "|", "Split", "Zoom pane", "(|)", "->", "Find", "Settings");
+            var find = (JButton) java.util.Arrays.stream(toolbar.getComponents())
+                .filter(child -> child instanceof JButton button && "Find".equals(button.getClientProperty("label"))).findFirst().orElseThrow();
+            var settings = toolbar.getComponent(toolbar.getComponentCount() - 1);
+            assertThat(settings.getX() + settings.getWidth()).isGreaterThan(900);
+            assertThat(find.getX()).isGreaterThan(700);
+            assertThat(find.getHeight()).isEqualTo(24);
+            assertThat(toolbar.getPreferredSize().height).isEqualTo(30);
         });
     }
 

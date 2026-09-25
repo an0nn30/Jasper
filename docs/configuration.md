@@ -31,7 +31,7 @@ These are the supported keys and defaults. Font and terminal behavior settings a
 
 ```toml
 [window]
-tab_height = 38
+tab_height = 30
 toolbar = "icons_and_labels"
 status_bar = true
 columns = 150
@@ -84,8 +84,10 @@ family = "system"
 [ui.theme]
 # "modern" or "retro"; fully quit and relaunch after changing style.
 style = "modern"
-# Modern only: "dark" or "light"; chrome and terminal colors switch together.
+# Modern only: "dark" or "light" for the UI chrome.
 variant = "dark"
+# Modern only: "match" (follow variant), "light" or "dark" terminal colors.
+terminal = "match"
 
 [keybindings]
 # Optional action overrides; see examples below.
@@ -93,7 +95,7 @@ variant = "dark"
 
 | Key | Default | Accepted values | When applied |
 |---|---|---|---|
-| `window.tab_height` | `38` | Integer 28–72 logical pixels | Live |
+| `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
 | `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
 | `window.status_bar` | `true` | Boolean | Live |
 | `window.columns` | `150` | Integer 5–500 | New windows |
@@ -108,7 +110,7 @@ variant = "dark"
 | `font.size` | `16.0` | Finite number 6–72 points | Live |
 | `font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
 | `font.ligatures` | `true` | Boolean | Live |
-| `font.line_height` | `1.0` | Finite multiplier 1.0–3.0 | Live |
+| `font.line_height` | `1.0` | Finite multiplier 0.5–3.0 | Live |
 | `terminal.shell.program` | `""` | Empty selects the default shell; otherwise one nonblank executable string without NUL | New pane requests |
 | `terminal.shell.args` | `[]` | Array of exact argument strings without NUL; empty strings allowed | New pane requests |
 | `terminal.env` | `{}` | Table of string values without NUL; names match `[A-Za-z_][A-Za-z0-9_]*` | New pane requests |
@@ -123,6 +125,7 @@ variant = "dark"
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.style` | `"modern"` | `"modern"`, `"retro"` | Full process restart |
 | `ui.theme.variant` | `"dark"` | `"dark"`, `"light"` | Live in modern mode; retained but ignored in retro |
+| `ui.theme.terminal` | `"match"` | `"match"`, `"light"`, `"dark"` | Live in modern mode; retained but ignored in retro |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy
@@ -235,7 +238,7 @@ window title bar. With multiple sessions, equal-width tabs fill that bar after
 the native controls; the add button stays at its right edge. Tab titles are
 centered, close buttons appear on hover, and shortcut labels reflect the actual
 key bindings. Narrow windows scroll overflowing tabs, and keyboard selection
-reveals the selected tab. Tab height remains configurable (38 points by default).
+reveals the selected tab. Tab height remains configurable (30 logical pixels by default, 20–72).
 
 Applications can set the terminal title with OSC 0, 1 or 2. An automatic tab and
 the native window show that text plus the foreground job in parentheses, like
@@ -318,9 +321,9 @@ name steps.
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary View → Appearance choice remains shared until the saved `ui.theme.variant` changes; unrelated reloads preserve it. The Tab height dialog's reset button restores the built-in 38px value.
+View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary View → Appearance choice remains shared until the saved `ui.theme.variant` changes; unrelated reloads preserve it. The Tab height dialog's reset button restores the built-in 30px value.
 
-Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
+Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
 On macOS, `option_as_meta` controls which Option key sends Meta input; `"none"` leaves Option character entry available. Application shortcuts retain priority over terminal encoding. Cursor settings supply the fallback: a program's cursor shape/blink escape sequence takes precedence until the program resets that choice. Configured pane dimming persists through focus and theme changes. Copy-on-select copies a completed local selection to the clipboard.
 
@@ -530,16 +533,16 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme variant
 
-`ui.theme.variant` selects one of the two bundled modern themes. `"dark"` (the default) pairs
-FlatLaf Dark chrome with the Jasper Dark terminal palette; `"light"` pairs FlatLaf Light chrome
-with the Jasper Light palette. These variants apply when `ui.theme.style = "modern"`;
+`ui.theme.variant` selects one of the two bundled modern themes. `"dark"` (the default) selects
+FlatLaf Dark chrome and `"light"` FlatLaf Light chrome; by default the terminal uses the matching
+Jasper Dark or Jasper Light palette (see [Terminal colors](#terminal-colors)). These variants apply when `ui.theme.style = "modern"`;
 [retro mode](#retro-metal-appearance) uses Java Metal instead. Jasper reads no custom theme files.
 An unrecognized variant produces an error diagnostic and keeps the default; a non-string value
 rejects the configuration.
 
 View → Appearance offers Light and Dark across all windows as a temporary choice that never
 rewrites the configuration. The choice survives unrelated reloads and clears when the saved
-variant changes. Terminal padding and status match the palette background; toolbar, menus,
+variant changes. Terminal padding and the area behind panes match the terminal palette; toolbar, menus,
 find controls and the native title follow the chrome. Theme changes retain shells, scrollback,
 split ratios and font choices, and a failed chrome installation keeps the previous theme and
 can be retried with Reload config.
@@ -547,6 +550,21 @@ can be retried with Reload config.
 The former `[colors]` table (`appearance`, `theme`) and custom palette files are no longer
 supported: a `[colors]` table is reported as an unknown setting and ignored. See the
 [dark](design/mock-ui-dark.png) and [light](design/mock-ui-light.png) renders.
+
+## Terminal colors
+
+`ui.theme.terminal` chooses the terminal palette independently of the UI chrome, for example a
+light UI with a dark terminal. `"match"` (the default) follows `ui.theme.variant`; `"light"` and
+`"dark"` always use the Jasper Light or Jasper Dark palette. Terminal views, their padding and the
+area behind the panes follow this choice; the title row, toolbar, tab strip, find bar, status
+bar, split dividers, menus and dialogs keep the UI chrome. Changes apply live to every window
+without reinstalling the look and feel, keeping shells, scrollback and splits.
+
+View → Appearance offers Terminal: Match UI, Light and Dark as a temporary choice for the
+session that never rewrites the configuration; it clears when the saved `terminal` value
+changes. An unrecognized value produces an error diagnostic and keeps `"match"`; a non-string
+value rejects the configuration. Retro keeps its fixed high-contrast terminal and ignores this
+setting.
 
 ### Retro Metal appearance
 
@@ -562,7 +580,7 @@ Do not add a second `[ui.theme]` table if one already exists. Retro uses Java's 
 
 Style changes take effect only after restarting the process. Reload keeps current sessions and windows as they are and shows a restart notice; changing the setting back clears that notice. When background residency is enabled, closing every window does not restart Jasper.
 
-The saved `variant` remains available for modern mode. Retro always uses light controls, so Light/Dark and custom tab-height commands are unavailable there. Font, terminal cursor, toolbar visibility, keybinding and other live settings continue to work normally.
+The saved `variant` and `terminal` choices remain available for modern mode. Retro always uses light controls, so Light/Dark and custom tab-height commands are unavailable there. Font, terminal cursor, toolbar visibility, keybinding and other live settings continue to work normally.
 
 Plugins need no changes to use ordinary Metal controls. Plugins using [SDK semantic icons](sdk-icons.md) automatically receive modern or OldGNOME2 artwork for the active style; no per-plugin icon setting is needed. Custom icons and custom-painted content remain plugin-owned. On macOS, retro places application menus inside each window; modern uses the macOS menu bar. This follows the startup style and requires a full process restart. On supported macOS/JBR installations, terminal and plugin windows use a compact, flat gray title bar with centered regular-weight text and native traffic lights. The menu stays below the title bar and terminal tabs remain below the toolbar. Windows, Linux and unsupported runtimes retain native title bars. File dialogs remain native; the Jasper logo and Buddy artwork are unchanged.
 

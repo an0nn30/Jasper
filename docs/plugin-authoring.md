@@ -107,13 +107,17 @@ private static void installUi(PluginContext context, long stepMillis) {
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
-- **Icons.** Prefer `context.appearance().icon(IconName.LOCK)` or `IconName.UNLOCK`
-  (import `dev.jasper.sdk.ui.IconName`, SDK `>=0.7.4, <0.8`). Jasper supplies both families
-  and selects the skin; plugins need no artwork or style check. Returned icons are 16px,
-  with separate 28px variants in retro host toolbars. For custom artwork, use the original
-  monochrome SVG `icon("path/in/your/jar.svg")`, or pair that path with an `OldGnomeIcon`
-  fallback as the sample demonstrates. These existing APIs retain their behavior.
-  See the [catalog and testing example](sdk-icons.md).
+- **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6
+  (`sdk = ">=0.7.6, <0.8"`) adds `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Jasper supplies
+  IntelliJ-style artwork in modern and OldGNOME2 artwork in retro, and selects the skin; plugins
+  need no artwork or style check. Returned icons are 16px, with separate 28px variants in retro
+  host toolbars. For custom artwork, draw a 16×16 SVG in the IntelliJ light palette (grey
+  `#6E6E6E`, blue `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`) and load it with
+  `icon("path/in/your/jar.svg")`: since 0.7.6 it is drawn in its own colours, and palette colours
+  follow dark and light themes. Colour carries meaning: green for run or success, red for stop or
+  error, blue for navigation and transfer, grey for everything else. Pair the path with an
+  `OldGnomeIcon` for retro, as the sample demonstrates. A session's `SessionSpec.icon` becomes its
+  tab icon. See the [catalog and testing example](sdk-icons.md).
 - **Threads.** Register and mutate on the event thread. Event handlers already run there, so
   updating a status item from a handler, as the sample does, needs no marshaling.
 

@@ -58,7 +58,7 @@ class ConfigTemplateTest {
         assertThat(toml.getTable("terminal.cursor").keySet()).containsExactlyInAnyOrder("shape", "blink");
         assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
         assertThat(toml.getTable("ui.font").keySet()).containsExactly("family");
-        assertThat(toml.getTable("ui.theme").keySet()).containsExactlyInAnyOrder("style", "variant");
+        assertThat(toml.getTable("ui.theme").keySet()).containsExactlyInAnyOrder("style", "variant", "terminal");
         assertThat(toml.getTable("keybindings").keySet()).isEmpty();
 
         for (boolean macOs : new boolean[]{true, false}) {
@@ -77,7 +77,7 @@ class ConfigTemplateTest {
             var all = ConfigLoader.parse(directory.resolve("config.toml"), uncommented, macOs);
             assertThat(all.rejected()).isFalse();
             assertThat(all.diagnostics()).isEmpty();
-            assertThat(all.snapshot().tabHeight()).isEqualTo(38);
+            assertThat(all.snapshot().tabHeight()).isEqualTo(30);
             assertThat(all.snapshot().toolbar()).isEqualTo(ToolbarMode.ICONS_AND_LABELS);
             assertThat(all.snapshot().statusBar()).isTrue();
             assertThat(all.snapshot().buddyEnabled()).isTrue();

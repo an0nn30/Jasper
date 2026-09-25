@@ -55,8 +55,9 @@ class RetroChromeTest {
                     var buttons = java.util.Arrays.stream(toolbar.getComponents())
                         .filter(javax.swing.JButton.class::isInstance).map(javax.swing.JButton.class::cast).toList();
                     if (style != ThemeStyle.RETRO) {
-                        assertThat(buttons).noneMatch(button -> button.getAction() == owner.action(dev.jasper.app.commands.ActionId.QUIT)
-                            || button.getAction() == owner.action(dev.jasper.app.commands.ActionId.OPEN_SETTINGS));
+                        // The modern toolbar pins a Settings button (Task 6); Quit stays retro-only.
+                        assertThat(buttons).noneMatch(button -> button.getAction() == owner.action(dev.jasper.app.commands.ActionId.QUIT));
+                        assertThat(buttons).anyMatch(button -> button.getAction() == owner.action(dev.jasper.app.commands.ActionId.OPEN_SETTINGS));
                         continue;
                     }
                     var settings = buttons.get(buttons.size() - 2);
