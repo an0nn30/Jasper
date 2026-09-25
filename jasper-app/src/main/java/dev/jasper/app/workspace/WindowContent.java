@@ -22,6 +22,7 @@ import dev.jasper.app.palette.CommandsScope;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
 
 
@@ -567,6 +568,15 @@ private void refreshTabs() {
         try { themes.selectAppearance(appearance); }
         catch (ThemeController.InstallationFailure failure) { onError.accept(failure.getMessage()); }
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
+    }
+
+    TerminalColors terminalColors() { return themes.terminalColors(); }
+
+    /** A session-only terminal palette choice shared by every window; the chrome is unchanged. */
+    void selectTerminalColors(TerminalColors colors) {
+        if (closed) return;
+        themes.selectTerminalColors(colors);
+        chrome.refreshTheme();
     }
 
     /** Updates all retained panes without reparenting them; the native boundary hooks in last. */

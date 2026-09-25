@@ -6,6 +6,7 @@ import dev.jasper.app.commands.CommandRegistry;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
 
 import java.awt.event.ActionEvent;
@@ -66,6 +67,11 @@ final class WindowCommands implements AutoCloseable {
             add(registry, "view.appearance." + appearance.name().toLowerCase(java.util.Locale.ROOT), label,
                 "Appearance: " + label, () -> owner.selectAppearance(appearance));
         }
+        for (var colors : TerminalColors.values()) {
+            String label = switch (colors) { case MATCH -> "Match UI"; case LIGHT -> "Light"; case DARK -> "Dark"; };
+            add(registry, "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT), "Terminal: " + label,
+                "Terminal Colors: " + label, () -> owner.selectTerminalColors(colors), List.of("terminal", "colors", "palette"));
+        }
         add(registry, "view.tab_height", "Tab height\u2026", "Tab Height\u2026", () -> owner.chrome().editTabHeight());
     }
 
@@ -107,6 +113,11 @@ for (var appearance : Appearance.values()) {
     action.putValue(Action.SELECTED_KEY, owner.appearance() == appearance);
     action.setEnabled(!owner.retro());
 }
+        for (var colors : TerminalColors.values()) {
+            var action = view("view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT));
+            action.putValue(Action.SELECTED_KEY, owner.terminalColors() == colors);
+            action.setEnabled(!owner.retro());
+        }
 view("view.tab_height").setEnabled(!owner.retro());
 
     }

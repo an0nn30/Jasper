@@ -8,6 +8,7 @@ import dev.jasper.app.contributions.MenuTarget;
 import dev.jasper.app.contributions.ToolbarEntry;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
 
 import java.awt.*;
@@ -28,6 +29,7 @@ final class WindowChrome {
     private final WindowStatusBar status = new WindowStatusBar();
     private final JMenuBar menuBar = new JMenuBar();
     private final java.util.EnumMap<Appearance, JRadioButtonMenuItem> themeItems = new java.util.EnumMap<>(Appearance.class);
+    private final java.util.EnumMap<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.EnumMap<>(TerminalColors.class);
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new JCheckBoxMenuItem("Status Bar", true);
     private final JCheckBoxMenuItem buddyVisible = new JCheckBoxMenuItem("Show Jasper", false);
@@ -77,6 +79,13 @@ final class WindowChrome {
             JRadioButtonMenuItem item = new JRadioButtonMenuItem(
                 owner.windowCommands().view("view.appearance." + theme.name().toLowerCase(java.util.Locale.ROOT)));
             themeItems.put(theme, item); themes.add(item); appearance.add(item);
+        }
+        appearance.addSeparator();
+        ButtonGroup terminalGroup = new ButtonGroup();
+        for (TerminalColors colors : TerminalColors.values()) {
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(owner.windowCommands().view(
+                "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT)));
+            terminalItems.put(colors, item); terminalGroup.add(item); appearance.add(item);
         }
         appearance.addMenuListener(new MenuListener() {
             @Override public void menuSelected(MenuEvent event) { refreshTheme(); }
@@ -479,6 +488,7 @@ final class WindowChrome {
         }
         status.setBackground(owner.retro() ? UIManager.getColor("Panel.background") : UIManager.getColor("Jasper.titleBackground"));
         themeItems.forEach((theme, item) -> item.setSelected(owner.appearance() == theme));
+        terminalItems.forEach((colors, item) -> item.setSelected(owner.terminalColors() == colors));
     }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }
     JToolBar toolbar() { return toolbar; }
