@@ -41,7 +41,34 @@ class ThemeManagerTest {
         "Jasper.runningForeground", "#a8c58d", "Jasper.splitDivider", "#77808f", "Jasper.tabHoverBackground", "#2c3036",
         "Jasper.tabSelectedBackground", "#262a2f", "Jasper.tabSelectedForeground", "#d3d7df", "Jasper.tabUnderline", "#4a88c7",
         "Jasper.tabUnderlineInactive", "#747a80", "Jasper.titleBackground", "#23262c", "Jasper.titleForeground", "#848c9b",
-        "Jasper.titleInactiveForeground", "#848c9b", "Jasper.titleSeparator", "#313439"};
+        "Jasper.titleInactiveForeground", "#848c9b", "Jasper.titleSeparator", "#313439",
+        // FlatLaf builds IntelliJ dark themes on its Darcula base; these keep FlatLaf Dark's values.
+        "Button.disabledBackground", "#292c34", "Button.disabledText", "#8b929f", "CheckBox.disabledText", "#8b929f",
+        "CheckBox.icon.background", "#34373e", "CheckBox.icon.disabledBackground", "#292c34",
+        "CheckBox.icon.focusedBackground", "#61afef4d", "CheckBox.icon.hoverBackground", "#3b3e46",
+        "CheckBox.icon.pressedBackground", "#42464f", "CheckBox.icon.selectedBackground", "#34373e",
+        "CheckBox.icon[filled].checkmarkColor", "#34373e", "CheckBoxMenuItem.acceleratorForeground", "#abb2bf",
+        "CheckBoxMenuItem.icon.checkmarkColor", "#afb2b9", "ComboBox.buttonEditableBackground", "#2f333b",
+        "ComboBox.disabledBackground", "#292c34", "EditorPane.disabledBackground", "#292c34",
+        "EditorPane.inactiveBackground", "#292c34", "FormattedTextField.disabledBackground", "#292c34",
+        "FormattedTextField.inactiveBackground", "#292c34", "FormattedTextField.placeholderForeground", "#8b929f",
+        "HelpButton.disabledBackground", "#292c34", "InternalFrame.inactiveTitleForeground", "#8b929f",
+        "List.cellFocusColor", "#545c6e", "Menu.acceleratorForeground", "#abb2bf", "MenuBar.hoverBackground", "#323842",
+        "MenuItem.underlineSelectionBackground", "#323842", "PasswordField.disabledBackground", "#292c34",
+        "PasswordField.inactiveBackground", "#292c34", "PasswordField.placeholderForeground", "#8b929f",
+        "PopupMenu.hoverScrollArrowBackground", "#343842", "ProgressBar.background", "#3b3f4b",
+        "RadioButton.disabledText", "#8b929f", "RadioButtonMenuItem.acceleratorForeground", "#abb2bf",
+        "ScrollPane.background", "#2b2e37", "Slider.tickColor", "#8b929f", "Spinner.buttonArrowColor", "#afb2b9",
+        "Spinner.buttonBackground", "#25272e", "Spinner.disabledBackground", "#292c34",
+        "TabbedPane.closeForeground", "#8b929f", "Table.cellFocusColor", "#545c6e", "TextArea.disabledBackground", "#292c34",
+        "TextArea.inactiveBackground", "#292c34", "TextField.disabledBackground", "#292c34",
+        "TextField.inactiveBackground", "#292c34", "TextField.placeholderForeground", "#8b929f",
+        "TextPane.disabledBackground", "#292c34", "TextPane.inactiveBackground", "#292c34",
+        "ToggleButton.disabledBackground", "#292c34", "ToggleButton.disabledText", "#8b929f",
+        "Tree.selectionBorderColor", "#545c6e"};
+    /** Geometry Jasper Dark keeps from FlatLaf Dark where FlatLaf's Darcula base differs. */
+    private static final String[] TODAYS_DARK_NUMBERS = {
+        "CheckBox.icon.focusWidth", "1", "Component.innerOutlineWidth", "1", "RadioButton.icon.centerDiameter", "8"};
 
     @Test void intellijLightInstallsTheClassicLightColours() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
@@ -82,6 +109,8 @@ class ThemeManagerTest {
             var expected = new LinkedHashMap<String, String>();
             for (int i = 0; i < TODAYS_DARK.length; i += 2) expected.put(TODAYS_DARK[i], TODAYS_DARK[i + 1]);
             assertColours(expected);
+            for (int i = 0; i < TODAYS_DARK_NUMBERS.length; i += 2)
+                assertThat(String.valueOf(UIManager.get(TODAYS_DARK_NUMBERS[i]))).as(TODAYS_DARK_NUMBERS[i]).isEqualTo(TODAYS_DARK_NUMBERS[i + 1]);
             // FlatLaf copies the list selection into menus; white text keeps it readable.
             assertColours(Map.of("MenuItem.selectionBackground", "#5e7293", "MenuItem.selectionForeground", "#ffffff"));
             assertColours(Map.of("ToolWindow.background", "#21252b", "StatusBar.background", "#23262c",
