@@ -224,7 +224,7 @@ disagree, the implementation is wrong, not the contract.
 Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
 per-session token from Jasper's own shell integration.
 
-## Skin-aware icons (SDK 0.7.4)
+## Semantic and plugin icons (SDK 0.7.4)
 
 SDK 0.8.0 removed `OldGnomeIcon` and `Appearance.icon(String, OldGnomeIcon)`; plugins use
 `icon(IconName)` or `icon(String)`.
@@ -235,8 +235,7 @@ plugin boundary. SDK types never enter platform/workspace/contribution productio
 
 Shared action, menu and palette icons stay 16px. WindowContributions also populates Swing's
 SMALL_ICON property so menu items receive the compact artwork. SVG foreground recoloring
-stays live. Legacy/custom icons are returned unchanged by the sizing helper.
-See [the icon catalog and compatibility contract](sdk-icons.md).
+stays live. See [the icon catalog and compatibility contract](sdk-icons.md).
 
 ### Host-owned semantic catalog (SDK 0.7.4)
 
@@ -273,7 +272,7 @@ never request closure. Host-owned fonts refresh overlay content with the rest of
 ## File workflow additions (SDK 0.7.5)
 
 Host-owned semantic icons now cover file/link navigation, upload/download, new folder and
-pause/resume. Plugins carry no skin artwork. Owner-scoped `Windows.chooseFiles` and
+pause/resume. Plugins carry no artwork for them. Owner-scoped `Windows.chooseFiles` and
 `chooseDirectory` bridge through native `PathChoice`/`PathChooser` values; `HostedUi` tracks
 owner cancellation before entering the modal picker and rejects late results after teardown.
 

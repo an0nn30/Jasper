@@ -47,4 +47,4 @@ fraction must be finite and within 0..1. Primary and optional secondary actions 
 to the plugin. Close the handle when finished.
 
 `FILE`, `LINK`, `UPLOAD`, `DOWNLOAD`, `UP`, `NEW_FOLDER`, `PAUSE` and `RESUME` extend the
-semantic icon catalog. All these additions require SDK `>=0.8.0, <0.9`.
+semantic icon catalog. All these additions arrived in SDK 0.7.5.

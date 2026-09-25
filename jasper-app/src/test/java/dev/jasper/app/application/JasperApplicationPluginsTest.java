@@ -232,4 +232,47 @@ class JasperApplicationPluginsTest {
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
+
+    private static final String APPEARANCE_FIXTURE = """
+        package fix.look;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import java.nio.file.Files;
+        import javax.swing.JButton;
+        import javax.swing.UIManager;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) throws Exception {
+                Files.writeString(context.dataDirectory().resolve("appearance"),
+                    context.appearance().variant().name() + "\\n" +
+                    UIManager.getLookAndFeel().getClass().getName() + "\\n" +
+                    new JButton().getUI().getClass().getName());
+            }
+        }
+        """;
+
+    @Test void pluginsStartInTheSavedVariantBeforeAnyWindowExists() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        java.nio.file.Files.writeString(dirs.configFile(), "ui.theme.variant='light'\n");
+        Path dev = home.resolve("look-plugin");
+        PluginJars.build(dev, "look.jar", PluginJars.descriptor("dev.example.look", "1.0.0", "fix.look.Main"),
+            Map.of("fix.look.Main", APPEARANCE_FIXTURE), List.of());
+        var service = new dev.jasper.app.config.ConfigService(dirs.configFile(), false);
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        try {
+            edt(() -> {
+                application[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(),
+                    null, terminated::countDown);
+                application[0].startPlugins(null, dev, false, dirs);
+                assertThat(application[0].terminals().windows()).isEmpty();
+                assertThat(com.formdev.flatlaf.FlatLaf.isLafDark()).isFalse();
+            });
+            assertThat(dirs.plugins().resolve("dev.example.look/data/appearance")).hasContent(
+                "LIGHT\ncom.formdev.flatlaf.FlatLightLaf\ndev.jasper.app.appearance.BrandedButtonUI");
+        } finally {
+            if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
+            service.close();
+            edt(() -> new dev.jasper.app.appearance.ThemeController());
+        }
+    }
 }

@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class NamedIconsTest {
-    @Test void catalogRendersEveryNameAndDistinctLockStatesInBothSkins() {
+    @Test void catalogRendersEveryNameAndDistinctLockStates() {
         try {
             new ThemeController(Appearance.LIGHT);
             assertThat(NamedIcons.NAMES).contains("FILE", "LINK", "UPLOAD", "DOWNLOAD", "UP", "NEW_FOLDER", "PAUSE", "RESUME",

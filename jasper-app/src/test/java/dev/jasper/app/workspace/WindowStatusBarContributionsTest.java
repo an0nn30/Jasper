@@ -85,7 +85,7 @@ class WindowStatusBarContributionsTest {
         assertThat(descendants(view).filter(JButton.class::isInstance).map(JButton.class::cast).filter(b -> "Cancel".equals(b.getText())).findFirst().orElseThrow().isEnabled()).isFalse();
     }
 
-    @Test void progressFitsNarrowBarsAndLargerUiFontsInBothSkins() {
+    @Test void progressFitsNarrowBarsAndLargerUiFonts() {
         try {
             new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.LIGHT);
             for (int size : new int[]{12, 18, 32}) {

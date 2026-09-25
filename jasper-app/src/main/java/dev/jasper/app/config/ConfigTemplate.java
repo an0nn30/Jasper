@@ -123,8 +123,7 @@ public final class ConfigTemplate {
             # size = 14
 
             [ui.theme]
-            # Theme variant for the UI chrome.
-            # Theme variant: "dark" or "light"; switches chrome colors live across windows.
+            # Theme variant for the UI chrome: "dark" or "light"; switches live across windows.
             # variant = "dark"
             # Terminal colors: "match" follows the variant; "light" or "dark" keeps the terminal
             # independent of the UI. Switches live.

@@ -13,7 +13,7 @@ import javax.swing.*;
 /** A centred window title over macOS's native controls; toolbar and tabs live in the window content. */
 public final class MacTitleBar extends JPanel implements AutoCloseable {
     /** Unscaled height of the title row. */
-    public static final int HEIGHT = 28;
+    public static final int TITLE_HEIGHT = 28;
     private final JRootPane root;
     private final Runnable minimumSizeChanged;
     private final JLabel title = new JLabel("Jasper", SwingConstants.CENTER);
@@ -114,7 +114,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         return Math.max(UIScale.scale(120), Math.max(nativeLeft, controlsEnd) + UIScale.scale(8));
     }
 
-    private int titleHeight() { return UIScale.scale(HEIGHT); }
+    private int titleHeight() { return UIScale.scale(TITLE_HEIGHT); }
 
     @Override public Dimension getMinimumSize() {
         return new Dimension(2 * Math.max(safeInset(), nativeRight) + UIScale.scale(64), titleHeight());

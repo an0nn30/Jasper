@@ -231,5 +231,5 @@ request_timeout_seconds = 30    # clamped to 1..300
 Shortcut changes apply live; app-level keybindings retain precedence. Actions are
 `dev.jasper.remote.sftp`, `.sftp.toggle`, `.transfers` and
 `.transfers.cancel` (each suffix uses the `dev.jasper.remote` prefix). Controls inherit the
-app UI font and use SDK semantic icons for the selected skin. Native acceptance and the
+app UI font and use SDK semantic icons. Native acceptance and the
 verified build commands are in [SFTP verification](remote-7c-verification.md).

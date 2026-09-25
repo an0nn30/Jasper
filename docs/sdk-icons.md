@@ -27,10 +27,6 @@ implementations inherit a default method that throws UnsupportedOperationExcepti
 implement this catalog; Jasper and the testkit implement every name. Null names throw
 NullPointerException.
 
-Headless render of actual manager buttons and status-bar controls, using named icons:
-
-![Vault lock and unlock states](images/vault-semantic-icons.png)
-
 ## Custom artwork remains supported
 
 For a plugin-specific image, the original `icon("path/in/your/jar.svg")` remains available.

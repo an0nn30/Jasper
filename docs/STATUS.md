@@ -5,8 +5,10 @@
 - **One layout** (branch `claude/theme-engine`, plan `docs/superpowers/plans/2026-09-25-jasper-single-layout.md`):
   the retro style, Metal, the GNOME/Tango/OldGNOME rasters and `ui.theme.style` are gone; every
   window uses the IntelliJ-style chrome. SDK 0.8.0 removes `OldGnomeIcon` and
-  `Appearance.icon(String, OldGnomeIcon)`; bundled plugins require `>=0.8.0, <0.9`. Next: the
-  theme engine with IntelliJ-format themes and IntelliJ Light (part 2). Not merged, not pushed.
+  `Appearance.icon(String, OldGnomeIcon)`; bundled plugins require `>=0.8.0, <0.9`. Plan
+  deviation: the title-row constant is `MacTitleBar.TITLE_HEIGHT` (`HEIGHT` hid
+  `ImageObserver.HEIGHT`). Next: the theme engine with IntelliJ-format themes and IntelliJ
+  Light (part 2). Not merged, not pushed.
 
 ### IntelliJ-style chrome and follow-ups — merged 2026-09-25
 

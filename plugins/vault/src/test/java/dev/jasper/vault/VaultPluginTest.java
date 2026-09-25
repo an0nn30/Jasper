@@ -261,7 +261,7 @@ class VaultPluginTest {
         }
     }
 
-    @Test void requestsBothIconFamiliesForEitherSkin() {
+    @Test void requestsLockAndUnlockIcons() {
         try (var host = new FakePluginHost()) {
             var delegate = plugin();
             var icons = new java.util.ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();

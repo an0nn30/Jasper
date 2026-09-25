@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -97,6 +98,9 @@ class WindowChromeTest {
             assertThat(find.getX()).isGreaterThan(700);
             assertThat(find.getHeight()).isEqualTo(24);
             assertThat(toolbar.getPreferredSize().height).isEqualTo(30);
+            assertThat(((JButton) settings).getAction()).isSameAs(owner.action(ActionId.OPEN_SETTINGS));
+            assertThat(java.util.Arrays.stream(toolbar.getComponents()).filter(JButton.class::isInstance)
+                .map(JButton.class::cast)).noneMatch(button -> button.getAction() == owner.action(ActionId.QUIT));
         });
     }
 

@@ -36,7 +36,7 @@ class RemotePluginTest {
         return new TestRemotePlugin(Runnable::run, context -> Optional.empty(), (delay, task) -> { scheduled.add(task); return () -> scheduled.remove(task); }, sshDir);
     }
 
-    @Test void hostSelectsNetworkArtworkForEitherSkin(@TempDir Path dir) {
+    @Test void hostRequestsNetworkAndServerIcons(@TempDir Path dir) {
         try (var host = new FakePluginHost()) {
             var delegate = plugin(dir.resolve("ssh"));
             var icons = new ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
