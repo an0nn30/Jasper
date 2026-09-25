@@ -2,6 +2,12 @@
 
 ## Current state — 2026-09-23
 
+- **One layout** (branch `claude/theme-engine`, plan `docs/superpowers/plans/2026-09-25-jasper-single-layout.md`):
+  the retro style, Metal, the GNOME/Tango/OldGNOME rasters and `ui.theme.style` are gone; every
+  window uses the IntelliJ-style chrome. SDK 0.8.0 removes `OldGnomeIcon` and
+  `Appearance.icon(String, OldGnomeIcon)`; bundled plugins require `>=0.8.0, <0.9`. Next: the
+  theme engine with IntelliJ-format themes and IntelliJ Light (part 2). Not merged, not pushed.
+
 ### IntelliJ-style chrome and follow-ups — merged 2026-09-25
 
 - **IntelliJ-style modern chrome** (branch `claude/intellij-chrome`, plan
@@ -260,7 +266,7 @@ Implemented on `codex/retro-metal` in `/Users/dustin/.codex/worktrees/retro-meta
 based on `ac02f94`, following the approved [design](superpowers/specs/2026-09-22-jasper-retro-metal-design.md)
 and [plan](superpowers/plans/2026-09-22-jasper-retro-metal.md). The user chose native inline
 execution with one independent final review. Headless verification and the independent review fix pass are complete.
-See [configuration](configuration.md#retro-metal-appearance) to enable it.
+See [configuration](configuration.md) to enable it.
 
 Retro uses Metal/Ocean, light controls, black high-contrast terminal colors and bundled GNOME
 icons. The startup style stays fixed; reload derives a restart notice while sessions and

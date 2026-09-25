@@ -107,35 +107,27 @@ private static void installUi(PluginContext context, long stepMillis) {
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
-- **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6
-  (`sdk = ">=0.7.6, <0.8"`) adds `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Jasper supplies
-  IntelliJ-style artwork in modern and OldGNOME2 artwork in retro, and selects the skin; plugins
-  need no artwork or style check. Returned icons are 16px, with separate 28px variants in retro
-  host toolbars. For custom artwork, draw a 16×16 SVG in the IntelliJ light palette (grey
-  `#6E6E6E`, blue `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`) and load it with
-  `icon("path/in/your/jar.svg")`: since 0.7.6 it is drawn in its own colours, and palette colours
-  follow dark and light themes. Colour carries meaning: green for run or success, red for stop or
-  error, blue for navigation and transfer, grey for everything else. Pair the path with an
-  `OldGnomeIcon` for retro, as the sample demonstrates. A session's `SessionSpec.icon` becomes its
-  tab icon. See the [catalog and testing example](sdk-icons.md).
+- **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. Bundled plugins
+  declare `sdk = ">=0.8.0, <0.9"`, which adds `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Jasper
+  supplies IntelliJ-style artwork; plugins need no artwork. Returned icons are 16px. For custom
+  artwork, draw a 16×16 SVG in the IntelliJ light palette (grey `#6E6E6E`, blue `#389FD6`, green
+  `#59A869`, red `#DB5860`, yellow `#EDA200`) and load it with `icon("path/in/your/jar.svg")`:
+  it is drawn in its own colours, and palette colours follow dark and light themes. Colour
+  carries meaning: green for run or success, red for stop or error, blue for navigation and
+  transfer, grey for everything else. A session's `SessionSpec.icon` becomes its tab icon.
+  See the [catalog and testing example](sdk-icons.md).
 - **Threads.** Register and mutate on the event thread. Event handlers already run there, so
   updating a status item from a handler, as the sample does, needs no marshaling.
 
 ## Consistent buttons, flexible layouts
 
-Use ordinary `JButton` components inside plugin content. In modern mode Jasper's look and feel supplies the
+Use ordinary `JButton` components inside plugin content. Jasper's look and feel supplies the
 TermLab reference styling: 24-logical-pixel minimum height, 72-pixel minimum text-button width,
 12-point labels, subtly rounded gray secondary buttons and blue default buttons. Text fields
 use square borders; dropdowns and lists use the reference selection colors. Dark and light
 palettes come from TermLab's theme definitions. The dark secondary text is slightly lighter
 than the source (#A7AEBB instead of #A0A7B4) to preserve the existing 4.5:1 contrast check;
 disabled button text retains Jasper's contrast-tested defaults.
-
-Retro mode supplies stock light Metal/Ocean delegates, fonts, borders and form buttons.
-No plugin changes or SDK version bump are required. `Variant.LIGHT` describes application
-chrome brightness; terminal colors are independent and retro terminals remain black.
-Plugin SVGs and custom artwork retain their existing contracts. The host's tab-close,
-toolbar and status controls use compact flat presentation; plugin form buttons retain Metal.
 
 Swing actions, mnemonics, focus and disabled states retain their behavior. Set the hosting
 `JRootPane`'s default button when a form attaches and release it when the form detaches, so a

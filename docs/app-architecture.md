@@ -172,25 +172,3 @@ The terminal checker enforces its existing allowlist; the app/Buddy checker vali
 all package edges and supported Buddy signatures. Neither uses cycle exemptions.
 Javadoc and copied guide examples are normal check dependencies. See the
 [verification report](app-refactor-verification.md) for current evidence and manual gaps.
-
-## Restart-required appearance style
-
-`ThemeController` captures `ThemeStyle` from startup configuration before any plugin or
-workspace UI is constructed. Modern installs Jasper's FlatLaf defaults. Retro installs stock
-`MetalLookAndFeel` with `OceanTheme`; `MetalDefaults` adds semantic color aliases for app-owned
-painting to that LAF's defaults. It never replaces Swing delegates. `BuiltinTheme.RETRO`
-reports light chrome and owns a separate black terminal palette.
-
-Style stays fixed for the process lifetime. `ConfigurationController` derives a restart
-warning when saved and running styles differ, and removes it when they match; ordinary
-live settings still apply. New windows, hidden panels and plugin factories use the running
-style. No SDK signatures or plugin lifecycle change.
-
-Modern windows stack three rows: `MacTitleBar` (macOS only) is a title-only 28 px row with the
-native controls and a centred bold title; `WindowChrome`'s IntelliJ-style toolbar (tab/window,
-pane, plugin and right-pinned Find/Settings groups; tooltips carry live shortcuts); and
-`WindowTabs`, IntelliJ editor tabs sized to content with a 3 px selection underline, wheel
-scrolling and a ▾ list of all tabs. Each pane's `FindBar` is IntelliJ's single-line find row.
-Retro keeps its Metal toolbar, `RetroTabs`, text-button find bar and 32 px title row. App icons
-resolve from bundled assets. Since SDK 0.7.6, plugin-supplied SVGs draw as authored and are no
-longer recoloured to the chrome foreground (see [SDK architecture](sdk-architecture.md)).

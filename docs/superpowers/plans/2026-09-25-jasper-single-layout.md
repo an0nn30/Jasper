@@ -17,7 +17,7 @@ No new behaviour is introduced. Modern Light and Dark look and act exactly as be
 
 **Spec:** [2026-09-25-jasper-single-layout-design.md](../specs/2026-09-25-jasper-single-layout-design.md)
 
-**Status:** Not started. Branch `claude/theme-engine`, worktree `/Users/RQ7RQVF/projects/moray/.worktrees/theme-engine`, cut from `main` at `eb0b2959`. Other sessions use the main checkout and other worktrees, so never run git in `/Users/RQ7RQVF/projects/moray` itself.
+**Status:** All tasks complete; `./gradlew check` passed (1868 tests, 0 failures, 0 errors, 3 skipped). Branch `claude/theme-engine`, worktree `/Users/RQ7RQVF/projects/moray/.worktrees/theme-engine`, cut from `main` at `eb0b2959`. Other sessions use the main checkout and other worktrees, so never run git in `/Users/RQ7RQVF/projects/moray` itself.
 
 ## Global Constraints
 

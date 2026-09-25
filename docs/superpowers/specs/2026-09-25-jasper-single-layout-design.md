@@ -1,6 +1,6 @@
 # One layout: remove the retro style
 
-**Status:** Design approved in chat by the user on 2026-09-25. Written specification awaiting user review. No plan yet.
+**Status:** Implemented on `claude/theme-engine`; visual acceptance pending.
 
 ## Purpose and scope
 

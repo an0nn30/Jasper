@@ -226,37 +226,34 @@ per-session token from Jasper's own shell integration.
 
 ## Skin-aware icons (SDK 0.7.4)
 
-`Appearance.icon(String, OldGnomeIcon)` adds a default modern-only fallback for existing
-Appearance implementations. HostedUi and FakePluginContext override it; no contribution
+SDK 0.8.0 removed `OldGnomeIcon` and `Appearance.icon(String, OldGnomeIcon)`; plugins use
+`icon(IconName)` or `icon(String)`.
+
+HostedUi and FakePluginContext implement `Appearance.icon(IconName)`; no contribution
 record changes. HostedUi converts enum names into validated app-native catalog keys at the
 plugin boundary. SDK types never enter platform/workspace/contribution production packages.
 
-The platform owns the explicit OldGNOME2 resource catalog and a captured retro ImageIcon.
-WindowChrome requests a separate 28px variant for host toolbar placements; shared action,
-menu and palette icons stay 16px. WindowContributions also populates Swing's SMALL_ICON
-property so menu items receive the compact artwork. Modern SVG foreground recoloring stays
-live. Legacy/custom icons are returned unchanged by the sizing helper. No global cache holds
-plugin class loaders: only the fixed raster catalog is cached. Style changes still require restart.
+Shared action, menu and palette icons stay 16px. WindowContributions also populates Swing's
+SMALL_ICON property so menu items receive the compact artwork. SVG foreground recoloring
+stays live. Legacy/custom icons are returned unchanged by the sizing helper.
 See [the icon catalog and compatibility contract](sdk-icons.md).
 
 ### Host-owned semantic catalog (SDK 0.7.4)
 
 `Appearance.icon(IconName)` is now preferred. The SDK carries meanings only. HostedUi
-translates the enum at the boundary; AppIcons/NamedIcons select app-owned modern SVG or
-OldGNOME2 raster using the running skin, never the plugin loader. The old custom overloads
-remain supported. Vault uses semantic LOCK/UNLOCK in its status/menu and manager controls.
-The fake returns inspectable FakeNamedIcon(name, retro); older custom Appearance implementations
-inherit an explicit UnsupportedOperationException for this method until they implement it.
+translates the enum at the boundary; AppIcons/NamedIcons select the app-owned SVG, never
+the plugin loader. The old custom overload remains supported. Vault uses semantic LOCK/UNLOCK
+in its status/menu and manager controls. The fake returns inspectable `FakeNamedIcon(name)`;
+older custom Appearance implementations inherit an explicit UnsupportedOperationException for
+this method until they implement it.
 
 ### Chrome icons and session tab icons (SDK 0.7.6)
 
-- `IconName` and `OldGnomeIcon` gain `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Retro artwork copies
-  existing GNOME2/OldGNOME2 rasters; modern artwork is IntelliJ classic-UI SVG vendored under
-  `jasper-app/.../icons/intellij/` (Apache-2.0, hash-pinned in `assets.tsv`).
-- Behaviour change: `Appearance.icon(String)` and the modern half of `icon(String, OldGnomeIcon)`
-  no longer recolour to the chrome foreground. They draw the SVG as authored; FlatLaf's global
-  colour filter maps IntelliJ light-palette colours to the running theme. Grey `#6E6E6E` artwork
-  looks as before.
+- `IconName` gains `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Artwork is IntelliJ classic-UI SVG
+  vendored under `jasper-app/.../icons/intellij/` (Apache-2.0, hash-pinned in `assets.tsv`).
+- Behaviour change: `Appearance.icon(String)` no longer recolours to the chrome foreground. It
+  draws the SVG as authored; FlatLaf's global colour filter maps IntelliJ light-palette colours
+  to the running theme. Grey `#6E6E6E` artwork looks as before.
 - `SessionSpec.icon` is no longer reserved: it is the tab icon. Empty shows `IconName.TERMINAL`.
   Inside the app the icon travels opaquely on `SessionRequest`.
 
