@@ -290,7 +290,6 @@ public final class CommandPalettePreview {
             return switch (theme) {
                 case DARK -> "dark";
                 case LIGHT -> "light";
-                case RETRO -> "retro";
             };
         }
 

@@ -276,33 +276,13 @@ class HostedUiTest {
         assertThat(auxiliary.open()).isEmpty();
         assertThatCode(() -> { prompt.close(); trust.close(); manager.setTitle("after close"); }).doesNotThrowAnyException();
     }
-@Test void metalKeepsPluginSvgAndSubscriptionContracts() {
-    new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.RETRO,
-        dev.jasper.app.config.Appearance.DARK);
-    try {
-        variant = Variant.LIGHT;
-        assertThat(ui.appearance().variant()).isEqualTo(Variant.LIGHT);
-        var icon = ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg");
-        var image = new java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-        var graphics = image.createGraphics();
-        try { graphics.scale(2, 2); icon.paintIcon(new javax.swing.JLabel(), graphics, 0, 0); }
-        finally { graphics.dispose(); }
-        assertThat(icon.getIconWidth()).isEqualTo(16);
-        assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon("absent.svg"));
-        var events = new java.util.ArrayList<Variant>();
-        var subscription = ui.appearance().onChanged(events::add);
-        subscription.close();
-        assertThat(themeHandlers).isEmpty();
-    } finally { ui.closeAll(); new dev.jasper.app.appearance.ThemeController(); }
-}
 
     @Test void namedIconsBelongToHostRatherThanPluginLoader() {
         var isolated = new HostedUi("dev.x.tool", model, containment, Runnable::run, () -> true, open::get,
             new ClassLoader(null) {}, () -> variant,
             handler -> () -> {}, auxiliary, terminals);
         try {
-            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN,
-                dev.jasper.app.config.Appearance.LIGHT);
+            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.LIGHT);
             for (var name : dev.jasper.sdk.ui.IconName.values()) {
                 var icon = isolated.appearance().icon(name);
                 assertThat(icon.getIconWidth()).isEqualTo(16);

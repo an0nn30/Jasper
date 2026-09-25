@@ -116,23 +116,18 @@ public final class ConfigTemplate {
 
             [ui.font]
             # UI font for app chrome and plugin controls; updates live, independently of [font].
-            # "system" uses the current style's platform font on macOS, Linux and Windows.
+            # "system" uses the platform font on macOS, Linux and Windows.
             # A missing named font falls back to that platform font.
             # Omit size to retain platform sizing. Use 8-32 points, including fractions, when set.
             # family = "system"
             # size = 14
 
             [ui.theme]
-            # Application style: "modern" or "retro" (stock light Java Metal).
-            # Set style to "retro" for Metal controls, classic icons and a high-contrast terminal.
-            # Restart required: fully quit and relaunch, including with background residency enabled.
-            # Reload reports the pending style change; existing windows keep their current style.
-            # style = "modern"
-            # Variant applies only to modern; retro always uses light controls and a dark terminal.
+            # Theme variant for the UI chrome.
             # Theme variant: "dark" or "light"; switches chrome colors live across windows.
             # variant = "dark"
             # Terminal colors: "match" follows the variant; "light" or "dark" keeps the terminal
-            # independent of the UI. Switches live; ignored in retro.
+            # independent of the UI. Switches live.
             # terminal = "match"
 
             [keybindings]

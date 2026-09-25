@@ -3,7 +3,6 @@ package dev.jasper.app.platform;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.Appearance;
-import dev.jasper.app.config.ThemeStyle;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
@@ -56,7 +55,7 @@ class IntellijIconsTest {
     }
 
     @Test void everyRequiredIconParsesAndPaintsAtSixteenPixels() {
-        new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+        new ThemeController(Appearance.LIGHT);
         try {
             for (String name : REQUIRED) {
                 var icon = new FlatSVGIcon(BASE + name + ".svg", 16, 16);
@@ -69,7 +68,7 @@ class IntellijIconsTest {
     }
 
     @Test void flatLafRemapsIntellijPaletteColoursForTheRunningTheme() {
-        var themes = new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+        var themes = new ThemeController(Appearance.LIGHT);
         try {
             var probe = new FlatSVGIcon("dev/jasper/app/icons/palette-probe.svg", 16, 16);
             assertThat(probe.hasFound()).isTrue();

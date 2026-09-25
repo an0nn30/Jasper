@@ -15,21 +15,15 @@ import static org.assertj.core.api.Assertions.*;
 
 class ApplicationBootstrapTest {
     @TempDir Path directory;
-    @Test void desktopMenuPlacementUsesTheStartupSkin() throws Exception {
+    @Test void desktopPropertiesOverrideAnInheritedMenuBarSetting() {
         String menuKey = "apple.laf.useScreenMenuBar", appearanceKey = "apple.awt.application.appearance";
         String previousMenu = System.getProperty(menuKey), previousAppearance = System.getProperty(appearanceKey);
         try {
-            for (String style : new String[]{"retro", "modern"}) {
-                Path file = directory.resolve(style + ".toml");
-                Files.writeString(file, "[ui.theme]\nstyle='" + style + "'\n");
-                try (var service = new ConfigService(file, true)) {
-                    // Override an inherited JVM setting in either direction before desktop startup.
-                    System.setProperty(menuKey, style.equals("retro") ? "true" : "false");
-                    ApplicationBootstrap.configureDesktopProperties(service.initialState().snapshot().style());
-                    assertThat(System.getProperty(menuKey)).isEqualTo(style.equals("modern") ? "true" : "false");
-                    assertThat(System.getProperty(appearanceKey)).isEqualTo("system");
-                }
-            }
+            // Override an inherited JVM setting before desktop startup.
+            System.setProperty(menuKey, "false");
+            ApplicationBootstrap.configureDesktopProperties();
+            assertThat(System.getProperty(menuKey)).isEqualTo("true");
+            assertThat(System.getProperty(appearanceKey)).isEqualTo("system");
         } finally {
             if (previousMenu == null) System.clearProperty(menuKey); else System.setProperty(menuKey, previousMenu);
             if (previousAppearance == null) System.clearProperty(appearanceKey); else System.setProperty(appearanceKey, previousAppearance);
@@ -174,5 +168,18 @@ class ApplicationBootstrapTest {
         assertThat(ApplicationBootstrap.standaloneNotice(safe)).isFalse();
         assertThat(ApplicationBootstrap.standaloneNotice(new AppArguments(file, false, false, false, null, true))).isFalse();
         assertThat(ApplicationBootstrap.standaloneNotice(new AppArguments(null, false, false, false, plugin, true))).isFalse();
+    }
+
+    @Test void desktopPropertiesAlwaysUseTheMacScreenMenuBar() {
+        String previous = System.getProperty("apple.laf.useScreenMenuBar");
+        try {
+            System.clearProperty("apple.laf.useScreenMenuBar");
+            ApplicationBootstrap.configureDesktopProperties();
+            assertThat(System.getProperty("apple.laf.useScreenMenuBar")).isEqualTo("true");
+            assertThat(System.getProperty("apple.awt.application.appearance")).isEqualTo("system");
+        } finally {
+            if (previous == null) System.clearProperty("apple.laf.useScreenMenuBar");
+            else System.setProperty("apple.laf.useScreenMenuBar", previous);
+        }
     }
 }

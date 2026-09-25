@@ -8,26 +8,6 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class UiTypographyTest {
-    @Test void retroFontReloadKeepsMetalAndRestoresPortableDefaults() throws Exception {
-        SwingUtilities.invokeAndWait(() -> {
-            var themes = new ThemeController(dev.jasper.app.config.ThemeStyle.RETRO, Appearance.LIGHT);
-            Font original = UIManager.getFont("Label.font");
-            try {
-                for (float size : new float[]{8, 18.5f, 32}) {
-                    themes.configure(Appearance.DARK, new UiFontConfig("Serif", size));
-                    assertThat(UIManager.getLookAndFeel()).isInstanceOf(javax.swing.plaf.metal.MetalLookAndFeel.class);
-                    for (var control : new JComponent[]{new JLabel(), new JButton(), new JTextField(), new JMenu(), new JTabbedPane()}) {
-                        assertThat(control.getFont().getFamily()).isEqualTo(Font.SERIF);
-                        assertThat(control.getFont().getSize2D()).isEqualTo(size);
-                        assertThat(control.getFont().isBold()).isFalse();
-                    }
-                }
-                themes.configure(Appearance.LIGHT, UiFontConfig.defaults());
-                assertThat(UIManager.getFont("Label.font")).isEqualTo(original);
-            } finally { new ThemeController(); }
-        });
-    }
-
     @Test void configuredPointSizesAreExactAcrossTheWholeSupportedRange() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var themes = new ThemeController();

@@ -232,45 +232,4 @@ class JasperApplicationPluginsTest {
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
-private static final String RETRO_FIXTURE = """
-    package fix.retro;
-    import dev.jasper.sdk.plugin.Plugin;
-    import dev.jasper.sdk.plugin.PluginContext;
-    import java.nio.file.Files;
-    import javax.swing.JButton;
-    import javax.swing.UIManager;
-    public final class Main implements Plugin {
-        public void start(PluginContext context) throws Exception {
-            Files.writeString(context.dataDirectory().resolve("appearance"),
-                context.appearance().variant().name() + "\\n" +
-                UIManager.getLookAndFeel().getClass().getName() + "\\n" +
-                new JButton().getUI().getClass().getName());
-        }
-    }
-    """;
-
-@Test void pluginsStartWithLightMetalBeforeAnyWindowExists() throws Exception {
-    var dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
-    java.nio.file.Files.writeString(dirs.configFile(), "ui.theme.style='retro'\nui.theme.variant='dark'\n");
-    var dev = home.resolve("retro-plugin");
-    PluginJars.build(dev, "retro.jar", PluginJars.descriptor("dev.example.retro", "1.0.0", "fix.retro.Main"),
-        Map.of("fix.retro.Main", RETRO_FIXTURE), List.of());
-    var service = new dev.jasper.app.config.ConfigService(dirs.configFile(), false);
-    var terminated = new CountDownLatch(1);
-    JasperApplication[] app = new JasperApplication[1];
-    try {
-        edt(() -> {
-            app[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(),
-                null, terminated::countDown);
-            app[0].startPlugins(null, dev, false, dirs);
-        });
-        assertThat(dirs.plugins().resolve("dev.example.retro/data/appearance")).hasContent(
-            "LIGHT\njavax.swing.plaf.metal.MetalLookAndFeel\njavax.swing.plaf.metal.MetalButtonUI");
-    } finally {
-        if (app[0] != null) { edt(app[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
-        service.close();
-        edt(() -> new dev.jasper.app.appearance.ThemeController());
-    }
-}
-
 }

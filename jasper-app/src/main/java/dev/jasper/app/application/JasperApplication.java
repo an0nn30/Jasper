@@ -138,7 +138,7 @@ public final class JasperApplication {
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir) {
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
-        themes = new ThemeController(startup.style(), startup.variant());
+        themes = new ThemeController(startup.variant());
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.

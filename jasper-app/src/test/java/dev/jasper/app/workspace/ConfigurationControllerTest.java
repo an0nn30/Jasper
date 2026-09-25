@@ -53,7 +53,7 @@ class ConfigurationControllerTest {
     void start(String text) throws Exception {
         Files.writeString(directory.resolve("config.toml"), text);
         service = new ConfigService(directory.resolve("config.toml"), false);
-        edt(() -> { themes = new ThemeController(service.initialState().snapshot().style(), service.initialState().snapshot().variant()); controller = new ConfigurationTestSupport(themes, service); });
+        edt(() -> { themes = new ThemeController(service.initialState().snapshot().variant()); controller = new ConfigurationTestSupport(themes, service); });
     }
     WindowContent owner() { return owner(launcher(pending)); }
     WindowContent owner(ShellLauncher launcher) {
@@ -616,49 +616,6 @@ class ConfigurationControllerTest {
                 .isEqualTo(KeyStroke.getKeyStroke("ctrl shift T"));
         });
     }
-@Test void changingDesiredStyleKeepsExistingAndNewOwnersUntilRestart() throws Exception {
-    start("ui.theme.style='retro'\n");
-    edt(() -> owner());
-    var first = owners.getFirst();
-    var retained = first.currentPane();
-    reload("ui.theme.style='modern'\nfont.size=21\n");
-    edt(() -> {
-        owner();
-        assertThat(themes.style()).isEqualTo(dev.jasper.app.config.ThemeStyle.RETRO);
-        assertThat(first.currentPane()).isSameAs(retained);
-        assertThat(owners).allSatisfy(w -> assertThat(w.theme().chrome()).isEqualTo(BuiltinTheme.RETRO));
-        assertThat(controller.shown().diagnostics()).filteredOn(d -> d.key().equals("ui.theme.style"))
-            .singleElement().satisfies(d -> assertThat(d.message()).contains("Restart Jasper"));
-        assertThat(controller.snapshot().fontSize()).isEqualTo(21);
-    });
-    reload("ui.theme.style='retro'\n");
-    edt(() -> assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().equals("ui.theme.style")));
-}
-
-@Test void modernVariantRemainsLiveWhileRetroIsPending() throws Exception {
-    start("ui.theme.style='modern'\nui.theme.variant='dark'\n");
-    reload("ui.theme.style='retro'\nui.theme.variant='light'\n");
-    edt(() -> {
-        assertThat(themes.style()).isEqualTo(dev.jasper.app.config.ThemeStyle.MODERN);
-        assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
-        assertThat(controller.shown().diagnostics()).anyMatch(d -> d.key().equals("ui.theme.style"));
-    });
-}
-
-@Test @DisabledOnOs(OS.WINDOWS)
-void retroStyleReloadKeepsALiveSessionAndAppliesFontChanges() throws Exception {
-    start("ui.theme.style='retro'\n");
-    edt(() -> owner()); launchAll();
-    var pane = owners.getFirst().currentPane();
-    var session = pane.session();
-    reload("ui.theme.style='modern'\nfont.size=22\n");
-    edt(() -> {
-        assertThat(pane.session()).isSameAs(session);
-        assertThat(pane.view().fontSize()).isEqualTo(22);
-        assertThat(pane.view().palette().background()).isEqualTo(java.awt.Color.BLACK);
-        assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.RETRO);
-    });
-}
 
     @Test void savedTerminalColorsApplyLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
         start("[ui.theme]\nvariant='light'\nterminal='dark'\n");

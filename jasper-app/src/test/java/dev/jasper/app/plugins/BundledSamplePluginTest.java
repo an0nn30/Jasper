@@ -89,7 +89,7 @@ class BundledSamplePluginTest {
         var deck = new BuddyTestSupport();
         var contributions = new dev.jasper.app.contributions.Contributions();
         onEdt(() -> {
-            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
+            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.LIGHT);
             runtime.set(new PluginRuntime(new PluginRuntime.Options(remoteOnly, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> {}),
                 (key, message) -> {}, contributions, AppContractTest.headlessWindows(),

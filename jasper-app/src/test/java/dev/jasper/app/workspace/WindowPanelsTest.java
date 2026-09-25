@@ -162,8 +162,7 @@ class WindowPanelsTest {
 
     @Test void hiddenPanelKeepsItsComponentAndHandlersAcrossADelegateThemeUpdate() throws Exception {
         edt(() -> {
-            var themes = new dev.jasper.app.appearance.ThemeController(
-                dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.DARK);
+            var themes = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.DARK);
             var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
             var model = new Contributions(); owner.connectContributions(model, UiState.inMemory());
             var clicks = new java.util.concurrent.atomic.AtomicInteger();

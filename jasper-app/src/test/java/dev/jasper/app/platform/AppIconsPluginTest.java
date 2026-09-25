@@ -2,7 +2,6 @@ package dev.jasper.app.platform;
 
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.Appearance;
-import dev.jasper.app.config.ThemeStyle;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
@@ -12,7 +11,7 @@ import static org.assertj.core.api.Assertions.*;
 @ExtendWith(EdtTestExtension.class)
 class AppIconsPluginTest {
     @Test void pluginSvgRendersAsAuthoredWithPaletteRemappingAndRejectsBadArguments() {
-        var themes = new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+        var themes = new ThemeController(Appearance.LIGHT);
         try {
             var loader = getClass().getClassLoader();
             var icon = AppIcons.plugin(loader, "dev/jasper/app/icons/palette-probe.svg");

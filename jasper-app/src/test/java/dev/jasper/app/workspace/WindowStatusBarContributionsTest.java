@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(EdtTestExtension.class)
 class WindowStatusBarContributionsTest {
     @Test void itemsRenderInPriorityOrderOnTheirSideAndClickTheirAction() {
-        new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
+        new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.LIGHT);
         var model = new Contributions();
         List<String> clicks = new ArrayList<>();
         Action run = new AbstractAction("Run") {
@@ -87,8 +87,7 @@ class WindowStatusBarContributionsTest {
 
     @Test void progressFitsNarrowBarsAndLargerUiFontsInBothSkins() {
         try {
-            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN,
-                dev.jasper.app.config.Appearance.LIGHT);
+            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.LIGHT);
             for (int size : new int[]{12, 18, 32}) {
                 javax.swing.UIManager.put("Label.font", new java.awt.Font("Dialog", java.awt.Font.PLAIN, size));
                 var view = new StatusProgressView();

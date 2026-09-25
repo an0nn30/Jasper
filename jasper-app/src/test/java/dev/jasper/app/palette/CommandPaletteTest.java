@@ -366,7 +366,7 @@ class CommandPaletteTest {
 
     @Test void threeVerbsShowInTheFooterAndAStepReplacesTheListWithFields() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            new ThemeController(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
+            new ThemeController(dev.jasper.app.config.Appearance.LIGHT);
             try {
             var palette = new CommandPalette(true, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
             var verbs = List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run"),
@@ -452,15 +452,14 @@ class CommandPaletteTest {
     @Test void renderPaletteResultsAndFormsAtBothScales() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try {
-                for (var choice : java.util.List.of(java.util.Map.entry(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.DARK),
-                        java.util.Map.entry(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT))) {
-                    new ThemeController(choice.getKey(), choice.getValue());
+                for (var choice : java.util.List.of(dev.jasper.app.config.Appearance.DARK, dev.jasper.app.config.Appearance.LIGHT)) {
+                    new ThemeController(choice);
                     var card = new CommandPalette(false, query -> {}, (row, verb) -> {}, () -> {}, () -> {});
                     card.setResults(List.of(PaletteRow.of("new_tab", "New terminal tab"), PaletteRow.of("settings", "Settings")), null, null);
                     var host = new javax.swing.JPanel(new java.awt.GridBagLayout()); host.add(card);
-                    for (int scale : new int[]{1, 2}) saveRender(host, choice.getKey()+"-"+choice.getValue()+"-palette-"+scale, scale);
+                    for (int scale : new int[]{1, 2}) saveRender(host, choice+"-palette-"+scale, scale);
                     card.showStep("Connect", List.of(new PaletteStep.Field("host", "Host", "example.org"), new PaletteStep.Field("user", "Username", "dustin")));
-                    for (int scale : new int[]{1, 2}) saveRender(host, choice.getKey()+"-"+choice.getValue()+"-palette-form-"+scale, scale);
+                    for (int scale : new int[]{1, 2}) saveRender(host, choice+"-palette-form-"+scale, scale);
                 }
             } finally { new ThemeController(); }
         });
@@ -479,7 +478,7 @@ private static void saveRender(javax.swing.JComponent component, String name, in
     try { graphics.scale(scale, scale); component.printAll(graphics); }
     finally { graphics.dispose(); }
     try {
-        var folder = java.nio.file.Path.of("build/retro-preview");
+        var folder = java.nio.file.Path.of("build/render-preview");
         java.nio.file.Files.createDirectories(folder);
         javax.imageio.ImageIO.write(image, "png", folder.resolve(name + ".png").toFile());
     } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }

@@ -48,7 +48,7 @@ class WindowChromeContributionsTest {
         edt(() -> {
             var model = new Contributions();
             List<Contributions.Invocation> seen = new ArrayList<>();
-            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.DARK));
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.DARK));
             List<String> before = buttons(owner);
             owner.connectContributions(model);
             ActionEntry run = model.addAction("dev.x.run", "Run Tool", null, List.of(), Optional.empty(), seen::add);
@@ -132,8 +132,7 @@ class WindowChromeContributionsTest {
 
     @Test void sharedManagedIconsSizePerPlacementInMultipleWindows() throws Exception {
         edt(() -> {
-            var theme = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.MODERN,
-                dev.jasper.app.config.Appearance.LIGHT);
+            var theme = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.LIGHT);
             try {
                 var icon = dev.jasper.app.platform.AppIcons.plugin(getClass().getClassLoader(), "dev/jasper/app/icons/intellij/find.svg");
                 var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(19,19,java.awt.image.BufferedImage.TYPE_INT_ARGB));

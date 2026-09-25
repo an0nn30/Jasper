@@ -3,11 +3,10 @@ package dev.jasper.app.appearance;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.terminal.config.Palette;
 
-/** App presentation presets, each with its terminal palette. */
+/** The bundled Light and Dark presets; MATCH terminal colours use the preset's palette. */
 public enum BuiltinTheme {
     DARK("dark", "Dark", Palette.jasperDark()),
-    LIGHT("light", "Light", Palette.jasperLight()),
-    RETRO("retro", "Retro", RetroPalette.create());
+    LIGHT("light", "Light", Palette.jasperLight());
 
     private final String id;
     private final String label;
