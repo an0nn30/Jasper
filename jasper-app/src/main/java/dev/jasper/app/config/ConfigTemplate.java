@@ -63,7 +63,7 @@ public final class ConfigTemplate {
             # fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
             # Fallback names must be nonblank; an empty fallback list is allowed.
             # ligatures = true
-            # Line height multiplier, 1.0-3.0; updates live.
+            # Line height multiplier, 0.5-3.0; updates live. Below 1.0 rows are tighter and glyphs may overlap.
             # line_height = 1.0
             # Font size in points, 6-72; changes update all panes live.
             # Reset Font Size restores this saved default.

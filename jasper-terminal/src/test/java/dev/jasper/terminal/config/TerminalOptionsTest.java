@@ -56,12 +56,20 @@ class TerminalOptionsTest {
 
     @Test
     void rejectsInvalidLineHeightsAndBell() {
-        for (float height : new float[] {Float.NaN, Float.POSITIVE_INFINITY, .99f, 3.01f}) {
+        for (float height : new float[] {Float.NaN, Float.POSITIVE_INFINITY, .49f, 3.01f}) {
             assertThatIllegalArgumentException().isThrownBy(() -> new TerminalOptions("Mono", 14f, List.of(), true,
                 Palette.jasperDark(), CursorStyle.BLOCK, true, OptionAsMeta.LEFT, 100, false, height, BellMode.VISUAL));
         }
         assertThatNullPointerException().isThrownBy(() -> new TerminalOptions("Mono", 14f, List.of(), true,
             Palette.jasperDark(), CursorStyle.BLOCK, true, OptionAsMeta.LEFT, 100, false, 1f, null));
+    }
+
+    @Test
+    void acceptsCompressedLineHeightsDownToOneHalf() {
+        for (float height : new float[] {.5f, .6f, .7f, .8f, .9f}) {
+            assertThat(new TerminalOptions("Mono", 14f, List.of(), true, Palette.jasperDark(), CursorStyle.BLOCK, true,
+                OptionAsMeta.LEFT, 100, false, height, BellMode.VISUAL).lineHeight()).isEqualTo(height);
+        }
     }
 
     @Test

@@ -10,8 +10,8 @@ public record FontConfig(String family, float size, List<String> fallback, boole
         if (!Float.isFinite(size) || size < 6 || size > 72) {
             throw new IllegalArgumentException("Font size must be a finite number from 6–72.");
         }
-        if (!Float.isFinite(lineHeight) || lineHeight < 1 || lineHeight > 3) {
-            throw new IllegalArgumentException("Line height must be a finite number from 1–3.");
+        if (!Float.isFinite(lineHeight) || lineHeight < .5f || lineHeight > 3) {
+            throw new IllegalArgumentException("Line height must be a finite number from 0.5–3.");
         }
         fallback = List.copyOf(fallback);
         fallback.forEach(FontConfig::requireName);

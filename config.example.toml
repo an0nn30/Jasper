@@ -44,7 +44,7 @@ size = 16.0
 fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
 # Live across existing and new panes.
 ligatures = true
-# Live multiplier from 1.0-3.0. It changes cell height without changing cell width.
+# Live multiplier from 0.5-3.0. It changes cell height without changing cell width; below 1.0 glyphs may overlap neighbouring rows.
 line_height = 1.0
 
 [terminal]

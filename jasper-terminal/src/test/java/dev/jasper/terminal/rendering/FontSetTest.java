@@ -33,6 +33,19 @@ class FontSetTest {
     }
 
     @Test
+    void compressedLineHeightShrinksCellsAndKeepsTheNaturalBaselineCentered() {
+        var natural = new FontSet(MONO, 16f, List.of(), true);
+        for (float height : new float[] {.9f, .8f, .7f, .6f, .5f}) {
+            var tight = new FontSet(MONO, 16f, List.of(), true, height);
+            assertThat(tight.cellWidth()).isEqualTo(natural.cellWidth());
+            assertThat(tight.cellHeight()).as("line height %s", height)
+                .isEqualTo((int) Math.ceil(natural.cellHeight() * height))
+                .isLessThan(natural.cellHeight()).isPositive();
+            assertThat(tight.ascent()).isEqualTo(natural.ascent() + (tight.cellHeight() - natural.cellHeight()) / 2);
+        }
+    }
+
+    @Test
     void primaryFontResolvesFromTheRuntime() {
         assertThat(new FontSet(MONO, 14f, List.of(), true).primaryFamily()).isEqualTo(MONO);
     }

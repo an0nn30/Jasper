@@ -221,7 +221,7 @@ public final class ConfigLoader {
             case "font.size" -> fontSize = number(path, value, 6, 72, fontSize);
             case "font.fallback" -> fallback = strings(path, value, ConfigLoader::fontName, fallback);
             case "font.ligatures" -> ligatures = bool(path, value, ligatures);
-            case "font.line_height" -> lineHeight = number(path, value, 1, 3, lineHeight);
+            case "font.line_height" -> lineHeight = number(path, value, .5, 3, lineHeight);
             case "ui.theme.style" -> style = choice(path, value, Map.of(
     "modern", ThemeStyle.MODERN, "retro", ThemeStyle.RETRO), style);
             case "ui.theme.variant" -> variant = choice(path, value, Map.of(
@@ -259,15 +259,20 @@ public final class ConfigLoader {
         return defaultValue;
     }
 
-    private float number(List<String> path, Object value, int min, int max, float defaultValue) {
+    private float number(List<String> path, Object value, double min, double max, float defaultValue) {
         if (!(value instanceof Long) && !(value instanceof Double)) typeError(path, "a number");
         else {
             double number = ((Number) value).doubleValue();
             if (!Double.isFinite(number) || number < min || number > max) {
-                valueError(path, "Use a finite number from " + min + "–" + max + "; using the default.");
+                valueError(path, "Use a finite number from " + bound(min) + "–" + bound(max) + "; using the default.");
             } else return (float) number;
         }
         return defaultValue;
+    }
+
+    /** Whole bounds print without a fraction, so existing messages read "6–72". */
+    private static String bound(double value) {
+        return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
     }
 
     private boolean bool(List<String> path, Object value, boolean defaultValue) {
