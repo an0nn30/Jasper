@@ -28,7 +28,7 @@ class ConfigurationStatusTest {
                     status.setMetadata("<html>very long shell".repeat(80), "/a/long/directory/".repeat(80), "120 × 36", true, false);
                     assertThat(status.getMinimumSize().width).isZero();
                     assertThat(status.getPreferredSize().width).isZero();
-                    assertThat(status.getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                    assertThat(status.getBackground()).isEqualTo(UIManager.getColor("StatusBar.background"));
                     assertThat(contrast(status.configButton().getForeground(), status.getBackground())).isGreaterThanOrEqualTo(4.5);
                     for (int width : new int[]{958, 320, 100, 20, 0}) {
                         status.setSize(width, 30); layout(status);
@@ -50,10 +50,26 @@ class ConfigurationStatusTest {
                 themes.select(theme);
                 status.applyPalette(theme.palette());
                 status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));
-                assertThat(status.getBackground()).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                assertThat(status.getBackground()).isEqualTo(UIManager.getColor("StatusBar.background"));
                 assertThat(contrast(status.configButton().getForeground(), status.getBackground())).isGreaterThanOrEqualTo(3);
             }
             themes.select(Theme.DARK);
+        });
+    }
+    @Test void statusBarPaintsTheThemesStatusSurfaceUnderATopRule() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController();
+            try {
+                for (var theme : List.of(Theme.DARK, Theme.LIGHT)) {
+                    themes.select(theme);
+                    var status = new WindowStatusBar();
+                    status.setSize(600, 30); status.doLayout();
+                    var image = new java.awt.image.BufferedImage(600, 30, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                    var graphics = image.createGraphics(); status.paint(graphics); graphics.dispose();
+                    assertThat(new Color(image.getRGB(300, 0))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.borderColor"));
+                    assertThat(new Color(image.getRGB(300, 15))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.background"));
+                }
+            } finally { themes.select(Theme.DARK); }
         });
     }
 

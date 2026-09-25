@@ -85,8 +85,12 @@ final class WorkspaceRegions extends JPanel {
         });
         host.removeAll();
         host.add(contents.get(region), BorderLayout.CENTER);
+        ToolWindowSurface.apply(host);
         return host;
     }
+
+    /** Reapplies the tool window colour after a theme change reset the region backgrounds. */
+    void refreshTheme() { hosts.values().forEach(ToolWindowSurface::apply); }
 
     private void rebuild() {
         removeAll();

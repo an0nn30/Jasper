@@ -445,7 +445,7 @@ final class WindowChrome {
         toolbar.setBackground(UIManager.getColor("Jasper.titleBackground"));
         for (Component child : toolbar.getComponents())
             if (child instanceof ReferenceButton button) button.setFont(button.chromeFont());
-        status.setBackground(UIManager.getColor("Jasper.titleBackground"));
+        status.refreshTheme();
         themeItems.forEach((theme, item) -> item.setSelected(owner.appearance() == theme));
         terminalItems.forEach((colors, item) -> item.setSelected(owner.terminalColors() == colors));
     }

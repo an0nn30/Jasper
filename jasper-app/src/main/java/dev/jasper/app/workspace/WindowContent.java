@@ -584,6 +584,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
             if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
             rail.refreshTheme();
+            regions.refreshTheme();
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
                 tab.setBackground(theme.palette().background());
