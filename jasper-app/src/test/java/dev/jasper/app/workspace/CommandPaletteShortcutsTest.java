@@ -73,8 +73,16 @@ class CommandPaletteShortcutsTest {
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_K, primary(false)))).isFalse();
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isTrue();
+                assertThat(owner.commandPalette().activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
                 assertThat(owner.action(ActionId.COMMAND_PALETTE).getValue(Action.ACCELERATOR_KEY))
                     .isEqualTo(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK));
+                owner.commandPalette().dismiss();
+                // The shortcut above is intercepted by PaletteKeyRouter before WorkspaceActions ever sees
+                // it. Invoke the same Action directly, as the View menu's own click does, to also pin that
+                // WorkspaceActions opens the same All tab rather than jasper.commands.
+                owner.action(ActionId.COMMAND_PALETTE).actionPerformed(new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, "menu"));
+                assertThat(owner.commandPalette().activeScopeId()).as("the View menu action agrees with the shortcut")
+                    .isEqualTo(PaletteScope.ALL_ID);
                 owner.commandPalette().dismiss();
                 owner.setBindings(KeyBindings.withOverrides(false, Map.of("command_palette", "none")));
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK))).isFalse();

@@ -183,7 +183,9 @@ final class WindowCommandPalette implements AutoCloseable {
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 Rectangle card = palette.getBounds();
-                g.setColor(new Color(0, 0, 0, owner.theme().chrome().dark() ? 4 : 2));
+                Color shadow = UIManager.getColor("Popup.dropShadowColor");
+                if (shadow == null) shadow = Color.BLACK;
+                g.setColor(new Color(shadow.getRed(), shadow.getGreen(), shadow.getBlue(), owner.theme().chrome().dark() ? 4 : 2));
                 for (int i = 12; i >= 1; i--) {
                     int expansion = UIScale.scale(i);
                     g.fillRect(card.x - expansion, card.y - expansion, card.width + expansion * 2, card.height + expansion * 2);

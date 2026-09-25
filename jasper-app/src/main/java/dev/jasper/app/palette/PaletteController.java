@@ -198,6 +198,7 @@ public final class PaletteController implements AutoCloseable {
     }
 
     private void completeStep() {
+        if (!valid()) { dismiss(); return; }
         PaletteStep current = step;
         long submitted = ++generation;
         completing = true;
@@ -262,7 +263,10 @@ public final class PaletteController implements AutoCloseable {
         rebuild(true);
     }
 
-    private boolean valid() { return originValid.getAsBoolean() && (active == null || scopes.contains(active)); }
+    private boolean valid() {
+        return originValid.getAsBoolean() && (active == null || scopes.contains(active))
+            && (stepScope == null || scopes.contains(stepScope));
+    }
 
     /** A scope came or went while open: show the new tabs and, on All, listen to the new roster. */
     private void applyRoster() {
@@ -293,7 +297,13 @@ public final class PaletteController implements AutoCloseable {
         } else {
             // One row more than shown tells whether a scope has more matches than All has room for.
             var probe = new PaletteContext(macOs, context.target(), maxResults + 1);
+            // The list is a hard-capped 200 rows overall (PaletteResults.MAX_ROWS): with enough
+            // participating scopes, each at the settings' own cap, sections could ask for far more.
+            // Budget rows across sections in tab order; a scope cut short by the budget still gets its
+            // own "More in..." row, and a scope reached after the budget is spent gets no section at all.
+            int remaining = PaletteResults.MAX_ROWS;
             for (PaletteScope scope : tabScopes()) {
+                if (remaining <= 0) break;
                 PaletteResults results;
                 try { results = scope.search(query, probe); }
                 catch (RuntimeException failure) {
@@ -301,10 +311,12 @@ public final class PaletteController implements AutoCloseable {
                     continue;
                 }
                 if (results.rows().isEmpty()) continue;
+                int cap = Math.min(maxResults, remaining);
+                List<PaletteRow> shown = results.rows().subList(0, Math.min(cap, results.rows().size()));
                 entries.add(new PaletteEntry.Header(scope.label()));
-                List<PaletteRow> shown = results.rows().subList(0, Math.min(maxResults, results.rows().size()));
                 for (PaletteRow row : shown) entries.add(new PaletteEntry.Item(scope, row));
-                if (results.rows().size() > maxResults) entries.add(new PaletteEntry.More(scope));
+                if (results.rows().size() > shown.size()) entries.add(new PaletteEntry.More(scope));
+                remaining -= shown.size();
                 String first = results.initialSelectionId();
                 if (initial == null && first != null && shown.stream().anyMatch(row -> row.id().equals(first)))
                     initial = PaletteEntry.key(scope, first);

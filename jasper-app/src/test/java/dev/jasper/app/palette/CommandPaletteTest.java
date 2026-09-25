@@ -36,9 +36,11 @@ class CommandPaletteTest {
         new PaletteVerb("paste_run", "Paste and run"), new PaletteVerb("save", "Save as snippet…")));
 
     // A theme's SearchEverywhere.*/List.*/Component.borderColor keys back every colour this component
-    // paints; the default cross-platform look and feel (active until something installs a FlatLaf theme)
-    // defines none of them. Production always installs a theme before any window exists; here, install one
-    // once so tests that build a bare CommandPalette do not depend on another test class running first.
+    // paints. The default cross-platform look and feel (active until something installs a FlatLaf theme)
+    // defines plain Swing keys such as List.foreground, but not FlatLaf-only ones such as
+    // Component.borderColor, so color()'s two-key fallback can still return null. Production always
+    // installs a theme before any window exists; here, install one once so tests that build a bare
+    // CommandPalette do not depend on another test class running first.
     @BeforeAll static void installDefaultTheme() throws Exception {
         SwingUtilities.invokeAndWait(() -> ThemeTestSupport.install(Theme.DARK));
     }
@@ -251,8 +253,9 @@ class CommandPaletteTest {
                     var palette = palette(new ArrayList<>());
                     palette.setTabs(List.of(new CommandPalette.Tab(PaletteScope.ALL_ID, "All", null, null),
                         new CommandPalette.Tab("jasper.commands", "Commands", null, null)), PaletteScope.ALL_ID);
+                    var historyRow = new PaletteRow("c", "Row c", "a detail", null, null, true, null);
                     palette.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "a"), item(COMMANDS, "b"),
-                        new PaletteEntry.Header("History"), item(HISTORY, "c")), null, null);
+                        new PaletteEntry.Header("History"), new PaletteEntry.Item(HISTORY, historyRow)), null, null);
                     palette.setSize(palette.getPreferredSize());
                     layoutTree(palette);
                     var image = paint(palette);
@@ -270,8 +273,30 @@ class CommandPaletteTest {
                     assertPixel(image, at(list, rule.width - 3, rule.y, palette), "SearchEverywhere.List.separatorColor", name);
                     assertPixel(image, at(palette.hintBar(), palette.hintBar().getWidth() - 3, palette.hintBar().getHeight() / 2, palette),
                         "SearchEverywhere.Advertiser.background", name);
-                    assertThat(labels(palette.tabStrip()).get(1).getForeground()).as(name).isEqualTo(UIManager.getColor("List.foreground"));
+                    assertThat(labels(palette.tabStrip()).get(1).getForeground()).as(name).isEqualTo(UIManager.getColor("Label.foreground"));
                     assertThat(allTab.getForeground()).as(name).isEqualTo(UIManager.getColor("SearchEverywhere.Tab.selectedForeground"));
+
+                    // Select History's row (three verbs, a detail) to populate the hint bar with link-coloured
+                    // secondary verbs and its detail text, without disturbing the pixel assertions taken above.
+                    list.setSelectedIndex(4);
+                    assertThat(palette.hintText()).as(name).isEqualTo("a detail");
+                    assertThat(palette.hintActionTexts()).as(name).isNotEmpty();
+                    assertThat(label(palette.hintBar(), "a detail").getForeground()).as(name)
+                        .isEqualTo(UIManager.getColor("SearchEverywhere.Advertiser.foreground"));
+                    for (String action : palette.hintActionTexts())
+                        assertThat(label(palette.hintBar(), action).getForeground()).as(name + " " + action)
+                            .isEqualTo(UIManager.getColor("Component.linkColor"));
+                    // Re-render specific rows directly (the cell renderer is one shared instance whose
+                    // children only reflect whichever row it painted last) to check colours the isSelected
+                    // parameter, not the list's actual selection, controls.
+                    var detailRendered = (Container) list.getCellRenderer()
+                        .getListCellRendererComponent(list, list.getModel().getElementAt(4), 4, false, false);
+                    assertThat(label(detailRendered, "a detail").getForeground()).as(name)
+                        .isEqualTo(UIManager.getColor("SearchEverywhere.SearchField.infoForeground"));
+                    var headerRendered = (Container) list.getCellRenderer()
+                        .getListCellRendererComponent(list, list.getModel().getElementAt(3), 3, false, false);
+                    assertThat(label(headerRendered, "History").getForeground()).as(name)
+                        .isEqualTo(UIManager.getColor("SearchEverywhere.List.separatorForeground"));
                 }
             } finally {
                 try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new IllegalStateException(failure); }
@@ -320,10 +345,36 @@ class CommandPaletteTest {
             line.doLayout();
             assertThat(tag.getWidth()).as("the tag goes first").isZero();
             assertThat(title.getWidth()).isPositive();
+            // Wide enough for title + tag alone, but not for title + detail + tag: the tag must still be
+            // dropped first, not just cut for the detail's sake, or the detail would never get its turn.
+            int side = UIScale.scale(8), gap = UIScale.scale(8), iconSize = UIScale.scale(16);
+            int start = side + iconSize + gap;
+            int fitsTitleAndTagOnly = start + title.getPreferredSize().width + gap + tag.getPreferredSize().width;
+            line.setSize(fitsTitleAndTagOnly + side, UIScale.scale(24));
+            line.doLayout();
+            assertThat(tag.getWidth()).as("the tag is dropped when the detail would not otherwise fit too").isZero();
+            assertThat(detail.getWidth()).as("the detail takes its place, cut if needed").isPositive();
             var more = (Container) renderer.getListCellRendererComponent(list, list.getModel().getElementAt(1), 1, false, false);
             assertThat(labels(more)).extracting(JLabel::getText).contains("More in History…");
             var header = renderer.getListCellRendererComponent(list, list.getModel().getElementAt(2), 2, false, false);
             assertThat(header.getPreferredSize().height).isEqualTo(UIScale.scale(22));
+        });
+    }
+
+    @Test void renderedRowsCarryNoNumberBadge() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var palette = palette(new ArrayList<>());
+            var entries = new ArrayList<PaletteEntry>();
+            for (int i = 0; i < 6; i++) entries.add(item(COMMANDS, "row" + i));
+            palette.setEntries(entries, null, null);
+            var list = palette.entryList();
+            var renderer = list.getCellRenderer();
+            var badges = List.of("⌘1", "⌘2", "⌘3", "⌘4", "⌘5", "Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5");
+            for (int i = 0; i < entries.size(); i++) {
+                var rendered = (Container) renderer.getListCellRendererComponent(list, list.getModel().getElementAt(i), i, false, false);
+                for (JLabel label : labels(rendered))
+                    for (String badge : badges) assertThat(label.getText()).as("row " + i).doesNotContain(badge);
+            }
         });
     }
 
@@ -404,6 +455,27 @@ class CommandPaletteTest {
                     assertThat(palette.hintBar().getHeight()).isEqualTo(UIScale.scale(26));
                 }
             } finally { themes.configure(Appearance.DARK, UiFontConfig.defaults()); }
+        });
+    }
+
+    @Test void refreshThemeKeepsTheQueryAndTheSelectedRow() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var original = UIManager.getLookAndFeel();
+            try {
+                var palette = palette(new ArrayList<>());
+                palette.setEntries(List.of(item(COMMANDS, "a"), item(COMMANDS, "b"), item(COMMANDS, "c")), null, null);
+                palette.queryField().setText("fir");
+                palette.selectRow("b");
+                assertThat(PaletteTestSupport.describe(palette.selectedEntry())).isEqualTo("jasper.commands/b");
+                for (Theme theme : List.of(Theme.LIGHT, Theme.DARK)) {
+                    ThemeTestSupport.install(theme);
+                    palette.refreshTheme();
+                    assertThat(palette.queryField().getText()).as(theme.name()).isEqualTo("fir");
+                    assertThat(PaletteTestSupport.describe(palette.selectedEntry())).as(theme.name()).isEqualTo("jasper.commands/b");
+                }
+            } finally {
+                try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new IllegalStateException(failure); }
+            }
         });
     }
 

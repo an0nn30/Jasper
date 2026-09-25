@@ -96,7 +96,7 @@ public final class CommandPalette extends JPanel {
     private int stepFocus = -1;
     private int hover = -1;
     private boolean composing;
-    private Color tabSelectedBackground, tabSelectedForeground, foreground, infoForeground, separatorColor,
+    private Color tabSelectedBackground, tabSelectedForeground, tabForeground, foreground, infoForeground, separatorColor,
         separatorForeground, selectionBackground, selectionForeground, hoverBackground, advertiserForeground, linkColor;
     private Font font, smallFont, monoFont;
 
@@ -348,6 +348,7 @@ public final class CommandPalette extends JPanel {
         Color headerBackground = color("SearchEverywhere.Header.background", "Panel.background");
         tabSelectedBackground = color("SearchEverywhere.Tab.selectedBackground", "List.selectionInactiveBackground");
         tabSelectedForeground = color("SearchEverywhere.Tab.selectedForeground", "Label.foreground");
+        tabForeground = UIManager.getColor("Label.foreground");
         foreground = color("List.foreground", "Label.foreground");
         infoForeground = color("SearchEverywhere.SearchField.infoForeground", "Label.disabledForeground");
         separatorColor = color("SearchEverywhere.List.separatorColor", "Separator.foreground");
@@ -466,7 +467,7 @@ public final class CommandPalette extends JPanel {
 
     private void applyTabColors() {
         for (TabLabel label : tabLabels) {
-            label.setForeground(label.selected() ? tabSelectedForeground : foreground);
+            label.setForeground(label.selected() ? tabSelectedForeground : tabForeground);
             if (font != null) label.setFont(font);
         }
     }
@@ -635,8 +636,11 @@ public final class CommandPalette extends JPanel {
             int titleWidth = title.getPreferredSize().width;
             int tagWidth = tag.getText().isEmpty() ? 0 : tag.getPreferredSize().width;
             int detailWidth = detail.getText().isEmpty() ? 0 : detail.getPreferredSize().width;
-            // When space runs out the tag goes first; then the detail, and finally the title, are cut short.
-            boolean showTag = tagWidth > 0 && start + titleWidth + gap + tagWidth <= end;
+            // When space runs out the tag goes first; then the detail, and finally the title, are cut
+            // short. The tag only shows when the title, the detail (if any) and the tag all fit together;
+            // otherwise the tag would claim room the detail needs and never get cut back for it.
+            int detailTerm = detailWidth > 0 ? gap + detailWidth : 0;
+            boolean showTag = tagWidth > 0 && start + titleWidth + detailTerm + gap + tagWidth <= end;
             int textEnd = showTag ? end - tagWidth - gap : end;
             tag.setBounds(showTag ? end - tagWidth : 0, 0, showTag ? tagWidth : 0, height);
             int shownTitle = Math.max(0, Math.min(titleWidth, textEnd - start));

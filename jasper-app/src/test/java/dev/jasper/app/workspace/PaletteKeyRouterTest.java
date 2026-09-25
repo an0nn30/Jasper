@@ -100,7 +100,7 @@ class PaletteKeyRouterTest {
         });
     }
 
-    @Test void missingNumberNavigationStaleResultAndImePreserveEditorOwnership() throws Exception {
+    @Test void missingNavigationStaleResultAndImePreserveEditorOwnership() throws Exception {
         edt(() -> {
             try (var owner = owner(false)) {
                 var root = install(owner); var router = router(owner, false, root);

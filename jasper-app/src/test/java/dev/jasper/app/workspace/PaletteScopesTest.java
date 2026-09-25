@@ -92,6 +92,27 @@ class PaletteScopesTest {
         });
     }
 
+    @Test void greaterThanInAllIsAPlainQueryNotAPicker() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner);
+                var fake = new FakeScope();
+                fake.rows = List.of(PaletteRow.of("gt", "closes > right"));
+                owner.scopes().register(fake);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.toggle();
+                var tabsBefore = PaletteTestSupport.tabIds(card);
+                var selectedBefore = PaletteTestSupport.selectedTabId(card);
+                card.queryField().setText(">");
+                assertThat(card.queryField().getText()).as("no picker rewrites the field").isEqualTo(">");
+                assertThat(PaletteTestSupport.tabIds(card)).as("the tabs are unchanged").isEqualTo(tabsBefore);
+                assertThat(PaletteTestSupport.selectedTabId(card)).as("the selected tab is unchanged").isEqualTo(selectedBefore);
+                assertThat(PaletteTestSupport.entries(card)).as("scopes are searched with the literal '>' text")
+                    .contains("test.fake/gt");
+            }
+        });
+    }
+
     @Test void allCapsEachSectionAndOffersTheRestInTheScopesTab() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
@@ -277,6 +298,24 @@ class PaletteScopesTest {
         });
     }
 
+    @Test void aStepOpenedFromAllClosesInsteadOfRunningWhenItsScopeIsRemoved() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner);
+                var fake = new FakeScope();
+                var registration = owner.scopes().register(fake);
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.toggle();
+                PaletteTestSupport.selectRow(card, "beta");
+                palette.enterPressed(2);
+                assertThat(palette.stepOpen()).as("the step opened from All").isTrue();
+                registration.close();
+                assertThat(palette.isOpen()).as("closed when the step's own scope is gone").isFalse();
+                assertThat(fake.completed).as("the removed scope's completion never ran").isEmpty();
+            }
+        });
+    }
+
     @Test void scopeChangesRefreshTheOpenListAndRemovingTheActiveScopeDismisses() throws Exception {
         edt(() -> {
             try (var owner = owner(true)) {
@@ -316,6 +355,36 @@ class PaletteScopesTest {
                 assertThat(PaletteTestSupport.tabIds(card)).doesNotContain("test.fake");
                 assertThat(PaletteTestSupport.entries(card)).doesNotContain("# Fake");
                 assertThat(fake.listeners).isEmpty();
+            }
+        });
+    }
+
+    @Test void allBudgetsItsRowsAcrossManyScopesInsteadOfThrowing() throws Exception {
+        edt(() -> {
+            try (var owner = owner(true)) {
+                install(owner);
+                // Eleven scopes at the settings' own max_results cap (20) would ask for 220 item rows,
+                // over PaletteResults.MAX_ROWS (200); All must budget instead of handing setEntries too many.
+                for (int n = 0; n < 11; n++) {
+                    int index = n;
+                    var scope = new FakeScope() {
+                        @Override public String id() { return "test.fake" + index; }
+                        @Override public String label() { return "Fake" + index; }
+                    };
+                    var rows = new ArrayList<PaletteRow>();
+                    for (int r = 0; r < 25; r++) rows.add(PaletteRow.of("row" + r, "Row " + r));
+                    scope.rows = rows;
+                    owner.scopes().register(scope);
+                }
+                var palette = owner.commandPalette(); var card = palette.component();
+                palette.setMaxResults(20);
+                palette.toggle();
+                assertThat(palette.isOpen()).as("All opens without throwing").isTrue();
+                assertThat(PaletteTestSupport.rowCount(card)).as("at most PaletteResults.MAX_ROWS (200) item rows").isEqualTo(200);
+                var headers = PaletteTestSupport.entries(card).stream().filter(entry -> entry.startsWith("# Fake")).toList();
+                var expected = new ArrayList<String>();
+                for (int n = 0; n < 10; n++) expected.add("# Fake" + n);
+                assertThat(headers).as("sections in tab order, stopping once the budget is spent").containsExactlyElementsOf(expected);
             }
         });
     }

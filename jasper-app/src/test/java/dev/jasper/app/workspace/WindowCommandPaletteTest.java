@@ -14,6 +14,7 @@ import dev.jasper.app.palette.PaletteController;
 import dev.jasper.app.palette.PaletteRow;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -87,6 +88,30 @@ class WindowCommandPaletteTest {
                 assertThat(Math.abs(palette.getBounds().getCenterX() - deck.getCenterX())).isLessThanOrEqualTo(1);
                 assertThat(palette.getBounds().y).isEqualTo(deck.y + deck.height / 5);
                 owner.setActive(false); assertThat(owner.commandPalette().isOpen()).isFalse();
+            }
+        });
+    }
+    @Test void overlayShadowTintsTowardThePopupDropShadowColour() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var owner = owner(new CommandHistory())) {
+                var root = install(owner);
+                owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
+                var overlay = (JComponent) owner.commandPalette().component().getParent();
+                var card = owner.commandPalette().component().getBounds();
+                Object previous = UIManager.get("Popup.dropShadowColor");
+                try {
+                    UIManager.put("Popup.dropShadowColor", Color.RED);
+                    var image = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                    var graphics = image.createGraphics();
+                    try {
+                        graphics.setColor(Color.GRAY);
+                        graphics.fillRect(0, 0, image.getWidth(), image.getHeight());
+                        overlay.paint(graphics);
+                    } finally { graphics.dispose(); }
+                    var pixel = new Color(image.getRGB(card.x - 2, card.y - 2), true);
+                    assertThat(pixel.getRed()).as("the shadow is tinted toward the configured drop-shadow colour")
+                        .isGreaterThan(pixel.getGreen());
+                } finally { UIManager.put("Popup.dropShadowColor", previous); }
             }
         });
     }
