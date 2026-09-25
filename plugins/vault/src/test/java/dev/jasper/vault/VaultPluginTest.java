@@ -287,7 +287,6 @@ class VaultPluginTest {
             });
             assertThat(host.failures()).isEmpty();
             assertThat(icons).extracting(dev.jasper.sdk.testing.FakeNamedIcon::name).containsExactly(dev.jasper.sdk.ui.IconName.LOCK, dev.jasper.sdk.ui.IconName.UNLOCK);
-            assertThat(icons).allSatisfy(icon -> assertThat(icon.retro()).isEqualTo(false));
         }
     }
 }

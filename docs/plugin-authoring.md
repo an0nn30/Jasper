@@ -73,7 +73,7 @@ built-in chrome; a plugin supplies titles, icons and handlers, never components.
 private static void installUi(PluginContext context, long stepMillis) {
     PluginAction[] demo = new PluginAction[1];
     demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
-            .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg", OldGnomeIcon.EXECUTE))
+            .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg"))
             .withKeywords(List.of("sample", "demo", "activity"))
             .withDefaultBinding("cmd+alt+j"),
         invoked -> {
@@ -163,7 +163,7 @@ without your plugin ever seeing a frame.
 <!-- example:pluginpanels -->
 ```java
 private static void installPanelAndWindow(PluginContext context, long stepMillis) {
-    var icon = context.appearance().icon("dev/jasper/sample/flask.svg", OldGnomeIcon.EXECUTE);
+    var icon = context.appearance().icon("dev/jasper/sample/flask.svg");
     // One instance per window, built the first time the panel is shown there.
     context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", icon, Anchor.LEFT), host -> {
         var run = new JButton("Run sample activity");

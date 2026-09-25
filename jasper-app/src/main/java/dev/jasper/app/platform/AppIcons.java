@@ -53,16 +53,6 @@ public final class AppIcons {
         return NamedIcons.tinted(name) ? tinted(resource) : svg(AppIcons.class.getClassLoader(), resource);
     }
 
-    /** Selects plugin SVG or explicit OldGNOME2 artwork for the running style. */
-    public static Icon skin(ClassLoader loader, String modernSvgResourcePath, String retroName) {
-        Objects.requireNonNull(loader, "loader");
-        if (retroName == null || !OldGnomeCatalog.NAMES.contains(retroName))
-            throw new IllegalArgumentException("Unknown OldGNOME2 icon: " + retroName);
-        if (modernSvgResourcePath == null || loader.getResource(modernSvgResourcePath) == null)
-            throw new IllegalArgumentException("No such icon resource: " + modernSvgResourcePath);
-        return SwingAppearance.retro() ? new SkinIcon(retroName) : plugin(loader, modernSvgResourcePath);
-    }
-
     /** Sizes only managed retro icons; shared compact icons and external artwork remain untouched. */
     public static Icon forToolbar(Icon icon) {
         return icon instanceof SkinIcon managed ? managed.toolbar() : icon;

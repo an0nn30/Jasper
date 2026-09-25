@@ -27,11 +27,10 @@ class SftpPanelTest {
     @Test void rowsUseHostIconsAndTreatHtmlAsLiteralAtLargerFont() throws Exception {
         SwingUtilities.invokeAndWait(()-> {
             var requested=new ArrayList<IconName>();
-            var panel=new SftpPanel(name->{requested.add(name);return new dev.jasper.sdk.testing.FakeNamedIcon(name,false);});
+            var panel=new SftpPanel(name->{requested.add(name);return new dev.jasper.sdk.testing.FakeNamedIcon(name);});
             panel.table().setFont(new Font(Font.DIALOG,Font.PLAIN,24));panel.table().updateRowHeight();
             panel.showPage("host","/home",List.of(new FileEntry("<html>literal",FileEntry.Kind.DIRECTORY,0,1000,0755,"")),0,1,true);
             var renderer=(JLabel)panel.table().prepareRenderer(panel.table().getCellRenderer(0,0),0,0);
-            assertThat(((dev.jasper.sdk.testing.FakeNamedIcon)renderer.getIcon()).retro()).isEqualTo(false);
             assertThat(renderer.getText()).isEqualTo("<html>literal");assertThat(renderer.getClientProperty("html.disable")).isEqualTo(true);
             assertThat(panel.table().getRowHeight()).isGreaterThanOrEqualTo(28);assertThat(requested).contains(IconName.FOLDER,IconName.UPLOAD,IconName.DOWNLOAD);
             assertThat(panel.selection()).hasSize(1);

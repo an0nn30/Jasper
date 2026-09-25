@@ -123,8 +123,8 @@ class VaultManagerWindowTest {
             var window = new VaultManagerWindow(context, f.lock, f.manager, service,
                 new SecretClipboard(text -> {}, Optional::empty, clear -> {}), () -> "status", () -> {});
             window.show(owner, Optional.empty());
-            assertThat(window.panel.lock.getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.LOCK, false));
-            assertThat(window.panel.unlock.getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.UNLOCK, false));
+            assertThat(window.panel.lock.getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.LOCK));
+            assertThat(window.panel.unlock.getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.UNLOCK));
             window.close();
         }
     }

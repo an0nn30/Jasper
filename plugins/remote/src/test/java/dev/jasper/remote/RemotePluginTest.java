@@ -67,7 +67,6 @@ class RemotePluginTest {
             assertThat(host.failures()).isEmpty();
             assertThat(icons).anyMatch(icon->icon.name()==dev.jasper.sdk.ui.IconName.NETWORK);
             assertThat(icons).as("session tab icon").anyMatch(icon->icon.name()==dev.jasper.sdk.ui.IconName.SERVER);
-            assertThat(icons).allSatisfy(icon->assertThat(icon.retro()).isEqualTo(false));
             assertThat(host.toolbar()).anyMatch(item -> item.contains("Sessions"));
             assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT","dev.jasper.remote.panel|SSH hosts|LEFT");
         }
