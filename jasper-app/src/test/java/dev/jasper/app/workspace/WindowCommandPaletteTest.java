@@ -115,6 +115,7 @@ class WindowCommandPaletteTest {
             }
         });
     }
+
     @SuppressWarnings("try")
     @Test void registeredActionsExecuteAndRecentsAreSharedWithoutCrossWindowDispatch() throws Exception {
         DesktopTestSupport.edt(() -> {

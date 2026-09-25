@@ -25,6 +25,7 @@ import javax.swing.JLabel;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import javax.swing.plaf.ColorUIResource;
 import javax.swing.text.DefaultEditorKit;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -275,6 +276,21 @@ class CommandPaletteTest {
                         "SearchEverywhere.Advertiser.background", name);
                     assertThat(labels(palette.tabStrip()).get(1).getForeground()).as(name).isEqualTo(UIManager.getColor("Label.foreground"));
                     assertThat(allTab.getForeground()).as(name).isEqualTo(UIManager.getColor("SearchEverywhere.Tab.selectedForeground"));
+
+                    // List.foreground and Label.foreground happen to coincide in both bundled themes, so
+                    // the assertion above alone can't tell which key the unselected tab actually reads.
+                    // Give Label.foreground a distinctive value List.foreground doesn't share, and prove
+                    // the tab follows it.
+                    Object originalLabelForeground = UIManager.get("Label.foreground");
+                    try {
+                        var distinctiveForeground = new ColorUIResource(0x123456);
+                        UIManager.put("Label.foreground", distinctiveForeground);
+                        palette.refreshTheme();
+                        assertThat(labels(palette.tabStrip()).get(1).getForeground()).as(name).isEqualTo(distinctiveForeground);
+                    } finally {
+                        UIManager.put("Label.foreground", originalLabelForeground);
+                        palette.refreshTheme();
+                    }
 
                     // Select History's row (three verbs, a detail) to populate the hint bar with link-coloured
                     // secondary verbs and its detail text, without disturbing the pixel assertions taken above.

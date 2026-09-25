@@ -348,7 +348,7 @@ public final class CommandPalette extends JPanel {
         Color headerBackground = color("SearchEverywhere.Header.background", "Panel.background");
         tabSelectedBackground = color("SearchEverywhere.Tab.selectedBackground", "List.selectionInactiveBackground");
         tabSelectedForeground = color("SearchEverywhere.Tab.selectedForeground", "Label.foreground");
-        tabForeground = UIManager.getColor("Label.foreground");
+        tabForeground = color("Label.foreground", "List.foreground");
         foreground = color("List.foreground", "Label.foreground");
         infoForeground = color("SearchEverywhere.SearchField.infoForeground", "Label.disabledForeground");
         separatorColor = color("SearchEverywhere.List.separatorColor", "Separator.foreground");
