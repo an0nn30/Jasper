@@ -41,7 +41,7 @@ From this worktree, build the application with its matching SDK and bundled plug
 The distribution is `jasper-app/build/install/jasper-app/`; launch its `bin/jasper-app` yourself,
 or use `./gradlew :jasper-app:run` for the worktree development home. The standalone plugin bundle
 is built by `./gradlew :jasper-plugin-remote:pluginZip` under `plugins/remote/build/distributions/`.
-It needs Jasper SDK 0.7.5 or later below 0.8; do not install it into an older application.
+It needs Jasper SDK 0.8.0 or later below 0.9; do not install it into an older application.
 
 Native GUI and real-host checks were not run by the agent. Use disposable directories on hosts
 you control for the following acceptance steps:
