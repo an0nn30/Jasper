@@ -21,6 +21,17 @@
   - **Planning decisions:** listed in the plan header. They cover the rail staying chrome, contrast
     floors for derived text, FlatLaf form-control heights, and Jasper Dark menus using the list
     selection.
+  - **Spike and deviations:** IntelliJ Light and Jasper Dark matched on the first run, so the
+    dark-parent fallback was not needed. The plan's status lists the deviations.
+  - **Accepted Jasper Dark differences:** FlatLaf builds IntelliJ dark themes on its Darcula base.
+    `jasper-dark.theme.json` pins the 52 drifted values Jasper draws. The rest are:
+    - ruled: menu selection, form heights, `Jasper.palette*`;
+    - set by FlatLaf after the theme: the spinner and editable combo follow `TextField.background`,
+      and toggle and tab underline colours come from `{*-dark}`;
+    - not drawn: AWT system colours, internal frames, sliders, hidden tab and scroll-bar buttons,
+      progress text, and FlatLaf-only window borders.
+
+    The plan's status has the full list.
   - **Not done:** visual acceptance of Light and Dark (user-run), merge and push.
 
 ### IntelliJ-style chrome and follow-ups — merged 2026-09-25

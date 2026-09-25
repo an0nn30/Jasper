@@ -2,7 +2,38 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Plan written 2026-09-25, awaiting user review. Not started.
+**Status:** Executed subagent-driven on `claude/theme-engine`. All 7 tasks and the final-review fix wave are done, and `./gradlew check` passed (1897 tests, 0 failures, 0 errors, 3 skipped). Not merged, not pushed. The user checks Light and Dark visually.
+- **Spike outcome (spec section 2):** IntelliJ Light and Jasper Dark matched every expected colour on the first run. The Step 6 dark-parent fallback was not needed, so the loader keeps IntelliJ's plain parent merge.
+- **Deviations from the plan text:**
+  - **Task 2:** `ThemeLoaderTest` casts to `Map<String, Object>` (with `@SuppressWarnings("unchecked")`), not `Map<?, ?>`. AssertJ's `containsEntry` cannot take `String` arguments on a wildcard capture. The assertion is unchanged.
+  - **Task 4:** `ThemeManager.install` briefly unregistered and re-registered the legacy `dev.jasper.app.themes` custom-defaults source around `FlatLaf.setup`. FlatLaf merges JVM-global custom sources into every look and feel. Task 5 deleted this bracket along with the registration and the properties files.
+  - **Task 7:** the verification grep also excludes `docs/superpowers/**` and `docs/STATUS.md`, because those are historical records.
+  - **Final-review fix wave:**
+    - `ToolWindowSurface` skips `CellRendererPane` subtrees and does not descend into `JList`, `JTable`, `JTree` or `JComboBox`. Cell renderers keep their selection colours, so the SSH hosts panel's selected row stays highlighted.
+    - `SidePanelRenderTest` adds the spec section 5 screenshot-parity render under both themes.
+    - `jasper-dark.theme.json` restores 52 values that FlatLaf's Darcula base had changed. It pins `@disabledBackground`, `@disabledForeground`, `@cellFocusColor`, `@menuHoverBackground`, `@menuAcceleratorForeground` and 12 explicit keys, and `TODAYS_DARK` checks all 52. It also drops `ComboBox.padding`, which FlatLaf ignores.
+    - Two unused `Theme` imports are removed.
+    - `docs/app-refactor-verification.md` lists the packaged theme resources.
+- **Accepted Jasper Dark differences.** FlatLaf builds IntelliJ dark themes on `FlatDarculaLaf` plus `IntelliJTheme$ThemeLaf`, not on `FlatDarkLaf`. These differences from base `8d221b0f` remain, found by diffing every resolved colour and number:
+  - **Ruled or specified:**
+    - menu selection `#5e7293` with white text (decision 7);
+    - `ComboBox.padding` and form-control heights (decision 6);
+    - `Jasper.paletteSelectionBackground` and `Jasper.paletteSelectionForeground` (part 2b removes the palette keys);
+    - the TermLab `Jasper.*` form keys, which the spec deletes.
+  - **Set by FlatLaf after the theme, so a theme cannot pin them:**
+    - `Spinner.background`, `EditorPane.background` and `TextPane.background` follow `TextField.background` (`#282c34`, was `#292c34`).
+    - `ComboBox.editableBackground` also follows `TextField.background` (it was unset, so FlatLaf used `#333841`). The tab-height spinner and the Remote plugin's editable group combo therefore show the field colour.
+    - `Desktop.background` is derived from the panel colour.
+    - `TabbedPane.inactiveUnderlineColor`, `ToggleButton.selectedBackground` and `ToggleButton.disabledSelectedBackground` come from FlatLaf's `{*-dark}` rules.
+  - **Not drawn by Jasper:**
+    - the AWT system colours (`control`, `controlText`, `text`, `textText`, `window`, `windowText`, `windowBorder`, `desktop`, `activeCaptionText`, `inactiveCaptionText`);
+    - internal frames, desktop icons, sliders, colour-chooser swatches and help buttons;
+    - `TabbedPane.disabledUnderlineColor`, `TabbedPane.focus` and `TabbedPane.shadow`, because the terminal deck hides its tab area;
+    - `ToggleButton.tab.disabledUnderlineColor`, because Jasper's toggles are toolbar buttons;
+    - `ScrollBar.hoverButtonBackground` and `ScrollBar.pressedButtonBackground`, because scroll bar buttons are hidden;
+    - `ProgressBar.selectionForeground`, because no progress bar paints its text;
+    - `RootPane.activeBorderColor` and `RootPane.inactiveBorderColor`, which FlatLaf uses only for decorated frames without a native border (not on macOS, on Windows 10+ with FlatLaf's native library, or on undecorated Linux frames).
+  - **New keys that change nothing:** `Button.shadowWidth` (`Button.paintShadow` is false) and the `Component.isIntelliJTheme` marker, which FlatLaf's delegates do not read.
 
 **Goal:** Install every Jasper theme through one engine that reads IntelliJ `.theme.json` files: classic IntelliJ Light becomes the built-in Light, and today's dark look becomes `jasper-dark.theme.json`.
 
