@@ -159,4 +159,27 @@ class WindowPanelsTest {
             assertThat(owner.rail().isVisible()).isTrue();
         });
     }
+
+    @Test void hiddenPanelKeepsItsComponentAndHandlersAcrossADelegateThemeUpdate() throws Exception {
+        edt(() -> {
+            var themes = new dev.jasper.app.appearance.ThemeController(
+                dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.DARK);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes);
+            var model = new Contributions(); owner.connectContributions(model, UiState.inMemory());
+            var clicks = new java.util.concurrent.atomic.AtomicInteger();
+            var button = new javax.swing.JButton("Plugin action");
+            button.addActionListener(event -> clicks.incrementAndGet());
+            var instances = new java.util.concurrent.atomic.AtomicInteger();
+            model.addPanel("dev.x.hidden", "Hidden panel", new ImageIcon(), PanelRegion.LEFT, site -> {
+                instances.incrementAndGet(); return button;
+            });
+            toggle(model, owner, "dev.x.hidden");
+            toggle(model, owner, "dev.x.hidden");
+            owner.applyTheme(owner.theme(), true);
+            toggle(model, owner, "dev.x.hidden");
+            assertThat(owner.regions().content(PanelRegion.LEFT)).isSameAs(button);
+            assertThat(instances.get()).isEqualTo(1);
+            button.doClick(); assertThat(clicks.get()).isEqualTo(1);
+        });
+    }
 }
