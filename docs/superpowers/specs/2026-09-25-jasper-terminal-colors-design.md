@@ -1,6 +1,6 @@
 # Terminal colours independent of the UI appearance
 
-**Status:** Design approved in chat by the user on 2026-09-25. Written specification awaiting user review. No plan yet.
+**Status:** Design and written specification approved by the user on 2026-09-25. Implemented on `claude/intellij-chrome`; visual acceptance pending.
 
 ## Purpose and scope
 

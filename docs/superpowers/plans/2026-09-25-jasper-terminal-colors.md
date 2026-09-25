@@ -14,7 +14,7 @@
 
 **Spec:** [2026-09-25-jasper-terminal-colors-design.md](../specs/2026-09-25-jasper-terminal-colors-design.md)
 
-**Status:** Not started. Branch `claude/intellij-chrome` (unmerged; continues the IntelliJ chrome work), worktree `/Users/RQ7RQVF/projects/moray/.worktrees/intellij-chrome`. Another session works in the main checkout: never run git in `/Users/RQ7RQVF/projects/moray` itself.
+**Status:** All tasks complete; `./gradlew check` passed (1,785 tests, 0 failures, 0 errors, 3 skipped). Executed inline (native) on `claude/intellij-chrome`, worktree `/Users/RQ7RQVF/projects/moray/.worktrees/intellij-chrome`. Two execution rulings: the `config.example.toml` comment differed from the plan text, and one `TerminalColorsThemeTest` expectation was corrected (MATCH follows the effective chrome, including a View override).
 
 ## Global Constraints
 

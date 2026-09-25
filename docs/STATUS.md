@@ -14,6 +14,10 @@
   artwork's license); one `RetroChromeTest` assertion that pinned "no Settings in modern" was
   narrowed to match the new modern chrome, with all other retro assertions unchanged.
   `./gradlew check` passed: 1,771 tests, 0 failures, 0 errors, 3 skipped.
+- **Terminal colours independent of the UI** (same branch, plan
+  `docs/superpowers/plans/2026-09-25-jasper-terminal-colors.md`): `ui.theme.terminal =
+  "match" | "light" | "dark"` and View → Appearance Terminal choices; live, retro ignores it, SDK
+  unchanged. Visual acceptance of the six light/dark combinations and retro is user-run.
 
 Configuration documentation follow-up: the example and settings reference now include
 explicit `ui.theme.style = "modern"` and `ui.font.family = "system"`, with optional
