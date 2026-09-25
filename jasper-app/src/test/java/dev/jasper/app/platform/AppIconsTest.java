@@ -50,4 +50,18 @@ class AppIconsTest {
             assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.chrome("absent")).withMessageContaining("absent");
         });
     }
+
+    @Test void everyApplicationIconIsSixteenPixelIntellijArtworkAndUnknownNamesFail() throws Exception {
+        edt(() -> {
+            for (String name : new String[]{"square-plus", "app-window", "columns-2", "maximize", "search", "settings",
+                    "refresh", "command", "history", "bookmark", "close", "exit"}) {
+                var icon = AppIcons.icon(name);
+                assertThat(icon).as(name).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
+                assertThat(icon.getIconWidth()).as(name).isEqualTo(16);
+            }
+            assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.icon("unknown")).withMessageContaining("unknown");
+            assertThat(java.util.Arrays.stream(AppIcons.class.getMethods()).map(java.lang.reflect.Method::getName))
+                .doesNotContain("toolbarIcon", "forToolbar");
+        });
+    }
 }

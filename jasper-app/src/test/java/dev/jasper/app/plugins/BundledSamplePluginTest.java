@@ -102,7 +102,6 @@ class BundledSamplePluginTest {
                 var icon = contributions.action("dev.jasper.remote.hosts").orElseThrow().icon();
                 assertThat(icon.getIconWidth()).isEqualTo(16);
                 assertThat(icon).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
-                assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(16);
                 assertThat(contributions.action("dev.jasper.remote.connect").orElseThrow().icon()).isSameAs(icon);
                 assertThat(contributions.action("dev.jasper.remote.sessions.manage").orElseThrow().icon()).isSameAs(icon);
                 assertThat(contributions.panels()).hasSize(2).allSatisfy(panel -> {

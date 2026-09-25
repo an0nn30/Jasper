@@ -114,7 +114,7 @@ final class WindowChrome {
 
     private void addSplitButton() {
         JButton split = addButton(ActionId.SPLIT_RIGHT, "columns-2");
-        split.setAction(null); split.setText("Split"); split.setIcon(AppIcons.toolbarIcon("columns-2"));
+        split.setAction(null); split.setText("Split"); split.setIcon(AppIcons.icon("columns-2"));
         split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");
         split.addActionListener(event -> {
             owner.updateActions(); JPopupMenu popup = new JPopupMenu();
@@ -136,7 +136,7 @@ final class WindowChrome {
         ReferenceButton button = new ReferenceButton(action, null);
         button.setText(owner.toolbarMode() == ToolbarMode.ICONS ? null : label);
         button.putClientProperty("label", label);
-        button.setIcon(icon != null ? AppIcons.forToolbar(icon) : AppIcons.toolbarIcon("command"));
+        button.setIcon(icon != null ? icon : AppIcons.icon("command"));
         button.setFocusable(false);
         button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
         button.setIconTextGap(UIScale.scale(4));
@@ -274,7 +274,7 @@ final class WindowChrome {
         };
         ReferenceButton button = new ReferenceButton(owner.action(id), id);
         button.setText(label); button.putClientProperty("label", label);
-        button.setIcon(AppIcons.toolbarIcon(icon)); button.setFocusable(false);
+        button.setIcon(AppIcons.icon(icon)); button.setFocusable(false);
         button.setBorder(BorderFactory.createEmptyBorder()); button.setContentAreaFilled(false);
         button.setIconTextGap(UIScale.scale(4));
         button.getAccessibleContext().setAccessibleName(id.label());

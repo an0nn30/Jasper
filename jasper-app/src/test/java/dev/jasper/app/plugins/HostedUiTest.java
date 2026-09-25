@@ -307,7 +307,6 @@ class HostedUiTest {
                 var icon = isolated.appearance().icon(name);
                 assertThat(icon.getIconWidth()).isEqualTo(16);
                 assertThat(icon.getIconHeight()).isEqualTo(16);
-                assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(16);
             }
             assertThatNullPointerException().isThrownBy(() -> isolated.appearance().icon((dev.jasper.sdk.ui.IconName) null));
             assertThatIllegalArgumentException().isThrownBy(() -> isolated.appearance().icon("dev/jasper/app/icons/intellij/find.svg"));
