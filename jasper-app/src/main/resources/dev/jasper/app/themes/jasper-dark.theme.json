@@ -37,7 +37,6 @@
     "Component.arc": 4,
     "Button.arc": 4,
     "TextComponent.arc": 0,
-    "ComboBox.padding": "3,6,4,6",
     "TextArea.margin": "4,8,4,8",
     "TextField.margin": "3,6,4,6",
     "PasswordField.margin": "3,6,4,6",
