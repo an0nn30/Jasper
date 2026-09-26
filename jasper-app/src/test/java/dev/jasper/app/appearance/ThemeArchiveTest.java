@@ -172,6 +172,35 @@ class ThemeArchiveTest {
             assertThat(problem).contains("BigLib.zip!/P/lib/big.jar").contains("larger than 32 MiB"));
     }
 
+    @Test void pathWithNoNameElementsDoesNotThrow() {
+        assertThat(ThemeArchive.read(directory.getRoot()).problems()).isNotEmpty();
+    }
+
+    @Test void aCorruptJarInLibDoesNotHideTheOthers() {
+        byte[] good = jarBytes(entries("META-INF/plugin.xml", pluginXml("Good", "/g.theme.json"),
+            "g.theme.json", theme("Good", true, null, "#000000")));
+        byte[] corrupt = java.util.Arrays.copyOf(good, good.length / 2);
+        // Overwrite the compressed data to ensure corruption on stream
+        for (int i = good.length / 2; i < corrupt.length; i++) corrupt[i] = (byte) 0xFF;
+        var contents = ThemeArchive.read(jar(directory.resolve("Mixed.zip"), entries(
+            "P/lib/a-corrupt.jar", corrupt, "P/lib/b-good.jar", good)));
+        assertThat(contents.themes()).extracting(ThemeArchive.Found::label)
+            .containsExactly("Mixed.zip!/P/lib/b-good.jar!/g.theme.json");
+        assertThat(contents.problems()).singleElement().asString()
+            .contains("Mixed.zip!/P/lib/a-corrupt.jar").contains("cannot be read");
+    }
+
+    @Test void aNestedJarWithTooManyEntriesIsReportedAndTheZipStillRead() {
+        var many = new LinkedHashMap<String, byte[]>();
+        for (int i = 0; i <= ThemeArchive.MAX_ENTRIES; i++) many.put("e" + i, new byte[0]);
+        byte[] good = jarBytes(entries("META-INF/plugin.xml", pluginXml("Good", "/g.theme.json"),
+            "g.theme.json", theme("Good", true, null, "#000000")));
+        var contents = ThemeArchive.read(jar(directory.resolve("Deep.zip"), entries("P/lib/a-many.jar", jarBytes(many), "P/lib/b-good.jar", good)));
+        assertThat(contents.themes()).hasSize(1);
+        assertThat(contents.problems()).singleElement().asString()
+            .contains("Deep.zip!/P/lib/a-many.jar").contains("more than 10,000 entries");
+    }
+
     /** A jar whose one entry is stored uncompressed, so the jar itself is at least {@code size} bytes. */
     private static byte[] storedJar(String name, int size) throws Exception {
         byte[] data = new byte[size];

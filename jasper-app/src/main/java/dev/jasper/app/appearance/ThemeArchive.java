@@ -62,7 +62,8 @@ final class ThemeArchive {
     static Contents read(Path archive) {
         var themes = new ArrayList<Found>();
         var problems = new ArrayList<String>();
-        String name = archive.getFileName().toString();
+        Path fileName = archive.getFileName();
+        String name = fileName == null ? archive.toString() : fileName.toString();
         try {
             if (Files.size(archive) > MAX_ARCHIVE) {
                 problems.add(name + " is larger than 64 MiB; skipped");
@@ -88,16 +89,26 @@ final class ThemeArchive {
         if (jars.size() > MAX_NESTED_JARS) problems.add(name + " has more than 16 jars in lib/; only the first 16 were read");
         boolean found = false;
         for (String entry : jars.subList(0, Math.min(jars.size(), MAX_NESTED_JARS))) {
+            String label = name + "!/" + entry;
             byte[] bytes;
-            try { bytes = entryBytes(zip, zip.getEntry(entry), MAX_NESTED); }
-            catch (TooLarge tooLarge) { problems.add(name + "!/" + entry + " is larger than 32 MiB; skipped"); continue; }
             boolean hasPlugin;
-            // An oversized plugin.xml still marks the plugin jar; plugin() reports its size.
-            try { hasPlugin = !fromBytes(bytes, Set.of(PLUGIN_XML)).isEmpty(); }
-            catch (TooLarge tooLarge) { hasPlugin = true; }
+            try {
+                bytes = entryBytes(zip, zip.getEntry(entry), MAX_NESTED);
+                // An oversized plugin.xml still marks the plugin jar; plugin() reports its size.
+                try { hasPlugin = !fromBytes(bytes, Set.of(PLUGIN_XML)).isEmpty(); }
+                catch (TooLarge tooLarge) { hasPlugin = true; }
+            } catch (TooLarge tooLarge) {
+                problems.add(label + " is larger than 32 MiB; skipped");
+                continue;
+            } catch (UncheckedIOException failure) {
+                // One unreadable jar in lib/ does not hide the others.
+                problems.add(label + " cannot be read: " + failure.getCause().getMessage());
+                continue;
+            }
             if (!hasPlugin) continue;
             found = true;
-            plugin(new Jar(name + "!/" + entry, wanted -> fromBytes(bytes, wanted)), themes, problems);
+            try { plugin(new Jar(label, wanted -> fromBytes(bytes, wanted)), themes, problems); }
+            catch (UncheckedIOException failure) { problems.add(label + " cannot be read: " + failure.getCause().getMessage()); }
         }
         if (!found) problems.add(name + " has no META-INF/plugin.xml, in itself or in a lib/*.jar; it is not an IntelliJ plugin");
     }
