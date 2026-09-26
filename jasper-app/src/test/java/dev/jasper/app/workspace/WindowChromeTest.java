@@ -1,11 +1,10 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ToolbarMode;
 
-import com.formdev.flatlaf.FlatDarkLaf;
-import com.formdev.flatlaf.FlatLightLaf;
 import java.util.ArrayDeque;
 import java.util.List;
 import javax.swing.*;
@@ -28,13 +27,13 @@ class WindowChromeTest {
                 JMenu firstAppearance = appearance(first);
                 JMenu secondAppearance = appearance(second);
                 firstAppearance.getItem(0).doClick();
-                assertThat(UIManager.getLookAndFeel()).isInstanceOf(FlatLightLaf.class);
+                assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("IntelliJ Light");
                 secondAppearance.setSelected(true);
                 assertThat(secondAppearance.getItem(0).isSelected()).isTrue();
                 assertThat(secondAppearance.getItem(1).isSelected()).isFalse();
                 secondAppearance.setSelected(false);
                 firstAppearance.getItem(1).doClick();
-                assertThat(UIManager.getLookAndFeel()).isInstanceOf(FlatDarkLaf.class);
+                assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Jasper Dark");
                 secondAppearance.setSelected(true);
                 assertThat(secondAppearance.getItem(1).isSelected()).isTrue();
                 assertThat(secondAppearance.getItem(0).isSelected()).isFalse();
@@ -97,6 +96,9 @@ class WindowChromeTest {
             assertThat(find.getX()).isGreaterThan(700);
             assertThat(find.getHeight()).isEqualTo(24);
             assertThat(toolbar.getPreferredSize().height).isEqualTo(30);
+            assertThat(((JButton) settings).getAction()).isSameAs(owner.action(ActionId.OPEN_SETTINGS));
+            assertThat(java.util.Arrays.stream(toolbar.getComponents()).filter(JButton.class::isInstance)
+                .map(JButton.class::cast)).noneMatch(button -> button.getAction() == owner.action(ActionId.QUIT));
         });
     }
 

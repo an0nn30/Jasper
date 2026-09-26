@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.platform.MacTitleBar;
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.app.workspace.WindowTabsTest;
@@ -52,7 +52,7 @@ class MacTitleBarTest {
             assertThat(root.getClientProperty("apple.awt.fullWindowContent")).isNull();
             assertThat(root.getClientProperty("apple.awt.transparentTitleBar")).isNull();
             assertThat(root.getClientProperty("apple.awt.windowTitleVisible")).isNull();
-            owner.selectTheme(BuiltinTheme.LIGHT);
+            owner.selectTheme(Theme.LIGHT);
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isNull();
             owner.currentTab().rename("plain window"); owner.update();
             assertThat(metadata.get()).isEqualTo("plain window");
@@ -105,12 +105,12 @@ class MacTitleBarTest {
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0x848c9b));
                 bar.setActive(false);
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0x848c9b));
-                owner.selectTheme(BuiltinTheme.LIGHT);
+                owner.selectTheme(Theme.LIGHT);
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
-                assertThat(pixel(bar)).isEqualTo(new Color(0xeaeaeb));
-                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x696c77));
+                assertThat(pixel(bar)).isEqualTo(new Color(0xf2f2f2));
+                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x8a8a8a));
                 bar.setActive(true);
-                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x383a42));
+                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x6e6e6e));
                 owner.setToolbarMode(ToolbarMode.HIDDEN);
                 assertThat(bar.isVisible()).isTrue();
                 assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 28);
@@ -132,7 +132,7 @@ class MacTitleBarTest {
             owner.onMinimumSizeChanged = changed::incrementAndGet;
             root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(100, 80));
             assertThat(changed.get()).isZero();
-            owner.onThemeChanged.accept(new ResolvedTheme(BuiltinTheme.LIGHT, BuiltinTheme.LIGHT.palette()));
+            owner.onThemeChanged.accept(new ResolvedTheme(Theme.LIGHT, Theme.LIGHT.palette()));
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
         });
     }
@@ -143,9 +143,9 @@ class MacTitleBarTest {
             var root = new JRootPane();
             try (var bar = MacTitleBar.install(root, new JPanel(), () -> { }, true)) {
                 bar.setTitle("Credential Vault");
-                for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
+                for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                     themes.select(theme); SwingUtilities.updateComponentTreeUI(root);
-                    bar.setLight(theme == BuiltinTheme.LIGHT); bar.setSize(800, 28); bar.doLayout();
+                    bar.setLight(theme == Theme.LIGHT); bar.setSize(800, 28); bar.doLayout();
                     var image = new BufferedImage(800, 28, BufferedImage.TYPE_INT_RGB);
                     var graphics = image.createGraphics();
                     try { bar.paint(graphics); } finally { graphics.dispose(); }
@@ -154,59 +154,6 @@ class MacTitleBarTest {
                             .isEqualTo(UIManager.getColor("Jasper.titleBackground"));
                 }
             }
-        });
-    }
-
-    @Test void retroTitleStaysAboveMenusAndNeverTakesTheWorkspaceTabs() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()), new dev.jasper.app.appearance.ThemeController(
-                dev.jasper.app.config.ThemeStyle.RETRO, dev.jasper.app.config.Appearance.LIGHT));
-            var root = new JRootPane();
-            var metadata = new AtomicReference<String>();
-            try (var bar = WindowContent.installTitleBar(root, owner, true, metadata::set)) {
-                assertThat(bar).isNotNull();
-                bar.setMenuBar(owner.menuBar());
-                owner.installRootBindings(root);
-                root.setSize(960, 640); layoutTree(root);
-                assertThat(bar.getHeight()).isEqualTo(32);
-                assertThat(root.getJMenuBar()).as("the menu is below the native title region").isNull();
-                var menuPoint = SwingUtilities.convertPoint(owner.menuBar(), 0, 0, root);
-                assertThat(menuPoint.y).isEqualTo(bar.getHeight());
-                assertThat(SwingUtilities.isDescendingFrom(owner.tabStrip(), owner)).isTrue();
-                assertThat(SwingUtilities.isDescendingFrom(owner.tabStrip(), bar)).isFalse();
-                assertThat(label(bar).getFont().getStyle()).isEqualTo(Font.PLAIN);
-                assertThat(label(bar).getFont().getFamily()).isEqualTo(UIManager.getFont("Label.font").getFamily());
-                assertThat(pixel(bar).getRed()).isLessThan(owner.toolbar().getBackground().getRed());
-                owner.newTab(HOME); owner.currentTab().rename("build logs"); owner.update(); layoutTree(root);
-                assertThat(label(bar).isVisible()).isTrue();
-                assertThat(label(bar).getText()).isEqualTo("build logs");
-                assertThat(metadata.get()).isEqualTo("build logs");
-                assertThat(label(bar).getX() * 2 + label(bar).getWidth()).isEqualTo(bar.getWidth());
-                int count = owner.tabStrip().getTabCount();
-                owner.menuBar().getMenu(0).getItem(0).doClick();
-                assertThat(owner.tabStrip().getTabCount()).isEqualTo(count + 1);
-                owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(root);
-                assertThat(bar.getHeight()).isEqualTo(32);
-                assertThat(owner.menuBar().isVisible()).isTrue();
-                root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(12, 6, 140, 20));
-                bar.doLayout();
-                assertThat(label(bar).getX()).isGreaterThanOrEqualTo(160);
-                bar.setSize(80, 32); bar.doLayout();
-                assertThat(label(bar).getWidth()).isZero();
-            }
-        });
-    }
-
-    @Test void retroUnsupportedRootKeepsNativeDecorationsAndMenuPlacement() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()), new dev.jasper.app.appearance.ThemeController(
-                dev.jasper.app.config.ThemeStyle.RETRO, dev.jasper.app.config.Appearance.LIGHT));
-            var root = new JRootPane();
-            assertThat(WindowContent.installTitleBar(root, owner, false, title -> {})).isNull();
-            root.setJMenuBar(owner.menuBar());
-            assertThat(root.getContentPane()).isSameAs(owner);
-            assertThat(root.getJMenuBar()).isSameAs(owner.menuBar());
-            assertThat(root.getClientProperty("apple.awt.fullWindowContent")).isNull();
         });
     }
 

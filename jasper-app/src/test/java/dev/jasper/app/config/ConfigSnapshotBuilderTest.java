@@ -16,12 +16,6 @@ class ConfigSnapshotBuilderTest {
     assertThatThrownBy(() -> original.toBuilder().maxResults(21).build())
         .isInstanceOf(IllegalArgumentException.class);
 }
-@Test void copyingASnapshotRetainsStyleAndUnrelatedValues() {
-    var saved = ConfigSnapshot.builder().style(ThemeStyle.RETRO).columns(91).build();
-    assertThat(saved.toBuilder().lines(33).build())
-        .isEqualTo(ConfigSnapshot.builder().style(ThemeStyle.RETRO).columns(91).lines(33).build());
-    assertThat(ConfigSnapshot.defaults().style()).isEqualTo(ThemeStyle.MODERN);
-}
 
     @Test void terminalColorsRoundTripThroughTheBuilderAndDefaultToMatch() {
         assertThat(ConfigSnapshot.defaults().terminalColors()).isEqualTo(TerminalColors.MATCH);

@@ -10,12 +10,11 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class PaletteScopeModelTest {
-    static PaletteScope scope(String id, String... aliases) {
+    static PaletteScope scope(String id) {
         return new PaletteScope() {
             @Override public String id() { return id; }
             @Override public String label() { return id; }
             @Override public String placeholder() { return "Search " + id; }
-            @Override public List<String> aliases() { return List.of(aliases); }
             @Override public List<PaletteVerb> verbs() { return List.of(new PaletteVerb("run", "Run")); }
             @Override public PaletteResults search(String query, PaletteContext context) { return PaletteResults.none(); }
             @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {}
@@ -53,7 +52,7 @@ class PaletteScopeModelTest {
             try (var registry = new ScopeRegistry()) {
                 var changes = new ArrayList<String>();
                 registry.onChanged(() -> changes.add("changed"));
-                var first = scope("test.one", "uno");
+                var first = scope("test.one");
                 var registration = registry.register(first);
                 assertThatIllegalArgumentException().isThrownBy(() -> registry.register(scope("test.one")));
                 assertThatIllegalArgumentException().isThrownBy(() -> registry.register(scope("Bad Id")));
@@ -76,5 +75,16 @@ class PaletteScopeModelTest {
         assertThat(none.workingDirectory().get()).isEqualTo(Optional.empty());
         assertThat(none.live().getAsBoolean()).isFalse();
         assertThat(new PaletteContext(true, none).macOs()).isTrue();
+    }
+
+    @Test void theAllTabsIdIsReservedAndContextsAcceptOneMoreThanTheSettingsCap() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var registry = new ScopeRegistry()) {
+                assertThatIllegalArgumentException().isThrownBy(() -> registry.register(scope(PaletteScope.ALL_ID)));
+            }
+        });
+        assertThat(new PaletteContext(true, PaletteTarget.none(), 21).maxResults()).isEqualTo(21);
+        assertThatIllegalArgumentException().isThrownBy(() -> new PaletteContext(true, PaletteTarget.none(), 0));
+        assertThatIllegalArgumentException().isThrownBy(() -> new PaletteContext(true, PaletteTarget.none(), PaletteResults.MAX_ROWS + 1));
     }
 }

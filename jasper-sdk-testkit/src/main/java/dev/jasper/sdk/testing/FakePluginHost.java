@@ -75,7 +75,6 @@ public final class FakePluginHost implements AutoCloseable {
     private Path dataRoot;
     private final boolean ownsRoot;
     private volatile Variant variant = Variant.DARK;
-    private boolean retroIcons;
 
     /** A host whose plugins' data directories live in a temporary directory this host deletes on close. */
     public FakePluginHost() { this.ownsRoot = true; }
@@ -233,20 +232,6 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     Variant variant() { return variant; }
-    boolean retroIcons() { return retroIcons; }
-
-    /**
-     * Configures the running icon style before any plugin starts. Retro uses light chrome.
-     * @param retro whether the host should select OldGNOME2 artwork
-     * @throws IllegalStateException after any plugin has started, including failed starts
-     * @since 0.7.4
-     */
-    public void setRetroIcons(boolean retro) {
-        if (!contexts.isEmpty()) throw new IllegalStateException("Configure icons before starting plugins");
-        retroIcons = retro;
-        if (retro) variant = Variant.LIGHT;
-    }
-
 
     void recordFailure(String line) { failures.add(line); }
 
@@ -262,7 +247,6 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public void setVariant(Variant next) {
         Objects.requireNonNull(next, "next");
-        if (retroIcons && next == Variant.DARK) throw new IllegalArgumentException("Retro uses light chrome");
         variant = next;
         publishApp(AppEvents.THEME_CHANGED, new AppEvents.ThemeChanged(next));
     }
@@ -861,6 +845,11 @@ public final class FakePluginHost implements AutoCloseable {
         public List<String> scopes() {
             return scopes.values().stream().map(registered -> registered.spec().id() + "|" + registered.spec().label() + "|"
                 + String.join(",", registered.spec().verbs().stream().map(PaletteVerb::id).toList())).toList();
+        }
+
+        /** The ids of registered scopes the palette's All tab searches, in registration order. */
+        public List<String> scopesInAll() {
+            return scopes.values().stream().filter(registered -> registered.spec().inAll()).map(registered -> registered.spec().id()).toList();
         }
 
         private FakePalette.Registered scope(String scopeId) {

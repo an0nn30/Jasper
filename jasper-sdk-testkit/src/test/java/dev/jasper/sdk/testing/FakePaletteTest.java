@@ -62,6 +62,7 @@ class FakePaletteTest {
             UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "t");
             UUID pane = host.addTerminalPane(tab, FakeTerminalsTest.info("zsh"));
             assertThat(host.scopes()).containsExactly("test.a.things|Things|paste,name");
+            assertThat(host.scopesInAll()).containsExactly("test.a.things");
             assertThat(host.searchScope("test.a.things", "on", window, pane)).containsExactly("one|One|true", "two|Two|false");
             assertThat(things.log).containsExactly("search:on:" + window);
             assertThat(host.availableInScope("test.a.things", "one", "paste", window, pane)).isTrue();

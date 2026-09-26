@@ -2,7 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import static dev.jasper.app.testsupport.LayoutTestSupport.layoutTree;
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -58,13 +58,13 @@ class MockUiTest {
             owner.action(ActionId.FONT_BIGGER).actionPerformed(null);
             owner.action(ActionId.FONT_RESET).actionPerformed(null);
             assertThat(pane.view().fontSize()).isEqualTo(16);
-            owner.selectTheme(BuiltinTheme.LIGHT);
+            owner.selectTheme(Theme.LIGHT);
             layoutTree(owner);
             assertThat(pane.getBackground()).isEqualTo(pane.view().palette().background());
             assertThat(pane.getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
             assertThat(pane.view().getBounds()).isEqualTo(new Rectangle(4, 4,
                 pane.getWidth() - 8, pane.getHeight() - 8));
-            owner.selectTheme(BuiltinTheme.DARK);
+            owner.selectTheme(Theme.DARK);
             layoutTree(owner);
             assertThat(pane.getInsets()).isEqualTo(new Insets(4, 4, 4, 4));
             assertThat(pane.view().getBounds()).isEqualTo(new Rectangle(4, 4,

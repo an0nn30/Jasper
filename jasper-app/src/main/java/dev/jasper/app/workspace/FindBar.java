@@ -3,7 +3,6 @@ package dev.jasper.app.workspace;
 import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.platform.AppIcons;
-import dev.jasper.app.platform.SwingAppearance;
 import dev.jasper.terminal.search.FindResult;
 import dev.jasper.terminal.search.SearchQuery;
 import dev.jasper.terminal.view.TerminalView;
@@ -23,11 +22,10 @@ import javax.swing.event.DocumentListener;
 final class FindBar extends JPanel {
     private static final int RECENT_LIMIT = 10;
     private final TerminalView view;
-    private final boolean modern = !SwingAppearance.retro();
     private final JTextField query = new JTextField(18);
-    private final JToggleButton regex = new JToggleButton(modern ? null : "Regex");
-    private final JToggleButton caseSensitive = new JToggleButton(modern ? null : "Case");
-    private final JLabel count = new JLabel(modern ? "" : "0 / 0");
+    private final JToggleButton regex = new JToggleButton();
+    private final JToggleButton caseSensitive = new JToggleButton();
+    private final JLabel count = new JLabel("");
     private final JButton clear = new JButton();
     private final Deque<String> recent = new ArrayDeque<>();
     private final Timer debounce;
@@ -45,7 +43,7 @@ final class FindBar extends JPanel {
         debounce.setRepeats(false);
         query.getAccessibleContext().setAccessibleName("Find in terminal");
         query.setToolTipText("Search each terminal row; matches do not span wrapped rows");
-        if (modern) buildModern(); else buildRetro();
+        build();
         query.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent event) { edited(); }
             public void removeUpdate(DocumentEvent event) { edited(); }
@@ -69,15 +67,8 @@ final class FindBar extends JPanel {
         setVisible(false);
     }
 
-    private void buildRetro() {
-        setLayout(new FlowLayout(FlowLayout.LEADING, 4, 3));
-        add(new JLabel("Find:")); add(query);
-        add(button("Previous", this::previous)); add(button("Next", this::next));
-        add(caseSensitive); add(regex); add(count); add(button("Close", this::close));
-    }
-
     /** IntelliJ's find row: history and toggles inside the field, then count, arrows and a far-right close. */
-    private void buildModern() {
+    private void build() {
         setLayout(new BorderLayout(UIScale.scale(6), 0));
         setBorder(BorderFactory.createEmptyBorder(UIScale.scale(2), UIScale.scale(6), UIScale.scale(3), UIScale.scale(6)));
         JButton history = iconButton("findHistory", "Recent searches", "Recent searches", "searchWithHistory", null);
@@ -103,12 +94,6 @@ final class FindBar extends JPanel {
         controls.add(iconButton("closeFind", "Close", "Close (Escape)", "close", this::close));
         add(query, BorderLayout.CENTER);
         add(controls, BorderLayout.EAST);
-    }
-
-    private static JButton button(String label, Runnable task) {
-        JButton button = new JButton(label);
-        button.addActionListener(event -> task.run());
-        return button;
     }
 
     private static JButton iconButton(String name, String accessible, String tooltip, String artwork, Runnable task) {
@@ -144,7 +129,6 @@ final class FindBar extends JPanel {
 
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        if (!modern) return;
         g.setColor(UIManager.getColor("Jasper.titleSeparator"));
         g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
     }
@@ -175,7 +159,7 @@ final class FindBar extends JPanel {
     }
 
     private void edited() {
-        if (modern) clear.setVisible(!query.getText().isEmpty());
+        clear.setVisible(!query.getText().isEmpty());
         schedule();
     }
 
@@ -231,8 +215,7 @@ final class FindBar extends JPanel {
 
     private void showResult(FindResult found) {
         result = found;
-        if (!modern) count.setText(found.error() == null ? found.current() + " / " + found.count() : "Invalid regex");
-        else if (found.error() != null) count.setText("Invalid regex");
+        if (found.error() != null) count.setText("Invalid regex");
         else if (found.count() > 0) count.setText(found.current() + "/" + found.count());
         else count.setText(missing ? "0 results" : "");
         count.setToolTipText(found.error());
@@ -242,7 +225,6 @@ final class FindBar extends JPanel {
     /** IntelliJ tints the field when nothing matches or the pattern is invalid. */
     private void miss(boolean value) {
         missing = value;
-        if (!modern) return;
         query.putClientProperty(FlatClientProperties.OUTLINE, value ? FlatClientProperties.OUTLINE_ERROR : null);
         // The tint is a plain Color so the field's own updateUI keeps it; the default stays a
         // UIResource so a theme switch restores the new theme's background.

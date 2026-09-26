@@ -1,0 +1,4 @@
+resource	source	sha256
+Light.theme.json	platform/platform-resources/src/themes/Light.theme.json	429151594b8a013938c3c66dd3a5121702182c028ad87ae1e68bc4243cc1c68d
+intellijlaf.theme.json	platform/platform-resources/src/themes/intellijlaf.theme.json	4450e2a85381b7b644c73bc9ec21f898aa55b184fc80f109a43ae9ff67af21ba
+darcula.theme.json	platform/platform-resources/src/themes/darcula.theme.json	858efbd6afdb12f26b4757c4ff7b1bccb8bdefc286797fa6344769496b6c59cb

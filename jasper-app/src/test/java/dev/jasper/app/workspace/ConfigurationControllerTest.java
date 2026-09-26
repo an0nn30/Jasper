@@ -6,7 +6,7 @@ import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.application.ConfigurationTestSupport;
 import dev.jasper.app.application.JasperApplication;
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.Appearance;
@@ -53,7 +53,7 @@ class ConfigurationControllerTest {
     void start(String text) throws Exception {
         Files.writeString(directory.resolve("config.toml"), text);
         service = new ConfigService(directory.resolve("config.toml"), false);
-        edt(() -> { themes = new ThemeController(service.initialState().snapshot().style(), service.initialState().snapshot().variant()); controller = new ConfigurationTestSupport(themes, service); });
+        edt(() -> { themes = new ThemeController(service.initialState().snapshot().variant()); controller = new ConfigurationTestSupport(themes, service); });
     }
     WindowContent owner() { return owner(launcher(pending)); }
     WindowContent owner(ShellLauncher launcher) {
@@ -76,7 +76,7 @@ class ConfigurationControllerTest {
             assertThat(first.tabHeight()).isEqualTo(44);
             assertThat(((JButton) first.toolbar().getComponent(0)).getText()).isNull();
             assertThat(first.status().isVisible()).isFalse();
-            assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(first.theme().chrome()).isEqualTo(Theme.LIGHT);
             assertThat(retained.view().fontSize()).isEqualTo(19);
             retained.findBar().open(); retained.findBar().queryField().setText("alpha");
             first.newTab(HOME); // pending and hides the retained terminal
@@ -103,16 +103,16 @@ class ConfigurationControllerTest {
         var first = owners.getFirst();
         edt(() -> {
             first.setTabHeight(60); first.setToolbarMode(ToolbarMode.HIDDEN);
-            first.setStatusVisible(false); first.selectTheme(BuiltinTheme.LIGHT); first.currentPane().view().setFontSize(28);
+            first.setStatusVisible(false); first.selectTheme(Theme.LIGHT); first.currentPane().view().setFontSize(28);
         });
         reload("# comment\n[font]\nsize=19\nunknown=1\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(60); assertThat(first.toolbar().isVisible()).isFalse();
-            assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(Theme.LIGHT);
             assertThat(first.currentPane().view().fontSize()).isEqualTo(28);
             var next = owner(); assertThat(next.tabHeight()).isEqualTo(30);
             assertThat(next.toolbar().isVisible()).isTrue(); assertThat(next.status().isVisible()).isTrue();
-            assertThat(first.theme().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(first.theme().chrome()).isEqualTo(Theme.LIGHT);
         }); launchAll();
         edt(() -> assertThat(owners.get(1).currentPane().view().fontSize()).isEqualTo(19));
         reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=20\n[ui.theme]\nvariant='light'\n");
@@ -200,7 +200,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             owner.close();
             assertThat(owner.action(ActionId.OPEN_SETTINGS).isEnabled()).isFalse();
-            var late = new ConfigService.State(new ConfigSnapshot(55, ToolbarMode.ICONS, false, FontConfig.defaults().withSize(22), BuiltinTheme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), file, true);
+            var late = new ConfigService.State(new ConfigSnapshot(55, ToolbarMode.ICONS, false, FontConfig.defaults().withSize(22), Theme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), file, true);
             controller.accept(late);
             assertThat(owner.tabHeight()).isEqualTo(48);
             assertThat(owner.status().configButton().isEnabled()).isFalse();
@@ -228,13 +228,13 @@ class ConfigurationControllerTest {
         service = new ConfigService(directory.resolve("config.toml"), false);
         var errors = new ArrayList<String>();
         edt(() -> {
-            themes = new ThemeController(theme -> theme != BuiltinTheme.LIGHT && ThemeTestSupport.install(theme));
+            themes = new ThemeController(theme -> theme != Theme.LIGHT && ThemeTestSupport.install(theme));
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = errors::add;
-            var state = new ConfigService.State(new ConfigSnapshot(53, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(18), BuiltinTheme.LIGHT.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
+            var state = new ConfigService.State(new ConfigSnapshot(53, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(18), Theme.LIGHT.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
             controller.accept(state);
             assertThat(owners.getFirst().tabHeight()).isEqualTo(53);
-            assertThat(owners.getFirst().theme().chrome()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(owners.getFirst().theme().chrome()).isEqualTo(Theme.DARK);
             assertThat(owners.getFirst().status().getText()).contains("Config loaded");
             assertThat(errors).singleElement().asString().contains("Could not apply theme");
         });
@@ -245,7 +245,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             var owner = owner();
             owner.onThemeChanged = ignored -> { throw new IllegalStateException("application callback"); };
-            var next = new ConfigService.State(new ConfigSnapshot(38, ToolbarMode.ICONS_AND_LABELS, true, FontConfig.defaults().withSize(16), BuiltinTheme.LIGHT.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
+            var next = new ConfigService.State(new ConfigSnapshot(38, ToolbarMode.ICONS_AND_LABELS, true, FontConfig.defaults().withSize(16), Theme.LIGHT.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
             assertThatThrownBy(() -> controller.accept(next)).isInstanceOf(IllegalStateException.class)
                 .hasMessage("application callback");
         });
@@ -313,7 +313,7 @@ class ConfigurationControllerTest {
             assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
             first.setActive(false);
             assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(.65f);
-            first.selectTheme(BuiltinTheme.LIGHT);
+            first.selectTheme(Theme.LIGHT);
             assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
             first.setActive(true);
             assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(0f);
@@ -326,13 +326,13 @@ class ConfigurationControllerTest {
     void typographyAndBehaviorChangesPreserveManualSizeAndThemeUntilSavedSizeChanges() throws Exception {
         start("[font]\nsize=18\n"); edt(this::owner); launchAll();
         var owner = owners.getFirst(); var pane = owner.currentPane();
-        edt(() -> { pane.view().setFontSize(27); owner.selectTheme(BuiltinTheme.LIGHT); });
+        edt(() -> { pane.view().setFontSize(27); owner.selectTheme(Theme.LIGHT); });
         reload(liveSettings(18));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(27);
             assertThat(pane.view().options().fontFamily()).isEqualTo("Monospaced");
             assertThat(pane.view().options().lineHeight()).isEqualTo(1.5f);
-            assertThat(pane.view().palette()).isEqualTo(BuiltinTheme.LIGHT.palette());
+            assertThat(pane.view().palette()).isEqualTo(Theme.LIGHT.palette());
             owner.newTab(HOME);
         }); launchAll();
         edt(() -> {
@@ -345,7 +345,7 @@ class ConfigurationControllerTest {
         reload(liveSettings(20));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(20);
-            assertThat(pane.view().palette()).isEqualTo(BuiltinTheme.LIGHT.palette());
+            assertThat(pane.view().palette()).isEqualTo(Theme.LIGHT.palette());
         });
     }
 
@@ -410,7 +410,7 @@ class ConfigurationControllerTest {
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.7f);
             owner.setActive(true);
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(0f);
-            owner.setActive(false); owner.selectTheme(BuiltinTheme.LIGHT);
+            owner.setActive(false); owner.selectTheme(Theme.LIGHT);
             assertThat(field(pane.view(), "inactiveDim")).isEqualTo(.7f);
         });
         reload("[terminal]\ndim_inactive_panes=0.2\n");
@@ -499,24 +499,24 @@ class ConfigurationControllerTest {
             }
         };
         var broken = new java.util.concurrent.atomic.AtomicBoolean(false);
-        var attempts = new ArrayList<BuiltinTheme>();
+        var attempts = new ArrayList<Theme>();
         var errors = new ArrayList<String>();
         service = new ConfigService(file, false, configWorker, SwingUtilities::invokeLater);
         edt(() -> {
             themes = new ThemeController(theme -> { attempts.add(theme); return !broken.get() && ThemeTestSupport.install(theme); });
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = errors::add;
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            assertThat(attempts).containsExactly(BuiltinTheme.DARK);
+            assertThat(themes.current().chrome()).isEqualTo(Theme.DARK);
+            assertThat(attempts).containsExactly(Theme.DARK);
             broken.set(true);
         });
         Files.writeString(file, "ui.theme.variant='light'");
         edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         edt(() -> {
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
+            assertThat(themes.current().chrome()).isEqualTo(Theme.DARK);
             assertThat(themes.choice()).isEqualTo(Appearance.DARK);
-            assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT);
+            assertThat(attempts).containsExactly(Theme.DARK, Theme.LIGHT);
             assertThat(errors).hasSize(1);
             broken.set(false);
         });
@@ -525,11 +525,11 @@ class ConfigurationControllerTest {
         edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         edt(() -> {
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
+            assertThat(themes.current().chrome()).isEqualTo(Theme.LIGHT);
             assertThat(owners.getFirst().theme()).isEqualTo(themes.current());
             assertThat(themes.choice()).isEqualTo(Appearance.LIGHT);
-            assertThat(themes.current().palette()).isEqualTo(BuiltinTheme.LIGHT.palette());
-            assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT, BuiltinTheme.LIGHT);
+            assertThat(themes.current().palette()).isEqualTo(Theme.LIGHT.palette());
+            assertThat(attempts).containsExactly(Theme.DARK, Theme.LIGHT, Theme.LIGHT);
             assertThat(errors).hasSize(1);
             owners.getFirst().selectAppearance(Appearance.DARK);
             owners.getFirst().invoke(ActionId.RELOAD_CONFIG);
@@ -539,9 +539,9 @@ class ConfigurationControllerTest {
         assertThat(Files.getLastModifiedTime(file)).isEqualTo(acceptedTime);
         edt(() -> {
             assertThat(themes.choice()).isEqualTo(Appearance.DARK);
-            assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.DARK);
-            assertThat(attempts).containsExactly(BuiltinTheme.DARK, BuiltinTheme.LIGHT,
-                BuiltinTheme.LIGHT, BuiltinTheme.DARK);
+            assertThat(themes.current().chrome()).isEqualTo(Theme.DARK);
+            assertThat(attempts).containsExactly(Theme.DARK, Theme.LIGHT,
+                Theme.LIGHT, Theme.DARK);
         });
     }
 
@@ -616,56 +616,13 @@ class ConfigurationControllerTest {
                 .isEqualTo(KeyStroke.getKeyStroke("ctrl shift T"));
         });
     }
-@Test void changingDesiredStyleKeepsExistingAndNewOwnersUntilRestart() throws Exception {
-    start("ui.theme.style='retro'\n");
-    edt(() -> owner());
-    var first = owners.getFirst();
-    var retained = first.currentPane();
-    reload("ui.theme.style='modern'\nfont.size=21\n");
-    edt(() -> {
-        owner();
-        assertThat(themes.style()).isEqualTo(dev.jasper.app.config.ThemeStyle.RETRO);
-        assertThat(first.currentPane()).isSameAs(retained);
-        assertThat(owners).allSatisfy(w -> assertThat(w.theme().chrome()).isEqualTo(BuiltinTheme.RETRO));
-        assertThat(controller.shown().diagnostics()).filteredOn(d -> d.key().equals("ui.theme.style"))
-            .singleElement().satisfies(d -> assertThat(d.message()).contains("Restart Jasper"));
-        assertThat(controller.snapshot().fontSize()).isEqualTo(21);
-    });
-    reload("ui.theme.style='retro'\n");
-    edt(() -> assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().equals("ui.theme.style")));
-}
-
-@Test void modernVariantRemainsLiveWhileRetroIsPending() throws Exception {
-    start("ui.theme.style='modern'\nui.theme.variant='dark'\n");
-    reload("ui.theme.style='retro'\nui.theme.variant='light'\n");
-    edt(() -> {
-        assertThat(themes.style()).isEqualTo(dev.jasper.app.config.ThemeStyle.MODERN);
-        assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.LIGHT);
-        assertThat(controller.shown().diagnostics()).anyMatch(d -> d.key().equals("ui.theme.style"));
-    });
-}
-
-@Test @DisabledOnOs(OS.WINDOWS)
-void retroStyleReloadKeepsALiveSessionAndAppliesFontChanges() throws Exception {
-    start("ui.theme.style='retro'\n");
-    edt(() -> owner()); launchAll();
-    var pane = owners.getFirst().currentPane();
-    var session = pane.session();
-    reload("ui.theme.style='modern'\nfont.size=22\n");
-    edt(() -> {
-        assertThat(pane.session()).isSameAs(session);
-        assertThat(pane.view().fontSize()).isEqualTo(22);
-        assertThat(pane.view().palette().background()).isEqualTo(java.awt.Color.BLACK);
-        assertThat(themes.current().chrome()).isEqualTo(BuiltinTheme.RETRO);
-    });
-}
 
     @Test void savedTerminalColorsApplyLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
         start("[ui.theme]\nvariant='light'\nterminal='dark'\n");
-        edt(() -> assertThat(themes.current()).isEqualTo(new ResolvedTheme(BuiltinTheme.LIGHT, Palette.jasperDark())));
+        edt(() -> assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperDark())));
         reload("[ui.theme]\nvariant='light'\nterminal='match'\n");
         edt(() -> {
-            assertThat(themes.current()).isEqualTo(new ResolvedTheme(BuiltinTheme.LIGHT, Palette.jasperLight()));
+            assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperLight()));
             assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.theme"));
         });
     }

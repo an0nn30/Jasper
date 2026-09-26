@@ -85,6 +85,7 @@ class VaultPluginTest {
             assertThat(host.failures()).isEmpty();
             assertThat(host.actions()).contains("dev.jasper.vault.open|Open Vault...|true", "dev.jasper.vault.lock|Lock Vault|false");
             assertThat(host.scopes()).containsExactly("dev.jasper.vault.scope|Vault|copy_password,copy_username,open");
+            assertThat(host.scopesInAll()).as("secrets stay out of the All tab").isEmpty();
             UUID window = host.addTerminalWindow();
             assertThat(api.get().lockState()).isEqualTo(LockState.NO_VAULT);
             assertThat(host.invoke(VaultPlugin.OPEN, window, null)).isTrue();
@@ -261,10 +262,8 @@ class VaultPluginTest {
         }
     }
 
-    @Test void requestsBothIconFamiliesForEitherSkin() {
-        for (boolean retro : new boolean[]{false, true}) try (var host = new FakePluginHost()) {
-            host.setRetroIcons(retro);
-
+    @Test void requestsLockAndUnlockIcons() {
+        try (var host = new FakePluginHost()) {
             var delegate = plugin();
             var icons = new java.util.ArrayList<dev.jasper.sdk.testing.FakeNamedIcon>();
             host.start(INFO, Set.of(), Set.of(), new dev.jasper.sdk.plugin.Plugin() {
@@ -289,7 +288,6 @@ class VaultPluginTest {
             });
             assertThat(host.failures()).isEmpty();
             assertThat(icons).extracting(dev.jasper.sdk.testing.FakeNamedIcon::name).containsExactly(dev.jasper.sdk.ui.IconName.LOCK, dev.jasper.sdk.ui.IconName.UNLOCK);
-            assertThat(icons).allSatisfy(icon -> assertThat(icon.retro()).isEqualTo(retro));
         }
     }
 }

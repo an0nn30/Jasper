@@ -187,31 +187,27 @@ these recipes when signatures change, and document any native acceptance still n
 Use patterns where an actual responsibility needs them. Future SDK work can adapt these
 boundaries; this refactor promises no plugin loading, binary compatibility or permissions.
 
-## Maintaining SDK skin icons
+## Themes
 
-`Appearance.icon(path, OldGnomeIcon)` is implemented at HostedUi's SDK boundary; AppIcons
-selects the family and adapts managed icons for toolbars. OldGnomeCatalog owns the distinct
-`icons/oldgnome-sdk` resources; do not reuse GnomeIcons' semantic mapping because some
-built-in toolbar entries deliberately use Tango. Existing custom icons keep their dimensions.
+To change Jasper Dark, edit `jasper-app/src/main/resources/dev/jasper/app/themes/jasper-dark.theme.json`
+using IntelliJ keys; `Jasper.*` keys set there win over derivation. To refresh the vendored IntelliJ
+themes, change `SHA` in `tools/themes/fetch-intellij-themes.py` and rerun it from the repository
+root, then update the pinned hashes in `IntellijThemesTest`. To add a chrome key, add it to
+`ChromeKeys.KEYS` and `ChromeKeys.derive` with a fallback FlatLaf always defines, and cover it in
+`ChromeKeysTest`. Run `ThemeLoaderTest`, `ChromeKeysTest`, `ThemeManagerTest` (IntelliJ Light
+values and Jasper Dark parity) and `ThemeButtonsTest`, then `check`. Light and dark visual
+acceptance is a user check.
 
-To add a catalog choice, add the SDK enum constant, copy available 16/24/32/48 originals,
-add the app-native source-size entry, update assets.tsv hashes and the [catalog](sdk-icons.md),
-and preserve LICENSE.txt/NOTICE.md. Keep original bytes, including rectangular sources;
-the loader centers those with their proportions intact. Rendering uses a nearest adequate
-source or the largest available source, with 1x/2x JDK multi-resolution images. Low-resolution
-originals can look softer when enlarged; do not silently replace them with different artwork.
+## Maintaining SDK icons
 
-Run SDK/testkit checks plus OldGnomeCatalogTest, HostedUiTest, SkinIconsTest and
-WindowChromeContributionsTest, then all architecture guards, check and installDist. The
-catalog's hashes/notices must also be present in the packaged app jar. Render headlessly;
-native application launch remains a user check.
-
-For standard meanings, prefer SDK `IconName` / `Appearance.icon(IconName)` (0.7.3).
-NamedIcons maps host-native names to `icons/standard` SVGs; AppIcons uses its own class loader,
-then selects the existing OldGNOME2 catalog in retro. Keep both catalogs complete when adding
-an IconName, with standard SVG source hashes/notices. LOCK/UNLOCK match Vault's original
-modern SVG bytes. NamedIconsTest and HostedUiTest verify all meanings, resource ownership,
-foreground changes and source integrity. Keep custom SVG overloads working for branded icons.
+`IconName` artwork lives in `NamedIcons`: an IntelliJ SVG, or a tinted Tabler SVG under
+`icons/standard/` for names IntelliJ has no equivalent for. To add an `IconName`, add the SDK
+enum constant and a `NamedIcons` map entry; when it uses standard artwork, also add a manifest
+row to `icons/standard/assets.tsv` with its source hash, and preserve LICENSE.txt/NOTICE.md.
+LOCK/UNLOCK match Vault's original SVG bytes. NamedIconsTest and HostedUiTest verify all
+meanings, resource ownership and source integrity. Run SDK/testkit checks plus HostedUiTest
+and WindowChromeContributionsTest, then all architecture guards, check and installDist. Render
+headlessly; native application launch remains a user check.
 
 ## Remote lives in a plugin
 

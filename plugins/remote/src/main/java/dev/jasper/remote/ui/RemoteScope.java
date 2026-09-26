@@ -41,8 +41,8 @@ public final class RemoteScope implements PaletteScope {
     }
 
     @Override public ScopeSpec spec() {
-        return ScopeSpec.of(ID, "SSH", "Search saved hosts, or > to switch scope", List.of(CONNECT, SPLIT, EDIT))
-            .withDescription("Connect to a saved SSH host").withAliases(List.of("ssh", "remote", "hosts")).withShortcutActionId(CONNECT_ACTION);
+        return ScopeSpec.of(ID, "SSH", "Search saved hosts", List.of(CONNECT, SPLIT, EDIT))
+            .withDescription("Connect to a saved SSH host").withShortcutActionId(CONNECT_ACTION);
     }
 
     @Override public PaletteResults search(String query, PaletteQuery context) {

@@ -73,8 +73,16 @@ class CommandPaletteShortcutsTest {
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_K, primary(false)))).isFalse();
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK))).isTrue();
                 assertThat(owner.commandPalette().isOpen()).isTrue();
+                assertThat(owner.commandPalette().activeScopeId()).isEqualTo(PaletteScope.ALL_ID);
                 assertThat(owner.action(ActionId.COMMAND_PALETTE).getValue(Action.ACCELERATOR_KEY))
                     .isEqualTo(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK));
+                owner.commandPalette().dismiss();
+                // The shortcut above is intercepted by PaletteKeyRouter before WorkspaceActions ever sees
+                // it. Invoke the same Action directly, as the View menu's own click does, to also pin that
+                // WorkspaceActions opens the same All tab rather than jasper.commands.
+                owner.action(ActionId.COMMAND_PALETTE).actionPerformed(new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, "menu"));
+                assertThat(owner.commandPalette().activeScopeId()).as("the View menu action agrees with the shortcut")
+                    .isEqualTo(PaletteScope.ALL_ID);
                 owner.commandPalette().dismiss();
                 owner.setBindings(KeyBindings.withOverrides(false, Map.of("command_palette", "none")));
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK))).isFalse();
@@ -124,16 +132,16 @@ class CommandPaletteShortcutsTest {
                 manager.send(PaletteKeyRouterTest.press(newer, KeyEvent.VK_K, primary(true)));
                 manager.send(PaletteKeyRouterTest.release(newer, KeyEvent.VK_K));
                 newer.commandPalette().component().queryField().setText("focus.fixture");
-                assertThat(manager.send(PaletteKeyRouterTest.press(newer, KeyEvent.VK_1, primary(true)))).isTrue();
+                assertThat(manager.send(PaletteKeyRouterTest.press(newer, KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(older.commandPalette().isOpen()).isTrue();
-                assertThat(manager.send(PaletteKeyRouterTest.press(older, KeyEvent.VK_1, primary(true)))).isTrue();
-                assertThat(manager.send(PaletteKeyRouterTest.typed(older, '1'))).isTrue();
+                assertThat(manager.send(PaletteKeyRouterTest.press(older, KeyEvent.VK_ENTER, 0))).isTrue();
+                assertThat(manager.send(PaletteKeyRouterTest.typed(older, '\n'))).isTrue();
                 assertThat(calls.get()).isZero();
-                assertThat(manager.send(PaletteKeyRouterTest.release(older, KeyEvent.VK_1))).isTrue();
+                assertThat(manager.send(PaletteKeyRouterTest.release(older, KeyEvent.VK_ENTER))).isTrue();
                 assertThat(manager.dispatchers).hasSize(closeSource ? 1 : 2);
-                assertThat(manager.send(PaletteKeyRouterTest.press(older, KeyEvent.VK_1, primary(true)))).isTrue();
+                assertThat(manager.send(PaletteKeyRouterTest.press(older, KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(calls.get()).isEqualTo(1);
-                manager.send(PaletteKeyRouterTest.release(older, KeyEvent.VK_1));
+                manager.send(PaletteKeyRouterTest.release(older, KeyEvent.VK_ENTER));
             } finally { KeyboardFocusManager.setCurrentKeyboardFocusManager(previous); }
         });
     }
@@ -159,7 +167,7 @@ class CommandPaletteShortcutsTest {
         edt(() -> {
             var previous = KeyboardFocusManager.getCurrentKeyboardFocusManager();
             var laf = UIManager.getLookAndFeel();
-            com.formdev.flatlaf.FlatDarkLaf.setup();
+            dev.jasper.app.appearance.ThemeTestSupport.install(dev.jasper.app.appearance.Theme.DARK);
             try (var owner = owner(System.getProperty("os.name").startsWith("Mac"))) {
                 var root = install(owner); owner.commandPalette().toggle();
                 var field = owner.commandPalette().component().queryField();
@@ -248,10 +256,10 @@ class CommandPaletteShortcutsTest {
                     send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_5, primary(mac)));
                     send.accept(PaletteKeyRouterTest.typed(view, '5'));
                     send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_5));
-                    send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_1, primary(mac)));
-                    send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_1, primary(mac)));
-                    send.accept(PaletteKeyRouterTest.typed(view, '1'));
-                    send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_1));
+                    send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_ENTER, 0));
+                    send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_ENTER, 0));
+                    send.accept(PaletteKeyRouterTest.typed(view, '\n'));
+                    send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_ENTER));
                     assertThat(calls.get()).isEqualTo(1);
                     send.accept(PaletteKeyRouterTest.press(view, KeyEvent.VK_K, primary(mac)));
                     send.accept(PaletteKeyRouterTest.release(view, KeyEvent.VK_K));

@@ -40,7 +40,7 @@ final class WorkspaceActions {
         TerminalPane pane = owner.currentPane();
         TerminalView view = pane == null ? null : pane.view();
         switch (id) {
-            case COMMAND_PALETTE -> owner.commandPalette().open(PaletteScope.COMMANDS_ID);
+            case COMMAND_PALETTE -> owner.commandPalette().open(PaletteScope.ALL_ID);
             case NEW_TAB -> owner.newTab(owner.directory());
             case NEW_WINDOW -> owner.requestNewWindow();
             case QUIT -> owner.requestQuit();

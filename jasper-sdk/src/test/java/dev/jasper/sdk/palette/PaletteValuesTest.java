@@ -10,11 +10,13 @@ import static org.assertj.core.api.Assertions.*;
 class PaletteValuesTest {
     static final PaletteVerb PASTE = new PaletteVerb("paste", "Paste");
 
-    @Test void aScopeSpecIsNamespacedHasOneToThreeDistinctVerbsAndLowercaseAliases() {
+    @Test void aScopeSpecIsNamespacedHasOneToThreeDistinctVerbsAndTakesPartInAllUnlessItOptsOut() {
         ScopeSpec spec = ScopeSpec.of("dev.x.things", "Things", "Search things", List.of(PASTE))
-            .withAliases(List.of("th", "things")).withDescription("All the things").withMonospaceRows(true)
-            .withShortcutActionId("dev.x.open");
-        assertThat(spec.aliases()).containsExactly("th", "things");
+            .withDescription("All the things").withMonospaceRows(true).withShortcutActionId("dev.x.open");
+        assertThat(spec.inAll()).isTrue();
+        assertThat(spec.withInAll(false).inAll()).isFalse();
+        assertThat(spec.withInAll(false).withDescription("x").inAll()).as("derivations keep the flag").isFalse();
+        assertThat(spec.description()).isEqualTo("All the things");
         assertThat(spec.shortcutActionId()).contains("dev.x.open");
         assertThat(spec.icon()).isEmpty();
         assertThatIllegalArgumentException().isThrownBy(() -> ScopeSpec.of("things", "Things", "Search", List.of(PASTE)));
@@ -24,7 +26,6 @@ class PaletteValuesTest {
             List.of(PASTE, new PaletteVerb("a", "A"), new PaletteVerb("b", "B"), new PaletteVerb("c", "C"))));
         assertThatIllegalArgumentException().as("verb ids are distinct").isThrownBy(() -> ScopeSpec.of("dev.x.things", "Things", "Search",
             List.of(PASTE, new PaletteVerb("paste", "Paste again"))));
-        assertThatIllegalArgumentException().isThrownBy(() -> spec.withAliases(List.of("Th")));
         assertThatIllegalArgumentException().isThrownBy(() -> new PaletteVerb("Paste", "Paste"));
         assertThatIllegalArgumentException().isThrownBy(() -> new PaletteVerb("paste", ""));
     }
@@ -61,6 +62,6 @@ class PaletteValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new PaletteQuery(null, Optional.empty(), 5, true));
         assertThat(Capabilities.PALETTE_CONTRIBUTE).isEqualTo("palette.contribute");
         assertThat(Capabilities.ALL).contains("palette.contribute");
-        assertThat(JasperSdk.VERSION).isEqualTo("0.7.6");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.8.0");
     }
 }

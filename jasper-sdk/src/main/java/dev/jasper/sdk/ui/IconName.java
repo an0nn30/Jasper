@@ -1,7 +1,7 @@
 package dev.jasper.sdk.ui;
 
 /**
- * Semantic icons supplied by Jasper. The host selects artwork for the running skin.
+ * Semantic icons supplied by Jasper; the host owns the artwork.
  * @since 0.7.4
  */
 public enum IconName {

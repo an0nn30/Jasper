@@ -2,7 +2,6 @@ package dev.jasper.app.platform;
 
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.Appearance;
-import dev.jasper.app.config.ThemeStyle;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
@@ -15,7 +14,7 @@ class AppIconsTest {
 
     @Test void modernApplicationIconsAreUntintedIntellijArtwork() throws Exception {
         edt(() -> {
-            new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+            new ThemeController(Appearance.LIGHT);
             try {
                 for (String name : ICONS) {
                     FlatSVGIcon icon = (FlatSVGIcon) AppIcons.icon(name);
@@ -32,7 +31,7 @@ class AppIconsTest {
 
     @Test void theSameHostIconFollowsALiveDarkSwitch() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+            var themes = new ThemeController(Appearance.LIGHT);
             try {
                 var icon = AppIcons.icon("search");
                 int[] light = IntellijIconsTest.pixels(icon);
@@ -48,6 +47,20 @@ class AppIconsTest {
         edt(() -> {
             assertThat(AppIcons.chrome("closeHovered").getIconWidth()).isEqualTo(16);
             assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.chrome("absent")).withMessageContaining("absent");
+        });
+    }
+
+    @Test void everyApplicationIconIsSixteenPixelIntellijArtworkAndUnknownNamesFail() throws Exception {
+        edt(() -> {
+            for (String name : new String[]{"square-plus", "app-window", "columns-2", "maximize", "search", "settings",
+                    "refresh", "command", "history", "bookmark", "close", "exit"}) {
+                var icon = AppIcons.icon(name);
+                assertThat(icon).as(name).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
+                assertThat(icon.getIconWidth()).as(name).isEqualTo(16);
+            }
+            assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.icon("unknown")).withMessageContaining("unknown");
+            assertThat(java.util.Arrays.stream(AppIcons.class.getMethods()).map(java.lang.reflect.Method::getName))
+                .doesNotContain("toolbarIcon", "forToolbar");
         });
     }
 }

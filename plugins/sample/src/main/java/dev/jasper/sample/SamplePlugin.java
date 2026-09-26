@@ -1,6 +1,5 @@
 package dev.jasper.sample;
 
-import dev.jasper.sdk.ui.OldGnomeIcon;
 import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.activity.ActivityHandle;
 import dev.jasper.sdk.activity.ActivitySpec;
@@ -82,7 +81,7 @@ public final class SamplePlugin implements Plugin {
     private static void installUi(PluginContext context, long stepMillis) {
         PluginAction[] demo = new PluginAction[1];
         demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
-                .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg", OldGnomeIcon.EXECUTE))
+                .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg"))
                 .withKeywords(List.of("sample", "demo", "activity"))
                 .withDefaultBinding("cmd+alt+j"),
             invoked -> {
@@ -110,7 +109,7 @@ public final class SamplePlugin implements Plugin {
 
     // example:pluginpanels:start
     private static void installPanelAndWindow(PluginContext context, long stepMillis) {
-        var icon = context.appearance().icon("dev/jasper/sample/flask.svg", OldGnomeIcon.EXECUTE);
+        var icon = context.appearance().icon("dev/jasper/sample/flask.svg");
         // One instance per window, built the first time the panel is shown there.
         context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", icon, Anchor.LEFT), host -> {
             var run = new JButton("Run sample activity");
@@ -214,9 +213,9 @@ public final class SamplePlugin implements Plugin {
         List<String> greetings = List.of("good morning", "hello", "hi there");
         context.palette().register(new PaletteScope() {
             @Override public ScopeSpec spec() {
-                return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings, or > to switch scope",
+                return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings",
                         List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run")))
-                    .withAliases(List.of("greet")).withShortcutActionId(GREETINGS_OPEN);
+                    .withShortcutActionId(GREETINGS_OPEN);
             }
             // Search runs on the UI thread for every keystroke: rank what is already in memory, never read files here.
             @Override public PaletteResults search(String query, PaletteQuery palette) {

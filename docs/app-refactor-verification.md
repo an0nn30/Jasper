@@ -141,9 +141,11 @@ Baseline application resource entries:
 - `dev/jasper/app/shell-integration/zsh/.zprofile`
 - `dev/jasper/app/shell-integration/zsh/.zshenv`
 - `dev/jasper/app/shell-integration/zsh/.zshrc`
-- `dev/jasper/app/themes/FlatDarkLaf.properties`
-- `dev/jasper/app/themes/FlatLaf.properties`
-- `dev/jasper/app/themes/FlatLightLaf.properties`
+- `dev/jasper/app/themes/intellij/LICENSE.txt`
+- `dev/jasper/app/themes/intellij/Light.theme.json`
+- `dev/jasper/app/themes/intellij/darcula.theme.json`
+- `dev/jasper/app/themes/intellij/intellijlaf.theme.json`
+- `dev/jasper/app/themes/jasper-dark.theme.json`
 
 Launcher: `dev.jasper.app.Main`. Benchmark/preview launchers are declared in
 `jasper-app/build.gradle.kts`; packaging reads the application main class and

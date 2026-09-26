@@ -276,76 +276,20 @@ class HostedUiTest {
         assertThat(auxiliary.open()).isEmpty();
         assertThatCode(() -> { prompt.close(); trust.close(); manager.setTitle("after close"); }).doesNotThrowAnyException();
     }
-@Test void metalKeepsPluginSvgAndSubscriptionContracts() {
-    new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.ThemeStyle.RETRO,
-        dev.jasper.app.config.Appearance.DARK);
-    try {
-        variant = Variant.LIGHT;
-        assertThat(ui.appearance().variant()).isEqualTo(Variant.LIGHT);
-        var icon = ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg");
-        var image = new java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-        var graphics = image.createGraphics();
-        try { graphics.scale(2, 2); icon.paintIcon(new javax.swing.JLabel(), graphics, 0, 0); }
-        finally { graphics.dispose(); }
-        assertThat(icon.getIconWidth()).isEqualTo(16);
-        assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon("absent.svg"));
-        var events = new java.util.ArrayList<Variant>();
-        var subscription = ui.appearance().onChanged(events::add);
-        subscription.close();
-        assertThat(themeHandlers).isEmpty();
-    } finally { ui.closeAll(); new dev.jasper.app.appearance.ThemeController(); }
-}
-
-
-    @Test void selectsEverySdkCatalogChoiceAndValidatesBothArguments() throws Exception {
-        for (boolean retro : new boolean[]{false, true}) {
-        new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
-            : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
-        try {
-            for (var choice : dev.jasper.sdk.ui.OldGnomeIcon.values()) {
-                var icon = ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg", choice);
-                assertThat(icon.getIconWidth()).isEqualTo(16);
-                assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(retro ? 28 : 16);
-                if (retro) {
-                    try (var input = getClass().getResourceAsStream("/dev/jasper/app/icons/oldgnome-sdk/16/" + choice.name() + ".png")) {
-                        var source = javax.imageio.ImageIO.read(input);
-                        var actual = new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                        var expected = new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                        var g = actual.createGraphics();
-                        try { icon.paintIcon(new javax.swing.JLabel(), g, 0, 0); } finally { g.dispose(); }
-                        g = expected.createGraphics();
-                        try { g.drawImage(source, 0, 0, null); } finally { g.dispose(); }
-                        assertThat(actual.getRGB(0,0,16,16,null,0,16)).as(choice.name())
-                            .isEqualTo(expected.getRGB(0,0,16,16,null,0,16));
-                    }
-                }
-            }
-            assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon("missing.svg", dev.jasper.sdk.ui.OldGnomeIcon.LOCK));
-            assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon(null, dev.jasper.sdk.ui.OldGnomeIcon.LOCK));
-            assertThatNullPointerException().isThrownBy(() -> ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg", null));
-            var legacy = ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg");
-            assertThat(dev.jasper.app.platform.AppIcons.forToolbar(legacy)).isSameAs(legacy);
-        } finally { new dev.jasper.app.appearance.ThemeController(); }
-        }
-    }
 
     @Test void namedIconsBelongToHostRatherThanPluginLoader() {
         var isolated = new HostedUi("dev.x.tool", model, containment, Runnable::run, () -> true, open::get,
             new ClassLoader(null) {}, () -> variant,
             handler -> () -> {}, auxiliary, terminals);
         try {
-            for (boolean retro : new boolean[]{false, true}) {
-                new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO
-                    : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
-                for (var name : dev.jasper.sdk.ui.IconName.values()) {
-                    var icon = isolated.appearance().icon(name);
-                    assertThat(icon.getIconWidth()).isEqualTo(16);
-                    assertThat(icon.getIconHeight()).isEqualTo(16);
-                    assertThat(dev.jasper.app.platform.AppIcons.forToolbar(icon).getIconWidth()).isEqualTo(retro ? 28 : 16);
-                }
-                assertThatNullPointerException().isThrownBy(() -> isolated.appearance().icon((dev.jasper.sdk.ui.IconName) null));
-                assertThatIllegalArgumentException().isThrownBy(() -> isolated.appearance().icon("dev/jasper/app/icons/intellij/find.svg"));
+            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.LIGHT);
+            for (var name : dev.jasper.sdk.ui.IconName.values()) {
+                var icon = isolated.appearance().icon(name);
+                assertThat(icon.getIconWidth()).isEqualTo(16);
+                assertThat(icon.getIconHeight()).isEqualTo(16);
             }
+            assertThatNullPointerException().isThrownBy(() -> isolated.appearance().icon((dev.jasper.sdk.ui.IconName) null));
+            assertThatIllegalArgumentException().isThrownBy(() -> isolated.appearance().icon("dev/jasper/app/icons/intellij/find.svg"));
         } finally { isolated.closeAll(); new dev.jasper.app.appearance.ThemeController(); }
     }
 }

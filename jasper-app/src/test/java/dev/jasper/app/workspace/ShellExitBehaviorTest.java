@@ -2,7 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigLoader;
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.application.ConfigurationTestSupport;
 import dev.jasper.app.launch.ShellLauncher;
@@ -111,7 +111,7 @@ class ShellExitBehaviorTest {
         TerminalPane retained = owner.currentPane(); TerminalView retainedView = retained.view();
         edt(() -> { exit(retained, 0); owner.newTab(directory); }); deliver();
         TerminalPane running = owner.currentPane();
-        edt(() -> { running.view().setFontSize(23f); running.applyTheme(BuiltinTheme.LIGHT.palette()); });
+        edt(() -> { running.view().setFontSize(23f); running.applyTheme(Theme.LIGHT.palette()); });
         var options = running.view().options(); var session = running.session();
         reload("close_on_success");
         edt(() -> {
@@ -120,7 +120,7 @@ class ShellExitBehaviorTest {
             assertThat(running.view().options()).isSameAs(options);
             assertThat(running.session()).isSameAs(session);
             assertThat(running.view().fontSize()).isEqualTo(23f);
-            assertThat(running.view().palette()).isEqualTo(BuiltinTheme.LIGHT.palette());
+            assertThat(running.view().palette()).isEqualTo(Theme.LIGHT.palette());
             exit(running, 0);
         });
         until(() -> owner.tabStrip().getTabCount() == 1);

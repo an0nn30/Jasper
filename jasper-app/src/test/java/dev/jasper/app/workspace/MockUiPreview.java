@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.testsupport.LayoutTestSupport;
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.launch.ShellLauncher;
@@ -87,7 +87,7 @@ public final class MockUiPreview {
                 until(() -> owner[0].currentPane().running()
                     && sessions.stream().allMatch(session -> session.title().equals("dustin")));
             }
-            for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
+            for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                 edt(() -> {
                     owner[0].selectTheme(theme);
                     root[0].setSize(958, 958); LayoutTestSupport.layoutTree(root[0]);

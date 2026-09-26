@@ -61,7 +61,7 @@ class HostedPaletteTest {
     /** A scope whose "boom" verb throws everywhere it can. */
     static final class Flaky implements PaletteScope {
         final List<String> log = new ArrayList<>();
-        @Override public ScopeSpec spec() { return ScopeSpec.of("test.a.flaky", "Flaky", "Search", List.of(PASTE, BOOM)).withAliases(List.of("fl")); }
+        @Override public ScopeSpec spec() { return ScopeSpec.of("test.a.flaky", "Flaky", "Search", List.of(PASTE, BOOM)).withInAll(false); }
         @Override public PaletteResults search(String query, PaletteQuery context) {
             if (query.equals("boom")) throw new IllegalStateException("search failed");
             log.add("search:" + query + ":" + context.target().map(pane -> pane.id().toString()).orElse("-"));
@@ -94,7 +94,7 @@ class HostedPaletteTest {
         onEdt(() -> {
             var scope = contributions.scopes().getFirst();
             assertThat(scope.id()).isEqualTo("test.a.flaky");
-            assertThat(scope.aliases()).containsExactly("fl");
+            assertThat(scope.inAll()).isFalse();
             assertThat(scope.verbs()).extracting(dev.jasper.app.palette.PaletteVerb::id).containsExactly("paste", "boom");
             var target = new PaletteTarget(text -> { }, () -> { }, Optional::empty, () -> true, Optional.of(window), Optional.of(pane));
             var ctx = new PaletteContext(true, target, 5);

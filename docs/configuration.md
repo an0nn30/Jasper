@@ -2,7 +2,7 @@
 
 Jasper reads UTF-8 TOML at startup and watches it for changes once per second. Reading configuration does not create the config file. Normal desktop startup can create application data: logs, extracted shell-integration scripts, and (when enabled) residency files. Click **Settings** to create a commented template if the file is absent, then open it in your operating system's editor. Jasper tries Edit, then Open, then revealing the file in Finder/Explorer when supported. If all attempts fail, Jasper shows the error. Existing files are never overwritten by Settings.
 
-For a copyable starting point, use the root [config.example.toml](../config.example.toml). It lists app settings with their built-in defaults, an empty environment table and optional platform-specific shortcut examples. UI font size stays commented because its default depends on the platform and style. Plugin settings belong in their separate [plugin files](#plugins).
+For a copyable starting point, use the root [config.example.toml](../config.example.toml). It lists app settings with their built-in defaults, an empty environment table and optional platform-specific shortcut examples. UI font size stays commented because its default depends on the platform. Plugin settings belong in their separate [plugin files](#plugins).
 
 ## Location and startup options
 
@@ -78,15 +78,13 @@ blink = true
 
 [ui.font]
 family = "system"
-# Optional: 8-32 points. Omit to keep the platform/style default.
+# Optional: 8-32 points. Omit to keep the platform default.
 # size = 14.0
 
 [ui.theme]
-# "modern" or "retro"; fully quit and relaunch after changing style.
-style = "modern"
-# Modern only: "dark" or "light" for the UI chrome.
+# "dark" or "light" for the UI chrome.
 variant = "dark"
-# Modern only: "match" (follow variant), "light" or "dark" terminal colors.
+# "match" (follow variant), "light" or "dark" terminal colors.
 terminal = "match"
 
 [keybindings]
@@ -123,9 +121,8 @@ terminal = "match"
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
-| `ui.theme.style` | `"modern"` | `"modern"`, `"retro"` | Full process restart |
-| `ui.theme.variant` | `"dark"` | `"dark"`, `"light"` | Live in modern mode; retained but ignored in retro |
-| `ui.theme.terminal` | `"match"` | `"match"`, `"light"`, `"dark"` | Live in modern mode; retained but ignored in retro |
+| `ui.theme.variant` | `"dark"` | `"dark"`, `"light"` | Live |
+| `ui.theme.terminal` | `"match"` | `"match"`, `"light"`, `"dark"` | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy
@@ -189,10 +186,9 @@ acted on.
 
 ### Palette
 
-`palette.max_results` is the hard cap on rows the command palette lists, in every scope: Commands shows the
-best `max_results` matches and History the most recent or best-matching `max_results` commands, with no
-scrolling. Cmd/Ctrl+1–5 always act on the first five rows, so a larger cap only adds rows you reach with the
-arrow keys. Changes apply live, including to an open palette.
+`palette.max_results` is the cap on rows each scope contributes: a scope's tab lists at most that
+many, and the All tab shows at most that many per scope, with a "More in <Scope>…" row when there
+are more. Changes apply live, including to an open palette.
 
 ### Finished-command notifications
 
@@ -308,7 +304,7 @@ configuration is reported as moved and ignored.
 
 ### Snippets
 
-The Snippets scope (Cmd+J on macOS, Ctrl+Shift+J elsewhere; `>snip` from the picker) is the
+The Snippets scope (Cmd+J on macOS, Ctrl+Shift+J elsewhere, or its tab in the palette) is the
 bundled `dev.jasper.snippets` plugin. It reads and appends `snippets.toml` in the plugin's data
 directory, `<Jasper home>/plugins/dev.jasper.snippets/data/`; a `snippets.toml` in the Jasper home
 from before the plugin is moved there on first launch. It is a separate file: it is not part of the
@@ -486,9 +482,8 @@ The [command palette](command-palette.md) opens with Cmd+K on macOS and Ctrl+K o
 Windows/Linux. Clear Scrollback uses Cmd+Shift+K on macOS and Ctrl+Shift+K
 elsewhere. The bundled plugins add Search Shell History (`"dev.jasper.history.open"`, Cmd+R on
 macOS and Ctrl+Shift+R elsewhere) and Snippets (`"dev.jasper.snippets.open"`, Cmd+J and
-Ctrl+Shift+J), rebindable by their quoted ids. While
-the palette is open, Cmd/Ctrl+1–5 runs the corresponding visible result; plain digits
-continue to edit the search field.
+Ctrl+Shift+J), rebindable by their quoted ids. Cmd+K opens the All tab. While the palette is
+open, Tab and Shift+Tab switch tabs; plain digits edit the search field.
 
 On macOS, keep Cmd+K for Clear Scrollback and move the palette to Cmd+P:
 
@@ -533,12 +528,12 @@ Bounded application logging is implemented; see [diagnostics](diagnostics.md) fo
 
 ## Theme variant
 
-`ui.theme.variant` selects one of the two bundled modern themes. `"dark"` (the default) selects
-FlatLaf Dark chrome and `"light"` FlatLaf Light chrome; by default the terminal uses the matching
-Jasper Dark or Jasper Light palette (see [Terminal colors](#terminal-colors)). These variants apply when `ui.theme.style = "modern"`;
-[retro mode](#retro-metal-appearance) uses Java Metal instead. Jasper reads no custom theme files.
-An unrecognized variant produces an error diagnostic and keeps the default; a non-string value
-rejects the configuration.
+`ui.theme.variant` selects one of the two bundled themes. `"dark"` (the default) selects Jasper
+Dark and `"light"` classic IntelliJ Light, the theme IntelliJ IDEA ships for its classic UI. By
+default the terminal uses the matching Jasper Dark or Jasper Light palette (see [Terminal
+colors](#terminal-colors)). Both are IntelliJ-format `.theme.json` files installed through one
+theme engine; Jasper does not yet read theme files of your own. An unrecognized variant produces
+an error diagnostic and keeps the default; a non-string value rejects the configuration.
 
 View → Appearance offers Light and Dark across all windows as a temporary choice that never
 rewrites the configuration. The choice survives unrelated reloads and clears when the saved
@@ -563,28 +558,7 @@ without reinstalling the look and feel, keeping shells, scrollback and splits.
 View → Appearance offers Terminal: Match UI, Light and Dark as a temporary choice for the
 session that never rewrites the configuration; it clears when the saved `terminal` value
 changes. An unrecognized value produces an error diagnostic and keeps `"match"`; a non-string
-value rejects the configuration. Retro keeps its fixed high-contrast terminal and ignores this
-setting.
-
-### Retro Metal appearance
-
-Set `style = "retro"` in your existing `[ui.theme]` table, then fully quit and relaunch Jasper:
-
-```toml
-[ui.theme]
-style = "retro"
-variant = "dark" # Saved for modern mode; ignored while retro is running.
-```
-
-Do not add a second `[ui.theme]` table if one already exists. Retro uses Java's stock light Metal/Ocean controls, GNOME 2 and Tango application icons, and a black high-contrast terminal. `style = "modern"` restores the current appearance. Existing configuration files default to modern.
-
-Style changes take effect only after restarting the process. Reload keeps current sessions and windows as they are and shows a restart notice; changing the setting back clears that notice. When background residency is enabled, closing every window does not restart Jasper.
-
-The saved `variant` and `terminal` choices remain available for modern mode. Retro always uses light controls, so Light/Dark and custom tab-height commands are unavailable there. Font, terminal cursor, toolbar visibility, keybinding and other live settings continue to work normally.
-
-Plugins need no changes to use ordinary Metal controls. Plugins using [SDK semantic icons](sdk-icons.md) automatically receive modern or OldGNOME2 artwork for the active style; no per-plugin icon setting is needed. Custom icons and custom-painted content remain plugin-owned. On macOS, retro places application menus inside each window; modern uses the macOS menu bar. This follows the startup style and requires a full process restart. On supported macOS/JBR installations, terminal and plugin windows use a compact, flat gray title bar with centered regular-weight text and native traffic lights. The menu stays below the title bar and terminal tabs remain below the toolbar. Windows, Linux and unsupported runtimes retain native title bars. File dialogs remain native; the Jasper logo and Buddy artwork are unchanged.
-
-Retro UI text uses regular-weight system fonts: Helvetica Neue (then Helvetica) on macOS, Segoe UI (then Tahoma) on Windows, and Noto Sans (then Liberation Sans) on Linux. All platforms fall back to Noto Sans/DejaVu Sans when applicable, then Java’s portable SansSerif font if no preferred family is installed. Fonts are discovered locally; none require downloading or bundling. The terminal keeps its configured monospace font. The retro menu bar and toolbar have matching solid light-gray backgrounds, separated by a subtle gray line. Toolbar buttons stay flat with 28-pixel classic icons and centered labels beneath them. Retro captions use regular weight at one point below the Metal button font, with compact five-pixel side padding. Settings and Exit sit at the far right; Settings opens the configuration file and Exit uses the normal application quit flow. Icon-only and hidden toolbar modes remain available; tab close controls are icon-only, and status actions remain unboxed. Ordinary form buttons retain Metal styling.
+value rejects the configuration.
 
 ### Interface typography
 
@@ -596,14 +570,14 @@ family = "system"
 size = 14
 ```
 
-`family = "system"` (the default) selects the current style's platform UI font. You can
+`family = "system"` (the default) selects the current platform UI font. You can
 choose any installed family; an unavailable family falls back to the platform font. This
-works on macOS, Linux and Windows without a downloaded font. Retro's system choices are
-listed above; an explicit family overrides that selection.
+works on macOS, Linux and Windows without a downloaded font. An explicit family overrides
+that selection.
 
 `size` accepts finite values from 8 to 32 points, including fractions such as `13.5`.
 The example's `14` is an override, not a universal default. Omit `size` to retain the
-platform/style size; do not set it to zero. Remove both keys to restore the defaults.
+platform size; do not set it to zero. Remove both keys to restore the defaults.
 
 Changes update open and hidden panels,
 menus, tabs, dialogs and subsequent windows without restarting sessions. Headings and secondary

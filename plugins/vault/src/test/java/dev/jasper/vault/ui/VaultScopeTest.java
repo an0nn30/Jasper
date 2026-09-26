@@ -69,7 +69,7 @@ class VaultScopeTest {
     @Test void specNamesTheOpenActionAndThreeVerbs(@TempDir Path dir) {
         scope(dir);
         assertThat(scope.spec().id()).isEqualTo(VaultScope.ID);
-        assertThat(scope.spec().aliases()).containsExactly("vault", "cred");
+        assertThat(scope.spec().inAll()).isFalse();
         assertThat(scope.spec().verbs()).containsExactly(VaultScope.COPY_PASSWORD, VaultScope.COPY_USERNAME, VaultScope.OPEN);
         assertThat(scope.spec().shortcutActionId()).contains("dev.jasper.vault.open");
     }

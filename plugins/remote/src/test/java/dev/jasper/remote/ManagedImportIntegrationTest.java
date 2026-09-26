@@ -15,8 +15,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.swing.*;
 import org.apache.sshd.common.config.keys.PublicKeyEntry;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.remote.ui.UiTestAccess.*;
 import static org.assertj.core.api.Assertions.*;
@@ -27,8 +26,7 @@ class ManagedImportIntegrationTest {
     static void settle(FakePluginHost host) throws Exception {
         for (int i = 0; i < 6; i++) { host.runBackground(); host.flush(); SwingUtilities.invokeAndWait(() -> {}); }
     }
-    @ParameterizedTest @ValueSource(booleans = {false, true})
-    void realImportSurvivesRestartAndSourceDeletion(boolean retro, @TempDir Path dir) throws Exception {
+    @Test void realImportSurvivesRestartAndSourceDeletion(@TempDir Path dir) throws Exception {
         var key = new KeyGenerator(dir.resolve("keys")).generate(KeyAlgorithm.ED25519, "shared", "fixture", "key-passphrase".toCharArray());
         var sshDir = Files.createDirectories(dir.resolve("ssh")); var persistedRoot = dir.resolve("plugins");
         UUID savedId;
@@ -36,7 +34,6 @@ class ManagedImportIntegrationTest {
             server.allow(PublicKeyEntry.parsePublicKeyEntry(Files.readString(key.publicPath()).strip()).resolvePublicKey(null, null, null));
             Files.writeString(sshDir.resolve("config"), "Host repaired other\n HostName 127.0.0.1\n Port " + server.port() + "\n User deploy\n IdentityFile \"" + key.privatePath() + "\"\n");
             try (var host = new FakePluginHost(persistedRoot)) {
-                host.setRetroIcons(retro);
                 VaultPlugin vault = VaultTestAccess.plugin(); host.start(VAULT, Set.of(), Set.of(), vault);
                 RemotePlugin remote = remote(sshDir); var context = host.start(RemotePluginTest.INFO, Set.of(), Set.of("dev.jasper.vault"), remote);
                 var old = RemoteHost.create("repaired", "old", 22, "old", Auth.AGENT, "Servers", Optional.empty()).withFavorite(true);
@@ -64,7 +61,6 @@ class ManagedImportIntegrationTest {
             }
             Files.delete(key.privatePath()); Files.delete(key.publicPath());
             try (var restarted = new FakePluginHost(persistedRoot)) {
-                restarted.setRetroIcons(retro);
                 var vault = VaultTestAccess.plugin(); restarted.start(VAULT, Set.of(), Set.of(), vault);
                 var remote = remote(sshDir); var context = restarted.start(RemotePluginTest.INFO, Set.of(), Set.of("dev.jasper.vault"), remote);
                 settle(restarted); UUID window = restarted.addTerminalWindow(); restarted.activateTerminalWindow(window);

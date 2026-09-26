@@ -42,9 +42,9 @@ final class HistoryScope implements PaletteScope {
     }
 
     @Override public ScopeSpec spec() {
-        return ScopeSpec.of(ID, "History", "Search shell history, or > to switch scope",
+        return ScopeSpec.of(ID, "History", "Search shell history",
                 snippets.isPresent() ? List.of(PASTE, PASTE_RUN, SAVE) : List.of(PASTE, PASTE_RUN))
-            .withDescription("Search shell history and paste or run a command").withAliases(List.of("hist", "shell"))
+            .withDescription("Search shell history and paste or run a command")
             .withMonospaceRows(true).withShortcutActionId(openActionId);
     }
 

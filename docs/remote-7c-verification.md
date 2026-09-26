@@ -23,12 +23,12 @@ JUnit XML. All accepted final-review findings have passing regression tests. The
 - Browser stale-result suppression, 100k-entry disk cache, bounded pages, links and cancelled recursive deletion.
 - Real staged-plugin/HostedContext stop during a blocked read, after a checkpoint and after publication;
   persisted pause intent, queue lock reacquisition and intact published output.
-- Both host icon skins, owner-cancelled pickers, stable progress components, larger UI typography,
+- Host icon artwork, owner-cancelled pickers, stable progress components, larger UI typography,
   settings reload and restored paused jobs without authentication.
 
 The transfer implementation lives in the plugin. Architecture guards enforce SDK-only plugin
 imports and app/SDK bridges. SQLite and SFTP are bundled plugin dependencies. No icon resources
-are packaged by Remote; host-owned Tabler and OldGNOME2 mappings provide all semantic icons.
+are packaged by Remote; host-owned Tabler mappings provide all semantic icons.
 
 ## Build and run for acceptance
 
@@ -41,13 +41,13 @@ From this worktree, build the application with its matching SDK and bundled plug
 The distribution is `jasper-app/build/install/jasper-app/`; launch its `bin/jasper-app` yourself,
 or use `./gradlew :jasper-app:run` for the worktree development home. The standalone plugin bundle
 is built by `./gradlew :jasper-plugin-remote:pluginZip` under `plugins/remote/build/distributions/`.
-It needs Jasper SDK 0.7.5 or later below 0.8; do not install it into an older application.
+It needs Jasper SDK 0.8.0 or later below 0.9; do not install it into an older application.
 
 Native GUI and real-host checks were not run by the agent. Use disposable directories on hosts
 you control for the following acceptance steps:
 
 1. Open SFTP through the SSH/View menus, saved-host context menu and terminal context menu.
-   Confirm one browser, compact readable rows, keyboard navigation, SDK icons under both skins
+   Confirm one browser, compact readable rows, keyboard navigation, SDK icons
    and enlarged UI fonts. Resize the sidebar; controls and paths should remain usable.
 2. Switch between two remote panes, then a local pane. Verify each remote directory/follow
    choice, manual navigation disabling follow and Refresh preserving it. A new SSH connection

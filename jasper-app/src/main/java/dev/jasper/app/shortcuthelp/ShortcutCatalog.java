@@ -68,11 +68,9 @@ final class ShortcutCatalog {
         add(rows, "palette.tertiary", "Command Palette", "Run third action", KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK, "Command palette");
         add(rows, "palette.next", "Command Palette", "Next result", KeyEvent.VK_DOWN, 0, "Command palette");
         add(rows, "palette.previous", "Command Palette", "Previous result", KeyEvent.VK_UP, 0, "Command palette");
-        add(rows, "palette.tab", "Command Palette", "Accept scope or next field", KeyEvent.VK_TAB, 0, "Palette scope picker or step form");
-        add(rows, "palette.backtab", "Command Palette", "Accept scope or previous field", KeyEvent.VK_TAB, InputEvent.SHIFT_DOWN_MASK, "Palette scope picker or step form");
+        add(rows, "palette.tab", "Command Palette", "Next tab or next field", KeyEvent.VK_TAB, 0, "Command palette or step form");
+        add(rows, "palette.backtab", "Command Palette", "Previous tab or previous field", KeyEvent.VK_TAB, InputEvent.SHIFT_DOWN_MASK, "Command palette or step form");
         add(rows, "palette.escape", "Command Palette", "Back or dismiss", KeyEvent.VK_ESCAPE, 0, "Command palette");
-        for (int n = 1; n <= 5; n++) add(rows, "palette.result" + n, "Command Palette", "Run result " + n,
-            KeyEvent.VK_1 + n - 1, primary, "Command palette");
         // These bundled controls have local handlers, not SDK action registrations. Keep in step with
         // HostsPanel.activate and ManagerPanel.editSelected; never instantiate plugin UI to inspect it.
         if (actions.stream().anyMatch(a -> a.id().startsWith("dev.jasper.remote."))) {

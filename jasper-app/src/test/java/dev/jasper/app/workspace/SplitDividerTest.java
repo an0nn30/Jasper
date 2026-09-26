@@ -1,6 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import com.formdev.flatlaf.util.UIScale;
 import java.awt.Color;
@@ -17,7 +17,7 @@ class SplitDividerTest {
             ThemeController themes = new ThemeController();
             JSplitPane split = new JSplitPane();
             try {
-                for (BuiltinTheme theme : java.util.List.of(BuiltinTheme.DARK, BuiltinTheme.LIGHT)) {
+                for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                     themes.select(theme);
                     SwingUtilities.updateComponentTreeUI(split);
                     split.setBorder(null);
@@ -53,7 +53,7 @@ class SplitDividerTest {
                     }
                 }
             } finally {
-                themes.select(BuiltinTheme.DARK);
+                themes.select(Theme.DARK);
             }
         });
     }

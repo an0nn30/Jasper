@@ -79,13 +79,11 @@ public final class PaletteKeyRouter implements AutoCloseable {
             | InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK | InputEvent.ALT_GRAPH_DOWN_MASK);
         int primary = macOs ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
         if (palette.composing() && modifiers == 0 && code != KeyEvent.VK_ESCAPE) return false;
-        boolean numbered = modifiers == primary && code >= KeyEvent.VK_1 && code <= KeyEvent.VK_5;
         boolean secondVerb = modifiers == primary && code == KeyEvent.VK_ENTER;
         boolean thirdVerb = modifiers == InputEvent.SHIFT_DOWN_MASK && code == KeyEvent.VK_ENTER;
         boolean backTab = modifiers == InputEvent.SHIFT_DOWN_MASK && code == KeyEvent.VK_TAB;
         Runnable operation = null;
-        if (numbered) operation = () -> palette.executeNumber(code - KeyEvent.VK_1 + 1);
-        else if (secondVerb) operation = () -> palette.enterPressed(1);
+        if (secondVerb) operation = () -> palette.enterPressed(1);
         else if (thirdVerb) operation = () -> palette.enterPressed(2);
         else if (backTab) operation = () -> palette.tabPressed(true);
         else if (modifiers == 0) operation = switch (code) {
@@ -110,7 +108,7 @@ public final class PaletteKeyRouter implements AutoCloseable {
     static String scopeFor(ActionId id) {
         if (id == null) return null;
         return switch (id) {
-            case COMMAND_PALETTE -> PaletteScope.COMMANDS_ID;
+            case COMMAND_PALETTE -> PaletteScope.ALL_ID;
             default -> null;
         };
     }

@@ -44,8 +44,7 @@ public final class CommandsScope implements PaletteScope {
     @Override public String label() { return "Commands"; }
     @Override public Icon icon() { return icon; }
     @Override public String description() { return "Run an application command"; }
-    @Override public String placeholder() { return "Type a command, or > to switch scope"; }
-    @Override public List<String> aliases() { return List.of("cmd", "commands", "actions"); }
+    @Override public String placeholder() { return "Type a command"; }
     @Override public List<PaletteVerb> verbs() { return List.of(RUN); }
 
     @Override public PaletteResults search(String query, PaletteContext context) {

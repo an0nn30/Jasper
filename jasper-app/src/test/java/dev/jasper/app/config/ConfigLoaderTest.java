@@ -1,6 +1,6 @@
 package dev.jasper.app.config;
 
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -217,7 +217,7 @@ class ConfigLoaderTest {
     @Test void snapshotAndResultDefensivelyCopyCollections() {
         var bindings = new HashMap<String,String>();
         bindings.put("copy", "none");
-        var snapshot = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(20f), BuiltinTheme.LIGHT.appearance(), bindings, 150, 45, TerminalConfig.defaults());
+        var snapshot = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(20f), Theme.LIGHT.appearance(), bindings, 150, 45, TerminalConfig.defaults());
         bindings.put("copy", "cmd+c");
         assertThat(snapshot.bindings(true).strokeFor(ActionId.COPY)).isEmpty();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> snapshot.keybindings().put("paste", "none"));
@@ -230,13 +230,13 @@ class ConfigLoaderTest {
 
     @Test void directSnapshotsRejectInvalidScalarFieldsAndBindings() {
         for (int height : new int[]{0, 19, 73}) assertThatIllegalArgumentException().isThrownBy(() ->
-            new ConfigSnapshot(height, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), BuiltinTheme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
+            new ConfigSnapshot(height, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), Theme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
         for (float size : new float[]{0, 5.9f, 72.1f, Float.NaN, Float.POSITIVE_INFINITY}) assertThatIllegalArgumentException().isThrownBy(() ->
-            new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(size), BuiltinTheme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
-        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, null, true, FontConfig.defaults().withSize(16f), BuiltinTheme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
+            new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(size), Theme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
+        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, null, true, FontConfig.defaults().withSize(16f), Theme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
         assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), (Appearance) null, Map.of(), 150, 45, TerminalConfig.defaults()));
         for (Map<String,String> bindings : java.util.List.of(Map.of("unknown", "none"), Map.of("copy", "cmd+secret"))) {
-            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), BuiltinTheme.DARK.appearance(), bindings, 150, 45, TerminalConfig.defaults()));
+            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), Theme.DARK.appearance(), bindings, 150, 45, TerminalConfig.defaults()));
         }
     }
 
@@ -350,30 +350,6 @@ class ConfigLoaderTest {
                 assertThat(d.message()).contains("plugins/dev.example.tool/dev.example.tool.toml");
             });
         }
-@Test void retroStyleDoesNotRewriteSavedVariant() {
-    var result = parse("[ui.theme]\nstyle='retro'\nvariant='dark'\n");
-    assertThat(result.rejected()).isFalse();
-    assertThat(result.diagnostics()).isEmpty();
-    assertThat(result.snapshot().style()).isEqualTo(ThemeStyle.RETRO);
-    assertThat(result.snapshot().variant()).isEqualTo(Appearance.DARK);
-    assertThat(parse("").snapshot().style()).isEqualTo(ThemeStyle.MODERN);
-}
-
-@Test void invalidStyleUsesTheExistingPerFieldDiagnosticPolicy() {
-    for (String value : java.util.List.of("'private-value'", "7", "true")) {
-        var result = parse("[ui.theme]\nstyle=" + value + "\nvariant='light'\n");
-        assertThat(result.rejected()).isEqualTo(!value.startsWith("'"));
-        assertThat(result.snapshot().style()).isEqualTo(ThemeStyle.MODERN);
-        assertThat(result.snapshot().variant()).isEqualTo(Appearance.LIGHT);
-        assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
-            assertThat(problem.key()).isEqualTo("ui.theme.style");
-            assertThat(problem.line()).isEqualTo(2);
-            assertThat(problem.column()).isEqualTo(1);
-            assertThat(problem.message()).doesNotContain("private-value");
-        });
-    }
-}
-
     @Test void terminalColorsDefaultToMatchAndAcceptEveryChoice() {
         assertThat(parse("").snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
         for (var choice : TerminalColors.values())
@@ -396,5 +372,15 @@ class ConfigLoaderTest {
                 assertThat(problem.message()).doesNotContain("private-value");
             });
         }
+    }
+
+    @Test void aLeftoverStyleLineIsAnOrdinaryUnknownSettingAndChangesNothing() {
+        var result = parse("[ui.theme]\nstyle = 'retro'\nvariant = 'light'\n");
+        assertThat(result.rejected()).isFalse();
+        assertThat(result.snapshot().variant()).isEqualTo(Appearance.LIGHT);
+        assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
+            assertThat(problem.key()).isEqualTo("ui.theme.style");
+            assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
+        });
     }
 }

@@ -1,6 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.BuiltinTheme;
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ResolvedTheme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
@@ -45,7 +45,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Runnable onEmpty;
     private final JTabbedPane tabs = new TerminalDeck();
     private final WindowTabs windowTabs;
-    private final RetroTabs retroTabs;
     private final WorkspaceActions workspaceActions;
     private final CommandRegistry commands = new CommandRegistry();
     private final WindowCommands windowCommands;
@@ -146,7 +145,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         chrome = new WindowChrome(this);
         commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
         scopes.register(commandsScope);
-        commandPalette = new WindowCommandPalette(this, scopes, PaletteScope.COMMANDS_ID, macOs);
+        commandPalette = new WindowCommandPalette(this, scopes, PaletteScope.ALL_ID, macOs);
         paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
             source -> !closed && active && bindingRoot != null && source != null
                 && SwingUtilities.isDescendingFrom(this, bindingRoot)
@@ -154,8 +153,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
-        windowTabs = retro() ? null : new WindowTabs(this);
-        retroTabs = retro() ? new RetroTabs(this) : null;
+        windowTabs = new WindowTabs(this);
         var north = new JPanel(new BorderLayout());
         north.add(chrome.toolbar(), BorderLayout.NORTH);
         if (windowTabs != null) north.add(windowTabs, BorderLayout.SOUTH);
@@ -323,10 +321,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void dispatchCommand(Command command) {
         command.action().actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, command.id()));
     }
-    /** The application shortcut that opens a scope directly, for the picker's trailing tag; null when none. */
+    /** The application shortcut that opens a scope directly, shown in its tab's tooltip; null when none. */
     String scopeShortcut(String scopeId) {
         ActionId id = switch (scopeId) {
-            case PaletteScope.COMMANDS_ID -> ActionId.COMMAND_PALETTE;
+            case PaletteScope.ALL_ID -> ActionId.COMMAND_PALETTE;
             default -> null;
         };
         return id == null ? null : CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
@@ -395,10 +393,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     JMenuBar menuBar() { return chrome.menuBar(); }
     JTabbedPane tabStrip() { return tabs; }
     WindowTabs windowTabs() { return windowTabs; }
-    boolean retro() { return themes.style() == dev.jasper.app.config.ThemeStyle.RETRO; }
-private void refreshTabs() {
-    if (retroTabs != null) retroTabs.refresh(); else windowTabs.refresh();
-}
+    private void refreshTabs() { windowTabs.refresh(); }
 
     public TerminalTab currentTab() { return (TerminalTab) tabs.getSelectedComponent(); }
     public TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
@@ -559,8 +554,8 @@ private void refreshTabs() {
 
     Appearance appearance() { return themes.choice(); }
 
-    void selectTheme(BuiltinTheme theme) {
-        selectAppearance(theme == BuiltinTheme.LIGHT ? Appearance.LIGHT : Appearance.DARK);
+    void selectTheme(Theme theme) {
+        selectAppearance(theme == Theme.LIGHT ? Appearance.LIGHT : Appearance.DARK);
     }
 
     void selectAppearance(Appearance appearance) {
@@ -589,6 +584,7 @@ private void refreshTabs() {
             if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
             if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
             rail.refreshTheme();
+            regions.refreshTheme();
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
                 tab.setBackground(theme.palette().background());
@@ -599,7 +595,7 @@ private void refreshTabs() {
                 }
             }
             setBackground(theme.palette().background());
-            tabs.setBackground(retro() ? UIManager.getColor("TabbedPane.background") : theme.palette().background());
+            tabs.setBackground(theme.palette().background());
             chrome.status().applyPalette(theme.palette());
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
@@ -645,7 +641,6 @@ private void refreshTabs() {
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};
         if (windowTabs != null) windowTabs.close();
-        if (retroTabs != null) retroTabs.close();
         themeRegistration.close();
         Runnable closeTabs = () -> {
             for (TerminalTab tab : terminalTabs()) { tab.close(); if (terminals != null) terminals.tabClosed(tab); }

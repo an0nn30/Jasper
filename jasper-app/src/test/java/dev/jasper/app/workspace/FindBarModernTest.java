@@ -3,7 +3,6 @@ package dev.jasper.app.workspace;
 import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.Appearance;
-import dev.jasper.app.config.ThemeStyle;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.config.TerminalOptions;
 import dev.jasper.terminal.session.SessionLaunchOptions;
@@ -28,7 +27,7 @@ class FindBarModernTest {
     @Test void modernBarIsOneRowWithInFieldTogglesAndIconOnlyNavigation() throws Exception {
         try (TerminalSession session = shell(HOME)) {
             edt(() -> {
-                new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+                new ThemeController(Appearance.LIGHT);
                 var bar = new FindBar(new TerminalView(session, TerminalOptions.defaults()));
                 var query = bar.queryField();
                 assertThat(query.getAccessibleContext().getAccessibleName()).isEqualTo("Find in terminal");
@@ -69,7 +68,7 @@ class FindBarModernTest {
             until(() -> session.title().equals("ready"));
             FindBar[] bar = new FindBar[1];
             edt(() -> {
-                new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+                new ThemeController(Appearance.LIGHT);
                 var view = new TerminalView(session, TerminalOptions.defaults());
                 view.setSize(view.getPreferredSize());
                 bar[0] = attached(view); bar[0].open();
@@ -105,23 +104,6 @@ class FindBarModernTest {
                 ((JMenuItem) menu.getComponent(1)).doClick();
                 assertThat(bar[0].queryField().getText()).isEqualTo("ALPHA");
                 bar[0].dispose(); bar[0].removeNotify();
-            });
-        }
-    }
-
-    @Test void retroKeepsTheTextButtonRow() throws Exception {
-        try (TerminalSession session = shell(HOME)) {
-            edt(() -> {
-                new ThemeController(ThemeStyle.RETRO, Appearance.LIGHT);
-                var bar = new FindBar(new TerminalView(session, TerminalOptions.defaults()));
-                List<String> texts = new ArrayList<>();
-                for (Component child : bar.getComponents()) {
-                    if (child instanceof AbstractButton button) texts.add(button.getText());
-                    else if (child instanceof JLabel label) texts.add(label.getText());
-                    else if (child instanceof JTextField) texts.add("[field]");
-                }
-                assertThat(texts).containsExactly("Find:", "[field]", "Previous", "Next", "Case", "Regex", "0 / 0", "Close");
-                bar.dispose();
             });
         }
     }

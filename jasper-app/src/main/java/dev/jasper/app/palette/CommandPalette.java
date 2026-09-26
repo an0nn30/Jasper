@@ -1,17 +1,20 @@
 package dev.jasper.app.palette;
 
+import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.app.platform.AppIcons;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.awt.RenderingHints;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.event.InputMethodEvent;
 import java.awt.event.InputMethodListener;
 import java.awt.event.MouseAdapter;
@@ -29,7 +32,6 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.Icon;
-import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -43,59 +45,79 @@ import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-/** The themed search card for any scope. Its host owns placement, focus, scope switching and key routing. */
+/**
+ * Jasper's Search Everywhere: a tab row (All, then each scope), a full-width search field, a one-line
+ * result list with section headers, and a hint bar with the selected row's detail and its scope's other
+ * verbs. Every colour comes from the installed theme ({@code SearchEverywhere.*}, {@code List.*},
+ * {@code Popup.borderColor}); a key a theme lacks falls back to one FlatLaf always defines. The host owns
+ * placement, focus, tab switching and key routing.
+ */
 public final class CommandPalette extends JPanel {
-    private static final int WIDTH = 560;
-    private static final int INPUT_HEIGHT = 56;
-    private static final int ROW_HEIGHT = 40;
-    private static final int LABEL_HEIGHT = 24;
-    private static final int FOOTER_HEIGHT = 24;
-    private static final int COMPACT_CHIP_WIDTH = 420;
+    static final int WIDTH = 680;
+    static final int TAB_HEIGHT = 30;
+    static final int FIELD_HEIGHT = 40;
+    static final int ROW_HEIGHT = 24;
+    static final int HEADER_HEIGHT = 22;
+    static final int HINT_HEIGHT = 26;
+    static final int STEP_ROW_HEIGHT = 36;
+    static final int MAX_VISIBLE_LINES = 15;
+
+    /** A tab above the search field: All, or one scope. */
+    public record Tab(String id, String label, Icon icon, String tooltip) {
+        public Tab { Objects.requireNonNull(id); Objects.requireNonNull(label); }
+    }
 
     private final boolean macOs;
-    private final ObjIntConsumer<PaletteRow> execute;
+    private final ObjIntConsumer<PaletteEntry> execute;
+    private final Consumer<String> tabSelected;
+    private final JPanel tabStrip = new FixedHeightPanel(TAB_HEIGHT);
+    private final List<TabLabel> tabLabels = new ArrayList<>();
+    private final JPanel fieldRow = new FixedHeightPanel(FIELD_HEIGHT);
     private final JTextField query = new JTextField();
-    private final JButton escape = new JButton("Esc");
-    private final ChipLabel chip = new ChipLabel();
-    private final JPanel inputRow = new FixedHeightPanel(INPUT_HEIGHT);
-    private final DefaultListModel<PaletteRow> model = new DefaultListModel<>();
-    private final JList<PaletteRow> results = new JList<>(model);
-    private final JLabel sectionLabel = new JLabel("Recent");
-    private final JLabel footer = new JLabel();
+    private final DefaultListModel<PaletteEntry> model = new DefaultListModel<>();
+    private final JList<PaletteEntry> list = new JList<>(model);
+    private final JScrollPane scroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+        JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+    private final JLabel empty = new JLabel("", SwingConstants.CENTER);
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel cards = new JPanel(cardLayout);
-    private final JLabel empty = new JLabel("No matching commands", SwingConstants.CENTER);
-    private final JScrollPane scrollingResults = new JScrollPane(results, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-        JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-    private final ResultRenderer renderer;
     private final JPanel stepPanel = new JPanel();
+    private final JLabel stepTitle = new JLabel();
     private final List<JTextField> stepFields = new ArrayList<>();
     private final List<String> stepNames = new ArrayList<>();
     private final List<JLabel> stepLabels = new ArrayList<>();
     private final JLabel stepError = new JLabel();
+    private JPanel errorRow;
+    private final JPanel hintBar = new FixedHeightPanel(HINT_HEIGHT);
+    private final JLabel hint = new JLabel();
+    private final JPanel hintActions = new JPanel(new FlowLayout(FlowLayout.TRAILING, 0, 0));
+    private final List<Integer> hintVerbs = new ArrayList<>();
+    private String listCard = "empty";
+    private long resultCount;
     private int stepFocus = -1;
-    private Color foregroundColor, mutedColor, borderColor, accentColor, selectionColor, selectionForegroundColor;
-    private Color surfaceBorder;
+    private int hover = -1;
     private boolean composing;
-    private String scopeLabel = "Commands";
-    private List<PaletteVerb> verbs = List.of(new PaletteVerb("run", "Run"));
-    private int preferredRows = 5;
+    private Color tabSelectedBackground, tabSelectedForeground, tabForeground, foreground, infoForeground, separatorColor,
+        separatorForeground, selectionBackground, selectionForeground, hoverBackground, advertiserForeground, linkColor;
+    private Font font, smallFont, monoFont;
 
-    CommandPalette(boolean macOs, Consumer<String> queryChanged, ObjIntConsumer<PaletteRow> execute, Runnable escape,
-                   Runnable chipClicked) {
+    CommandPalette(boolean macOs, Consumer<String> queryChanged, ObjIntConsumer<PaletteEntry> execute,
+                   Consumer<String> tabSelected) {
         super(new BorderLayout());
         this.macOs = macOs;
         this.execute = Objects.requireNonNull(execute);
+        this.tabSelected = Objects.requireNonNull(tabSelected);
         Objects.requireNonNull(queryChanged);
-        Objects.requireNonNull(escape);
-        Objects.requireNonNull(chipClicked);
-        renderer = new ResultRenderer(macOs);
+        setOpaque(true);
+        // AWT retargets a press to the nearest ancestor that has mouse listeners. Without one here, a
+        // press in the tab-strip gap, the hint bar's detail text or the field row's padding would bubble
+        // past the palette to the overlay behind it, which dismisses on any press it receives.
+        var swallowClicks = new MouseAdapter() { };
+        addMouseListener(swallowClicks);
+        addMouseMotionListener(swallowClicks);
 
-        setOpaque(false);
-        query.setOpaque(false);
-        query.setBorder(BorderFactory.createEmptyBorder());
-        query.putClientProperty("JTextField.placeholderText", "Type a command…");
-        query.getAccessibleContext().setAccessibleName("Search commands");
+        tabStrip.setLayout(new FlowLayout(FlowLayout.LEADING, 0, 0));
+        query.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Search everywhere");
         query.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent event) { changed(); }
             @Override public void removeUpdate(DocumentEvent event) { changed(); }
@@ -103,173 +125,190 @@ public final class CommandPalette extends JPanel {
             private void changed() { queryChanged.accept(query.getText()); }
         });
         query.addInputMethodListener(new InputMethodListener() {
-            @Override public void inputMethodTextChanged(InputMethodEvent event) {
-                composing = uncommittedCharacters(event) > 0;
-            }
+            @Override public void inputMethodTextChanged(InputMethodEvent event) { composing = uncommittedCharacters(event) > 0; }
             @Override public void caretPositionChanged(InputMethodEvent event) {}
         });
+        fieldRow.setLayout(new BorderLayout());
+        fieldRow.add(query, BorderLayout.CENTER);
+        var top = new JPanel();
+        top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
+        top.setOpaque(false);
+        top.add(tabStrip);
+        top.add(fieldRow);
+        add(top, BorderLayout.NORTH);
 
-        this.escape.setFocusable(false);
-        this.escape.setOpaque(false);
-        this.escape.setContentAreaFilled(false);
-        this.escape.setMargin(new Insets(0, UIScale.scale(7), 0, UIScale.scale(7)));
-        this.escape.getAccessibleContext().setAccessibleName("Dismiss command palette");
-        this.escape.addActionListener(event -> escape.run());
-        var escapeHolder = new JPanel(new GridBagLayout());
-        escapeHolder.setOpaque(false);
-        escapeHolder.add(this.escape);
-        chip.set("Commands", null);
-        chip.addMouseListener(new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent event) { if (SwingUtilities.isLeftMouseButton(event)) chipClicked.run(); }
-        });
-        var chipHolder = new JPanel(new GridBagLayout());
-        chipHolder.setOpaque(false);
-        chipHolder.add(chip);
-        inputRow.setOpaque(false);
-        inputRow.setLayout(new BorderLayout(UIScale.scale(10), 0));
-        inputRow.add(chipHolder, BorderLayout.LINE_START);
-        inputRow.add(query, BorderLayout.CENTER);
-        inputRow.add(escapeHolder, BorderLayout.LINE_END);
-        add(inputRow, BorderLayout.NORTH);
-
-        for (JLabel label : List.of(sectionLabel, footer)) {
-            label.setOpaque(false);
-            label.putClientProperty("html.disable", Boolean.TRUE);
-            label.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(16), 0, UIScale.scale(16)));
-            label.setVisible(false);
-        }
-        sectionLabel.setPreferredSize(new Dimension(0, UIScale.scale(LABEL_HEIGHT)));
-        footer.setPreferredSize(new Dimension(0, UIScale.scale(FOOTER_HEIGHT)));
-
-        results.setOpaque(false);
-        results.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        results.setFocusable(false);
-        results.setFixedCellHeight(UIScale.scale(ROW_HEIGHT));
-        results.setVisibleRowCount(1);
-        results.setCellRenderer(renderer);
-        results.getAccessibleContext().setAccessibleName("Commands");
-        results.getAccessibleContext().setAccessibleDescription("0 results");
-        results.addMouseListener(new MouseAdapter() {
+        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        list.setFocusable(false);
+        list.setCellRenderer(new EntryRenderer());
+        list.getAccessibleContext().setAccessibleDescription("0 results");
+        list.addListSelectionListener(event -> updateHint());
+        var mouse = new MouseAdapter() {
             @Override public void mousePressed(MouseEvent event) {
                 if (!SwingUtilities.isLeftMouseButton(event)) return;
-                int index = results.locationToIndex(event.getPoint());
+                int index = entryAt(event.getPoint());
                 if (index < 0) return;
-                var bounds = results.getCellBounds(index, index);
-                if (bounds != null && bounds.contains(event.getPoint())) execute.accept(model.get(index), 0);
+                list.setSelectedIndex(index);
+                execute.accept(model.get(index), 0);
             }
-        });
-
-        cards.setOpaque(false);
-        empty.setOpaque(false);
+            @Override public void mouseMoved(MouseEvent event) { setHover(entryAt(event.getPoint())); }
+            @Override public void mouseExited(MouseEvent event) { setHover(-1); }
+        };
+        list.addMouseListener(mouse);
+        list.addMouseMotionListener(mouse);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
         empty.putClientProperty("html.disable", Boolean.TRUE);
-        empty.setPreferredSize(new Dimension(0, UIScale.scale(ROW_HEIGHT)));
-        scrollingResults.setBorder(BorderFactory.createEmptyBorder());
-        scrollingResults.setOpaque(false); scrollingResults.getViewport().setOpaque(false);
         stepPanel.setLayout(new BoxLayout(stepPanel, BoxLayout.Y_AXIS));
-        stepPanel.setOpaque(false);
-        stepError.setOpaque(false);
-        stepError.putClientProperty("html.disable", Boolean.TRUE);
-        stepError.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(16), 0, UIScale.scale(16)));
-        stepError.setPreferredSize(new Dimension(0, UIScale.scale(LABEL_HEIGHT)));
-        stepError.setMaximumSize(new Dimension(Integer.MAX_VALUE, UIScale.scale(LABEL_HEIGHT)));
-        stepError.setVisible(false);
-        cards.add(stepPanel, "step");
-        cards.add(scrollingResults, "results");
+        for (JLabel label : List.of(stepTitle, stepError, hint)) label.putClientProperty("html.disable", Boolean.TRUE);
+        cards.add(scroll, "results");
         cards.add(empty, "empty");
-        cardLayout.show(cards, "empty");
+        cards.add(stepPanel, "step");
+        cardLayout.show(cards, listCard);
+        add(cards, BorderLayout.CENTER);
 
-        var body = new JPanel(new BorderLayout());
-        body.setOpaque(false);
-        body.add(sectionLabel, BorderLayout.NORTH);
-        body.add(cards, BorderLayout.CENTER);
-        body.add(footer, BorderLayout.SOUTH);
-        add(body, BorderLayout.CENTER);
+        hintActions.setOpaque(false);
+        hintBar.setLayout(new BorderLayout());
+        hintBar.add(hint, BorderLayout.CENTER);
+        hintBar.add(hintActions, BorderLayout.EAST);
+        add(hintBar, BorderLayout.SOUTH);
+        setTabs(List.of(new Tab(PaletteScope.ALL_ID, "All", null, null)), PaletteScope.ALL_ID);
         refreshTheme();
     }
 
     public JTextField queryField() { return query; }
-    JList<PaletteRow> resultList() { return results; }
-    JLabel chip() { return chip; }
-    JLabel footer() { return footer; }
-    JLabel sectionLabel() { return sectionLabel; }
+    JList<PaletteEntry> entryList() { return list; }
+    JPanel tabStrip() { return tabStrip; }
+    JPanel hintBar() { return hintBar; }
+    JLabel stepTitle() { return stepTitle; }
 
-    void setScope(String label, Icon icon, String placeholder, List<PaletteVerb> verbs, int maxRows, boolean monospace) {
-        scopeLabel = Objects.requireNonNull(label);
-        this.verbs = List.copyOf(verbs);
-        this.preferredRows = Math.max(1, maxRows);
-        chip.set(label, icon);
-        chip.getAccessibleContext().setAccessibleName("Scope: " + label);
-        query.putClientProperty("JTextField.placeholderText", placeholder);
-        query.getAccessibleContext().setAccessibleName("Search " + label.toLowerCase(Locale.ROOT));
-        results.getAccessibleContext().setAccessibleName(label);
-        footer.setText(footerText(this.verbs, macOs));
-        footer.setVisible(this.verbs.size() > 1);
-        renderer.setMonospace(monospace);
-        empty.setText("No matching " + label.toLowerCase(Locale.ROOT));
-        revalidate(); repaint();
-    }
-
-    static String footerText(List<PaletteVerb> verbs, boolean macOs) {
-        if (verbs.size() < 2) return "";
-        String[] keys = macOs ? new String[]{"⏎", "⌘⏎", "⇧⏎"}
-            : new String[]{"Enter", "Ctrl+Enter", "Shift+Enter"};
-        var text = new StringBuilder();
-        for (int i = 0; i < Math.min(3, verbs.size()); i++) {
-            if (i > 0) text.append("  ");
-            text.append(keys[i]).append(' ').append(verbs.get(i).label());
+    /** Shows {@code tabs} in order and marks {@code selectedId}; the field and list are named after it. */
+    void setTabs(List<Tab> tabs, String selectedId) {
+        tabStrip.removeAll();
+        tabLabels.clear();
+        String name = "All";
+        for (Tab tab : tabs) {
+            var label = new TabLabel(tab, tab.id().equals(selectedId));
+            if (label.selected()) name = tab.label();
+            tabLabels.add(label);
+            tabStrip.add(label);
         }
-        return text.toString();
+        query.getAccessibleContext().setAccessibleName("Search " + name.toLowerCase(Locale.ROOT));
+        list.getAccessibleContext().setAccessibleName(name);
+        applyTabColors();
+        tabStrip.revalidate();
+        tabStrip.repaint();
     }
 
-    void setResults(List<PaletteRow> rows, String label, String selectionId) {
-        if (rows.size() > PaletteResults.MAX_ROWS) throw new IllegalArgumentException("Too many palette results");
-        int selected = 0;
+    List<String> tabIds() { return tabLabels.stream().map(TabLabel::id).toList(); }
+    String selectedTabId() { return tabLabels.stream().filter(TabLabel::selected).map(TabLabel::id).findFirst().orElse(null); }
+    /** As a left click on that tab; an unknown id does nothing. */
+    void clickTab(String id) { if (tabIds().contains(id)) tabSelected.accept(id); }
+    void setPlaceholder(String text) { query.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, text); }
+
+    /** Replaces the list, selecting {@code selectionKey} when present and otherwise the first selectable entry. */
+    void setEntries(List<PaletteEntry> entries, String selectionKey, String emptyText) {
+        long rows = entries.stream().filter(entry -> entry instanceof PaletteEntry.Item).count();
+        if (rows > PaletteResults.MAX_ROWS) throw new IllegalArgumentException("Too many palette results");
+        int selected = -1, first = -1;
         model.clear();
-        for (int i = 0; i < rows.size(); i++) {
-            PaletteRow row = rows.get(i);
-            model.addElement(row);
-            if (row.id().equals(selectionId)) selected = i;
+        hover = -1;
+        for (int i = 0; i < entries.size(); i++) {
+            PaletteEntry entry = entries.get(i);
+            model.addElement(entry);
+            if (entry.selectable() && first < 0) first = i;
+            if (selectionKey != null && selectionKey.equals(entry.key())) selected = i;
         }
-        sectionLabel.setText(label == null ? "" : label);
-        sectionLabel.setVisible(label != null && !rows.isEmpty());
-        if (rows.isEmpty()) results.clearSelection(); else results.setSelectedIndex(selected);
-        cardLayout.show(cards, rows.isEmpty() ? "empty" : "results");
-        results.setVisibleRowCount(Math.max(1, Math.min(rows.size(), preferredRows)));
-        results.getAccessibleContext().setAccessibleDescription(rows.size() + " results"
-            + (footer.isVisible() ? "; " + footer.getText() : ""));
+        if (selected < 0) selected = first;
+        empty.setText(emptyText == null ? "" : emptyText);
+        if (selected < 0) list.clearSelection(); else list.setSelectedIndex(selected);
+        listCard = first < 0 ? "empty" : "results";
+        if (!stepShowing()) cardLayout.show(cards, listCard);
+        resultCount = rows;
+        updateHint();
         revalidate();
-        if (!rows.isEmpty()) {
-            scrollingResults.doLayout();
-            scrollingResults.getViewport().doLayout();
-            results.ensureIndexIsVisible(selected);
+        if (selected >= 0) {
+            scroll.doLayout();
+            scroll.getViewport().doLayout();
+            reveal(selected);
         }
         repaint();
     }
 
-    /** Shows a form instead of the list; the query and chip stay. The first field takes focus. */
+    PaletteEntry selectedEntry() { return list.getSelectedValue(); }
+
+    String selectedKey() {
+        PaletteEntry entry = list.getSelectedValue();
+        return entry == null ? null : entry.key();
+    }
+
+    /** Selects the first row with {@code rowId}, whichever scope it came from. */
+    void selectRow(String rowId) {
+        for (int i = 0; i < model.size(); i++)
+            if (model.get(i) instanceof PaletteEntry.Item item && item.row().id().equals(rowId)) {
+                list.setSelectedIndex(i);
+                reveal(i);
+                return;
+            }
+    }
+
+    /** Moves {@code delta} selectable entries, skipping headers and stopping at either end. */
+    void selectRelative(int delta) {
+        int index = list.getSelectedIndex();
+        if (index < 0 || delta == 0) return;
+        int direction = Integer.signum(delta), remaining = Math.abs(delta), target = index;
+        for (int i = index + direction; remaining > 0 && i >= 0 && i < model.size(); i += direction)
+            if (model.get(i).selectable()) { target = i; remaining--; }
+        list.setSelectedIndex(target);
+        reveal(target);
+    }
+
+    void executeSelected() { executeSelected(0); }
+
+    void executeSelected(int verb) {
+        PaletteEntry entry = list.getSelectedValue();
+        if (entry != null) execute.accept(entry, verb);
+    }
+
+    boolean composing() { return composing; }
+    int itemHeight() { return UIScale.scale(ROW_HEIGHT); }
+    String hintText() { return hint.getText(); }
+
+    List<String> hintActionTexts() {
+        var texts = new ArrayList<String>();
+        for (Component action : hintActions.getComponents()) texts.add(((JLabel) action).getText());
+        return texts;
+    }
+
+    /** As a click on the {@code index}th hint action. */
+    void clickHintAction(int index) { executeSelected(hintVerbs.get(index)); }
+
+    /** Shows a form instead of the list; the tabs and query stay and the hint bar hides. The first field takes focus. */
     void showStep(String title, List<PaletteStep.Field> fields) {
         stepPanel.removeAll(); stepFields.clear(); stepNames.clear(); stepLabels.clear();
+        stepTitle.setText(title);
+        stepPanel.add(row(stepTitle));
         for (PaletteStep.Field field : fields) {
-            var row = new FixedHeightPanel(ROW_HEIGHT);
-            row.setOpaque(false);
-            row.setLayout(new BorderLayout(UIScale.scale(10), 0));
-            row.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(16), UIScale.scale(6), UIScale.scale(16)));
             var label = new JLabel(field.label());
             label.putClientProperty("html.disable", Boolean.TRUE);
             label.setPreferredSize(new Dimension(UIScale.scale(140), 0));
             var text = new JTextField(field.prefill());
-            text.setOpaque(false);
             text.getAccessibleContext().setAccessibleName(field.label());
-            row.add(label, BorderLayout.LINE_START);
-            row.add(text, BorderLayout.CENTER);
-            stepPanel.add(row);
+            var line = new FixedHeightPanel(STEP_ROW_HEIGHT);
+            line.setLayout(new BorderLayout(UIScale.scale(10), 0));
+            line.setOpaque(false);
+            line.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(4), UIScale.scale(12), UIScale.scale(4), UIScale.scale(12)));
+            line.add(label, BorderLayout.LINE_START);
+            line.add(text, BorderLayout.CENTER);
+            stepPanel.add(line);
             stepFields.add(text); stepNames.add(field.name()); stepLabels.add(label);
         }
-        stepError.setText(""); stepError.setVisible(false);
-        stepPanel.add(stepError);
+        stepError.setText("");
+        stepError.setVisible(false);
+        errorRow = row(stepError);
+        errorRow.setVisible(false);
+        stepPanel.add(errorRow);
         applyStepColors();
-        sectionLabel.setText(title); sectionLabel.setVisible(true);
         cardLayout.show(cards, "step");
+        hintBar.setVisible(false);
         stepFocus = 0;
         stepFields.getFirst().requestFocusInWindow();
         stepFields.getFirst().selectAll();
@@ -278,8 +317,10 @@ public final class CommandPalette extends JPanel {
 
     void hideStep() {
         stepPanel.removeAll(); stepFields.clear(); stepNames.clear(); stepLabels.clear();
+        errorRow = null;
         stepFocus = -1;
-        cardLayout.show(cards, model.isEmpty() ? "empty" : "results");
+        hintBar.setVisible(true);
+        cardLayout.show(cards, listCard);
         revalidate(); repaint();
     }
 
@@ -306,160 +347,185 @@ public final class CommandPalette extends JPanel {
     void setStepError(String message) {
         stepError.setText(message == null ? "" : message);
         stepError.setVisible(message != null);
+        if (errorRow != null) errorRow.setVisible(message != null);
         revalidate(); repaint();
     }
 
-    void selectRow(String id) {
-        for (int i = 0; i < model.size(); i++) {
-            if (!model.get(i).id().equals(id)) continue;
-            results.setSelectedIndex(i);
-            results.ensureIndexIsVisible(i);
-            return;
-        }
-    }
-
-    private static boolean retro() { return dev.jasper.app.platform.SwingAppearance.retro(); }
-    private static int radius(int modern) { return retro() ? 0 : modern; }
-
-    private void applyStepColors() {
-        if (foregroundColor == null) return;
-        for (JLabel label : stepLabels) { label.setForeground(mutedColor); label.setFont(footer.getFont()); }
-        for (JTextField field : stepFields) {
-            field.setForeground(foregroundColor);
-            field.setCaretColor(accentColor);
-            field.setSelectionColor(selectionColor);
-            field.setSelectedTextColor(selectionForegroundColor);
-            if (retro()) {
-                field.setBorder(UIManager.getBorder("TextField.border"));
-                field.setFont(UIManager.getFont("TextField.font"));
-            } else field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(borderColor, UIScale.scale(1), true),
-                BorderFactory.createEmptyBorder(0, UIScale.scale(6), 0, UIScale.scale(6))));
-        }
-        stepError.setForeground(accentColor);
-        stepError.setFont(footer.getFont());
-    }
-
     void refreshTheme() {
-        Color background = color("Jasper.paletteBackground", "Panel.background", Color.DARK_GRAY);
-        Color foreground = color("Jasper.paletteForeground", "Label.foreground", Color.WHITE);
-        Color muted = color("Jasper.paletteMutedForeground", "Label.disabledForeground", Color.GRAY);
-        Color border = color("Jasper.paletteBorder", "Component.borderColor", muted);
-        Color accent = color("Jasper.paletteAccent", "Component.focusedBorderColor", foreground);
-        Color selection = color("Jasper.paletteSelectionBackground", "List.selectionBackground", background);
-        Color selectionForeground = color("Jasper.paletteSelectionForeground", "List.selectionForeground", foreground);
-        foregroundColor = foreground; mutedColor = muted; borderColor = border; accentColor = accent;
-        selectionColor = selection; selectionForegroundColor = selectionForeground;
+        Color headerBackground = color("SearchEverywhere.Header.background", "Panel.background");
+        tabSelectedBackground = color("SearchEverywhere.Tab.selectedBackground", "List.selectionInactiveBackground");
+        tabSelectedForeground = color("SearchEverywhere.Tab.selectedForeground", "Label.foreground");
+        tabForeground = color("Label.foreground", "List.foreground");
+        foreground = color("List.foreground", "Label.foreground");
+        infoForeground = color("SearchEverywhere.SearchField.infoForeground", "Label.disabledForeground");
+        separatorColor = color("SearchEverywhere.List.separatorColor", "Separator.foreground");
+        separatorForeground = color("SearchEverywhere.List.separatorForeground", "Label.disabledForeground");
+        Color listBackground = color("List.background", "Panel.background");
+        selectionBackground = UIManager.getColor("List.selectionBackground");
+        selectionForeground = UIManager.getColor("List.selectionForeground");
+        hoverBackground = UIManager.getColor("List.hoverBackground");
+        Color advertiserBackground = color("SearchEverywhere.Advertiser.background", "Panel.background");
+        advertiserForeground = color("SearchEverywhere.Advertiser.foreground", "Label.disabledForeground");
+        linkColor = UIManager.getColor("Component.linkColor");
+        Color border = color("Popup.borderColor", "PopupMenu.borderColor");
+        Color fieldBackground = color("SearchEverywhere.SearchField.background", "TextField.background");
+        Color fieldBorder = color("SearchEverywhere.SearchField.borderColor", "Component.borderColor");
+        font = UIManager.getFont("Label.font");
+        smallFont = font.deriveFont(Font.PLAIN, font.getSize2D() - UIScale.scale(1f));
+        monoFont = new Font(Font.MONOSPACED, Font.PLAIN, 13).deriveFont(font.getSize2D());
 
-        setBackground(background);
-        setForeground(foreground);
-        surfaceBorder = border;
-        inputRow.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, UIScale.scale(1), 0, border),
-            BorderFactory.createEmptyBorder(0, UIScale.scale(12), 0, UIScale.scale(10))));
-        query.setForeground(foreground);
-        query.setCaretColor(accent);
-        query.setSelectionColor(selection);
-        query.setSelectedTextColor(selectionForeground);
-        escape.setForeground(muted);
-        escape.setBorder(BorderFactory.createLineBorder(border, UIScale.scale(1), !retro()));
-        chip.colors(accent, selection, border);
-        sectionLabel.setForeground(muted);
-        footer.setForeground(muted);
-        empty.setForeground(muted);
-        results.setBackground(background);
-        results.setForeground(foreground);
-        results.setFixedCellHeight(UIScale.scale(ROW_HEIGHT));
-        sectionLabel.setPreferredSize(new Dimension(0, UIScale.scale(LABEL_HEIGHT)));
-        footer.setPreferredSize(new Dimension(0, UIScale.scale(FOOTER_HEIGHT)));
-        empty.setPreferredSize(new Dimension(0, UIScale.scale(ROW_HEIGHT)));
-        stepError.setPreferredSize(new Dimension(0, UIScale.scale(LABEL_HEIGHT)));
-        stepError.setMaximumSize(new Dimension(Integer.MAX_VALUE, UIScale.scale(LABEL_HEIGHT)));
-        for (JLabel label : List.of(sectionLabel, footer, stepError))
-            label.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(16), 0, UIScale.scale(16)));
-        for (JLabel label : stepLabels) {
-            label.setPreferredSize(new Dimension(UIScale.scale(140), 0));
-            if (label.getParent() instanceof JPanel row) {
-                row.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(16), UIScale.scale(6), UIScale.scale(16)));
-                ((BorderLayout) row.getLayout()).setHgap(UIScale.scale(10));
-            }
-        }
-        ((BorderLayout) inputRow.getLayout()).setHgap(UIScale.scale(10));
-        escape.setMargin(new Insets(0, UIScale.scale(7), 0, UIScale.scale(7)));
-        Font uiFont = UIManager.getFont("Label.font");
-        if (uiFont != null) {
-            results.setFont(uiFont);
-            chip.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
-            footer.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
-        }
-        results.setSelectionBackground(selection);
-        results.setSelectionForeground(selectionForeground);
-        renderer.refreshTheme(foreground, muted, border, selection, selectionForeground);
-        if (retro()) {
-            query.setBorder(UIManager.getBorder("TextField.border"));
-            query.setFont(UIManager.getFont("TextField.font"));
-            chip.setFont(UIManager.getFont("Label.font"));
-            footer.setFont(UIManager.getFont("Label.font"));
-        }
+        setBackground(listBackground);
+        setBorder(BorderFactory.createLineBorder(border, UIScale.scale(1)));
+        tabStrip.setBackground(headerBackground);
+        fieldRow.setBackground(fieldBackground);
+        fieldRow.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(8), UIScale.scale(6), UIScale.scale(8)));
+        query.putClientProperty(FlatClientProperties.STYLE, "background: " + hex(fieldBackground)
+            + "; borderColor: " + hex(fieldBorder) + "; placeholderForeground: " + hex(infoForeground));
+        query.putClientProperty(FlatClientProperties.TEXT_FIELD_LEADING_ICON, AppIcons.icon("search"));
+        query.setFont(font);
+        list.setBackground(listBackground);
+        list.setForeground(foreground);
+        list.setSelectionBackground(selectionBackground);
+        list.setSelectionForeground(selectionForeground);
+        list.setFont(font);
+        scroll.getViewport().setBackground(listBackground);
+        cards.setBackground(listBackground);
+        stepPanel.setBackground(listBackground);
+        empty.setForeground(infoForeground);
+        empty.setFont(font);
+        hintBar.setBackground(advertiserBackground);
+        hintBar.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(UIScale.scale(1), 0, 0, 0, separatorColor),
+            BorderFactory.createEmptyBorder(0, UIScale.scale(12), 0, UIScale.scale(12))));
+        hint.setForeground(advertiserForeground);
+        hint.setFont(smallFont);
+        applyTabColors();
+        applyHintColors();
         applyStepColors();
         revalidate(); repaint();
     }
 
-    void selectRelative(int delta) {
-        if (model.isEmpty()) return;
-        int index = Math.max(0, Math.min(model.size() - 1, results.getSelectedIndex() + delta));
-        results.setSelectedIndex(index);
-        results.ensureIndexIsVisible(index);
-    }
-
-    void executeNumber(int number) {
-        if (number >= 1 && number <= Math.min(5, model.size())) execute.accept(model.get(number - 1), 0);
-    }
-
-    void executeSelected() { executeSelected(0); }
-
-    void executeSelected(int verb) {
-        PaletteRow row = results.getSelectedValue();
-        if (row != null) execute.accept(row, verb);
-    }
-
-    boolean composing() { return composing; }
-
-    @Override public void doLayout() {
-        chip.setCompact(getWidth() < UIScale.scale(COMPACT_CHIP_WIDTH));
-        super.doLayout();
-    }
-
     @Override public Dimension getPreferredSize() {
-        if (stepShowing()) {
-            int footerHeight = footer.isVisible() ? FOOTER_HEIGHT : 0;
-            int errorHeight = stepError.isVisible() ? LABEL_HEIGHT : 0;
-            return new Dimension(UIScale.scale(WIDTH),
-                UIScale.scale(INPUT_HEIGHT + LABEL_HEIGHT + stepFields.size() * ROW_HEIGHT + errorHeight + footerHeight));
-        }
-        int rows = Math.max(1, Math.min(model.size(), preferredRows));
-        int label = sectionLabel.isVisible() ? LABEL_HEIGHT : 0;
-        int footerHeight = footer.isVisible() ? FOOTER_HEIGHT : 0;
-        return new Dimension(UIScale.scale(WIDTH), UIScale.scale(INPUT_HEIGHT + rows * ROW_HEIGHT + label + footerHeight));
+        Insets insets = getInsets();
+        int height = TAB_HEIGHT + FIELD_HEIGHT + (stepShowing()
+            ? HEADER_HEIGHT + stepFields.size() * STEP_ROW_HEIGHT + (stepError.isVisible() ? HEADER_HEIGHT : 0)
+            : listHeight() + HINT_HEIGHT);
+        return new Dimension(UIScale.scale(WIDTH), UIScale.scale(height) + insets.top + insets.bottom);
     }
 
-    @Override protected void paintComponent(Graphics graphics) {
-        paintSurface(graphics, getWidth(), getHeight(), getBackground(), surfaceBorder, radius(12));
+    private int listHeight() {
+        if ("empty".equals(listCard)) return ROW_HEIGHT;
+        int height = 0;
+        for (int i = 0; i < Math.min(model.size(), MAX_VISIBLE_LINES); i++)
+            height += model.get(i) instanceof PaletteEntry.Header ? HEADER_HEIGHT : ROW_HEIGHT;
+        return height;
     }
 
-    static void paintSurface(Graphics graphics, int width, int height, Color background, Color border, int radius) {
-        var g = (Graphics2D) graphics.create();
-        try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int diameter = UIScale.scale(radius * 2);
-            g.setColor(background);
-            g.fillRoundRect(0, 0, width, height, diameter, diameter);
-            if (border != null) {
-                g.setColor(border);
-                g.drawRoundRect(0, 0, width - 1, height - 1, diameter, diameter);
+    private void reveal(int index) {
+        if (index > 0 && !model.get(index - 1).selectable()) list.ensureIndexIsVisible(index - 1);
+        list.ensureIndexIsVisible(index);
+    }
+
+    private int entryAt(Point point) {
+        int index = list.locationToIndex(point);
+        if (index < 0) return -1;
+        Rectangle bounds = list.getCellBounds(index, index);
+        return bounds != null && bounds.contains(point) && model.get(index).selectable() ? index : -1;
+    }
+
+    private void setHover(int index) {
+        if (index == hover) return;
+        hover = index;
+        list.repaint();
+    }
+
+    private void updateHint() {
+        hintActions.removeAll();
+        hintVerbs.clear();
+        String text = "";
+        String verbsDescription = "";
+        PaletteEntry entry = list.getSelectedValue();
+        if (entry instanceof PaletteEntry.Item item) {
+            PaletteRow row = item.row();
+            text = row.detail() != null ? row.detail() : row.tag() != null ? row.tag() : "";
+            List<PaletteVerb> verbs = item.scope().verbs();
+            verbsDescription = verbsDescription(verbs);
+            for (int verb = 1; verb < Math.min(3, verbs.size()); verb++) {
+                int chosen = verb;
+                var action = new SizedLabel(verbs.get(verb).label() + " " + keys(verb), HINT_HEIGHT - 1);
+                action.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(14), 0, 0));
+                action.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                action.addMouseListener(new MouseAdapter() {
+                    @Override public void mousePressed(MouseEvent event) { if (SwingUtilities.isLeftMouseButton(event)) executeSelected(chosen); }
+                });
+                hintActions.add(action);
+                hintVerbs.add(verb);
             }
-        } finally { g.dispose(); }
+        } else if (entry instanceof PaletteEntry.More more) {
+            text = "Show every match in " + more.scope().label();
+            verbsDescription = keys(0) + " " + text;
+        }
+        hint.setText(text);
+        list.getAccessibleContext().setAccessibleDescription(
+            resultCount + " results" + (verbsDescription.isEmpty() ? "" : "; " + verbsDescription));
+        applyHintColors();
+        hintActions.revalidate();
+        hintActions.repaint();
     }
+
+    /** Every verb, primary through third, in the base card's format: {@code key label  key label}. */
+    private String verbsDescription(List<PaletteVerb> verbs) {
+        if (verbs.size() < 2) return "";
+        var text = new StringBuilder();
+        for (int verb = 0; verb < Math.min(3, verbs.size()); verb++) {
+            if (verb > 0) text.append("  ");
+            text.append(keys(verb)).append(' ').append(verbs.get(verb).label());
+        }
+        return text.toString();
+    }
+
+    private String keys(int verb) {
+        return (macOs ? new String[]{"⏎", "⌘⏎", "⇧⏎"} : new String[]{"Enter", "Ctrl+Enter", "Shift+Enter"})[verb];
+    }
+
+    private void applyTabColors() {
+        for (TabLabel label : tabLabels) {
+            label.setForeground(label.selected() ? tabSelectedForeground : tabForeground);
+            if (font != null) label.setFont(font);
+        }
+    }
+
+    private void applyHintColors() {
+        for (Component action : hintActions.getComponents()) {
+            action.setForeground(linkColor);
+            if (smallFont != null) action.setFont(smallFont);
+        }
+    }
+
+    private void applyStepColors() {
+        if (foreground == null) return;
+        stepTitle.setForeground(separatorForeground);
+        stepTitle.setFont(smallFont);
+        for (JLabel label : stepLabels) { label.setForeground(infoForeground); label.setFont(smallFont); }
+        stepError.setForeground(UIManager.getColor("Actions.Red"));
+        stepError.setFont(smallFont);
+    }
+
+    private static JPanel row(JLabel label) {
+        var row = new FixedHeightPanel(HEADER_HEIGHT);
+        row.setLayout(new BorderLayout());
+        row.setOpaque(false);
+        row.setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(12), 0, UIScale.scale(12)));
+        row.add(label, BorderLayout.CENTER);
+        return row;
+    }
+
+    private static Color color(String key, String fallbackKey) {
+        Color value = UIManager.getColor(key);
+        return value != null ? value : UIManager.getColor(fallbackKey);
+    }
+
+    private static String hex(Color color) { return String.format("#%06x", color.getRGB() & 0xffffff); }
 
     private static int uncommittedCharacters(InputMethodEvent event) {
         AttributedCharacterIterator text = event.getText();
@@ -468,202 +534,156 @@ public final class CommandPalette extends JPanel {
         return Math.max(0, length - event.getCommittedCharacterCount());
     }
 
-    private static Color color(String key, String fallbackKey, Color fallback) {
-        Color value = UIManager.getColor(key);
-        if (value == null) value = UIManager.getColor(fallbackKey);
-        return value == null ? fallback : value;
-    }
-
-    private static final class FixedHeightPanel extends JPanel {
+    private static class FixedHeightPanel extends JPanel {
         private final int logicalHeight;
 
-        FixedHeightPanel(int logicalHeight) {
-            this.logicalHeight = logicalHeight;
-        }
+        FixedHeightPanel(int logicalHeight) { this.logicalHeight = logicalHeight; }
 
         @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(logicalHeight)); }
-        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(logicalHeight)); }
+        @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, UIScale.scale(logicalHeight)); }
         @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, UIScale.scale(logicalHeight)); }
     }
 
-    /** The scope pill at the left of the input: icon plus label, or icon only in narrow cards. */
-    private static final class ChipLabel extends JLabel {
-        private String fullText = "";
-        private Color fill, outline;
-        private boolean compact;
+    /** A label whose height is fixed in logical pixels, so tabs and hints stay aligned under any font. */
+    private static class SizedLabel extends JLabel {
+        private final int logicalHeight;
 
-        ChipLabel() {
-            setOpaque(false);
+        SizedLabel(String text, int logicalHeight) {
+            super(text);
+            this.logicalHeight = logicalHeight;
             putClientProperty("html.disable", Boolean.TRUE);
-            setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(8), 0, UIScale.scale(8)));
-            setIconTextGap(UIScale.scale(5));
-            setHorizontalAlignment(SwingConstants.CENTER);
         }
 
-        void set(String label, Icon icon) { fullText = label; setIcon(icon); setText(compact && icon != null ? null : label); }
-        void setCompact(boolean value) {
-            if (compact == value) return;
-            compact = value; setText(compact && getIcon() != null ? null : fullText); revalidate();
-        }
-        void colors(Color foreground, Color fill, Color outline) {
-            setForeground(foreground); this.fill = fill; this.outline = outline; repaint();
+        @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, UIScale.scale(logicalHeight)); }
+    }
+
+    private final class TabLabel extends SizedLabel {
+        private final String id;
+        private final boolean selected;
+
+        TabLabel(Tab tab, boolean selected) {
+            super(tab.label(), TAB_HEIGHT);
+            this.id = tab.id();
+            this.selected = selected;
+            setIcon(tab.icon());
+            setIconTextGap(UIScale.scale(4));
+            setToolTipText(tab.tooltip());
+            setBorder(BorderFactory.createEmptyBorder(0, UIScale.scale(10), 0, UIScale.scale(10)));
+            getAccessibleContext().setAccessibleName(tab.label() + " tab");
+            addMouseListener(new MouseAdapter() {
+                @Override public void mousePressed(MouseEvent event) { if (SwingUtilities.isLeftMouseButton(event)) tabSelected.accept(id); }
+            });
         }
 
-        @Override public Dimension getPreferredSize() {
-            Dimension size = super.getPreferredSize();
-            return new Dimension(size.width, UIScale.scale(24));
-        }
+        String id() { return id; }
+        boolean selected() { return selected; }
 
         @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D) graphics.create();
-            try {
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                int arc = radius(UIScale.scale(12));
-                if (fill != null) { g.setColor(fill); g.fillRoundRect(0, 0, getWidth(), getHeight(), arc, arc); }
-                if (outline != null) { g.setColor(outline); g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc); }
-            } finally { g.dispose(); }
+            if (selected && tabSelectedBackground != null) {
+                graphics.setColor(tabSelectedBackground);
+                graphics.fillRect(0, 0, getWidth(), getHeight());
+            }
             super.paintComponent(graphics);
         }
     }
 
-    private static final class ResultRenderer extends JPanel implements ListCellRenderer<PaletteRow> {
-        private final boolean macOs;
+    private final class EntryRenderer extends JPanel implements ListCellRenderer<PaletteEntry> {
         private final JLabel icon = new JLabel();
         private final JLabel title = new JLabel();
         private final JLabel detail = new JLabel();
         private final JLabel tag = new JLabel();
-        private final BadgeLabel badge = new BadgeLabel();
-        private Color foreground, muted, selectionForeground, selection;
-        private Font uiTitle = getFont(), monoTitle = getFont();
-        private boolean monospace, selected;
+        private PaletteEntry entry;
+        private boolean selected, hovered, first;
 
-        ResultRenderer(boolean macOs) {
-            this.macOs = macOs;
-            setOpaque(false);
+        EntryRenderer() {
             setLayout(null);
-            for (JLabel label : List.of(icon, title, detail, tag, badge)) {
+            setOpaque(false);
+            for (JLabel label : List.of(icon, title, detail, tag)) {
                 label.setOpaque(false);
                 label.putClientProperty("html.disable", Boolean.TRUE);
                 add(label);
             }
             icon.setHorizontalAlignment(SwingConstants.CENTER);
-            badge.setHorizontalAlignment(SwingConstants.CENTER);
         }
 
-        void setMonospace(boolean value) { monospace = value; }
-
-        void refreshTheme(Color foreground, Color muted, Color border, Color selection, Color selectionForeground) {
-            this.foreground = foreground; this.muted = muted; this.selection = selection; this.selectionForeground = selectionForeground;
-            title.setForeground(foreground);
-            detail.setForeground(muted);
-            tag.setForeground(muted);
-            badge.colors(muted, border, selectionForeground);
-            Font uiFont = UIManager.getFont("Label.font");
-            if (uiFont == null) uiFont = getFont();
-            uiTitle = uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(1f));
-            monoTitle = new Font(Font.MONOSPACED, Font.PLAIN, 13).deriveFont(uiTitle.getSize2D());
-            icon.setFont(uiTitle);
-            detail.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
-            tag.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-1f)));
-            badge.setFont(uiFont.deriveFont(Font.PLAIN, uiFont.getSize2D() + UIScale.scale(-2f)));
-        }
-
-        @Override public Component getListCellRendererComponent(JList<? extends PaletteRow> list, PaletteRow row,
-                                                                 int index, boolean selected, boolean cellHasFocus) {
-            this.selected = selected;
-            icon.setIcon(row.icon());
-            title.setFont(monospace ? monoTitle : uiTitle);
-            title.setText(row.title());
-            detail.setText(row.detail() == null ? "" : row.detail());
-            tag.setText(row.tag() == null ? "" : row.tag());
-            badge.setText((macOs ? "⌘" : "Ctrl+") + (index + 1));
-            badge.setVisible(index < 5);
-            title.setForeground(selected ? selectionForeground : row.enabled() ? foreground : muted);
-            detail.setForeground(selected ? selectionForeground : muted);
-            tag.setForeground(selected ? selectionForeground : muted);
-            badge.selected(selected);
+        @Override public Component getListCellRendererComponent(JList<? extends PaletteEntry> source, PaletteEntry value,
+                                                                 int index, boolean isSelected, boolean cellHasFocus) {
+            entry = value;
+            selected = isSelected && value.selectable();
+            hovered = index == hover && !selected && value.selectable();
+            first = index == 0;
+            icon.setIcon(null);
+            detail.setText("");
+            tag.setText("");
+            switch (value) {
+                case PaletteEntry.Header header -> {
+                    title.setText(header.label());
+                    title.setFont(smallFont);
+                    title.setForeground(separatorForeground);
+                }
+                case PaletteEntry.Item item -> {
+                    PaletteRow row = item.row();
+                    icon.setIcon(row.icon());
+                    title.setText(row.title());
+                    title.setFont(item.scope().monospaceRows() ? monoFont : font);
+                    title.setForeground(selected ? selectionForeground : row.enabled() ? foreground : infoForeground);
+                    detail.setText(row.detail() == null ? "" : row.detail());
+                    detail.setFont(font);
+                    detail.setForeground(selected ? selectionForeground : infoForeground);
+                    tag.setText(row.tag() == null ? "" : row.tag());
+                    tag.setFont(smallFont);
+                    tag.setForeground(selected ? selectionForeground : infoForeground);
+                }
+                case PaletteEntry.More more -> {
+                    title.setText("More in " + more.scope().label() + "…");
+                    title.setFont(font);
+                    title.setForeground(selected ? selectionForeground : infoForeground);
+                }
+            }
             return this;
         }
 
+        @Override public Dimension getPreferredSize() {
+            return new Dimension(0, UIScale.scale(entry instanceof PaletteEntry.Header ? HEADER_HEIGHT : ROW_HEIGHT));
+        }
+
         @Override public void doLayout() {
-            int side = UIScale.scale(12), iconWidth = UIScale.scale(20), gap = UIScale.scale(10);
-            int titleStart = side + iconWidth + gap;
-            int rowHeight = getHeight();
-            icon.setBounds(side, 0, iconWidth, rowHeight);
-            int titleEnd = getWidth() - side;
-            if (badge.isVisible()) {
-                int badgeWidth = Math.min(Math.max(0, getWidth() - titleStart), badge.getPreferredSize().width + UIScale.scale(12));
-                int badgeX = Math.max(titleStart, getWidth() - side - badgeWidth);
-                badge.setBounds(badgeX, (rowHeight - UIScale.scale(22)) / 2, badgeWidth, UIScale.scale(22));
-                titleEnd = Math.max(titleStart, badgeX - gap);
-            } else badge.setBounds(0, 0, 0, 0);
-            int available = titleEnd - titleStart;
-            int titlePreferred = Math.max(title.getPreferredSize().width, detail.getText().isEmpty() ? 0 : detail.getPreferredSize().width);
+            int side = UIScale.scale(8), gap = UIScale.scale(8), iconSize = UIScale.scale(16), height = getHeight();
+            if (entry instanceof PaletteEntry.Header) {
+                title.setBounds(side, 0, Math.max(0, getWidth() - 2 * side), height);
+                for (JLabel unused : List.of(icon, detail, tag)) unused.setBounds(0, 0, 0, 0);
+                return;
+            }
+            icon.setBounds(side, (height - iconSize) / 2, iconSize, iconSize);
+            int start = side + iconSize + gap, end = getWidth() - side;
+            int titleWidth = title.getPreferredSize().width;
             int tagWidth = tag.getText().isEmpty() ? 0 : tag.getPreferredSize().width;
-            boolean showTag = tagWidth > 0 && titlePreferred + UIScale.scale(12) + tagWidth <= available;
-            tag.setVisible(showTag);
-            int titleWidth = available;
-            if (showTag) {
-                int tagX = titleEnd - tagWidth;
-                tag.setBounds(tagX, 0, tagWidth, rowHeight);
-                titleWidth = Math.max(0, tagX - UIScale.scale(12) - titleStart);
-            } else tag.setBounds(0, 0, 0, 0);
-            boolean hasDetail = !detail.getText().isEmpty();
-            detail.setVisible(hasDetail);
-            if (hasDetail) {
-                title.setBounds(titleStart, UIScale.scale(3), Math.max(0, titleWidth), UIScale.scale(19));
-                detail.setBounds(titleStart, UIScale.scale(21), Math.max(0, titleWidth), UIScale.scale(16));
-            } else {
-                title.setBounds(titleStart, 0, Math.max(0, titleWidth), rowHeight);
-                detail.setBounds(0, 0, 0, 0);
-            }
+            int detailWidth = detail.getText().isEmpty() ? 0 : detail.getPreferredSize().width;
+            // When space runs out the tag goes first; then the detail, and finally the title, are cut
+            // short. The tag only shows when the title, the detail (if any) and the tag all fit together;
+            // otherwise the tag would claim room the detail needs and never get cut back for it.
+            int detailTerm = detailWidth > 0 ? gap + detailWidth : 0;
+            boolean showTag = tagWidth > 0 && start + titleWidth + detailTerm + gap + tagWidth <= end;
+            int textEnd = showTag ? end - tagWidth - gap : end;
+            tag.setBounds(showTag ? end - tagWidth : 0, 0, showTag ? tagWidth : 0, height);
+            int shownTitle = Math.max(0, Math.min(titleWidth, textEnd - start));
+            title.setBounds(start, 0, shownTitle, height);
+            int detailStart = start + shownTitle + gap;
+            detail.setBounds(detailStart, 0, Math.max(0, Math.min(detailWidth, textEnd - detailStart)), height);
         }
 
         @Override protected void paintComponent(Graphics graphics) {
-            // CellRendererPane assigns this component's bounds immediately before painting;
-            // lay out its null-layout children at that final width.
+            // CellRendererPane assigns the bounds just before painting; lay the labels out at that width.
             doLayout();
-            if (selected) {
-                var g = (Graphics2D) graphics.create();
-                try {
-                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                    g.setColor(selection);
-                    int insetX = UIScale.scale(4), insetY = UIScale.scale(2), arc = radius(UIScale.scale(12));
-                    g.fillRoundRect(insetX, insetY, Math.max(0, getWidth() - insetX * 2),
-                        Math.max(0, getHeight() - insetY * 2), arc, arc);
-                } finally { g.dispose(); }
+            Color fill = selected ? selectionBackground : hovered ? hoverBackground : null;
+            if (fill != null) {
+                graphics.setColor(fill);
+                graphics.fillRect(0, 0, getWidth(), getHeight());
             }
-            super.paintComponent(graphics);
-        }
-    }
-
-    private static final class BadgeLabel extends JLabel {
-        private Color border;
-        private Color selectedForeground;
-        private Color normalForeground;
-        private boolean selected;
-
-        void colors(Color foreground, Color border, Color selectedForeground) {
-            normalForeground = foreground;
-            this.border = border;
-            this.selectedForeground = selectedForeground;
-            setForeground(foreground);
-        }
-
-        void selected(boolean selected) {
-            this.selected = selected;
-            setForeground(selected ? selectedForeground : normalForeground);
-            repaint();
-        }
-
-        @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D) graphics.create();
-            try {
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(border);
-                int arc = radius(UIScale.scale(8));
-                g.drawRoundRect(0, 0, Math.max(0, getWidth() - 1), Math.max(0, getHeight() - 1), arc, arc);
-            } finally { g.dispose(); }
+            if (entry instanceof PaletteEntry.Header && !first) {
+                graphics.setColor(separatorColor);
+                graphics.fillRect(0, 0, getWidth(), UIScale.scale(1));
+            }
             super.paintComponent(graphics);
         }
     }

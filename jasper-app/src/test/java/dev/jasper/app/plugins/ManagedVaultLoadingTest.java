@@ -11,17 +11,15 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.*;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static org.assertj.core.api.Assertions.*;
 
-/** Real staged API/parsing dependency boundary plus headless forms in both application skins. */
+/** Real staged API/parsing dependency boundary plus headless forms. */
 class ManagedVaultLoadingTest {
     @TempDir Path root;
-    @ParameterizedTest @ValueSource(booleans = {false, true})
-    void stagedVaultImportsThroughExportedApiAndRendersForms(boolean retro) throws Exception {
+    @Test void stagedVaultImportsThroughExportedApiAndRendersForms() throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
         try (var loader = new PluginClassLoader("dev.jasper.vault", jars(staged.resolve("dev.jasper.vault")), getClass().getClassLoader(), Map.of());
              var remote = new PluginClassLoader("dev.jasper.remote", jars(staged.resolve("dev.jasper.remote")), getClass().getClassLoader(), Map.of("dev.jasper.vault.api", loader));
@@ -38,8 +36,7 @@ class ManagedVaultLoadingTest {
             Plugin plugin = (Plugin) loader.loadClass("dev.jasper.vault.VaultPlugin").getConstructor().newInstance();
             var api = new AtomicReference<Object>(); var owner = new AtomicReference<WindowHandle>();
             onEdt(() -> {
-                new dev.jasper.app.appearance.ThemeController(retro ? dev.jasper.app.config.ThemeStyle.RETRO : dev.jasper.app.config.ThemeStyle.MODERN, dev.jasper.app.config.Appearance.LIGHT);
-                host.setRetroIcons(retro);
+                new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.LIGHT);
                 host.start(new PluginInfo("dev.jasper.vault", "Credential Vault", "0.2.0", Set.of(dev.jasper.sdk.Capabilities.PALETTE_CONTRIBUTE)), Set.of(), Set.of(), plugin);
                 var consumer = host.start(new PluginInfo("dev.jasper.remote", "Remote", "0.2.0", Set.of()), Set.of("dev.jasper.vault"), Set.of(), context -> api.set(context.services().require(apiType)));
                 UUID id = host.addTerminalWindow(); host.activateTerminalWindow(id); owner.set(consumer.terminals().window(id).orElseThrow());
@@ -61,13 +58,13 @@ class ManagedVaultLoadingTest {
             assertThat(result.get()).as("import request before passphrase: " + host.failures()).isNotDone();
             onEdt(() -> {
                 var prompt = host.windowContent("dev.jasper.vault", "Import SSH keys").orElseThrow();
-                render(prompt, retro, "passphrase");
+                render(prompt, "passphrase");
                 fields(prompt, JPasswordField.class).getFirst().setText("phrase"); button(prompt, "Unlock key").doClick();
             });
             settle(host);
             onEdt(() -> {
                 var prompt = host.windowContent("dev.jasper.vault", "Import SSH keys").orElseThrow();
-                assertThat(button(prompt, "Import and use").isEnabled()).isTrue(); render(prompt, retro, "review"); button(prompt, "Import and use").doClick();
+                assertThat(button(prompt, "Import and use").isEnabled()).isTrue(); render(prompt, "review"); button(prompt, "Import and use").doClick();
             });
             settle(host);
             assertThat((Optional<?>) result.get().get(5, TimeUnit.SECONDS)).isPresent();
@@ -95,7 +92,7 @@ class ManagedVaultLoadingTest {
             }
             onEdt(() -> {
                 host.invoke("dev.jasper.vault.open", owner.get().id(), null);
-                var manager = host.windowContent("dev.jasper.vault", "Credential Vault").orElseThrow(); render(manager, retro, "manager");
+                var manager = host.windowContent("dev.jasper.vault", "Credential Vault").orElseThrow(); render(manager, "manager");
                 assertThat(host.failures()).isEmpty();
             });
         } finally { onEdt(() -> new dev.jasper.app.appearance.ThemeController()); }
@@ -107,7 +104,7 @@ class ManagedVaultLoadingTest {
     }
     static JButton button(Container root, String text) { return fields(root, JButton.class).stream().filter(b -> text.equals(b.getText())).findFirst().orElseThrow(); }
     static void layout(Container c) { c.doLayout(); for (Component child : c.getComponents()) if (child instanceof Container nested) layout(nested); }
-    static void render(JComponent component, boolean retro, String name) {
+    static void render(JComponent component, String name) {
         try {
             component.addNotify();
             component.setSize(name.equals("manager") ? 980 : 660, name.equals("manager") ? 580 : 360);
@@ -121,7 +118,7 @@ class ManagedVaultLoadingTest {
             for (int scale : List.of(1, 2)) {
                 var image = new java.awt.image.BufferedImage(component.getWidth() * scale, component.getHeight() * scale, java.awt.image.BufferedImage.TYPE_INT_ARGB);
                 var graphics = image.createGraphics(); graphics.scale(scale, scale); component.printAll(graphics); graphics.dispose();
-                javax.imageio.ImageIO.write(image, "png", output.resolve((retro ? "retro" : "modern") + "-" + name + "-" + scale + "x.png").toFile());
+                javax.imageio.ImageIO.write(image, "png", output.resolve("modern-" + name + "-" + scale + "x.png").toFile());
             }
         } catch (Exception failure) { throw new AssertionError(failure); }
         finally { component.removeNotify(); }

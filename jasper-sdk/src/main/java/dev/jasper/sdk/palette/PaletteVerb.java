@@ -5,7 +5,7 @@ package dev.jasper.sdk.palette;
  * and Shift+Enter.
  *
  * @param id    lower-case identifier, unique within the scope: {@code [a-z][a-z0-9_.-]{0,127}}
- * @param label what the footer shows, such as "Paste and run"
+ * @param label what the hint bar shows next to this verb's key, such as "Paste and run"
  */
 public record PaletteVerb(String id, String label) {
     /** Validates both parts. */

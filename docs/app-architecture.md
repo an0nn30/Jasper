@@ -137,7 +137,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
 | `workspace` | EDT windows, tabs, splits, panes, panel regions and the rail, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions. WindowContent closes subscriptions/panes; each pane closes its session. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
-| `palette` | EDT scope/query/step state, keyboard routing, the Swing card and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
+| `palette` | EDT scope/query/step state, keyboard routing, the Swing palette popup and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
 | `config` | Immutable values and pure parsing; ConfigService owns background watch/reload work and marshals delivery to EDT. Application closes the service. |
 | `contributions` | EDT model of what extensions contribute to the chrome, in app-native types. Application owns the single instance; the plugin runtime writes it and every window renders it. |
 | `appearance` | EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles. |
@@ -162,8 +162,8 @@ list is documented in each package-info file and verified from compiled bytecode
 
 ## Resources and verification
 
-FlatLaf defaults and shell scripts keep their existing classpath paths. Reflection-based
-class references in theme properties must track package moves. Icons use absolute paths;
+Theme files and shell scripts keep their classpath paths. `ThemeManager.APP_DEFAULTS` names
+`SplitDividerBorder` by class name, so it must track package moves. Icons use absolute paths;
 Buddy loads its sprite relative to BuddySprite in its own jar. Artifact tests open actual
 jars, decode the PNG, resolve the configured divider class and reject test fixtures.
 
@@ -173,24 +173,32 @@ all package edges and supported Buddy signatures. Neither uses cycle exemptions.
 Javadoc and copied guide examples are normal check dependencies. See the
 [verification report](app-refactor-verification.md) for current evidence and manual gaps.
 
-## Restart-required appearance style
+## Window chrome
 
-`ThemeController` captures `ThemeStyle` from startup configuration before any plugin or
-workspace UI is constructed. Modern installs Jasper's FlatLaf defaults. Retro installs stock
-`MetalLookAndFeel` with `OceanTheme`; `MetalDefaults` adds semantic color aliases for app-owned
-painting to that LAF's defaults. It never replaces Swing delegates. `BuiltinTheme.RETRO`
-reports light chrome and owns a separate black terminal palette.
+Windows stack three rows: `MacTitleBar` (macOS only) is a title-only row,
+`MacTitleBar.TITLE_HEIGHT` (28 px) high, with the native controls and a centred bold title;
+`WindowChrome`'s IntelliJ-style toolbar (tab/window, pane, plugin and right-pinned
+Find/Settings groups; tooltips carry live shortcuts); and `WindowTabs`, IntelliJ editor tabs
+sized to content with a 3 px selection underline, wheel scrolling and a ▾ list of all tabs.
+Each pane's `FindBar` is IntelliJ's single-line find row. App icons resolve from bundled
+assets. Since SDK 0.7.6, plugin-supplied SVGs draw as authored and are no longer recoloured
+to the chrome foreground (see [SDK architecture](sdk-architecture.md)).
 
-Style stays fixed for the process lifetime. `ConfigurationController` derives a restart
-warning when saved and running styles differ, and removes it when they match; ordinary
-live settings still apply. New windows, hidden panels and plugin factories use the running
-style. No SDK signatures or plugin lifecycle change.
+## Themes
 
-Modern windows stack three rows: `MacTitleBar` (macOS only) is a title-only 28 px row with the
-native controls and a centred bold title; `WindowChrome`'s IntelliJ-style toolbar (tab/window,
-pane, plugin and right-pinned Find/Settings groups; tooltips carry live shortcuts); and
-`WindowTabs`, IntelliJ editor tabs sized to content with a 3 px selection underline, wheel
-scrolling and a ▾ list of all tabs. Each pane's `FindBar` is IntelliJ's single-line find row.
-Retro keeps its Metal toolbar, `RetroTabs`, text-button find bar and 32 px title row. App icons
-resolve from bundled assets. Since SDK 0.7.6, plugin-supplied SVGs draw as authored and are no
-longer recoloured to the chrome foreground (see [SDK architecture](sdk-architecture.md)).
+Every theme is an IntelliJ-format `.theme.json` under `dev/jasper/app/themes/`, installed by one
+path in `ThemeManager`:
+1. `ThemeLoader` resolves the `parentTheme` chain (parent entries first, the child's replacing
+   them in its order, so FlatLaf's in-order wildcards match IntelliJ's precedence), resolves the
+   `colors` table and drops IntelliJ implementation classes.
+2. FlatLaf's `IntelliJTheme` builds the look and feel with `ThemeManager.APP_DEFAULTS` (form
+   typography, split divider) as extra defaults.
+3. The manager puts back the explicit colours FlatLaf skips (IntelliJ-only namespaces such as
+   `SearchEverywhere.*`, `EditorTabs.*`, `ToolWindow.*`, `StatusBar.*`).
+4. `ChromeKeys` fills each `Jasper.*` chrome key the theme did not set from IntelliJ keys, with
+   contrast floors for derived text.
+
+Restored and derived keys are also recorded as the instance's extra defaults, so a rollback to it
+keeps them. The built-ins are `Theme.LIGHT` (classic IntelliJ Light, vendored from
+intellij-community with provenance under `themes/intellij/`) and `Theme.DARK` (`jasper-dark.theme.json`).
+Side panels paint `ToolWindow.background` through `ToolWindowSurface`; the rail stays chrome.

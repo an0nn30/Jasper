@@ -91,13 +91,12 @@ use `MacTitleBar`; dialogs retain their modal ownership, close guards and normal
 Title-only surfaces hide the unused tab component so the entire header uses `Jasper.titleBackground`.
 The rail and toolbar use that same semantic color in both themes. Dialogs are parented through
 `WindowOwner`, so an SDK type never exposes a frame or needs its own chrome API.
-The application's look and feel supplies `BrandedButtonUI` for ordinary Swing buttons in any
-plugin layout, including content added later. It retains FlatLaf interaction and border painting,
-uses TermLab form sizing (24-pixel minimum height, 72-pixel minimum text-button width,
-12-point labels) and follows UI refreshes. Gray secondary and blue default buttons use the
-ported dark/light palette; dark secondary text retains Jasper's contrast threshold.
-Text fields, password fields, formatted fields, text areas and dropdowns share the form styling.
-Toolbar button geometry stays independent (30-pixel height, 12-pixel arc).
+Ordinary Swing buttons, fields, lists and dropdowns in any plugin layout, including content
+added later, are drawn by FlatLaf in the installed theme's colours: classic IntelliJ Light or
+Jasper Dark. Form text, button labels included, uses the 12-point form font and follows UI font
+changes. Plugin side panels paint the theme's tool window colour (`ToolWindow.background`) behind
+plain containers; a background a plugin sets itself is kept. Toolbar button geometry stays
+independent (30-pixel height, 12-pixel arc).
 Small app-owned toolbar/rail/status controls keep their existing geometry. The SDK's ordinary-Swing
 component contract remains unchanged; plugin authors do not need a button factory.
 
@@ -161,7 +160,9 @@ and routes a `PaletteRequest` for its window to `WindowCommandPalette.open(scope
 `shortcutActionId`, only while the palette is open; closed, the plugin's own action handler runs
 and calls `Palette.open`. `plugins.HostedPalette` adapts an SDK scope: contained calls, a
 `PaletteQuery` built from the target's window and pane ids through the plugin's own handles, and
-the plugin's row kept as the app row's token so it comes back unchanged. `HostedContext.notices()`
+the plugin's row kept as the app row's token so it comes back unchanged. Every scope gets a tab;
+`ScopeSpec.inAll` (SDK 0.8.0, `withInAll(false)` to opt out) decides whether the All tab searches it
+too, and `HostedPalette` carries it as `PaletteScope.inAll()`. `HostedContext.notices()`
 reaches the last active window's error handler; `platform().openInEditor` runs the application's
 `ConfigEditor` on the plugin's executor and reports failure as a notice. `PaneInfo.shell` is
 `PaneSnapshot.shell`, the pane's launcher label. The bundled History and Snippets plugins are the first
@@ -224,39 +225,35 @@ disagree, the implementation is wrong, not the contract.
 Explicit commands in `LocalSpec`, and a stronger locality signal than the host name, such as a
 per-session token from Jasper's own shell integration.
 
-## Skin-aware icons (SDK 0.7.4)
+## Semantic and plugin icons (SDK 0.7.4)
 
-`Appearance.icon(String, OldGnomeIcon)` adds a default modern-only fallback for existing
-Appearance implementations. HostedUi and FakePluginContext override it; no contribution
+SDK 0.8.0 removed `OldGnomeIcon` and `Appearance.icon(String, OldGnomeIcon)`; plugins use
+`icon(IconName)` or `icon(String)`.
+
+HostedUi and FakePluginContext implement `Appearance.icon(IconName)`; no contribution
 record changes. HostedUi converts enum names into validated app-native catalog keys at the
 plugin boundary. SDK types never enter platform/workspace/contribution production packages.
 
-The platform owns the explicit OldGNOME2 resource catalog and a captured retro ImageIcon.
-WindowChrome requests a separate 28px variant for host toolbar placements; shared action,
-menu and palette icons stay 16px. WindowContributions also populates Swing's SMALL_ICON
-property so menu items receive the compact artwork. Modern SVG foreground recoloring stays
-live. Legacy/custom icons are returned unchanged by the sizing helper. No global cache holds
-plugin class loaders: only the fixed raster catalog is cached. Style changes still require restart.
-See [the icon catalog and compatibility contract](sdk-icons.md).
+Shared action, menu and palette icons stay 16px. WindowContributions also populates Swing's
+SMALL_ICON property so menu items receive the compact artwork. SVG foreground recoloring
+stays live. See [the icon catalog and compatibility contract](sdk-icons.md).
 
 ### Host-owned semantic catalog (SDK 0.7.4)
 
 `Appearance.icon(IconName)` is now preferred. The SDK carries meanings only. HostedUi
-translates the enum at the boundary; AppIcons/NamedIcons select app-owned modern SVG or
-OldGNOME2 raster using the running skin, never the plugin loader. The old custom overloads
-remain supported. Vault uses semantic LOCK/UNLOCK in its status/menu and manager controls.
-The fake returns inspectable FakeNamedIcon(name, retro); older custom Appearance implementations
-inherit an explicit UnsupportedOperationException for this method until they implement it.
+translates the enum at the boundary; AppIcons/NamedIcons select the app-owned SVG, never
+the plugin loader. The old custom overload remains supported. Vault uses semantic LOCK/UNLOCK
+in its status/menu and manager controls. The fake returns inspectable `FakeNamedIcon(name)`;
+older custom Appearance implementations inherit an explicit UnsupportedOperationException for
+this method until they implement it.
 
 ### Chrome icons and session tab icons (SDK 0.7.6)
 
-- `IconName` and `OldGnomeIcon` gain `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Retro artwork copies
-  existing GNOME2/OldGNOME2 rasters; modern artwork is IntelliJ classic-UI SVG vendored under
-  `jasper-app/.../icons/intellij/` (Apache-2.0, hash-pinned in `assets.tsv`).
-- Behaviour change: `Appearance.icon(String)` and the modern half of `icon(String, OldGnomeIcon)`
-  no longer recolour to the chrome foreground. They draw the SVG as authored; FlatLaf's global
-  colour filter maps IntelliJ light-palette colours to the running theme. Grey `#6E6E6E` artwork
-  looks as before.
+- `IconName` gains `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Artwork is IntelliJ classic-UI SVG
+  vendored under `jasper-app/.../icons/intellij/` (Apache-2.0, hash-pinned in `assets.tsv`).
+- Behaviour change: `Appearance.icon(String)` no longer recolours to the chrome foreground. It
+  draws the SVG as authored; FlatLaf's global colour filter maps IntelliJ light-palette colours
+  to the running theme. Grey `#6E6E6E` artwork looks as before.
 - `SessionSpec.icon` is no longer reserved: it is the tab icon. Empty shows `IconName.TERMINAL`.
   Inside the app the icon travels opaquely on `SessionRequest`.
 
@@ -276,7 +273,7 @@ never request closure. Host-owned fonts refresh overlay content with the rest of
 ## File workflow additions (SDK 0.7.5)
 
 Host-owned semantic icons now cover file/link navigation, upload/download, new folder and
-pause/resume. Plugins carry no skin artwork. Owner-scoped `Windows.chooseFiles` and
+pause/resume. Plugins carry no artwork for them. Owner-scoped `Windows.chooseFiles` and
 `chooseDirectory` bridge through native `PathChoice`/`PathChooser` values; `HostedUi` tracks
 owner cancellation before entering the modal picker and rejects late results after teardown.
 

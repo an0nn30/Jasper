@@ -73,7 +73,7 @@ built-in chrome; a plugin supplies titles, icons and handlers, never components.
 private static void installUi(PluginContext context, long stepMillis) {
     PluginAction[] demo = new PluginAction[1];
     demo[0] = context.actions().register(ActionSpec.of(DEMO, "Run Sample Activity")
-            .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg", OldGnomeIcon.EXECUTE))
+            .withIcon(context.appearance().icon("dev/jasper/sample/flask.svg"))
             .withKeywords(List.of("sample", "demo", "activity"))
             .withDefaultBinding("cmd+alt+j"),
         invoked -> {
@@ -107,35 +107,25 @@ private static void installUi(PluginContext context, long stepMillis) {
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
-- **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6
-  (`sdk = ">=0.7.6, <0.8"`) adds `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Jasper supplies
-  IntelliJ-style artwork in modern and OldGNOME2 artwork in retro, and selects the skin; plugins
-  need no artwork or style check. Returned icons are 16px, with separate 28px variants in retro
-  host toolbars. For custom artwork, draw a 16×16 SVG in the IntelliJ light palette (grey
-  `#6E6E6E`, blue `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`) and load it with
-  `icon("path/in/your/jar.svg")`: since 0.7.6 it is drawn in its own colours, and palette colours
-  follow dark and light themes. Colour carries meaning: green for run or success, red for stop or
-  error, blue for navigation and transfer, grey for everything else. Pair the path with an
-  `OldGnomeIcon` for retro, as the sample demonstrates. A session's `SessionSpec.icon` becomes its
-  tab icon. See the [catalog and testing example](sdk-icons.md).
+- **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
+  `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.8.0, <0.9"`.
+  Jasper supplies IntelliJ-style artwork; plugins need no artwork. Returned icons are 16px.
+  For custom artwork, draw a 16×16 SVG in the IntelliJ light palette (grey `#6E6E6E`, blue
+  `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`) and load it with
+  `icon("path/in/your/jar.svg")`: it is drawn in its own colours, and palette colours follow
+  dark and light themes. Colour carries meaning: green for run or success, red for stop or
+  error, blue for navigation and transfer, grey for everything else. A session's
+  `SessionSpec.icon` becomes its tab icon. See the [catalog and testing example](sdk-icons.md).
 - **Threads.** Register and mutate on the event thread. Event handlers already run there, so
   updating a status item from a handler, as the sample does, needs no marshaling.
 
 ## Consistent buttons, flexible layouts
 
-Use ordinary `JButton` components inside plugin content. In modern mode Jasper's look and feel supplies the
-TermLab reference styling: 24-logical-pixel minimum height, 72-pixel minimum text-button width,
-12-point labels, subtly rounded gray secondary buttons and blue default buttons. Text fields
-use square borders; dropdowns and lists use the reference selection colors. Dark and light
-palettes come from TermLab's theme definitions. The dark secondary text is slightly lighter
-than the source (#A7AEBB instead of #A0A7B4) to preserve the existing 4.5:1 contrast check;
-disabled button text retains Jasper's contrast-tested defaults.
-
-Retro mode supplies stock light Metal/Ocean delegates, fonts, borders and form buttons.
-No plugin changes or SDK version bump are required. `Variant.LIGHT` describes application
-chrome brightness; terminal colors are independent and retro terminals remain black.
-Plugin SVGs and custom artwork retain their existing contracts. The host's tab-close,
-toolbar and status controls use compact flat presentation; plugin form buttons retain Metal.
+Use ordinary `JButton` components inside plugin content. They are drawn by FlatLaf in the
+installed theme's colours, classic IntelliJ Light or Jasper Dark, with 12-point labels; text
+fields, dropdowns and lists use the theme's own colours and selection. Leave plain panels at the
+look and feel's background so a side panel shows the theme's tool window colour, and read any
+colour you need from `UIManager` keys rather than hard-coding it, so it follows a theme change.
 
 Swing actions, mnemonics, focus and disabled states retain their behavior. Set the hosting
 `JRootPane`'s default button when a form attaches and release it when the form detaches, so a
@@ -163,7 +153,7 @@ without your plugin ever seeing a frame.
 <!-- example:pluginpanels -->
 ```java
 private static void installPanelAndWindow(PluginContext context, long stepMillis) {
-    var icon = context.appearance().icon("dev/jasper/sample/flask.svg", OldGnomeIcon.EXECUTE);
+    var icon = context.appearance().icon("dev/jasper/sample/flask.svg");
     // One instance per window, built the first time the panel is shown there.
     context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", icon, Anchor.LEFT), host -> {
         var run = new JButton("Run sample activity");
@@ -342,11 +332,12 @@ private static void connectEcho(PendingSession pending, long stepMillis) {
 ## Palette scopes
 
 A scope is one kind of searchable thing in the command palette, beside Commands. Declare
-`palette.contribute`, register a `PaletteScope` through `context.palette()`, and the scope appears in
-every window's scope picker under its label and `>alias`. The spec is read once; its id must start
+`palette.contribute`, register a `PaletteScope` through `context.palette()`, and the scope gets a tab
+in every window's palette and a section in its All tab (`withInAll(false)` keeps a scope, such as
+Vault's secrets, out of All). The spec is read once; its id must start
 with your plugin id. Search, `available`, `step` and `execute` run on the UI thread and must do no
 I/O: keep an index, refresh it in the background and tell the palette through the `onChanged`
-listener. The palette shows at most `maxResults` rows and never scrolls. A verb may return a
+listener. Return at most `maxResults` rows. A verb may return a
 `PaletteStep` (a small form) instead of running at once; its completion answers `done()`,
 `error(message)` (keeps the form open) or `reopen(scopeId, rowId, query)`, which dismisses and
 reopens the palette elsewhere, in any registered scope. `Palette.open` does the same from an action;
@@ -389,9 +380,9 @@ private static void installPaletteDemo(PluginContext context) {
     List<String> greetings = List.of("good morning", "hello", "hi there");
     context.palette().register(new PaletteScope() {
         @Override public ScopeSpec spec() {
-            return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings, or > to switch scope",
+            return ScopeSpec.of(GREETINGS, "Greetings", "Search greetings",
                     List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run")))
-                .withAliases(List.of("greet")).withShortcutActionId(GREETINGS_OPEN);
+                .withShortcutActionId(GREETINGS_OPEN);
         }
         // Search runs on the UI thread for every keystroke: rank what is already in memory, never read files here.
         @Override public PaletteResults search(String query, PaletteQuery palette) {

@@ -1,6 +1,6 @@
 actual UIScale=2x
 root=1800x1200
-palette=340,373 1120x512
-preferredWidth=1120
-inputHeight=112
-rowHeight=80
+palette=220,368 1360x480
+preferredWidth=1360
+inputHeight=80
+rowHeight=48

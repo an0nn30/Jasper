@@ -28,4 +28,10 @@ class VersionRangeTest {
         for (String bad : new String[]{"0.1", "~1.0", ">=", ">=1,,<2", "=>1"})
             assertThatIllegalArgumentException().as(bad).isThrownBy(() -> VersionRange.parse(bad));
     }
+
+    @Test void pluginsBuiltForSdkZeroSevenAreIncompatibleWithZeroEight() {
+        var host = Version.parse(dev.jasper.sdk.JasperSdk.VERSION);
+        assertThat(VersionRange.parse(">=0.7.4, <0.8").contains(host)).isFalse();
+        assertThat(VersionRange.parse(">=0.8.0, <0.9").contains(host)).isTrue();
+    }
 }

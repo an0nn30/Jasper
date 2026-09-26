@@ -91,4 +91,4 @@ clipboard timing. The following checks need a user-run Jasper window:
 
 8. Search and filter the manager; verify two-line rows, empty results, double-click/Enter editing,
    and palette navigation revealing a row hidden by a prior filter. Open each + and More action.
-   Compare buttons, inputs and list colors to the TermLab reference in light and dark themes.
+   Compare buttons, inputs and list colors with IntelliJ Light and Jasper Dark.

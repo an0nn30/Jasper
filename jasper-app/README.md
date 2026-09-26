@@ -77,5 +77,3 @@ the maintenance guide lists each route.
 A new resource must be tested from the produced jar. FlatLaf and shell-integration
 resource paths remain under `dev/jasper/app/`; moving a Java class can still require
 updating reflective class names in `.properties` files.
-
-For stock light Metal controls and a high-contrast terminal, see [Retro Metal appearance](../docs/configuration.md#retro-metal-appearance). The style requires a full process restart.

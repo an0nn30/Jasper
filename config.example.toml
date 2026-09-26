@@ -31,8 +31,7 @@ long_command_seconds = 10
 enabled = false
 
 [palette]
-# Live. Rows the command palette shows in every scope (Commands and History). Range: 1-20.
-# Cmd/Ctrl+1-5 still act on the first five rows.
+# Live. Rows each palette scope shows, and the All tab shows per scope. Range: 1-20.
 max_results = 5
 
 [font]
@@ -92,22 +91,16 @@ blink = true
 
 [ui.font]
 # Live UI font for app chrome and plugin controls, independent of terminal [font].
-# "system" uses the current style's platform font on macOS, Linux and Windows.
+# "system" uses the platform font on macOS, Linux and Windows.
 # A missing named font falls back to that platform font.
 family = "system"
 # Optional size: 8-32 points, including fractional values. Omit to keep platform sizing.
 # size = 14.0
 
 [ui.theme]
-# Application style: "modern" or "retro" (stock light Java Metal).
-# Set style to "retro" for Metal controls, classic icons and a high-contrast terminal.
-# Restart required: fully quit and relaunch, including when background residency is enabled.
-# Reload reports the pending style change; existing windows keep their current style.
-style = "modern"
-# Variant applies only to modern; retro always uses light controls and a dark terminal.
 # Live across open windows. Options: "dark" or "light" for the FlatLaf chrome.
 variant = "dark"
-# Terminal colors, live and modern only: "match" follows variant; "light" or "dark" is independent of the UI.
+# Terminal colors, live: "match" follows variant; "light" or "dark" is independent of the UI.
 terminal = "match"
 
 [keybindings]

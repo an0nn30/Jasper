@@ -3,7 +3,6 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.TerminalColors;
-import dev.jasper.app.config.ThemeStyle;
 import dev.jasper.terminal.config.Palette;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -25,7 +24,7 @@ class TerminalColorsTest {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owners = new WindowContent[2];
         edt(() -> {
-            var themes = new ThemeController(ThemeStyle.MODERN, Appearance.LIGHT);
+            var themes = new ThemeController(Appearance.LIGHT);
             owners[0] = content(launcher(pending), themes);
             owners[1] = content(launcher(pending), themes);
         });
@@ -60,7 +59,7 @@ class TerminalColorsTest {
 
     @Test void appearanceMenuOffersTerminalChoicesThatApplyLiveAndReflectTheCurrentChoice() throws Exception {
         edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()), new ThemeController(ThemeStyle.MODERN, Appearance.DARK));
+            var owner = content(launcher(new ArrayDeque<>()), new ThemeController(Appearance.DARK));
             owner.updateActions();
             JMenu menu = appearance(owner);
             List<JRadioButtonMenuItem> items = terminalItems(menu);
@@ -75,15 +74,6 @@ class TerminalColorsTest {
             open(menu);
             assertThat(items.get(2).isSelected()).isTrue();
             assertThat(items).allMatch(JMenuItem::isEnabled);
-        });
-    }
-
-    @Test void retroShowsTheTerminalChoicesDisabled() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()), new ThemeController(ThemeStyle.RETRO, Appearance.LIGHT));
-            owner.updateActions();
-            assertThat(terminalItems(appearance(owner))).hasSize(3).noneMatch(JMenuItem::isEnabled);
-            assertThat(owner.terminalColors()).isEqualTo(TerminalColors.MATCH);
         });
     }
 

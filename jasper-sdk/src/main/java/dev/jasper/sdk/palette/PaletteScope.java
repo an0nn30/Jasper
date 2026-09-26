@@ -57,7 +57,8 @@ public interface PaletteScope {
     void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context);
 
     /**
-     * The scope became active in an open palette; a scope may ask its index for a background refresh.
+     * Called when the palette opens on this scope's own tab, and when it opens on All or switches to
+     * All while this scope takes part; a scope may ask its index for a background refresh.
      *
      * @param context the query context
      */

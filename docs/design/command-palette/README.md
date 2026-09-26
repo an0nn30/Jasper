@@ -1,5 +1,10 @@
 # Command palette verification
 
+Regenerated on 2026-09-25 for the Search Everywhere palette (All and scope tabs, IntelliJ Light and
+Jasper Dark). The Recents, `pane`, No match and Long labels states now render the All tab. The
+History and Snippets images, and the notes about the chip, the `>` picker and numbered badges
+further down, record the earlier palette.
+
 These images render the real `WindowContent`, `JRootPane`, terminal component,
 command registry, in-memory history, and palette overlay. The fixture creates no
 `JFrame` and never starts the user's login shell. On macOS and Linux it runs the
@@ -28,7 +33,7 @@ the rest carry no directory. Every third synthetic entry is bash and the rest ar
 | Long labels, 360×500 | [1×](long-labels-narrow-dark-360x500-1x.png) / [2×](long-labels-narrow-dark-360x500-2x.png) | [1×](long-labels-narrow-light-360x500-1x.png) / [2×](long-labels-narrow-light-360x500-2x.png) |
 | History, most recent (15 entries, the newest 5 shown) | [1×](history-recent-dark-900x600-1x.png) / [2×](history-recent-dark-900x600-2x.png) | [1×](history-recent-light-900x600-1x.png) / [2×](history-recent-light-900x600-2x.png) |
 | History, `git` query, two results | [1×](history-query-dark-900x600-1x.png) / [2×](history-query-dark-900x600-2x.png) | [1×](history-query-light-900x600-1x.png) / [2×](history-query-light-900x600-2x.png) |
-| Scope picker (`>`) | [1×](scope-picker-dark-900x600-1x.png) / [2×](scope-picker-dark-900x600-2x.png) | [1×](scope-picker-light-900x600-1x.png) / [2×](scope-picker-light-900x600-2x.png) |
+| Commands tab, `pane` | [1×](commands-tab-dark-900x600-1x.png) / [2×](commands-tab-dark-900x600-2x.png) | [1×](commands-tab-light-900x600-1x.png) / [2×](commands-tab-light-900x600-2x.png) |
 | Snippets, five of six shown | [1×](snippets-dark-900x600-1x.png) / [2×](snippets-dark-900x600-2x.png) | [1×](snippets-light-900x600-1x.png) / [2×](snippets-light-900x600-2x.png) |
 | Snippet fill-in step (`Deploy`, two fields) | [1×](snippet-fill-in-dark-900x600-1x.png) / [2×](snippet-fill-in-dark-900x600-2x.png) | [1×](snippet-fill-in-light-900x600-1x.png) / [2×](snippet-fill-in-light-900x600-2x.png) |
 | History save-name step (`npm run dev`) | [1×](history-save-name-dark-900x600-1x.png) / [2×](history-save-name-dark-900x600-2x.png) | [1×](history-save-name-light-900x600-1x.png) / [2×](history-save-name-light-900x600-2x.png) |
@@ -36,8 +41,8 @@ the rest carry no directory. Every third synthetic entry is bash and the rest ar
 The 1×/2× labels above describe output pixels: both paint the same logical Swing
 geometry. A separate fresh JVM with `flatlaf.uiScale=2x` produced the
 [actual UI-scale render](actual-ui-scale-2x.png) and [dimension record](actual-ui-scale-2x.txt).
-The assertions measured a 1120px preferred card width, 112px input row and 80px
-result row, exactly twice the 560/56/40 logical geometry and therefore scaled once.
+The assertions measured a 1360px preferred card width, 80px input row and 48px
+result row, exactly twice the 680/40/24 logical geometry and therefore scaled once.
 
 All 28 matrix PNGs and the UI-scale image were inspected with the image tool. The
 controller independently inspected a cross-theme/state subset. The first render

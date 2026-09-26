@@ -17,7 +17,6 @@ import dev.jasper.sdk.services.ServiceUnavailableException;
 import dev.jasper.sdk.services.Services;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.Appearance;
-import dev.jasper.sdk.ui.OldGnomeIcon;
 import dev.jasper.sdk.ui.Menus;
 import dev.jasper.sdk.ui.Panels;
 import dev.jasper.sdk.ui.Rail;
@@ -177,12 +176,7 @@ public final class FakePluginContext implements PluginContext {
                 return events().subscribe(AppEvents.THEME_CHANGED, event -> handler.accept(event.variant()));
             }
             @Override public javax.swing.Icon icon(dev.jasper.sdk.ui.IconName name) {
-                return new FakeNamedIcon(java.util.Objects.requireNonNull(name, "name"), host.retroIcons());
-            }
-            @Override public javax.swing.Icon icon(String modernSvgResourcePath, OldGnomeIcon retroIcon) {
-                java.util.Objects.requireNonNull(retroIcon, "retroIcon");
-                icon(modernSvgResourcePath);
-                return new FakeSkinIcon(modernSvgResourcePath, retroIcon, host.retroIcons());
+                return new FakeNamedIcon(java.util.Objects.requireNonNull(name, "name"));
             }
             @Override public javax.swing.Icon icon(String svgResourcePath) {
                 if (svgResourcePath == null || plugin.getClass().getClassLoader().getResource(svgResourcePath) == null)

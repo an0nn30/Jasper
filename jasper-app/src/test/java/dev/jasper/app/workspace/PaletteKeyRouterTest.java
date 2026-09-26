@@ -48,12 +48,12 @@ class PaletteKeyRouterTest {
                 var count = new AtomicInteger();
                 owner.commands().register(command("fixture", count::incrementAndGet));
                 owner.commandPalette().toggle(); owner.commandPalette().component().queryField().setText("fixture");
-                assertThat(router.dispatch(press(owner, KeyEvent.VK_1, primary(mac)))).isTrue();
+                assertThat(router.dispatch(press(owner, KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(count.get()).isEqualTo(1);
                 assertThat(owner.commandPalette().isOpen()).isFalse();
-                assertThat(router.dispatch(press(other, KeyEvent.VK_1, primary(mac)))).isTrue();
-                assertThat(router.dispatch(typed(other, '1'))).isTrue();
-                assertThat(router.dispatch(release(other, KeyEvent.VK_1))).isTrue();
+                assertThat(router.dispatch(press(other, KeyEvent.VK_ENTER, 0))).isTrue();
+                assertThat(router.dispatch(typed(other, '\n'))).isTrue();
+                assertThat(router.dispatch(release(other, KeyEvent.VK_ENTER))).isTrue();
                 assertThat(count.get()).isEqualTo(1);
                 assertThat(router.dispatch(press(other, KeyEvent.VK_K, primary(mac)))).isFalse();
                 assertThat(router.dispatch(typed(other, 'k'))).isFalse();
@@ -100,7 +100,7 @@ class PaletteKeyRouterTest {
         });
     }
 
-    @Test void missingNumberNavigationStaleResultAndImePreserveEditorOwnership() throws Exception {
+    @Test void missingNavigationStaleResultAndImePreserveEditorOwnership() throws Exception {
         edt(() -> {
             try (var owner = owner(false)) {
                 var root = install(owner); var router = router(owner, false, root);
@@ -110,9 +110,9 @@ class PaletteKeyRouterTest {
                 owner.commandPalette().toggle(); var card = owner.commandPalette().component();
                 card.queryField().setText("fixture");
                 for (int i = 0; i < 6; i++) assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_DOWN, 0))).isTrue();
-                assertThat(dev.jasper.app.palette.PaletteTestSupport.resultList(card).getSelectedIndex()).isEqualTo(1);
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRowIndex(card)).isEqualTo(1);
                 for (int i = 0; i < 6; i++) router.dispatch(press(card.queryField(), KeyEvent.VK_UP, 0));
-                assertThat(dev.jasper.app.palette.PaletteTestSupport.resultList(card).getSelectedIndex()).isZero();
+                assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRowIndex(card)).isZero();
                 assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_5, primary(false)))).isTrue();
                 assertThat(router.dispatch(typed(card.queryField(), '5'))).isTrue();
                 router.dispatch(release(card.queryField(), KeyEvent.VK_5));
@@ -131,13 +131,13 @@ class PaletteKeyRouterTest {
                     null, 0, null, null);
                 for (var listener : card.queryField().getInputMethodListeners()) listener.inputMethodTextChanged(committed);
                 owner.commandPalette().toggle(); registration.close();
-                PaletteTestSupport.setResults(card, PaletteTestSupport.rows(owner.commandsScope(), List.of(first)), null, null);
+                PaletteTestSupport.setRows(card, owner.commandsScope(), PaletteTestSupport.rows(owner.commandsScope(), List.of(first)), null);
                 assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0))).isTrue();
                 assertThat(count.get()).isZero();
                 router.dispatch(release(card.queryField(), KeyEvent.VK_ENTER));
                 owner.commandPalette().toggle(); second.action().setEnabled(false);
-                PaletteTestSupport.setResults(card, PaletteTestSupport.rows(owner.commandsScope(), List.of(second)), null, null);
+                PaletteTestSupport.setRows(card, owner.commandsScope(), PaletteTestSupport.rows(owner.commandsScope(), List.of(second)), null);
                 router.dispatch(press(card.queryField(), KeyEvent.VK_ENTER, 0));
                 assertThat(count.get()).isZero();
             }

@@ -2,6 +2,53 @@
 
 ## Current state — 2026-09-23
 
+- **One layout** (branch `claude/theme-engine`, plan `docs/superpowers/plans/2026-09-25-jasper-single-layout.md`):
+  the retro style, Metal, the GNOME/Tango/OldGNOME rasters and `ui.theme.style` are gone; every
+  window uses the IntelliJ-style chrome. SDK 0.8.0 removes `OldGnomeIcon` and
+  `Appearance.icon(String, OldGnomeIcon)`; bundled plugins require `>=0.8.0, <0.9`. Plan
+  deviation: the title-row constant is `MacTitleBar.TITLE_HEIGHT` (`HEIGHT` hid
+  `ImageObserver.HEIGHT`). Next: the theme engine with IntelliJ-format themes and IntelliJ
+  Light (part 2). Not merged, not pushed.
+- **Theme engine** (branch `claude/theme-engine`, plan
+  `docs/superpowers/plans/2026-09-25-jasper-theme-engine.md`):
+  - **Themes:** every theme is an IntelliJ-format `.theme.json` installed by `ThemeManager`. Light
+    is classic IntelliJ Light, vendored from intellij-community at `f7377708`. Dark is
+    `jasper-dark.theme.json`, keeping today's colours.
+  - **Keys:** `ChromeKeys` derives the `Jasper.*` chrome keys a theme leaves unset.
+  - **Surfaces:** side panels paint `ToolWindow.background`, and the status bar paints `StatusBar.*`
+    under a 1-px rule.
+  - **Removed:** the FlatLaf properties overrides, `BrandedButtonUI` and `BuiltinTheme`.
+  - **Planning decisions:** listed in the plan header. They cover the rail staying chrome, contrast
+    floors for derived text, FlatLaf form-control heights, and Jasper Dark menus using the list
+    selection.
+  - **Spike and deviations:** IntelliJ Light and Jasper Dark matched on the first run, so the
+    dark-parent fallback was not needed. The plan's status lists the deviations.
+  - **Accepted Jasper Dark differences:** FlatLaf builds IntelliJ dark themes on its Darcula base.
+    `jasper-dark.theme.json` pins the 52 drifted values Jasper draws. The rest are:
+    - ruled: menu selection, form heights, `Jasper.palette*`;
+    - set by FlatLaf after the theme: the spinner and editable combo follow `TextField.background`,
+      and toggle and tab underline colours come from `{*-dark}`;
+    - not drawn: AWT system colours, internal frames, sliders, hidden tab and scroll-bar buttons,
+      progress text, and FlatLaf-only window borders.
+
+    The plan's status has the full list.
+  - **Not done:** visual acceptance of Light and Dark (user-run), merge and push.
+- **Search Everywhere palette** (branch `claude/theme-engine`, plan
+  `docs/superpowers/plans/2026-09-25-jasper-search-everywhere.md`):
+  - **Tabs:** All first (Cmd/Ctrl+K), then one tab per scope.
+  - **All tab:** groups each participating scope's matches, capped per scope, with a "More in…"
+    row. SDK 0.8.0 adds `ScopeSpec.withInAll`; Vault opts out.
+  - **Rows:** one line, with a hint bar showing the other verbs. Tab and Shift+Tab switch tabs.
+  - **Colours** come from the theme's `SearchEverywhere.*`, `List.*`, `Popup.borderColor`,
+    `Popup.dropShadowColor` and `Component.linkColor`.
+  - **Removed:** the `>` picker, scope aliases, the Cmd+1–5 row shortcuts and the `Jasper.palette*`
+    keys.
+  - **Deviations:** View → Command Palette opens All too; a step from All closes with its scope;
+    the tag drops before the detail; All caps at 200 rows; the shortcut reference and config
+    template drop Cmd+1–5. Details in the plan's status banner.
+  - **Planning decisions:** listed in the plan header.
+  - **Not done:** visual acceptance (user-run), merge and push.
+
 ### IntelliJ-style chrome and follow-ups — merged 2026-09-25
 
 - **IntelliJ-style modern chrome** (branch `claude/intellij-chrome`, plan
@@ -260,7 +307,7 @@ Implemented on `codex/retro-metal` in `/Users/dustin/.codex/worktrees/retro-meta
 based on `ac02f94`, following the approved [design](superpowers/specs/2026-09-22-jasper-retro-metal-design.md)
 and [plan](superpowers/plans/2026-09-22-jasper-retro-metal.md). The user chose native inline
 execution with one independent final review. Headless verification and the independent review fix pass are complete.
-See [configuration](configuration.md#retro-metal-appearance) to enable it.
+See [configuration](configuration.md) to enable it.
 
 Retro uses Metal/Ocean, light controls, black high-contrast terminal colors and bundled GNOME
 icons. The startup style stays fixed; reload derives a restart notice while sessions and
