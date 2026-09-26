@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Plan written 2026-09-25 and awaiting user review; not started. This is plan 3a of the spec. Plan 3b, the bundled set, follows it.
+**Status:** Executed 2026-09-25/26 on branch `claude/theme-import`, subagent-driven (Tasks 1–8 plus one final-review fix wave, `dee8de96..4728d98f`). Deviations: the plan's own inline links broke `AppDocumentationTest` (fixed in the plan); an invalid scheme colour falls through to the parent scheme (decision 7 corrected); `ThemeArchive` isolates each nested jar, reports a null file name and tests the nested entry cap; `ThemeCatalog` contains every per-file failure; the final review added: blank or `null` `ui` values are ignored, UI-delegate keys and non-FlatLaf class names are dropped, a theme that fails to install never stops start-up or configuration (a warning), providers are de-duplicated and capped at 64 with batched reads and a 256 MiB inflation budget for nested jars, `ConfigService` survives any `Throwable`, colour resolution is memoized, `<extensions xmlns="com.intellij">` is accepted, and two test restores no longer pin `UIManager` defaults (the `ThemeManagerTest` flake). Open: the inflation budget does not yet cover plain `.jar` reads (bounded; follow-up). Not done: plan 3b, visual acceptance (user-run), merge and push.
 
 **Goal:** Let Jasper use any JetBrains Marketplace theme plugin dropped into `<home>/themes/`, chosen by name with `ui.theme.name`, with the theme's editor-scheme console colours as the terminal palette.
 
