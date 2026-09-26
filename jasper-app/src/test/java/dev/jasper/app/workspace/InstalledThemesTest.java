@@ -4,6 +4,7 @@ import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeFixtures;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.application.ConfigurationTestSupport;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
@@ -92,6 +93,24 @@ class InstalledThemesTest {
             assertThat(themes.current().chrome()).isEqualTo(Theme.DARK);
             assertThat(controller.shown().diagnostics()).singleElement().satisfies(problem ->
                 assertThat(problem.message()).contains("Unknown theme \"\"").contains("keeping Jasper Dark"));
+        });
+    }
+
+    @Test void aThemeThatFailsToInstallNeverStopsConfigurationAndIsReportedInstead() throws Exception {
+        ThemeFixtures.plugin(themes().resolve("fixture.jar"), "Fixture Dark", true, "#123456", "101820");
+        Files.writeString(config(), "[ui.theme]\nname = 'Fixture Dark'\n");
+        service = new ConfigService(config(), false);
+        var catalog = ThemeCatalog.beside(config());
+        service.watchWith(catalog::scan).get();
+        edt(() -> {
+            var themes = new ThemeController(theme -> !theme.name().equals("Fixture Dark") && ThemeTestSupport.install(theme));
+            controller = new ConfigurationTestSupport(themes, service, catalog);
+            assertThat(themes.current().chrome()).isEqualTo(Theme.DARK);
+            assertThat(controller.shown().diagnostics()).singleElement().satisfies(problem -> {
+                assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
+                assertThat(problem.key()).isEqualTo("ui.theme.name");
+                assertThat(problem.message()).contains("Could not apply theme \"Fixture Dark\"").contains("keeping Jasper Dark");
+            });
         });
     }
 

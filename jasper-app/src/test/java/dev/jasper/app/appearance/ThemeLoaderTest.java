@@ -3,10 +3,12 @@ package dev.jasper.app.appearance;
 import com.formdev.flatlaf.json.Json;
 import java.awt.Color;
 import java.io.StringReader;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class ThemeLoaderTest {
     private static ThemeLoader loader(Map<String, String> files) {
@@ -59,6 +61,25 @@ class ThemeLoaderTest {
         assertThat(resolved.colors()).containsEntry("Panel.background", new Color(0xf2f2f2));
     }
 
+    @Test void resolvingA20000LinkChainOfNamedColoursIsNotCubic() throws Exception {
+        // "link" (not hex digits) keeps a name like "link10000" from ever accidentally matching the hex pattern.
+        var json = new StringBuilder("{\"name\": \"Child\", \"colors\": {");
+        for (int i = 0; i < 20_000; i++) {
+            if (i > 0) json.append(',');
+            json.append("\"link").append(i).append("\":\"").append(i == 19_999 ? "#123456" : "link" + (i + 1)).append('"');
+        }
+        json.append("}, \"ui\": {");
+        for (int i = 0; i < 20_000; i++) {
+            if (i > 0) json.append(',');
+            json.append("\"k").append(i).append("\":\"link").append(i).append('"');
+        }
+        json.append("}}");
+        var resolved = assertTimeoutPreemptively(Duration.ofSeconds(5),
+            () -> loader(Map.of("child.json", json.toString())).load("child.json"));
+        var ui = ui(resolved);
+        for (int i = 0; i < 20_000; i++) assertThat(ui).as("k" + i).containsEntry("k" + i, "#123456");
+    }
+
     @Test void valuesThatNameNoThemeColourPassThroughUnchanged() throws Exception {
         var resolved = loader(Map.of("child.json", """
             {"name": "Child", "colors": {"panel": "#f2f2f2"},
@@ -76,6 +97,35 @@ class ThemeLoaderTest {
               "Panel.background": "#f2f2f2"}}"""))
             .load("child.json"));
         assertThat(ui).containsOnlyKeys("Panel.background");
+    }
+
+    @Test void blankOrNullUiValuesAreDroppedWithAWarningNamingEachKey() throws Exception {
+        var resolved = loader(Map.of("child.json", """
+            {"name": "Child", "ui": {"Label.foreground": "", "Panel.background": "null", "A.x": "#010101"}}"""))
+            .load("child.json");
+        assertThat(ui(resolved)).containsOnlyKeys("A.x");
+        assertThat(resolved.warnings()).hasSize(2)
+            .anySatisfy(warning -> assertThat(warning).contains("child.json").contains("\"Label.foreground\""))
+            .anySatisfy(warning -> assertThat(warning).contains("child.json").contains("\"Panel.background\""));
+    }
+
+    @Test void anyKeyEndingInUiIsDroppedRegardlessOfValue() throws Exception {
+        var ui = ui(loader(Map.of("child.json", """
+            {"name": "Child", "ui": {"PanelUI": "#f2f2f2", "Button.UI": "#f2f2f2", "MenuBar.UI": "#f2f2f2",
+              "Panel.background": "#f2f2f2"}}"""))
+            .load("child.json"));
+        assertThat(ui).containsOnlyKeys("Panel.background");
+    }
+
+    @Test void classNameLookingValuesAreDroppedUnlessTheyAreFlatLaf() throws Exception {
+        var ui = ui(loader(Map.of("child.json", """
+            {"name": "Child", "ui": {"CheckBox.icon": "probe.Other", "CheckBox.icon2": "com.formdev.flatlaf.icons.FlatCheckBoxIcon",
+              "A.a": "#123456", "A.b": "1,2,3,4", "A.c": "true", "A.d": "Arial"}}"""))
+            .load("child.json"));
+        assertThat(ui).containsOnlyKeys("CheckBox.icon2", "A.a", "A.b", "A.c", "A.d")
+            .containsEntry("CheckBox.icon2", "com.formdev.flatlaf.icons.FlatCheckBoxIcon")
+            .containsEntry("A.a", "#123456").containsEntry("A.b", "1,2,3,4")
+            .containsEntry("A.c", "true").containsEntry("A.d", "Arial");
     }
 
     @Test void explicitColoursApplyWildcardsInOrderAndKeepAlpha() {

@@ -98,7 +98,6 @@ class WindowCommandPaletteTest {
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                 var overlay = (JComponent) owner.commandPalette().component().getParent();
                 var card = owner.commandPalette().component().getBounds();
-                Object previous = UIManager.get("Popup.dropShadowColor");
                 try {
                     UIManager.put("Popup.dropShadowColor", Color.RED);
                     var image = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -111,7 +110,11 @@ class WindowCommandPaletteTest {
                     var pixel = new Color(image.getRGB(card.x - 2, card.y - 2), true);
                     assertThat(pixel.getRed()).as("the shadow is tinted toward the configured drop-shadow colour")
                         .isGreaterThan(pixel.getGreen());
-                } finally { UIManager.put("Popup.dropShadowColor", previous); }
+                } finally {
+                    // Putting the saved value back would pin it in the developer defaults, ahead of
+                    // whatever look and feel installs next; clearing the override is the real restore.
+                    UIManager.put("Popup.dropShadowColor", null);
+                }
             }
         });
     }

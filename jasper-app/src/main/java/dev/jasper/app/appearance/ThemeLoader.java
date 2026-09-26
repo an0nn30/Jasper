@@ -7,7 +7,9 @@ import java.awt.Color;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -66,7 +68,9 @@ final class ThemeLoader {
         Map<String, String> colors = resolveColors(file, theme.colors);
         var ui = new LinkedHashMap<String, Object>();
         theme.ui.forEach((key, value) -> {
-            Object kept = withoutIntellijClasses(value);
+            // A Swing UI delegate is never a legitimate theme setting for Jasper; FlatLaf and Swing would load it.
+            if (key.endsWith("UI")) return;
+            Object kept = withoutUnusableValues(file, key, value, warnings);
             if (kept != null) ui.put(key, named(kept, colors));
         });
         var json = new LinkedHashMap<String, Object>();
@@ -110,35 +114,67 @@ final class ThemeLoader {
         return own.over(resolve(parentFile, chain, warnings));
     }
 
-    /** Resolves every entry of the merged colour table to a literal; names may refer to other names. */
+    /**
+     * Resolves every entry of the merged colour table to a literal; names may refer to other names. Each
+     * name is walked at most once: a name already resolved by an earlier chain short-circuits the walk, so
+     * the whole table resolves in time linear in its size, not cubic in the chain length.
+     */
     private static Map<String, String> resolveColors(String file, Map<String, Object> table) {
-        var resolved = new LinkedHashMap<String, String>();
-        for (String name : table.keySet()) resolved.put(name, resolveColor(file, table, name, new ArrayList<>()));
-        return resolved;
+        var resolved = new HashMap<String, String>();
+        for (String name : table.keySet()) resolveColor(file, table, name, resolved);
+        var ordered = new LinkedHashMap<String, String>();
+        for (String name : table.keySet()) ordered.put(name, resolved.get(name));
+        return ordered;
     }
 
-    private static String resolveColor(String file, Map<String, Object> table, String name, List<String> path) {
-        if (path.contains(name)) throw new ThemeException(file + ": colours form a cycle: " + String.join(" -> ", path) + " -> " + name);
-        path.add(name);
-        Object value = table.get(name);
-        if (!(value instanceof String text)) throw new ThemeException(file + ": colour \"" + name + "\" is not a string");
-        if (HEX.matcher(text).matches()) return normalized(text);
-        if (!table.containsKey(text)) throw new ThemeException(file + ": colour \"" + name + "\" refers to unknown colour \"" + text + "\"");
-        return resolveColor(file, table, text, path);
+    /** Walks {@code name}'s chain, memoizing every name on the walked path into {@code resolved}. */
+    private static void resolveColor(String file, Map<String, Object> table, String name, Map<String, String> resolved) {
+        if (resolved.containsKey(name)) return;
+        var path = new LinkedHashSet<String>();
+        String current = name;
+        while (true) {
+            if (!path.add(current)) throw new ThemeException(file + ": colours form a cycle: " + String.join(" -> ", path) + " -> " + current);
+            String cached = resolved.get(current);
+            if (cached != null) { path.forEach(link -> resolved.put(link, cached)); return; }
+            Object value = table.get(current);
+            if (!(value instanceof String text)) throw new ThemeException(file + ": colour \"" + current + "\" is not a string");
+            if (HEX.matcher(text).matches()) {
+                String literal = normalized(text);
+                path.forEach(link -> resolved.put(link, literal));
+                return;
+            }
+            if (!table.containsKey(text)) throw new ThemeException(file + ": colour \"" + current + "\" refers to unknown colour \"" + text + "\"");
+            current = text;
+        }
     }
+
+    /** A string that names a Java class in full, for example {@code com.intellij.ide.ui.laf.darcula.ui.DarculaButtonUI}. */
+    private static final Pattern CLASS_NAME = Pattern.compile("(?:[a-z_$][\\w$]*\\.)+[A-Z][\\w$]*");
 
     /**
-     * The value without IntelliJ's own UI, border and painter classes, which Jasper cannot load (FlatLaf
-     * would try to); a per-OS value keeps its other branches. Null when nothing is left.
+     * The value without blank or {@code null} entries, and without class names Jasper cannot load (FlatLaf
+     * or Swing would try to instantiate them) other than FlatLaf's own icon and painter classes; a per-OS
+     * value keeps its other branches. Null when nothing is left. A dropped blank or {@code null} entry adds
+     * a warning naming {@code key}; a dropped class name does not, matching the existing IntelliJ-class rule.
      */
-    private static Object withoutIntellijClasses(Object value) {
-        if (value instanceof String text) return text.startsWith("com.intellij.") ? null : value;
+    private static Object withoutUnusableValues(String file, String key, Object value, List<String> warnings) {
+        if (value instanceof String text) return usable(file, key, text, warnings) ? value : null;
         if (!(value instanceof Map<?, ?> byOs) || !perOs(byOs)) return value;
         var kept = new LinkedHashMap<String, Object>();
         byOs.forEach((os, branch) -> {
-            if (!(branch instanceof String text && text.startsWith("com.intellij."))) kept.put(os.toString(), branch);
+            if (!(branch instanceof String text) || usable(file, key, text, warnings)) kept.put(os.toString(), branch);
         });
         return kept.isEmpty() ? null : kept;
+    }
+
+    /** Whether one scalar value survives: not blank or {@code null}, and not an unloadable class name. */
+    private static boolean usable(String file, String key, String text, List<String> warnings) {
+        String stripped = text.strip();
+        if (stripped.isEmpty() || stripped.equalsIgnoreCase("null")) {
+            warnings.add(file + ": \"" + key + "\" has an empty value; ignoring it");
+            return false;
+        }
+        return !CLASS_NAME.matcher(text).matches() || text.startsWith("com.formdev.flatlaf.");
     }
 
     /** A value naming a colour becomes that colour; other values, including IntelliJ palette names, pass through. */

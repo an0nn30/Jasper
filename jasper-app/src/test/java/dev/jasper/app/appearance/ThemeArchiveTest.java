@@ -79,6 +79,16 @@ class ThemeArchiveTest {
         assertThat(contents.themes()).extracting(ThemeArchive.Found::label).containsExactly("Real.jar!/real.theme.json");
     }
 
+    @Test void anExtensionsElementDeclaringItsNamespaceAsXmlnsIsAccepted() {
+        Path file = jar(directory.resolve("Xmlns.jar"), entries(
+            "META-INF/plugin.xml", "<idea-plugin><name>Xmlns</name>"
+                + "<extensions xmlns=\"com.intellij\"><themeProvider id=\"x\" path=\"/x.theme.json\"/></extensions></idea-plugin>",
+            "x.theme.json", theme("X", true, null, "#010101")));
+        var contents = ThemeArchive.read(file);
+        assertThat(contents.problems()).isEmpty();
+        assertThat(contents.themes()).extracting(ThemeArchive.Found::label).containsExactly("Xmlns.jar!/x.theme.json");
+    }
+
     @Test void aSchemeNamedInsteadOfAPathIsPassedOnByName() {
         Path file = jar(directory.resolve("Named.jar"), entries(
             "META-INF/plugin.xml", pluginXml("Named", "/Named.theme.json"),
@@ -87,6 +97,33 @@ class ThemeArchiveTest {
             assertThat(found.schemeName()).isEqualTo("Darcula");
             assertThat(found.schemeXml()).isNull();
         });
+    }
+
+    @Test void repeatedProviderPathsAreDeduplicatedToOneTheme() {
+        var providers = new StringBuilder();
+        for (int i = 0; i < 400; i++) providers.append("<themeProvider id=\"t").append(i).append("\" path=\"/one.theme.json\"/>\n");
+        Path file = jar(directory.resolve("Repeat.jar"), entries(
+            "META-INF/plugin.xml", "<idea-plugin><name>Repeat</name><extensions defaultExtensionNs=\"com.intellij\">"
+                + providers + "</extensions></idea-plugin>",
+            "one.theme.json", theme("One", true, null, "#111111")));
+        var contents = ThemeArchive.read(file);
+        assertThat(contents.problems()).isEmpty();
+        assertThat(contents.themes()).hasSize(1);
+    }
+
+    @Test void moreThanSixtyFourDistinctProvidersAreCappedWithAProblem() {
+        var providers = new StringBuilder();
+        var files = new LinkedHashMap<String, byte[]>();
+        for (int i = 0; i < 65; i++) {
+            providers.append("<themeProvider id=\"t").append(i).append("\" path=\"/t").append(i).append(".theme.json\"/>\n");
+            files.put("t" + i + ".theme.json", theme("T" + i, true, null, "#111111").getBytes(StandardCharsets.UTF_8));
+        }
+        files.put("META-INF/plugin.xml", ("<idea-plugin><name>Many</name><extensions defaultExtensionNs=\"com.intellij\">"
+            + providers + "</extensions></idea-plugin>").getBytes(StandardCharsets.UTF_8));
+        Path file = jar(directory.resolve("Many65.jar"), files);
+        var contents = ThemeArchive.read(file);
+        assertThat(contents.themes()).hasSize(64);
+        assertThat(contents.problems()).anySatisfy(problem -> assertThat(problem).contains("more than 64 themes"));
     }
 
     @Test void aPluginWithoutThemeProvidersSaysItDrawsItsThemeInCode() {
@@ -199,6 +236,21 @@ class ThemeArchiveTest {
         assertThat(contents.themes()).hasSize(1);
         assertThat(contents.problems()).singleElement().asString()
             .contains("Deep.zip!/P/lib/a-many.jar").contains("more than 10,000 entries");
+    }
+
+    @Test void aLibJarEntryThatInflatesPastTheBudgetIsReportedWithoutReadingItAll() {
+        // 300 MiB of zeros deflates to roughly 300 KiB; placed before plugin.xml so the plugin-probe pass
+        // (which streams every entry in order) meets it first and must not silently skip-inflate it.
+        var libEntries = new LinkedHashMap<String, byte[]>();
+        libEntries.put("big.bin", new byte[300 << 20]);
+        libEntries.put("META-INF/plugin.xml", pluginXml("Bomb", "/small.theme.json").getBytes(StandardCharsets.UTF_8));
+        libEntries.put("small.theme.json", theme("Small", true, null, "#111111").getBytes(StandardCharsets.UTF_8));
+        byte[] lib = jarBytes(libEntries);
+        Path file = jar(directory.resolve("Bomb.zip"), entries("P/lib/big.jar", lib));
+        var contents = ThemeArchive.read(file);
+        assertThat(contents.themes()).isEmpty();
+        assertThat(contents.problems()).anySatisfy(problem ->
+            assertThat(problem).contains("Bomb.zip!/P/lib/big.jar").contains("inflates to more than 256 MiB"));
     }
 
     /** A jar whose one entry is stored uncompressed, so the jar itself is at least {@code size} bytes. */

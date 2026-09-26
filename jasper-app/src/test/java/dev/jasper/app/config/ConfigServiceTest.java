@@ -428,6 +428,17 @@ class ConfigServiceTest {
         }
     }
 
+    @Test void aCompanionThatThrowsAnErrorFailsItsFutureRatherThanHangingAndLaterReloadsStillWork() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Files.writeString(file, "[window]\ntab_height=40\n");
+        try (var service = new ConfigService(file, false)) {
+            var first = service.watchWith(() -> { throw new OutOfMemoryError("probe"); });
+            assertThat(first).failsWithin(5, java.util.concurrent.TimeUnit.SECONDS);
+            Files.writeString(file, "[window]\ntab_height=44\n");
+            assertThat(service.reload().get(5, java.util.concurrent.TimeUnit.SECONDS).snapshot().tabHeight()).isEqualTo(44);
+        }
+    }
+
     private static void assertError(ConfigService.State state) {
         assertThat(state.present()).isTrue();
         assertThat(state.diagnostics()).isNotEmpty().allSatisfy(diagnostic -> {

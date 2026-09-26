@@ -235,7 +235,14 @@ class ConfigurationControllerTest {
             controller.accept(state);
             assertThat(owners.getFirst().tabHeight()).isEqualTo(53);
             assertThat(owners.getFirst().theme().chrome()).isEqualTo(Theme.DARK);
-            assertThat(owners.getFirst().status().getText()).contains("Config loaded");
+            // A theme that fails to install is also a configuration warning now, not just a toast: the
+            // status bar reflects it and shown() carries the diagnostic (both still keep the other
+            // settings that theme accompanied, per this test's name).
+            assertThat(owners.getFirst().status().getText()).contains("Config warnings");
+            assertThat(controller.shown().diagnostics()).anySatisfy(diagnostic -> {
+                assertThat(diagnostic.key()).isEqualTo("ui.theme.name");
+                assertThat(diagnostic.message()).contains("Could not apply theme").contains("keeping Jasper Dark");
+            });
             assertThat(errors).singleElement().asString().contains("Could not apply theme");
         });
     }

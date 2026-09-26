@@ -280,14 +280,15 @@ class CommandPaletteTest {
                     // the assertion above alone can't tell which key the unselected tab actually reads.
                     // Give Label.foreground a distinctive value List.foreground doesn't share, and prove
                     // the tab follows it.
-                    Object originalLabelForeground = UIManager.get("Label.foreground");
                     try {
                         var distinctiveForeground = new ColorUIResource(0x123456);
                         UIManager.put("Label.foreground", distinctiveForeground);
                         palette.refreshTheme();
                         assertThat(labels(palette.tabStrip()).get(1).getForeground()).as(name).isEqualTo(distinctiveForeground);
                     } finally {
-                        UIManager.put("Label.foreground", originalLabelForeground);
+                        // Putting the saved value back would pin it in the developer defaults, ahead of
+                        // whatever look and feel installs next; clearing the override is the real restore.
+                        UIManager.put("Label.foreground", null);
                         palette.refreshTheme();
                     }
 

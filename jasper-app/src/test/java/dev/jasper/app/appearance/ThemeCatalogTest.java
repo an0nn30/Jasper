@@ -123,6 +123,21 @@ class ThemeCatalogTest {
             .anySatisfy(message -> assertThat(message).contains("ExperimentalDark").contains("Darcula"));
     }
 
+    @Test void aReaderThatThrowsAnErrorBecomesAProblemAndTheScanContinues() throws Exception {
+        plugin(themes().resolve("good.jar"), "Good", true, "#111111", "111111");
+        Files.writeString(themes().resolve("bad.jar"), "x");
+        var catalog = new ThemeCatalog(themes(), file -> {
+            if (file.getFileName().toString().equals("bad.jar")) throw new StackOverflowError();
+            return ThemeArchive.read(file);
+        });
+        var snapshot = catalog.scan();
+        assertThat(snapshot.find("Good")).isPresent();
+        assertThat(snapshot.problems()).singleElement().satisfies(problem -> {
+            assertThat(problem.file().getFileName()).hasToString("bad.jar");
+            assertThat(problem.message()).contains("cannot be read");
+        });
+    }
+
     @Test void aFileWhoseThemesCannotBeBuiltBecomesAProblemNotAThrow() throws Exception {
         Files.createDirectories(themes());
         Files.writeString(themes().resolve("odd.jar"), "x");

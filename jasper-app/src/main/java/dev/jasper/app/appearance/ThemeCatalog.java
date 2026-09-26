@@ -90,7 +90,7 @@ public final class ThemeCatalog {
             Read read;
             // Nothing one file does may stop the scan: it becomes that file's problem.
             try { read = read(file); }
-            catch (RuntimeException failure) {
+            catch (RuntimeException | OutOfMemoryError | StackOverflowError failure) {
                 problems.add(new Problem(file, file.getFileName() + " cannot be read: " + failure));
                 continue;
             }

@@ -93,7 +93,11 @@ public final class ConfigService implements AutoCloseable {
             if (this.listener != null) throw new IllegalStateException("Configuration listener already started.");
             this.listener = listener;
             publish();
-            worker.scheduleWithFixedDelay(() -> refresh(false, false), 1, 1, TimeUnit.SECONDS);
+            worker.scheduleWithFixedDelay(() -> {
+                // One failed poll must never cancel scheduleWithFixedDelay for good.
+                try { refresh(false, false); }
+                catch (Throwable failure) { LOG.log(System.Logger.Level.WARNING, "Configuration poll failed", failure); }
+            }, 1, 1, TimeUnit.SECONDS);
         }
     }
 
@@ -138,7 +142,7 @@ public final class ConfigService implements AutoCloseable {
         if (current == null) return;
         // A failing companion must not stop configuration reads or the change poll.
         try { current.run(); }
-        catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "Configuration companion failed", failure); }
+        catch (Throwable failure) { LOG.log(System.Logger.Level.WARNING, "Configuration companion failed", failure); }
     }
 
     private State readState(ConfigSnapshot lastGood, boolean force) {
@@ -225,8 +229,8 @@ public final class ConfigService implements AutoCloseable {
                             if (closed) result.completeExceptionally(closedException());
                             else result.complete(value);
                         }
-                    } catch (Exception exception) {
-                        result.completeExceptionally(exception);
+                    } catch (Throwable failure) {
+                        result.completeExceptionally(failure);
                     } finally {
                         synchronized (lifecycle) {
                             pending.remove(result);

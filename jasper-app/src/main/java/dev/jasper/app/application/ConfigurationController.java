@@ -55,7 +55,10 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         this.themes = themes; this.service = service; this.catalog = catalog; this.editor = editor;
         state = service.initialState();
-        configureThemes(state);
+        try { configureThemes(state); }
+        catch (ThemeController.InstallationFailure ignored) {
+            // Already recorded as a theme problem below; a theme that cannot be installed never stops start-up.
+        }
         service.start(this::accept);
     }
 
@@ -128,8 +131,17 @@ final class ConfigurationController implements AutoCloseable {
             problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.name",
                 "Unknown theme \"" + name + "\"; keeping " + theme.name() + ". Available: " + String.join(", ", available.names()) + "."));
         }
-        themeProblems = List.copyOf(problems);
-        themes.configure(theme, next.snapshot().terminalColors(), next.snapshot().uiFont());
+        try {
+            themes.configure(theme, next.snapshot().terminalColors(), next.snapshot().uiFont());
+            themeProblems = List.copyOf(problems);
+        } catch (ThemeController.InstallationFailure failure) {
+            Throwable cause = failure.getCause();
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.name",
+                "Could not apply theme \"" + theme.name() + "\": " + (cause != null ? cause.getMessage() : failure.getMessage())
+                    + "; keeping " + themes.choice().name() + "."));
+            themeProblems = List.copyOf(problems);
+            throw failure;
+        }
     }
 
     @Override public void close() {

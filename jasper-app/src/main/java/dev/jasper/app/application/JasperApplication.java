@@ -144,7 +144,15 @@ public final class JasperApplication {
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
         themeCatalog = service == null ? ThemeCatalog.builtIn() : ThemeCatalog.beside(service.initialState().file());
         if (service != null) scanThemes(service);
-        themes = new ThemeController(themeCatalog.latest().find(startup.theme()).orElse(Theme.DARK));
+        Theme saved = themeCatalog.latest().find(startup.theme()).orElse(Theme.DARK);
+        ThemeController created;
+        try { created = new ThemeController(saved); }
+        catch (ThemeController.InstallationFailure failure) {
+            // A theme that cannot be installed never stops start-up; the configuration reports it.
+            LOG.log(System.Logger.Level.WARNING, "Starting in Jasper Dark: " + failure.getMessage(), failure);
+            created = new ThemeController(Theme.DARK);
+        }
+        themes = created;
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.
