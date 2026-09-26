@@ -1,5 +1,7 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.appearance.Theme;
+import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -49,7 +51,7 @@ final class ConfigurationController implements AutoCloseable {
         requireEdt();
         this.themes = themes; this.service = service; this.editor = editor;
         state = service.initialState();
-        themes.configure(state.snapshot().variant(), state.snapshot().terminalColors(), state.snapshot().uiFont());
+        configureThemes(state);
         service.start(this::accept);
     }
 
@@ -93,7 +95,7 @@ final class ConfigurationController implements AutoCloseable {
     void accept(ConfigService.State next) {
         requireEdt();
         if (closed) return;
-        try { themes.configure(next.snapshot().variant(), next.snapshot().terminalColors(), next.snapshot().uiFont()); }
+        try { configureThemes(next); }
         catch (ThemeController.InstallationFailure failure) {
             for (WindowContent owner : List.copyOf(owners)) owner.onError.accept(failure.getMessage());
         }
@@ -104,6 +106,12 @@ final class ConfigurationController implements AutoCloseable {
             owner.applyConfiguration(next.snapshot(), service.macOs());
             owner.setConfigurationState(shown());
         }
+    }
+
+    /** Applies the saved theme, terminal colours and UI font; an unknown theme name keeps the theme showing. */
+    private void configureThemes(ConfigService.State next) {
+        Theme theme = ThemeCatalog.builtIn().latest().find(next.snapshot().theme()).orElse(themes.choice());
+        themes.configure(theme, next.snapshot().terminalColors(), next.snapshot().uiFont());
     }
 
     @Override public void close() {

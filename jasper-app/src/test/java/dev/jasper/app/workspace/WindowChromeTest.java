@@ -2,7 +2,6 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ToolbarMode;
 
 import java.util.ArrayDeque;
@@ -15,35 +14,53 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WindowChromeTest {
     @org.junit.jupiter.api.AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    @Test void openingSiblingAppearanceMenuReflectsTheCurrentGlobalTheme() throws Exception {
+    @Test void openingSiblingTerminalColorsMenuReflectsTheCurrentGlobalChoice() throws Exception {
         edt(() -> {
-            var original = UIManager.getLookAndFeel();
             WindowContent first = null;
             WindowContent second = null;
             try {
                 var themes = new ThemeController();
                 first = content(launcher(new ArrayDeque<>()), themes);
                 second = content(launcher(new ArrayDeque<>()), themes);
-                JMenu firstAppearance = appearance(first);
-                JMenu secondAppearance = appearance(second);
-                firstAppearance.getItem(0).doClick();
-                assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("IntelliJ Light");
-                secondAppearance.setSelected(true);
-                assertThat(secondAppearance.getItem(0).isSelected()).isTrue();
-                assertThat(secondAppearance.getItem(1).isSelected()).isFalse();
-                secondAppearance.setSelected(false);
-                firstAppearance.getItem(1).doClick();
-                assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Jasper Dark");
-                secondAppearance.setSelected(true);
-                assertThat(secondAppearance.getItem(1).isSelected()).isTrue();
-                assertThat(secondAppearance.getItem(0).isSelected()).isFalse();
+                JMenu firstColors = terminalColors(first);
+                JMenu secondColors = terminalColors(second);
+                firstColors.getItem(1).doClick();
+                secondColors.setSelected(true);
+                assertThat(secondColors.getItem(1).isSelected()).isTrue();
+                assertThat(secondColors.getItem(0).isSelected()).isFalse();
+                secondColors.setSelected(false);
+                firstColors.getItem(2).doClick();
+                secondColors.setSelected(true);
+                assertThat(secondColors.getItem(2).isSelected()).isTrue();
+                assertThat(secondColors.getItem(1).isSelected()).isFalse();
             } finally {
                 if (first != null) first.close();
                 if (second != null) second.close();
-                try { UIManager.setLookAndFeel(original); }
-                catch (UnsupportedLookAndFeelException e) { throw new AssertionError(e); }
             }
         });
+    }
+
+    @Test void theViewMenuOffersTerminalColorsButNoThemeChoice() throws Exception {
+        edt(() -> {
+            try (var owner = content(launcher(new ArrayDeque<>()))) {
+                var names = new java.util.ArrayList<String>();
+                for (var component : owner.menuBar().getMenu(2).getMenuComponents())
+                    if (component instanceof JMenuItem item) names.add(item.getText());
+                assertThat(names).contains("Terminal Colors").doesNotContain("Appearance");
+                assertThat(java.util.Arrays.stream(terminalColors(owner).getMenuComponents())
+                    .filter(JMenuItem.class::isInstance).map(item -> ((JMenuItem) item).getText()))
+                    .containsExactly("Terminal: Match UI", "Terminal: Light", "Terminal: Dark");
+                assertThat(owner.commands().entries().stream().map(entry -> entry.command().id()))
+                    .noneMatch(id -> id.startsWith("view.appearance."));
+            }
+        });
+    }
+
+    private static JMenu terminalColors(WindowContent owner) {
+        for (var component : owner.menuBar().getMenu(2).getMenuComponents()) {
+            if (component instanceof JMenu menu && menu.getText().equals("Terminal Colors")) return menu;
+        }
+        throw new AssertionError("Terminal Colors menu is absent");
     }
 
     @Test void referenceToolbarKeepsLabelsAccessibilityDisabledActionsAndVisibilityModes() throws Exception {
@@ -100,12 +117,5 @@ class WindowChromeTest {
             assertThat(java.util.Arrays.stream(toolbar.getComponents()).filter(JButton.class::isInstance)
                 .map(JButton.class::cast)).noneMatch(button -> button.getAction() == owner.action(ActionId.QUIT));
         });
-    }
-
-    private static JMenu appearance(WindowContent owner) {
-        for (var component : owner.menuBar().getMenu(2).getMenuComponents()) {
-            if (component instanceof JMenu menu && menu.getText().equals("Appearance")) return menu;
-        }
-        throw new AssertionError("Appearance menu is absent");
     }
 }

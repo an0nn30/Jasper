@@ -6,7 +6,6 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.commands.CommandRegistry;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -185,8 +184,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if (bar != null) bar.setTitle(display);
         };
         if (bar != null) {
-            content.onThemeChanged = theme -> bar.setLight(theme.chrome().appearance() == Appearance.LIGHT);
-            bar.setLight(content.theme().chrome().appearance() == Appearance.LIGHT);
+            content.onThemeChanged = theme -> bar.setLight(!theme.chrome().dark());
+            bar.setLight(!content.theme().chrome().dark());
         }
         content.update();
         return bar;
@@ -552,15 +551,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     ResolvedTheme theme() { return themes.current(); }
 
-    Appearance appearance() { return themes.choice(); }
-
+    /** Applies {@code theme} to every window, as the saved configuration applies its theme. */
     void selectTheme(Theme theme) {
-        selectAppearance(theme == Theme.LIGHT ? Appearance.LIGHT : Appearance.DARK);
-    }
-
-    void selectAppearance(Appearance appearance) {
         if (closed) return;
-        try { themes.selectAppearance(appearance); }
+        try { themes.configure(theme); }
         catch (ThemeController.InstallationFailure failure) { onError.accept(failure.getMessage()); }
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }

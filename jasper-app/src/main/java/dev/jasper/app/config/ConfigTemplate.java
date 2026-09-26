@@ -123,10 +123,11 @@ public final class ConfigTemplate {
             # size = 14
 
             [ui.theme]
-            # Theme variant for the UI chrome: "dark" or "light"; switches live across windows.
-            # variant = "dark"
-            # Terminal colors: "match" follows the variant; "light" or "dark" keeps the terminal
-            # independent of the UI. Switches live.
+            # The UI theme by name: "Jasper Dark" (the default), "IntelliJ Light", or a theme plugin
+            # installed in the themes folder beside this file. Switches live across windows.
+            # name = "Jasper Dark"
+            # Terminal colors: "match" uses the theme's console colours (Jasper's palette when it has
+            # none); "light" or "dark" keeps Jasper's palette. Switches live.
             # terminal = "match"
 
             [keybindings]

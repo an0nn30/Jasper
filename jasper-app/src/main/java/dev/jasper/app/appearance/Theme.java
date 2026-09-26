@@ -1,6 +1,5 @@
 package dev.jasper.app.appearance;
 
-import dev.jasper.app.config.Appearance;
 import dev.jasper.terminal.config.Palette;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -36,8 +35,4 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
         Objects.requireNonNull(palette);
         Objects.requireNonNull(source);
     }
-
-    static Theme of(Appearance appearance) { return appearance == Appearance.LIGHT ? LIGHT : DARK; }
-
-    public Appearance appearance() { return dark ? Appearance.DARK : Appearance.LIGHT; }
 }

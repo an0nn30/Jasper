@@ -48,7 +48,7 @@ public final class ConfigLoader {
         Map.entry(List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height")),
         Map.entry(List.of("ui"), Set.of("theme", "font")),
         Map.entry(List.of("ui", "font"), Set.of("family", "size")),
-        Map.entry(List.of("ui", "theme"), Set.of("variant", "terminal")),
+        Map.entry(List.of("ui", "theme"), Set.of("name", "terminal")),
         Map.entry(List.of("terminal"), Set.of("shell", "env", "scrollback", "option_as_meta", "cursor",
             "dim_inactive_panes", "copy_on_select", "bell", "on_exit", "shell_integration")),
         Map.entry(List.of("terminal", "shell"), Set.of("program", "args")),
@@ -87,7 +87,7 @@ public final class ConfigLoader {
     private BellMode bell = BellMode.VISUAL;
     private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
     private ShellIntegrationMode shellIntegration = ShellIntegrationMode.AUTO;
-    private Appearance variant = Appearance.DARK;
+    private String theme = ConfigSnapshot.DEFAULT_THEME;
     private TerminalColors terminalColors = TerminalColors.MATCH;
     private Map<String, String> keybindings = Map.of();
     private Map<String, Map<String, Object>> plugins = Map.of();
@@ -113,7 +113,7 @@ public final class ConfigLoader {
         readTable(List.of(), toml);
         diagnostics.sort(Comparator.comparingInt(ConfigDiagnostic::line).thenComparingInt(ConfigDiagnostic::column));
         var snapshot = new ConfigSnapshot(tabHeight, toolbar, statusBar,
-            new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
+            new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), theme, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
                 buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, new UiFontConfig(uiFontFamily, uiFontSize), terminalColors);
@@ -221,8 +221,8 @@ public final class ConfigLoader {
             case "font.fallback" -> fallback = strings(path, value, ConfigLoader::fontName, fallback);
             case "font.ligatures" -> ligatures = bool(path, value, ligatures);
             case "font.line_height" -> lineHeight = number(path, value, .5, 3, lineHeight);
-            case "ui.theme.variant" -> variant = choice(path, value, Map.of(
-                "light", Appearance.LIGHT, "dark", Appearance.DARK), variant);
+            // Any name: whether a theme has it is known only to the theme catalog.
+            case "ui.theme.name" -> theme = string(path, value, ignored -> true, "", theme).strip();
             case "ui.theme.terminal" -> terminalColors = choice(path, value, Map.of(
                 "match", TerminalColors.MATCH, "light", TerminalColors.LIGHT, "dark", TerminalColors.DARK), terminalColors);
             case "terminal.shell.program" -> program = string(path, value,

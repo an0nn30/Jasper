@@ -9,7 +9,6 @@ import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.FontConfig;
@@ -53,7 +52,7 @@ class ConfigurationControllerTest {
     void start(String text) throws Exception {
         Files.writeString(directory.resolve("config.toml"), text);
         service = new ConfigService(directory.resolve("config.toml"), false);
-        edt(() -> { themes = new ThemeController(service.initialState().snapshot().variant()); controller = new ConfigurationTestSupport(themes, service); });
+        edt(() -> { themes = new ThemeController(ThemeTestSupport.named(service.initialState().snapshot().theme())); controller = new ConfigurationTestSupport(themes, service); });
     }
     WindowContent owner() { return owner(launcher(pending)); }
     WindowContent owner(ShellLauncher launcher) {
@@ -68,7 +67,7 @@ class ConfigurationControllerTest {
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void savedFieldsApplyAcrossOwnersAndPendingHiddenViewsWithoutReplacingSessions() throws Exception {
-        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=19\n[ui.theme]\nvariant='light'\n");
+        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=19\n[ui.theme]\nname='IntelliJ Light'\n");
         edt(() -> { owner(); owner(); }); launchAll();
         var first = owners.getFirst(); var second = owners.get(1);
         var retained = first.currentPane(); var session = retained.session();
@@ -103,22 +102,23 @@ class ConfigurationControllerTest {
         var first = owners.getFirst();
         edt(() -> {
             first.setTabHeight(60); first.setToolbarMode(ToolbarMode.HIDDEN);
-            first.setStatusVisible(false); first.selectTheme(Theme.LIGHT); first.currentPane().view().setFontSize(28);
+            first.setStatusVisible(false); first.currentPane().view().setFontSize(28);
         });
         reload("# comment\n[font]\nsize=19\nunknown=1\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(60); assertThat(first.toolbar().isVisible()).isFalse();
-            assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(Theme.LIGHT);
+            assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(Theme.DARK);
             assertThat(first.currentPane().view().fontSize()).isEqualTo(28);
             var next = owner(); assertThat(next.tabHeight()).isEqualTo(30);
             assertThat(next.toolbar().isVisible()).isTrue(); assertThat(next.status().isVisible()).isTrue();
-            assertThat(first.theme().chrome()).isEqualTo(Theme.LIGHT);
+            assertThat(next.theme().chrome()).isEqualTo(Theme.DARK);
         }); launchAll();
         edt(() -> assertThat(owners.get(1).currentPane().view().fontSize()).isEqualTo(19));
-        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=20\n[ui.theme]\nvariant='light'\n");
+        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=20\n[ui.theme]\nname='IntelliJ Light'\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(45); assertThat(first.toolbar().isVisible()).isTrue();
             assertThat(first.currentPane().view().fontSize()).isEqualTo(20);
+            assertThat(first.theme().chrome()).as("the saved theme name applies").isEqualTo(Theme.LIGHT);
         });
     }
 
@@ -200,7 +200,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             owner.close();
             assertThat(owner.action(ActionId.OPEN_SETTINGS).isEnabled()).isFalse();
-            var late = new ConfigService.State(new ConfigSnapshot(55, ToolbarMode.ICONS, false, FontConfig.defaults().withSize(22), Theme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), file, true);
+            var late = new ConfigService.State(new ConfigSnapshot(55, ToolbarMode.ICONS, false, FontConfig.defaults().withSize(22), Theme.DARK.name(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), file, true);
             controller.accept(late);
             assertThat(owner.tabHeight()).isEqualTo(48);
             assertThat(owner.status().configButton().isEnabled()).isFalse();
@@ -231,7 +231,7 @@ class ConfigurationControllerTest {
             themes = new ThemeController(theme -> theme != Theme.LIGHT && ThemeTestSupport.install(theme));
             controller = new ConfigurationTestSupport(themes, service);
             owner().onError = errors::add;
-            var state = new ConfigService.State(new ConfigSnapshot(53, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(18), Theme.LIGHT.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
+            var state = new ConfigService.State(new ConfigSnapshot(53, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(18), Theme.LIGHT.name(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
             controller.accept(state);
             assertThat(owners.getFirst().tabHeight()).isEqualTo(53);
             assertThat(owners.getFirst().theme().chrome()).isEqualTo(Theme.DARK);
@@ -245,7 +245,7 @@ class ConfigurationControllerTest {
         edt(() -> {
             var owner = owner();
             owner.onThemeChanged = ignored -> { throw new IllegalStateException("application callback"); };
-            var next = new ConfigService.State(new ConfigSnapshot(38, ToolbarMode.ICONS_AND_LABELS, true, FontConfig.defaults().withSize(16), Theme.LIGHT.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
+            var next = new ConfigService.State(new ConfigSnapshot(38, ToolbarMode.ICONS_AND_LABELS, true, FontConfig.defaults().withSize(16), Theme.LIGHT.name(), Map.of(), 150, 45, TerminalConfig.defaults()), List.of(), directory.resolve("config.toml"), true);
             assertThatThrownBy(() -> controller.accept(next)).isInstanceOf(IllegalStateException.class)
                 .hasMessage("application callback");
         });
@@ -332,7 +332,7 @@ class ConfigurationControllerTest {
             assertThat(pane.view().fontSize()).isEqualTo(27);
             assertThat(pane.view().options().fontFamily()).isEqualTo("Monospaced");
             assertThat(pane.view().options().lineHeight()).isEqualTo(1.5f);
-            assertThat(pane.view().palette()).isEqualTo(Theme.LIGHT.palette());
+            assertThat(pane.view().palette()).as("a reload applies the configured theme").isEqualTo(Theme.DARK.palette());
             owner.newTab(HOME);
         }); launchAll();
         edt(() -> {
@@ -345,7 +345,7 @@ class ConfigurationControllerTest {
         reload(liveSettings(20));
         edt(() -> {
             assertThat(pane.view().fontSize()).isEqualTo(20);
-            assertThat(pane.view().palette()).isEqualTo(Theme.LIGHT.palette());
+            assertThat(pane.view().palette()).as("a reload applies the configured theme").isEqualTo(Theme.DARK.palette());
         });
     }
 
@@ -491,7 +491,7 @@ class ConfigurationControllerTest {
 
     @Test void reloadActionRetriesFailedSavedInstallationWithUnchangedFiles() throws Exception {
         Path file = directory.resolve("config.toml");
-        Files.writeString(file, "ui.theme.variant='dark'");
+        Files.writeString(file, "ui.theme.name='Jasper Dark'");
         var configWorker = new java.util.concurrent.ScheduledThreadPoolExecutor(1) {
             @Override public java.util.concurrent.ScheduledFuture<?> scheduleWithFixedDelay(
                     Runnable command, long initialDelay, long delay, java.util.concurrent.TimeUnit unit) {
@@ -510,12 +510,12 @@ class ConfigurationControllerTest {
             assertThat(attempts).containsExactly(Theme.DARK);
             broken.set(true);
         });
-        Files.writeString(file, "ui.theme.variant='light'");
+        Files.writeString(file, "ui.theme.name='IntelliJ Light'");
         edt(() -> owners.getFirst().invoke(ActionId.RELOAD_CONFIG));
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         edt(() -> {
             assertThat(themes.current().chrome()).isEqualTo(Theme.DARK);
-            assertThat(themes.choice()).isEqualTo(Appearance.DARK);
+            assertThat(themes.choice()).isEqualTo(Theme.DARK);
             assertThat(attempts).containsExactly(Theme.DARK, Theme.LIGHT);
             assertThat(errors).hasSize(1);
             broken.set(false);
@@ -527,21 +527,22 @@ class ConfigurationControllerTest {
         edt(() -> {
             assertThat(themes.current().chrome()).isEqualTo(Theme.LIGHT);
             assertThat(owners.getFirst().theme()).isEqualTo(themes.current());
-            assertThat(themes.choice()).isEqualTo(Appearance.LIGHT);
+            assertThat(themes.choice()).isEqualTo(Theme.LIGHT);
             assertThat(themes.current().palette()).isEqualTo(Theme.LIGHT.palette());
             assertThat(attempts).containsExactly(Theme.DARK, Theme.LIGHT, Theme.LIGHT);
             assertThat(errors).hasSize(1);
-            owners.getFirst().selectAppearance(Appearance.DARK);
+            owners.getFirst().selectTheme(Theme.DARK);
             owners.getFirst().invoke(ActionId.RELOAD_CONFIG);
         });
         configWorker.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         assertThat(Files.readString(file)).isEqualTo(acceptedText);
         assertThat(Files.getLastModifiedTime(file)).isEqualTo(acceptedTime);
         edt(() -> {
-            assertThat(themes.choice()).isEqualTo(Appearance.DARK);
-            assertThat(themes.current().chrome()).isEqualTo(Theme.DARK);
+            // A reload re-applies the configured theme over a window's own choice.
+            assertThat(themes.choice()).isEqualTo(Theme.LIGHT);
+            assertThat(themes.current().chrome()).isEqualTo(Theme.LIGHT);
             assertThat(attempts).containsExactly(Theme.DARK, Theme.LIGHT,
-                Theme.LIGHT, Theme.DARK);
+                Theme.LIGHT, Theme.DARK, Theme.LIGHT);
         });
     }
 
@@ -618,9 +619,9 @@ class ConfigurationControllerTest {
     }
 
     @Test void savedTerminalColorsApplyLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
-        start("[ui.theme]\nvariant='light'\nterminal='dark'\n");
+        start("[ui.theme]\nname='IntelliJ Light'\nterminal='dark'\n");
         edt(() -> assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperDark())));
-        reload("[ui.theme]\nvariant='light'\nterminal='match'\n");
+        reload("[ui.theme]\nname='IntelliJ Light'\nterminal='match'\n");
         edt(() -> {
             assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperLight()));
             assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.theme"));

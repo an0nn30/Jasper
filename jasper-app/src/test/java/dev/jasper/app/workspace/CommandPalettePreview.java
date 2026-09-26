@@ -209,7 +209,7 @@ public final class CommandPalettePreview {
 
         private void configure(Scenario scenario, Theme theme) throws Exception {
             SwingUtilities.invokeAndWait(() -> {
-                themes.configure(theme.appearance());
+                themes.configure(theme);
                 while (owner.commandPalette().stepOpen()) owner.commandPalette().escape();
                 if (!scenario.scope.equals(owner.commandPalette().activeScopeId())) owner.commandPalette().open(scenario.scope);
                 owner.commandPalette().component().queryField().setText(scenario.query);

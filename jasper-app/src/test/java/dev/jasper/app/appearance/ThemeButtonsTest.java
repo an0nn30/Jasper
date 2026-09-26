@@ -27,7 +27,7 @@ class ThemeButtonsTest {
             var dialog = new JRootPane(); var confirm = new JButton("OK"); dialog.getContentPane().add(confirm); dialog.setDefaultButton(confirm);
             int[] clicks = {0}; button.addActionListener(event -> clicks[0]++);
             for (var theme : List.of(Theme.DARK, Theme.LIGHT)) {
-                themes.select(theme);
+                themes.configure(theme);
                 SwingUtilities.updateComponentTreeUI(parent);
                 SwingUtilities.updateComponentTreeUI(dialog);
                 assertThat(button.getUI()).isInstanceOf(FlatButtonUI.class);

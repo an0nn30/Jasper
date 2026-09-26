@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.palette.PaletteTestSupport;
 import dev.jasper.app.testsupport.LayoutTestSupport;
@@ -7,7 +8,6 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.palette.PaletteController;
@@ -174,7 +174,7 @@ class WindowCommandPaletteTest {
             assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRow(owner.commandPalette().component()).title()).isEqualTo("Hide Status Bar");
             owner.setStatusVisible(false);
             assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRow(owner.commandPalette().component()).title()).isEqualTo("Show Status Bar");
-            owner.selectAppearance(Appearance.LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
+            owner.selectTheme(Theme.LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
             var overlay = owner.commandPalette().component().getParent(); owner.close();
             assertThat(overlay.getParent()).isNull(); assertThat(root.getComponentListeners().length).isLessThan(listeners);
             assertThat(owner.commands().entries()).isEmpty();

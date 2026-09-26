@@ -10,7 +10,7 @@ public final class ConfigTestSupport {
     public static ConfigSnapshot snapshot(String program, List<String> args, Map<String, String> env, int scrollback,
                                    int columns, int lines) {
         var d = ConfigSnapshot.defaults(); var t = d.terminal();
-        return new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.variant(), d.keybindings(),
+        return new ConfigSnapshot(d.tabHeight(), d.toolbar(), d.statusBar(), d.font(), d.theme(), d.keybindings(),
             columns, lines, new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback,
             t.optionAsMeta(), t.cursorShape(), t.cursorBlink(), t.dimInactivePanes(), t.copyOnSelect(), t.bell()));
     }

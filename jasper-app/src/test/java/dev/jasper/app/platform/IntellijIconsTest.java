@@ -1,8 +1,8 @@
 package dev.jasper.app.platform;
 
+import dev.jasper.app.appearance.Theme;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import dev.jasper.app.appearance.ThemeController;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
@@ -55,7 +55,7 @@ class IntellijIconsTest {
     }
 
     @Test void everyRequiredIconParsesAndPaintsAtSixteenPixels() {
-        new ThemeController(Appearance.LIGHT);
+        new ThemeController(Theme.LIGHT);
         try {
             for (String name : REQUIRED) {
                 var icon = new FlatSVGIcon(BASE + name + ".svg", 16, 16);
@@ -68,13 +68,13 @@ class IntellijIconsTest {
     }
 
     @Test void flatLafRemapsIntellijPaletteColoursForTheRunningTheme() {
-        var themes = new ThemeController(Appearance.LIGHT);
+        var themes = new ThemeController(Theme.LIGHT);
         try {
             var probe = new FlatSVGIcon("dev/jasper/app/icons/palette-probe.svg", 16, 16);
             assertThat(probe.hasFound()).isTrue();
             int light = centre(probe);
             assertThat(light).isEqualTo(UIManager.getColor("Actions.Blue").getRGB());
-            themes.selectAppearance(Appearance.DARK);
+            themes.configure(Theme.DARK);
             int dark = centre(probe);
             assertThat(dark).as("the same icon instance re-filters on a live theme change")
                 .isEqualTo(UIManager.getColor("Actions.Blue").getRGB());

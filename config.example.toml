@@ -98,9 +98,9 @@ family = "system"
 # size = 14.0
 
 [ui.theme]
-# Live across open windows. Options: "dark" or "light" for the FlatLaf chrome.
-variant = "dark"
-# Terminal colors, live: "match" follows variant; "light" or "dark" is independent of the UI.
+# Live across open windows: "Jasper Dark", "IntelliJ Light", or an installed theme plugin's name.
+name = "Jasper Dark"
+# Terminal colors, live: "match" uses the theme's console colours; "light" or "dark" keeps Jasper's palette.
 terminal = "match"
 
 [keybindings]

@@ -144,7 +144,7 @@ class MacTitleBarTest {
             try (var bar = MacTitleBar.install(root, new JPanel(), () -> { }, true)) {
                 bar.setTitle("Credential Vault");
                 for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
-                    themes.select(theme); SwingUtilities.updateComponentTreeUI(root);
+                    themes.configure(theme); SwingUtilities.updateComponentTreeUI(root);
                     bar.setLight(theme == Theme.LIGHT); bar.setSize(800, 28); bar.doLayout();
                     var image = new BufferedImage(800, 28, BufferedImage.TYPE_INT_RGB);
                     var graphics = image.createGraphics();

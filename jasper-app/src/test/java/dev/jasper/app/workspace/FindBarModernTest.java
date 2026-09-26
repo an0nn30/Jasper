@@ -1,8 +1,8 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.Theme;
 import com.formdev.flatlaf.FlatClientProperties;
 import dev.jasper.app.appearance.ThemeController;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.config.TerminalOptions;
 import dev.jasper.terminal.session.SessionLaunchOptions;
@@ -27,7 +27,7 @@ class FindBarModernTest {
     @Test void modernBarIsOneRowWithInFieldTogglesAndIconOnlyNavigation() throws Exception {
         try (TerminalSession session = shell(HOME)) {
             edt(() -> {
-                new ThemeController(Appearance.LIGHT);
+                new ThemeController(Theme.LIGHT);
                 var bar = new FindBar(new TerminalView(session, TerminalOptions.defaults()));
                 var query = bar.queryField();
                 assertThat(query.getAccessibleContext().getAccessibleName()).isEqualTo("Find in terminal");
@@ -68,7 +68,7 @@ class FindBarModernTest {
             until(() -> session.title().equals("ready"));
             FindBar[] bar = new FindBar[1];
             edt(() -> {
-                new ThemeController(Appearance.LIGHT);
+                new ThemeController(Theme.LIGHT);
                 var view = new TerminalView(session, TerminalOptions.defaults());
                 view.setSize(view.getPreferredSize());
                 bar[0] = attached(view); bar[0].open();

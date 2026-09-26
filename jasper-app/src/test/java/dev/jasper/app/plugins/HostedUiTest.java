@@ -282,7 +282,7 @@ class HostedUiTest {
             new ClassLoader(null) {}, () -> variant,
             handler -> () -> {}, auxiliary, terminals);
         try {
-            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.config.Appearance.LIGHT);
+            new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.LIGHT);
             for (var name : dev.jasper.sdk.ui.IconName.values()) {
                 var icon = isolated.appearance().icon(name);
                 assertThat(icon.getIconWidth()).isEqualTo(16);

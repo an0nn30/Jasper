@@ -1,7 +1,7 @@
 package dev.jasper.app.platform;
 
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.*;
 class NamedIconsTest {
     @Test void catalogRendersEveryNameAndDistinctLockStates() {
         try {
-            new ThemeController(Appearance.LIGHT);
+            new ThemeController(Theme.LIGHT);
             assertThat(NamedIcons.NAMES).contains("FILE", "LINK", "UPLOAD", "DOWNLOAD", "UP", "NEW_FOLDER", "PAUSE", "RESUME",
                 "SPLIT", "ZOOM", "TERMINAL", "SERVER");
             for (String name : NamedIcons.NAMES) {
@@ -35,11 +35,11 @@ class NamedIconsTest {
     }
 
     @Test void modernNamedIconRecolorsAndUsesOriginalVaultShapes() throws Exception {
-        var theme = new ThemeController(Appearance.LIGHT);
+        var theme = new ThemeController(Theme.LIGHT);
         try {
             var icon = AppIcons.named("LOCK");
             var before = pixels(icon,1);
-            theme.selectAppearance(Appearance.DARK);
+            theme.configure(Theme.DARK);
             assertThat(pixels(icon,1)).isNotEqualTo(before);
             Path root = Path.of("").toAbsolutePath();
             while (root != null && !Files.isDirectory(root.resolve("plugins/vault"))) root = root.getParent();

@@ -1,7 +1,6 @@
 package dev.jasper.app.shortcuthelp;
 
 import dev.jasper.app.appearance.ThemeController;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.config.UiFontConfig;
 import dev.jasper.app.contributions.Contributions;
@@ -26,7 +25,7 @@ public final class ShortcutHelpPreview {
             c.addAction("dev.jasper.remote.palette", "SSH Hosts", null, List.of("connect"), Optional.of("cmd+shift+h"), ignored -> {});
             c.addAction("dev.jasper.remote.panel", "Toggle SSH Hosts", null, List.of(), Optional.of("cmd+shift+s"), ignored -> {});
             c.addAction("dev.jasper.vault.open", "Credential Vault", null, List.of(), Optional.empty(), ignored -> {});
-            for (Appearance appearance : Appearance.values()) for (int size : new int[]{0, 18}) {
+            for (dev.jasper.app.appearance.Theme appearance : dev.jasper.app.appearance.ThemeManager.builtIns()) for (int size : new int[]{0, 18}) {
                 themes.configure(appearance, new UiFontConfig("system", size));
                 var panel = new ShortcutPanel();
                 panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), c.actions(),

@@ -1,5 +1,7 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.appearance.Theme;
+import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -137,7 +139,7 @@ public final class JasperApplication {
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir) {
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
-        themes = new ThemeController(startup.variant());
+        themes = new ThemeController(ThemeCatalog.builtIn().latest().find(startup.theme()).orElse(Theme.DARK));
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.

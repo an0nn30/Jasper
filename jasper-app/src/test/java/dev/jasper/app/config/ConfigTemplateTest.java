@@ -58,7 +58,7 @@ class ConfigTemplateTest {
         assertThat(toml.getTable("terminal.cursor").keySet()).containsExactlyInAnyOrder("shape", "blink");
         assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
         assertThat(toml.getTable("ui.font").keySet()).containsExactly("family");
-        assertThat(toml.getTable("ui.theme").keySet()).containsExactlyInAnyOrder("variant", "terminal");
+        assertThat(toml.getTable("ui.theme").keySet()).containsExactlyInAnyOrder("name", "terminal");
         assertThat(toml.getTable("keybindings").keySet()).isEmpty();
 
         for (boolean macOs : new boolean[]{true, false}) {
@@ -87,7 +87,7 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().lines()).isEqualTo(45);
             assertThat(all.snapshot().font()).isEqualTo(FontConfig.defaults());
             assertThat(all.snapshot().terminal()).isEqualTo(TerminalConfig.defaults());
-            assertThat(all.snapshot().variant()).isEqualTo(Appearance.DARK);
+            assertThat(all.snapshot().theme()).isEqualTo("Jasper Dark");
             assertThat(all.snapshot().keybindings()).hasSize(ActionId.values().length);
             var defaults = KeyBindings.defaults(macOs);
             for (ActionId action : ActionId.values()) {
