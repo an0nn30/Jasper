@@ -3,6 +3,7 @@ package dev.jasper.app.application;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.platform.ConfigEditor;
@@ -19,17 +20,21 @@ import javax.swing.SwingUtilities;
 final class ConfigurationController implements AutoCloseable {
     private final ThemeController themes;
     private final ConfigService service;
+    private final ThemeCatalog catalog;
     private final Set<WindowContent> owners = new LinkedHashSet<>();
     private final Consumer<Path> editor;
     private ConfigService.State state;
     private boolean closed;
     private Consumer<ConfigSnapshot> applicationListener = snapshot -> {};
-    private final List<dev.jasper.app.config.ConfigDiagnostic> reported = new java.util.ArrayList<>();
+    private final List<ConfigDiagnostic> reported = new java.util.ArrayList<>();
+    /** The theme catalog's problems, and an unknown theme name, from the last state applied. */
+    private List<ConfigDiagnostic> themeProblems = List.of();
 
-    /** The saved state plus problems plugins reported about their own tables since the last reload. */
+    /** The saved state plus theme problems and problems plugins reported about their own tables since the last reload. */
     ConfigService.State shown() {
         requireEdt();
         var merged = new java.util.ArrayList<>(state.diagnostics());
+        merged.addAll(themeProblems);
         merged.addAll(reported);
         return new ConfigService.State(state.snapshot(), merged, state.file(), state.present());
     }
@@ -38,18 +43,17 @@ final class ConfigurationController implements AutoCloseable {
     void report(String key, String message) {
         requireEdt();
         if (closed) return;
-        reported.add(new dev.jasper.app.config.ConfigDiagnostic(dev.jasper.app.config.ConfigDiagnostic.Severity.WARNING,
-            state.file(), 0, 0, key, message));
+        reported.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, state.file(), 0, 0, key, message));
         for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
     }
 
-    ConfigurationController(ThemeController themes, ConfigService service) {
-        this(themes, service, new ConfigEditor()::open);
+    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog) {
+        this(themes, service, catalog, new ConfigEditor()::open);
     }
 
-    ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor) {
+    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, Consumer<Path> editor) {
         requireEdt();
-        this.themes = themes; this.service = service; this.editor = editor;
+        this.themes = themes; this.service = service; this.catalog = catalog; this.editor = editor;
         state = service.initialState();
         configureThemes(state);
         service.start(this::accept);
@@ -108,9 +112,23 @@ final class ConfigurationController implements AutoCloseable {
         }
     }
 
-    /** Applies the saved theme, terminal colours and UI font; an unknown theme name keeps the theme showing. */
+    /**
+     * Applies the saved theme, terminal colours and UI font from the catalog's latest scan. An unknown
+     * theme name keeps the theme showing (Jasper Dark at start-up) and is reported with the names available.
+     */
     private void configureThemes(ConfigService.State next) {
-        Theme theme = ThemeCatalog.builtIn().latest().find(next.snapshot().theme()).orElse(themes.choice());
+        ThemeCatalog.Snapshot available = catalog.latest();
+        var problems = new java.util.ArrayList<ConfigDiagnostic>();
+        for (ThemeCatalog.Problem problem : available.problems())
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), 0, 0, "", problem.message()));
+        String name = next.snapshot().theme();
+        Theme theme = available.find(name).orElse(null);
+        if (theme == null) {
+            theme = themes.choice();
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.name",
+                "Unknown theme \"" + name + "\"; keeping " + theme.name() + ". Available: " + String.join(", ", available.names()) + "."));
+        }
+        themeProblems = List.copyOf(problems);
         themes.configure(theme, next.snapshot().terminalColors(), next.snapshot().uiFont());
     }
 

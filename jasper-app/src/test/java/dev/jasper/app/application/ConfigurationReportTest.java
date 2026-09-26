@@ -1,5 +1,6 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
@@ -22,7 +23,7 @@ class ConfigurationReportTest {
         // The service reads its initial state here, off the EDT, as production does; the controller is EDT-owned.
         try (var service = new ConfigService(file, true, worker, SwingUtilities::invokeLater)) {
             edt(() -> {
-                var controller = new ConfigurationController(new ThemeController(theme -> true), service, path -> { });
+                var controller = new ConfigurationController(new ThemeController(theme -> true), service, ThemeCatalog.builtIn(), path -> { });
                 assertThat(controller.shown().diagnostics()).isEmpty();
                 controller.report("plugins.\"a.b\".port", "out of range");
                 assertThat(controller.shown().diagnostics()).singleElement().satisfies(diagnostic -> {

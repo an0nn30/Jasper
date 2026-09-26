@@ -404,6 +404,30 @@ class ConfigServiceTest {
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> state.diagnostics().clear());
     }
 
+    @Test void aCompanionRunsOnTheWorkerNowAndOnEveryForcedRead() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Files.writeString(file, "[window]\ntab_height=40\n");
+        try (var service = new ConfigService(file, false)) {
+            var threads = new java.util.concurrent.CopyOnWriteArrayList<String>();
+            service.watchWith(() -> threads.add(Thread.currentThread().getName())).get(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(threads).containsExactly("jasper-config");
+            service.reload().get(5, java.util.concurrent.TimeUnit.SECONDS);
+            service.reload().get(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(threads).containsExactly("jasper-config", "jasper-config", "jasper-config");
+        }
+    }
+
+    @Test void aFailingCompanionDoesNotStopConfigurationReads() throws Exception {
+        Path file = directory.resolve("config.toml");
+        Files.writeString(file, "[window]\ntab_height=40\n");
+        try (var service = new ConfigService(file, false)) {
+            var first = service.watchWith(() -> { throw new IllegalStateException("scan failed"); });
+            assertThat(first).failsWithin(5, java.util.concurrent.TimeUnit.SECONDS);
+            Files.writeString(file, "[window]\ntab_height=44\n");
+            assertThat(service.reload().get(5, java.util.concurrent.TimeUnit.SECONDS).snapshot().tabHeight()).isEqualTo(44);
+        }
+    }
+
     private static void assertError(ConfigService.State state) {
         assertThat(state.present()).isTrue();
         assertThat(state.diagnostics()).isNotEmpty().allSatisfy(diagnostic -> {

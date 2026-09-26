@@ -38,6 +38,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
@@ -58,6 +60,7 @@ import dev.jasper.app.terminals.TerminalRegistry;
 public final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
     private final ThemeController themes;
+    private final ThemeCatalog themeCatalog;
     private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
@@ -139,7 +142,9 @@ public final class JasperApplication {
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir) {
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
-        themes = new ThemeController(ThemeCatalog.builtIn().latest().find(startup.theme()).orElse(Theme.DARK));
+        themeCatalog = service == null ? ThemeCatalog.builtIn() : ThemeCatalog.beside(service.initialState().file());
+        if (service != null) scanThemes(service);
+        themes = new ThemeController(themeCatalog.latest().find(startup.theme()).orElse(Theme.DARK));
         this.history = history;
         this.suppliedLauncher = suppliedLauncher;
         // The exit thread runs this after the bounded cleanup wait, so a replacement never meets this process's endpoint.
@@ -150,7 +155,7 @@ public final class JasperApplication {
         buddyAppearance = themes.subscribe((theme, changed) -> buddy.appearance(SystemFonts.system(java.awt.Font.PLAIN, 13f), theme.chrome().dark()));
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
-        configuration = service == null ? null : new ConfigurationController(themes, service);
+        configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog);
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             loginItems.accept(snapshot.backgroundEnabled());
@@ -174,6 +179,19 @@ public final class JasperApplication {
         if (supports(Desktop.Action.APP_EVENT_REOPENED)) {
             reopenListener = event -> SwingUtilities.invokeLater(() -> openOrRaise(Path.of(System.getProperty("user.home"))));
             Desktop.getDesktop().addAppEventListener(reopenListener);
+        }
+    }
+
+    /**
+     * The first scan of the themes folder runs on the configuration worker; start-up waits for it, at most
+     * 10 s, so the first window shows the saved theme. Later scans run with each configuration read.
+     */
+    private void scanThemes(ConfigService service) {
+        try { service.watchWith(themeCatalog::scan).get(10, java.util.concurrent.TimeUnit.SECONDS); }
+        catch (ExecutionException | TimeoutException failure) {
+            LOG.log(System.Logger.Level.WARNING, "The themes folder could not be read at start-up", failure);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 
