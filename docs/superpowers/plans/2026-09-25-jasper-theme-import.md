@@ -29,7 +29,7 @@
    - The unknown-name warning has the config file, key `ui.theme.name` and no position.
 7. **Scheme field and colour fallbacks.**
    - A scheme attribute that is missing a field inherits that field from the parent scheme. IntelliJ would treat it as unset, but inheriting gives a complete palette.
-   - A colour that isn't hexadecimal gets a warning and is ignored, and the next fallback applies.
+   - A colour that isn't hexadecimal gets a warning and is ignored. The same key is then looked up in the parent scheme, in the spec's inheritance order.
 
 ## Global Constraints
 
