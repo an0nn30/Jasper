@@ -154,15 +154,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
         windowTabs = new WindowTabs(this);
-        var north = new JPanel(new BorderLayout());
-        north.add(chrome.toolbar(), BorderLayout.NORTH);
-        if (windowTabs != null) north.add(windowTabs, BorderLayout.SOUTH);
-        regions = new WorkspaceRegions(tabs);
+        // The tabs belong to the terminal column, so the rail and the side panels reach the toolbar.
+        var terminalColumn = new JPanel(new BorderLayout());
+        terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
+        regions = new WorkspaceRegions(terminalColumn);
         rail = new WindowRail(action(ActionId.OPEN_SETTINGS));
         rail.setVisible(false);
         var body = new JPanel(new BorderLayout());
         body.add(rail, BorderLayout.WEST); body.add(regions, BorderLayout.CENTER);
-        add(north, BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
+        add(chrome.toolbar(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         tabs.addChangeListener(event -> {
             if (!rearranging) {
                 if (terminals != null) terminals.tabSelected();

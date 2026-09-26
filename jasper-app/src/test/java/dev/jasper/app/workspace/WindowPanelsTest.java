@@ -5,6 +5,9 @@ import dev.jasper.app.contributions.PanelEntry;
 import dev.jasper.app.contributions.PanelRegion;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.testsupport.LayoutTestSupport;
+import java.awt.Component;
+import java.awt.Rectangle;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -180,5 +183,41 @@ class WindowPanelsTest {
             assertThat(instances.get()).isEqualTo(1);
             button.doClick(); assertThat(clicks.get()).isEqualTo(1);
         });
+    }
+
+    @Test void theRailAndSidePanelsReachTheToolbarAndTheTabsSitOverTheTerminalOnly() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = window();
+            owner.connectContributions(model, UiState.inMemory());
+            var left = new JLabel("left"); var right = new JLabel("right"); var bottom = new JLabel("bottom");
+            model.addPanel("dev.x.left", "Left", new ImageIcon(), PanelRegion.LEFT, site -> left);
+            model.addPanel("dev.x.right", "Right", new ImageIcon(), PanelRegion.RIGHT, site -> right);
+            model.addPanel("dev.x.bottom", "Bottom", new ImageIcon(), PanelRegion.BOTTOM, site -> bottom);
+            toggle(model, owner, "dev.x.left"); toggle(model, owner, "dev.x.right"); toggle(model, owner, "dev.x.bottom");
+            owner.setSize(1200, 800);
+            // Twice: a trailing split learns its size in the first pass and places its divider in the second.
+            LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner);
+
+            Rectangle toolbar = in(owner, owner.toolbar()), rail = in(owner, owner.rail()), strip = in(owner, owner.windowTabs());
+            Rectangle deck = in(owner, owner.tabStrip()), leftBounds = in(owner, left), rightBounds = in(owner, right);
+            Rectangle bottomBounds = in(owner, bottom);
+            int underToolbar = toolbar.y + toolbar.height;
+            assertThat(rail.y).as("the rail starts under the toolbar").isEqualTo(underToolbar);
+            assertThat(leftBounds.y).as("the left panel starts under the toolbar").isEqualTo(underToolbar);
+            assertThat(rightBounds.y).as("the right panel starts under the toolbar").isEqualTo(underToolbar);
+            assertThat(strip.y).isEqualTo(underToolbar);
+            assertThat(strip.x).as("the tabs start right of the left panel").isGreaterThanOrEqualTo(leftBounds.x + leftBounds.width);
+            assertThat(strip.x + strip.width).as("the tabs end left of the right panel").isLessThanOrEqualTo(rightBounds.x);
+            assertThat(strip.x).isEqualTo(deck.x);
+            assertThat(strip.width).isEqualTo(deck.width);
+            assertThat(deck.y).as("the terminal sits right under its tabs").isEqualTo(strip.y + strip.height);
+            assertThat(bottomBounds.y).as("the bottom panel sits under the terminal").isGreaterThan(deck.y + deck.height);
+            assertThat(bottomBounds.x).isEqualTo(deck.x);
+        });
+    }
+
+    private static Rectangle in(JComponent root, Component component) {
+        return SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), root);
     }
 }

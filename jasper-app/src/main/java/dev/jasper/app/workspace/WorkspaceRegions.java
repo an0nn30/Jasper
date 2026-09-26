@@ -10,8 +10,9 @@ import javax.swing.JPanel;
 import javax.swing.JSplitPane;
 
 /**
- * The terminal deck with up to three panel regions around it. BOTTOM wraps the center, RIGHT wraps
- * that, LEFT wraps that, so the bottom region spans only the terminal. With no region shown the
+ * The terminal column (the tab strip over the deck) with up to three panel regions around it. BOTTOM
+ * wraps the center, RIGHT wraps that, LEFT wraps that, so the bottom region spans only the terminal
+ * and the side regions run the full height beside the tabs. With no region shown the
  * center is the only child and the layout is exactly what it was before regions existed. EDT only.
  */
 final class WorkspaceRegions extends JPanel {

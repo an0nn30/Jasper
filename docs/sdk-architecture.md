@@ -76,8 +76,9 @@ plugin default.
 
 Panels and rail actions are part of the `Contributions` model. Each window's
 `WindowContributions` keeps one lazily built instance per panel, shows at most one per region
-through `WorkspaceRegions` (nested split panes rebuilt around the terminal deck: bottom wraps
-the deck, right wraps that, left wraps that), and renders `WindowRail`. A window with nothing
+through `WorkspaceRegions` (nested split panes rebuilt around the terminal column, the tab
+strip over the deck: bottom wraps the column, right wraps that, left wraps that, so the rail and
+the side panels run from the toolbar to the status bar), and renders `WindowRail`. A window with nothing
 contributed has no rail and its old layout. Requests to show, hide or toggle a panel travel
 through the model tagged with a window id, so an action or a `PanelHost` reaches exactly one
 window. Every panel gets an application-registered `<panel id>.toggle` action and a View →

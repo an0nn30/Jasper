@@ -2,6 +2,11 @@
 
 ## Current state — 2026-09-23
 
+- **Full-height rail** (branch `worktree-rail-full-height`, 2026-09-25): the tab strip now sits
+  over the terminal deck inside `WorkspaceRegions`' center, so the rail and the left/right panels
+  run from the toolbar to the status bar and the bottom panel sits under the terminal only.
+  `WindowPanelsTest` pins the geometry. `./gradlew check` passed: 1,912 tests, 0 failures, 3
+  skipped. Not done: visual acceptance (user-run), merge and push.
 - **One layout** (branch `claude/theme-engine`, plan `docs/superpowers/plans/2026-09-25-jasper-single-layout.md`):
   the retro style, Metal, the GNOME/Tango/OldGNOME rasters and `ui.theme.style` are gone; every
   window uses the IntelliJ-style chrome. SDK 0.8.0 removes `OldGnomeIcon` and
