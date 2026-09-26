@@ -122,4 +122,39 @@ class ThemeLoaderTest {
         assertThatThrownBy(() -> loader(Map.of("child.json", "{\"name\": ")).load("child.json"))
             .isInstanceOf(ThemeLoader.ThemeException.class).hasMessageContaining("child.json");
     }
+
+    @Test void anUnknownParentFallsBackToTheBaseForTheThemesDarknessWithAWarning() throws Exception {
+        var files = Map.of(
+            "darcula.json", """
+                {"name": "Darcula", "dark": true, "ui": {"A.x": "#101010"}}""",
+            "light.json", """
+                {"name": "IntelliJ", "ui": {"A.x": "#f0f0f0"}}""",
+            "child.json", """
+                {"name": "Child", "dark": true, "parentTheme": "ExperimentalDark", "ui": {"B.y": "#202020"}}""",
+            "bright.json", """
+                {"name": "Bright", "parentTheme": "Islands Light"}""");
+        var loader = new ThemeLoader(files::get, Map.of("Darcula", "darcula.json", "IntelliJ", "light.json"));
+        var dark = loader.load("child.json");
+        assertThat(ui(dark)).containsEntry("A.x", "#101010").containsEntry("B.y", "#202020");
+        assertThat(dark.warnings()).singleElement().asString()
+            .contains("child.json").contains("ExperimentalDark").contains("Darcula");
+        var light = loader.load("bright.json");
+        assertThat(ui(light)).containsEntry("A.x", "#f0f0f0");
+        assertThat(light.warnings()).singleElement().asString().contains("Islands Light").contains("IntelliJ");
+        assertThat(loader.load("darcula.json").warnings()).isEmpty();
+    }
+
+    @Test void aParentThemeThatIsNotAStringIsAnError() {
+        for (String parent : List.of("{}", "[\"Parent\"]"))
+            assertThatThrownBy(() -> loader(Map.of("child.json", "{\"name\": \"Child\", \"parentTheme\": " + parent + "}"))
+                .load("child.json"))
+                .isInstanceOf(ThemeLoader.ThemeException.class).hasMessageContaining("child.json").hasMessageContaining("parentTheme");
+    }
+
+    @Test void aPerOsValueDropsOnlyItsIntellijClassBranches() throws Exception {
+        var ui = ui(loader(Map.of("child.json", """
+            {"name": "Child", "ui": {"Menu.border": {"os.mac": "com.intellij.ide.ui.laf.darcula.ui.DarculaMenuBorder",
+              "os.default": "1,1,1,1"}}}""")).load("child.json"));
+        assertThat(ui).containsEntry("Menu.border", Map.of("os.default", "1,1,1,1"));
+    }
 }

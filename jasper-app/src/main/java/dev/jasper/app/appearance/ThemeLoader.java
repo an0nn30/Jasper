@@ -22,9 +22,9 @@ import java.util.regex.Pattern;
  * resolved; the explicit colours are also returned because FlatLaf skips IntelliJ-only namespaces.
  */
 final class ThemeLoader {
-    /** A resolved theme: FlatLaf's JSON input and every explicit colour, keyed as the theme names it. */
-    record Resolved(String name, boolean dark, String json, Map<String, Color> colors) {
-        Resolved { colors = Map.copyOf(colors); }
+    /** A resolved theme: FlatLaf's JSON input, every explicit colour keyed as the theme names it, and the problems met. */
+    record Resolved(String name, boolean dark, String json, Map<String, Color> colors, List<String> warnings) {
+        Resolved { colors = Map.copyOf(colors); warnings = List.copyOf(warnings); }
     }
 
     /** A theme that cannot be resolved; the message names the theme file and the offending key. */
@@ -61,10 +61,14 @@ final class ThemeLoader {
     }
 
     Resolved load(String file) {
-        Raw theme = resolve(file, new ArrayList<>());
+        var warnings = new ArrayList<String>();
+        Raw theme = resolve(file, new ArrayList<>(), warnings);
         Map<String, String> colors = resolveColors(file, theme.colors);
         var ui = new LinkedHashMap<String, Object>();
-        theme.ui.forEach((key, value) -> { if (!intellijClass(value)) ui.put(key, named(value, colors)); });
+        theme.ui.forEach((key, value) -> {
+            Object kept = withoutIntellijClasses(value);
+            if (kept != null) ui.put(key, named(kept, colors));
+        });
         var json = new LinkedHashMap<String, Object>();
         json.put("name", theme.name);
         json.put("dark", theme.dark);
@@ -73,10 +77,10 @@ final class ThemeLoader {
         json.put("colors", new LinkedHashMap<String, Object>(colors));
         json.put("ui", ui);
         if (!theme.icons.isEmpty()) json.put("icons", theme.icons);
-        return new Resolved(theme.name, theme.dark, write(json), explicitColors(ui));
+        return new Resolved(theme.name, theme.dark, write(json), explicitColors(ui), warnings);
     }
 
-    private Raw resolve(String file, List<String> chain) {
+    private Raw resolve(String file, List<String> chain, List<String> warnings) {
         if (chain.contains(file)) throw new ThemeException("Theme parents form a cycle: " + String.join(" -> ", chain) + " -> " + file);
         chain.add(file);
         String text = read.apply(file);
@@ -92,10 +96,18 @@ final class ThemeLoader {
         var own = new Raw(json.get("name") instanceof String name ? name : file, "true".equals(String.valueOf(json.get("dark"))),
             json.get("author") instanceof String author ? author : "",
             flatten(object(json, "colors", file)), flatten(object(json, "ui", file)), new LinkedHashMap<>(object(json, "icons", file)));
-        if (!(json.get("parentTheme") instanceof String parent)) return own;
-        String parentFile = filesByName.get(parent);
-        if (parentFile == null) throw new ThemeException(file + ": unknown parentTheme \"" + parent + "\"");
-        return own.over(resolve(parentFile, chain));
+        Object parent = json.get("parentTheme");
+        if (parent == null) return own;
+        if (!(parent instanceof String parentName)) throw new ThemeException(file + ": \"parentTheme\" must be a string");
+        String parentFile = filesByName.get(parentName);
+        if (parentFile == null) {
+            // A parent Jasper does not ship (a New UI or another plugin's theme) becomes the classic base.
+            String base = own.dark ? "Darcula" : "IntelliJ";
+            parentFile = filesByName.get(base);
+            if (parentFile == null) throw new ThemeException(file + ": unknown parentTheme \"" + parentName + "\"");
+            warnings.add(file + ": parentTheme \"" + parentName + "\" is not a theme Jasper has; using " + base + " instead");
+        }
+        return own.over(resolve(parentFile, chain, warnings));
     }
 
     /** Resolves every entry of the merged colour table to a literal; names may refer to other names. */
@@ -115,10 +127,18 @@ final class ThemeLoader {
         return resolveColor(file, table, text, path);
     }
 
-    /** IntelliJ's own UI, border and painter classes, which Jasper cannot load; FlatLaf would try to. */
-    private static boolean intellijClass(Object value) {
-        return value instanceof String text ? text.startsWith("com.intellij.")
-            : value instanceof Map<?, ?> perOs && perOs.values().stream().anyMatch(ThemeLoader::intellijClass);
+    /**
+     * The value without IntelliJ's own UI, border and painter classes, which Jasper cannot load (FlatLaf
+     * would try to); a per-OS value keeps its other branches. Null when nothing is left.
+     */
+    private static Object withoutIntellijClasses(Object value) {
+        if (value instanceof String text) return text.startsWith("com.intellij.") ? null : value;
+        if (!(value instanceof Map<?, ?> byOs) || !perOs(byOs)) return value;
+        var kept = new LinkedHashMap<String, Object>();
+        byOs.forEach((os, branch) -> {
+            if (!(branch instanceof String text && text.startsWith("com.intellij."))) kept.put(os.toString(), branch);
+        });
+        return kept.isEmpty() ? null : kept;
     }
 
     /** A value naming a colour becomes that colour; other values, including IntelliJ palette names, pass through. */

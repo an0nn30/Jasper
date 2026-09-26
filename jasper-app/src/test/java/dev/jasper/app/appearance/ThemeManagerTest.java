@@ -168,6 +168,10 @@ class ThemeManagerTest {
         assertThat(Theme.DARK.id()).isEqualTo("jasper-dark");
     }
 
+    @Test void theBuiltInThemesLoadWithoutWarnings() {
+        for (Theme theme : ThemeManager.builtIns()) assertThat(ThemeManager.resolve(theme).warnings()).as(theme.name()).isEmpty();
+    }
+
     private static void assertColours(Map<String, String> expected) {
         expected.forEach((key, value) -> assertThat(hex(UIManager.getColor(key))).as(key).isEqualTo(value));
     }
