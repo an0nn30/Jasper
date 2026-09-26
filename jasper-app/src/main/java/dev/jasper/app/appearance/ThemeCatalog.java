@@ -2,6 +2,7 @@ package dev.jasper.app.appearance;
 
 import dev.jasper.terminal.config.Palette;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -86,7 +87,13 @@ public final class ThemeCatalog {
                 continue;
             }
             if (!lower.endsWith(".jar") && !lower.endsWith(".zip")) continue;
-            Read read = read(file);
+            Read read;
+            // Nothing one file does may stop the scan: it becomes that file's problem.
+            try { read = read(file); }
+            catch (RuntimeException failure) {
+                problems.add(new Problem(file, file.getFileName() + " cannot be read: " + failure));
+                continue;
+            }
             if (read == null) continue;
             next.put(file, read);
             problems.addAll(read.problems());
@@ -114,7 +121,7 @@ public final class ThemeCatalog {
                         .thenComparing(file -> file.getFileName().toString()))
                     .toList();
             }
-        } catch (IOException | SecurityException failure) {
+        } catch (IOException | UncheckedIOException | SecurityException failure) {
             problems.add(new Problem(directory, "Cannot read the themes folder: " + failure));
             return List.of();
         }

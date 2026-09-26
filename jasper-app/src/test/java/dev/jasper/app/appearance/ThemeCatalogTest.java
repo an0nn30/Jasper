@@ -122,4 +122,29 @@ class ThemeCatalogTest {
             .anySatisfy(message -> assertThat(message).contains("mixed.jar!/bad.theme.json").contains("nowhere"))
             .anySatisfy(message -> assertThat(message).contains("ExperimentalDark").contains("Darcula"));
     }
+
+    @Test void aFileWhoseThemesCannotBeBuiltBecomesAProblemNotAThrow() throws Exception {
+        Files.createDirectories(themes());
+        Files.writeString(themes().resolve("odd.jar"), "x");
+        var catalog = new ThemeCatalog(themes(), file -> new ThemeArchive.Contents(
+            java.util.List.of(new ThemeArchive.Found("odd.jar!/a.theme.json", null, null, null, null)), java.util.List.of()));
+        var snapshot = catalog.scan();
+        assertThat(snapshot.themes()).containsExactly(Theme.LIGHT, Theme.DARK);
+        assertThat(snapshot.problems()).singleElement().satisfies(problem -> {
+            assertThat(problem.file().getFileName()).hasToString("odd.jar");
+            assertThat(problem.message()).contains("cannot be read");
+        });
+    }
+
+    @Test void withinOnePluginTheFirstProviderOfANameWins() {
+        jar(themes().resolve("pair.jar"), entries(
+            "META-INF/plugin.xml", pluginXml("Pair", "/one.theme.json", "/two.theme.json"),
+            "one.theme.json", theme("Same", true, null, "#111111"),
+            "two.theme.json", theme("Same", true, null, "#222222")));
+        var snapshot = catalog().scan();
+        assertThat(snapshot.find("Same").map(Theme::source)).get().isInstanceOfSatisfying(Theme.Archive.class,
+            archive -> assertThat(archive.entry()).isEqualTo("pair.jar!/one.theme.json"));
+        assertThat(snapshot.problems()).singleElement().satisfies(problem ->
+            assertThat(problem.message()).contains("\"Same\"").contains("provided twice"));
+    }
 }
