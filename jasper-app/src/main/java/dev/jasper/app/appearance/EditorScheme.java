@@ -112,7 +112,9 @@ final class EditorScheme {
         Color color(String key) {
             for (Scheme scheme : chain) {
                 String value = scheme.colors().get(key);
-                if (value != null && !value.isBlank()) return hex(value, key);
+                if (value == null || value.isBlank()) continue;
+                Color color = hex(value, key);
+                if (color != null) return color;
             }
             return null;
         }
@@ -124,7 +126,12 @@ final class EditorScheme {
                 Attribute attribute = scheme.attributes().get(key);
                 if (attribute == null) continue;
                 String value = attribute.values().get(field);
-                if (value != null && !value.isBlank()) return hex(value, key);
+                if (value != null && !value.isBlank()) {
+                    Color color = hex(value, key);
+                    if (color != null) return color;
+                    // An invalid value is ignored: the parent scheme's value for this key comes next.
+                    continue;
+                }
                 // baseAttributes redirects to another key, looked up from the start of the chain.
                 if (attribute.base() != null && depth < 16) return attribute(attribute.base(), field, depth + 1);
             }

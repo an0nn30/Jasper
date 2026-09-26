@@ -95,7 +95,7 @@ class EditorSchemeTest {
 
     @Test void badColoursAndDocumentsFallBackWithWarnings() {
         var bad = read("<scheme name=\"Bad\" parent_scheme=\"Default\"><colors><option name=\"CARET_COLOR\" value=\"zz\"/></colors></scheme>", false);
-        assertThat(bad.palette().cursor()).isEqualTo(Palette.jasperLight().cursor());
+        assertThat(bad.palette().cursor()).as("the parent Default's valid caret").isEqualTo(Color.BLACK);
         assertThat(bad.warnings()).singleElement().asString().contains("CARET_COLOR").contains("zz");
         var broken = read("<scheme", true);
         assertThat(broken.palette()).isEqualTo(Palette.jasperDark());
