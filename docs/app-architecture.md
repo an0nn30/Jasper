@@ -202,3 +202,18 @@ Restored and derived keys are also recorded as the instance's extra defaults, so
 keeps them. The built-ins are `Theme.LIGHT` (classic IntelliJ Light, vendored from
 intellij-community with provenance under `themes/intellij/`) and `Theme.DARK` (`jasper-dark.theme.json`).
 Side panels paint `ToolWindow.background` through `ToolWindowSurface`; the rail stays chrome.
+
+Installed themes come from `ThemeCatalog`, which lists the plugins in the `themes` folder beside
+`config.toml`, then the built-ins. The pieces:
+- **Reading:** `ThemeArchive` reads a Marketplace plugin (a `.jar`, or a `.zip` of `lib/*.jar`) in place, with
+  caps. Its `META-INF/plugin.xml` names each theme through `themeProvider`, and a theme names its
+  editor scheme.
+- **Terminal palette:** `EditorScheme` turns the scheme's console colours into the theme's terminal palette,
+  with IntelliJ's own Default and Darcula schemes
+  (`themes/intellij/DefaultColorSchemesManager.xml`) as parents.
+- **Untrusted XML:** `SafeXml` parses plugin XML with DOCTYPE and external entities disabled.
+- **Installing:** a `Theme` records its source, a bundled resource or an archive, so `ThemeManager` installs
+  an installed theme the same way as a built-in one.
+- **Scanning and resolving:** `ConfigService.watchWith` runs the catalog's scan on the configuration worker at start-up and
+  after each read. `ConfigurationController` resolves `ui.theme.name` against the latest scan and
+  shows the catalog's problems as configuration warnings.

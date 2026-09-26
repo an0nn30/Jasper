@@ -1,6 +1,6 @@
 # Plan 4c actual-component theme renders
 
-> Historical evidence from 2026-09-12. Custom theme files and Follow System have since been removed; current [theme settings](../../configuration.md#theme-variant) support the bundled dark/light variants only.
+> Historical evidence from 2026-09-12. Custom theme files and Follow System have since been removed; current [theme settings](../../configuration.md#theme) name a built-in or installed [theme](../../themes.md) instead of a dark/light variant.
 
 Generated and visually inspected on 2026-09-12 with JBR 25.0.4.1+1-b583.48, macOS 26.6.2 (25G83), headless Swing at 958 × 958 logical pixels and 2× raster scale. No physical screens tested, native detector initialized, JFrame created or login shell started. A controlled `/bin/sh -c` fixture emits prompt metadata and waits for cleanup.
 

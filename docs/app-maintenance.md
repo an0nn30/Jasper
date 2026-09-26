@@ -198,6 +198,12 @@ root, then update the pinned hashes in `IntellijThemesTest`. To add a chrome key
 values and Jasper Dark parity) and `ThemeButtonsTest`, then `check`. Light and dark visual
 acceptance is a user check.
 
+The vendored `DefaultColorSchemesManager.xml` (IntelliJ's Default and Darcula editor schemes) comes
+from the same commit through the same tool, and its hash is pinned in `IntellijThemesTest` too.
+To support another theme-plugin layout, extend `ThemeArchive` and add a case to
+`ThemeArchiveTest`; `ThemeFixtures` builds plugin jars and Marketplace zips. Run
+`ThemeArchiveTest`, `EditorSchemeTest`, `ThemeCatalogTest` and `InstalledThemesTest`, then `check`.
+
 ## Maintaining SDK icons
 
 `IconName` artwork lives in `NamedIcons`: an IntelliJ SVG, or a tinted Tabler SVG under

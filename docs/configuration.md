@@ -82,9 +82,9 @@ family = "system"
 # size = 14.0
 
 [ui.theme]
-# "dark" or "light" for the UI chrome.
-variant = "dark"
-# "match" (follow variant), "light" or "dark" terminal colors.
+# A built-in or installed theme's name; see Themes.
+name = "Jasper Dark"
+# "match" (the theme's console colours), "light" or "dark" terminal colors.
 terminal = "match"
 
 [keybindings]
@@ -121,7 +121,7 @@ terminal = "match"
 | `terminal.bell` | `"visual"` | `"visual"`, `"sound"`, `"none"` | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
-| `ui.theme.variant` | `"dark"` | `"dark"`, `"light"` | Live |
+| `ui.theme.name` | `"Jasper Dark"` | A built-in or installed theme's name ([Themes](themes.md)) | Live |
 | `ui.theme.terminal` | `"match"` | `"match"`, `"light"`, `"dark"` | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
@@ -317,7 +317,7 @@ name steps.
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary View → Appearance choice remains shared until the saved `ui.theme.variant` changes; unrelated reloads preserve it. The Tab height dialog's reset button restores the built-in 30px value.
+View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary View → Terminal Colors choice remains shared until the saved `ui.theme.terminal` changes; unrelated reloads preserve it. The Tab height dialog's reset button restores the built-in 30px value.
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
@@ -526,21 +526,22 @@ Syntax errors, wrong types, unreadable files, invalid UTF-8 and files larger tha
 Bounded application logging is implemented; see [diagnostics](diagnostics.md) for paths and privacy rules and the [packaging guide](packaging.md) for desktop launcher details. Unsupported keys warn. Native font rendering, keyboard behavior, audio, screen sizing and editor integration still require the user-run [terminal configuration checklist](superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md), alongside the acceptance checks linked from the README.
 
 
-## Theme variant
+## Theme
 
-`ui.theme.variant` selects one of the two bundled themes. `"dark"` (the default) selects Jasper
-Dark and `"light"` classic IntelliJ Light, the theme IntelliJ IDEA ships for its classic UI. By
-default the terminal uses the matching Jasper Dark or Jasper Light palette (see [Terminal
-colors](#terminal-colors)). Both are IntelliJ-format `.theme.json` files installed through one
-theme engine; Jasper does not yet read theme files of your own. An unrecognized variant produces
-an error diagnostic and keeps the default; a non-string value rejects the configuration.
+`ui.theme.name` names the UI theme:
+- `"Jasper Dark"` (the default);
+- `"IntelliJ Light"` (classic IntelliJ Light, the theme IntelliJ IDEA ships for its classic UI);
+- or a theme plugin installed in the `themes` folder beside this file.
 
-View → Appearance offers Light and Dark across all windows as a temporary choice that never
-rewrites the configuration. The choice survives unrelated reloads and clears when the saved
-variant changes. Terminal padding and the area behind panes match the terminal palette; toolbar, menus,
-find controls and the native title follow the chrome. Theme changes retain shells, scrollback,
-split ratios and font choices, and a failed chrome installation keeps the previous theme and
-can be retried with Reload config.
+The name is matched ignoring case and surrounding spaces. [Themes](themes.md) covers installing
+Marketplace themes and how a theme colours the terminal. An unknown name is a warning that lists
+the available themes: at start-up Jasper uses Jasper Dark, and on a reload it keeps the theme
+showing. A non-string value rejects the configuration.
+
+Terminal padding and the area behind panes match the terminal palette; toolbar, menus, find
+controls and the native title follow the theme. Theme changes retain shells, scrollback, split
+ratios and font choices, and a failed installation keeps the previous theme and can be retried
+with Reload config.
 
 The former `[colors]` table (`appearance`, `theme`) and custom palette files are no longer
 supported: a `[colors]` table is reported as an unknown setting and ignored. See the
@@ -549,13 +550,14 @@ supported: a `[colors]` table is reported as an unknown setting and ignored. See
 ## Terminal colors
 
 `ui.theme.terminal` chooses the terminal palette independently of the UI chrome, for example a
-light UI with a dark terminal. `"match"` (the default) follows `ui.theme.variant`; `"light"` and
-`"dark"` always use the Jasper Light or Jasper Dark palette. Terminal views, their padding and the
-area behind the panes follow this choice; the title row, toolbar, tab strip, find bar, status
-bar, split dividers, menus and dialogs keep the UI chrome. Changes apply live to every window
-without reinstalling the look and feel, keeping shells, scrollback and splits.
+light UI with a dark terminal. `"match"` (the default) uses the theme's console colours, or
+Jasper Dark or Jasper Light by the theme's darkness when it has none ([Themes](themes.md));
+`"light"` and `"dark"` always use the Jasper Light or Jasper Dark palette. Terminal views, their
+padding and the area behind the panes follow this choice; the title row, toolbar, tab strip, find
+bar, status bar, split dividers, menus and dialogs keep the UI chrome. Changes apply live to every
+window without reinstalling the look and feel, keeping shells, scrollback and splits.
 
-View → Appearance offers Terminal: Match UI, Light and Dark as a temporary choice for the
+View → Terminal Colors offers Terminal: Match UI, Light and Dark as a temporary choice for the
 session that never rewrites the configuration; it clears when the saved `terminal` value
 changes. An unrecognized value produces an error diagnostic and keeps `"match"`; a non-string
 value rejects the configuration.
