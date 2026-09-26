@@ -41,7 +41,17 @@ public final class ThemeManager {
     /** The bundled themes, Light first. */
     public static List<Theme> builtIns() { return List.of(Theme.LIGHT, Theme.DARK); }
 
-    static ThemeLoader.Resolved resolve(Theme theme) { return RESOLVED.computeIfAbsent(theme, key -> LOADER.load(key.file())); }
+    static ThemeLoader.Resolved resolve(Theme theme) { return RESOLVED.computeIfAbsent(theme, key -> load(key.source())); }
+
+    /** Resolves a theme's file; touches no Swing state, so it is safe off the EDT. */
+    static ThemeLoader.Resolved load(Theme.Source source) {
+        return switch (source) {
+            case Theme.Resource resource -> LOADER.load(resource.file());
+            // Parents a plugin theme names resolve against the chains Jasper ships.
+            case Theme.Archive archive ->
+                new ThemeLoader(file -> file.equals(archive.entry()) ? archive.json() : read(file), FILES).load(archive.entry());
+        };
+    }
 
     /** Installs {@code theme} as the look and feel; false when FlatLaf could not set it up. */
     public static boolean install(Theme theme) {
