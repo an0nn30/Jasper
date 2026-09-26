@@ -3133,7 +3133,11 @@ name = "Jasper Dark"
 # "match" (the theme's console colours), "light" or "dark" terminal colors.
 ```
 
-2. In the settings table, replace the row ``| `ui.theme.variant` | `"dark"` | `"dark"`, `"light"` | Live |`` with ``| `ui.theme.name` | `"Jasper Dark"` | A built-in or installed theme's name ([Themes](themes.md)) | Live |``.
+2. In the settings table, replace the row ``| `ui.theme.variant` | `"dark"` | `"dark"`, `"light"` | Live |`` with:
+
+```markdown
+| `ui.theme.name` | `"Jasper Dark"` | A built-in or installed theme's name ([Themes](themes.md)) | Live |
+```
 
 3. Replace the section from `## Theme variant` up to, but not including, `## Terminal colors` with:
 
@@ -3161,7 +3165,11 @@ supported: a `[colors]` table is reported as an unknown setting and ignored. See
 ```
 
 4. In `## Terminal colors`:
-   - Replace ``"match"` (the default) follows `ui.theme.variant`;`` with ``"match"` (the default) uses the theme's console colours, or Jasper Dark or Jasper Light by the theme's darkness when it has none ([Themes](themes.md));``.
+   - Replace ``"match"` (the default) follows `ui.theme.variant`;`` with:
+
+     ```markdown
+     `"match"` (the default) uses the theme's console colours, or Jasper Dark or Jasper Light by the theme's darkness when it has none ([Themes](themes.md));
+     ```
    - Replace `View → Appearance offers Terminal: Match UI, Light and Dark` with `View → Terminal Colors offers Terminal: Match UI, Light and Dark`.
 
 5. Run `git grep -nE 'ui\.theme\.variant|theme-variant|View → Appearance|Theme variant' -- 'docs/*.md' README.md 'jasper-app/*.md' ':!docs/superpowers/**' ':!docs/STATUS.md'`. Rewrite every remaining hit for the new key and menu, and point any `#theme-variant` anchor at `#theme`. Expected afterwards: no output.
