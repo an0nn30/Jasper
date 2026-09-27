@@ -110,6 +110,21 @@ class ConfigLoaderTest {
         assertThat(parse("window.toolbar='icons_and_labels'").diagnostics()).isEmpty();
     }
 
+    @Test void railWidthDefaultsToThirtySixAndClampsOutOfRangeValuesWithAWarning() {
+        assertThat(parse("").snapshot().railWidth()).isEqualTo(36);
+        assertThat(ConfigSnapshot.defaults().railWidth()).isEqualTo(36);
+        for (int width : new int[]{28, 36, 64}) assertThat(parse("window.rail_width=" + width).snapshot().railWidth()).isEqualTo(width);
+        for (int[] example : new int[][]{{10, 28}, {27, 28}, {65, 64}, {200, 64}}) {
+            var result = parse("[window]\nrail_width = " + example[0] + "\n");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().railWidth()).as("rail_width = %d", example[0]).isEqualTo(example[1]);
+            assertDiagnostic(result, "window.rail_width", 2, 1, ConfigDiagnostic.Severity.WARNING);
+            assertThat(result.diagnostics().getFirst().message()).contains(String.valueOf(example[1]));
+        }
+        assertThat(ConfigSnapshot.defaults().toBuilder().railWidth(48).build().railWidth()).isEqualTo(48);
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().railWidth(27).build());
+    }
+
     @Test void tabHeightDefaultsToThirtyAndClampsOutOfRangeValuesWithAWarning() {
         assertThat(parse("").snapshot().tabHeight()).isEqualTo(30);
         assertThat(ConfigSnapshot.defaults().tabHeight()).isEqualTo(30);

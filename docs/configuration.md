@@ -32,6 +32,7 @@ These are the supported keys and defaults. Font and terminal behavior settings a
 ```toml
 [window]
 tab_height = 30
+rail_width = 36
 toolbar = "icons_and_labels"
 status_bar = true
 columns = 150
@@ -94,6 +95,7 @@ terminal = "match"
 | Key | Default | Accepted values | When applied |
 |---|---|---|---|
 | `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
+| `window.rail_width` | `36` | Integer 28–64 logical pixels; the panel rail's buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
 | `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
 | `window.status_bar` | `true` | Boolean | Live |
 | `window.columns` | `150` | Integer 5–500 | New windows |

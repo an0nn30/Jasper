@@ -67,6 +67,7 @@ final class WindowCommands implements AutoCloseable {
                 "Terminal Colors: " + label, () -> owner.selectTerminalColors(colors), List.of("terminal", "colors", "palette"));
         }
         add(registry, "view.tab_height", "Tab height\u2026", "Tab Height\u2026", () -> owner.chrome().editTabHeight());
+        add(registry, "view.rail_width", "Rail width\u2026", "Rail Width\u2026", () -> owner.chrome().editRailWidth());
     }
 
     private void add(CommandRegistry registry, String id, String label, String title, Runnable callback) {
@@ -107,8 +108,8 @@ final class WindowCommands implements AutoCloseable {
             action.putValue(Action.SELECTED_KEY, owner.terminalColors() == colors);
             action.setEnabled(true);
         }
-view("view.tab_height").setEnabled(true);
-
+        view("view.tab_height").setEnabled(true);
+        view("view.rail_width").setEnabled(true);
     }
 
     @Override public void close() {

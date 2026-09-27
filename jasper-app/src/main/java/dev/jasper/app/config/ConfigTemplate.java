@@ -25,6 +25,8 @@ public final class ConfigTemplate {
             [window]
             # Tab height in logical pixels, 20-72; out-of-range values use the nearest limit. Updates live.
             # tab_height = 30
+            # Panel rail width in logical pixels, 28-64; out-of-range values use the nearest limit. Updates live.
+            # rail_width = 36
             # Toolbar: "icons_and_labels", "icons", or "hidden"; updates live.
             # toolbar = "icons_and_labels"
             # Show the status bar; updates live.

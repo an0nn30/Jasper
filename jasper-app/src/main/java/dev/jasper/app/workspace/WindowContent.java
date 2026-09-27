@@ -79,6 +79,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     Runnable onTabHeightChanged = () -> {};
     java.util.function.ToIntFunction<JComponent> confirmTabHeight = control -> JOptionPane.showConfirmDialog(
         this, control, "Tab height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+    private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
+    java.util.function.ToIntFunction<JComponent> confirmRailWidth = control -> JOptionPane.showConfirmDialog(
+        this, control, "Rail width", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     private boolean closed;
     private boolean rearranging;
     private WindowTerminals terminals;
@@ -600,6 +603,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     int tabHeight() { return tabHeight; }
 
+    int railWidth() { return railWidth; }
+
+    void setRailWidth(int width) {
+        if (width < ConfigSnapshot.MIN_RAIL_WIDTH || width > ConfigSnapshot.MAX_RAIL_WIDTH)
+            throw new IllegalArgumentException("Rail width must be between 28 and 64 pixels");
+        if (closed || railWidth == width) return;
+        railWidth = width;
+        rail.setRailWidth(width);
+        revalidate(); repaint();
+        onMinimumSizeChanged.run();
+    }
+
     void setTabHeight(int height) {
         if (height < MIN_TAB_HEIGHT || height > MAX_TAB_HEIGHT)
             throw new IllegalArgumentException("Tab height must be between 20 and 72 pixels");
@@ -647,6 +662,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
         confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
+        confirmRailWidth = control -> JOptionPane.CANCEL_OPTION;
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
         activityListeners.clear();

@@ -15,9 +15,12 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                       FontConfig font, String theme, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
                       int maxResults, int longCommandSeconds, boolean backgroundEnabled,
-                      Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors) {
+                      Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors,
+                      int railWidth) {
     /** The theme a configuration without {@code ui.theme.name} uses. */
     public static final String DEFAULT_THEME = "Jasper Dark";
+    /** The rail's width in logical pixels without {@code window.rail_width}, and its limits. */
+    public static final int DEFAULT_RAIL_WIDTH = 36, MIN_RAIL_WIDTH = 28, MAX_RAIL_WIDTH = 64;
 
     public ConfigSnapshot {
         if (longCommandSeconds < 0 || longCommandSeconds > 3600)
@@ -25,6 +28,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         if (maxResults < PaletteSettings.MIN_MAX_RESULTS || maxResults > PaletteSettings.MAX_MAX_RESULTS)
             throw new IllegalArgumentException("Max results must be 1\u201320.");
         if (tabHeight < 20 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 20–72.");
+        if (railWidth < MIN_RAIL_WIDTH || railWidth > MAX_RAIL_WIDTH) throw new IllegalArgumentException("Rail width must be 28–64.");
         if (columns < 5 || columns > 500) throw new IllegalArgumentException("Columns must be 5–500.");
         if (lines < 2 || lines > 200) throw new IllegalArgumentException("Lines must be 2–200.");
         Objects.requireNonNull(font, "font");
@@ -47,6 +51,16 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                 throw new IllegalArgumentException("Keybindings must name known actions and valid, noncolliding shortcuts.");
             }
         }
+    }
+
+    /** Every field but the rail width, which is the default. */
+    public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
+                          FontConfig font, String theme, Map<String, String> keybindings,
+                          int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
+                          int maxResults, int longCommandSeconds, boolean backgroundEnabled,
+                          Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors) {
+        this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled,
+            maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, DEFAULT_RAIL_WIDTH);
     }
 
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
@@ -144,6 +158,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private boolean backgroundEnabled;
         private Map<String, Map<String, Object>> plugins;
         private TerminalColors terminalColors;
+        private int railWidth;
         private Builder(ConfigSnapshot source) {
             tabHeight = source.tabHeight();
             toolbar = source.toolbar();
@@ -161,8 +176,10 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             backgroundEnabled = source.backgroundEnabled();
             plugins = source.plugins();
             terminalColors = source.terminalColors();
+            railWidth = source.railWidth();
         }
         public Builder tabHeight(int value) { tabHeight = value; return this; }
+        public Builder railWidth(int value) { railWidth = value; return this; }
         public Builder toolbar(ToolbarMode value) { toolbar = value; return this; }
         public Builder statusBar(boolean value) { statusBar = value; return this; }
         public Builder uiFont(UiFontConfig value) { uiFont = value; return this; }
@@ -179,7 +196,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder terminalColors(TerminalColors value) { terminalColors = value; return this; }
         public Builder plugins(Map<String, Map<String, Object>> value) { plugins = Map.copyOf(value); return this; }
         public ConfigSnapshot build() {
-            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors);
+            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth);
         }
     }
 }

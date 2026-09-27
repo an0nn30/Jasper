@@ -89,6 +89,9 @@
   the minimum at 1 to avoid overlap).
 - **Tab height:** `window.tab_height` is 20–72 logical pixels, default 30; out-of-range values clamp
   to the nearest limit with a warning instead of falling back to the default.
+- **Rail width:** `window.rail_width` is 28–64 logical pixels, default 36, clamped the same way.
+  Rail buttons stay square at width − 6, separators at width − 14. View → Rail width… and the
+  `view.rail_width` command set a session-only width, like Tab height….
 - **SDK version on merge:** `main` had already claimed SDK 0.7.5 for the Remote SFTP icons (FILE,
   LINK, UPLOAD, DOWNLOAD, UP, NEW_FOLDER, PAUSE, RESUME), so the chrome names moved to 0.7.6 and
   Remote requires `>=0.7.6`.

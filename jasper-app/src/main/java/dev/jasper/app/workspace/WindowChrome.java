@@ -7,6 +7,7 @@ import dev.jasper.app.contributions.MenuSection;
 import dev.jasper.app.contributions.MenuTarget;
 import dev.jasper.app.contributions.ToolbarEntry;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -86,6 +87,7 @@ final class WindowChrome {
         view.add(terminalColors);
         JMenuItem tabHeight = new JMenuItem(owner.windowCommands().view("view.tab_height"));
         view.add(tabHeight);
+        view.add(new JMenuItem(owner.windowCommands().view("view.rail_width")));
         pluginSeparator.setName("pluginSeparator");
         buildToolbar();
     }
@@ -238,6 +240,24 @@ final class WindowChrome {
             owner.setTabHeight(((Number) height.getValue()).intValue());
         } catch (java.text.ParseException | IllegalArgumentException failure) {
             owner.onError.accept("Enter a tab height between 20 and 72 pixels.");
+        }
+    }
+
+    void editRailWidth() {
+        var control = new JPanel(new FlowLayout(FlowLayout.LEADING));
+        var width = new JSpinner(new SpinnerNumberModel(owner.railWidth(),
+            ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH, 1));
+        width.setName("railWidth");
+        var label = new JLabel("Width (pixels):"); label.setLabelFor(width);
+        var reset = new JButton("Reset to default"); reset.setName("resetRailWidth");
+        reset.addActionListener(event -> width.setValue(ConfigSnapshot.DEFAULT_RAIL_WIDTH));
+        control.add(label); control.add(width); control.add(reset);
+        if (owner.confirmRailWidth.applyAsInt(control) != JOptionPane.OK_OPTION) return;
+        try {
+            width.commitEdit();
+            owner.setRailWidth(((Number) width.getValue()).intValue());
+        } catch (java.text.ParseException | IllegalArgumentException failure) {
+            owner.onError.accept("Enter a rail width between 28 and 64 pixels.");
         }
     }
 

@@ -44,7 +44,7 @@ public final class ConfigLoader {
         // palette.scopes once held the History scope's settings; the table is kept known so the
         // moved-to-a-plugin report below replaces the generic unknown-key warning.
         Map.entry(List.of("palette", "scopes"), Set.of()),
-        Map.entry(List.of("window"), Set.of("tab_height", "toolbar", "status_bar", "columns", "lines")),
+        Map.entry(List.of("window"), Set.of("tab_height", "rail_width", "toolbar", "status_bar", "columns", "lines")),
         Map.entry(List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height")),
         Map.entry(List.of("ui"), Set.of("theme", "font")),
         Map.entry(List.of("ui", "font"), Set.of("family", "size")),
@@ -60,6 +60,7 @@ public final class ConfigLoader {
     private final List<ConfigDiagnostic> diagnostics = new ArrayList<>();
     private boolean rejected;
     private int tabHeight = 30;
+    private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
     private ToolbarMode toolbar = ToolbarMode.ICONS_AND_LABELS;
     private boolean statusBar = true;
     private boolean buddyEnabled = true;
@@ -116,7 +117,7 @@ public final class ConfigLoader {
             new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), theme, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, new UiFontConfig(uiFontFamily, uiFontSize), terminalColors);
+                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, new UiFontConfig(uiFontFamily, uiFontSize), terminalColors, railWidth);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -201,6 +202,8 @@ public final class ConfigLoader {
     private void readField(String name, List<String> path, Object value) {
         switch (name) {
             case "window.tab_height" -> tabHeight = clampedInteger(path, value, 20, 72, tabHeight);
+            case "window.rail_width" -> railWidth = clampedInteger(path, value,
+                ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH, railWidth);
             case "window.columns" -> columns = integer(path, value, 5, 500, columns);
             case "window.lines" -> lines = integer(path, value, 2, 200, lines);
             case "window.toolbar" -> toolbar = choice(path, value, Map.of(
