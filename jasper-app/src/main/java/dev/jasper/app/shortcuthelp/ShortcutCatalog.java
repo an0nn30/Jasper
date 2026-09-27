@@ -20,17 +20,22 @@ final class ShortcutCatalog {
             .map(a -> new KeyBindings.Extension(a.id(), a.defaultBinding())).toList());
         var rows = new ArrayList<ShortcutEntry>();
         for (ActionId id : ActionId.values()) rows.add(new ShortcutEntry(id.id(), category(id), id.label(),
-            resolved.bindings().strokeFor(id).orElse(null), "Terminal window", id.id().replace('_', ' ')));
+            resolved.bindings().strokeFor(id).orElse(null), "Terminal window", id.id().replace('_', ' '), true, KeyBindings.effectiveDefaultBinding(id, macOs)));
         for (ActionEntry action : actions) {
             String context = resolved.problems().stream().filter(problem -> problem.actionId().equals(action.id()))
                 .map(KeyBindings.Problem::message).findFirst().orElse("Terminal window");
             rows.add(new ShortcutEntry(action.id(), pluginGroup(action.id(), plugins), action.title(),
-                resolved.bindings().strokeFor(action.id()).orElse(null), context, String.join(" ", action.keywords())));
+                resolved.bindings().strokeFor(action.id()).orElse(null), context, String.join(" ", action.keywords()), true, validDefault(action.defaultBinding().orElse("none"), macOs)));
         }
         contextual(rows, actions, plugins, macOs);
         rows.sort(Comparator.comparing(ShortcutEntry::group, String.CASE_INSENSITIVE_ORDER)
             .thenComparing(ShortcutEntry::name, String.CASE_INSENSITIVE_ORDER).thenComparing(ShortcutEntry::id));
         return List.copyOf(rows);
+    }
+
+    private static String validDefault(String binding, boolean macOs) {
+        try { KeyBindings.parse(binding, macOs); return binding; }
+        catch (IllegalArgumentException invalid) { return "none"; }
     }
 
     private static String pluginGroup(String id, Map<String, String> plugins) {

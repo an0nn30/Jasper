@@ -1,5 +1,11 @@
 package dev.jasper.app.config;
 
+import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.persistence.TomlStateFile;
+import java.util.Map;
+import java.util.Optional;
+import java.util.LinkedHashMap;
+
 import javax.swing.SwingUtilities;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -116,6 +122,57 @@ public final class ConfigService implements AutoCloseable {
             }
             opener.accept(file);
             return file;
+        });
+    }
+
+    /** Applies explicit shortcut edits on the config worker, then publishes them through normal reload. */
+    public CompletableFuture<State> saveKeybindings(Map<String, String> expected,
+            Map<String, Optional<String>> changes, List<KeyBindings.Extension> extensions) {
+        var before = Map.copyOf(expected);
+        var edits = Map.copyOf(changes);
+        var actions = List.copyOf(extensions);
+        return submit(() -> {
+            Path target = Files.exists(file) || Files.isSymbolicLink(file) ? file.toRealPath() : file.toAbsolutePath();
+            var original = TomlStateFile.readBounded(file, MAX_BYTES, "Configuration");
+            String source = original.orElseGet(() -> ConfigTemplate.text(macOs));
+            var parsed = ConfigLoader.parse(file, source, macOs);
+            if (parsed.rejected() || parsed.diagnostics().stream().anyMatch(d ->
+                    d.severity() == ConfigDiagnostic.Severity.ERROR || d.key().startsWith("keybindings")))
+                throw new IllegalArgumentException("Fix the settings file's keybinding or configuration errors before saving shortcuts.");
+            if (!parsed.snapshot().keybindings().equals(before)) {
+                refresh(true, true);
+                throw new IllegalArgumentException("Shortcuts changed on disk. Review the updated bindings and try again.");
+            }
+            var next = new LinkedHashMap<>(before);
+            edits.forEach((id, value) -> { if (value.isPresent()) next.put(id, value.get()); else next.remove(id); });
+            var oldBindings = KeyBindings.withOverrides(macOs, before).withExtensions(actions).bindings();
+            var newBindings = KeyBindings.withOverrides(macOs, next).withExtensions(actions).bindings();
+            for (var bound : oldBindings.strokes().entrySet()) {
+                if (!edits.containsKey(bound.getKey()) && !newBindings.strokeFor(bound.getKey()).filter(bound.getValue()::equals).isPresent())
+                    throw new IllegalArgumentException("Shortcut is used by " + bound.getKey() + ". Reassign it explicitly first.");
+            }
+            for (var edit : edits.entrySet()) {
+                var builtIn = ActionId.forId(edit.getKey());
+                var extension = actions.stream().filter(a -> a.id().equals(edit.getKey())).findFirst();
+                if (builtIn.isEmpty() && extension.isEmpty()) continue;
+                String intended = edit.getValue().orElseGet(() -> builtIn
+                    .map(a -> KeyBindings.effectiveDefaultBinding(a, macOs))
+                    .orElseGet(() -> extension.orElseThrow().defaultBinding().orElse("none")));
+                if (!KeyBindings.parse(intended, macOs).equals(newBindings.strokeFor(edit.getKey())))
+                    throw new IllegalArgumentException("The default shortcut for " + edit.getKey() + " is unavailable. Assign a shortcut explicitly instead.");
+            }
+            String updated = KeybindingText.update(source, edits);
+            var checked = ConfigLoader.parse(file, updated, macOs);
+            if (checked.rejected() || !checked.snapshot().keybindings().equals(next))
+                throw new IllegalArgumentException("Cannot safely save these shortcuts; review the settings file.");
+            if (updated.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES)
+                throw new IOException("Configuration exceeds 1 MiB.");
+            if (!TomlStateFile.readBounded(file, MAX_BYTES, "Configuration").equals(original))
+                throw new IOException("Settings changed while saving. Try again.");
+            Path currentTarget = Files.exists(file) || Files.isSymbolicLink(file) ? file.toRealPath() : file.toAbsolutePath();
+            if (!target.equals(currentTarget)) throw new IOException("Settings location changed while saving. Try again.");
+            TomlStateFile.writeAtomically(target, ".shortcuts-", updated);
+            return refresh(true, true);
         });
     }
 

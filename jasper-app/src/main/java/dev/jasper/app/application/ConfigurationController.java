@@ -1,5 +1,9 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.config.KeyBindings;
+import java.util.Map;
+import java.util.Optional;
+
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
@@ -92,6 +96,12 @@ final class ConfigurationController implements AutoCloseable {
                 if (!closed && owners.contains(owner)) owner.onError.accept(failure.getMessage());
             });
         });
+    }
+
+    CompletableFuture<Void> saveKeybindings(Map<String, Optional<String>> changes,
+            List<KeyBindings.Extension> extensions) {
+        requireEdt();
+        return service.saveKeybindings(state.snapshot().keybindings(), changes, extensions).thenApply(ignored -> null);
     }
 
     void unregister(WindowContent owner) {

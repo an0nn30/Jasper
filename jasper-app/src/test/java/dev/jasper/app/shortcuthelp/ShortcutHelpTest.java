@@ -79,7 +79,7 @@ class ShortcutHelpTest {
 
     @Test void searchFindsNamesPluginsAndChordsAndCaptureConsumesWholeSequenceOnlyInItsWindow() throws Exception {
         edt(() -> {
-            var panel = new ShortcutPanel();
+            var panel = new ShortcutPanel(true, changes -> { throw new AssertionError("Unexpected save"); });
             var root = new JRootPane(); root.setContentPane(panel);
             var stroke = KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK);
             panel.setRows(List.of(new ShortcutEntry("remote.hosts", "Remote", "SSH Hosts", stroke, "Terminal window", "connect"),
@@ -106,7 +106,7 @@ class ShortcutHelpTest {
 
     @Test void captureMatchesEscapeAndTabAndNativeMenuShortcutsWithoutExecutingThem() throws Exception {
         edt(() -> {
-            var panel = new ShortcutPanel();
+            var panel = new ShortcutPanel(true, changes -> { throw new AssertionError("Unexpected save"); });
             var root = new JRootPane(); root.setContentPane(panel);
             panel.record.doClick();
             for (int code : new int[]{KeyEvent.VK_ESCAPE, KeyEvent.VK_TAB, KeyEvent.VK_W, KeyEvent.VK_Q}) {
@@ -129,7 +129,7 @@ class ShortcutHelpTest {
             var windows = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(
                 () -> {}, () -> {}, () -> {}, title -> {}, () -> new Rectangle(0, 0, 850, 600), (title, initial) -> Optional.empty()));
             KeyBindings[] base = {KeyBindings.defaults(true)};
-            var help = new ShortcutHelp(windows, c, () -> base[0], () -> Map.of("dev.test", "Test Plugin"), true);
+            var help = new ShortcutHelp(windows, c, () -> base[0], () -> Map.of("dev.test", "Test Plugin"), true, changes -> { throw new AssertionError("Unexpected save"); });
             help.open(); var surface = windows.open().getFirst();
             var panel = (ShortcutPanel) surface.holder().getComponent(0);
             panel.search.setText("hello"); assertThat(panel.table.getRowCount()).isZero();
@@ -150,7 +150,7 @@ class ShortcutHelpTest {
 
     @Test void mountedRecorderHandlesNativeAcceleratorsAndDetachesOnDisposal() throws Exception {
         edt(() -> {
-            var panel = new ShortcutPanel();
+            var panel = new ShortcutPanel(true, changes -> { throw new AssertionError("Unexpected save"); });
             var root = new JRootPane(); root.setContentPane(panel);
             panel.addNotify();
             try {
@@ -169,7 +169,7 @@ class ShortcutHelpTest {
     @Test void themedRowsGrowWithTypographyAndSearchControlsRemainUsable() throws Exception {
         edt(() -> {
             var themes = new dev.jasper.app.appearance.ThemeController();
-            var panel = new ShortcutPanel();
+            var panel = new ShortcutPanel(true, changes -> { throw new AssertionError("Unexpected save"); });
             try {
                 panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
                 int normal = panel.table.getRowHeight();
@@ -190,7 +190,7 @@ class ShortcutHelpTest {
 
     @Test void losingWindowFocusReleasesKeysEvenIfTheirReleaseHappenedOutsideJasper() throws Exception {
         edt(() -> {
-            var panel = new ShortcutPanel();
+            var panel = new ShortcutPanel(true, changes -> { throw new AssertionError("Unexpected save"); });
             panel.record.doClick();
             assertThat(panel.dispatch(key(panel, KeyEvent.KEY_PRESSED, KeyEvent.VK_H, InputEvent.META_DOWN_MASK))).isTrue();
             panel.focusLeftWindow();

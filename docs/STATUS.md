@@ -2,6 +2,24 @@
 
 ## Current state — 2026-09-23
 
+- **Editable keyboard shortcuts** (branch `codex/shortcut-editor`, worktree
+  `/Users/dustin/.codex/worktrees/shortcut-editor/moray`, 2026-09-27): approved bounded
+  in-chat design, implemented inline with test-first coverage; no plan document.
+  Clicking a shortcut or Unassigned opens an inline recorder with Save, Cancel,
+  Remove and Restore default. Conflicts require explicit reassignment. App/plugin
+  bindings save to the active `config.toml`, preserve unrelated text and comments,
+  support symlink targets, and publish live to all windows. Contextual keys remain
+  read-only. Commands already registered `app.shortcuts`; its search terms now
+  include keymap and editing/settings aliases. Independent final review is complete;
+  the symlink test skips platforms without symlink privileges, and search/edit recorders
+  are mutually exclusive. The preview task now uses the theme ID in filenames (the
+  existing theme-object filename exceeded filesystem limits after the theme refactor).
+  `./gradlew check :jasper-app:installDist :jasper-app:shortcutHelpPreview` passed:
+  2,017 tests, zero failures/errors, five environment-specific skips. Architecture,
+  source hygiene and diff checks passed; light/dark previews at default and 18-point
+  typography were inspected. Native GUI acceptance is user-run. Not merged or pushed.
+  See [shortcut guide](keyboard-shortcuts.md).
+
 - **Three-platform CI** (branch `fix/ci-cross-platform`, 2026-09-27): `main` had been red on Linux
   and Windows since 2026-09-13 (last green `1db31b1b`). The logs showed no assertion text and
   Gradle stopped at the first failing module, so most failures were hidden. CI now prints full

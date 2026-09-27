@@ -1,5 +1,10 @@
 package dev.jasper.app.shortcuthelp;
 
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+
 import dev.jasper.app.platform.WindowInput;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -28,12 +33,13 @@ import javax.swing.event.DocumentListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 
-/** Passive grouped table and window-scoped capture. Native dispatch exists only while mounted. */
+/** Editable grouped table and window-scoped capture. Native dispatch exists only while mounted. */
 final class ShortcutPanel extends JPanel implements AutoCloseable {
     final JTextField search = new JTextField();
     final JButton record = new JButton("Record shortcut");
     final JButton clear = new JButton("Clear");
     final JTable table;
+    final ShortcutEditPanel editor;
     private final JLabel status = new JLabel();
     private final Rows model = new Rows();
     private List<ShortcutEntry> all = List.of();
@@ -52,8 +58,10 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     private final WindowInput.ShortcutRecorder nativeRecorder = new WindowInput.ShortcutRecorder(this::capture);
     private JRootPane mountedRoot;
 
-    ShortcutPanel() {
+    ShortcutPanel(boolean macOs, Function<Map<String, Optional<String>>,
+            CompletableFuture<Void>> writer) {
         super(new BorderLayout(0, 12));
+        editor = new ShortcutEditPanel(macOs, writer, this::stopSearchRecording);
         setBorder(BorderFactory.createEmptyBorder(18, 18, 14, 18));
         var top = new JPanel(new BorderLayout(10, 8));
         var label = new JLabel("Find a shortcut"); label.setLabelFor(search);
@@ -78,7 +86,20 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         scroll.setColumnHeaderView(table.getTableHeader());
         add(scroll, BorderLayout.CENTER);
         status.getAccessibleContext().setAccessibleName("Shortcut search status");
-        add(status, BorderLayout.SOUTH);
+        var bottom = new JPanel(new BorderLayout(0, 8));
+        bottom.add(editor, BorderLayout.CENTER); bottom.add(status, BorderLayout.SOUTH);
+        add(bottom, BorderLayout.SOUTH);
+        table.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent event) {
+                int row = table.rowAtPoint(event.getPoint());
+                if (row >= 0 && table.columnAtPoint(event.getPoint()) == 1) editRow(row);
+            }
+        });
+        table.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "editShortcut");
+        table.getActionMap().put("editShortcut", new javax.swing.AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) { editRow(table.getSelectedRow()); }
+        });
         search.getDocument().addDocumentListener(new DocumentListener() {
             private void changed() { if (!editingCapture) { captured = null; filter(); } }
             @Override public void insertUpdate(DocumentEvent event) { changed(); }
@@ -86,6 +107,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
             @Override public void changedUpdate(DocumentEvent event) { changed(); }
         });
         record.addActionListener(event -> {
+            editor.stopRecording();
             recording = !recording;
             search.setEditable(!recording);
             record.setText(recording ? "Stop recording" : "Record shortcut");
@@ -100,18 +122,30 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         table.setRowHeight(table.getFontMetrics(table.getFont()).getHeight() + 12);
     }
 
-    void setRows(List<ShortcutEntry> rows) { all = List.copyOf(rows); filter(); }
+    void setRows(List<ShortcutEntry> rows) { all = List.copyOf(rows); editor.setRows(all); filter(); }
+
+    private void editRow(int index) {
+        if (index < 0 || index >= visible.size()) return;
+        stopSearchRecording();
+        editor.begin(visible.get(index)); filter();
+    }
+
+    private void stopSearchRecording() {
+        recording = false; search.setEditable(true); record.setText("Record shortcut"); filter();
+    }
 
     private void filter() {
         visible = all.stream().filter(row -> ShortcutText.matches(row, search.getText(), captured)).toList();
         model.fireTableDataChanged();
         status.setText(recording ? "Press a shortcut to find it. Click Stop recording when finished."
             : visible.isEmpty() ? "No matching shortcuts. Try another name or key combination."
-            : visible.size() + " shortcuts · Current bindings · Read-only reference");
+            : visible.size() + (visible.size() == 1 ? " shortcut" : " shortcuts") + " · Click a shortcut to edit · Contextual keys are read-only");
     }
 
     boolean capture(KeyStroke stroke) {
-        if (!recording || closed) return false;
+        if (closed) return false;
+        if (editor.capture(stroke)) return true;
+        if (!recording) return false;
         captured = stroke;
         editingCapture = true;
         try { search.setText(ShortcutText.format(stroke)); }
@@ -126,7 +160,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
             : type == KeyEvent.KEY_PRESSED && held.contains(code);
         if (type == KeyEvent.KEY_PRESSED) swallowTyped = tail;
         if (tail) { event.consume(); return true; }
-        if (closed || !recording || type != KeyEvent.KEY_PRESSED || !belongs(event.getComponent())) return false;
+        if (closed || !(recording || editor.recording()) || type != KeyEvent.KEY_PRESSED || !belongs(event.getComponent())) return false;
         held.add(code); swallowTyped = true;
         if (!modifier(code)) capture(KeyStroke.getKeyStrokeForEvent(event));
         event.consume(); return true;
@@ -135,6 +169,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     /** Losing focus can hide key releases from AWT; never retain physical keys across that boundary. */
     void focusLeftWindow() {
         held.clear(); swallowTyped = false;
+        editor.stopRecording();
         recording = false; search.setEditable(true); record.setText("Record shortcut");
         filter();
     }
@@ -171,7 +206,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         mountedRoot = null; held.clear(); swallowTyped = false;
     }
 
-    @Override public void close() { closed = true; recording = false; uninstall(); }
+    @Override public void close() { closed = true; recording = false; editor.close(); uninstall(); }
 
     private final class Rows extends AbstractTableModel {
         private static final String[] HEADINGS = {"Action", "Shortcut", "Section / Plugin", "Context"};
@@ -197,7 +232,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
             setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(start ? 1 : 0, 0, 0, 0, line),
                 BorderFactory.createEmptyBorder(4, 8, 4, 8)));
             setFont(grid.getFont().deriveFont(column == 2 ? Font.BOLD : Font.PLAIN));
-            setToolTipText(String.valueOf(value));
+            setToolTipText(column == 1 ? visible.get(row).editable() ? "Click to change this shortcut" : "Fixed contextual key (read-only)" : String.valueOf(value));
             return this;
         }
     }
