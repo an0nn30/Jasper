@@ -17,6 +17,12 @@ public interface Appearance {
      */
     Variant variant();
 
+    /** Host-owned colors for specialized document widgets. UI thread only.
+     * @return the active theme's editor palette
+     * @since 0.8.5
+     */
+    default EditorPalette editorPalette() { return EditorPalette.current(); }
+
     /**
      * Runs the handler on the UI thread after each change of variant.
      *

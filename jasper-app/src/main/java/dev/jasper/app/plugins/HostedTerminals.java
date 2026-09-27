@@ -179,6 +179,8 @@ final class HostedTerminals implements Terminals {
         @Override public String toString() { return "pane " + id; }
     }
 
+    boolean ownsWindow(WindowHandle handle) { return handle instanceof Window window && window.hostRegistry() == registry; }
+
     boolean ownsOpenWindow(WindowHandle handle) {
         return handle instanceof Window window && window.hostRegistry() == registry && registry.window(window.id()).isPresent();
     }

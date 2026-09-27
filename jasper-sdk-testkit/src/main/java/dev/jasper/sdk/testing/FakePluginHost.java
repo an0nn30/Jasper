@@ -574,11 +574,6 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Every open plugin window and dialog, creation order.
-     *
-     * @return lines of the form {@code id|title|shown}, where a dialog's id is {@code dialog}
-     */
-    /**
      * Inspects the actual Swing content of an open plugin surface for headless form tests.
      * @param pluginId surface owner
      * @param title exact surface title
@@ -633,6 +628,7 @@ public final class FakePluginHost implements AutoCloseable {
      * @since 0.8.4
      */
     public boolean requestQuit() {
+        for (FakePluginContext context : contexts.values()) if (!context.ui.closeContent(List.copyOf(context.ui.contents), false).getNow(false)) return false;
         for (FakePluginContext context : contexts.values())
             for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows))
                 if (!window.id.equals("dialog") && !window.id.equals("overlay") && !window.mayClose()) return false;
@@ -960,4 +956,17 @@ public final class FakePluginHost implements AutoCloseable {
 
         /** Every file a plugin asked to open in the editor. */
         public List<Path> openedInEditor() { return List.copyOf(openedInEditor); }
+    /** @return hosted content in registration order, for contract assertions */
+    public List<dev.jasper.sdk.ui.ContentTab> contentTabs() {
+        return contexts.values().stream().flatMap(c -> c.ui.contents.stream()).map(c -> (dev.jasper.sdk.ui.ContentTab)c).toList();
+    }
+    /** @param tab handle from this host
+     * @return the actual hosted component */
+    public javax.swing.JComponent contentComponent(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).component; }
+    /** @param tab handle from this host
+     * @return recorded presentation */
+    public dev.jasper.sdk.ui.ContentPresentation contentPresentation(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).presentation; }
+    /** @param tab handle from this host
+     * @return originating owner */
+    public dev.jasper.sdk.WindowOwner contentOwner(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).owner; }
 }

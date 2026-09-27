@@ -25,7 +25,7 @@ final class FakeWorkspace {
         Tab(Window window, String title) { this.window = window; this.title = title; }
     }
     static final class Window {
-        final UUID id = UUID.randomUUID(); final List<Tab> tabs = new ArrayList<>(); Tab selected; boolean open = true;
+        final UUID id = UUID.randomUUID(); final List<Tab> tabs = new ArrayList<>(); Tab selected; boolean open = true; boolean detached;
     }
 
     private final FakePluginHost host;

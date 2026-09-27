@@ -21,6 +21,9 @@ import dev.jasper.app.palette.PaletteScope;
  * that changed. Everything here is EDT-only; callbacks into contributors are their concern to contain.
  */
 public final class Contributions {
+    private final ContentRegistry content = new ContentRegistry();
+    public ContentRegistry content() { return content; }
+
     /** Which part changed. */
     public enum Kind { ACTIONS, TOOLBAR, MENUS, STATUS, PANELS, RAIL, SCOPES }
 

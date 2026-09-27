@@ -113,6 +113,20 @@ final class FakeUi {
         @Override public void close() { closed = true; ui.status.remove(this); }
     }
 
+    final List<FakeContent> contents = new ArrayList<>();
+    java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean, java.util.concurrent.CompletableFuture<Boolean>> contentGuard = (tabs,batch) -> java.util.concurrent.CompletableFuture.completedFuture(true);
+    java.util.concurrent.CompletableFuture<Boolean> pendingContent;
+    List<FakeContent> pendingTabs = List.of();
+    java.util.concurrent.CompletableFuture<Boolean> closeContent(List<FakeContent> tabs, boolean remove) {
+        if (pendingContent != null) return tabs.equals(pendingTabs) ? pendingContent : java.util.concurrent.CompletableFuture.completedFuture(false);
+        if (tabs.stream().anyMatch(tab -> tab.pins > 0)) return java.util.concurrent.CompletableFuture.completedFuture(false);
+        var result = new java.util.concurrent.CompletableFuture<Boolean>(); pendingContent = result; pendingTabs = List.copyOf(tabs);
+        try { contentGuard.apply(new ArrayList<dev.jasper.sdk.ui.ContentTab>(tabs), !remove).whenComplete((allowed, error) -> {
+            if (error == null && Boolean.TRUE.equals(allowed) && remove) for(var tab:List.copyOf(tabs))tab.close();
+            pendingContent = null; pendingTabs = List.of(); result.complete(error == null && Boolean.TRUE.equals(allowed));
+        }); } catch(RuntimeException failure) { pendingContent=null;pendingTabs=List.of();result.complete(false); }
+        return result;
+    }
     final FakePluginHost host;
     final FakePluginContext context;
     final Map<String, Action> actions = new LinkedHashMap<>();
@@ -136,6 +150,7 @@ final class FakeUi {
     }
 
     void closeAll() {
+        for (var content : List.copyOf(contents)) content.close();
         for (var item : status) item.closed = true;
         actions.clear(); toolbar.clear(); sections.clear(); topLevelIds.clear(); status.clear();
         for (Panel panel : List.copyOf(panels)) panel.instances.values().forEach(PanelInstance::close);
@@ -380,18 +395,42 @@ final class FakeUi {
     }
 
     private boolean liveChooserOwner(WindowOwner owner) {
+        if (owner instanceof FakeContent content) return contents.contains(content) && !content.closed;
         if (owner instanceof FakeWindow window) return windows.contains(window) && window.shown && !window.closed;
         return owner instanceof WindowHandle terminal && context.terminals.ownsOpenWindow(terminal);
     }
     private List<java.nio.file.Path> choosePaths(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
         context.requireOpen(); java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial);
         if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
-        var paths = host.takePathSelection();
-        return context.state == FakePluginContext.State.CLOSED || !liveChooserOwner(owner) ? List.of() : paths;
+        FakeContent document = owner instanceof FakeContent tab ? tab : null;
+        if (document != null) document.pins++;
+        try {
+            var paths = host.takePathSelection();
+            return context.state == FakePluginContext.State.CLOSED || !liveChooserOwner(owner) ? List.of() : paths;
+        } finally { if (document != null) document.pins--; }
     }
 
     Windows windows() {
         return new Windows() {
+            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
+                context.requireOpen();
+                for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}
+                if (owner instanceof FakeContent tab) {
+                    if (!contents.contains(tab)) throw new IllegalArgumentException("Closed or foreign content owner");
+                    owner = tab.owner;
+                }
+                if (owner != null && (!(owner instanceof WindowHandle handle) || !context.terminals.ownsWindow(handle)))
+                    throw new IllegalArgumentException("Content requires a workspace owner");
+                if (owner == null || !((WindowHandle)owner).isOpen()) {
+                    var window = host.workspace.windows.stream().filter(w -> w.open && !w.detached).findFirst().orElseGet(host.workspace::addWindow);
+                    owner = context.terminals.windowHandle(window.id);
+                }
+                var entry=new FakeContent(FakeUi.this,spec,owner,component);contents.add(entry);entry.select();return entry;
+            }
+            @Override public Subscription onTabsClosing(java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean,java.util.concurrent.CompletableFuture<Boolean>> guard) {
+                context.requireOpen();contentGuard=guard;return ()->{if(contentGuard==guard)contentGuard=(tabs,batch)->java.util.concurrent.CompletableFuture.completedFuture(true);};
+            }
+
             @Override public List<java.nio.file.Path> chooseFiles(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
                 return choosePaths(owner, title, initial);
             }
@@ -427,9 +466,14 @@ final class FakeUi {
                 if (owner instanceof FakeWindow window) {
                     if (window.closed || !windows.contains(window)) throw new IllegalArgumentException("A dialog needs an open owner window");
                     parent = window;
-                } else if (!(owner instanceof WindowHandle))
+                } else if (!(owner instanceof WindowHandle) && !(owner instanceof FakeContent content && contents.contains(content)))
                     throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
                 var dialog = new FakeWindow("dialog", spec.title(), parent);
+                if (owner instanceof FakeContent content) {
+                    if (spec.modal()) content.pins++;
+                    var registration = content.onClosed(dialog::close);
+                    dialog.onClosed(() -> { registration.close(); if (spec.modal()) content.pins--; });
+                }
                 windows.add(dialog);
                 return dialog;
             }
