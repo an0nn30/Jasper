@@ -549,7 +549,7 @@ public final class FakePluginHost implements AutoCloseable {
     private Runnable duringPathSelection = () -> {};
 
     /**
-     * Queues multiple files or one directory; an empty list scripts cancellation.
+     * Queues multiple files, one directory or one save target (chooseFiles, chooseDirectory, chooseSaveFile); an empty list scripts cancellation.
      * @param selection selected local paths
      * @since 0.7.5
      */
@@ -609,6 +609,34 @@ public final class FakePluginHost implements AutoCloseable {
         for (FakePluginContext context : contexts.values())
             for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows)) if (window.id.equals(windowId)) return window.requestClose();
         return false;
+    }
+
+    /**
+     * Runs the Close Window command of the first open window with this id, as File → Close Window or Cmd/Ctrl+W
+     * would: its close-command handlers newest first, then, when none handled it, its closing guards.
+     *
+     * @param windowId the window id
+     * @return true when the window closed; false when a handler handled the command, a guard vetoed or there is no such window
+     * @since 0.8.4
+     */
+    public boolean closeCommand(String windowId) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows)) if (window.id.equals(windowId)) return window.closeCommand();
+        return false;
+    }
+
+    /**
+     * Asks the closing guards of every open plugin window, as quitting or restarting Jasper does, and closes
+     * nothing. Dialogs and overlays are not asked.
+     *
+     * @return whether the quit may go ahead
+     * @since 0.8.4
+     */
+    public boolean requestQuit() {
+        for (FakePluginContext context : contexts.values())
+            for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows))
+                if (!window.id.equals("dialog") && !window.id.equals("overlay") && !window.mayClose()) return false;
+        return true;
     }
 
     /**

@@ -58,10 +58,37 @@ class FileEndpointTest {
         else assertThatThrownBy(() -> endpoint.metadata(target, 1_700_000_000_000L, 0640)).isInstanceOf(IOException.class).hasMessageContaining("POSIX");
         if (posix) assertThat(endpoint.stat(target).permissions() & 0777).isEqualTo(0640);
         assertThat(endpoint.stat(target).modifiedMillis()).isEqualTo(1_700_000_000_000L);
+        // The editor's safe write: an exclusive create whose mode applies as the file is created, owner and
+        // group, and whether this user may write. Skipped for SFTP on Windows, where MINA's server has no POSIX modes.
+        if (posix || endpoint instanceof LocalEndpoint) {
+            String created = endpoint.child(root, "private");
+            try (var out = endpoint.create(created, 0600)) { out.write(new byte[]{7, 8}); assertThat(out.checkpoint()).isEqualTo(2); }
+            try (var in = endpoint.read(created, 0)) { assertThat(in.readAllBytes()).containsExactly(7, 8); }
+            assertThatThrownBy(() -> endpoint.create(created, 0600)).isInstanceOf(FileAlreadyExistsException.class);
+            if (posix) {
+                var entry = endpoint.stat(created);
+                assertThat(entry.permissions()).isEqualTo(0600);
+                assertThat(entry.uid()).isGreaterThanOrEqualTo(0);
+                assertThat(entry.gid()).isGreaterThanOrEqualTo(0);
+                assertThat(endpoint.writable(created)).isTrue();
+                endpoint.metadata(created, -1, 0400);
+                assertThat(endpoint.writable(created)).as("a read-only file").isFalse();
+            }
+            endpoint.remove(created, false);
+        }
     }
 
     @Test void localContract() throws Exception {
         try (var endpoint = new LocalEndpoint()) { contract(endpoint, directory.toRealPath().toString()); }
+    }
+    @Test @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void localStatReportsOwnerAndGroup() throws Exception {
+        Path file = Files.writeString(directory.toRealPath().resolve("owned"), "x");
+        try (var endpoint = new LocalEndpoint()) {
+            var entry = endpoint.stat(file.toString());
+            assertThat(entry.uid()).isEqualTo(Files.getAttribute(file, "unix:uid"));
+            assertThat(entry.gid()).isEqualTo(Files.getAttribute(file, "unix:gid"));
+        }
     }
     @Test void sparseOffsetsAreLongAndAbortClosesOwnedHandles() throws Exception {
         try (var endpoint = new LocalEndpoint()) {

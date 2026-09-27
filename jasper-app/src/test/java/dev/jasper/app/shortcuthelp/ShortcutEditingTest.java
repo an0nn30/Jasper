@@ -135,9 +135,10 @@ class ShortcutEditingTest {
     }
 
     private static void clickShortcut(ShortcutPanel panel) {
-        panel.table.setSize(900, 400); panel.table.doLayout();
-        var cell = panel.table.getCellRect(0, 1, true);
-        panel.table.dispatchEvent(new MouseEvent(panel.table, MouseEvent.MOUSE_CLICKED, 0, 0, cell.x + 3, cell.y + 3, 1, false));
+        panel.tree.setSize(900, 400); panel.tree.doLayout();
+        var cell = panel.tree.getRowBounds(1);
+        panel.tree.dispatchEvent(new MouseEvent(panel.tree, MouseEvent.MOUSE_CLICKED, 0, 0,
+            cell.x + 3, cell.y + 3, 1, false, MouseEvent.BUTTON1));
     }
     private static KeyEvent key(ShortcutPanel panel, int type, int code, int modifiers) {
         return new KeyEvent(panel, type, 0, modifiers, code, KeyEvent.CHAR_UNDEFINED);

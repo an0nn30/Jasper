@@ -34,6 +34,8 @@ val stagePlugins = tasks.register<Sync>("stagePlugins") {
     from(project(":jasper-plugin-vault").configurations.named("runtimeClasspath")) { into("dev.jasper.vault") }
     from(project(":jasper-plugin-remote").tasks.named("jar")) { into("dev.jasper.remote") }
     from(project(":jasper-plugin-remote").configurations.named("runtimeClasspath")) { into("dev.jasper.remote") }
+    from(project(":jasper-plugin-editor").tasks.named("jar")) { into("dev.jasper.editor") }
+    from(project(":jasper-plugin-editor").configurations.named("runtimeClasspath")) { into("dev.jasper.editor") }
     into(layout.buildDirectory.dir("plugins"))
 }
 // installDist and the distribution archives carry them beside the application jar, where the runtime looks.

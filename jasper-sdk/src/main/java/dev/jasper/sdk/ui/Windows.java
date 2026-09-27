@@ -69,4 +69,20 @@ public interface Windows {
     default Optional<Path> chooseDirectory(WindowOwner owner, String title, Optional<Path> initial) {
         throw new UnsupportedOperationException("Directory selection is unavailable");
     }
+
+    /**
+     * Asks for a local file to save to, in the platform's save dialog, which confirms replacing an existing
+     * file. The same owner, lifetime and UI-thread rules as {@link #chooseFiles} apply.
+     * @param owner live terminal window or shown window created by this plugin
+     * @param title dialog title
+     * @param initial a directory to start in, or a suggested file whose folder and name are filled in; empty for the platform default
+     * @return an absolute normalized path, or empty on cancellation or owner closure
+     * @throws IllegalArgumentException for a foreign, unshown or dead owner
+     * @throws IllegalStateException for a closed context or off-UI call
+     * @throws UnsupportedOperationException if the host lacks this picker
+     * @since 0.8.4
+     */
+    default Optional<Path> chooseSaveFile(WindowOwner owner, String title, Optional<Path> initial) {
+        throw new UnsupportedOperationException("Save selection is unavailable");
+    }
 }

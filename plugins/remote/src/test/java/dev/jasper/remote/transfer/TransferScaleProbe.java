@@ -58,6 +58,8 @@ public final class TransferScaleProbe {
         public void remove(String path,boolean directory) { created=false; }
         public void publish(String temporary,String target,boolean replace) { published=true;created=false;digest=TransferRecovery.hex(hash); }
         public void metadata(String path,long time,int mode) {}
+        public WriteHandle create(String path,int mode) { throw new UnsupportedOperationException(); }
+        public boolean writable(String path) { return true; }
         public String canonical(String path) { return path; }
         public String home() { return "/"; }
         public void abort() {}

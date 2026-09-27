@@ -87,3 +87,9 @@ Native acceptance (user-run):
 - Change an app or Remote shortcut setting while the window is open and check the row.
 - Hold a recorded key, switch away, release it, then return and type in a terminal.
 - Resize the reference and change the app's theme/UI font; headings and controls stay usable.
+
+## Editor window
+
+The bundled Editor's window has its own shortcuts, listed in its ⋯ menu and in [Editor](editor.md).
+They belong to that window's content, not to terminal windows, so they are not in this catalog; the
+terminal-window action **Open in Editor…** (`dev.jasper.editor.open`, Cmd/Ctrl+O) is.

@@ -79,11 +79,13 @@ class MockUiTest {
             DesktopTestSupport.setStatusMetadata(status, "bash", "/tmp", "91 \u00d7 35", true, false); layoutTree(status);
             BufferedImage before = paint(status);
             assertThat(before.getRGB(32, 30) & 0xffffff).isEqualTo(0xa8c58d);
-            DesktopTestSupport.setStatusMetadata(status, "bash", "/very-long-directory".repeat(100), "91 \u00d7 35", false, false); layoutTree(status);
+            String longDirectory = "/very-long-directory".repeat(100);
+            DesktopTestSupport.setStatusMetadata(status, "bash", longDirectory, "91 \u00d7 35", false, false); layoutTree(status);
             BufferedImage after = paint(status);
             assertThat(status.getMinimumSize().width).isZero();
             assertThat(status.getPreferredSize().width).isZero();
-            assertThat(status.getText()).contains("/very-long-directory").contains("91 \u00d7 35");
+            // A local directory is shown as the platform renders it absolute (D:\very-long-directory\... on Windows).
+            assertThat(status.getText()).contains(java.nio.file.Path.of(longDirectory).toAbsolutePath().normalize().toString()).contains("91 \u00d7 35");
             assertThat(after.getRGB(32, 30) & 0xffffff).isEqualTo(0xa7b2bf);
             for (int y = 0; y < 60; y++) for (int x = 900; x < 1200; x++)
                 assertThat(after.getRGB(x, y)).as("right segment remains visible").isEqualTo(before.getRGB(x, y));

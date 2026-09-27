@@ -34,9 +34,83 @@
   Setup EXE and ZIP rebuilt successfully; MSI verification and all 14 restored asset
   hashes in the packaged JAR pass. Independent review found no issues. Full `check`
   was not rerun for this refresh; the earlier privilege limitations above still apply.
+  Resolved the subsequent pull of `origin/main` at `39b8a7e3`: kept both status
+  histories and the shared source-icon ignore exception. Retained Windows startup-focus
+  coverage because the branch's attached-session fixture needs no Unix shell.
+  Nine focused resource/icon/focus tests passed with no skips; Windows setup EXE and
+  ZIP rebuilt and package/MSI verification passed. Full `check` was not rerun.
   Setup remains unsigned. Interactive install/upgrade/uninstall acceptance is
   user-run; no installer or GUI was launched. [Build and acceptance](packaging.md#windows-setup-wizard).
   Not merged or pushed.
+
+- **Local/remote integration and missing icon assets** (2026-09-27): merged
+  `origin/main` at `2d59d455` with the local keyboard-panel changes, retaining both
+  sets of status notes. Integration checks exposed 14 missing vendored SVGs under
+  `icons/intellij/build/`: the broad `build/` ignore rule had excluded that source
+  category from Git. Restored the exact files from the UI worktree, verified every
+  SHA-256 against `assets.tsv`, and added a source-only ignore exception.
+  Full `./gradlew check` passed: 2,266 tests, zero failures/errors, five skips.
+
+- **Thin shortcut disclosure chevrons** (`codex/keyboard-shortcuts-ui`, 2026-09-27):
+  the shortcut tree now uses outlined chevrons instead of filled triangles: right when
+  collapsed and down when expanded. Only the arrow shape is overridden; the active
+  theme still supplies its colors. Existing shortcut tests passed and dark/light
+  headless previews were inspected.
+
+- **Expandable keyboard shortcut sections** (`codex/keyboard-shortcuts-ui`, 2026-09-27):
+  replaced the flat four-column table with collapsible section/plugin groups, vendored
+  folder icons and right-aligned bindings. Panel, tree, viewport and editor share the
+  active theme's panel surface; selected rows retain the theme's rounded treatment.
+  Search temporarily opens matching sections and restores manual disclosure state when
+  cleared. Live refresh preserves selection by action ID; Enter edits actions or toggles
+  groups, and expand/collapse-all controls support browsing. Context remains in tooltips
+  and accessible descriptions; recording, conflict resolution and read-only keys retain
+  their existing behavior. Headless previews cover dark/light and larger UI fonts.
+  Regression checks cover disclosure, search, refresh, rendering and full-width row
+  clicks; independent review findings are fixed and the final review is clean.
+  `check :jasper-app:packageDist` passed: 2,072 tests, zero failures/errors, five skips;
+  package verification passed and the DMG was rebuilt. An initial unrelated asynchronous
+  terminal-search timeout passed in isolation and in the final full suite. No GUI launched.
+
+- **Missing `build/` icons** (branch `claude/fix-build-icons`, 2026-09-27): the New UI catalog lists 7 icons
+  (14 SVGs) under `icons/intellij/build/`, which the root `.gitignore`'s `build/` rule kept out of Git, so
+  `IntellijIconsTest` and `HostedUiTest` failed on every clean checkout (CI red since `6bd1132d`). The 14 files
+  were fetched from `intellij-community` at the pinned commit and match `assets.tsv`'s SHA-256; `.gitignore`
+  now excepts that folder. `./gradlew check`: 2,262 tests, 2,257 passed, 0 failed, 5 skipped.
+
+- **Editor work merged with `origin/main`** (branch `claude/sync-origin`, 2026-09-27): local `main` (Editor
+  plans A and B) and `origin/main` (28 commits: New UI icon catalog as SDK 0.8.2, remote-directory hints as
+  SDK 0.8.3, workspace chrome, shortcut editor) had both numbered new SDK APIs 0.8.2. The Editor's additions
+  (`PluginWindow.onCloseCommand`, quit guards, `Windows.chooseSaveFile`) are now SDK **0.8.4**; the Editor
+  declares `sdk = ">=0.8.4, <0.9"`, Remote 0.4.0 `>=0.8.3`. Conflicts: Remote's manifest and `RemotePlugin`
+  (both sides kept), SDK version tests, SDK docs and this file.
+
+- **Editor plugin, plan B** (branch `claude/editor-plugin-b`, plan
+  `docs/superpowers/plans/2026-09-27-jasper-editor-plugin-b.md`): Remote 0.4.0 optionally requires the Editor.
+  - Double-click or Enter in the SFTP browser opens a file, or a link to a file, in the Editor; **Open in Editor** opens up to 20 selected files.
+  - Saving follows the write contract over SFTP (`dev.jasper.remote.edit.SafeWrite`):
+    - an owner-only sibling created with its mode through a hand-built `SSH_FXP_OPEN`;
+    - posix-rename, and writing in place otherwise;
+    - read-only files refused.
+  - Editor operations run one at a time per connection on one SFTP channel (`EditChannels`).
+  - The spec's sections 4.4, 6.1, 6.2 and 6.4 carry the Plan B amendments.
+  - Deviations from the task text, from the task reviews: `SafeWrite` falls back to writing in place when the target's permissions are unknown (−1) or when the sibling create is refused with `AccessDeniedException` (other create failures propagate); `EditChannels` settles a channel before failing its queued jobs, so work submitted from a failure callback is not lost; `plugins/remote/build.gradle.kts`'s first two comment lines were replaced, since the plan's replacement already carried the second line's text; a late link lookup in the SFTP panel navigates or reports only while the panel still shows the same host and folder, and Open in Editor still opens the selection's regular files when a link fails to resolve, naming the reason; Step 4's `docs/README.md` instruction was rephrased so no inline code in the plan holds Markdown link syntax, which `AppDocumentationTest` misread as a broken link from `docs/superpowers/plans/`.
+  - Final review fix wave: a failed save over SFTP no longer leaves its hidden sibling (`SafeWrite` marks one it could not remove with `SafeWrite.SiblingLeft`, and `RemoteDocument` queues a never-prompting removal), a sibling created readable by others is narrowed to `0600` before any byte, and the review's minor text, test and documentation items are in.
+  - Follow-up (final review): a save costs about 55 sequential SFTP round trips (every endpoint call re-checks each ancestor folder; two channel opens per save; content uploaded twice without posix-rename) — measure with checklist item 20, then consider resolved-path calls without the ancestor walk, checking posix-rename up front, and a short channel linger (a §6.3 amendment).
+  - `./gradlew check` (2026-09-27): **BUILD SUCCESSFUL**. Totals across `*/build/test-results/test/` and `plugins/*/build/test-results/test/`: 2,196 tests, 2,191 passed, 0 failed, 5 skipped, 0 errors.
+  - Not done: GUI acceptance (items 12–20 of the [checklist](editor-verification.md), user-run) and push. Merged into `main` locally on 2026-09-27.
+
+- **Editor plugin, plan A** (branch `claude/editor-plugin`, plan
+  `docs/superpowers/plans/2026-09-27-jasper-editor-plugin-a.md`, spec
+  `docs/superpowers/specs/2026-09-27-jasper-editor-plugin-design.md`): SDK 0.8.4 (numbered 0.8.2 on the
+  branch; renumbered when merged with `origin/main`, whose 0.8.2 and 0.8.3 are the New UI icon catalog and
+  remote-directory hints) adds
+  `PluginWindow.onCloseCommand`, quit and restart asking plugin windows' closing guards, and
+  `Windows.chooseSaveFile`. The bundled Editor (`plugins/editor`, RSyntaxTextArea 3.6.0) opens, edits
+  and safely saves local files in tabs in one window, with a TOML lexer, conflict checks and outside-change
+  polling. Planning decisions and deviations are in the plan's header. Not done: plan B (SFTP editing
+  through Remote), GUI acceptance ([checklist](editor-verification.md), user-run) and push. Merged into
+  `main` locally on 2026-09-27 after `origin/main`'s three-platform CI work.
 
 - **Terminal-first startup focus** (`codex/intellij-new-icons`, 2026-09-27):
   removed the SSH panel's deferred focus request on every hierarchy showing event,

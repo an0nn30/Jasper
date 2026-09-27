@@ -187,6 +187,68 @@ class JasperApplicationPluginsTest {
         } finally { release.countDown(); }
     }
 
+    private static final String GUARD_FIXTURE = """
+        package fix.guard;
+        import dev.jasper.sdk.plugin.Plugin;
+        import dev.jasper.sdk.plugin.PluginContext;
+        import dev.jasper.sdk.ui.WindowSpec;
+        import java.awt.Dimension;
+        import java.nio.file.Files;
+        public final class Main implements Plugin {
+            @Override public void start(PluginContext context) {
+                var window = context.windows().create(new WindowSpec("dev.example.guard.window", "Guarded", new Dimension(100, 100), false));
+                window.onClosing(() -> {
+                    try { Files.writeString(context.dataDirectory().resolve("asked"), "yes"); }
+                    catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                    return Files.exists(context.dataDirectory().resolve("allow"));
+                });
+            }
+        }
+        """;
+
+    @Test void quitAndRestartAskPluginWindowsFirstAndARefusalKeepsJasperRunning() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("dev-plugin");
+        PluginJars.build(dev, "guard.jar", PluginJars.descriptor("dev.example.guard", "1.0.0", "fix.guard.Main"),
+            Map.of("fix.guard.Main", GUARD_FIXTURE), List.of());
+        Path data = dirs.plugins().resolve("dev.example.guard/data");
+        List<String> spawned = new CopyOnWriteArrayList<>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].restartPlanner = mode -> Optional.of(List.of("jasper"));
+            application[0].spawner = command -> spawned.add(String.join(" ", command));
+            application[0].startPlugins(null, dev, false, dirs);
+        });
+        edt(application[0]::quit);
+        edt(() -> assertThat(application[0].restart(RestartMode.SAME)).as("handled: the window said no").isTrue());
+        edt(() -> { });
+        assertThat(data.resolve("asked")).exists();
+        assertThat(terminated.getCount()).as("still running").isEqualTo(1);
+        java.nio.file.Files.writeString(data.resolve("allow"), "yes");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(spawned).as("the refused restart left no relaunch behind").isEmpty();
+    }
+
+    @Test void quitNowDoesNotAskPluginWindows() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("dev-plugin");
+        PluginJars.build(dev, "guard.jar", PluginJars.descriptor("dev.example.guard", "1.0.0", "fix.guard.Main"),
+            Map.of("fix.guard.Main", GUARD_FIXTURE), List.of());
+        Path data = dirs.plugins().resolve("dev.example.guard/data");
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, dev, false, dirs);
+        });
+        edt(application[0]::quitNow);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(data.resolve("asked")).as("the guard was never consulted").doesNotExist();
+    }
+
     @Test void anUnknownCommandLineLeavesJasperRunning() throws Exception {
         List<String> spawned = new CopyOnWriteArrayList<>();
         var terminated = new CountDownLatch(1);

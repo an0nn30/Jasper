@@ -32,7 +32,8 @@ var unlock = context.appearance().icon(IconName.UNLOCK);
 Import `dev.jasper.sdk.ui.IconName`. Plugins request only the meaning, without image paths.
 Icons use IntelliJ New UI artwork, selected centrally and fitted into a 16px square.
 SDK 0.8.2 also exposes all 885 catalog choices through `Appearance.icon(BundledIcon)`.
-Vault requires `sdk = ">=0.8.2, <0.9"`; Remote requires `sdk = ">=0.8.3, <0.9"`. Other bundled plugins retain their 0.8.0 floor.
+Vault requires `sdk = ">=0.8.2, <0.9"`; Remote requires `sdk = ">=0.8.3, <0.9"`. Editor requires `sdk = ">=0.8.4, <0.9"`, for `onCloseCommand`, quit guards and `chooseSaveFile`.
+Other bundled plugins retain their 0.8.0 floor.
 Older custom hosts inherit UnsupportedOperationException until they implement each catalog.
 See the [catalog, size rules and testkit example](../docs/sdk-icons.md).
 

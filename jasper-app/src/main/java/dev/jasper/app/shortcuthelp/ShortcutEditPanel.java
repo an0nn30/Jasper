@@ -44,17 +44,19 @@ final class ShortcutEditPanel extends JPanel {
 
     ShortcutEditPanel(boolean macOs, Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer, Runnable recordingStarted) {
         super(new BorderLayout(0, 8));
+        setOpaque(false);
+        reassign.setOpaque(false);
         this.macOs = macOs; this.writer = writer; this.recordingStarted = recordingStarted;
         add(title, BorderLayout.NORTH);
-        var center = new JPanel(new BorderLayout(8, 6));
+        var center = new JPanel(new BorderLayout(8, 6)); center.setOpaque(false);
         value.setEditable(false); value.getAccessibleContext().setAccessibleName("New keyboard shortcut");
         center.add(value, BorderLayout.CENTER); center.add(record, BorderLayout.EAST);
         message.setEditable(false); message.setFocusable(false); message.setOpaque(false);
         message.setLineWrap(true); message.setWrapStyleWord(true);
         center.add(message, BorderLayout.SOUTH); add(center, BorderLayout.CENTER);
-        var bottom = new JPanel(new BorderLayout());
+        var bottom = new JPanel(new BorderLayout()); bottom.setOpaque(false);
         bottom.add(reassign, BorderLayout.NORTH);
-        var buttons = new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0));
+        var buttons = new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0)); buttons.setOpaque(false);
         buttons.add(save); buttons.add(cancel); buttons.add(remove); buttons.add(restore);
         bottom.add(buttons, BorderLayout.SOUTH); add(bottom, BorderLayout.SOUTH);
         record.addActionListener(e -> { recording = !recording; if (recording) recordingStarted.run(); update(); value.requestFocusInWindow(); });

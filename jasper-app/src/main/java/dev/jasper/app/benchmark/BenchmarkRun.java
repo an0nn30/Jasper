@@ -390,7 +390,7 @@ final class BenchmarkRun implements AutoCloseable {
         Exception failure = null;
         try {
             edt(() -> {
-                try { if (application != null) application.quit(); }
+                try { if (application != null) application.quitNow(); }
                 finally { if (previousRepaintManager != null) RepaintManager.setCurrentManager(previousRepaintManager); }
                 return null;
             });

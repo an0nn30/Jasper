@@ -90,6 +90,18 @@ public final class AuxiliaryWindows implements AutoCloseable {
 
     public List<AuxiliarySurface> open() { return List.copyOf(open); }
 
+    /**
+     * Quit and restart ask every open window's closing guards first, in creation order; the first refusal
+     * cancels them. Dialogs and overlays are not asked, and nothing closes.
+     *
+     * @return whether the quit may go ahead
+     */
+    public boolean mayQuit() {
+        for (AuxiliarySurface surface : List.copyOf(open))
+            if (surface.kind() == AuxiliarySurface.Kind.WINDOW && !surface.mayClose()) return false;
+        return true;
+    }
+
     /** Shutdown: closes everything, newest first, without consulting guards. */
     @Override public void close() {
         List<AuxiliarySurface> closing = new ArrayList<>(open);

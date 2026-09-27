@@ -1,6 +1,6 @@
 .gradle/
 build/
-# Source artwork has a literal build/ category; it is not a Gradle output folder.
+# IntelliJ's "build" icon group is vendored artwork, not build output.
 !jasper-app/src/main/resources/dev/jasper/app/icons/intellij/build/
 out/
 .idea/
