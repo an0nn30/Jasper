@@ -128,8 +128,8 @@ class ConfigLoaderTest {
     @Test void toolbarHeightDefaultsToThirtyAndClampsOutOfRangeValuesWithAWarning() {
         assertThat(parse("").snapshot().toolbarHeight()).isEqualTo(30);
         assertThat(ConfigSnapshot.defaults().toolbarHeight()).isEqualTo(30);
-        for (int height : new int[]{24, 30, 64}) assertThat(parse("window.toolbar_height=" + height).snapshot().toolbarHeight()).isEqualTo(height);
-        for (int[] example : new int[][]{{0, 24}, {23, 24}, {65, 64}, {200, 64}}) {
+        for (int height : new int[]{28, 30, 64}) assertThat(parse("window.toolbar_height=" + height).snapshot().toolbarHeight()).isEqualTo(height);
+        for (int[] example : new int[][]{{0, 28}, {24, 28}, {27, 28}, {65, 64}, {200, 64}}) {
             var result = parse("[window]\ntoolbar_height = " + example[0] + "\n");
             assertThat(result.rejected()).isFalse();
             assertThat(result.snapshot().toolbarHeight()).as("toolbar_height = %d", example[0]).isEqualTo(example[1]);
@@ -137,7 +137,7 @@ class ConfigLoaderTest {
             assertThat(result.diagnostics().getFirst().message()).contains(String.valueOf(example[1]));
         }
         assertThat(ConfigSnapshot.defaults().toBuilder().toolbarHeight(40).build().toolbarHeight()).isEqualTo(40);
-        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().toolbarHeight(23).build());
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().toolbarHeight(27).build());
         assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().toolbarHeight(65).build());
     }
 

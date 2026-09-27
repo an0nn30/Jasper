@@ -182,6 +182,8 @@ def stage = tasks.register('stagePackage', Sync) {
     duplicatesStrategy = DuplicatesStrategy.FAIL
 }
 
+apply from: rootProject.file('gradle/mac-notifications.gradle')
+
 def packageApp = tasks.register('packageApp') {
     group = 'distribution'
     description = 'Builds a native Jasper application image for the current host.'
@@ -237,6 +239,11 @@ def packageApp = tasks.register('packageApp') {
                 File executable = new File(image, 'Contents/MacOS/Jasper')
                 Files.write(executable.toPath(), macLauncherWithIdentity(Files.readAllBytes(executable.toPath()),
                     'dev.jasper.app', macLauncherTemplate(context.sdkHome)))
+                // jpackage re-signs native inputs. Restore our already-signed bridge so the
+                // same staged payload is verified byte-for-byte, then sign the outer bundle.
+                Files.copy(new File(inputDirectory.get().asFile, 'libjasper-notifications.dylib').toPath(),
+                    new File(image, 'Contents/app/libjasper-notifications.dylib').toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                 resignImage(image)
             } else {
                 removePluginClasspath(new File(imageDir, 'Jasper/app/Jasper.cfg'))
@@ -316,6 +323,14 @@ def verifyPackage = tasks.register('verifyPackage') {
             } finally { zip.close() }
         }
         if (context.host.os == 'macos') {
+            File notificationBridge = new File(appDir, 'libjasper-notifications.dylib')
+            if (!notificationBridge.isFile()) throw new GradleException('Package verification failed: notification bridge missing')
+            String bridgeArchitecture = executeNative(['/usr/bin/lipo', '-archs', notificationBridge.absolutePath],
+                'notification bridge architecture').stdout.trim()
+            String expectedBridgeArchitecture = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
+            if (bridgeArchitecture != expectedBridgeArchitecture) throw new GradleException('Package verification failed: notification bridge architecture mismatch')
+            executeNative(['/usr/bin/codesign', '--verify', '--strict', notificationBridge.absolutePath],
+                'notification bridge signature')
             File plist = new File(image, 'Contents/Info.plist')
             if (!plist.isFile()) throw new GradleException("Package verification failed: missing ${plist}")
             def identifier = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist.absolutePath], 'plutil identifier').stdout.trim()

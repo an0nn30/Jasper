@@ -1,5 +1,9 @@
 package dev.jasper.app.shortcuthelp;
 
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.lifecycle.Subscription;
@@ -16,13 +20,15 @@ public final class ShortcutHelp {
     private final Supplier<KeyBindings> bindings;
     private final Supplier<Map<String, String>> pluginNames;
     private final boolean macOs;
+    private final Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer;
     private AuxiliarySurface surface;
     private ShortcutPanel panel;
 
     public ShortcutHelp(AuxiliaryWindows windows, Contributions contributions, Supplier<KeyBindings> bindings,
-                        Supplier<Map<String, String>> pluginNames, boolean macOs) {
+                        Supplier<Map<String, String>> pluginNames, boolean macOs,
+                        Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer) {
         this.windows = windows; this.contributions = contributions; this.bindings = bindings;
-        this.pluginNames = pluginNames; this.macOs = macOs;
+        this.pluginNames = pluginNames; this.macOs = macOs; this.writer = writer;
     }
 
     /** Opens the reference or focuses its existing window, preserving the current search. */
@@ -30,7 +36,7 @@ public final class ShortcutHelp {
         if (surface == null) {
             var opened = windows.window("app.shortcuts", "Keyboard Shortcuts", new Dimension(1000, 640), true);
             surface = opened;
-            var view = new ShortcutPanel(); panel = view;
+            var view = new ShortcutPanel(macOs, writer); panel = view;
             opened.setContent(view);
             Subscription listening = contributions.onChanged(kind -> {
                 if (kind == Contributions.Kind.ACTIONS) refresh();

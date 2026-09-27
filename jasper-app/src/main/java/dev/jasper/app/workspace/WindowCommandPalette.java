@@ -124,16 +124,16 @@ final class WindowCommandPalette implements AutoCloseable {
         overlay.doLayout(); overlay.repaint();
     }
 
-    static Rectangle positioned(Rectangle terminal, Dimension preferred, Rectangle available, int margin) {
+    static Rectangle positioned(Rectangle available, Dimension preferred, int margin) {
         int insetX = Math.min(margin, Math.max(0, available.width / 2));
         int insetY = Math.min(margin, Math.max(0, available.height / 2));
         int width = Math.min(preferred.width, Math.max(0, available.width - 2 * insetX));
         int height = Math.min(preferred.height, Math.max(0, available.height - 2 * insetY));
-        int x = terminal.x + (terminal.width - width) / 2;
+        int x = available.x + (available.width - width) / 2;
         // Anchor the card's TOP, never its centre: the input row is the first thing in the card, so
         // a height that depends on the result count must grow downwards only. Anchoring the centre
         // moved the input row every time a scope returned a different number of rows.
-        int y = terminal.y + terminal.height / TOP_ANCHOR_DIVISOR;
+        int y = available.y + available.height / TOP_ANCHOR_DIVISOR;
         x = Math.max(available.x + insetX, Math.min(x, available.x + available.width - insetX - width));
         y = Math.max(available.y + insetY, Math.min(y, available.y + available.height - insetY - height));
         return new Rectangle(x, y, width, height);
@@ -171,11 +171,10 @@ final class WindowCommandPalette implements AutoCloseable {
         }
         @Override public void doLayout() {
             if (root == null || !SwingUtilities.isDescendingFrom(owner, root.getLayeredPane())) return;
-            Rectangle terminal = SwingUtilities.convertRectangle(owner.tabStrip().getParent(), owner.tabStrip().getBounds(), this);
-            Rectangle available = terminal;
-            if (terminal.height < palette.getPreferredSize().height + UIScale.scale(32))
-                available = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this);
-            palette.setBounds(positioned(terminal, palette.getPreferredSize(), available, UIScale.scale(16)));
+            // The workspace spans the window, including its rail and tool panels. Only native
+            // title controls are outside it; panel dividers must not move or narrow the palette.
+            Rectangle window = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this);
+            palette.setBounds(positioned(window, palette.getPreferredSize(), UIScale.scale(16)));
         }
         @Override protected void paintComponent(Graphics graphics) {
             if (!controller.isOpen()) return;

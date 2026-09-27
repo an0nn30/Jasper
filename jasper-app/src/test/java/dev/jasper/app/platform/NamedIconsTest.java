@@ -4,11 +4,6 @@ import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.image.BufferedImage;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 import javax.swing.Icon;
 import javax.swing.JLabel;
 import org.junit.jupiter.api.Test;
@@ -34,44 +29,38 @@ class NamedIconsTest {
         } finally { new ThemeController(); }
     }
 
-    @Test void modernNamedIconRecolorsAndUsesOriginalVaultShapes() throws Exception {
+    @Test void allSemanticIconsUseTheNewCatalogAndLockStatesFollowLiveThemes() {
         var theme = new ThemeController(Theme.LIGHT);
         try {
+            for (String name : NamedIcons.NAMES)
+                if (!name.equals("KEY")) assertThat(AppIcons.bundledIds()).contains(NamedIcons.id(name));
             var icon = AppIcons.named("LOCK");
-            var before = pixels(icon,1);
+            var before = pixels(icon, 1);
             theme.configure(Theme.DARK);
-            assertThat(pixels(icon,1)).isNotEqualTo(before);
-            Path root = Path.of("").toAbsolutePath();
-            while (root != null && !Files.isDirectory(root.resolve("plugins/vault"))) root = root.getParent();
-            assertThat(root).isNotNull();
-            for (String name : new String[]{"LOCK", "UNLOCK"}) {
-                try (var in = getClass().getResourceAsStream("/dev/jasper/app/icons/standard/"+name+".svg")) {
-                    assertThat(in).isNotNull();
-                    assertThat(in.readAllBytes()).isEqualTo(Files.readAllBytes(root.resolve(
-                        "plugins/vault/src/main/resources/dev/jasper/vault/"+(name.equals("LOCK") ? "lock" : "lock-open")+".svg")));
-                }
-            }
+            assertThat(pixels(icon, 1)).isNotEqualTo(before);
+            assertThat(pixels(icon, 1)).isNotEqualTo(pixels(AppIcons.named("UNLOCK"), 1));
         } finally { new ThemeController(); }
     }
 
-    @Test void manifestAndNoticeCoverAllStandardArtwork() throws Exception {
-        String base="/dev/jasper/app/icons/standard/";
-        try (var in=getClass().getResourceAsStream(base+"assets.tsv")) {
-            assertThat(in).isNotNull();
-            var rows=new String(in.readAllBytes(),StandardCharsets.UTF_8).lines().skip(1).toList();
-            var listed=rows.stream().map(row -> row.split("\\t")[0]).toList();
-            for (String name : NamedIcons.NAMES)
-                if (NamedIcons.tinted(name)) assertThat(listed).as("standard artwork for %s", name).contains(name + ".svg");
-            for(String row:rows) {
-                var fields=row.split("\\t");
-                try(var asset=getClass().getResourceAsStream(base+fields[0])) {
-                    assertThat(asset).isNotNull();
-                    assertThat(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(asset.readAllBytes()))).isEqualTo(fields[2]);
-                }
+    @Test void keyFallbackRetainsMeaningProvenanceAndLiveThemeColor() throws Exception {
+        String base = "/dev/jasper/app/icons/standard/";
+        try (var manifest = getClass().getResourceAsStream(base + "assets.tsv")) {
+            var rows = new String(manifest.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).lines().skip(1).toList();
+            assertThat(rows).hasSize(1);
+            var fields = rows.getFirst().split("\\t");
+            assertThat(fields[0]).isEqualTo("KEY.svg");
+            try (var svg = getClass().getResourceAsStream(base + fields[0])) {
+                assertThat(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(svg.readAllBytes()))).isEqualTo(fields[2]);
             }
         }
-        for(String file:new String[]{"NOTICE.md","LICENSE.txt"})
-            try(var in=getClass().getResourceAsStream(base+file)){assertThat(in).isNotNull();}
+        var theme = new ThemeController(Theme.LIGHT);
+        try {
+            var key = AppIcons.named("KEY");
+            var before = pixels(key, 1);
+            theme.configure(Theme.DARK);
+            assertThat(pixels(key, 1)).isNotEqualTo(before);
+        } finally { new ThemeController(); }
     }
 
     private static int[] pixels(Icon icon, int scale) {

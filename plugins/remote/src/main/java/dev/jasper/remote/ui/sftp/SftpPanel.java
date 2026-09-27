@@ -25,7 +25,7 @@ public class SftpPanel extends JPanel {
     private final JCheckBox follow=new JCheckBox("Follow terminal folder",true);
     private final Rows model=new Rows();
     private final FileTable table=new FileTable();
-    private final JButton previous=new JButton(new ChevronIcon(ChevronIcon.Direction.LEFT)),next=new JButton(new ChevronIcon(ChevronIcon.Direction.RIGHT)),cancel;
+    private final JButton previous, next, cancel;
     private final Map<String,JButton> buttons=new LinkedHashMap<>();
     private final JPopupMenu popup=new JPopupMenu();
     private final JMenuItem openInEditor;
@@ -43,7 +43,7 @@ public class SftpPanel extends JPanel {
     private final TableColumn sizeColumn,modifiedColumn;
     private boolean details=true;
     public SftpPanel(Function<IconName,Icon> icons) {
-        super(new BorderLayout(0,6));this.icons=icons;setBorder(BorderFactory.createEmptyBorder(8,8,8,8));
+        super(new BorderLayout(0,6));this.icons=icons;previous=new JButton(icons.apply(IconName.PREVIOUS));next=new JButton(icons.apply(IconName.NEXT));setBorder(BorderFactory.createEmptyBorder(8,8,8,8));
         var north=new JPanel();north.setLayout(new BoxLayout(north,BoxLayout.Y_AXIS));
         host.setAlignmentX(LEFT_ALIGNMENT);north.add(host);north.add(Box.createVerticalStrut(6));
         var toolbar=new dev.jasper.remote.ui.FlatToolBar();

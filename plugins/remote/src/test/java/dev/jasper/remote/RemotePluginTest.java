@@ -327,21 +327,33 @@ class RemotePluginTest {
             plugin.openHost(handle, followed); settle(host);
             assertThat(server.server.getActiveSessions()).as("each followed pane has its own").hasSize(3);
 
-            assertThat(host.openPanel(SftpUi.PANEL, window)).isNotNull();
             UUID followedPane = host.terminalPanes().getLast();
             host.focusTerminalPane(followedPane); host.flush();
             long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
-            while (!server.execCommands.contains("sh -s") && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
-            assertThat(server.execCommands).as("focus probes the followed pane").contains("sh -s");
+            while (context.terminals().pane(followedPane).orElseThrow().info().remoteDirectory().isEmpty() && System.nanoTime() < deadline) { settle(host); Thread.sleep(20); }
+            assertThat(server.execCommands).as("focus probes the followed pane with SFTP closed").contains("sh -s");
+            assertThat(context.terminals().pane(followedPane).orElseThrow().info().remoteDirectory())
+                .contains(new dev.jasper.sdk.terminal.RemoteDirectory("127.0.0.1", "/srv/app"));
+            server.execReplies(Map.of("uname -s", "Linux\n", "cat /etc/os-release", "", "sh -s", "jasper-cwd\0/srv/changed\0"));
 
             long before = server.execCommands.stream().filter("sh -s"::equals).count();
             host.typeIntoSession(followedPane, "\r");
             deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
-            while (server.execCommands.stream().filter("sh -s"::equals).count() == before && System.nanoTime() < deadline) {
+            while (!context.terminals().pane(followedPane).orElseThrow().info().remoteDirectory().map(directory -> directory.path().equals("/srv/changed")).orElse(false) && System.nanoTime() < deadline) {
                 var tasks = List.copyOf(scheduled); scheduled.clear(); tasks.forEach(Runnable::run);
                 settle(host); Thread.sleep(20);
             }
             assertThat(server.execCommands.stream().filter("sh -s"::equals).count()).as("Enter probes again").isGreaterThan(before);
+            assertThat(context.terminals().pane(followedPane).orElseThrow().info().remoteDirectory())
+                .contains(new dev.jasper.sdk.terminal.RemoteDirectory("127.0.0.1", "/srv/changed"));
+            host.remoteCwdChanged(followedPane, "reported-host", "/shell/path"); host.flush();
+            long reportedProbes = server.execCommands.stream().filter("sh -s"::equals).count();
+            host.typeIntoSession(followedPane, "\r");
+            var pendingTasks = List.copyOf(scheduled); scheduled.clear(); pendingTasks.forEach(Runnable::run);
+            host.focusTerminalPane(followedPane); settle(host);
+            assertThat(server.execCommands.stream().filter("sh -s"::equals).count()).isEqualTo(reportedProbes);
+            assertThat(context.terminals().pane(followedPane).orElseThrow().info().remoteDirectory())
+                .contains(new dev.jasper.sdk.terminal.RemoteDirectory("reported-host", "/shell/path"));
 
             long probes = server.execCommands.stream().filter("sh -s"::equals).count();
             host.focusTerminalPane(host.terminalPanes().getFirst()); host.flush(); settle(host);

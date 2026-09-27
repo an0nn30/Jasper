@@ -49,6 +49,8 @@ public final class TerminalWindow implements AutoCloseable {
         if (titleBar != null) titleBar.setMenuBar(content.menuBar());
         else frame.setJMenuBar(content.menuBar());
         content.installRootBindings(frame.getRootPane());
+        // Native initial focus must not fall through to the first restored tool-panel control.
+        frame.setFocusTraversalPolicy(content.getFocusTraversalPolicy());
         content.onMinimumSizeChanged = this::updateMinimumSize;
         if (titleBar != null) titleBar.attach(frame);
         frame.addWindowListener(events); frame.pack();

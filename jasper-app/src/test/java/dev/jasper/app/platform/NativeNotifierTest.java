@@ -1,28 +1,78 @@
 package dev.jasper.app.platform;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class NativeNotifierTest {
-    /**
-     * The whole point of the argv form: a command containing quotes and a newline must reach osascript
-     * as data. If this ever became an interpolated script, these characters would end it early.
-     */
-    @Test void theCommandTextTravelsAsArgumentsNotAsScript() {
-        String nasty = "echo \"hi\"; say 'boo'\nrm -rf /";
-
-        List<String> arguments = NativeNotifier.command(nasty, "Finished in 1m");
-
-        assertThat(arguments).endsWith("Finished in 1m", nasty);
-        assertThat(arguments).containsSequence("-e", "on run argv");
-        assertThat(arguments.subList(0, arguments.size() - 2))
-            .as("no element interpolates the text").noneMatch(part -> part.contains("echo"));
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named = "jasper.testNotificationLibrary", matches = ".+")
+    @SuppressWarnings("restricted")
+    void realNativeBridgeLoadsAndDeclinesAnUnbundledJvm() throws Exception {
+        System.load(System.getProperty("jasper.testNotificationLibrary"));
+        var post = MacNotifications.class.getDeclaredMethod("post", String.class, String.class);
+        post.setAccessible(true);
+        // Exercises real JNI linkage without a permission prompt or notification side effect.
+        post.invoke(null, "build", "Finished");
     }
 
-    @Test void anUnsupportedPlatformSendsNothing() {
-        try (var notifier = new NativeNotifier(false)) {
-            notifier.send("build", "Finished in 1m");
+    @Test void sendsLiteralUnicodeTextOffTheCallingThread() throws Exception {
+        String title = "echo \"hi\"; say 'boo'\n\\ $() " + (char) 0xD83D + (char) 0xDE80;
+        String detail = "Finished\0in 1m";
+        var delivered = new CountDownLatch(1);
+        var values = new CopyOnWriteArrayList<String>();
+        var caller = Thread.currentThread();
+        var threads = new CopyOnWriteArrayList<Thread>();
+        try (var notifier = new NativeNotifier(true, (t, d) -> {
+            values.addAll(List.of(t, d));
+            threads.add(Thread.currentThread());
+            delivered.countDown();
+        })) {
+            notifier.send(title, detail);
+            assertThat(delivered.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(values).containsExactly(title, detail);
+            assertThat(threads).noneMatch(thread -> thread == caller);
         }
+    }
+
+    @Test void unsupportedAndClosedNotifiersSendNothing() {
+        var values = new CopyOnWriteArrayList<String>();
+        try (var notifier = new NativeNotifier(false, (t, d) -> values.add(t))) {
+            notifier.send("build", "Finished");
+        }
+        var notifier = new NativeNotifier(true, (t, d) -> values.add(t));
+        notifier.close();
+        notifier.send("build", "Finished");
+        assertThat(values).isEmpty();
+    }
+
+    @Test void aNativeLinkFailureDoesNotKillSubsequentDelivery() throws Exception {
+        var delivered = new CountDownLatch(1);
+        try (var notifier = new NativeNotifier(true, (t, d) -> {
+            if (t.equals("first")) throw new UnsatisfiedLinkError("test missing library");
+            delivered.countDown();
+        })) {
+            notifier.send("first", "Finished");
+            notifier.send("second", "Finished");
+            assertThat(delivered.await(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test void nativeLibraryBelongsToTheRunningBundleIncludingRenamedApps() {
+        assertThat(MacNotifications.libraryPath("/Applications/Jasper Preview.app/Contents/MacOS/Jasper"))
+            .isEqualTo(Path.of("/Applications/Jasper Preview.app/Contents/app/libjasper-notifications.dylib")
+                .toAbsolutePath());
+    }
+
+    @Test void unpackagedLaunchesDoNotUseAnotherApplicationsIdentity() {
+        assertThat(MacNotifications.libraryPath(null)).isNull();
+        assertThat(MacNotifications.libraryPath(" ")).isNull();
+        assertThat(MacNotifications.libraryPath("/usr/bin/java")).isNull();
+        assertThat(MacNotifications.libraryPath("/tmp/Contents/MacOS/Jasper")).isNull();
+        assertThat(MacNotifications.libraryPath("/Contents/MacOS/Jasper")).isNull();
     }
 }

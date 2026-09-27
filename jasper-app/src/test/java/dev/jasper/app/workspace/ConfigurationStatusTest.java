@@ -25,7 +25,7 @@ class ConfigurationStatusTest {
                     Path file = Path.of("fixture", "settings.toml");
                     status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(
                         new ConfigDiagnostic(severity, file, 1234567, 1, "window.tab_height", "<html>Check this key")), file, true));
-                    status.setMetadata("<html>very long shell".repeat(80), "/a/long/directory/".repeat(80), "120 × 36", true, false);
+                    DesktopTestSupport.setStatusMetadata(status, "<html>very long shell".repeat(80), "/a/long/directory/".repeat(80), "120 × 36", true, false);
                     assertThat(status.getMinimumSize().width).isZero();
                     assertThat(status.getPreferredSize().width).isZero();
                     assertThat(status.getBackground()).isEqualTo(UIManager.getColor("StatusBar.background"));
@@ -66,7 +66,7 @@ class ConfigurationStatusTest {
                     status.setSize(600, 30); status.doLayout();
                     var image = new java.awt.image.BufferedImage(600, 30, java.awt.image.BufferedImage.TYPE_INT_RGB);
                     var graphics = image.createGraphics(); status.paint(graphics); graphics.dispose();
-                    assertThat(new Color(image.getRGB(300, 0))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.borderColor"));
+                    assertThat(new Color(image.getRGB(300, 0))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.background"));
                     assertThat(new Color(image.getRGB(300, 15))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.background"));
                 }
             } finally { themes.configure(Theme.DARK); }

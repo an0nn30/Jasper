@@ -11,8 +11,14 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class AppearanceContractTest {
+    @Test void bundledCatalogIsAnAdditiveAppearanceOverload() throws Exception {
+        assertThat(Appearance.class.getMethod("icon", BundledIcon.class).isDefault()).isTrue();
+        assertThat(BundledIcon.values()).hasSize(885);
+        assertThat(BundledIcon.GENERAL_SEARCH.id()).isEqualTo("general/search");
+    }
+
     @Test void appearanceOffersOneIconFamilyInSdkZeroEight() {
-        assertThat(JasperSdk.VERSION).isEqualTo("0.8.2");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.8.4");
         assertThat(Arrays.stream(Appearance.class.getMethods()).filter(method -> method.getName().equals("icon"))
             .map(method -> method.getParameterCount())).containsOnly(1);
     }
@@ -27,10 +33,12 @@ class AppearanceContractTest {
         assertThat(legacy.icon("icon.svg")).isSameAs(original);
         assertThatThrownBy(() -> legacy.icon(IconName.LOCK)).isInstanceOf(UnsupportedOperationException.class);
         assertThatNullPointerException().isThrownBy(() -> legacy.icon((IconName) null));
+        assertThatThrownBy(() -> legacy.icon(BundledIcon.GENERAL_ADD)).isInstanceOf(UnsupportedOperationException.class);
+        assertThatNullPointerException().isThrownBy(() -> legacy.icon((BundledIcon) null));
     }
 
-    @Test void theCatalogHoldsThirtyFourMeaningsIncludingTheChromeNames() {
-        assertThat(IconName.values()).hasSize(34)
+    @Test void theCatalogHoldsFortySevenMeaningsIncludingTheChromeNames() {
+        assertThat(IconName.values()).hasSize(47)
             .contains(IconName.SPLIT, IconName.ZOOM, IconName.TERMINAL, IconName.SERVER);
     }
 }

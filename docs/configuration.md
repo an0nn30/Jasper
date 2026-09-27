@@ -99,7 +99,7 @@ terminal = "match"
 | `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
 | `window.rail_width` | `28` | Integer 28–64 logical pixels; the panel rail's buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
 | `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
-| `window.toolbar_height` | `30` | Integer 24–64 logical pixels; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning | Live |
+| `window.toolbar_height` | `30` | Integer 28–64 logical pixels; also sets the unified macOS title-bar height; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning | Live |
 | `window.status_bar` | `true` | Boolean | Live |
 | `window.status_bar_height` | `24` | Integer 20–48 logical pixels; the bar grows past it only when a large UI font needs the room; out-of-range values use the nearest limit with a warning | Live |
 | `window.columns` | `100` | Integer 5–500 | New windows |
@@ -231,16 +231,36 @@ you. Double-clicking him still raises the terminal and right-clicking still open
 
 A **system notification** is sent as well, unless the command finished in the pane you were actually
 typing in. That includes a command finishing in a visible but unfocused split pane, which is easy to
-miss. System notifications are macOS-only; elsewhere the drawer is the only channel.
+miss. System notifications require the packaged macOS `Jasper.app`; elsewhere (including Gradle/IDE
+launches) the drawer is the only channel. macOS uses Jasper's app icon and notification settings.
+The first eligible notice asks for permission; allow Jasper in System Settings → Notifications.
+Denied permission leaves the drawer available.
 
 ### Automatic tab and notification titles
 
-With one session, Jasper hides the tab strip and centers its title in the macOS
-window title bar. With multiple sessions, equal-width tabs fill that bar after
-the native controls; the add button stays at its right edge. Tab titles are
-centered, close buttons appear on hover, and shortcut labels reflect the actual
-key bindings. Narrow windows scroll overflowing tabs, and keyboard selection
-reveals the selected tab. Tab height remains configurable (30 logical pixels by default, 20–72).
+On macOS, the title bar combines the native window controls, a compact working-context
+label and the toolbar in one row (30 logical pixels by default). The label follows the
+focused pane: a local directory basename (`~` for home), or a provided session's saved
+host/session name with its remote directory when available. Hover for the full context.
+Program titles and manual tab names do not replace this label. A remote OSC 7 report
+from a local shell can also supply remote context; Jasper does not infer SSH hosts by
+parsing command text.
+
+Tabs sit directly beneath the header. The selected tab has an inset rounded fill and
+thin outline from the active UI theme, with a muted blue selection in Jasper Dark.
+Independent terminal colors do not change the tab's fill, text or icon variant. Narrow
+windows scroll overflowing tabs, and keyboard selection reveals the selected tab. Tab height remains configurable (30 logical
+pixels by default, 20–72).
+
+Split and contributed dropdowns such as Sessions retain labels in `icons_and_labels` mode;
+familiar built-in actions use icons with tooltips. Whole controls move into **More actions**
+when the toolbar is crowded, preserving submenus, shortcuts and action state. Find and
+Settings receive the highest space priority; Settings has one toolbar home. The toolbar
+never wraps or shrinks click targets to fit. `toolbar_height` sizes both its controls
+and the entire unified macOS row, with a 28–64 pixel range (default 30). Changes apply
+live, including while the toolbar is hidden; the context label and native controls
+remain visible. Other platforms keep their native title bar and a separate toolbar
+with the same overflow behavior.
 
 Applications can set the terminal title with OSC 0, 1 or 2. An automatic tab and
 the native window show that text plus the foreground job in parentheses, like
@@ -256,8 +276,9 @@ Buddy bubbles use the program-supplied title without the tab's job suffix; shell
 integration provides the current command as their fallback. Running subtext shimmers from left to right. Dragging the buddy smoothly moves
 the bubbles between above/below positions while keeping them on screen. Live title changes
 update a bubble in place, without moving it to the front or replaying its arrival.
-Once the command finishes, its bubble and native notification keep its last title;
-later prompt titles do not rewrite the result. Title reception works without shell
+Once the command finishes, its bubble and native notification show the completed
+command, including its arguments (for example, `sleep 12`), instead of the live terminal
+title. Later prompt titles do not rewrite the result. Title reception works without shell
 integration, but buddy notifications still need command-start/end marks.
 
 Inside tmux, the multiplexer must forward titles to its outer terminal. If tmux's

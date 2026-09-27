@@ -39,6 +39,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     private TerminalSession session;
     /** EDT snapshots preserve the order of titles, command starts and command ends from the reader. */
     private String reportedTitle = "";
+    /** Visible OSC override belongs to one command; notification event history stays independent. */
+    private String displayTitle = "";
     private String runningCommand = "";
     private String foregroundJob = "";
     private boolean jobQueryPending;
@@ -93,6 +95,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     Runnable onPaneBlurred = () -> {};
     private final SessionRequest request;
     private SessionAttempt attempt;
+    /** Provider metadata belongs to this attempt and is read only on the EDT. */
+    private RemoteLocation providerDirectory;
     private final JLabel noticeLabel = new JLabel();
     private final JButton noticePrimary = new JButton();
     private final JButton noticeSecondary = new JButton();
@@ -111,6 +115,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
             SwingUtilities.invokeLater(() -> {
                 if (closed) return;
                 runningCommand = command;
+                displayTitle = "";
                 onCommandStarted.accept(command);
                 onTitleChanged.accept(title());
                 onChanged.run();
@@ -122,6 +127,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
             SwingUtilities.invokeLater(() -> {
                 if (closed) return;
                 reportedTitle = title == null ? "" : title;
+                displayTitle = reportedTitle;
                 onTitleChanged.accept(title());
                 onChanged.run();
             });
@@ -149,6 +155,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
                 if (closed) return;
                 onCommandFinished.accept(command, exitStatus, duration, workingDirectory, remote);
                 runningCommand = "";
+                displayTitle = "";
                 onChanged.run();
             });
         }
@@ -165,6 +172,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         this.shellLabel = requestOrNull == null ? launcher.label() : requestOrNull.title();
         if (requestOrNull != null) reportedTitle = requestOrNull.title();
         setPreferredSize(new Dimension(958, 821));
+        setFocusable(true);
         add(new JLabel("Starting terminal…", SwingConstants.CENTER));
         setBackground(UIManager.getColor("Panel.background"));
         noticeLabel.putClientProperty("html.disable", Boolean.TRUE);
@@ -216,6 +224,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         if (session != null) session.removeListener(listener);
         session = created;
         view = new TerminalView(session, applicationOptions());
+        setFocusable(false);
         findBar = new FindBar(view);
         view.setOnCloseRequest(() -> onClose.run());
         view.addPropertyChangeListener("minimumSize", event -> onChanged.run());
@@ -225,7 +234,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
             @Override public void componentResized(ComponentEvent event) { queueUpdate(); }
         });
         session.addListener(listener);
-        if (request == null) reportedTitle = session.title();
+        if (request == null) { reportedTitle = session.title(); displayTitle = reportedTitle; }
         refreshJob(); jobTimer.start();
         // Always defer: the process may already have exited before launch delivery.
         // Read the policy on the EDT after onReady has applied the latest configuration.
@@ -256,11 +265,17 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         ShellLauncher.SessionDefaults defaults = launcher.sessionDefaults();
         var current = new SessionAttempt(id, defaults.columns(), defaults.lines(), request.cleanup(), SwingUtilities::invokeLater);
         attempt = current;
+        providerDirectory = null;
+        displayTitle = ""; runningCommand = ""; foregroundJob = "";
         current.onStatus = text -> { if (!closed && attempt == current) showPending(text); };
         current.onAttached = connection -> {
             // The pane may have closed, or moved on, between the attach and this hop to the EDT.
             if (closed || attempt != current) { connection.close().run(); return; }
             adopt(TerminalSession.attach(connection, new GridSize(defaults.columns(), defaults.lines()), defaults.scrollback()));
+        };
+        current.onRemoteDirectory = directory -> {
+            if (closed || attempt != current || !running() || session.remoteDirectory().isPresent()) return;
+            if (!directory.equals(providerDirectory)) { providerDirectory = directory; onChanged.run(); }
         };
         current.onFailed = message -> { if (!closed && attempt == current) showDisconnected(message); };
         showPending("Connecting…");
@@ -367,8 +382,16 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
             : session.remoteDirectory().map(directory -> new RemoteLocation(directory.host(), directory.path()));
     }
 
-    /** Where this pane is, for display: {@code host:path} when the program reports a remote directory. */
-    String locationLabel() { return remoteOf(session).map(RemoteLocation::label).orElseGet(() -> directory().toString()); }
+    private Optional<RemoteLocation> displayRemoteDirectory() {
+        if (attempt != null && attempt.state() != SessionAttempt.State.ATTACHED) return Optional.empty();
+        return remoteOf(session).or(() -> Optional.ofNullable(providerDirectory));
+    }
+
+    /** Where this pane is, for display; provider labels stand in until its remote path is known. */
+    String locationLabel() {
+        return displayRemoteDirectory().map(RemoteLocation::label)
+            .orElseGet(() -> request == null ? directory().toString() : shellLabel);
+    }
 
     /** The provider's tab icon, or {@code null} for a local shell or a provider that chose none. */
     javax.swing.Icon providedIcon() { return request == null ? null : request.icon(); }
@@ -386,7 +409,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         boolean exited = exit.isDone();
         Integer code = exited && !exit.isCompletedExceptionally() ? exit.getNow(null) : null;
         return new PaneSnapshot(title(), session.workingDirectory(), session.columns(), session.rows(), session.shellIntegrationDetected(),
-            exited ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING, code == null ? OptionalInt.empty() : OptionalInt.of(code), provider, remoteOf(session), shellLabel);
+            exited ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING, code == null ? OptionalInt.empty() : OptionalInt.of(code), provider, displayRemoteDirectory(), shellLabel);
     }
 
     /** The foreground job, asked off the EDT like the pane's own poll; empty when nothing runs here. */
@@ -413,10 +436,17 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         return TerminalTitle.singleLine(!reportedTitle.isBlank() ? reportedTitle : runningCommand.strip());
     }
     String tabTitle() {
-        return TerminalTitle.tab(reportedTitle, directory(), foregroundJob.isBlank() ? shellLabel : foregroundJob);
+        String job = commandLabel();
+        return TerminalTitle.tab(displayTitle, request != null && job.equals("Shell") ? shellLabel : job);
+    }
+    String programTitle() { return TerminalTitle.singleLine(displayTitle); }
+    String commandLabel() {
+        if (!runningCommand.isBlank()) return TerminalTitle.singleLine(runningCommand.strip());
+        String job = foregroundJob.isBlank() ? request == null ? shellLabel : "Shell" : foregroundJob;
+        return TerminalTitle.singleLine(job.startsWith("-") ? job.substring(1) : job);
     }
     String shellLabel() { return shellLabel; }
-    void focusTerminal() { if (view != null) view.requestFocusInWindow(); }
+    void focusTerminal() { if (!closed) (view == null ? this : view).requestFocusInWindow(); }
     void setActive(boolean selected) {
         active = selected;
         setBorder(BorderFactory.createEmptyBorder(PADDING, PADDING, PADDING, PADDING));

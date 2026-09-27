@@ -14,7 +14,8 @@ import javax.swing.*;
 
 /** Bounded status segments: long shell/path metadata never displaces dimensions/defaults. */
 final class WindowStatusBar extends JPanel {
-    private final Segment left = new Segment(new JLabel());
+    private final PathBreadcrumbs breadcrumbs = new PathBreadcrumbs();
+    private final Segment left = new Segment(breadcrumbs);
     private final JButton configButton = new JButton("Built-in defaults");
     private final Segment right = new Segment(configButton);
     private final java.util.Map<String, JComponent> itemViews = new java.util.HashMap<>();
@@ -48,10 +49,14 @@ final class WindowStatusBar extends JPanel {
         revalidate(); repaint();
     }
 
-    void setMetadata(String shell, String directory, String dimensions, boolean running, boolean integration) {
-        this.running = running; this.shell = shell; this.directory = directory; this.dimensions = dimensions;
-        this.integration = integration;
-        left.setParts(shellLabel(), directory);
+    void setMetadata(dev.jasper.app.terminals.PaneSnapshot pane, String dimensions, boolean running) {
+        var location = PathBreadcrumbs.Location.from(pane, java.nio.file.Path.of(System.getProperty("user.home")));
+        this.running = running; this.shell = pane == null ? "" : pane.shell();
+        this.directory = location.path(); this.dimensions = dimensions;
+        this.integration = pane != null && pane.shellIntegration();
+        breadcrumbs.setLocation(location);
+        // The remote breadcrumb already names the provider's host.
+        left.setParts(pane != null && pane.providerId().isPresent() ? "" : shellLabel(), directory);
         left.setToolTipText(directory);
         left.setFirstToolTip(shell.isEmpty() ? null : integration ? "Shell integration active" : "Shell integration not detected");
         updateText();
@@ -154,13 +159,9 @@ final class WindowStatusBar extends JPanel {
         Color colour = UIManager.getColor("StatusBar.background");
         return colour != null ? colour : UIManager.getColor("Panel.background");
     }
-    private static Color rule() {
-        Color colour = UIManager.getColor("StatusBar.borderColor");
-        return colour != null ? colour : UIManager.getColor("Jasper.titleSeparator");
-    }
     void refreshTheme() {
         setBackground(surface());
-        left.refreshTheme(); right.refreshTheme();
+        left.refreshTheme(); right.refreshTheme(); breadcrumbs.refreshTheme();
         for (Box row : new Box[]{leftItems, rightItems})
             for (Component child : row.getComponents()) if (child instanceof JButton item) {
                 item.setForeground(muted());
@@ -180,7 +181,7 @@ final class WindowStatusBar extends JPanel {
         void setParts(String first, String last) {
             this.first.setText(first);
             if (this.last instanceof JLabel label) label.setText(last);
-            else ((JButton) this.last).setText(last);
+            else if (this.last instanceof JButton button) button.setText(last);
             slash.setVisible(!first.isEmpty());
         }
         void setFirstToolTip(String tip) { first.setToolTipText(tip); }
@@ -195,7 +196,7 @@ final class WindowStatusBar extends JPanel {
                 + last.getPreferredSize().width, Math.max(first.getPreferredSize().height, last.getPreferredSize().height));
         }
         @Override public void doLayout() {
-            int firstWidth = Math.min(getWidth(), first.getPreferredSize().width);
+            int firstWidth = Math.min(last instanceof PathBreadcrumbs ? getWidth() / 3 : getWidth(), first.getPreferredSize().width);
             int separatorWidth = Math.min(Math.max(0, getWidth() - firstWidth), slash.isVisible() ? UIScale.scale(28) : 0);
             first.setBounds(0, 0, firstWidth, getHeight());
             slash.setBounds(firstWidth, 0, separatorWidth, getHeight());
@@ -205,7 +206,7 @@ final class WindowStatusBar extends JPanel {
     @Override public Dimension getMinimumSize() { return getPreferredSize(); }
     @Override public Dimension getPreferredSize() {
         // Items and segments are laid out at the bar's height; only the text sets a floor, so it never clips.
-        return new Dimension(0, Math.max(UIScale.scale(barHeight), getFontMetrics(statusFont()).getHeight()));
+        return new Dimension(0, Math.max(UIScale.scale(barHeight), Math.max(left.getPreferredSize().height, getFontMetrics(statusFont()).getHeight())));
     }
     @Override public void doLayout() {
         int edge = Math.min(UIScale.scale(14), getWidth() / 2), leftInset = Math.min(getWidth(), UIScale.scale(26));
@@ -230,8 +231,6 @@ final class WindowStatusBar extends JPanel {
     }
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(rule());
-        g.fillRect(0, 0, getWidth(), UIScale.scale(1));
         g.setColor(running ? UIManager.getColor("Jasper.runningForeground") : muted());
         var copy = (Graphics2D) g.create();
         try {

@@ -12,6 +12,23 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WindowChromeTest {
+    @Test void narrowToolbarOffersOverflowInsteadOfShrinkingTargets() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var toolbar = owner.toolbar();
+            toolbar.setSize(130, 30); toolbar.doLayout();
+            var overflow = WindowTabsTest.named(toolbar, "toolbarOverflow");
+            assertThat(overflow).isNotNull();
+            assertThat(overflow.isVisible()).isTrue();
+            for (var child : toolbar.getComponents()) {
+                if (!(child instanceof JButton) || !child.isVisible()) continue;
+                assertThat(child.getWidth()).isGreaterThanOrEqualTo(24);
+                assertThat(child.getX()).isGreaterThanOrEqualTo(0);
+                assertThat(child.getX() + child.getWidth()).isLessThanOrEqualTo(130);
+            }
+        });
+    }
+
     @org.junit.jupiter.api.AfterEach void cleanup() throws Exception { closeOwners(); }
 
     @Test void openingSiblingTerminalColorsMenuReflectsTheCurrentGlobalChoice() throws Exception {
@@ -71,7 +88,7 @@ class WindowChromeTest {
                 .filter(JButton.class::isInstance).map(JButton.class::cast).toList();
 
             assertThat(buttons).extracting(JButton::getText)
-                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find", "Settings");
+                .containsExactly(null, null, "Split", null, null, null, null);
             assertThat(buttons).allSatisfy(button -> {
                 assertThat(button.getIcon().getIconWidth()).isEqualTo(16);
                 assertThat(button.getIcon().getIconHeight()).isEqualTo(16);
@@ -90,7 +107,7 @@ class WindowChromeTest {
             owner.setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
             assertThat(owner.toolbar().isVisible()).isTrue();
             assertThat(buttons).extracting(JButton::getText)
-                .containsExactly("New tab", "New window", "Split", "Zoom pane", "Find", "Settings");
+                .containsExactly(null, null, "Split", null, null, null, null);
         });
     }
 
@@ -105,10 +122,10 @@ class WindowChromeTest {
                 else if (child instanceof JSeparator separator) shape.add(separator.isVisible() ? "|" : "(|)");
                 else if (child instanceof Box.Filler) shape.add("->");
             }
-            assertThat(shape).containsExactly("New tab", "New window", "|", "Split", "Zoom pane", "(|)", "->", "Find", "Settings");
+            assertThat(shape).containsExactly("New tab", "New window", "|", "Split", "Zoom pane", "(|)", "->", "Find", "Settings", "More actions");
             var find = (JButton) java.util.Arrays.stream(toolbar.getComponents())
                 .filter(child -> child instanceof JButton button && "Find".equals(button.getClientProperty("label"))).findFirst().orElseThrow();
-            var settings = toolbar.getComponent(toolbar.getComponentCount() - 1);
+            var settings = toolbar.getComponent(toolbar.getComponentCount() - 2);
             assertThat(settings.getX() + settings.getWidth()).isGreaterThan(900);
             assertThat(find.getX()).isGreaterThan(700);
             assertThat(find.getHeight()).isEqualTo(24);

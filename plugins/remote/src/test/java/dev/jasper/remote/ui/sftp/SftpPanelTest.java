@@ -32,7 +32,7 @@ class SftpPanelTest {
             panel.showPage("host","/home",List.of(new FileEntry("<html>literal",FileEntry.Kind.DIRECTORY,0,1000,0755,"")),0,1,true);
             var renderer=(JLabel)panel.table().prepareRenderer(panel.table().getCellRenderer(0,0),0,0);
             assertThat(renderer.getText()).isEqualTo("<html>literal");assertThat(renderer.getClientProperty("html.disable")).isEqualTo(true);
-            assertThat(panel.table().getRowHeight()).isGreaterThanOrEqualTo(28);assertThat(requested).contains(IconName.FOLDER,IconName.UPLOAD,IconName.DOWNLOAD);
+            assertThat(panel.table().getRowHeight()).isGreaterThanOrEqualTo(28);assertThat(requested).contains(IconName.FOLDER,IconName.UPLOAD,IconName.DOWNLOAD,IconName.PREVIOUS,IconName.NEXT);
             assertThat(panel.selection()).hasSize(1);
         });
     }
@@ -47,7 +47,7 @@ class SftpPanelTest {
 
     @Test void toolbarsAreFlatIconOnlyAndTheBottomRowsAlignLeft() throws Exception {
         SwingUtilities.invokeAndWait(()-> {
-            var panel=new SftpPanel(icon->new ImageIcon(new java.awt.image.BufferedImage(16,16,2)));var pages=new ArrayList<Long>();
+            var panel=new SftpPanel(dev.jasper.sdk.testing.FakeNamedIcon::new);var pages=new ArrayList<Long>();
             panel.actions(new SftpPanel.Actions(p->{},()->{},()->{},f->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},pages::add));
             for(String name:List.of("Up","Download selected","Upload files","Refresh","New folder","Delete selected","Copy paths","Previous page","Next page")) {
                 var button=named(panel,name);
@@ -57,17 +57,15 @@ class SftpPanelTest {
             }
             var toolbar=(JToolBar)named(panel,"Up").getParent();
             assertThat(toolbar.isFloatable()).isFalse();assertThat(toolbar.isRollover()).isTrue();assertThat(toolbar.isBorderPainted()).isFalse();
-            assertThat(named(panel,"Previous page").getIcon()).isInstanceOf(ChevronIcon.class);
+            assertThat(named(panel,"Previous page").getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(IconName.PREVIOUS));
             assertThat(named(panel,"Next page").getIcon().getIconWidth()).isEqualTo(16);
             panel.showPage("prod","/srv",List.of(new FileEntry("a",FileEntry.Kind.FILE,1,1000,0644,"")),200,450,false);
             named(panel,"Next page").doClick();named(panel,"Previous page").doClick();
             assertThat(pages).containsExactly(400L,0L);
             var follow=find(panel,JCheckBox.class,box->"Follow terminal folder".equals(box.getText())).orElseThrow();
             for(var row:follow.getParent().getComponents()) assertThat(row.getAlignmentX()).as("bottom row "+row.getClass().getSimpleName()).isEqualTo(Component.LEFT_ALIGNMENT);
-            var image=new java.awt.image.BufferedImage(16,16,java.awt.image.BufferedImage.TYPE_INT_ARGB);var graphics=image.createGraphics();
-            named(panel,"Next page").getIcon().paintIcon(named(panel,"Next page"),graphics,0,0);graphics.dispose();
-            boolean painted=false;for(int x=0;x<16;x++) for(int y=0;y<16;y++) painted|=(image.getRGB(x,y)>>>24)!=0;
-            assertThat(painted).as("the chevron draws something").isTrue();
+            assertThat(named(panel,"Next page").getIcon())
+                .isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(IconName.NEXT));
         });
     }
     static JButton named(Container root,String name) { return find(root,JButton.class,button->name.equals(button.getAccessibleContext().getAccessibleName())).orElseThrow(()->new AssertionError("no button "+name)); }

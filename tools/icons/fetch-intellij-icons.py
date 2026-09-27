@@ -1,66 +1,126 @@
 #!/usr/bin/env python3
-"""Vendors Jasper's IntelliJ classic-UI icons at a pinned intellij-community commit.
+"""Vendor complete pinned IntelliJ platform and Terminal New UI SVG catalogs.
 
-Run from the repository root. Rewrites icons/intellij/*.svg, assets.tsv and NOTICE.txt.
-It does not touch LICENSE.txt: upstream's root LICENSE.txt is JetBrains' "OPEN-SOURCE BUILD
-TERMS" for its IDE binaries, not the Apache License 2.0 that actually covers these SVGs (each
-SVG header cites Apache 2.0). LICENSE.txt here is the canonical Apache-2.0 text instead, vendored
-by hand; update it manually if it ever needs to move.
-A missing file (HTTP 404) fails the run: update ICONS instead of skipping silently.
+Run from any directory. Downloads are staged and verified against Git blob IDs before
+replacing managed files. Runtime is offline. SDK enum and host index are generated
+from the same base paths. Apache LICENSE.txt is deliberately retained (upstream's
+root LICENSE.txt is IDE build terms, not the artwork license).
 """
+import concurrent.futures
 import hashlib
+import json
 import pathlib
+import re
+import tempfile
+import time
 import urllib.request
 
-SHA = "f7377708b654b73b206da40bb382ecb4d44e8f12"
-BASE = f"https://raw.githubusercontent.com/JetBrains/intellij-community/{SHA}/"
-OUT = pathlib.Path("jasper-app/src/main/resources/dev/jasper/app/icons/intellij")
-# local name: (upstream path without ".svg", upstream ships a "_dark" variant)
-ICONS = {
-    "add": ("platform/icons/src/general/add", True),
-    "moveToWindow": ("platform/icons/src/actions/moveToWindow", True),
-    "splitVertically": ("platform/icons/src/actions/splitVertically", True),
-    "expandComponent": ("platform/icons/src/general/expandComponent", False),
-    "find": ("platform/icons/src/actions/find", True),
-    "gearPlain": ("platform/icons/src/general/gearPlain", True),
-    "refresh": ("platform/icons/src/actions/refresh", True),
-    "execute": ("platform/icons/src/actions/execute", True),
-    "history": ("platform/icons/src/vcs/history", True),
-    "bookmark": ("platform/icons/src/nodes/bookmark", True),
-    "close": ("platform/icons/src/actions/close", False),
-    "closeHovered": ("platform/icons/src/actions/closeHovered", False),
-    "exit": ("platform/icons/src/actions/exit", True),
-    "arrowDown": ("platform/icons/src/general/arrowDown", True),
-    "console": ("platform/icons/src/debugger/console", True),
-    "server": ("platform/icons/src/webreferences/server", True),
-    "previousOccurence": ("platform/icons/src/actions/previousOccurence", True),
-    "nextOccurence": ("platform/icons/src/actions/nextOccurence", True),
-    "matchCase": ("platform/icons/src/actions/matchCase", False),
-    "regex": ("platform/icons/src/actions/regex", False),
-    "searchWithHistory": ("platform/icons/src/actions/searchWithHistory", False),
-    "folder": ("platform/icons/src/nodes/folder", False),
-    "menu-saveall": ("platform/icons/src/actions/menu-saveall", True),
-    "copy": ("platform/icons/src/actions/copy", True),
-    "menu-paste": ("platform/icons/src/actions/menu-paste", True),
-    "remove": ("platform/icons/src/general/remove", True),
-    "web": ("platform/icons/src/general/web", True),
-    "information": ("platform/icons/src/general/information", False),
-    "help": ("platform/icons/src/actions/help", True),
+SHA = "60b8fbadc2f08ef18a6ecab0c138a849e14f13fb"
+TREES = {
+    "": ("platform/icons/src/expui", "0e5a878b1aa7a7d64ffa43039710f47833a11307"),
+    "terminal/": ("plugins/terminal/resources/icons/expui", "18185b5c8c5304412348c7d52cd0f8a13cf4a36a"),
 }
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+OUT = ROOT / "jasper-app/src/main/resources/dev/jasper/app/icons/intellij"
+ENUM = ROOT / "jasper-sdk/src/main/java/dev/jasper/sdk/ui/BundledIcon.java"
+RAW = f"https://raw.githubusercontent.com/JetBrains/intellij-community/{SHA}/"
 
 
-def fetch(path):
-    with urllib.request.urlopen(BASE + path) as response:
-        return response.read()
+def fetch(url):
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(url, timeout=40) as response:
+                return response.read()
+        except Exception:
+            if attempt == 3:
+                raise
+            time.sleep(attempt + 1)
 
 
-OUT.mkdir(parents=True, exist_ok=True)
-rows = ["resource\tsource\tsha256"]
-for local, (upstream, dark) in sorted(ICONS.items()):
-    for suffix in ([".svg", "_dark.svg"] if dark else [".svg"]):
-        data = fetch(upstream + suffix)
-        (OUT / (local + suffix)).write_bytes(data)
-        rows.append(f"{local}{suffix}\t{upstream}{suffix}\t{hashlib.sha256(data).hexdigest()}")
-(OUT / "assets.tsv").write_text("\n".join(rows) + "\n", encoding="utf-8")
-(OUT / "NOTICE.txt").write_bytes(fetch("NOTICE.txt"))
-print(f"{len(rows) - 1} files from {SHA}")
+def constant(path):
+    value = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", path)
+    return re.sub(r"[^a-zA-Z0-9]+", "_", value).upper()
+
+
+def main():
+    entries = []
+    for prefix, (source, tree) in TREES.items():
+        result = json.loads(fetch(f"https://api.github.com/repos/JetBrains/intellij-community/git/trees/{tree}?recursive=1"))
+        if result.get("truncated"):
+            raise RuntimeError("Refusing truncated tree")
+        for item in result["tree"]:
+            if item["type"] == "blob" and item["path"].endswith(".svg"):
+                entries.append((prefix + item["path"], source + "/" + item["path"], item["sha"]))
+    entries.sort()
+    bases = [local[:-4] for local, _, _ in entries if not local.endswith("_dark.svg")]
+    if len(set(map(constant, bases))) != len(bases):
+        raise RuntimeError("SDK constant collision")
+    with tempfile.TemporaryDirectory(prefix="jasper-icons-") as temp:
+        stage = pathlib.Path(temp)
+        def download(entry):
+            local, source, blob = entry
+            data = fetch(RAW + source)
+            if hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest() != blob:
+                raise RuntimeError("Git blob mismatch: " + source)
+            target = stage / local
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            return f"{local}\t{source}\t{hashlib.sha256(data).hexdigest()}"
+        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+            rows = list(pool.map(download, entries))
+        notice = fetch(RAW + "NOTICE.txt")
+        # Mutate only after the complete download succeeds.
+        OUT.mkdir(parents=True, exist_ok=True)
+        for old in OUT.rglob("*.svg"):
+            old.unlink()
+        for local, _, _ in entries:
+            target = OUT / local
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((stage / local).read_bytes())
+        (OUT / "assets.tsv").write_text("resource\tsource\tsha256\n" + "\n".join(rows) + "\n")
+        (OUT / "catalog.txt").write_text("\n".join(bases) + "\n")
+        (OUT / "NOTICE.txt").write_bytes(notice)
+    declarations = ",\n".join(f'    /** {path}. */\n    {constant(path)}("{path}")' for path in bases)
+    ENUM.write_text('''package dev.jasper.sdk.ui;
+
+/**
+ * Complete host-owned IntelliJ New UI catalog, generated by tools/icons/fetch-intellij-icons.py.
+ * Dark variants are selected by the host. Size variants are distinct choices, still rendered
+ * within a 16-pixel box. Prefer {@link IconName} when a semantic meaning exists.
+ * @since 0.8.2
+ */
+public enum BundledIcon {
+''' + declarations + ''';
+
+    private final String id;
+    BundledIcon(String id) { this.id = id; }
+    /**
+     * Stable catalog identifier, independent of classpath location.
+     * @return catalog id
+     */
+    public String id() { return id; }
+}
+''')
+    (OUT / "SOURCE.md").write_text(f'''# IntelliJ New UI artwork
+
+Byte-identical SVGs from JetBrains/intellij-community commit `{SHA}`.
+Complete `platform/icons/src/expui` plus `plugins/terminal/resources/icons/expui`
+(the latter under `terminal/`): {len(entries)} SVGs, {len(bases)} base/size choices.
+Dark siblings are automatic; size variants are individually available. Intentional
+empty/stub assets are preserved. This includes upstream plugin/file-type marks;
+these assets do not replace Jasper's application branding.
+
+Artwork copyright and Apache-2.0 notices are retained in each SVG. LICENSE.txt is
+the canonical Apache-2.0 text; NOTICE.txt is upstream's notice. The upstream root
+LICENSE.txt contains IDE build terms and is not this artwork's license.
+
+assets.tsv records source paths and SHA-256. catalog.txt and SDK BundledIcon are
+generated together. Refresh with `python3 tools/icons/fetch-intellij-icons.py`.
+The script pins tree IDs, verifies Git blob hashes, stages downloads, and only
+then replaces managed SVGs. Builds and runtime do not access the network.
+''')
+    print(f"Vendored {len(entries)} SVGs / {len(bases)} catalog choices from {SHA}")
+
+
+if __name__ == "__main__":
+    main()

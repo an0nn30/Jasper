@@ -33,6 +33,7 @@ public final class SessionAttempt {
     /** Pane callbacks: set on the UI thread before the connector runs, invoked on the UI thread. */
     public Consumer<String> onStatus = text -> { };
     public Consumer<AttachedConnection> onAttached = connection -> { };
+    public Consumer<RemoteLocation> onRemoteDirectory = directory -> { };
     public Consumer<String> onFailed = message -> { };
 
     public SessionAttempt(UUID paneId, int columns, int rows, Executor cleanup, Consumer<Runnable> ui) {
@@ -51,6 +52,13 @@ public final class SessionAttempt {
         Objects.requireNonNull(text, "text");
         if (state.get() != State.PENDING) { LOG.log(System.Logger.Level.DEBUG, "Status for a finished attempt ignored"); return; }
         ui.accept(() -> { if (state.get() == State.PENDING) onStatus.accept(text); });
+    }
+
+    /** A provider's display-only directory hint, delivered on the UI thread after attachment. */
+    public void reportRemoteDirectory(RemoteLocation directory) {
+        Objects.requireNonNull(directory, "directory");
+        if (state.get() != State.ATTACHED) return;
+        ui.accept(() -> { if (state.get() == State.ATTACHED) onRemoteDirectory.accept(directory); });
     }
 
     public void attach(AttachedConnection connection) {

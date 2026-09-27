@@ -339,8 +339,12 @@ public final class JasperApplication {
         boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
         shortcutHelp = new dev.jasper.app.shortcuthelp.ShortcutHelp(auxiliary, contributions,
             () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).bindings(macOs),
-            plugins::pluginNames, macOs);
-        contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("help", "keys", "bindings"),
+            plugins::pluginNames, macOs, changes -> configuration == null
+                ? java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("Settings are unavailable."))
+                : configuration.saveKeybindings(changes, contributions.actions().stream()
+                    .filter(a -> KeyBindings.extensionId(a.id()))
+                    .map(a -> new KeyBindings.Extension(a.id(), a.defaultBinding())).toList()));
+        contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("help", "keys", "bindings", "keymap", "edit shortcuts", "keyboard settings"),
             Optional.empty(), invocation -> { if (!quitting && !stopped) shortcutHelp.open(); });
         contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(List.of(new MenuEntry.Item("app.shortcuts")));
         boolean[] replayed = new boolean[1];

@@ -15,7 +15,7 @@ public interface PluginWindow extends WindowSurface, WindowOwner {
      *
      * @param handler returns whether the content handled the command
      * @return the registration
-     * @since 0.8.2
+     * @since 0.8.4
      */
     Subscription onCloseCommand(BooleanSupplier handler);
 }

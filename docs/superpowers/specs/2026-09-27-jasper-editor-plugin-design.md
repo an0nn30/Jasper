@@ -1,6 +1,6 @@
 # Editor plugin
 
-**Status:** Approved by the user on 2026-09-27. Plan A (SDK 0.8.2 and the Editor for local files) is executed and merged. Plan B (SFTP editing through Remote) amends sections 4.4, 6.1, 6.2 and 6.4, as marked **Amended (Plan B)**, with the user's approval of that plan. Depends on the [plugin SDK](2026-09-21-jasper-plugin-sdk-design.md) and, for Plan B, on [Remote SFTP](2026-09-23-jasper-remote-sftp-design.md).
+**Status:** Approved by the user on 2026-09-27. Plan A (SDK 0.8.4 and the Editor for local files) is executed and merged. The SDK additions were numbered 0.8.2 until the Editor work was merged with `origin/main`, whose 0.8.2 and 0.8.3 are the New UI icon catalog and remote-directory hints; they are now 0.8.4. Plan B (SFTP editing through Remote) amends sections 4.4, 6.1, 6.2 and 6.4, as marked **Amended (Plan B)**, with the user's approval of that plan. Depends on the [plugin SDK](2026-09-21-jasper-plugin-sdk-design.md) and, for Plan B, on [Remote SFTP](2026-09-23-jasper-remote-sftp-design.md).
 
 ## Purpose and scope
 
@@ -34,7 +34,7 @@ id = "dev.jasper.editor"
 name = "Editor"
 version = "0.1.0"
 entry = "dev.jasper.editor.EditorPlugin"
-sdk = ">=0.8.2, <0.9"
+sdk = ">=0.8.4, <0.9"
 description = "Edit local and remote text files in tabs, with syntax highlighting."
 vendor = "Jasper"
 capabilities = []
@@ -95,16 +95,16 @@ public final class TooLargeException extends IOException { /* size(), limit() */
 ### 1.3 Remote
 
 Remote 0.4.0 changes (Plan B):
-- **Manifest:** `requires` gains `{ id = "dev.jasper.editor", version = ">=0.1", optional = true }`. The SDK floor stays `>=0.8.1`.
+- **Manifest:** `requires` gains `{ id = "dev.jasper.editor", version = ">=0.1", optional = true }`. The SDK floor is `>=0.8.3` (raised on `origin/main` for remote-directory hints).
 - **Build:** `compileOnly(project(":jasper-plugin-editor"))` and `testImplementation` of the same; `declaredImports` in `gradle/plugin-architecture.gradle.kts` gains `dev.jasper.editor.api` for `:jasper-plugin-remote`.
 - **Lookup:** `services().find(Editor.class)` once at start. Without the Editor, Remote behaves as today and the new menu item is hidden.
 - **What Remote adds** is in section 6.
 
 The rejected direction was Remote exporting a file API that the Editor requires. A double-click in Remote would then have to reach the Editor as an event, and local editing would depend on Remote. With the chosen direction the Editor stays generic and Remote remains the only code that knows SFTP.
 
-### 1.4 SDK 0.8.2
+### 1.4 SDK 0.8.4
 
-`JasperSdk` goes to 0.8.2. Three additions, each implemented by the application (`HostedUi`, `AuxiliarySurface`, `NativeShells`) and by the testkit (`FakePluginHost`), with contract cases in `PluginContractTest` where the fake can express them:
+`JasperSdk` goes to 0.8.4. Three additions, each implemented by the application (`HostedUi`, `AuxiliarySurface`, `NativeShells`) and by the testkit (`FakePluginHost`), with contract cases in `PluginContractTest` where the fake can express them:
 
 1. **Quit consults plugin window closing guards.** Quit (⌘Q, the Quit menu item, the macOS quit event) and Restart (from the Plugins manager and elsewhere) first run the `WindowSurface.onClosing` guards of every open plugin window, in window creation order. The first guard that returns false cancels the quit or restart, and nothing is closed. The guards run before `JasperApplication` sets `quitting` and before `ApplicationShutdown` arms the exit deadline, so a guard's modal prompt can never be ended by the deadline. Plugin dialogs and overlays are not consulted. This replaces the documented rule, in `WindowSurface` and `plugin-authoring.md`, that quitting does not consult guards. Testkit: `FakePluginHost.requestQuit()` runs the guards the same way and returns whether the quit may proceed.
 2. **`WindowSurface.onCloseCommand(BooleanSupplier handler)`,** returning a `Subscription`. The Close Window command of a plugin window (File → Close Window and ⌘W) asks these handlers first, newest first. The first to return true means the content handled the command, for example by closing a tab, and the window stays open. When none returns true, the window closes through its closing guards as today. The window's own close button does not consult these handlers. Reason: with the macOS screen menu bar, the Close Window accelerator fires before the content's key bindings see ⌘W; the shortcut recorder already works around the same problem through `WindowInput.captureShortcut`. Testkit: `FakePluginHost.closeCommand(windowId)`.
@@ -402,7 +402,7 @@ Automated tests are headless and run in `./gradlew check`.
 
 - New: `docs/editor.md` (the user's guide) and `docs/editor-verification.md`.
 - Updated:
-  - `docs/sdk-architecture.md` and `docs/plugin-authoring.md`: SDK 0.8.2, quit guards, `onCloseCommand`, `chooseSaveFile`;
+  - `docs/sdk-architecture.md` and `docs/plugin-authoring.md`: SDK 0.8.4, quit guards, `onCloseCommand`, `chooseSaveFile`;
   - `docs/remote.md`: Open in Editor;
   - `docs/keyboard-shortcuts.md`, `docs/configuration.md` (a pointer to the Editor's settings), `docs/README.md`;
   - `docs/STATUS.md`;
@@ -411,5 +411,5 @@ Automated tests are headless and run in `./gradlew check`.
 ## 12. Delivery
 
 One plan per runnable deliverable, each written with `superpowers:writing-plans`:
-- **Plan A — SDK 0.8.2 and the Editor for local files:** section 1.4; the Editor plugin and its API (sections 1.1–1.2, 2–5, 7–9); its tests and documentation. Runnable on its own: local files open, edit and save.
+- **Plan A — SDK 0.8.4 and the Editor for local files:** section 1.4; the Editor plugin and its API (sections 1.1–1.2, 2–5, 7–9); its tests and documentation. Runnable on its own: local files open, edit and save.
 - **Plan B — SFTP editing through Remote:** sections 1.3 and 6; Remote's tests; the Remote documentation and the remote parts of the verification checklist.

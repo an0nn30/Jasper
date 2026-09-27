@@ -22,6 +22,14 @@ public final class DesktopTestSupport {
             return TerminalSession.start(SessionLaunchOptions.builder().command(List.of("/bin/sh", "-c", "printf 'alpha alpha\\n'; read answer")).environment(System.getenv()).workingDirectory(directory).grid(new GridSize(80, 24)).scrollback(100).build());
         } catch (Exception e) { throw new CompletionException(e); }
     }
+    static void setStatusMetadata(WindowStatusBar status, String shell, String directory, String dimensions, boolean running, boolean integration) {
+        // Treat hostile display text as a remote string, never as a platform filesystem path.
+        boolean remote = directory.startsWith("<html>");
+        var snapshot = new dev.jasper.app.terminals.PaneSnapshot("", remote ? Optional.empty() : Optional.of(Path.of(directory)),
+            80, 24, integration, dev.jasper.app.terminals.PaneSnapshot.State.RUNNING, OptionalInt.empty(), Optional.empty(),
+            remote ? Optional.of(new dev.jasper.app.terminals.RemoteLocation("host", directory)) : Optional.empty(), shell);
+        status.setMetadata(snapshot, dimensions, running);
+    }
     public static void edt(Runnable task) throws Exception { SwingUtilities.invokeAndWait(task); }
     public static void until(BooleanSupplier condition) throws Exception {
         long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);

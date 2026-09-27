@@ -29,7 +29,7 @@ public final class ConfigTemplate {
             # rail_width = 28
             # Toolbar: "icons_and_labels", "icons", or "hidden"; updates live.
             # toolbar = "icons_and_labels"
-            # Toolbar height in logical pixels, 24-64; out-of-range values use the nearest limit. Updates live.
+            # Toolbar/title-bar height in logical pixels, 28-64; out-of-range values use the nearest limit. Updates live.
             # toolbar_height = 30
             # Show the status bar; updates live.
             # status_bar = true

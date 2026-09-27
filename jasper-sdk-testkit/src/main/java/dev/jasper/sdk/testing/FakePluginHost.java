@@ -617,7 +617,7 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param windowId the window id
      * @return true when the window closed; false when a handler handled the command, a guard vetoed or there is no such window
-     * @since 0.8.2
+     * @since 0.8.4
      */
     public boolean closeCommand(String windowId) {
         for (FakePluginContext context : contexts.values())
@@ -630,7 +630,7 @@ public final class FakePluginHost implements AutoCloseable {
      * nothing. Dialogs and overlays are not asked.
      *
      * @return whether the quit may go ahead
-     * @since 0.8.2
+     * @since 0.8.4
      */
     public boolean requestQuit() {
         for (FakePluginContext context : contexts.values())

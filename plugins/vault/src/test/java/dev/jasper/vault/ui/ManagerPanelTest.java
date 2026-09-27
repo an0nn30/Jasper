@@ -8,6 +8,16 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ManagerPanelTest {
+    @Test void controlsUseHostSemanticIcons() {
+        var panel = panel(new AtomicReference<>());
+        assertThat(panel.add.getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.ADD));
+        assertThat(panel.edit.getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.EDIT));
+        assertThat(panel.more.getIcon()).isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.MORE));
+        assertThat(panel.search.getClientProperty("JTextField.leadingIcon"))
+            .isEqualTo(new dev.jasper.sdk.testing.FakeNamedIcon(dev.jasper.sdk.ui.IconName.SEARCH));
+        panel.close();
+    }
+
     @Test void searchAndTypeFiltersPreserveOnlyVisibleSelectionAndPaletteNavigationRevealsRows() {
         var panel = panel(new AtomicReference<>());
         var key = new VaultManager.Row(UUID.randomUUID(), "Zulu", "SHA256:fingerprint", VaultManager.Type.SSH_KEY);
@@ -39,6 +49,6 @@ class ManagerPanelTest {
         panel.close();
     }
     private static ManagerPanel panel(AtomicReference<VaultManager.Type> added) {
-        return new ManagerPanel(id -> Optional.empty(), added::set, id -> { }, id -> { }, id -> { }, grant -> { }, () -> { }, () -> { }, () -> { }, () -> { });
+        return new ManagerPanel(id -> Optional.empty(), added::set, id -> { }, id -> { }, id -> { }, grant -> { }, () -> { }, () -> { }, () -> { }, () -> { }, dev.jasper.sdk.testing.FakeNamedIcon::new);
     }
 }

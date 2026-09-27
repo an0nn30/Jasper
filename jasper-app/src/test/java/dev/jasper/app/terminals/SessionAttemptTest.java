@@ -32,6 +32,23 @@ class SessionAttemptTest {
 
     private void run(List<Runnable> queue) { while (!queue.isEmpty()) queue.remove(0).run(); }
 
+    @Test void remoteDirectoryReportsArePostedOnlyAfterAttachment() {
+        SessionAttempt attempt = attempt();
+        attempt.onRemoteDirectory = directory -> seen.add(directory.label());
+        attempt.reportRemoteDirectory(new RemoteLocation("host", "/before"));
+        attempt.attach(connection());
+        attempt.reportRemoteDirectory(new RemoteLocation("host", "/after"));
+        assertThat(seen).isEmpty();
+        run(posted);
+        assertThat(seen).containsExactly("attached", "host:/after");
+        SessionAttempt failed = attempt();
+        failed.onRemoteDirectory = directory -> seen.add("unexpected");
+        failed.fail("failed");
+        failed.reportRemoteDirectory(new RemoteLocation("host", "/failed"));
+        run(posted);
+        assertThat(seen).doesNotContain("unexpected");
+    }
+
     @Test void statusThenAttachReachThePaneOnTheUiThreadAndTheFirstOutcomeWins() {
         SessionAttempt attempt = attempt();
         assertThat(attempt.columns()).isEqualTo(120);

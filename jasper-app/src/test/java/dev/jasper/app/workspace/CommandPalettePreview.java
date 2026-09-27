@@ -252,7 +252,7 @@ public final class CommandPalettePreview {
                 if (preferred.width != 680 * expectedScale) {
                     throw new AssertionError("Palette width scaled more or less than once: " + preferred.width);
                 }
-                if (inputHeight != 40 * expectedScale) {
+                if (inputHeight != 44 * expectedScale) {
                     throw new AssertionError("Input height scaled more or less than once: " + inputHeight);
                 }
                 if (rowHeight != 24 * expectedScale) {
@@ -278,7 +278,7 @@ public final class CommandPalettePreview {
                 + "root=" + width + "x" + height + "\n"
                 + "palette=" + bounds[0] + "," + bounds[1] + " " + bounds[2] + "x" + bounds[3] + "\n"
                 + "preferredWidth=" + (680 * expectedScale) + "\n"
-                + "inputHeight=" + (40 * expectedScale) + "\n"
+                + "inputHeight=" + (44 * expectedScale) + "\n"
                 + "rowHeight=" + (24 * expectedScale) + "\n";
             Files.writeString(output.resolve("actual-ui-scale-" + expectedScale + "x.txt"), report);
             System.out.println(image);

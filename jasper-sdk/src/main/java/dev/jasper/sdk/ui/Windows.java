@@ -80,7 +80,7 @@ public interface Windows {
      * @throws IllegalArgumentException for a foreign, unshown or dead owner
      * @throws IllegalStateException for a closed context or off-UI call
      * @throws UnsupportedOperationException if the host lacks this picker
-     * @since 0.8.2
+     * @since 0.8.4
      */
     default Optional<Path> chooseSaveFile(WindowOwner owner, String title, Optional<Path> initial) {
         throw new UnsupportedOperationException("Save selection is unavailable");

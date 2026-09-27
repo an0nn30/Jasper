@@ -10,14 +10,26 @@ import java.awt.event.*;
 import java.beans.PropertyChangeListener;
 import javax.swing.*;
 
-/** A centred window title over macOS's native controls; toolbar and tabs live in the window content. */
+/** Native macOS controls with either a dialog title or a workspace context and toolbar. */
 public final class MacTitleBar extends JPanel implements AutoCloseable {
     /** Unscaled height of the title row. */
     public static final int TITLE_HEIGHT = 28;
     private final JRootPane root;
     private final Runnable minimumSizeChanged;
-    private final JLabel title = new JLabel("Jasper", SwingConstants.CENTER);
+    private final JLabel title = new JLabel("Jasper", SwingConstants.CENTER) {
+        @Override public JToolTip createToolTip() {
+            var tip = new JToolTip();
+            tip.putClientProperty("html.disable", true);
+            tip.setComponent(this);
+            return tip;
+        }
+    };
     private final PropertyChangeListener boundsChanged;
+    private JComponent toolbar;
+    private MouseAdapter nativeDrag;
+    private final PropertyChangeListener toolbarChanged = event -> {
+        toolbarGeometryChanged();
+    };
     private Window window;
     private WindowDecorations decorations;
     private WindowDecorations.CustomTitleBar nativeTitle;
@@ -59,7 +71,43 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         title.putClientProperty("html.disable", true);
         title.getAccessibleContext().setAccessibleName("Window title");
         add(title);
+        // A tooltip installs mouse listeners, so explicitly preserve native dragging on context.
+        var drag = new MouseAdapter() {
+            private void hit() { if (nativeTitle != null) nativeTitle.forceHitTest(false); }
+            @Override public void mousePressed(MouseEvent event) { hit(); }
+            @Override public void mouseReleased(MouseEvent event) { hit(); }
+            @Override public void mouseClicked(MouseEvent event) { hit(); }
+            @Override public void mouseEntered(MouseEvent event) { hit(); }
+            @Override public void mouseMoved(MouseEvent event) { hit(); }
+            @Override public void mouseDragged(MouseEvent event) { hit(); }
+        };
+        nativeDrag = drag;
+        title.addMouseListener(drag); title.addMouseMotionListener(drag);
         root.addPropertyChangeListener(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, boundsChanged);
+    }
+
+    /** Moves an existing toolbar into this native row; ownership stays with the workspace. */
+    public void setToolbar(JComponent toolbar) {
+        if (closed || this.toolbar != null) return;
+        this.toolbar = toolbar;
+        add(toolbar);
+        toolbar.addPropertyChangeListener(toolbarChanged);
+        toolbar.addMouseListener(nativeDrag); toolbar.addMouseMotionListener(nativeDrag);
+        title.setHorizontalAlignment(SwingConstants.LEADING);
+        title.getAccessibleContext().setAccessibleName("Working context");
+        toolbarGeometryChanged();
+    }
+
+    private void toolbarGeometryChanged() {
+        refreshNativeGeometry(); revalidate(); repaint(); minimumSizeChanged.run();
+    }
+
+    /** Focused pane's command or explicit terminal title; metadata is maintained by the host. */
+    public void setContext(String label, String tooltip, Icon icon) {
+        if (closed) return;
+        title.setText(label); title.setToolTipText(tooltip); title.setIcon(icon);
+        title.getAccessibleContext().setAccessibleDescription(tooltip);
+        revalidate(); repaint();
     }
 
     /** Menus stay on the root, which the macOS screen menu bar displays. */
@@ -111,19 +159,35 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         Object bounds = root.getClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS);
         // Published native bounds are already in root-pane coordinates; do not scale again.
         int controlsEnd = bounds instanceof Rectangle rectangle ? Math.max(0, rectangle.x + rectangle.width) : 0;
-        return Math.max(UIScale.scale(120), Math.max(nativeLeft, controlsEnd) + UIScale.scale(8));
+        return Math.max(UIScale.scale(toolbar == null ? 120 : 96), Math.max(nativeLeft, controlsEnd) + UIScale.scale(8));
     }
 
-    private int titleHeight() { return UIScale.scale(TITLE_HEIGHT); }
+    private int titleHeight() {
+        return toolbar == null ? UIScale.scale(TITLE_HEIGHT)
+            : Math.max(UIScale.scale(TITLE_HEIGHT), toolbar.getPreferredSize().height);
+    }
 
     @Override public Dimension getMinimumSize() {
-        return new Dimension(2 * Math.max(safeInset(), nativeRight) + UIScale.scale(64), titleHeight());
+        return new Dimension(toolbar == null ? 2 * Math.max(safeInset(), nativeRight) + UIScale.scale(64)
+            : safeInset() + nativeRight + UIScale.scale(280), titleHeight());
     }
     @Override public Dimension getPreferredSize() { return new Dimension(Math.max(UIScale.scale(400), getMinimumSize().width), titleHeight()); }
 
     @Override public void doLayout() {
         refreshNativeGeometry();
-        // Reserve the same space at both ends so native controls cannot shift the title off centre.
+        if (toolbar != null) {
+            int left = Math.min(safeInset(), getWidth());
+            int right = Math.max(UIScale.scale(8), nativeRight);
+            int available = Math.max(0, getWidth() - left - right);
+            int preferred = Math.max(UIScale.scale(280), Math.min(UIScale.scale(480), title.getPreferredSize().width + UIScale.scale(12)));
+            int contextWidth = toolbar.isVisible()
+                ? Math.min(preferred, Math.max(0, available - UIScale.scale(214))) : available;
+            title.setBounds(left, 0, contextWidth, getHeight());
+            int gap = contextWidth > 0 ? UIScale.scale(24) : 0;
+            toolbar.setBounds(left + contextWidth + gap, 0, Math.max(0, available - contextWidth - gap), getHeight());
+            return;
+        }
+        // Dialog titles remain centred independently of the window controls.
         int inset = Math.max(Math.min(safeInset(), getWidth()), nativeRight);
         title.setBounds(inset, 0, Math.max(0, getWidth() - 2 * inset), getHeight());
     }
@@ -139,20 +203,30 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
 
     private void refreshColors() {
         setBackground(UIManager.getColor("Jasper.titleBackground"));
-        title.setFont(SystemFonts.ui(Font.BOLD, 13f));
+        title.setFont(SystemFonts.ui(toolbar == null ? Font.BOLD : Font.PLAIN, 13f));
         title.setForeground(UIManager.getColor(active ? "Jasper.titleForeground" : "Jasper.titleInactiveForeground"));
         repaint();
     }
 
-    @Override protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        g.setColor(UIManager.getColor("Jasper.titleSeparator"));
-        g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
+    @Override protected void paintChildren(Graphics g) {
+        super.paintChildren(g);
+        if (toolbar != null) {
+            Color highlight = UIManager.getColor("Jasper.headerHighlight");
+            if (highlight != null) { g.setColor(highlight); g.fillRect(0, 0, getWidth(), UIScale.scale(1)); }
+        }
+        if (toolbar == null) {
+            g.setColor(UIManager.getColor("Jasper.titleSeparator"));
+            g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
+        }
     }
 
     @Override public void close() {
         if (closed) return;
         closed = true;
+        if (toolbar != null) {
+            toolbar.removePropertyChangeListener(toolbarChanged);
+            toolbar.removeMouseListener(nativeDrag); toolbar.removeMouseMotionListener(nativeDrag);
+        }
         root.removePropertyChangeListener(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, boundsChanged);
         if (window != null) {
             window.removeComponentListener(frameBounds);

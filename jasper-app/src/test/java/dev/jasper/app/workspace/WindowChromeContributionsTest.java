@@ -58,7 +58,7 @@ class WindowChromeContributionsTest {
             model.addToolbar(new ToolbarEntry.Button("dev.x.never-registered"));
 
             List<String> after = buttons(owner);
-            assertThat(after).endsWith("Zoom pane", "Run Tool", "Tool", "Find", "Settings");
+            assertThat(after).endsWith("Zoom pane", "Run Tool", "Tool", "Find", "Settings", "More actions");
             assertThat(WindowTabsTest.named(owner.toolbar(), "pluginSeparator").isVisible()).isTrue();
             assertThat(after).hasSize(before.size() + 2);
             JButton button = null;
@@ -176,7 +176,7 @@ class WindowChromeContributionsTest {
         edt(() -> {
             var theme = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.LIGHT);
             try {
-                var icon = dev.jasper.app.platform.AppIcons.plugin(getClass().getClassLoader(), "dev/jasper/app/icons/intellij/find.svg");
+                var icon = dev.jasper.app.platform.AppIcons.plugin(getClass().getClassLoader(), "dev/jasper/app/icons/intellij/general/search.svg");
                 var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(19,19,java.awt.image.BufferedImage.TYPE_INT_ARGB));
                 var model = new Contributions();
                 model.addAction("dev.x.lock", "Lock", icon, List.of(), Optional.empty(), event -> {});

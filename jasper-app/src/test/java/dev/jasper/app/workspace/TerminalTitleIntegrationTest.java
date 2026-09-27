@@ -38,7 +38,8 @@ class TerminalTitleIntegrationTest {
         return "\\033]1341;jasper;cmd;" + encoded + "\\007\\033]133;C\\007";
     }
 
-    private record Fixture(WindowContent content, BuddyTestSupport deck, List<String> nativeTitles) { }
+    private record Fixture(WindowContent content, BuddyTestSupport deck, List<String> nativeTitles,
+                           List<String> notificationTitles) { }
 
     private Fixture open(String script) throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(
@@ -57,8 +58,9 @@ class TerminalTitleIntegrationTest {
         edt(() -> {
             WindowContent window = content(launcher);
             BuddyTestSupport deck = new BuddyTestSupport();
+            List<String> notificationTitles = new ArrayList<>();
             CommandNotifier notifier = new CommandNotifier(() -> Duration.ofNanos(1), deck.companion(),
-                (title, detail) -> {}, working -> {}, (delay, run) -> () -> {});
+                (title, detail) -> notificationTitles.add(title), working -> {}, (delay, run) -> () -> {});
             window.activity(event -> {
             switch (event) {
                 case WorkspaceActivity.Started value -> notifier.started(value.id(), value.command(),
@@ -79,7 +81,7 @@ class TerminalTitleIntegrationTest {
             });
             List<String> titles = new ArrayList<>();
             window.onTitle = titles::add;
-            fixture[0] = new Fixture(window, deck, titles);
+            fixture[0] = new Fixture(window, deck, titles, notificationTitles);
         });
         pending.remove().run();
         until(() -> fixture[0].content.currentPane().view() != null);
@@ -88,15 +90,15 @@ class TerminalTitleIntegrationTest {
 
     @Test void tabsAndNativeTitlesFollowForegroundJobsWithoutShellIntegration() throws Exception {
         Fixture f = open(List.of("/bin/bash", "--noprofile", "--norc", "-l", "-i"), "bash");
-        until(() -> f.content.currentTab().title().equals("~ (-bash)"));
+        until(() -> f.content.currentTab().title().equals("bash"));
         edt(() -> f.content.currentPane().session().write("sleep 30\r"));
-        until(() -> f.content.currentTab().title().equals("~ (sleep)"));
+        until(() -> f.content.currentTab().title().equals("sleep"));
         edt(() -> {
-            assertThat(f.nativeTitles.getLast()).isEqualTo("~ (sleep)");
+            assertThat(f.nativeTitles.getLast()).isEqualTo("sleep");
             assertThat(f.content.currentPane().shellIntegrationDetected()).isFalse();
             f.content.currentPane().session().write(new byte[]{3});
         });
-        until(() -> f.content.currentTab().title().equals("~ (-bash)"));
+        until(() -> f.content.currentTab().title().equals("bash"));
     }
 
     @Test void tmuxForwardsPaneTitlesToTheOuterTab(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
@@ -113,9 +115,9 @@ class TerminalTitleIntegrationTest {
             Fixture f = open(List.of(tmux.get().toString(), "-L", socket, "-f", config.toString(),
                 "new-session", "/bin/sh", script.toString()), "tmux");
             edt(() -> f.content.currentPane().session().write("Reviewing files\r"));
-            until(() -> f.content.currentTab().title().equals("Reviewing files (tmux)"));
+            until(() -> f.content.currentTab().title().equals("Reviewing files"));
             edt(() -> {
-                assertThat(f.nativeTitles.getLast()).isEqualTo("Reviewing files (tmux)");
+                assertThat(f.nativeTitles.getLast()).isEqualTo("Reviewing files");
                 assertThat(f.content.currentPane().title()).isEqualTo("Reviewing files");
             });
         } finally {
@@ -130,27 +132,28 @@ class TerminalTitleIntegrationTest {
         edt(() -> f.content.currentPane().session().write("start\n"));
         until(() -> !f.deck.isEmpty());
         edt(() -> {
-            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("~ (bash)");
+            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("worker");
             assertThat(f.deck.notices().getFirst().title()).isEqualTo("worker");
             f.content.currentPane().session().write("Reviewing files\n");
         });
         until(() -> f.deck.notices().getFirst().title().equals("Reviewing files"));
         edt(() -> {
-            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Reviewing files (bash)");
-            assertThat(f.nativeTitles.getLast()).isEqualTo("Reviewing files (bash)");
+            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Reviewing files");
+            assertThat(f.nativeTitles.getLast()).isEqualTo("Reviewing files");
             f.content.currentPane().session().write("Writing tests\n");
         });
         until(() -> f.deck.notices().getFirst().title().equals("Writing tests"));
         edt(() -> {
-            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Writing tests (bash)");
+            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Writing tests");
             f.content.currentPane().session().write("\n");
         });
         until(() -> f.deck.notices().getFirst().title().equals("worker"));
-        edt(() -> assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("~ (bash)"));
+        edt(() -> assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("worker"));
     }
 
     @Test void aBurstEndingWithAPromptTitleCannotOverwriteTheCompletedNotice() throws Exception {
-        String burst = start("worker") + "\\033]0;Task complete\\007\\033]133;D;0\\007"
+        String burst = "\\033]0;~\\007" + start("sleep 12")
+            + "\\033]0;~\\007\\033]133;D;0\\007"
             + "\\033]2;Prompt directory\\007";
         Fixture f = open("read step; printf '" + burst + "'; read step");
         CountDownLatch parsed = new CountDownLatch(1);
@@ -161,23 +164,24 @@ class TerminalTitleIntegrationTest {
                 }
             });
             f.content.currentPane().session().write("go\n");
-            // Hold Swing until the reader has parsed the entire burst. A later session.title() read
-            // would now see only "Prompt directory", losing the title belonging to the command.
+            // Hold Swing until the reader has parsed the entire burst. Completion must name the
+            // captured command even with directory titles on both sides of its end marker.
             try { assertThat(parsed.await(5, TimeUnit.SECONDS)).isTrue(); }
             catch (InterruptedException failure) { throw new AssertionError(failure); }
         });
-        until(() -> f.content.tabStrip().getTitleAt(0).equals("Prompt directory (bash)"));
+        until(() -> f.content.tabStrip().getTitleAt(0).equals("Prompt directory"));
         edt(() -> {
-            assertThat(f.deck.notices().getFirst().title()).isEqualTo("Task complete");
+            assertThat(f.deck.notices().getFirst().title()).isEqualTo("sleep 12");
+            assertThat(f.notificationTitles).containsExactly("sleep 12");
             assertThat(f.deck.notices().getFirst().state()).isEqualTo(BuddyNotice.State.DONE);
-            assertThat(f.nativeTitles.getLast()).isEqualTo("Prompt directory (bash)");
+            assertThat(f.nativeTitles.getLast()).isEqualTo("Prompt directory");
         });
     }
 
     @Test void programTitlesWorkWithoutShellIntegrationAndManualTabNamesStillWin() throws Exception {
         Fixture f = open("while read title; do printf '\\033]1;%s\\007' \"$title\"; done");
         edt(() -> f.content.currentPane().session().write("Editor document\n"));
-        until(() -> f.content.tabStrip().getTitleAt(0).equals("Editor document (bash)"));
+        until(() -> f.content.tabStrip().getTitleAt(0).equals("Editor document"));
         edt(() -> {
             f.content.currentTab().rename("Pinned name");
             f.content.currentPane().session().write("Another document\n");
@@ -187,7 +191,7 @@ class TerminalTitleIntegrationTest {
             assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Pinned name");
             assertThat(f.deck.notices()).isEmpty();
             f.content.currentTab().rename("");
-            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Another document (bash)");
+            assertThat(f.content.tabStrip().getTitleAt(0)).isEqualTo("Another document");
         });
     }
 }

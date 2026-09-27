@@ -10,7 +10,7 @@ import java.util.OptionalInt;
  *
  * @param title the program's title, or the running command when it set none
  * @param workingDirectory the local working directory the shell last reported; a hint that may not exist
- * @param remoteDirectory a directory reported under another host
+ * @param remoteDirectory a remote directory reported by the shell, or its session provider when unavailable
  * @param columns the grid width in cells; zero before the session starts
  * @param rows the grid height in cells; zero before the session starts
  * @param shellIntegration whether the shell reports prompts and commands

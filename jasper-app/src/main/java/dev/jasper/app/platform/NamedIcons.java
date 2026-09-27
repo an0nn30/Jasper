@@ -3,56 +3,61 @@ package dev.jasper.app.platform;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * App-owned modern resources for semantic SDK icon names: IntelliJ artwork, or the tinted Tabler
- * outline where IntelliJ has no equivalent. LOCK and UNLOCK stay a Tabler pair shared with Vault.
- */
+/** The sole mapping from Jasper semantic meanings to bundled New UI artwork. */
 final class NamedIcons {
-    private static final String INTELLIJ = "dev/jasper/app/icons/intellij/";
-    private static final String STANDARD = "dev/jasper/app/icons/standard/";
-    private static final Map<String, String> MODERN = Map.ofEntries(
-        Map.entry("FILE", STANDARD + "FILE.svg"),
-        Map.entry("LINK", STANDARD + "LINK.svg"),
-        Map.entry("UPLOAD", STANDARD + "UPLOAD.svg"),
-        Map.entry("DOWNLOAD", STANDARD + "DOWNLOAD.svg"),
-        Map.entry("UP", STANDARD + "UP.svg"),
-        Map.entry("NEW_FOLDER", STANDARD + "NEW_FOLDER.svg"),
-        Map.entry("PAUSE", STANDARD + "PAUSE.svg"),
-        Map.entry("RESUME", STANDARD + "RESUME.svg"),
-        Map.entry("ADD", INTELLIJ + "add.svg"),
-        Map.entry("BOOKMARK", INTELLIJ + "bookmark.svg"),
-        Map.entry("CLOSE", INTELLIJ + "close.svg"),
-        Map.entry("CONNECT", STANDARD + "CONNECT.svg"),
-        Map.entry("COPY", INTELLIJ + "copy.svg"),
-        Map.entry("DELETE", STANDARD + "DELETE.svg"),
-        Map.entry("DISCONNECT", STANDARD + "DISCONNECT.svg"),
-        Map.entry("EXECUTE", INTELLIJ + "execute.svg"),
-        Map.entry("FOLDER", INTELLIJ + "folder.svg"),
-        Map.entry("HELP", INTELLIJ + "help.svg"),
-        Map.entry("HISTORY", INTELLIJ + "history.svg"),
-        Map.entry("INFO", INTELLIJ + "information.svg"),
-        Map.entry("KEY", STANDARD + "KEY.svg"),
-        Map.entry("LOCK", STANDARD + "LOCK.svg"),
-        Map.entry("NETWORK", INTELLIJ + "web.svg"),
-        Map.entry("PASTE", INTELLIJ + "menu-paste.svg"),
-        Map.entry("REFRESH", INTELLIJ + "refresh.svg"),
-        Map.entry("REMOVE", INTELLIJ + "remove.svg"),
-        Map.entry("SAVE", INTELLIJ + "menu-saveall.svg"),
-        Map.entry("SEARCH", INTELLIJ + "find.svg"),
-        Map.entry("SERVER", INTELLIJ + "server.svg"),
-        Map.entry("SETTINGS", INTELLIJ + "gearPlain.svg"),
-        Map.entry("SPLIT", INTELLIJ + "splitVertically.svg"),
-        Map.entry("TERMINAL", INTELLIJ + "console.svg"),
-        Map.entry("UNLOCK", STANDARD + "UNLOCK.svg"),
-        Map.entry("ZOOM", INTELLIJ + "expandComponent.svg"));
-    static final Set<String> NAMES = MODERN.keySet();
+    private static final Map<String, String> ARTWORK = Map.ofEntries(
+        Map.entry("ADD", "general/add"),
+        Map.entry("BOOKMARK", "bookmarks/bookmark"),
+        Map.entry("CLOSE", "general/closeSmall"),
+        Map.entry("CLOSE_HOVERED", "general/closeSmallHovered"),
+        Map.entry("CONNECT", "run/resume"),
+        Map.entry("COPY", "general/copy"),
+        Map.entry("DELETE", "general/delete"),
+        Map.entry("DISCONNECT", "general/exit"),
+        Map.entry("DOWNLOAD", "general/download"),
+        Map.entry("DROPDOWN", "general/chevronDown"),
+        Map.entry("EDIT", "general/edit"),
+        Map.entry("EXECUTE", "run/run"),
+        Map.entry("EXIT", "general/exit"),
+        Map.entry("FILE", "fileTypes/text"),
+        Map.entry("FOLDER", "nodes/folder"),
+        Map.entry("HELP", "general/help"),
+        Map.entry("HISTORY", "general/history"),
+        Map.entry("INFO", "general/informationDialog"),
+        Map.entry("KEY", "standard/KEY"),
+        Map.entry("LINK", "nodes/symlink"),
+        Map.entry("LOCK", "general/locked"),
+        Map.entry("MATCH_CASE", "inline/matchCase"),
+        Map.entry("MORE", "general/moreHorizontal"),
+        Map.entry("NETWORK", "toolwindows/web"),
+        Map.entry("NEW_FOLDER", "actions/newFolder"),
+        Map.entry("NEW_WINDOW", "actions/moveToWindow"),
+        Map.entry("NEXT", "general/chevronRight"),
+        Map.entry("NEXT_MATCH", "general/down"),
+        Map.entry("PASTE", "general/paste"),
+        Map.entry("PAUSE", "run/pause"),
+        Map.entry("PREVIOUS", "general/chevronLeft"),
+        Map.entry("PREVIOUS_MATCH", "general/up"),
+        Map.entry("REFRESH", "general/refresh"),
+        Map.entry("REGEX", "inline/regex"),
+        Map.entry("REMOVE", "general/remove"),
+        Map.entry("RESUME", "run/resume"),
+        Map.entry("SAVE", "general/save"),
+        Map.entry("SEARCH", "general/search"),
+        Map.entry("SEARCH_HISTORY", "inline/searchHistory"),
+        Map.entry("SERVER", "webReferences/server"),
+        Map.entry("SETTINGS", "general/settings"),
+        Map.entry("SPLIT", "general/splitVertically"),
+        Map.entry("TERMINAL", "terminal/toolwindow/terminal"),
+        Map.entry("UNLOCK", "general/unlocked"),
+        Map.entry("UP", "general/up"),
+        Map.entry("UPLOAD", "general/upload"),
+        Map.entry("ZOOM", "inline/expand"));
+    static final Set<String> NAMES = ARTWORK.keySet();
     private NamedIcons() { }
 
-    static String resource(String name) {
+    static String id(String name) {
         if (name == null || !NAMES.contains(name)) throw new IllegalArgumentException("Unknown icon name: " + name);
-        return MODERN.get(name);
+        return ARTWORK.get(name);
     }
-
-    /** True for the Tabler fallback, which is recoloured to the chrome foreground. */
-    static boolean tinted(String name) { return resource(name).startsWith(STANDARD); }
 }

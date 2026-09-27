@@ -15,7 +15,7 @@ class ThemeStateTest {
         new Theme.Resource("jasper-dark.theme.json"));
 
     @Test void theConfiguredThemeResolvesWithItsOwnPalette() {
-        assertThat(ThemeState.defaults().resolve()).isEqualTo(new ResolvedTheme(Theme.DARK, Palette.jasperDark()));
+        assertThat(ThemeState.defaults().resolve()).isEqualTo(new ResolvedTheme(Theme.DARK, Theme.DARK.palette()));
         assertThat(ThemeState.defaults().configure(Theme.LIGHT).resolve()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperLight()));
         assertThat(ThemeState.defaults().configure(INSTALLED).resolve()).isEqualTo(new ResolvedTheme(INSTALLED, SCHEME));
     }

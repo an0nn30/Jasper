@@ -19,7 +19,7 @@ class ThemeButtonsTest {
             var button = new JButton("Generate Key...");
             var parent = new JPanel(); parent.add(button);
             var field = new JTextField("Existing text", 20);
-            var password = new JPasswordField(20);
+            var password = new JPasswordField("example", 20);
             var formatted = new JFormattedTextField();
             var choices = new JComboBox<>(new String[]{"Password", "Key"});
             var note = new JTextArea("First line\nSecond line");
@@ -37,7 +37,7 @@ class ThemeButtonsTest {
                 // IntelliJ Light's default button is a slight gradient; sample within a small tolerance.
                 assertThat(distance(fill(confirm), UIManager.getColor("Button.default.background"))).as(theme.name()).isLessThanOrEqualTo(8);
                 for (var input : List.of(field, password, formatted)) {
-                    assertThat(input.getPreferredSize().height).isBetween(20, 30);
+                    assertThat(input.getPreferredSize().height).isBetween(26, 34);
                     assertThat(input.isEditable()).isTrue();
                 }
                 assertThat(field.getBackground()).isEqualTo(UIManager.getColor("TextField.background"));
@@ -47,6 +47,7 @@ class ThemeButtonsTest {
                 assertThat(note.getBackground()).isEqualTo(UIManager.getColor("TextArea.background"));
                 assertThat(field.getText()).isEqualTo("Existing text");
                 assertThat(note.getText()).isEqualTo("First line\nSecond line");
+                saveInputsPreview(List.of(field, password, formatted), theme);
                 button.setEnabled(false); button.doClick(); assertThat(clicks[0]).isZero();
                 button.setEnabled(true);
             }
@@ -54,6 +55,28 @@ class ThemeButtonsTest {
             button.setText("Always allow for an unusually long plugin name");
             assertThat(button.getPreferredSize().width).isGreaterThan(200);
         } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    private static void saveInputsPreview(List<JTextField> fields, Theme theme) throws java.io.IOException {
+        var image = new BufferedImage(720, 320, BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try {
+            g.scale(2, 2);
+            g.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g.setColor(UIManager.getColor("Panel.background")); g.fillRect(0, 0, 360, 160);
+            String[] names = {"Text", "Password", "Formatted"};
+            for (int i = 0; i < fields.size(); i++) {
+                var field = fields.get(i);
+                field.setSize(230, field.getPreferredSize().height);
+                g.setFont(UIManager.getFont("Label.font")); g.setColor(UIManager.getColor("Label.foreground"));
+                g.drawString(names[i], 12, 32 + i * 48);
+                var control = g.create(110, 12 + i * 48, field.getWidth(), field.getHeight());
+                try { field.paint(control); } finally { control.dispose(); }
+            }
+        } finally { g.dispose(); }
+        var output = java.nio.file.Path.of("build/render-preview");
+        java.nio.file.Files.createDirectories(output);
+        javax.imageio.ImageIO.write(image, "png", output.resolve("inputs-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
     }
 
     private static Color fill(JButton button) {

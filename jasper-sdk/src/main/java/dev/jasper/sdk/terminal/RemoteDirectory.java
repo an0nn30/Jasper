@@ -3,9 +3,9 @@ package dev.jasper.sdk.terminal;
 import java.util.Objects;
 
 /**
- * A working directory the shell reported that is not a directory of this machine: another host named it, or the
+ * A working directory the shell or session provider reported that is not a directory of this machine: another host named it, or the
  * pane's session is not a local process. It is unauthenticated
- * text from whatever runs in the pane: a hint, never a fact.
+ * text for display: a hint, never a local path or a verified fact.
  *
  * @param host the reported host name; empty when the program named none
  * @param path the reported path, as text
