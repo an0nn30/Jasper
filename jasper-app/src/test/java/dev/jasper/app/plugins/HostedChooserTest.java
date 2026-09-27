@@ -26,7 +26,7 @@ class HostedChooserTest {
     private final AtomicReference<Runnable> during = new AtomicReference<>(() -> {});
     private final AtomicBoolean disposed = new AtomicBoolean();
     private final List<PathChoice> requests = new ArrayList<>();
-    private List<Path> selected = List.of(Path.of("/one"), Path.of("/two"));
+    private List<Path> selected = List.of(Path.of("/one").toAbsolutePath(), Path.of("/two").toAbsolutePath());
     private final AuxiliaryWindows windows = new AuxiliaryWindows(UiState.inMemory(),
         surface -> new AuxiliarySurface.Shell(() -> {}, () -> {}, () -> {}, title -> {},
             () -> new Rectangle(0,0,100,100), (title,initial) -> Optional.empty()),
@@ -36,11 +36,11 @@ class HostedChooserTest {
 
     @Test void terminalOwnerSelectsMultipleFilesOrOneDirectory() {
         var owner = terminals.windowHandle(fixture.addWindow());
-        assertThat(ui.windows().chooseFiles(owner, "Upload", Optional.empty())).containsExactly(Path.of("/one"),Path.of("/two"));
+        assertThat(ui.windows().chooseFiles(owner, "Upload", Optional.empty())).containsExactly(Path.of("/one").toAbsolutePath(),Path.of("/two").toAbsolutePath());
         assertThat(requests.getFirst().terminalOwner()).isEqualTo(owner.id());
         assertThat(disposed).isTrue();
-        selected = List.of(Path.of("/dest"));
-        assertThat(ui.windows().chooseDirectory(owner, "Download", Optional.empty())).contains(Path.of("/dest"));
+        selected = List.of(Path.of("/dest").toAbsolutePath());
+        assertThat(ui.windows().chooseDirectory(owner, "Download", Optional.empty())).contains(Path.of("/dest").toAbsolutePath());
         assertThat(requests.getLast().directory()).isTrue();
         selected = List.of();
         assertThat(ui.windows().chooseFiles(owner, "Cancelled", Optional.empty())).isEmpty();
