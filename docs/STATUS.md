@@ -2,6 +2,12 @@
 
 ## Current state — 2026-09-23
 
+- **Thin shortcut disclosure chevrons** (`codex/keyboard-shortcuts-ui`, 2026-09-27):
+  the shortcut tree now uses outlined chevrons instead of filled triangles: right when
+  collapsed and down when expanded. Only the arrow shape is overridden; the active
+  theme still supplies its colors. Existing shortcut tests passed and dark/light
+  headless previews were inspected.
+
 - **Expandable keyboard shortcut sections** (`codex/keyboard-shortcuts-ui`, 2026-09-27):
   replaced the flat four-column table with collapsible section/plugin groups, vendored
   folder icons and right-aligned bindings. Panel, tree, viewport and editor share the

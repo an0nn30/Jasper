@@ -27,6 +27,7 @@ final class ShortcutTree extends JTree {
         setToggleClickCount(1);
         setCellRenderer(new Row());
         setBorder(BorderFactory.createEmptyBorder(UIScale.scale(4), UIScale.scale(4), UIScale.scale(4), UIScale.scale(4)));
+        putClientProperty(FlatClientProperties.STYLE, "icon.arrowType: chevron");
         putClientProperty(FlatClientProperties.TREE_WIDE_SELECTION, true);
         putClientProperty(FlatClientProperties.TREE_WIDE_CELL_RENDERER, true);
         getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
