@@ -253,6 +253,25 @@ class ThemeArchiveTest {
             assertThat(problem).contains("Bomb.zip!/P/lib/big.jar").contains("inflates to more than 256 MiB"));
     }
 
+    @Test void aPlainJarWhoseThemesInflatePastTheBudgetIsReported() {
+        // 64 providers (the cap), each theme at the 4 MiB file cap: the themes alone fill the 256 MiB budget,
+        // so plugin.xml's bytes take the read past it. The filler deflates to a jar well under 1 MiB.
+        String head = "{\"name\": \"Budget\", \"dark\": true, \"filler\": \"", tail = "\"}";
+        byte[] theme = (head + "a".repeat(ThemeArchive.MAX_FILE - head.length() - tail.length()) + tail)
+            .getBytes(StandardCharsets.UTF_8);
+        var paths = new String[ThemeArchive.MAX_PROVIDERS];
+        var files = new LinkedHashMap<String, byte[]>();
+        for (int i = 0; i < paths.length; i++) {
+            paths[i] = "/t" + i + ".theme.json";
+            files.put("t" + i + ".theme.json", theme);
+        }
+        files.put("META-INF/plugin.xml", pluginXml("Budget", paths).getBytes(StandardCharsets.UTF_8));
+        var contents = ThemeArchive.read(jar(directory.resolve("Budget.jar"), files));
+        assertThat(contents.themes()).isEmpty();
+        assertThat(contents.problems()).singleElement().asString()
+            .contains("Budget.jar").contains("inflates to more than 256 MiB").doesNotContain("Exception");
+    }
+
     /** A jar whose one entry is stored uncompressed, so the jar itself is at least {@code size} bytes. */
     private static byte[] storedJar(String name, int size) throws Exception {
         byte[] data = new byte[size];

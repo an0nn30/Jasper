@@ -58,7 +58,7 @@
     Default and Darcula schemes as parents.
   - **Problems** are configuration warnings; none blocks start-up.
   - **Planning decisions and deviations:** listed in the plan header (status line), including the final review's hardening.
-  - **Open:** the 256 MiB inflation budget does not yet cover plain `.jar` reads (bounded by the 64-provider and 4 MiB caps).
+  - **Follow-up done:** one 256 MiB inflation budget per archive read now covers plain `.jar` reads too.
   - **Not done:** plan 3b (the bundled set), visual acceptance (user-run), merge and push.
 
 ### IntelliJ-style chrome and follow-ups — merged 2026-09-25

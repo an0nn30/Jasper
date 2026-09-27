@@ -70,9 +70,10 @@ final class ThemeArchive {
     }
 
     /**
-     * How many bytes a nested jar's entries have inflated to so far, shared across every {@link #fromBytes}
-     * pass over one {@link #read(Path)} call (including its other nested jars): a 3 KiB zip that inflates to
-     * 1 GiB must not take unbounded time or memory just because most of that is entries nobody wants.
+     * How many bytes one {@link #read(Path)} call has inflated so far, shared by every read it makes: the
+     * archive's own entries (a plain jar's files, a Marketplace zip's lib jars) and every {@link #fromBytes}
+     * pass over a nested jar. A 3 KiB zip that inflates to 1 GiB must not take unbounded time or memory,
+     * whether that is entries nobody wants or 64 wanted themes of 4 MiB each and their schemes.
      */
     private static final class Inflated {
         private long used;
@@ -99,10 +100,13 @@ final class ThemeArchive {
                     problems.add(name + " has more than 10,000 entries; skipped");
                     return new Contents(themes, problems);
                 }
-                if (zip.getEntry(PLUGIN_XML) != null) plugin(new Jar(name, wanted -> fromZip(zip, wanted)), themes, problems);
-                else nested(zip, name, themes, problems, new Inflated());
+                var budget = new Inflated();
+                if (zip.getEntry(PLUGIN_XML) != null) plugin(new Jar(name, wanted -> fromZip(zip, wanted, budget)), themes, problems);
+                else nested(zip, name, themes, problems, budget);
             }
-        } catch (IOException | UncheckedIOException | SecurityException failure) {
+        } catch (UncheckedIOException failure) {
+            problems.add(name + " cannot be read as a plugin archive: " + failure.getCause().getMessage());
+        } catch (IOException | SecurityException failure) {
             problems.add(name + " cannot be read as a plugin archive: " + failure.getMessage());
         }
         return new Contents(themes, problems);
@@ -118,7 +122,7 @@ final class ThemeArchive {
             byte[] bytes;
             boolean hasPlugin;
             try {
-                bytes = entryBytes(zip, zip.getEntry(entry), MAX_NESTED);
+                bytes = entryBytes(zip, zip.getEntry(entry), MAX_NESTED, budget);
                 // An oversized plugin.xml still marks the plugin jar; plugin() reports its size.
                 Batch probe = fromBytes(bytes, Set.of(PLUGIN_XML), budget);
                 hasPlugin = !probe.bytes().isEmpty() || probe.tooLarge().contains(PLUGIN_XML);
@@ -305,21 +309,21 @@ final class ThemeArchive {
         return name.matches("[^/]+/lib/[^/]+") && name.toLowerCase(Locale.ROOT).endsWith(".jar");
     }
 
-    private static Batch fromZip(ZipFile zip, Set<String> wanted) {
+    private static Batch fromZip(ZipFile zip, Set<String> wanted, Inflated budget) {
         var found = new HashMap<String, byte[]>();
         var tooLarge = new HashSet<String>();
         for (String name : wanted) {
             ZipEntry entry = zip.getEntry(name);
             if (entry == null || entry.isDirectory()) continue;
-            try { found.put(name, entryBytes(zip, entry, MAX_FILE)); }
+            try { found.put(name, entryBytes(zip, entry, MAX_FILE, budget)); }
             catch (TooLarge large) { tooLarge.add(name); }
         }
         return new Batch(found, tooLarge);
     }
 
-    private static byte[] entryBytes(ZipFile zip, ZipEntry entry, int limit) {
+    private static byte[] entryBytes(ZipFile zip, ZipEntry entry, int limit, Inflated budget) {
         try (InputStream in = zip.getInputStream(entry)) {
-            return capped(in, limit);
+            return capped(in, limit, budget);
         } catch (IOException failure) {
             throw new UncheckedIOException(failure);
         }
@@ -373,8 +377,10 @@ final class ThemeArchive {
         return wanted && !tooLarge ? kept.toByteArray() : null;
     }
 
-    private static byte[] capped(InputStream in, int limit) throws IOException {
+    /** Reads at most {@code limit + 1} bytes, charging every byte read to {@code budget}, even an entry over its cap. */
+    private static byte[] capped(InputStream in, int limit, Inflated budget) throws IOException {
         byte[] bytes = in.readNBytes(limit + 1);
+        budget.add(bytes.length);
         if (bytes.length > limit) throw new TooLarge();
         return bytes;
     }
