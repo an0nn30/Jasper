@@ -38,7 +38,8 @@ class TerminalTitleIntegrationTest {
         return "\\033]1341;jasper;cmd;" + encoded + "\\007\\033]133;C\\007";
     }
 
-    private record Fixture(WindowContent content, BuddyTestSupport deck, List<String> nativeTitles) { }
+    private record Fixture(WindowContent content, BuddyTestSupport deck, List<String> nativeTitles,
+                           List<String> notificationTitles) { }
 
     private Fixture open(String script) throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(
@@ -57,8 +58,9 @@ class TerminalTitleIntegrationTest {
         edt(() -> {
             WindowContent window = content(launcher);
             BuddyTestSupport deck = new BuddyTestSupport();
+            List<String> notificationTitles = new ArrayList<>();
             CommandNotifier notifier = new CommandNotifier(() -> Duration.ofNanos(1), deck.companion(),
-                (title, detail) -> {}, working -> {}, (delay, run) -> () -> {});
+                (title, detail) -> notificationTitles.add(title), working -> {}, (delay, run) -> () -> {});
             window.activity(event -> {
             switch (event) {
                 case WorkspaceActivity.Started value -> notifier.started(value.id(), value.command(),
@@ -79,7 +81,7 @@ class TerminalTitleIntegrationTest {
             });
             List<String> titles = new ArrayList<>();
             window.onTitle = titles::add;
-            fixture[0] = new Fixture(window, deck, titles);
+            fixture[0] = new Fixture(window, deck, titles, notificationTitles);
         });
         pending.remove().run();
         until(() -> fixture[0].content.currentPane().view() != null);
@@ -150,7 +152,8 @@ class TerminalTitleIntegrationTest {
     }
 
     @Test void aBurstEndingWithAPromptTitleCannotOverwriteTheCompletedNotice() throws Exception {
-        String burst = start("worker") + "\\033]0;Task complete\\007\\033]133;D;0\\007"
+        String burst = "\\033]0;~\\007" + start("sleep 12")
+            + "\\033]0;~\\007\\033]133;D;0\\007"
             + "\\033]2;Prompt directory\\007";
         Fixture f = open("read step; printf '" + burst + "'; read step");
         CountDownLatch parsed = new CountDownLatch(1);
@@ -161,14 +164,15 @@ class TerminalTitleIntegrationTest {
                 }
             });
             f.content.currentPane().session().write("go\n");
-            // Hold Swing until the reader has parsed the entire burst. A later session.title() read
-            // would now see only "Prompt directory", losing the title belonging to the command.
+            // Hold Swing until the reader has parsed the entire burst. Completion must name the
+            // captured command even with directory titles on both sides of its end marker.
             try { assertThat(parsed.await(5, TimeUnit.SECONDS)).isTrue(); }
             catch (InterruptedException failure) { throw new AssertionError(failure); }
         });
         until(() -> f.content.tabStrip().getTitleAt(0).equals("Prompt directory (bash)"));
         edt(() -> {
-            assertThat(f.deck.notices().getFirst().title()).isEqualTo("Task complete");
+            assertThat(f.deck.notices().getFirst().title()).isEqualTo("sleep 12");
+            assertThat(f.notificationTitles).containsExactly("sleep 12");
             assertThat(f.deck.notices().getFirst().state()).isEqualTo(BuddyNotice.State.DONE);
             assertThat(f.nativeTitles.getLast()).isEqualTo("Prompt directory (bash)");
         });

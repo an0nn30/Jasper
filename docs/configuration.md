@@ -259,8 +259,9 @@ Buddy bubbles use the program-supplied title without the tab's job suffix; shell
 integration provides the current command as their fallback. Running subtext shimmers from left to right. Dragging the buddy smoothly moves
 the bubbles between above/below positions while keeping them on screen. Live title changes
 update a bubble in place, without moving it to the front or replaying its arrival.
-Once the command finishes, its bubble and native notification keep its last title;
-later prompt titles do not rewrite the result. Title reception works without shell
+Once the command finishes, its bubble and native notification show the completed
+command, including its arguments (for example, `sleep 12`), instead of the live terminal
+title. Later prompt titles do not rewrite the result. Title reception works without shell
 integration, but buddy notifications still need command-start/end marks.
 
 Inside tmux, the multiplexer must forward titles to its outer terminal. If tmux's

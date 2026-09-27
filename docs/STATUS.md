@@ -18,6 +18,17 @@
   Distribution membership, all asset hashes and Java source hygiene verified. Headless comparison:
   `python3 tools/icons/render-preview.py`. [Details](new-ui-icons-verification.md).
   Native visual acceptance is user-run; not merged or pushed.
+- **Completed notification command** (follow-up on `codex/mac-notification-icon`, 2026-09-27):
+  the user reported `sleep 12` completing as `~`. Completion reused the live terminal
+  title, which can contain a shell's directory. `CommandNotifier.finished` now uses
+  the captured command from the completion event, including arguments, for both the
+  native notice and completed Buddy card. Running-title updates remain live. Unit
+  regressions and a headless real-PTY burst reproduce the old `~` result and pass
+  with `sleep 12`; failure wording and multiline commands are covered too.
+  This supersedes the earlier final-program-title rule. `check` passed: 2,008 Java
+  tests, zero failures/errors, five skips, plus the native harness. `packageDist`
+  passed; the mounted DMG contains the current app JAR and passes strict deep signature
+  verification. Independent review found no issues. No GUI launched. Not merged or pushed.
 
 - **macOS notification icon** (branch `codex/mac-notification-icon`, 2026-09-27):
   the screenshot's icon belongs to AppleScript: `NativeNotifier` launched `osascript`,
