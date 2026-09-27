@@ -2,6 +2,23 @@
 
 ## Current state — 2026-09-23
 
+- **Original Steep application icon** (branch `codex/jasper-steep-icon`):
+  user-selected full-height 68-degree tab and Frost chevron replace Ember in
+  native packages and runtime assets. The exact SVG master and Inkscape generator
+  live in `packaging/icons`; `build/Jasper-icon-set.zip` contains macOS
+  ICNS/Retina assets, Windows 20-frame ICO with 24 PNG sizes, and Linux 18 sizes
+  plus scalable SVG. Work is isolated in the managed `jasper-steep-icon` worktree.
+  Follow-up: the user requested a full-canvas macOS variant with the steep tab
+  drawn into its top edge after rejecting an added surround. Icon Composer
+  supplies `Assets.car`; the ICNS/runtime PNGs contain the matching flattened
+  artwork. Packaged Mac launches retain the native Dock icon instead of replacing
+  it after Java starts. Windows/Linux retain the free-standing silhouette.
+  Full check/package passed: 1,997 tests, zero failures/errors, three skips.
+  Mounted DMG catalog/ICNS bytes and strict signature passed; native rendering
+  confirmed the edge-tab artwork. Independent review found no remaining issues.
+  See [verification](../packaging/icons/VERIFICATION.md) for final checks.
+  No desktop GUI launched. The user approved merging to main and pushing.
+
 - **Duplicate contributed menus on macOS** (branch `codex/fix-duplicate-plugin-menus`,
   2026-09-26): investigation of the installed app's logs confirmed older user Remote/Vault
   copies were skipped in favor of bundled versions, not loaded twice. `WindowChrome` could

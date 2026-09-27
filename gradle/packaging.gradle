@@ -22,6 +22,9 @@ def markerFile = packagingRoot.map { it.file('image.complete') }
 // Shown by macOS's Local Network privacy prompt. Without the grant, connections to LAN addresses
 // fail with EHOSTUNREACH ("No route to host"), which is how Remote's SSH connections to them fail.
 def localNetworkUsage = 'Jasper connects to SSH hosts on your local network.'
+// Modern macOS renders the full-canvas tab artwork from this Icon Composer catalog.
+def macIconCatalog = rootProject.file('packaging/icons/macos/Assets.car')
+def macIconName = 'Jasper'
 
 def normalizedHost = {
     String os = System.getProperty('os.name').toLowerCase(Locale.ROOT)
@@ -173,6 +176,10 @@ def packageApp = tasks.register('packageApp') {
     dependsOn(stage)
     inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(nativeIcon).withPathSensitivity(PathSensitivity.RELATIVE)
+    if (normalizedHost().os == 'macos') {
+        inputs.file(macIconCatalog).withPathSensitivity(PathSensitivity.RELATIVE)
+        inputs.property('macIconName', macIconName)
+    }
     inputs.property('mainClass', app.mainClass)
     inputs.property('jvmArgs', providers.provider { app.applicationDefaultJvmArgs.collect { it.toString() } })
     inputs.property('localNetworkUsage', localNetworkUsage)
@@ -206,6 +213,10 @@ def packageApp = tasks.register('packageApp') {
             if (context.host.os == 'macos') {
                 File image = new File(imageDir, 'Jasper.app')
                 removePluginClasspath(new File(image, 'Contents/app/Jasper.cfg'))
+                Files.copy(macIconCatalog.toPath(), new File(image, 'Contents/Resources/Assets.car').toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                executeNative(['/usr/bin/plutil', '-replace', 'CFBundleIconName', '-string', macIconName,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil icon catalog name')
                 executeNative(['/usr/bin/plutil', '-replace', 'NSLocalNetworkUsageDescription', '-string', localNetworkUsage,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil local network usage')
                 refreshLauncherSdk(image)
@@ -300,6 +311,12 @@ def verifyPackage = tasks.register('verifyPackage') {
             File packagedIcon = new File(image, "Contents/Resources/${iconName}")
             if (!packagedIcon.isFile() || !Arrays.equals(Files.readAllBytes(nativeIcon.get().toPath()), Files.readAllBytes(packagedIcon.toPath()))) {
                 throw new GradleException('Package verification failed: bundled macOS icon differs from the official icon')
+            }
+            String catalogName = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIconName', 'raw', '-o', '-', plist.absolutePath], 'plutil icon catalog name').stdout.trim()
+            File packagedCatalog = new File(image, 'Contents/Resources/Assets.car')
+            if (catalogName != macIconName || !packagedCatalog.isFile() ||
+                    !Arrays.equals(Files.readAllBytes(macIconCatalog.toPath()), Files.readAllBytes(packagedCatalog.toPath()))) {
+                throw new GradleException('Package verification failed: named macOS icon catalog is missing or differs from the official catalog')
             }
             String fileOutput = executeNative(['/usr/bin/file', nativeLauncher.absolutePath, new File(runtimeHome, 'bin/java').absolutePath], 'native architecture inspection').stdout
             String architectureNeedle = context.host.architecture == 'aarch64' ? 'arm64' : 'x86_64'
