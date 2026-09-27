@@ -6,6 +6,7 @@ import dev.jasper.editor.api.TooLargeException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -92,6 +93,7 @@ public final class LocalFiles {
             if (!exists) throw cannotCreate;
             return inPlace(target, content);
         }
+        boolean atomicMoveUnavailable = false;
         try {
             try (FileChannel channel = FileChannel.open(sibling, StandardOpenOption.WRITE)) {
                 writeAll(channel, content);
@@ -104,10 +106,19 @@ public final class LocalFiles {
                 }
                 copyPermissions(target, sibling);
             }
-            Files.move(sibling, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Files.move(sibling, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException noAtomicMove) {
+                // Spec 4.4's fourth trigger: an atomic replacement is unavailable.
+                atomicMoveUnavailable = true;
+            }
         } catch (IOException | RuntimeException failure) {
             try { Files.deleteIfExists(sibling); } catch (IOException suppressed) { failure.addSuppressed(suppressed); }
             throw failure;
+        }
+        if (atomicMoveUnavailable) {
+            Files.deleteIfExists(sibling);
+            return inPlace(target, content);
         }
         return revision(target).orElseThrow(() -> new NoSuchFileException(target.toString()));
     }
