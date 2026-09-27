@@ -25,7 +25,7 @@ import javax.swing.event.MenuListener;
 /** Menus, toolbar and status all route through the window's shared actions. */
 final class WindowChrome {
     private final WindowContent owner;
-    private final JToolBar toolbar;
+    private final ReferenceToolbar toolbar;
     private final WindowStatusBar status = new WindowStatusBar();
     private final JMenuBar menuBar = new JMenuBar();
     private final java.util.EnumMap<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.EnumMap<>(TerminalColors.class);
@@ -88,6 +88,8 @@ final class WindowChrome {
         JMenuItem tabHeight = new JMenuItem(owner.windowCommands().view("view.tab_height"));
         view.add(tabHeight);
         view.add(new JMenuItem(owner.windowCommands().view("view.rail_width")));
+        view.add(new JMenuItem(owner.windowCommands().view("view.toolbar_height")));
+        view.add(new JMenuItem(owner.windowCommands().view("view.status_bar_height")));
         pluginSeparator.setName("pluginSeparator");
         buildToolbar();
     }
@@ -226,38 +228,47 @@ final class WindowChrome {
     }
 
     void editTabHeight() {
-        var control = new JPanel(new FlowLayout(FlowLayout.LEADING));
-        var height = new JSpinner(new SpinnerNumberModel(owner.tabHeight(),
-            WindowContent.MIN_TAB_HEIGHT, WindowContent.MAX_TAB_HEIGHT, 1));
-        height.setName("tabHeight");
-        var label = new JLabel("Height (pixels):"); label.setLabelFor(height);
-        var reset = new JButton("Reset to default"); reset.setName("resetTabHeight");
-        reset.addActionListener(event -> height.setValue(WindowContent.DEFAULT_TAB_HEIGHT));
-        control.add(label); control.add(height); control.add(reset);
-        if (owner.confirmTabHeight.applyAsInt(control) != JOptionPane.OK_OPTION) return;
-        try {
-            height.commitEdit();
-            owner.setTabHeight(((Number) height.getValue()).intValue());
-        } catch (java.text.ParseException | IllegalArgumentException failure) {
-            owner.onError.accept("Enter a tab height between 20 and 72 pixels.");
-        }
+        editSize("tabHeight", "tab height", "Height", owner.tabHeight(), WindowContent.MIN_TAB_HEIGHT,
+            WindowContent.MAX_TAB_HEIGHT, WindowContent.DEFAULT_TAB_HEIGHT, owner.confirmTabHeight, owner::setTabHeight);
     }
 
     void editRailWidth() {
+        editSize("railWidth", "rail width", "Width", owner.railWidth(), ConfigSnapshot.MIN_RAIL_WIDTH,
+            ConfigSnapshot.MAX_RAIL_WIDTH, ConfigSnapshot.DEFAULT_RAIL_WIDTH, owner.confirmRailWidth, owner::setRailWidth);
+    }
+
+    void editToolbarHeight() {
+        editSize("toolbarHeight", "toolbar height", "Height", owner.toolbarHeight(), ConfigSnapshot.MIN_TOOLBAR_HEIGHT,
+            ConfigSnapshot.MAX_TOOLBAR_HEIGHT, ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT, owner.confirmToolbarHeight,
+            owner::setToolbarHeight);
+    }
+
+    void editStatusBarHeight() {
+        editSize("statusBarHeight", "status bar height", "Height", owner.statusBarHeight(),
+            ConfigSnapshot.MIN_STATUS_BAR_HEIGHT, ConfigSnapshot.MAX_STATUS_BAR_HEIGHT,
+            ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT, owner.confirmStatusBarHeight, owner::setStatusBarHeight);
+    }
+
+    /**
+     * A session-only size dialog: a spinner named {@code name} over the range, and a reset button named
+     * {@code reset<Name>}. The size applies only on OK; an entry outside the range reports an error instead.
+     */
+    private void editSize(String name, String setting, String dimension, int current, int min, int max, int reset,
+                          java.util.function.ToIntFunction<JComponent> confirm, java.util.function.IntConsumer apply) {
         var control = new JPanel(new FlowLayout(FlowLayout.LEADING));
-        var width = new JSpinner(new SpinnerNumberModel(owner.railWidth(),
-            ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH, 1));
-        width.setName("railWidth");
-        var label = new JLabel("Width (pixels):"); label.setLabelFor(width);
-        var reset = new JButton("Reset to default"); reset.setName("resetRailWidth");
-        reset.addActionListener(event -> width.setValue(ConfigSnapshot.DEFAULT_RAIL_WIDTH));
-        control.add(label); control.add(width); control.add(reset);
-        if (owner.confirmRailWidth.applyAsInt(control) != JOptionPane.OK_OPTION) return;
+        var size = new JSpinner(new SpinnerNumberModel(current, min, max, 1));
+        size.setName(name);
+        var label = new JLabel(dimension + " (pixels):"); label.setLabelFor(size);
+        var resetButton = new JButton("Reset to default");
+        resetButton.setName("reset" + Character.toUpperCase(name.charAt(0)) + name.substring(1));
+        resetButton.addActionListener(event -> size.setValue(reset));
+        control.add(label); control.add(size); control.add(resetButton);
+        if (confirm.applyAsInt(control) != JOptionPane.OK_OPTION) return;
         try {
-            width.commitEdit();
-            owner.setRailWidth(((Number) width.getValue()).intValue());
+            size.commitEdit();
+            apply.accept(((Number) size.getValue()).intValue());
         } catch (java.text.ParseException | IllegalArgumentException failure) {
-            owner.onError.accept("Enter a rail width between 28 and 64 pixels.");
+            owner.onError.accept("Enter a " + setting + " between " + min + " and " + max + " pixels.");
         }
     }
 
@@ -332,11 +343,17 @@ final class WindowChrome {
             return font.deriveFont(Font.PLAIN, font.getSize2D() - UIScale.scale(.5f));
         }
 
+        /** The toolbar's button height; icon-only buttons are square. */
+        private int side() {
+            return getParent() instanceof ReferenceToolbar bar ? bar.buttonSide() : ReferenceToolbar.buttonSide(ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT);
+        }
+
         @Override public Dimension getPreferredSize() {
-            int width = UIScale.scale(24);
-            if (labels()) width += UIScale.scale(4) + getFontMetrics(chromeFont()).stringWidth(getText());
+            int side = side();
+            // A labelled button keeps its 4 px padding however tall the toolbar is.
+            int width = labels() ? UIScale.scale(24) + UIScale.scale(4) + getFontMetrics(chromeFont()).stringWidth(getText()) : side;
             if (menu()) width += UIScale.scale(10);
-            return new Dimension(width, UIScale.scale(24));
+            return new Dimension(width, side);
         }
 
         @Override protected void paintComponent(Graphics graphics) {
@@ -353,7 +370,9 @@ final class WindowChrome {
                 }
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.38f));
                 Icon icon = getIcon();
-                int x = labels() || menu() ? UIScale.scale(4) : (getWidth() - icon.getIconWidth()) / 2;
+                int x = labels() ? UIScale.scale(4)
+                    : menu() ? Math.max(UIScale.scale(4), (getWidth() - UIScale.scale(10) - icon.getIconWidth()) / 2)
+                    : (getWidth() - icon.getIconWidth()) / 2;
                 icon.paintIcon(this, g, x, (getHeight() - icon.getIconHeight()) / 2);
                 x += icon.getIconWidth();
                 if (labels()) {
@@ -381,10 +400,23 @@ final class WindowChrome {
         }
     }
 
-    /** A 30 px IntelliJ row; shrinks to icon controls before any action can disappear at narrow widths. */
+    /** An IntelliJ row; shrinks to icon controls before any action can disappear at narrow widths. */
     private static final class ReferenceToolbar extends JToolBar {
-        @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(30)); }
-        @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(30)); }
+        /** Height in logical pixels; buttons sit 3 px in from each edge and separators 7 px. */
+        private int barHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
+
+        /** Sets the height in logical pixels; the caller validates the range. */
+        void setBarHeight(int height) {
+            if (barHeight == height) return;
+            barHeight = height;
+            revalidate(); repaint();
+        }
+
+        static int buttonSide(int barHeight) { return UIScale.scale(barHeight - 6); }
+        int buttonSide() { return buttonSide(barHeight); }
+
+        @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(barHeight)); }
+        @Override public Dimension getPreferredSize() { return getMinimumSize(); }
         @Override public void doLayout() {
             int available = Math.max(0, getWidth() - UIScale.scale(16));
             int preferred = 0;
@@ -404,16 +436,16 @@ final class WindowChrome {
             }
             // At extreme widths compress spacing/buttons together; menus retain the same actions.
             double ratio = Math.min(1, available / (double) Math.max(1, fixed));
-            int x = UIScale.scale(8), y = (getHeight() - UIScale.scale(24)) / 2;
+            int x = UIScale.scale(8), side = buttonSide(), y = (getHeight() - side) / 2, rule = UIScale.scale(barHeight - 14);
             for (Component child : getComponents()) {
                 if (!child.isVisible()) continue;
                 int width;
                 if (child instanceof JButton) {
                     width = (int) Math.floor(child.getPreferredSize().width * ratio);
-                    child.setBounds(x, y, width, UIScale.scale(24));
+                    child.setBounds(x, y, width, side);
                 } else if (child instanceof JSeparator) {
                     width = (int) Math.floor(UIScale.scale(9) * ratio);
-                    child.setBounds(x + width / 2, (getHeight() - UIScale.scale(16)) / 2, UIScale.scale(1), UIScale.scale(16));
+                    child.setBounds(x + width / 2, (getHeight() - rule) / 2, UIScale.scale(1), rule);
                 } else {
                     width = child.getPreferredSize().width > 0 ? (int) Math.floor(child.getPreferredSize().width * ratio) : Math.max(0, available - fixed);
                     child.setBounds(x, 0, width, getHeight());
@@ -461,6 +493,7 @@ final class WindowChrome {
     }
     void setStatusVisible(boolean visible) { status.setVisible(visible); statusVisible.setSelected(visible); }
     JToolBar toolbar() { return toolbar; }
+    void setToolbarHeight(int height) { toolbar.setBarHeight(height); }
     WindowStatusBar status() { return status; }
     JMenuBar menuBar() { return menuBar; }
 }

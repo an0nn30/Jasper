@@ -174,9 +174,12 @@ class WindowCommandPaletteTest {
             var owner = owner(new CommandHistory()); var root = install(owner);
             int listeners = root.getComponentListeners().length;
             owner.commandPalette().toggle(); owner.commandPalette().component().queryField().setText("status bar");
-            assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRow(owner.commandPalette().component()).title()).isEqualTo("Hide Status Bar");
+            // "Status Bar Height…" matches too; follow the visibility toggle's own row.
+            java.util.function.Supplier<String> toggle = () -> dev.jasper.app.palette.PaletteTestSupport.rows(owner.commandPalette().component())
+                .stream().filter(row -> row.id().equals("view.status_bar")).findFirst().orElseThrow().title();
+            assertThat(toggle.get()).isEqualTo("Hide Status Bar");
             owner.setStatusVisible(false);
-            assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRow(owner.commandPalette().component()).title()).isEqualTo("Show Status Bar");
+            assertThat(toggle.get()).isEqualTo("Show Status Bar");
             owner.selectTheme(Theme.LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
             var overlay = owner.commandPalette().component().getParent(); owner.close();
             assertThat(overlay.getParent()).isNull(); assertThat(root.getComponentListeners().length).isLessThan(listeners);

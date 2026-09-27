@@ -82,6 +82,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
     java.util.function.ToIntFunction<JComponent> confirmRailWidth = control -> JOptionPane.showConfirmDialog(
         this, control, "Rail width", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+    private int toolbarHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
+    java.util.function.ToIntFunction<JComponent> confirmToolbarHeight = control -> JOptionPane.showConfirmDialog(
+        this, control, "Toolbar height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+    private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
+    java.util.function.ToIntFunction<JComponent> confirmStatusBarHeight = control -> JOptionPane.showConfirmDialog(
+        this, control, "Status bar height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     private boolean closed;
     private boolean rearranging;
     private WindowTerminals terminals;
@@ -605,9 +611,36 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     int railWidth() { return railWidth; }
 
+    int toolbarHeight() { return toolbarHeight; }
+
+    int statusBarHeight() { return statusBarHeight; }
+
+    /** Rejects a size outside its range, naming the setting and its limits. */
+    private static void requireSize(String setting, int value, int min, int max) {
+        if (value < min || value > max)
+            throw new IllegalArgumentException(setting + " must be between " + min + " and " + max + " pixels");
+    }
+
+    void setToolbarHeight(int height) {
+        requireSize("Toolbar height", height, ConfigSnapshot.MIN_TOOLBAR_HEIGHT, ConfigSnapshot.MAX_TOOLBAR_HEIGHT);
+        if (closed || toolbarHeight == height) return;
+        toolbarHeight = height;
+        chrome.setToolbarHeight(height);
+        revalidate(); repaint();
+        onMinimumSizeChanged.run();
+    }
+
+    void setStatusBarHeight(int height) {
+        requireSize("Status bar height", height, ConfigSnapshot.MIN_STATUS_BAR_HEIGHT, ConfigSnapshot.MAX_STATUS_BAR_HEIGHT);
+        if (closed || statusBarHeight == height) return;
+        statusBarHeight = height;
+        chrome.status().setBarHeight(height);
+        revalidate(); repaint();
+        onMinimumSizeChanged.run();
+    }
+
     void setRailWidth(int width) {
-        if (width < ConfigSnapshot.MIN_RAIL_WIDTH || width > ConfigSnapshot.MAX_RAIL_WIDTH)
-            throw new IllegalArgumentException("Rail width must be between 28 and 64 pixels");
+        requireSize("Rail width", width, ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH);
         if (closed || railWidth == width) return;
         railWidth = width;
         rail.setRailWidth(width);
@@ -616,8 +649,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     void setTabHeight(int height) {
-        if (height < MIN_TAB_HEIGHT || height > MAX_TAB_HEIGHT)
-            throw new IllegalArgumentException("Tab height must be between 20 and 72 pixels");
+        requireSize("Tab height", height, MIN_TAB_HEIGHT, MAX_TAB_HEIGHT);
         if (closed || tabHeight == height) return;
         tabHeight = height;
         if (windowTabs != null) { windowTabs.revalidate(); windowTabs.repaint(); }
@@ -663,6 +695,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         onTabHeightChanged = () -> {};
         confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
         confirmRailWidth = control -> JOptionPane.CANCEL_OPTION;
+        confirmToolbarHeight = control -> JOptionPane.CANCEL_OPTION;
+        confirmStatusBarHeight = control -> JOptionPane.CANCEL_OPTION;
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
         activityListeners.clear();

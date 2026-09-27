@@ -17,6 +17,8 @@ final class WorkspaceConfiguration {
         configured = next;
         if (previous == null || previous.tabHeight() != next.tabHeight()) owner.setTabHeight(next.tabHeight());
         if (previous == null || previous.railWidth() != next.railWidth()) owner.setRailWidth(next.railWidth());
+        if (previous == null || previous.toolbarHeight() != next.toolbarHeight()) owner.setToolbarHeight(next.toolbarHeight());
+        if (previous == null || previous.statusBarHeight() != next.statusBarHeight()) owner.setStatusBarHeight(next.statusBarHeight());
         if (previous == null || previous.toolbar() != next.toolbar()) owner.setToolbarMode(next.toolbar());
         if (previous == null || previous.statusBar() != next.statusBar()) owner.setStatusVisible(next.statusBar());
         boolean sizeChanged = previous == null || previous.fontSize() != next.fontSize();

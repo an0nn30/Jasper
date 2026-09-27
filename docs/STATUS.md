@@ -92,6 +92,13 @@
 - **Rail width:** `window.rail_width` is 28–64 logical pixels, default 36, clamped the same way.
   Rail buttons stay square at width − 6, separators at width − 14. View → Rail width… and the
   `view.rail_width` command set a session-only width, like Tab height….
+- **Toolbar and status bar height:** `window.toolbar_height` (24–64, default 30) and
+  `window.status_bar_height` (20–48, default 30) clamp the same way and have matching session-only
+  View dialogs and `view.toolbar_height` / `view.status_bar_height` commands. Toolbar buttons are the
+  height − 6 (icon-only buttons square; labelled buttons keep their side padding), separators the
+  height − 14. The status bar is exactly its configured height unless the status font's line is taller,
+  so a large UI font never clips it. Hiding either bar keeps its height. The four size dialogs share
+  `WindowChrome.editSize`.
 - **SDK version on merge:** `main` had already claimed SDK 0.7.5 for the Remote SFTP icons (FILE,
   LINK, UPLOAD, DOWNLOAD, UP, NEW_FOLDER, PAUSE, RESUME), so the chrome names moved to 0.7.6 and
   Remote requires `>=0.7.6`.

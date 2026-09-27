@@ -125,6 +125,44 @@ class ConfigLoaderTest {
         assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().railWidth(27).build());
     }
 
+    @Test void toolbarHeightDefaultsToThirtyAndClampsOutOfRangeValuesWithAWarning() {
+        assertThat(parse("").snapshot().toolbarHeight()).isEqualTo(30);
+        assertThat(ConfigSnapshot.defaults().toolbarHeight()).isEqualTo(30);
+        for (int height : new int[]{24, 30, 64}) assertThat(parse("window.toolbar_height=" + height).snapshot().toolbarHeight()).isEqualTo(height);
+        for (int[] example : new int[][]{{0, 24}, {23, 24}, {65, 64}, {200, 64}}) {
+            var result = parse("[window]\ntoolbar_height = " + example[0] + "\n");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().toolbarHeight()).as("toolbar_height = %d", example[0]).isEqualTo(example[1]);
+            assertDiagnostic(result, "window.toolbar_height", 2, 1, ConfigDiagnostic.Severity.WARNING);
+            assertThat(result.diagnostics().getFirst().message()).contains(String.valueOf(example[1]));
+        }
+        assertThat(ConfigSnapshot.defaults().toBuilder().toolbarHeight(40).build().toolbarHeight()).isEqualTo(40);
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().toolbarHeight(23).build());
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().toolbarHeight(65).build());
+    }
+
+    @Test void statusBarHeightDefaultsToThirtyAndClampsOutOfRangeValuesWithAWarning() {
+        assertThat(parse("").snapshot().statusBarHeight()).isEqualTo(30);
+        assertThat(ConfigSnapshot.defaults().statusBarHeight()).isEqualTo(30);
+        for (int height : new int[]{20, 30, 48}) assertThat(parse("window.status_bar_height=" + height).snapshot().statusBarHeight()).isEqualTo(height);
+        for (int[] example : new int[][]{{0, 20}, {19, 20}, {49, 48}, {200, 48}}) {
+            var result = parse("[window]\nstatus_bar_height = " + example[0] + "\n");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().statusBarHeight()).as("status_bar_height = %d", example[0]).isEqualTo(example[1]);
+            assertDiagnostic(result, "window.status_bar_height", 2, 1, ConfigDiagnostic.Severity.WARNING);
+            assertThat(result.diagnostics().getFirst().message()).contains(String.valueOf(example[1]));
+        }
+        // The two heights and the visibility switches are independent keys.
+        var both = parse("[window]\ntoolbar = \"hidden\"\ntoolbar_height = 40\nstatus_bar = false\nstatus_bar_height = 24\n").snapshot();
+        assertThat(both.toolbar()).isEqualTo(ToolbarMode.HIDDEN);
+        assertThat(both.toolbarHeight()).isEqualTo(40);
+        assertThat(both.statusBar()).isFalse();
+        assertThat(both.statusBarHeight()).isEqualTo(24);
+        assertThat(ConfigSnapshot.defaults().toBuilder().statusBarHeight(40).build().statusBarHeight()).isEqualTo(40);
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().statusBarHeight(19).build());
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().statusBarHeight(49).build());
+    }
+
     @Test void tabHeightDefaultsToThirtyAndClampsOutOfRangeValuesWithAWarning() {
         assertThat(parse("").snapshot().tabHeight()).isEqualTo(30);
         assertThat(ConfigSnapshot.defaults().tabHeight()).isEqualTo(30);

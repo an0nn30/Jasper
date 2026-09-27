@@ -16,11 +16,15 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
                       int maxResults, int longCommandSeconds, boolean backgroundEnabled,
                       Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors,
-                      int railWidth) {
+                      int railWidth, int toolbarHeight, int statusBarHeight) {
     /** The theme a configuration without {@code ui.theme.name} uses. */
     public static final String DEFAULT_THEME = "Jasper Dark";
     /** The rail's width in logical pixels without {@code window.rail_width}, and its limits. */
     public static final int DEFAULT_RAIL_WIDTH = 36, MIN_RAIL_WIDTH = 28, MAX_RAIL_WIDTH = 64;
+    /** The toolbar's height in logical pixels without {@code window.toolbar_height}, and its limits. */
+    public static final int DEFAULT_TOOLBAR_HEIGHT = 30, MIN_TOOLBAR_HEIGHT = 24, MAX_TOOLBAR_HEIGHT = 64;
+    /** The status bar's height in logical pixels without {@code window.status_bar_height}, and its limits. */
+    public static final int DEFAULT_STATUS_BAR_HEIGHT = 30, MIN_STATUS_BAR_HEIGHT = 20, MAX_STATUS_BAR_HEIGHT = 48;
 
     public ConfigSnapshot {
         if (longCommandSeconds < 0 || longCommandSeconds > 3600)
@@ -29,6 +33,10 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             throw new IllegalArgumentException("Max results must be 1\u201320.");
         if (tabHeight < 20 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 20–72.");
         if (railWidth < MIN_RAIL_WIDTH || railWidth > MAX_RAIL_WIDTH) throw new IllegalArgumentException("Rail width must be 28–64.");
+        if (toolbarHeight < MIN_TOOLBAR_HEIGHT || toolbarHeight > MAX_TOOLBAR_HEIGHT)
+            throw new IllegalArgumentException("Toolbar height must be 24–64.");
+        if (statusBarHeight < MIN_STATUS_BAR_HEIGHT || statusBarHeight > MAX_STATUS_BAR_HEIGHT)
+            throw new IllegalArgumentException("Status bar height must be 20–48.");
         if (columns < 5 || columns > 500) throw new IllegalArgumentException("Columns must be 5–500.");
         if (lines < 2 || lines > 200) throw new IllegalArgumentException("Lines must be 2–200.");
         Objects.requireNonNull(font, "font");
@@ -53,14 +61,15 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         }
     }
 
-    /** Every field but the rail width, which is the default. */
+    /** Every field but the rail width and bar heights, which are the defaults. */
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                           FontConfig font, String theme, Map<String, String> keybindings,
                           int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,
                           int maxResults, int longCommandSeconds, boolean backgroundEnabled,
                           Map<String, Map<String, Object>> plugins, UiFontConfig uiFont, TerminalColors terminalColors) {
         this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled,
-            maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, DEFAULT_RAIL_WIDTH);
+            maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, DEFAULT_RAIL_WIDTH,
+            DEFAULT_TOOLBAR_HEIGHT, DEFAULT_STATUS_BAR_HEIGHT);
     }
 
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
@@ -159,6 +168,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         private Map<String, Map<String, Object>> plugins;
         private TerminalColors terminalColors;
         private int railWidth;
+        private int toolbarHeight;
+        private int statusBarHeight;
         private Builder(ConfigSnapshot source) {
             tabHeight = source.tabHeight();
             toolbar = source.toolbar();
@@ -177,9 +188,13 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             plugins = source.plugins();
             terminalColors = source.terminalColors();
             railWidth = source.railWidth();
+            toolbarHeight = source.toolbarHeight();
+            statusBarHeight = source.statusBarHeight();
         }
         public Builder tabHeight(int value) { tabHeight = value; return this; }
         public Builder railWidth(int value) { railWidth = value; return this; }
+        public Builder toolbarHeight(int value) { toolbarHeight = value; return this; }
+        public Builder statusBarHeight(int value) { statusBarHeight = value; return this; }
         public Builder toolbar(ToolbarMode value) { toolbar = value; return this; }
         public Builder statusBar(boolean value) { statusBar = value; return this; }
         public Builder uiFont(UiFontConfig value) { uiFont = value; return this; }
@@ -196,7 +211,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         public Builder terminalColors(TerminalColors value) { terminalColors = value; return this; }
         public Builder plugins(Map<String, Map<String, Object>> value) { plugins = Map.copyOf(value); return this; }
         public ConfigSnapshot build() {
-            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth);
+            return new ConfigSnapshot(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, uiFont, terminalColors, railWidth, toolbarHeight, statusBarHeight);
         }
     }
 }

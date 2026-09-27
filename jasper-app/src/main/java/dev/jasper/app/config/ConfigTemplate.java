@@ -29,8 +29,12 @@ public final class ConfigTemplate {
             # rail_width = 36
             # Toolbar: "icons_and_labels", "icons", or "hidden"; updates live.
             # toolbar = "icons_and_labels"
+            # Toolbar height in logical pixels, 24-64; out-of-range values use the nearest limit. Updates live.
+            # toolbar_height = 30
             # Show the status bar; updates live.
             # status_bar = true
+            # Status bar height in logical pixels, 20-48; never shorter than its text. Updates live.
+            # status_bar_height = 30
 
             # Initial terminal grid for new windows only; existing windows keep their size.
             # columns = 150

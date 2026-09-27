@@ -68,6 +68,9 @@ final class WindowCommands implements AutoCloseable {
         }
         add(registry, "view.tab_height", "Tab height\u2026", "Tab Height\u2026", () -> owner.chrome().editTabHeight());
         add(registry, "view.rail_width", "Rail width\u2026", "Rail Width\u2026", () -> owner.chrome().editRailWidth());
+        add(registry, "view.toolbar_height", "Toolbar height\u2026", "Toolbar Height\u2026", () -> owner.chrome().editToolbarHeight());
+        add(registry, "view.status_bar_height", "Status bar height\u2026", "Status Bar Height\u2026",
+            () -> owner.chrome().editStatusBarHeight());
     }
 
     private void add(CommandRegistry registry, String id, String label, String title, Runnable callback) {
@@ -110,6 +113,8 @@ final class WindowCommands implements AutoCloseable {
         }
         view("view.tab_height").setEnabled(true);
         view("view.rail_width").setEnabled(true);
+        view("view.toolbar_height").setEnabled(true);
+        view("view.status_bar_height").setEnabled(true);
     }
 
     @Override public void close() {

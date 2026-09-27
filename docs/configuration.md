@@ -34,7 +34,9 @@ These are the supported keys and defaults. Font and terminal behavior settings a
 tab_height = 30
 rail_width = 36
 toolbar = "icons_and_labels"
+toolbar_height = 30
 status_bar = true
+status_bar_height = 30
 columns = 150
 lines = 45
 
@@ -97,7 +99,9 @@ terminal = "match"
 | `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
 | `window.rail_width` | `36` | Integer 28–64 logical pixels; the panel rail's buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
 | `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
+| `window.toolbar_height` | `30` | Integer 24–64 logical pixels; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning | Live |
 | `window.status_bar` | `true` | Boolean | Live |
+| `window.status_bar_height` | `30` | Integer 20–48 logical pixels; the bar grows past it only when a large UI font needs the room; out-of-range values use the nearest limit with a warning | Live |
 | `window.columns` | `150` | Integer 5–500 | New windows |
 | `window.lines` | `45` | Integer 2–200 | New windows |
 | `buddy.enabled` | `true` | Boolean | Live |
@@ -319,7 +323,7 @@ name steps.
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary View → Terminal Colors choice remains shared until the saved `ui.theme.terminal` changes; unrelated reloads preserve it. The Tab height dialog's reset button restores the built-in 30px value.
+View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary View → Terminal Colors choice remains shared until the saved `ui.theme.terminal` changes; unrelated reloads preserve it. The View menu's Tab height, Rail width, Toolbar height and Status bar height dialogs are such overrides too; each reset button restores the built-in value (30, 36, 30 and 30 pixels).
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 

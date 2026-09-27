@@ -48,7 +48,8 @@ class ConfigTemplateTest {
         assertThat(toml.getTable("notifications").keySet()).containsExactly("long_command_seconds");
         assertThat(toml.getTable("palette").keySet()).containsExactly("max_results");
         assertThat(toml.getTable("window").keySet())
-            .containsExactlyInAnyOrder("tab_height", "rail_width", "toolbar", "status_bar", "columns", "lines");
+            .containsExactlyInAnyOrder("tab_height", "rail_width", "toolbar", "toolbar_height", "status_bar",
+                "status_bar_height", "columns", "lines");
         assertThat(toml.getTable("font").keySet())
             .containsExactlyInAnyOrder("family", "size", "fallback", "ligatures", "line_height");
         assertThat(toml.getTable("terminal").keySet())

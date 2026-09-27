@@ -9,8 +9,12 @@ tab_height = 30
 rail_width = 36
 # Live across open windows. Options: "icons_and_labels", "icons", or "hidden".
 toolbar = "icons_and_labels"
+# Live across open windows. Range: 24-64 logical pixels; out-of-range values use the nearest limit.
+toolbar_height = 30
 # Live across open windows.
 status_bar = true
+# Live across open windows. Range: 20-48 logical pixels; out-of-range values use the nearest limit.
+status_bar_height = 30
 # Initial grid for new windows only. Columns: 5-500; lines: 2-200.
 columns = 150
 lines = 45
