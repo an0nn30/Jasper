@@ -7,6 +7,7 @@
 - Task 3 (review fix): `EditChannels` settles a channel (clears the queue and runs `next`) before failing its jobs on an open failure or a missing sign-in window, so work submitted from a failure callback is never lost (planning decision 8).
 - Task 4 (ruling): in `plugins/remote/build.gradle.kts` the first two comment lines were replaced, since the plan's replacement already carried the second line's text.
 - Task 5 (ruling and review fixes): the panel test's compound `var` declaration was split (invalid Java); a late link lookup navigates or writes a message only while the panel still shows the same host and folder (opening a file stays unconditional); when Open in Editor cannot resolve a selected link, it still opens the selection's regular files and shows the reason (the "Opened 20 of N files." message only when every link resolved).
+- Task 6 (ruling): Step 4's instruction was rephrased so no inline code in this plan holds a Markdown link, which AppDocumentationTest reads as a broken link from docs/superpowers/plans/.
 
 **Goal:** Double-clicking a file in Remote's SFTP panel opens it in the Editor, and saving writes it back to the host through the Editor's write contract.
 
@@ -2579,7 +2580,7 @@ Append:
 
 - [ ] **Step 4: `docs/README.md` and `AGENTS.md`**
 
-`docs/README.md`: replace `- [Editor](editor.md): editing local files in tabs in the Editor window,` with `- [Editor](editor.md): editing local and remote files in tabs in the Editor window,` and keep the rest of the line.
+`docs/README.md`: in the Editor line, replace `editing local files in tabs in the Editor window,` with `editing local and remote files in tabs in the Editor window,` and keep the rest of the line.
 
 `AGENTS.md`: replace `Remote is bundled too (\`plugins/remote\`, bundling Apache MINA sshd); it consumes only the Vault API.` with `Remote is bundled too (\`plugins/remote\`, bundling Apache MINA sshd); it consumes only the Vault API and, optionally, the Editor API (\`dev.jasper.editor.api\`, named only in \`dev.jasper.remote.edit\`'s \`RemoteDocument\` and \`RemoteEditing\`).`
 
