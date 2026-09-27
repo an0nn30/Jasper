@@ -10,6 +10,10 @@ shortcut opens its tab: Cmd+R (Ctrl+Shift+R elsewhere) History, Cmd+J (Ctrl+Shif
 Pressing the shortcut of the tab already showing closes the palette. Tab and Shift+Tab move between
 tabs, keeping the query; clicking a tab does the same.
 
+The palette centers horizontally across the full window, including tool panels and the rail.
+Its top stays anchored near the upper fifth of the workspace as results change; tall cards
+are clamped inside the window. Opening or resizing a tool panel does not move or narrow it.
+
 Rows are one line: an icon, the title, a grey detail and a right-aligned tag. Up and Down move
 between rows, skipping the section headers. Enter runs a row's first verb, Cmd+Enter (Ctrl+Enter
 elsewhere) its second and Shift+Enter its third. The hint bar under the list shows the selected

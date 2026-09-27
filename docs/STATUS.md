@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-23
 
+- **Window-centered command palette** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  the screenshot showed the palette shifted into the terminal column when a tool panel
+  was open. Placement now uses the whole workspace's window bounds, including panels
+  and rail, for centering, available width and the stable top anchor. Native header
+  controls remain outside the placement area. A failing-before/passing-after regression
+  covers asymmetric panels, divider sizes, window resizing and both native-header modes;
+  existing scope-height and small-window tests pass. Independent review found no issues.
+  `check :jasper-app:packageDist` passed: 2,032 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
 - **Rounded plugin tool panels** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   shared left/right/bottom region hosts provide 8px rounded surfaces and 6px chrome
   gutters. Plugin content clips to the outline, including partial repaints, while
