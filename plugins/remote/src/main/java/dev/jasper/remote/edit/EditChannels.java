@@ -91,11 +91,12 @@ public final class EditChannels implements AutoCloseable {
     private void open(Channel channel, Job<?> job) {
         Optional<WindowHandle> owner = job.owner.get();
         if (owner.isEmpty() && !authenticated.test(channel.identity)) {
-            // Remote's sign-in prompts are cancelled without an owner window.
+            // Remote's sign-in prompts are cancelled without an owner window. Bookkeeping first: a job
+            // submitted from this failure's callback must see a settled channel, not this job still queued.
             channel.queue.poll();
+            next(channel);
             job.result.completeExceptionally(new IOException("Reconnecting to " + channel.identity.host().name()
                 + " needs an open terminal window for the sign-in prompt."));
-            next(channel);
             return;
         }
         CompletableFuture<FileEndpoint> opening;
@@ -118,11 +119,15 @@ public final class EditChannels implements AutoCloseable {
         }
         if (failure != null) {
             // Every queued operation needed this connection: fail them together rather than prompting once each.
-            for (Job<?> waiting : List.copyOf(channel.queue)) waiting.result.completeExceptionally(failure);
+            // Bookkeeping first: a job submitted from one of these failure callbacks must see a settled
+            // (removed) channel, not this one still holding the jobs the failure is about to fail out from under it.
+            List<Job<?>> waiting = List.copyOf(channel.queue);
             channel.queue.clear();
-        } else {
-            channel.endpoint = endpoint;
+            next(channel);
+            for (Job<?> job : waiting) job.result.completeExceptionally(failure);
+            return;
         }
+        channel.endpoint = endpoint;
         next(channel);
     }
 

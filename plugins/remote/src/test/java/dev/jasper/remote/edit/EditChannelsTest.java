@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
@@ -170,5 +171,24 @@ class EditChannelsTest {
         assertThat(opened.getFirst().wasAborted()).isTrue();
         var late = submit(prod, endpoint -> "late");
         assertThatThrownBy(() -> late.get(10, TimeUnit.SECONDS)).hasRootCauseMessage("Remote has stopped");
+    }
+
+    @Test void aJobSubmittedFromAFailureCallbackIsNotLostByTheInFlightFailure() throws Exception {
+        var prod = identity("prod");
+        var firstOpening = new CompletableFuture<FileEndpoint>();
+        var secondEndpoint = new TestEndpoint(new LocalEndpoint());
+        var attempts = new AtomicInteger();
+        var direct = new EditChannels((identity, owner) -> attempts.incrementAndGet() == 1
+            ? firstOpening : CompletableFuture.completedFuture(secondEndpoint), identity -> true, background, Runnable::run);
+        var first = direct.submit(prod, Optional::empty, endpoint -> "first");
+        var second = direct.submit(prod, Optional::empty, endpoint -> "second");
+        var third = new AtomicReference<CompletableFuture<String>>();
+        first.whenComplete((value, failure) -> third.set(direct.submit(prod, Optional::empty, endpoint -> "third")));
+        firstOpening.completeExceptionally(new IOException("dead"));
+        assertThatThrownBy(() -> first.get(10, TimeUnit.SECONDS)).hasRootCauseMessage("dead");
+        assertThatThrownBy(() -> second.get(10, TimeUnit.SECONDS)).hasRootCauseMessage("dead");
+        assertThat(third.get().get(10, TimeUnit.SECONDS)).isEqualTo("third");
+        assertThat(attempts).as("one failed attempt for the first two, one fresh attempt for the third").hasValue(2);
+        direct.close();
     }
 }
