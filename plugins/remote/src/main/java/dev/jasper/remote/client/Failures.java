@@ -33,7 +33,9 @@ public final class Failures {
         // macOS reports a LAN address the app may not reach (Local Network privacy) as EHOSTUNREACH.
         if (hasCause(cause, NoRouteToHostException.class) || text.contains("no route to host"))
             return "No route to host " + hostname + ". On macOS, allow Jasper under System Settings > Privacy & Security > Local Network.";
-        if (cause instanceof ConnectException || text.contains("connection refused")) return "Connection refused";
+        // Windows' async sockets report a refusal as a plain IOException in their own words.
+        if (hasCause(cause, ConnectException.class) || text.contains("connection refused") || text.contains("refused the network connection"))
+            return "Connection refused";
         if (cause instanceof TimeoutException || text.contains("timeout") || text.contains("timed out")) return "Timed out after " + connectTimeout.toSeconds() + " s";
         if (text.contains("connection lost") || text.contains("closed") || text.contains("reset")) return "Connection lost";
         return cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
