@@ -168,6 +168,10 @@ public final class SftpUi implements AutoCloseable {
             destination->nameDialog(owner,destination,operations::mkdir),operations::cancel,dialog::close);
         pickerReference.set(picker);dialog.onClosed(()-> { picker.close();operations.close(); });dialog.setContent(picker);dialog.show();
     }
+    /** Whether {@code view} is still {@code owner}'s open view, showing the same identity and directory {@code capture} was taken from: a late result from the per-identity {@link RemoteEditing} queue must not act on a view that moved on in the meantime. */
+    private boolean stillShowing(View view,WindowHandle owner,SftpController.Capture capture) {
+        return views.get(owner.id())==view && view.controller().capture().filter(now->now.identity().equals(capture.identity()) && now.directory().equals(capture.directory())).isPresent();
+    }
     /** Double-click or Enter on one file or link: a file opens in the Editor; a link opens when it leads to a file and navigates when it leads to a folder. */
     private void activate(View view,FileEntry entry) {
         var captured=view.controller().capture();if(captured.isEmpty() || closed || editing==null) return;var capture=captured.orElseThrow();WindowHandle owner=view.host().window();
@@ -175,15 +179,15 @@ public final class SftpUi implements AutoCloseable {
         if(entry.kind()==FileEntry.Kind.FILE) { editing.open(capture.identity(),path,owner);return; }
         editing.kinds(capture.identity(),List.of(path),owner).whenComplete((kinds,failure)->ui.execute(()-> {
             if(closed || !owner.isOpen()) return;
-            if(failure!=null) { view.panel().error(message(failure));return; }
+            if(failure!=null) { if(stillShowing(view,owner,capture)) view.panel().error(message(failure));return; }
             var kind=kinds.getFirst();
-            if(kind.isEmpty()) view.panel().error(entry.name()+": its target does not exist");
+            if(kind.isEmpty()) { if(stillShowing(view,owner,capture)) view.panel().error(entry.name()+": its target does not exist"); }
             else if(kind.orElseThrow()==FileEntry.Kind.FILE) editing.open(capture.identity(),path,owner);
-            else if(kind.orElseThrow()==FileEntry.Kind.DIRECTORY) { var now=view.controller().capture();if(now.isPresent() && now.orElseThrow().identity().equals(capture.identity())) view.controller().manual(path); }
-            else view.panel().error(entry.name()+" is not a regular file");
+            else if(kind.orElseThrow()==FileEntry.Kind.DIRECTORY) { if(stillShowing(view,owner,capture)) view.controller().manual(path); }
+            else if(stillShowing(view,owner,capture)) view.panel().error(entry.name()+" is not a regular file");
         }));
     }
-    /** Open in Editor: the selected files and links to files, at most {@link RemoteEditing#MAX_OPEN}. */
+    /** Open in Editor: the selected files and links to files, at most {@link RemoteEditing#MAX_OPEN}. A failed link resolution still opens the selection's regular files. */
     private void openSelected(View view) {
         var captured=view.controller().capture();if(captured.isEmpty() || closed || editing==null) return;var capture=captured.orElseThrow();WindowHandle owner=view.host().window();
         var candidates=capture.selection().stream().filter(entry->entry.kind()==FileEntry.Kind.FILE || entry.kind()==FileEntry.Kind.LINK).toList();if(candidates.isEmpty()) return;
@@ -193,14 +197,18 @@ public final class SftpUi implements AutoCloseable {
         CompletableFuture<List<Optional<FileEntry.Kind>>> resolved=links.isEmpty()?CompletableFuture.completedFuture(List.of()):editing.kinds(capture.identity(),links,owner);
         resolved.whenComplete((kinds,failure)->ui.execute(()-> {
             if(closed || !owner.isOpen()) return;
-            if(failure!=null) { view.panel().error(message(failure));return; }
-            var files=new ArrayList<String>();int link=0;
-            for(int i=0;i<candidates.size();i++) {
-                if(candidates.get(i).kind()==FileEntry.Kind.FILE) files.add(paths.get(i));
-                else if(kinds.get(link++).filter(kind->kind==FileEntry.Kind.FILE).isPresent()) files.add(paths.get(i));
-            }
+            var files=new ArrayList<String>();
+            if(failure==null) {
+                int link=0;
+                for(int i=0;i<candidates.size();i++) {
+                    if(candidates.get(i).kind()==FileEntry.Kind.FILE) files.add(paths.get(i));
+                    else if(kinds.get(link++).filter(kind->kind==FileEntry.Kind.FILE).isPresent()) files.add(paths.get(i));
+                }
+            } else for(int i=0;i<candidates.size();i++) if(candidates.get(i).kind()==FileEntry.Kind.FILE) files.add(paths.get(i));
             for(String path:files.subList(0,Math.min(files.size(),RemoteEditing.MAX_OPEN))) editing.open(capture.identity(),path,owner);
-            if(files.size()>RemoteEditing.MAX_OPEN) view.panel().error("Opened "+RemoteEditing.MAX_OPEN+" of "+files.size()+" files.");
+            if(!stillShowing(view,owner,capture)) return;
+            if(failure!=null) view.panel().error(message(failure));
+            else if(files.size()>RemoteEditing.MAX_OPEN) view.panel().error("Opened "+RemoteEditing.MAX_OPEN+" of "+files.size()+" files.");
         }));
     }
     private static String message(Throwable failure) { while((failure instanceof CompletionException || failure instanceof ExecutionException) && failure.getCause()!=null) failure=failure.getCause();return failure.getMessage()==null?"SFTP operation failed":failure.getMessage(); }

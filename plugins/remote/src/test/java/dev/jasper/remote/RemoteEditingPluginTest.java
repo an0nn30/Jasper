@@ -22,9 +22,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory;
+import org.apache.sshd.server.channel.ChannelSession;
+import org.apache.sshd.server.command.Command;
+import org.apache.sshd.sftp.server.SftpSubsystem;
 import org.apache.sshd.sftp.server.SftpSubsystemFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -52,8 +56,12 @@ class RemoteEditingPluginTest {
 
     /** Connects a saved host whose SFTP root is {@code files} and shows its listing of {@code rows} entries. */
     static SftpPanel browse(FakePluginHost host, LoopbackServer server, Path files, Path dir, Optional<FakeEditor> editor, int rows) throws Exception {
+        return browse(host, server, files, dir, editor, rows, new SftpSubsystemFactory());
+    }
+    /** As above, serving through {@code factory} instead of a plain {@link SftpSubsystemFactory}. */
+    static SftpPanel browse(FakePluginHost host, LoopbackServer server, Path files, Path dir, Optional<FakeEditor> editor, int rows, SftpSubsystemFactory factory) throws Exception {
         server.server.setFileSystemFactory(new VirtualFileSystemFactory(files.toRealPath()));
-        server.server.setSubsystemFactories(List.of(new SftpSubsystemFactory()));
+        server.server.setSubsystemFactories(List.of(factory));
         var vault = new FakeVault();
         host.start(FakeVault.INFO, Set.of(), Set.of(), vault);
         editor.ifPresent(fake -> host.start(EDITOR, Set.of(), Set.of(), fake));
@@ -92,6 +100,19 @@ class RemoteEditingPluginTest {
             if (child instanceof java.awt.Container container) texts.addAll(labels(container));
         }
         return texts;
+    }
+    /** Counts down {@code blocked} and waits on {@code release} the first time {@code path} itself is (l)stat-ed, then serves it normally. */
+    static SftpSubsystemFactory blockingLstat(String path, CountDownLatch blocked, CountDownLatch release) {
+        return new SftpSubsystemFactory() {
+            @Override public Command createSubsystem(ChannelSession channel) {
+                return new SftpSubsystem(channel, this) {
+                    @Override protected java.util.Map<String, Object> doLStat(int id, String requested, int flags) throws java.io.IOException {
+                        if (requested.equals(path)) { blocked.countDown(); try { release.await(); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); } }
+                        return super.doLStat(id, requested, flags);
+                    }
+                };
+            }
+        };
     }
 
     @Test void enterOpensFilesAndLinksToFilesAndALinkToAFolderNavigates(@TempDir Path dir) throws Exception {
@@ -175,6 +196,53 @@ class RemoteEditingPluginTest {
             editor.failure = null;
             enter(panel, "notes.toml");
             assertThat(editor.documents).hasSize(1);
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Finding 2 (review round 1): one link loop must not stop the regular files in the same selection from opening. */
+    @Test void openInEditorStillOpensRegularFilesWhenALinkLoopFailsToResolve(@TempDir Path dir) throws Exception {
+        Path files = Files.createDirectories(dir.resolve("files"));
+        Files.writeString(files.resolve("one.txt"), "one");
+        Files.writeString(files.resolve("two.txt"), "two");
+        Files.createSymbolicLink(files.resolve("a"), Path.of("b"));
+        Files.createSymbolicLink(files.resolve("b"), Path.of("a"));
+        var editor = new FakeEditor();
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var panel = browse(host, server, files, dir, Optional.of(editor), 4);
+            panel.table().selectAll();
+            RemotePluginTest.menuItem(panel.table().getComponentPopupMenu(), "Open in Editor").doClick();
+            await(host, () -> editor.documents.size() == 2, "the regular files open despite the link loop");
+            assertThat(editor.documents).extracting(EditorDocument::name).containsExactlyInAnyOrder("one.txt", "two.txt");
+            await(host, () -> labels(panel).stream().anyMatch(text -> text.contains("Too many levels of symbolic links")), "the link loop failure is reported");
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /** Finding 1 (review round 1): a link lookup that is still queued when the user navigates elsewhere must not pull the view back. */
+    @Test void aLateLinkLookupDoesNotNavigateAViewThatHasMovedOn(@TempDir Path dir) throws Exception {
+        Path files = Files.createDirectories(dir.resolve("files"));
+        Files.createDirectory(files.resolve("conf"));
+        Files.createSymbolicLink(files.resolve("conf-link"), Path.of("conf"));
+        Files.createDirectory(files.resolve("other"));
+        var editor = new FakeEditor();
+        var blocked = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
+            var panel = browse(host, server, files, dir, Optional.of(editor), 3, blockingLstat("/conf-link", blocked, release));
+            enter(panel, "conf-link");
+            await(host, () -> blocked.getCount() == 0, "the link lookup reached the server and is now blocked there");
+            enter(panel, "other");
+            await(host, () -> panel.directory().equals("/other"), "navigating elsewhere while the lookup is still in flight");
+            release.countDown();
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            while (System.nanoTime() < deadline) {
+                RemotePluginTest.settle(host);
+                assertThat(panel.directory()).as("a late link result must not pull a view that moved on").isEqualTo("/other");
+                Thread.sleep(20);
+            }
             host.stopAll();
             assertThat(host.failures()).isEmpty();
         }
