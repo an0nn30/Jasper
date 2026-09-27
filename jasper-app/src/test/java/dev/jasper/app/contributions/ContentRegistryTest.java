@@ -87,4 +87,14 @@ class ContentRegistryTest {
             assertThat(answer).isNotDone();
         } finally { timer.stop(); answer.complete(false); }
     }
+    @Test void windowCloseRefusesNewDocumentsOpenedDuringApproval() {
+        hosts();
+        registry.open("plugin.file", "a", "A", main, new JPanel());
+        registry.guard("plugin.file", (entries, batch) -> {
+            registry.open("plugin.file", "b", "B", main, new JPanel());
+            return CompletableFuture.completedFuture(true);
+        });
+        assertThat(registry.mayClose(() -> registry.inWindow(main))).isFalse();
+        assertThat(registry.entries()).hasSize(2);
+    }
 }

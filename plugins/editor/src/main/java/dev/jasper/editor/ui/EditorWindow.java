@@ -404,7 +404,14 @@ public final class EditorWindow {
 
     private void refreshStatus() {
         status.display(selected(), environment.settings().get().tabSize());
-        if (selectedTab != null && hosted.containsKey(selectedTab)) hosted.get(selectedTab).setStatus(status.items());
+        if (selectedTab != null && hosted.containsKey(selectedTab)) {
+            var tab = selectedTab;
+            hosted.get(tab).setStatus(status.items().stream().map(item -> new dev.jasper.sdk.ui.ContentStatus(
+                item.text(), item.tooltip(), item.run() == null ? null : () -> {
+                    if (!hosted.containsKey(tab)) return;
+                    activate(tab); item.run().run();
+                })).toList());
+        }
         if (environment.timers() && selected().flatMap(tab -> tab.session().notice()).isPresent()) noticeTimer.restart();
     }
 

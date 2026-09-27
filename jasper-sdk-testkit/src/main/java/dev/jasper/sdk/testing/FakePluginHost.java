@@ -969,4 +969,7 @@ public final class FakePluginHost implements AutoCloseable {
     /** @param tab handle from this host
      * @return originating owner */
     public dev.jasper.sdk.WindowOwner contentOwner(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).owner; }
+    /** @param tab hosted content handle
+     * @return published status descriptors */
+    public List<dev.jasper.sdk.ui.ContentStatus> contentStatus(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).status; }
 }

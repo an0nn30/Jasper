@@ -479,7 +479,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var close = new JMenuItem("Close Tab"); close.addActionListener(event -> closeTab(component)); menu.add(close); return menu;
     }
     public void focusSelected() { var entry = selectedContent(); if (entry != null) entry.focus(); else if (currentTab() != null) currentTab().focusTerminal(); }
-    public boolean mayClose() { return contentRegistry == null || contentRegistry.mayClose(contentRegistry.inWindow(id)); }
+    public boolean mayClose() { return contentRegistry == null || contentRegistry.mayClose(() -> contentRegistry.inWindow(id)); }
 
     WorkspaceRegions regions() { return regions; }
     WindowRail rail() { return rail; }

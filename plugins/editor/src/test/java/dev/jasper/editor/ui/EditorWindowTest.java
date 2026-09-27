@@ -357,4 +357,16 @@ class EditorWindowTest {
         assertThat(window.sessions()).extracting(DocumentSession::name).containsExactly("renamed.txt", "original.txt");
         assertThat(host.contentComponent(host.contentTabs().getFirst())).isNotSameAs(host.contentComponent(host.contentTabs().getLast()));
     }
+    @Test void statusActionsTargetTheirOwnDocumentAcrossWindows() throws Exception {
+        var first = opened(file("first.txt", "one"));
+        var firstHandle = host.contentTabs().getFirst();
+        firstHandle.move(true);
+        var wrap = host.contentStatus(firstHandle).stream().filter(item -> item.text().startsWith("Wrap:")).findFirst().orElseThrow();
+        var second = opened(file("second.txt", "two"));
+        boolean original = first.session().wrap();
+        boolean other = second.session().wrap();
+        wrap.run().run();
+        assertThat(first.session().wrap()).isEqualTo(!original);
+        assertThat(second.session().wrap()).isEqualTo(other);
+    }
 }

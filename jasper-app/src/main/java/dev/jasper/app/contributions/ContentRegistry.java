@@ -151,6 +151,11 @@ public final class ContentRegistry {
         return await(approve(entries));
     }
 
+    public boolean mayClose(java.util.function.Supplier<List<ContentEntry>> contents) {
+        var requested = List.copyOf(contents.get());
+        return mayClose(requested) && requested.equals(contents.get());
+    }
+
     private static boolean await(CompletableFuture<Boolean> future) {
         if (future.isDone()) return future.getNow(false);
         var loop = Toolkit.getDefaultToolkit().getSystemEventQueue().createSecondaryLoop();

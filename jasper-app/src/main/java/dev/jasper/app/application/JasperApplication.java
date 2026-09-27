@@ -549,7 +549,11 @@ public final class JasperApplication {
     }
 
     /** Plugin windows' closing guards, asked before quit or restart changes anything and before the exit deadline is armed. */
-    private boolean pluginWindowsMayClose() { return contributions.content().mayClose(contributions.content().entries()) && (auxiliary == null || auxiliary.mayQuit()); }
+    private boolean pluginWindowsMayClose() {
+        var requested = contributions.content().entries();
+        return contributions.content().mayClose(requested) && (auxiliary == null || auxiliary.mayQuit())
+            && requested.equals(contributions.content().entries());
+    }
 
     /** Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. EDT. */
     public void quitNow() {
