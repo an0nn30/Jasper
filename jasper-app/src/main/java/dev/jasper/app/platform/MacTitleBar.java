@@ -16,7 +16,14 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
     public static final int TITLE_HEIGHT = 28;
     private final JRootPane root;
     private final Runnable minimumSizeChanged;
-    private final JLabel title = new JLabel("Jasper", SwingConstants.CENTER);
+    private final JLabel title = new JLabel("Jasper", SwingConstants.CENTER) {
+        @Override public JToolTip createToolTip() {
+            var tip = new JToolTip();
+            tip.putClientProperty("html.disable", true);
+            tip.setComponent(this);
+            return tip;
+        }
+    };
     private final PropertyChangeListener boundsChanged;
     private JComponent toolbar;
     private MouseAdapter nativeDrag;
@@ -95,7 +102,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         refreshNativeGeometry(); revalidate(); repaint(); minimumSizeChanged.run();
     }
 
-    /** Focused directory or provider identity; window title metadata is maintained by the host. */
+    /** Focused pane's command or explicit terminal title; metadata is maintained by the host. */
     public void setContext(String label, String tooltip, Icon icon) {
         if (closed) return;
         title.setText(label); title.setToolTipText(tooltip); title.setIcon(icon);
@@ -172,11 +179,11 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
             int left = Math.min(safeInset(), getWidth());
             int right = Math.max(UIScale.scale(8), nativeRight);
             int available = Math.max(0, getWidth() - left - right);
-            int preferred = Math.min(UIScale.scale(200), title.getPreferredSize().width + UIScale.scale(12));
+            int preferred = Math.max(UIScale.scale(280), Math.min(UIScale.scale(480), title.getPreferredSize().width + UIScale.scale(12)));
             int contextWidth = toolbar.isVisible()
-                ? Math.min(preferred, Math.max(0, available - UIScale.scale(190))) : available;
+                ? Math.min(preferred, Math.max(0, available - UIScale.scale(214))) : available;
             title.setBounds(left, 0, contextWidth, getHeight());
-            int gap = contextWidth > 0 ? UIScale.scale(8) : 0;
+            int gap = contextWidth > 0 ? UIScale.scale(24) : 0;
             toolbar.setBounds(left + contextWidth + gap, 0, Math.max(0, available - contextWidth - gap), getHeight());
             return;
         }

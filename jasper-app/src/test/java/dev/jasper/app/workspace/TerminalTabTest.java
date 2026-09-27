@@ -110,7 +110,7 @@ class TerminalTabTest {
         edt(() -> {
             assertThat(owner[0].currentTab().title()).isEqualTo("manual");
             owner[0].currentTab().rename("");
-            assertThat(owner[0].currentTab().title()).isEqualTo("new-shell-title (bash)");
+            assertThat(owner[0].currentTab().title()).isEqualTo("new-shell-title");
             owner[0].close();
         });
     }

@@ -71,6 +71,41 @@ class SessionPaneTest {
         return value;
     }
 
+    @Test void headerAndShortTabFollowCommandsProgramTitlesAndActivePane() throws Exception {
+        open(false);
+        var connection = new Loopback(); attempts.getFirst().attach(connection.connection());
+        until(() -> pane.view() != null);
+        var bar = new dev.jasper.app.platform.MacTitleBar[1];
+        var label = new javax.swing.JLabel[1];
+        edt(() -> {
+            bar[0] = WindowContent.installTitleBar(new javax.swing.JRootPane(), owner, true, title -> {});
+            label[0] = (javax.swing.JLabel) bar[0].getComponent(0);
+        });
+        try {
+            attempts.getFirst().reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("build-host", "/srv/app"));
+            String command = java.util.Base64.getEncoder().encodeToString("sleep 12".getBytes(StandardCharsets.UTF_8));
+            connection.remote.write(("\033]2;old prompt\007\033]1341;jasper;cmd;" + command + "\007\033]133;C\007").getBytes(StandardCharsets.UTF_8));
+            connection.remote.flush();
+            until(() -> label[0].getText().equals("build-host:/srv/app : sleep 12"));
+            edt(() -> assertThat(owner.currentTab().title()).isEqualTo("sleep 12"));
+            connection.remote.write("\033]2;Claude Code — Reviewing files\007".getBytes(StandardCharsets.UTF_8)); connection.remote.flush();
+            until(() -> label[0].getText().equals("Claude Code — Reviewing files"));
+            edt(() -> {
+                assertThat(owner.currentTab().title()).isEqualTo("Claude Code — Reviewing files");
+                var tab = owner.currentTab();
+                tab.split(SplitTree.Axis.RIGHT);
+                assertThat(label[0].getText()).isNotEqualTo("Claude Code — Reviewing files");
+                tab.focus(pane);
+                assertThat(label[0].getText()).isEqualTo("Claude Code — Reviewing files");
+                owner.newTab(HOME); owner.selectTab(tab);
+                assertThat(label[0].getText()).isEqualTo("Claude Code — Reviewing files");
+            });
+            connection.remote.write("\033]133;D;0\007".getBytes(StandardCharsets.UTF_8)); connection.remote.flush();
+            until(() -> label[0].getText().equals("build-host:/srv/app : Shell"));
+            edt(() -> assertThat(owner.currentTab().title()).isEqualTo("build-host"));
+        } finally { edt(() -> bar[0].close()); }
+    }
+
     @Test void providerDirectoryIsDisplayOnlyAndOldAttemptsCannotChangeAReconnectedPane() throws Exception {
         open(false);
         edt(() -> assertThat(pane.locationLabel()).isEqualTo("build-host"));

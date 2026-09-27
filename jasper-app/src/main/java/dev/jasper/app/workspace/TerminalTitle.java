@@ -4,15 +4,11 @@ package dev.jasper.app.workspace;
 final class TerminalTitle {
     private TerminalTitle() { }
 
-    /** iTerm-style session title and foreground job. Program titles are opaque text. */
-    static String tab(String programTitle, java.nio.file.Path directory, String job) {
+    /** Short automatic tab label; an explicit program title replaces it entirely. */
+    static String tab(String programTitle, String job) {
         String title = singleLine(programTitle);
-        if (title.isBlank()) {
-            java.nio.file.Path home = java.nio.file.Path.of(System.getProperty("user.home"));
-            title = directory == null ? "Terminal" : directory.equals(home) ? "~"
-                : directory.getFileName() == null ? directory.toString() : directory.getFileName().toString();
-        }
-        return job == null || job.isBlank() ? title : title + " (" + singleLine(job) + ")";
+        if (!title.isBlank()) return title;
+        return job == null || job.isBlank() ? "Terminal" : singleLine(job);
     }
 
     /** Preserve the full text; each surface clips to its own available width. */

@@ -29,16 +29,17 @@ public final class TitleBarPreview {
                     for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                         owner.selectTheme(theme);
                         while (owner.tabStrip().getTabCount() > 1) owner.closeTab(owner.currentTab());
-                        owner.currentTab().rename("~ (-zsh)");
+                        owner.currentTab().rename("zsh");
                         render(bar, output, theme, "single", 830);
-                        owner.newTab(HOME); owner.currentTab().rename("~ (-zsh)");
+                        owner.newTab(HOME); owner.currentTab().rename("zsh");
                         render(bar, output, theme, "shell-tabs", 830);
-                        owner.currentTab().rename("Reviewing the notification implementation (tmux)");
+                        owner.currentTab().rename("Reviewing the notification implementation");
                         owner.selectTab((TerminalTab) owner.tabStrip().getComponentAt(0));
-                        owner.currentTab().rename("~ (tmux)");
+                        owner.currentTab().rename("tmux");
+                        bar.setContext("Claude Code — Reviewing the notification implementation", "Claude Code — Reviewing the notification implementation", dev.jasper.app.platform.AppIcons.named("TERMINAL"));
                         render(bar, output, theme, "tmux-tabs", 830);
                         render(bar, output, theme, "narrow", 450);
-                        bar.setContext("staging-01 · /srv/app", "Session: staging-01 · /srv/app",
+                        bar.setContext("staging-01:/srv/app : make test", "staging-01:/srv/app : make test",
                             dev.jasper.app.platform.AppIcons.named("SERVER"));
                         render(bar, output, theme, "remote", 830);
                         render(bar, output, theme, "remote-narrow", 450);

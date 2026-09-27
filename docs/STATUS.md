@@ -2,6 +2,20 @@
 
 ## Current state — 2026-09-23
 
+- **Command-aware header and short tabs** (`codex/intellij-new-icons`, 2026-09-27):
+  the user approved full `user@path : command` headers and short command/program tab
+  labels. SSH headers use saved host identity and remote path instead of local metadata.
+  OSC program titles override the complete automatic header/tab wording; manually named
+  tabs still win. Display overrides reset on command boundaries and reconnects, while
+  notification-title tracking is preserved. Native window metadata follows the header.
+  The title reserves 280–480px when available, with 24px before toolbar controls; narrow
+  windows retain clipping, full literal tooltips and action overflow. Headless dark/light
+  previews inspected. Test-first checks cover command text, foreground fallback, OSC and
+  tmux titles, SSH paths, pane/tab focus, spacing and literal HTML-looking tooltips.
+  Independent review completed and its tooltip finding fixed. `check :jasper-app:packageDist`
+  passed: 2,059 tests, zero failures/errors, five skips. Package verification passed and
+  the DMG was rebuilt. No GUI launched.
+
 - **UI branch refreshed from main** (`codex/intellij-new-icons`, 2026-09-27):
   merged `origin/main` at `617ad248`, bringing in the editable keyboard-shortcuts
   window (no new plugin in the incoming commits). Preserved both status histories

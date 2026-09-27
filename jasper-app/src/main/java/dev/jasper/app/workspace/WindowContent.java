@@ -194,12 +194,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             bar.setToolbar(content.toolbar());
         }
         content.onTitle = value -> {
-            String display = TerminalTitle.windowTitle(value);
-            nativeTitle.accept(display);
+            TerminalPane pane = content.currentPane();
+            var context = WindowHeaderContext.from(pane == null ? null : pane.snapshot(),
+                Path.of(System.getProperty("user.home")), pane == null ? "" : pane.programTitle(),
+                pane == null ? "" : pane.commandLabel());
+            nativeTitle.accept(context.label());
             if (bar != null) {
-                TerminalPane pane = content.currentPane();
-                var context = WindowHeaderContext.from(pane == null ? null : pane.snapshot(),
-                    Path.of(System.getProperty("user.home")));
                 bar.setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
             }
         };

@@ -255,8 +255,16 @@ API references: [Apple UserNotifications](https://developer.apple.com/documentat
 
 `WindowContent.installTitleBar` moves the existing `WindowToolbar` into `MacTitleBar` on
 macOS. The workspace computes `WindowHeaderContext` from the focused pane; the platform
-package stays independent of workspace and terminal types. Native window metadata remains
-separate from the visible directory/host context. Native drag hit testing applies to the
+package stays independent of workspace and terminal types. Both the visible header and
+native window metadata show `user@path : command` locally, or saved SSH host plus remote
+path and command. Home paths abbreviate to `~`; remote paths never use local metadata.
+Explicit OSC titles replace the complete automatic header and tab title. Automatic tabs
+show only the running command or shell; user-renamed tabs keep their names. Command text
+from shell integration takes precedence over the foreground-process fallback. Display
+overrides reset at command boundaries and reconnects without changing notification-title
+tracking. The header reserves 280–480 logical pixels where space permits and a 24px gap
+before the toolbar; narrow windows clip the label and retain action overflow. The full
+title remains in a literal-text tooltip. Native drag hit testing applies to the
 context label and blank toolbar area, never command buttons. The unified row follows
 `window.toolbar_height` live (28–64 logical pixels, default 30), including when its
 toolbar is hidden. `MacTitleBar` updates the JBR custom-title height with the same
