@@ -53,6 +53,18 @@
     template drop Cmd+1–5. Details in the plan's status banner.
   - **Planning decisions:** listed in the plan header.
   - **Not done:** visual acceptance (user-run), merge and push.
+- **IntelliJ theme import, plan 3a** (branch `claude/theme-import`, plan
+  `docs/superpowers/plans/2026-09-25-jasper-theme-import.md`):
+  - **Choosing:** `ui.theme.name` names a built-in or installed theme. `ui.theme.variant`, the View → Appearance
+    Light and Dark items and `view.appearance.*` are removed; the View submenu is Terminal Colors.
+  - **Installing:** JetBrains Marketplace theme plugins (`.jar`, `.zip`) in `<home>/themes/`, read in
+    place and rescanned with each configuration read.
+  - **Terminal:** under `match`, a theme's editor-scheme console colours, with IntelliJ's vendored
+    Default and Darcula schemes as parents.
+  - **Problems** are configuration warnings; none blocks start-up.
+  - **Planning decisions and deviations:** listed in the plan header (status line), including the final review's hardening.
+  - **Follow-up done:** one 256 MiB inflation budget per archive read now covers plain `.jar` reads too.
+  - **Not done:** plan 3b (the bundled set), visual acceptance (user-run), merge and push.
 
 ### IntelliJ-style chrome and follow-ups — merged 2026-09-25
 
@@ -77,6 +89,22 @@
   the minimum at 1 to avoid overlap).
 - **Tab height:** `window.tab_height` is 20–72 logical pixels, default 30; out-of-range values clamp
   to the nearest limit with a warning instead of falling back to the default.
+- **Window defaults (2026-09-26, user's choice):** new windows open at 100 × 35 cells (was 150 × 45,
+  which superseded the parent spec's grid ruling below); the rail defaults to its 28 px minimum and the
+  status bar to 24 px; the toolbar stays 30 px. `buddy.enabled` now defaults to false (Jasper is opt-in).
+- **View → Tools:** the app's per-panel toggles submenu is now titled Tools (was Panels). Remote no
+  longer adds its own View items (SFTP panel, SSH Hosts), which duplicated those toggles; its actions
+  stay registered for their shortcuts, the SSH menu, the status item and the palette.
+- **Rail width:** `window.rail_width` is 28–64 logical pixels, default 28, clamped the same way.
+  Rail buttons stay square at width − 6, separators at width − 14. View → Rail width… and the
+  `view.rail_width` command set a session-only width, like Tab height….
+- **Toolbar and status bar height:** `window.toolbar_height` (24–64, default 30) and
+  `window.status_bar_height` (20–48, default 24) clamp the same way and have matching session-only
+  View dialogs and `view.toolbar_height` / `view.status_bar_height` commands. Toolbar buttons are the
+  height − 6 (icon-only buttons square; labelled buttons keep their side padding), separators the
+  height − 14. The status bar is exactly its configured height unless the status font's line is taller,
+  so a large UI font never clips it. Hiding either bar keeps its height. The four size dialogs share
+  `WindowChrome.editSize`.
 - **SDK version on merge:** `main` had already claimed SDK 0.7.5 for the Remote SFTP icons (FILE,
   LINK, UPLOAD, DOWNLOAD, UP, NEW_FOLDER, PAUSE, RESUME), so the chrome names moved to 0.7.6 and
   Remote requires `>=0.7.6`.
@@ -2025,7 +2053,7 @@ bracketed paste enabled. No GUI, merge or push.
 
 **Fast quit (2026-09-14):** On `claude/fast-quit` in `.worktrees/fast-quit` (from main `0c6463a`), the JVM no longer lingers after the last window closes. Nothing called `System.exit`, so exit relied on AWT's auto-shutdown, which waits a full quiet second after the last peer is disposed (JBR 25 `AWTAutoShutdown.SAFETY_TIMEOUT`; measured 1.0 s headlessly) before the JVM tears down. `JasperApplication.shutdown()` now waits, bounded at two seconds, for the command-history file and the exit of every shell it started (`track`), then runs an injected terminator off the EDT; `Main` passes `System.exit(0)`, tests pass a no-op. The bounded pty force-kill fallback is preserved because closed shells' `exitFuture`s are awaited. One INFO line, `Shutdown finished in N ms`, records the timeline in the app log. New headless `JasperApplicationShutdownTest`; `./gradlew check` passed. Desktop check is user-run: type `exit` (with `on_exit = "close_on_success"`) or close the last window and the Dock icon should vanish at once.
 
-**Two modern theme variants (2026-09-14):** On `claude/modern-restore`, the purple theme, the OS-following appearance mode (and its jSystemThemeDetector dependency), custom Alacritty-style palette files and the `[colors]` table are removed. `ui.theme.variant` (`"dark"` default, or `"light"`) selects the bundled FlatLaf Dark + Jasper Dark or FlatLaf Light + Jasper Light pairing; View → Appearance keeps Light/Dark as a temporary override that clears when the saved variant changes; Reload config retries a failed chrome installation. No Java built-in look and feel is used or selectable. `ThemeState` is now `(saved, override)`, `ConfigService.State` carries no palette, `ConfigurationController` has no appearance source, and `AppDirs` has no themes directory. Legacy `[colors]` settings warn as unknown and are ignored ([migration](rebranding.md), [configuration](configuration.md#theme-variant)). `./gradlew check` after the rebase onto `b779c08` with the desk buddy carried across: 656 tests, 655 passed, one known font skip. Headless previews regenerated: `design/mock-ui-dark.png`, `design/mock-ui-light.png`, and the 16-image [command palette matrix](design/command-palette/README.md). Not done: GUI check (user-run), merge, push. The classic vanilla Swing look (`d09b82e`/`5bc288f`) is still to be added back later as a selectable option.
+**Two modern theme variants (2026-09-14):** On `claude/modern-restore`, the purple theme, the OS-following appearance mode (and its jSystemThemeDetector dependency), custom Alacritty-style palette files and the `[colors]` table are removed. `ui.theme.variant` (`"dark"` default, or `"light"`) selects the bundled FlatLaf Dark + Jasper Dark or FlatLaf Light + Jasper Light pairing; View → Appearance keeps Light/Dark as a temporary override that clears when the saved variant changes; Reload config retries a failed chrome installation. No Java built-in look and feel is used or selectable. `ThemeState` is now `(saved, override)`, `ConfigService.State` carries no palette, `ConfigurationController` has no appearance source, and `AppDirs` has no themes directory. Legacy `[colors]` settings warn as unknown and are ignored ([migration](rebranding.md), [configuration](configuration.md#theme)). `./gradlew check` after the rebase onto `b779c08` with the desk buddy carried across: 656 tests, 655 passed, one known font skip. Headless previews regenerated: `design/mock-ui-dark.png`, `design/mock-ui-light.png`, and the 16-image [command palette matrix](design/command-palette/README.md). Not done: GUI check (user-run), merge, push. The classic vanilla Swing look (`d09b82e`/`5bc288f`) is still to be added back later as a selectable option.
 
 **Modern Jasper restored (2026-09-14):** On `claude/modern-restore` in `.worktrees/modern`, the user chose the modern FlatLaf app as Jasper's baseline again. This commit puts the tree of the rebrand snapshot `e365e8a` (Jasper rebrand + silver turtle icon on the pre-vanilla FlatLaf chrome: native macOS title bar with tabs, Tabler toolbar, coordinated dark/light/purple themes, custom TOML palettes, System appearance) back on top of main. The branch was then rebased onto `b779c08` (main after the desk-buddy merge), re-applying the desk buddy's small hooks in the config loader, snapshot, template, controller, application, terminal window, window chrome and commands onto the modern files; the buddy's own classes, sprite, tests and docs came across unchanged. Main `5bc288f` had merged the rebrand with the vanilla Swing snapshot `d09b82e`. Nothing from that merge besides the vanilla UI and its documentation was dropped; the merge's edits to `rebranding.md` and the spec's visual amendment were vanilla-only. The vanilla Swing implementation stays in history at `d09b82e` and `5bc288f` (standard controls, OS title bar, GNOME 2 icons, `ui.laf` built-in look and feel selection, headless previews under `docs/design/vanilla-swing/`), and a FlatLaf-light/dark `ui.laf` addition to that version is on `claude/flatlaf` at `618f157`. Direction: keep the modern theme as the default and later add the classic vanilla Swing appearance back as a selectable option rather than a replacement. `./gradlew check` on the restored tree before the theme change: 662 tests, 661 passed, one known font skip. No GUI, merge or push.
 

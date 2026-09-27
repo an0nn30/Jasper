@@ -1,7 +1,7 @@
 package dev.jasper.app.platform;
 
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
-import dev.jasper.app.config.Appearance;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
@@ -14,7 +14,7 @@ class AppIconsTest {
 
     @Test void modernApplicationIconsAreUntintedIntellijArtwork() throws Exception {
         edt(() -> {
-            new ThemeController(Appearance.LIGHT);
+            new ThemeController(Theme.LIGHT);
             try {
                 for (String name : ICONS) {
                     FlatSVGIcon icon = (FlatSVGIcon) AppIcons.icon(name);
@@ -31,11 +31,11 @@ class AppIconsTest {
 
     @Test void theSameHostIconFollowsALiveDarkSwitch() throws Exception {
         edt(() -> {
-            var themes = new ThemeController(Appearance.LIGHT);
+            var themes = new ThemeController(Theme.LIGHT);
             try {
                 var icon = AppIcons.icon("search");
                 int[] light = IntellijIconsTest.pixels(icon);
-                themes.selectAppearance(Appearance.DARK);
+                themes.configure(Theme.DARK);
                 int[] dark = IntellijIconsTest.pixels(icon);
                 assertThat(dark).isNotEqualTo(light);
                 assertThat(Arrays.stream(dark).anyMatch(pixel -> pixel == 0xff6e6e6e)).isFalse();

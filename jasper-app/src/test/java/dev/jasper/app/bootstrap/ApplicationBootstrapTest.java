@@ -1,6 +1,5 @@
 package dev.jasper.app.bootstrap;
 
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.residency.HandoffSocket;
@@ -54,15 +53,15 @@ class ApplicationBootstrapTest {
         } finally { if (received.get() != null) received.get().close(); }
     }
 
-    @Test void explicitConfigurationSuppliesTheSavedThemeVariant() throws Exception {
+    @Test void explicitConfigurationSuppliesTheSavedThemeName() throws Exception {
         Path config = directory.resolve("elsewhere/config.toml");
         Files.createDirectories(config.getParent());
-        Files.writeString(config, "ui.theme.variant='light'");
+        Files.writeString(config, "ui.theme.name='IntelliJ Light'");
         var received = new AtomicReference<ConfigService>();
         try {
             assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err,
                 (service, options) -> received.set(service))).isZero();
-            assertThat(received.get().initialState().snapshot().variant()).isEqualTo(Appearance.LIGHT);
+            assertThat(received.get().initialState().snapshot().theme()).isEqualTo("IntelliJ Light");
         } finally {
             if (received.get() != null) received.get().close();
         }

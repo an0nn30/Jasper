@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.palette.PaletteTestSupport;
 import dev.jasper.app.testsupport.LayoutTestSupport;
@@ -7,7 +8,6 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.palette.PaletteController;
@@ -98,7 +98,6 @@ class WindowCommandPaletteTest {
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                 var overlay = (JComponent) owner.commandPalette().component().getParent();
                 var card = owner.commandPalette().component().getBounds();
-                Object previous = UIManager.get("Popup.dropShadowColor");
                 try {
                     UIManager.put("Popup.dropShadowColor", Color.RED);
                     var image = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -111,7 +110,11 @@ class WindowCommandPaletteTest {
                     var pixel = new Color(image.getRGB(card.x - 2, card.y - 2), true);
                     assertThat(pixel.getRed()).as("the shadow is tinted toward the configured drop-shadow colour")
                         .isGreaterThan(pixel.getGreen());
-                } finally { UIManager.put("Popup.dropShadowColor", previous); }
+                } finally {
+                    // Putting the saved value back would pin it in the developer defaults, ahead of
+                    // whatever look and feel installs next; clearing the override is the real restore.
+                    UIManager.put("Popup.dropShadowColor", null);
+                }
             }
         });
     }
@@ -171,10 +174,13 @@ class WindowCommandPaletteTest {
             var owner = owner(new CommandHistory()); var root = install(owner);
             int listeners = root.getComponentListeners().length;
             owner.commandPalette().toggle(); owner.commandPalette().component().queryField().setText("status bar");
-            assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRow(owner.commandPalette().component()).title()).isEqualTo("Hide Status Bar");
+            // "Status Bar Height…" matches too; follow the visibility toggle's own row.
+            java.util.function.Supplier<String> toggle = () -> dev.jasper.app.palette.PaletteTestSupport.rows(owner.commandPalette().component())
+                .stream().filter(row -> row.id().equals("view.status_bar")).findFirst().orElseThrow().title();
+            assertThat(toggle.get()).isEqualTo("Hide Status Bar");
             owner.setStatusVisible(false);
-            assertThat(dev.jasper.app.palette.PaletteTestSupport.selectedRow(owner.commandPalette().component()).title()).isEqualTo("Show Status Bar");
-            owner.selectAppearance(Appearance.LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
+            assertThat(toggle.get()).isEqualTo("Show Status Bar");
+            owner.selectTheme(Theme.LIGHT); assertThat(owner.commandPalette().isOpen()).isTrue();
             var overlay = owner.commandPalette().component().getParent(); owner.close();
             assertThat(overlay.getParent()).isNull(); assertThat(root.getComponentListeners().length).isLessThan(listeners);
             assertThat(owner.commands().entries()).isEmpty();

@@ -1,6 +1,9 @@
 package dev.jasper.app.application;
 
+import dev.jasper.app.appearance.Theme;
+import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.platform.ConfigEditor;
@@ -17,17 +20,21 @@ import javax.swing.SwingUtilities;
 final class ConfigurationController implements AutoCloseable {
     private final ThemeController themes;
     private final ConfigService service;
+    private final ThemeCatalog catalog;
     private final Set<WindowContent> owners = new LinkedHashSet<>();
     private final Consumer<Path> editor;
     private ConfigService.State state;
     private boolean closed;
     private Consumer<ConfigSnapshot> applicationListener = snapshot -> {};
-    private final List<dev.jasper.app.config.ConfigDiagnostic> reported = new java.util.ArrayList<>();
+    private final List<ConfigDiagnostic> reported = new java.util.ArrayList<>();
+    /** The theme catalog's problems, and an unknown theme name, from the last state applied. */
+    private List<ConfigDiagnostic> themeProblems = List.of();
 
-    /** The saved state plus problems plugins reported about their own tables since the last reload. */
+    /** The saved state plus theme problems and problems plugins reported about their own tables since the last reload. */
     ConfigService.State shown() {
         requireEdt();
         var merged = new java.util.ArrayList<>(state.diagnostics());
+        merged.addAll(themeProblems);
         merged.addAll(reported);
         return new ConfigService.State(state.snapshot(), merged, state.file(), state.present());
     }
@@ -36,20 +43,22 @@ final class ConfigurationController implements AutoCloseable {
     void report(String key, String message) {
         requireEdt();
         if (closed) return;
-        reported.add(new dev.jasper.app.config.ConfigDiagnostic(dev.jasper.app.config.ConfigDiagnostic.Severity.WARNING,
-            state.file(), 0, 0, key, message));
+        reported.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, state.file(), 0, 0, key, message));
         for (WindowContent owner : List.copyOf(owners)) owner.setConfigurationState(shown());
     }
 
-    ConfigurationController(ThemeController themes, ConfigService service) {
-        this(themes, service, new ConfigEditor()::open);
+    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog) {
+        this(themes, service, catalog, new ConfigEditor()::open);
     }
 
-    ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor) {
+    ConfigurationController(ThemeController themes, ConfigService service, ThemeCatalog catalog, Consumer<Path> editor) {
         requireEdt();
-        this.themes = themes; this.service = service; this.editor = editor;
+        this.themes = themes; this.service = service; this.catalog = catalog; this.editor = editor;
         state = service.initialState();
-        themes.configure(state.snapshot().variant(), state.snapshot().terminalColors(), state.snapshot().uiFont());
+        try { configureThemes(state); }
+        catch (ThemeController.InstallationFailure ignored) {
+            // Already recorded as a theme problem below; a theme that cannot be installed never stops start-up.
+        }
         service.start(this::accept);
     }
 
@@ -93,7 +102,7 @@ final class ConfigurationController implements AutoCloseable {
     void accept(ConfigService.State next) {
         requireEdt();
         if (closed) return;
-        try { themes.configure(next.snapshot().variant(), next.snapshot().terminalColors(), next.snapshot().uiFont()); }
+        try { configureThemes(next); }
         catch (ThemeController.InstallationFailure failure) {
             for (WindowContent owner : List.copyOf(owners)) owner.onError.accept(failure.getMessage());
         }
@@ -103,6 +112,35 @@ final class ConfigurationController implements AutoCloseable {
         for (WindowContent owner : List.copyOf(owners)) {
             owner.applyConfiguration(next.snapshot(), service.macOs());
             owner.setConfigurationState(shown());
+        }
+    }
+
+    /**
+     * Applies the saved theme, terminal colours and UI font from the catalog's latest scan. An unknown
+     * theme name keeps the theme showing (Jasper Dark at start-up) and is reported with the names available.
+     */
+    private void configureThemes(ConfigService.State next) {
+        ThemeCatalog.Snapshot available = catalog.latest();
+        var problems = new java.util.ArrayList<ConfigDiagnostic>();
+        for (ThemeCatalog.Problem problem : available.problems())
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, problem.file(), 0, 0, "", problem.message()));
+        String name = next.snapshot().theme();
+        Theme theme = available.find(name).orElse(null);
+        if (theme == null) {
+            theme = themes.choice();
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.name",
+                "Unknown theme \"" + name + "\"; keeping " + theme.name() + ". Available: " + String.join(", ", available.names()) + "."));
+        }
+        try {
+            themes.configure(theme, next.snapshot().terminalColors(), next.snapshot().uiFont());
+            themeProblems = List.copyOf(problems);
+        } catch (ThemeController.InstallationFailure failure) {
+            Throwable cause = failure.getCause();
+            problems.add(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, next.file(), 0, 0, "ui.theme.name",
+                "Could not apply theme \"" + theme.name() + "\": " + (cause != null ? cause.getMessage() : failure.getMessage())
+                    + "; keeping " + themes.choice().name() + "."));
+            themeProblems = List.copyOf(problems);
+            throw failure;
         }
     }
 

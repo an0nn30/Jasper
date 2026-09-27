@@ -36,6 +36,8 @@ public final class ConfigService implements AutoCloseable {
     private static final int MAX_BYTES = 1024 * 1024;
     private static final Fingerprint MISSING = new Fingerprint(false, null, 0);
 
+    private static final System.Logger LOG = System.getLogger(ConfigService.class.getName());
+
     private final Path file;
     private final boolean macOs;
     private final ScheduledExecutorService worker;
@@ -50,6 +52,8 @@ public final class ConfigService implements AutoCloseable {
     private Consumer<State> listener;
     private long revision;
     private boolean closed;
+    /** Runs on the worker after each read of the file; see {@link #watchWith}. */
+    private volatile Runnable companion;
 
     public ConfigService(Path file, boolean macOs) {
         this(file, macOs, newWorker(), SwingUtilities::invokeLater);
@@ -70,6 +74,17 @@ public final class ConfigService implements AutoCloseable {
     public State initialState() { return initialState; }
     public boolean macOs() { return macOs; }
 
+    /**
+     * Runs {@code companion} on the configuration worker now, and again after every later read that
+     * changed the state or was forced (Reload config, Settings), before that state is published. The
+     * future completes when this first run finishes. The theme catalog rescans its folder this way.
+     */
+    public CompletableFuture<Void> watchWith(Runnable companion) {
+        Objects.requireNonNull(companion, "companion");
+        this.companion = companion;
+        return submit(() -> { companion.run(); return null; });
+    }
+
     /** Registers once, publishing the current state before watching for subsequent changes. */
     public void start(Consumer<State> listener) {
         Objects.requireNonNull(listener, "listener");
@@ -78,7 +93,11 @@ public final class ConfigService implements AutoCloseable {
             if (this.listener != null) throw new IllegalStateException("Configuration listener already started.");
             this.listener = listener;
             publish();
-            worker.scheduleWithFixedDelay(() -> refresh(false, false), 1, 1, TimeUnit.SECONDS);
+            worker.scheduleWithFixedDelay(() -> {
+                // One failed poll must never cancel scheduleWithFixedDelay for good.
+                try { refresh(false, false); }
+                catch (Throwable failure) { LOG.log(System.Logger.Level.WARNING, "Configuration poll failed", failure); }
+            }, 1, 1, TimeUnit.SECONDS);
         }
     }
 
@@ -104,7 +123,9 @@ public final class ConfigService implements AutoCloseable {
         synchronized (lifecycle) {
             if (closed) return state;
         }
+        State previous = lastConfig;
         lastConfig = readState(lastConfig.snapshot(), force);
+        if (force || !lastConfig.equals(previous)) runCompanion();
         State next = lastConfig;
         synchronized (lifecycle) {
             if (!closed && (publishUnchanged || !next.equals(state))) {
@@ -114,6 +135,14 @@ public final class ConfigService implements AutoCloseable {
             }
             return state;
         }
+    }
+
+    private void runCompanion() {
+        Runnable current = companion;
+        if (current == null) return;
+        // A failing companion must not stop configuration reads or the change poll.
+        try { current.run(); }
+        catch (Throwable failure) { LOG.log(System.Logger.Level.WARNING, "Configuration companion failed", failure); }
     }
 
     private State readState(ConfigSnapshot lastGood, boolean force) {
@@ -200,8 +229,8 @@ public final class ConfigService implements AutoCloseable {
                             if (closed) result.completeExceptionally(closedException());
                             else result.complete(value);
                         }
-                    } catch (Exception exception) {
-                        result.completeExceptionally(exception);
+                    } catch (Throwable failure) {
+                        result.completeExceptionally(failure);
                     } finally {
                         synchronized (lifecycle) {
                             pending.remove(result);

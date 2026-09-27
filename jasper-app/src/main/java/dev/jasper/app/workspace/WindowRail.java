@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.commands.Command;
+import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.contributions.PanelRegion;
 import dev.jasper.app.platform.AppIcons;
 import java.awt.Component;
@@ -34,6 +35,8 @@ final class WindowRail extends JPanel {
     BiConsumer<String, PanelRegion> onMove = (id, region) -> { };
     private final List<AbstractButton> buttons = new ArrayList<>();
     private final JButton settings;
+    /** The rail's width in logical pixels; buttons, separators and spacing follow it. */
+    private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
 
     WindowRail(Action settingsAction) {
         super(null);
@@ -96,22 +99,30 @@ final class WindowRail extends JPanel {
 
     List<AbstractButton> buttons() { return List.copyOf(buttons); }
 
-    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(36), UIScale.scale(80)); }
+    /** Sets the width in logical pixels; the caller validates the range. */
+    void setRailWidth(int width) {
+        if (railWidth == width) return;
+        railWidth = width;
+        revalidate(); repaint();
+    }
+
+    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(railWidth), UIScale.scale(80)); }
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
 
     @Override public void doLayout() {
-        int x = UIScale.scale(3), side = UIScale.scale(30), y = UIScale.scale(4);
+        // Square buttons 3 px in from each side, 4 px apart; separators inset 7 px.
+        int x = UIScale.scale(3), side = UIScale.scale(railWidth - 6), step = side + UIScale.scale(4), y = UIScale.scale(4);
         for (Component child : getComponents()) {
             if (child == settings) continue;
             if (child instanceof JSeparator) {
-                child.setBounds(UIScale.scale(7), y + UIScale.scale(3), UIScale.scale(22), UIScale.scale(1));
+                child.setBounds(UIScale.scale(7), y + UIScale.scale(3), UIScale.scale(railWidth - 14), UIScale.scale(1));
                 y += UIScale.scale(8);
             } else {
                 child.setBounds(x, y, side, side);
-                y += UIScale.scale(34);
+                y += step;
             }
         }
-        settings.setBounds(x, Math.max(y, getHeight() - UIScale.scale(34)), side, side);
+        settings.setBounds(x, Math.max(y, getHeight() - step), side, side);
     }
 
     void refreshTheme() {

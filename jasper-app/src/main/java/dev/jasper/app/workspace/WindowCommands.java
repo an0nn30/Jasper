@@ -3,7 +3,6 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.commands.CommandRegistry;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.config.TerminalColors;
@@ -62,17 +61,16 @@ final class WindowCommands implements AutoCloseable {
         add(registry, "view.rail", "Rail", "Hide Rail", () -> owner.setRailVisible(!owner.railVisible()), List.of("panels", "sidebar"));
         add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
             List.of("jasper", "mascot", "turtle", "desk buddy"));
-        for (var appearance : Appearance.values()) {
-            String label = switch (appearance) { case LIGHT -> "Light"; case DARK -> "Dark"; };
-            add(registry, "view.appearance." + appearance.name().toLowerCase(java.util.Locale.ROOT), label,
-                "Appearance: " + label, () -> owner.selectAppearance(appearance));
-        }
         for (var colors : TerminalColors.values()) {
             String label = switch (colors) { case MATCH -> "Match UI"; case LIGHT -> "Light"; case DARK -> "Dark"; };
             add(registry, "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT), "Terminal: " + label,
                 "Terminal Colors: " + label, () -> owner.selectTerminalColors(colors), List.of("terminal", "colors", "palette"));
         }
         add(registry, "view.tab_height", "Tab height\u2026", "Tab Height\u2026", () -> owner.chrome().editTabHeight());
+        add(registry, "view.rail_width", "Rail width\u2026", "Rail Width\u2026", () -> owner.chrome().editRailWidth());
+        add(registry, "view.toolbar_height", "Toolbar height\u2026", "Toolbar Height\u2026", () -> owner.chrome().editToolbarHeight());
+        add(registry, "view.status_bar_height", "Status bar height\u2026", "Status Bar Height\u2026",
+            () -> owner.chrome().editStatusBarHeight());
     }
 
     private void add(CommandRegistry registry, String id, String label, String title, Runnable callback) {
@@ -108,18 +106,15 @@ final class WindowCommands implements AutoCloseable {
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);
         for (var mode : ToolbarMode.values())
             view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)).putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
-for (var appearance : Appearance.values()) {
-    var action = view("view.appearance." + appearance.name().toLowerCase(java.util.Locale.ROOT));
-    action.putValue(Action.SELECTED_KEY, owner.appearance() == appearance);
-    action.setEnabled(true);
-}
         for (var colors : TerminalColors.values()) {
             var action = view("view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT));
             action.putValue(Action.SELECTED_KEY, owner.terminalColors() == colors);
             action.setEnabled(true);
         }
-view("view.tab_height").setEnabled(true);
-
+        view("view.tab_height").setEnabled(true);
+        view("view.rail_width").setEnabled(true);
+        view("view.toolbar_height").setEnabled(true);
+        view("view.status_bar_height").setEnabled(true);
     }
 
     @Override public void close() {

@@ -48,7 +48,8 @@ class ConfigTemplateTest {
         assertThat(toml.getTable("notifications").keySet()).containsExactly("long_command_seconds");
         assertThat(toml.getTable("palette").keySet()).containsExactly("max_results");
         assertThat(toml.getTable("window").keySet())
-            .containsExactlyInAnyOrder("tab_height", "toolbar", "status_bar", "columns", "lines");
+            .containsExactlyInAnyOrder("tab_height", "rail_width", "toolbar", "toolbar_height", "status_bar",
+                "status_bar_height", "columns", "lines");
         assertThat(toml.getTable("font").keySet())
             .containsExactlyInAnyOrder("family", "size", "fallback", "ligatures", "line_height");
         assertThat(toml.getTable("terminal").keySet())
@@ -58,7 +59,7 @@ class ConfigTemplateTest {
         assertThat(toml.getTable("terminal.cursor").keySet()).containsExactlyInAnyOrder("shape", "blink");
         assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
         assertThat(toml.getTable("ui.font").keySet()).containsExactly("family");
-        assertThat(toml.getTable("ui.theme").keySet()).containsExactlyInAnyOrder("variant", "terminal");
+        assertThat(toml.getTable("ui.theme").keySet()).containsExactlyInAnyOrder("name", "terminal");
         assertThat(toml.getTable("keybindings").keySet()).isEmpty();
 
         for (boolean macOs : new boolean[]{true, false}) {
@@ -80,14 +81,17 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().tabHeight()).isEqualTo(30);
             assertThat(all.snapshot().toolbar()).isEqualTo(ToolbarMode.ICONS_AND_LABELS);
             assertThat(all.snapshot().statusBar()).isTrue();
-            assertThat(all.snapshot().buddyEnabled()).isTrue();
+            assertThat(all.snapshot().buddyEnabled()).isFalse();
             assertThat(all.snapshot().maxResults()).isEqualTo(5);
             assertThat(all.snapshot().fontSize()).isEqualTo(16f);
-            assertThat(all.snapshot().columns()).isEqualTo(150);
-            assertThat(all.snapshot().lines()).isEqualTo(45);
+            assertThat(all.snapshot().columns()).isEqualTo(100);
+            assertThat(all.snapshot().lines()).isEqualTo(35);
+            assertThat(all.snapshot().railWidth()).isEqualTo(28);
+            assertThat(all.snapshot().toolbarHeight()).isEqualTo(30);
+            assertThat(all.snapshot().statusBarHeight()).isEqualTo(24);
             assertThat(all.snapshot().font()).isEqualTo(FontConfig.defaults());
             assertThat(all.snapshot().terminal()).isEqualTo(TerminalConfig.defaults());
-            assertThat(all.snapshot().variant()).isEqualTo(Appearance.DARK);
+            assertThat(all.snapshot().theme()).isEqualTo("Jasper Dark");
             assertThat(all.snapshot().keybindings()).hasSize(ActionId.values().length);
             var defaults = KeyBindings.defaults(macOs);
             for (ActionId action : ActionId.values()) {

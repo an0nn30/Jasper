@@ -4,7 +4,6 @@ import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeTestSupport;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.UiFontConfig;
 import dev.jasper.app.lifecycle.Subscription;
 import java.awt.Color;
@@ -281,14 +280,15 @@ class CommandPaletteTest {
                     // the assertion above alone can't tell which key the unselected tab actually reads.
                     // Give Label.foreground a distinctive value List.foreground doesn't share, and prove
                     // the tab follows it.
-                    Object originalLabelForeground = UIManager.get("Label.foreground");
                     try {
                         var distinctiveForeground = new ColorUIResource(0x123456);
                         UIManager.put("Label.foreground", distinctiveForeground);
                         palette.refreshTheme();
                         assertThat(labels(palette.tabStrip()).get(1).getForeground()).as(name).isEqualTo(distinctiveForeground);
                     } finally {
-                        UIManager.put("Label.foreground", originalLabelForeground);
+                        // Putting the saved value back would pin it in the developer defaults, ahead of
+                        // whatever look and feel installs next; clearing the override is the real restore.
+                        UIManager.put("Label.foreground", null);
                         palette.refreshTheme();
                     }
 
@@ -449,7 +449,7 @@ class CommandPaletteTest {
 
     @Test void aStepReplacesTheListAndHidesTheHintBar() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            new ThemeController(Appearance.LIGHT);
+            new ThemeController(Theme.LIGHT);
             try {
                 var palette = palette(new ArrayList<>());
                 palette.setEntries(List.of(item(HISTORY, "a"), item(HISTORY, "b")), null, null);
@@ -492,7 +492,7 @@ class CommandPaletteTest {
             palette.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "a")), null, null);
             try {
                 for (float size : new float[]{18, 32, 12}) {
-                    themes.configure(Appearance.DARK, new UiFontConfig("system", size));
+                    themes.configure(Theme.DARK, new UiFontConfig("system", size));
                     SwingUtilities.updateComponentTreeUI(palette);
                     palette.refreshTheme();
                     palette.setSize(palette.getPreferredSize());
@@ -501,7 +501,7 @@ class CommandPaletteTest {
                     assertThat(palette.entryList().getCellBounds(1, 1).height).isEqualTo(UIScale.scale(24));
                     assertThat(palette.hintBar().getHeight()).isEqualTo(UIScale.scale(26));
                 }
-            } finally { themes.configure(Appearance.DARK, UiFontConfig.defaults()); }
+            } finally { themes.configure(Theme.DARK, UiFontConfig.defaults()); }
         });
     }
 
@@ -529,16 +529,16 @@ class CommandPaletteTest {
     @Test void renderPaletteResultsAndFormsAtBothScales() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try {
-                for (var choice : List.of(Appearance.DARK, Appearance.LIGHT)) {
+                for (var choice : List.of(Theme.DARK, Theme.LIGHT)) {
                     new ThemeController(choice);
                     var card = palette(new ArrayList<>());
                     card.setTabs(List.of(new CommandPalette.Tab(PaletteScope.ALL_ID, "All", null, null),
                         new CommandPalette.Tab("jasper.commands", "Commands", null, null)), PaletteScope.ALL_ID);
                     card.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "new_tab"), item(COMMANDS, "settings")), null, null);
                     var host = new javax.swing.JPanel(new java.awt.GridBagLayout()); host.add(card);
-                    for (int scale : new int[]{1, 2}) saveRender(host, choice + "-palette-" + scale, scale);
+                    for (int scale : new int[]{1, 2}) saveRender(host, choice.name() + "-palette-" + scale, scale);
                     card.showStep("Connect", List.of(new PaletteStep.Field("host", "Host", "example.org"), new PaletteStep.Field("user", "Username", "dustin")));
-                    for (int scale : new int[]{1, 2}) saveRender(host, choice + "-palette-form-" + scale, scale);
+                    for (int scale : new int[]{1, 2}) saveRender(host, choice.name() + "-palette-form-" + scale, scale);
                 }
             } finally { new ThemeController(); }
         });

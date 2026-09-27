@@ -18,7 +18,7 @@ class ConfigurationStatusTest {
         edt(() -> {
             var themes = new ThemeController();
             for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
-                themes.select(theme);
+                themes.configure(theme);
                 var status = new WindowStatusBar();
                 status.applyPalette(theme.palette());
                 for (var severity : ConfigDiagnostic.Severity.values()) {
@@ -47,13 +47,13 @@ class ConfigurationStatusTest {
             var themes = new ThemeController();
             var status = new WindowStatusBar();
             for (var theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
-                themes.select(theme);
+                themes.configure(theme);
                 status.applyPalette(theme.palette());
                 status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), Path.of("config.toml"), true));
                 assertThat(status.getBackground()).isEqualTo(UIManager.getColor("StatusBar.background"));
                 assertThat(contrast(status.configButton().getForeground(), status.getBackground())).isGreaterThanOrEqualTo(3);
             }
-            themes.select(Theme.DARK);
+            themes.configure(Theme.DARK);
         });
     }
     @Test void statusBarPaintsTheThemesStatusSurfaceUnderATopRule() throws Exception {
@@ -61,7 +61,7 @@ class ConfigurationStatusTest {
             var themes = new ThemeController();
             try {
                 for (var theme : List.of(Theme.DARK, Theme.LIGHT)) {
-                    themes.select(theme);
+                    themes.configure(theme);
                     var status = new WindowStatusBar();
                     status.setSize(600, 30); status.doLayout();
                     var image = new java.awt.image.BufferedImage(600, 30, java.awt.image.BufferedImage.TYPE_INT_RGB);
@@ -69,7 +69,7 @@ class ConfigurationStatusTest {
                     assertThat(new Color(image.getRGB(300, 0))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.borderColor"));
                     assertThat(new Color(image.getRGB(300, 15))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.background"));
                 }
-            } finally { themes.select(Theme.DARK); }
+            } finally { themes.configure(Theme.DARK); }
         });
     }
 

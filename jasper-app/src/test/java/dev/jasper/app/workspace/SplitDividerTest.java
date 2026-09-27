@@ -18,7 +18,7 @@ class SplitDividerTest {
             JSplitPane split = new JSplitPane();
             try {
                 for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
-                    themes.select(theme);
+                    themes.configure(theme);
                     SwingUtilities.updateComponentTreeUI(split);
                     split.setBorder(null);
                     for (int orientation : new int[] {JSplitPane.HORIZONTAL_SPLIT, JSplitPane.VERTICAL_SPLIT}) {
@@ -53,7 +53,7 @@ class SplitDividerTest {
                     }
                 }
             } finally {
-                themes.select(Theme.DARK);
+                themes.configure(Theme.DARK);
             }
         });
     }

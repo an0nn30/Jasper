@@ -1,6 +1,5 @@
 package dev.jasper.app.appearance;
 
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.UiFontConfig;
 import java.awt.Font;
@@ -32,10 +31,10 @@ public final class ThemeController {
     private static final List<String> FORM_FONTS = List.of("Label.font", "List.font", "TextField.font",
         "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font", "Button.font");
 
-    public ThemeController() { this(Appearance.DARK); }
-    public ThemeController(Appearance saved) { this(saved, ThemeManager::install); }
-    public ThemeController(Predicate<Theme> installer) { this(Appearance.DARK, installer); }
-    ThemeController(Appearance saved, Predicate<Theme> installer) {
+    public ThemeController() { this(Theme.DARK); }
+    public ThemeController(Theme saved) { this(saved, ThemeManager::install); }
+    public ThemeController(Predicate<Theme> installer) { this(Theme.DARK, installer); }
+    ThemeController(Theme saved, Predicate<Theme> installer) {
         requireEdt();
         this.installer = Objects.requireNonNull(installer);
         this.state = ThemeState.defaults().configure(Objects.requireNonNull(saved));
@@ -50,24 +49,21 @@ public final class ThemeController {
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
     public ResolvedTheme current() { requireEdt(); return state.resolve(); }
-    public Appearance choice() { requireEdt(); return state.choice(); }
+    /** The configured theme. */
+    public Theme choice() { requireEdt(); return state.choice(); }
     /** The effective terminal colours. */
     public TerminalColors terminalColors() { requireEdt(); return state.terminalChoice(); }
-    public void selectAppearance(Appearance choice) {
-        requireEdt(); apply(state.choose(Objects.requireNonNull(choice)));
-    }
     /** A temporary View choice for every window. */
     public void selectTerminalColors(TerminalColors choice) {
         requireEdt(); apply(state.chooseTerminal(Objects.requireNonNull(choice)));
     }
-    public void configure(Appearance saved) { configure(saved, uiFont); }
-    public void configure(Appearance saved, UiFontConfig font) { configure(saved, state.terminalSaved(), font); }
-    public void configure(Appearance saved, TerminalColors terminal, UiFontConfig font) {
+    public void configure(Theme saved) { configure(saved, uiFont); }
+    public void configure(Theme saved, UiFontConfig font) { configure(saved, state.terminalSaved(), font); }
+    public void configure(Theme saved, TerminalColors terminal, UiFontConfig font) {
         requireEdt();
         apply(state.configure(Objects.requireNonNull(saved)).configureTerminal(Objects.requireNonNull(terminal)),
             Objects.requireNonNull(font));
     }
-    public void select(Theme theme) { selectAppearance(Objects.requireNonNull(theme).appearance()); }
     private void apply(ThemeState candidate) { apply(candidate, uiFont); }
     private void apply(ThemeState candidate, UiFontConfig font) {
         ResolvedTheme previous = state.resolve(), next = candidate.resolve();

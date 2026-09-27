@@ -1,6 +1,5 @@
 package dev.jasper.app.appearance;
 
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.TerminalColors;
 import dev.jasper.app.config.UiFontConfig;
 import dev.jasper.app.testsupport.EdtTestExtension;
@@ -14,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TerminalColorsThemeTest {
     @Test void aTerminalOnlyChangeNotifiesOnceWithoutReinstallingTheLookAndFeel() {
         var installs = new ArrayList<Theme>();
-        var themes = new ThemeController(Appearance.LIGHT, theme -> { installs.add(theme); return ThemeTestSupport.install(theme); });
+        var themes = new ThemeController(Theme.LIGHT, theme -> { installs.add(theme); return ThemeTestSupport.install(theme); });
         try {
             var chromeFlags = new ArrayList<Boolean>();
             var palettes = new ArrayList<Palette>();
@@ -31,21 +30,21 @@ class TerminalColorsThemeTest {
         } finally { new ThemeController(); }
     }
 
-    @Test void changingTheUiVariantKeepsAFixedTerminalPalette() {
-        var themes = new ThemeController(Appearance.DARK, ThemeTestSupport::install);
+    @Test void changingTheThemeKeepsAFixedTerminalPalette() {
+        var themes = new ThemeController(Theme.DARK, ThemeTestSupport::install);
         try {
-            themes.configure(Appearance.DARK, TerminalColors.DARK, UiFontConfig.defaults());
+            themes.configure(Theme.DARK, TerminalColors.DARK, UiFontConfig.defaults());
             var chromeFlags = new ArrayList<Boolean>();
             themes.subscribe((theme, chromeChanged) -> chromeFlags.add(chromeChanged));
             chromeFlags.clear();
-            themes.configure(Appearance.LIGHT, TerminalColors.DARK, UiFontConfig.defaults());
+            themes.configure(Theme.LIGHT, TerminalColors.DARK, UiFontConfig.defaults());
             assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperDark()));
             assertThat(chromeFlags).containsExactly(true);
-            themes.selectAppearance(Appearance.DARK);
+            themes.configure(Theme.DARK);
             assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.DARK, Palette.jasperDark()));
-            themes.configure(Appearance.LIGHT, TerminalColors.MATCH, UiFontConfig.defaults());
-            assertThat(themes.current()).as("MATCH follows the effective chrome, including the View override")
-                .isEqualTo(new ResolvedTheme(Theme.DARK, Palette.jasperDark()));
+            themes.configure(Theme.LIGHT, TerminalColors.MATCH, UiFontConfig.defaults());
+            assertThat(themes.current()).as("MATCH follows the configured theme")
+                .isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperLight()));
         } finally { new ThemeController(); }
     }
 

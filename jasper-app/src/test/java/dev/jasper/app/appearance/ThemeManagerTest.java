@@ -3,12 +3,14 @@ package dev.jasper.app.appearance;
 import com.formdev.flatlaf.FlatLaf;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.awt.Color;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
@@ -166,6 +168,23 @@ class ThemeManagerTest {
         }
         assertThat(Theme.LIGHT.id()).isEqualTo("intellij-light");
         assertThat(Theme.DARK.id()).isEqualTo("jasper-dark");
+    }
+
+    @Test void theBuiltInThemesLoadWithoutWarnings() {
+        for (Theme theme : ThemeManager.builtIns()) assertThat(ThemeManager.resolve(theme).warnings()).as(theme.name()).isEmpty();
+    }
+
+    @Test void anInstalledThemeInstallsWithItsOwnColoursAndDerivedChromeKeys(@TempDir Path home) throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        try {
+            ThemeFixtures.plugin(home.resolve("themes/fixture.jar"), "Fixture Dark", true, "#123456", "101820");
+            Theme theme = ThemeCatalog.beside(home.resolve("config.toml")).scan().find("Fixture Dark").orElseThrow();
+            assertThat(ThemeManager.install(theme)).isTrue();
+            assertThat(UIManager.getLookAndFeel().getName()).isEqualTo("Fixture Dark");
+            assertThat(UIManager.getColor("Panel.background")).isEqualTo(new Color(0x123456));
+            assertThat(FlatLaf.isLafDark()).isTrue();
+            assertThat(UIManager.getColor("Jasper.titleBackground")).isNotNull();
+        } finally { UIManager.setLookAndFeel(original); }
     }
 
     private static void assertColours(Map<String, String> expected) {

@@ -31,13 +31,32 @@ class ConfigLoaderTest {
         }
     }
 
-    @Test void themeVariantDefaultsToDarkAndAcceptsLight() {
+    @Test void themeNameDefaultsToJasperDarkAndAcceptsBuiltInNames() {
         var path = Path.of("config.toml");
-        assertThat(ConfigLoader.parse(path, "", true).snapshot().variant()).isEqualTo(Appearance.DARK);
-        assertThat(ConfigLoader.parse(path, "[ui.theme]\nvariant = 'light'\n", true).snapshot().variant())
-            .isEqualTo(Appearance.LIGHT);
-        assertThat(ConfigLoader.parse(path, "ui.theme.variant = 'dark'\n", true).snapshot().variant())
-            .isEqualTo(Appearance.DARK);
+        assertThat(ConfigLoader.parse(path, "", true).snapshot().theme()).isEqualTo("Jasper Dark");
+        assertThat(ConfigLoader.parse(path, "[ui.theme]\nname = 'IntelliJ Light'\n", true).snapshot().theme())
+            .isEqualTo("IntelliJ Light");
+        assertThat(ConfigLoader.parse(path, "ui.theme.name = 'Jasper Dark'\n", true).snapshot().theme())
+            .isEqualTo("Jasper Dark");
+    }
+
+    @Test void themeNameIsAStrippedStringOfAnyValue() {
+        assertThat(parse("").snapshot().theme()).isEqualTo(ConfigSnapshot.DEFAULT_THEME).isEqualTo("Jasper Dark");
+        assertThat(parse("[ui.theme]\nname = '  Dracula '\n").snapshot().theme()).isEqualTo("Dracula");
+        assertThat(parse("[ui.theme]\nname = ''\n").diagnostics()).as("resolution reports an empty name").isEmpty();
+        var wrongType = parse("ui.theme.name = 7\n");
+        assertThat(wrongType.rejected()).isTrue();
+        assertThat(wrongType.diagnostics()).singleElement().satisfies(problem -> assertThat(problem.key()).isEqualTo("ui.theme.name"));
+    }
+
+    @Test void theRemovedVariantKeyIsAnOrdinaryUnknownSetting() {
+        var result = parse("[ui.theme]\nvariant = 'light'\n");
+        assertThat(result.rejected()).isFalse();
+        assertThat(result.snapshot().theme()).isEqualTo("Jasper Dark");
+        assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
+            assertThat(problem.key()).isEqualTo("ui.theme.variant");
+            assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);
+        });
     }
 
     @Test void emptyFileSuppliesUsableDefaultsOnBothPlatforms() {
@@ -61,7 +80,7 @@ class ConfigLoaderTest {
             [font]
             size = 18
             [ui.theme]
-            variant = "light"
+            name = "IntelliJ Light"
             [keybindings]
             "copy" = "cmd+v"
             paste = "cmd+c"
@@ -76,7 +95,7 @@ class ConfigLoaderTest {
         assertThat(state.toolbar()).isEqualTo(ToolbarMode.ICONS);
         assertThat(state.statusBar()).isFalse();
         assertThat(state.fontSize()).isEqualTo(18f);
-        assertThat(state.variant()).isEqualTo(Appearance.LIGHT);
+        assertThat(state.theme()).isEqualTo("IntelliJ Light");
         assertThat(state.bindings(true).actionFor(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.META_DOWN_MASK)))
             .contains(ActionId.COPY);
         assertThat(state.bindings(true).strokeFor(ActionId.NEW_TAB)).isEmpty();
@@ -89,6 +108,59 @@ class ConfigLoaderTest {
         for (float size : new float[]{6f, 72f, 13.5f}) assertThat(parse("font.size=" + size).snapshot().fontSize()).isEqualTo(size);
         assertThat(parse("window.toolbar='hidden'").snapshot().toolbar()).isEqualTo(ToolbarMode.HIDDEN);
         assertThat(parse("window.toolbar='icons_and_labels'").diagnostics()).isEmpty();
+    }
+
+    @Test void railWidthDefaultsToTwentyEightAndClampsOutOfRangeValuesWithAWarning() {
+        assertThat(parse("").snapshot().railWidth()).isEqualTo(28);
+        assertThat(ConfigSnapshot.defaults().railWidth()).isEqualTo(28);
+        for (int width : new int[]{28, 36, 64}) assertThat(parse("window.rail_width=" + width).snapshot().railWidth()).isEqualTo(width);
+        for (int[] example : new int[][]{{10, 28}, {27, 28}, {65, 64}, {200, 64}}) {
+            var result = parse("[window]\nrail_width = " + example[0] + "\n");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().railWidth()).as("rail_width = %d", example[0]).isEqualTo(example[1]);
+            assertDiagnostic(result, "window.rail_width", 2, 1, ConfigDiagnostic.Severity.WARNING);
+            assertThat(result.diagnostics().getFirst().message()).contains(String.valueOf(example[1]));
+        }
+        assertThat(ConfigSnapshot.defaults().toBuilder().railWidth(48).build().railWidth()).isEqualTo(48);
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().railWidth(27).build());
+    }
+
+    @Test void toolbarHeightDefaultsToThirtyAndClampsOutOfRangeValuesWithAWarning() {
+        assertThat(parse("").snapshot().toolbarHeight()).isEqualTo(30);
+        assertThat(ConfigSnapshot.defaults().toolbarHeight()).isEqualTo(30);
+        for (int height : new int[]{24, 30, 64}) assertThat(parse("window.toolbar_height=" + height).snapshot().toolbarHeight()).isEqualTo(height);
+        for (int[] example : new int[][]{{0, 24}, {23, 24}, {65, 64}, {200, 64}}) {
+            var result = parse("[window]\ntoolbar_height = " + example[0] + "\n");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().toolbarHeight()).as("toolbar_height = %d", example[0]).isEqualTo(example[1]);
+            assertDiagnostic(result, "window.toolbar_height", 2, 1, ConfigDiagnostic.Severity.WARNING);
+            assertThat(result.diagnostics().getFirst().message()).contains(String.valueOf(example[1]));
+        }
+        assertThat(ConfigSnapshot.defaults().toBuilder().toolbarHeight(40).build().toolbarHeight()).isEqualTo(40);
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().toolbarHeight(23).build());
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().toolbarHeight(65).build());
+    }
+
+    @Test void statusBarHeightDefaultsToTwentyFourAndClampsOutOfRangeValuesWithAWarning() {
+        assertThat(parse("").snapshot().statusBarHeight()).isEqualTo(24);
+        assertThat(ConfigSnapshot.defaults().statusBarHeight()).isEqualTo(24);
+        for (int height : new int[]{20, 30, 48}) assertThat(parse("window.status_bar_height=" + height).snapshot().statusBarHeight()).isEqualTo(height);
+        for (int[] example : new int[][]{{0, 20}, {19, 20}, {49, 48}, {200, 48}}) {
+            var result = parse("[window]\nstatus_bar_height = " + example[0] + "\n");
+            assertThat(result.rejected()).isFalse();
+            assertThat(result.snapshot().statusBarHeight()).as("status_bar_height = %d", example[0]).isEqualTo(example[1]);
+            assertDiagnostic(result, "window.status_bar_height", 2, 1, ConfigDiagnostic.Severity.WARNING);
+            assertThat(result.diagnostics().getFirst().message()).contains(String.valueOf(example[1]));
+        }
+        // The two heights and the visibility switches are independent keys.
+        var both = parse("[window]\ntoolbar = \"hidden\"\ntoolbar_height = 40\nstatus_bar = false\nstatus_bar_height = 24\n").snapshot();
+        assertThat(both.toolbar()).isEqualTo(ToolbarMode.HIDDEN);
+        assertThat(both.toolbarHeight()).isEqualTo(40);
+        assertThat(both.statusBar()).isFalse();
+        assertThat(both.statusBarHeight()).isEqualTo(24);
+        assertThat(ConfigSnapshot.defaults().toBuilder().statusBarHeight(40).build().statusBarHeight()).isEqualTo(40);
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().statusBarHeight(19).build());
+        assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().statusBarHeight(49).build());
     }
 
     @Test void tabHeightDefaultsToThirtyAndClampsOutOfRangeValuesWithAWarning() {
@@ -123,7 +195,7 @@ class ConfigLoaderTest {
 
     @Test void wrongScalarTypesRejectWholeCandidate() {
         for (String assignment : new String[]{"window.tab_height=38.0", "window.toolbar=true", "window.status_bar=1",
-                "font.size='secret-value'", "ui.theme.variant=1", "keybindings.copy=7", "font.size=[16]",
+                "font.size='secret-value'", "ui.theme.name=1", "keybindings.copy=7", "font.size=[16]",
                 "window.tab_height={x=38}"}) {
             var result = parse(assignment);
             assertThat(result.rejected()).as(assignment).isTrue();
@@ -217,7 +289,7 @@ class ConfigLoaderTest {
     @Test void snapshotAndResultDefensivelyCopyCollections() {
         var bindings = new HashMap<String,String>();
         bindings.put("copy", "none");
-        var snapshot = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(20f), Theme.LIGHT.appearance(), bindings, 150, 45, TerminalConfig.defaults());
+        var snapshot = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(20f), Theme.LIGHT.name(), bindings, 150, 45, TerminalConfig.defaults());
         bindings.put("copy", "cmd+c");
         assertThat(snapshot.bindings(true).strokeFor(ActionId.COPY)).isEmpty();
         assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> snapshot.keybindings().put("paste", "none"));
@@ -230,13 +302,13 @@ class ConfigLoaderTest {
 
     @Test void directSnapshotsRejectInvalidScalarFieldsAndBindings() {
         for (int height : new int[]{0, 19, 73}) assertThatIllegalArgumentException().isThrownBy(() ->
-            new ConfigSnapshot(height, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), Theme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
+            new ConfigSnapshot(height, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), Theme.DARK.name(), Map.of(), 150, 45, TerminalConfig.defaults()));
         for (float size : new float[]{0, 5.9f, 72.1f, Float.NaN, Float.POSITIVE_INFINITY}) assertThatIllegalArgumentException().isThrownBy(() ->
-            new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(size), Theme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
-        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, null, true, FontConfig.defaults().withSize(16f), Theme.DARK.appearance(), Map.of(), 150, 45, TerminalConfig.defaults()));
-        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), (Appearance) null, Map.of(), 150, 45, TerminalConfig.defaults()));
+            new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(size), Theme.DARK.name(), Map.of(), 150, 45, TerminalConfig.defaults()));
+        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, null, true, FontConfig.defaults().withSize(16f), Theme.DARK.name(), Map.of(), 150, 45, TerminalConfig.defaults()));
+        assertThatNullPointerException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), (String) null, Map.of(), 150, 45, TerminalConfig.defaults()));
         for (Map<String,String> bindings : java.util.List.of(Map.of("unknown", "none"), Map.of("copy", "cmd+secret"))) {
-            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), Theme.DARK.appearance(), bindings, 150, 45, TerminalConfig.defaults()));
+            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, FontConfig.defaults().withSize(16f), Theme.DARK.name(), bindings, 150, 45, TerminalConfig.defaults()));
         }
     }
 
@@ -252,10 +324,14 @@ class ConfigLoaderTest {
         assertThat(off.rejected()).isFalse();
         assertThat(off.diagnostics()).isEmpty();
         assertThat(off.snapshot().buddyEnabled()).isFalse();
-        assertThat(ConfigSnapshot.defaults().buddyEnabled()).isTrue();
+        assertThat(parse("").snapshot().buddyEnabled()).as("Jasper is opt-in").isFalse();
+        assertThat(ConfigSnapshot.defaults().buddyEnabled()).isFalse();
+        var on = parse("[buddy]\nenabled = true\n");
+        assertThat(on.diagnostics()).isEmpty();
+        assertThat(on.snapshot().buddyEnabled()).isTrue();
         var bad = parse("[buddy]\nenabled = 1\n");
         assertThat(bad.rejected()).isTrue();
-        assertThat(bad.snapshot().buddyEnabled()).isTrue();
+        assertThat(bad.snapshot().buddyEnabled()).isFalse();
         assertDiagnostic(bad, "buddy.enabled", 2, 1, ConfigDiagnostic.Severity.ERROR);
         var unknown = parse("[buddy]\nvisible = true\n");
         assertDiagnostic(unknown, "buddy.visible", 2, 1, ConfigDiagnostic.Severity.WARNING);
@@ -355,17 +431,17 @@ class ConfigLoaderTest {
         for (var choice : TerminalColors.values())
             assertThat(parse("[ui.theme]\nterminal = '" + choice.name().toLowerCase(java.util.Locale.ROOT) + "'\n")
                 .snapshot().terminalColors()).isEqualTo(choice);
-        var mixed = parse("ui.theme.terminal = 'dark'\nui.theme.variant = 'light'\n").snapshot();
-        assertThat(mixed.variant()).isEqualTo(Appearance.LIGHT);
+        var mixed = parse("ui.theme.terminal = 'dark'\nui.theme.name = 'IntelliJ Light'\n").snapshot();
+        assertThat(mixed.theme()).isEqualTo("IntelliJ Light");
         assertThat(mixed.terminalColors()).isEqualTo(TerminalColors.DARK);
     }
 
     @Test void invalidTerminalColorsUseTheExistingPerFieldDiagnosticPolicy() {
         for (String value : java.util.List.of("'private-value'", "7", "true")) {
-            var result = parse("[ui.theme]\nterminal=" + value + "\nvariant='light'\n");
+            var result = parse("[ui.theme]\nterminal=" + value + "\nname='IntelliJ Light'\n");
             assertThat(result.rejected()).isEqualTo(!value.startsWith("'"));
             assertThat(result.snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
-            assertThat(result.snapshot().variant()).isEqualTo(Appearance.LIGHT);
+            assertThat(result.snapshot().theme()).isEqualTo("IntelliJ Light");
             assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
                 assertThat(problem.key()).isEqualTo("ui.theme.terminal");
                 assertThat(problem.line()).isEqualTo(2);
@@ -375,9 +451,9 @@ class ConfigLoaderTest {
     }
 
     @Test void aLeftoverStyleLineIsAnOrdinaryUnknownSettingAndChangesNothing() {
-        var result = parse("[ui.theme]\nstyle = 'retro'\nvariant = 'light'\n");
+        var result = parse("[ui.theme]\nstyle = 'retro'\nname = 'IntelliJ Light'\n");
         assertThat(result.rejected()).isFalse();
-        assertThat(result.snapshot().variant()).isEqualTo(Appearance.LIGHT);
+        assertThat(result.snapshot().theme()).isEqualTo("IntelliJ Light");
         assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
             assertThat(problem.key()).isEqualTo("ui.theme.style");
             assertThat(problem.severity()).isEqualTo(ConfigDiagnostic.Severity.WARNING);

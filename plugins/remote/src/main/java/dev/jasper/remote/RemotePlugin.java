@@ -37,7 +37,6 @@ import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginMenu;
 import dev.jasper.sdk.ui.Side;
-import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.vault.api.CredentialDescriptor;
@@ -173,8 +172,7 @@ public class RemotePlugin implements Plugin {
         PluginMenu menu = context.menus().create(MENU, "SSH");
         menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(IMPORT);
         menu.addSeparator();menu.add(SFTP);menu.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
-        context.menus().standard(StandardMenu.VIEW).add(SFTP_TOGGLE);
-        context.menus().standard(StandardMenu.VIEW).add(HOSTS);
+        // View > Tools already toggles both panels; these actions stay for their shortcuts, the SSH menu and the palette.
 
         scope = new RemoteScope(store::hosts, store::error, this::openHost, this::splitHost, (window, host) -> editHost(window, Optional.of(host)));
         context.palette().register(scope);

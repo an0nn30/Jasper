@@ -1,7 +1,7 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeController;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.TerminalColors;
 import dev.jasper.terminal.config.Palette;
 import java.util.ArrayDeque;
@@ -24,7 +24,7 @@ class TerminalColorsTest {
         var pending = new ArrayDeque<Runnable>();
         WindowContent[] owners = new WindowContent[2];
         edt(() -> {
-            var themes = new ThemeController(Appearance.LIGHT);
+            var themes = new ThemeController(Theme.LIGHT);
             owners[0] = content(launcher(pending), themes);
             owners[1] = content(launcher(pending), themes);
         });
@@ -57,11 +57,11 @@ class TerminalColorsTest {
         });
     }
 
-    @Test void appearanceMenuOffersTerminalChoicesThatApplyLiveAndReflectTheCurrentChoice() throws Exception {
+    @Test void terminalColorsMenuOffersChoicesThatApplyLiveAndReflectTheCurrentChoice() throws Exception {
         edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()), new ThemeController(Appearance.DARK));
+            var owner = content(launcher(new ArrayDeque<>()), new ThemeController(Theme.DARK));
             owner.updateActions();
-            JMenu menu = appearance(owner);
+            JMenu menu = terminalColors(owner);
             List<JRadioButtonMenuItem> items = terminalItems(menu);
             assertThat(items).extracting(JMenuItem::getText)
                 .containsExactly("Terminal: Match UI", "Terminal: Light", "Terminal: Dark");
@@ -81,10 +81,10 @@ class TerminalColorsTest {
         for (var listener : menu.getMenuListeners()) listener.menuSelected(new MenuEvent(menu));
     }
 
-    private static JMenu appearance(WindowContent owner) {
+    private static JMenu terminalColors(WindowContent owner) {
         for (var component : owner.menuBar().getMenu(2).getMenuComponents())
-            if (component instanceof JMenu menu && menu.getText().equals("Appearance")) return menu;
-        throw new AssertionError("Appearance menu is absent");
+            if (component instanceof JMenu menu && menu.getText().equals("Terminal Colors")) return menu;
+        throw new AssertionError("Terminal Colors menu is absent");
     }
 
     private static List<JRadioButtonMenuItem> terminalItems(JMenu menu) {

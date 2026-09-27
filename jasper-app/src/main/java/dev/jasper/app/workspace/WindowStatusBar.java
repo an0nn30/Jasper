@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
+import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.contributions.StatusEntry;
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.terminal.config.Palette;
@@ -27,6 +28,8 @@ final class WindowStatusBar extends JPanel {
     private boolean integration;
     private Palette palette = Palette.jasperDark();
     private String text = "Built-in defaults";
+    /** Height in logical pixels; the bar is taller only when the status font needs more. */
+    private int barHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
 
     WindowStatusBar() {
         super(null);
@@ -36,6 +39,13 @@ final class WindowStatusBar extends JPanel {
         configButton.addActionListener(event -> onConfigurationDetails.run());
         add(left); add(leftItems); add(rightItems); add(right); refreshTheme();
         getAccessibleContext().setAccessibleName("Terminal status");
+    }
+
+    /** Sets the height in logical pixels; the caller validates the range. */
+    void setBarHeight(int height) {
+        if (barHeight == height) return;
+        barHeight = height;
+        revalidate(); repaint();
     }
 
     void setMetadata(String shell, String directory, String dimensions, boolean running, boolean integration) {
@@ -182,7 +192,7 @@ final class WindowStatusBar extends JPanel {
         }
         @Override public Dimension getPreferredSize() {
             return new Dimension(first.getPreferredSize().width + (slash.isVisible() ? UIScale.scale(28) : 0)
-                + last.getPreferredSize().width, Math.max(UIScale.scale(30), Math.max(first.getPreferredSize().height, last.getPreferredSize().height)));
+                + last.getPreferredSize().width, Math.max(first.getPreferredSize().height, last.getPreferredSize().height));
         }
         @Override public void doLayout() {
             int firstWidth = Math.min(getWidth(), first.getPreferredSize().width);
@@ -194,8 +204,8 @@ final class WindowStatusBar extends JPanel {
     }
     @Override public Dimension getMinimumSize() { return getPreferredSize(); }
     @Override public Dimension getPreferredSize() {
-        return new Dimension(0, Math.max(Math.max(left.getPreferredSize().height, right.getPreferredSize().height),
-            Math.max(leftItems.getPreferredSize().height, rightItems.getPreferredSize().height)));
+        // Items and segments are laid out at the bar's height; only the text sets a floor, so it never clips.
+        return new Dimension(0, Math.max(UIScale.scale(barHeight), getFontMetrics(statusFont()).getHeight()));
     }
     @Override public void doLayout() {
         int edge = Math.min(UIScale.scale(14), getWidth() / 2), leftInset = Math.min(getWidth(), UIScale.scale(26));

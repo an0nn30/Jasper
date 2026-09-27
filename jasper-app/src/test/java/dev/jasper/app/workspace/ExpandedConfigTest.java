@@ -1,7 +1,6 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.Theme;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -31,25 +30,20 @@ class ExpandedConfigTest {
 
     private ConfigLoader.Result parse(String text) { return ConfigLoader.parse(FILE, text, true); }
 
-    @Test void readsThemeVariantInEveryKeyForm() {
-        for (String text : List.of("[ui.theme]\nvariant='light'\n", "ui.theme.variant='light'\n", "[ui]\ntheme.variant='light'\n")) {
+    @Test void readsTheThemeNameInEveryKeyForm() {
+        for (String text : List.of("[ui.theme]\nname='IntelliJ Light'\n", "ui.theme.name='IntelliJ Light'\n", "[ui]\ntheme.name='IntelliJ Light'\n")) {
             var result = parse(text);
             assertThat(result.rejected()).as(text).isFalse();
             assertThat(result.diagnostics()).as(text).isEmpty();
-            assertThat(result.snapshot().variant()).as(text).isEqualTo(Appearance.LIGHT);
+            assertThat(result.snapshot().theme()).as(text).isEqualTo("IntelliJ Light");
         }
     }
 
-    @Test void invalidVariantDefaultsWhileWrongTypeRejectsAndLegacyColorsWarn() {
-        var invalid = parse("[ui.theme]\nvariant='system'");
-        assertThat(invalid.rejected()).isFalse();
-        assertThat(invalid.snapshot().variant()).isEqualTo(Appearance.DARK);
-        assertPosition(invalid, "ui.theme.variant", 2, 1, ConfigDiagnostic.Severity.ERROR);
-
-        var wrongType = parse("ui.theme.variant=1");
+    @Test void aThemeNameOfTheWrongTypeRejectsAndLegacyColorsWarn() {
+        var wrongType = parse("ui.theme.name=1");
         assertThat(wrongType.rejected()).isTrue();
-        assertThat(wrongType.snapshot().variant()).isEqualTo(Appearance.DARK);
-        assertPosition(wrongType, "ui.theme.variant", 1, 1, ConfigDiagnostic.Severity.ERROR);
+        assertThat(wrongType.snapshot().theme()).isEqualTo("Jasper Dark");
+        assertPosition(wrongType, "ui.theme.name", 1, 1, ConfigDiagnostic.Severity.ERROR);
 
         var legacy = parse("[colors]\ntheme='jasper-light'\nappearance='system'");
         assertThat(legacy.rejected()).isFalse();
@@ -148,7 +142,7 @@ class ExpandedConfigTest {
             assertThat(result.rejected()).as(assignment).isFalse();
             var expected = ConfigSnapshot.defaults();
             assertThat(result.snapshot()).isEqualTo(new ConfigSnapshot(44, expected.toolbar(), expected.statusBar(),
-                expected.font(), expected.variant(), expected.keybindings(), expected.columns(), expected.lines(), expected.terminal()));
+                expected.font(), expected.theme(), expected.keybindings(), expected.columns(), expected.lines(), expected.terminal()));
             assertThat(result.diagnostics()).singleElement().satisfies(d -> {
                 assertThat(d.severity()).as(assignment).isEqualTo(ConfigDiagnostic.Severity.ERROR);
                 assertThat(d.message()).doesNotContain("secret", "bad");
@@ -218,13 +212,13 @@ class ExpandedConfigTest {
 
     @Test void defaultsAndOldConstructorRetainAppDefaultsAndRuntimeConversion() {
         var snapshot = parse("").snapshot();
-        assertThat(snapshot.columns()).isEqualTo(150);
-        assertThat(snapshot.lines()).isEqualTo(45);
+        assertThat(snapshot.columns()).isEqualTo(100);
+        assertThat(snapshot.lines()).isEqualTo(35);
         assertThat(snapshot.font()).isEqualTo(new FontConfig("JetBrains Mono", 16f,
             List.of("Symbols Nerd Font Mono", "Apple Color Emoji"), true, 1f));
         assertThat(snapshot.terminal()).isEqualTo(new TerminalConfig(new TerminalConfig.Shell("", List.of()),
             Map.of(), 10000, OptionAsMeta.LEFT, CursorStyle.BLOCK, true, .3f, false, BellMode.VISUAL));
-        var legacy = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(22f), Theme.LIGHT.appearance(), Map.of(), 150, 45, TerminalConfig.defaults());
+        var legacy = new ConfigSnapshot(40, ToolbarMode.HIDDEN, false, FontConfig.defaults().withSize(22f), Theme.LIGHT.name(), Map.of(), 150, 45, TerminalConfig.defaults());
         assertThat(legacy.font().size()).isEqualTo(22f);
         assertThat(legacy.fontSize()).isEqualTo(22f);
         assertThat(legacy.columns()).isEqualTo(150);
@@ -321,10 +315,10 @@ class ExpandedConfigTest {
             assertThatIllegalArgumentException().isThrownBy(() -> new TerminalConfig(shell, Map.of(), 12, OptionAsMeta.NONE, CursorStyle.BLOCK, true, dim, false, BellMode.NONE));
         }
         for (int columns : new int[]{4, 501}) {
-            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, font, Theme.DARK.appearance(), Map.of(), columns, 45, terminal));
+            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, font, Theme.DARK.name(), Map.of(), columns, 45, terminal));
         }
         for (int lines : new int[]{1, 201}) {
-            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, font, Theme.DARK.appearance(), Map.of(), 150, lines, terminal));
+            assertThatIllegalArgumentException().isThrownBy(() -> new ConfigSnapshot(38, ToolbarMode.ICONS, true, font, Theme.DARK.name(), Map.of(), 150, lines, terminal));
         }
     }
 

@@ -81,7 +81,7 @@ class ShellIntegrationEndToEndTest {
             terminal.dimInactivePanes(), terminal.copyOnSelect(), terminal.bell(), terminal.onExit(),
             ShellIntegrationMode.AUTO);
         return new ConfigSnapshot(defaults.tabHeight(), defaults.toolbar(), defaults.statusBar(), defaults.font(),
-            defaults.variant(), Map.of(), defaults.columns(), defaults.lines(), configured, defaults.buddyEnabled(),
+            defaults.theme(), Map.of(), defaults.columns(), defaults.lines(), configured, defaults.buddyEnabled(),
             defaults.maxResults());
     }
 

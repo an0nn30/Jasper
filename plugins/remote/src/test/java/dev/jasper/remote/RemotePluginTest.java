@@ -239,6 +239,7 @@ class RemotePluginTest {
             assertThat(host.panels()).containsExactly("dev.jasper.remote.sftp.panel|SFTP|LEFT","dev.jasper.remote.panel|SSH hosts|LEFT");
             assertThat(host.scopes()).containsExactly("dev.jasper.remote.scope|SSH|connect,split,edit");
             assertThat(host.menu("top:dev.jasper.remote.menu")).isNotEmpty();
+            assertThat(host.menu("VIEW")).as("View > Tools already toggles both panels").isEmpty();
             assertThat(host.status()).as("hidden at zero").isEmpty();
             assertThat(vault.consumers).containsExactly("dev.jasper.remote");
 

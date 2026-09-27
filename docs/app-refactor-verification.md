@@ -141,8 +141,12 @@ Baseline application resource entries:
 - `dev/jasper/app/shell-integration/zsh/.zprofile`
 - `dev/jasper/app/shell-integration/zsh/.zshenv`
 - `dev/jasper/app/shell-integration/zsh/.zshrc`
+- `dev/jasper/app/themes/intellij/DefaultColorSchemesManager.xml`
 - `dev/jasper/app/themes/intellij/LICENSE.txt`
 - `dev/jasper/app/themes/intellij/Light.theme.json`
+- `dev/jasper/app/themes/intellij/NOTICE.txt`
+- `dev/jasper/app/themes/intellij/SOURCE.md`
+- `dev/jasper/app/themes/intellij/assets.tsv`
 - `dev/jasper/app/themes/intellij/darcula.theme.json`
 - `dev/jasper/app/themes/intellij/intellijlaf.theme.json`
 - `dev/jasper/app/themes/jasper-dark.theme.json`

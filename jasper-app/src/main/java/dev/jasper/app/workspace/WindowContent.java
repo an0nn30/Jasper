@@ -6,7 +6,6 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.Command;
 import dev.jasper.app.commands.CommandRegistry;
-import dev.jasper.app.config.Appearance;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
@@ -80,6 +79,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     Runnable onTabHeightChanged = () -> {};
     java.util.function.ToIntFunction<JComponent> confirmTabHeight = control -> JOptionPane.showConfirmDialog(
         this, control, "Tab height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+    private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
+    java.util.function.ToIntFunction<JComponent> confirmRailWidth = control -> JOptionPane.showConfirmDialog(
+        this, control, "Rail width", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+    private int toolbarHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
+    java.util.function.ToIntFunction<JComponent> confirmToolbarHeight = control -> JOptionPane.showConfirmDialog(
+        this, control, "Toolbar height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+    private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
+    java.util.function.ToIntFunction<JComponent> confirmStatusBarHeight = control -> JOptionPane.showConfirmDialog(
+        this, control, "Status bar height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     private boolean closed;
     private boolean rearranging;
     private WindowTerminals terminals;
@@ -185,8 +193,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if (bar != null) bar.setTitle(display);
         };
         if (bar != null) {
-            content.onThemeChanged = theme -> bar.setLight(theme.chrome().appearance() == Appearance.LIGHT);
-            bar.setLight(content.theme().chrome().appearance() == Appearance.LIGHT);
+            content.onThemeChanged = theme -> bar.setLight(!theme.chrome().dark());
+            bar.setLight(!content.theme().chrome().dark());
         }
         content.update();
         return bar;
@@ -552,15 +560,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     ResolvedTheme theme() { return themes.current(); }
 
-    Appearance appearance() { return themes.choice(); }
-
+    /** Applies {@code theme} to every window, as the saved configuration applies its theme. */
     void selectTheme(Theme theme) {
-        selectAppearance(theme == Theme.LIGHT ? Appearance.LIGHT : Appearance.DARK);
-    }
-
-    void selectAppearance(Appearance appearance) {
         if (closed) return;
-        try { themes.selectAppearance(appearance); }
+        try { themes.configure(theme); }
         catch (ThemeController.InstallationFailure failure) { onError.accept(failure.getMessage()); }
         finally { chrome.refreshTheme(); chrome.status().refreshTheme(); }
     }
@@ -606,9 +609,47 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     int tabHeight() { return tabHeight; }
 
+    int railWidth() { return railWidth; }
+
+    int toolbarHeight() { return toolbarHeight; }
+
+    int statusBarHeight() { return statusBarHeight; }
+
+    /** Rejects a size outside its range, naming the setting and its limits. */
+    private static void requireSize(String setting, int value, int min, int max) {
+        if (value < min || value > max)
+            throw new IllegalArgumentException(setting + " must be between " + min + " and " + max + " pixels");
+    }
+
+    void setToolbarHeight(int height) {
+        requireSize("Toolbar height", height, ConfigSnapshot.MIN_TOOLBAR_HEIGHT, ConfigSnapshot.MAX_TOOLBAR_HEIGHT);
+        if (closed || toolbarHeight == height) return;
+        toolbarHeight = height;
+        chrome.setToolbarHeight(height);
+        revalidate(); repaint();
+        onMinimumSizeChanged.run();
+    }
+
+    void setStatusBarHeight(int height) {
+        requireSize("Status bar height", height, ConfigSnapshot.MIN_STATUS_BAR_HEIGHT, ConfigSnapshot.MAX_STATUS_BAR_HEIGHT);
+        if (closed || statusBarHeight == height) return;
+        statusBarHeight = height;
+        chrome.status().setBarHeight(height);
+        revalidate(); repaint();
+        onMinimumSizeChanged.run();
+    }
+
+    void setRailWidth(int width) {
+        requireSize("Rail width", width, ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH);
+        if (closed || railWidth == width) return;
+        railWidth = width;
+        rail.setRailWidth(width);
+        revalidate(); repaint();
+        onMinimumSizeChanged.run();
+    }
+
     void setTabHeight(int height) {
-        if (height < MIN_TAB_HEIGHT || height > MAX_TAB_HEIGHT)
-            throw new IllegalArgumentException("Tab height must be between 20 and 72 pixels");
+        requireSize("Tab height", height, MIN_TAB_HEIGHT, MAX_TAB_HEIGHT);
         if (closed || tabHeight == height) return;
         tabHeight = height;
         if (windowTabs != null) { windowTabs.revalidate(); windowTabs.repaint(); }
@@ -653,6 +694,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
         confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
+        confirmRailWidth = control -> JOptionPane.CANCEL_OPTION;
+        confirmToolbarHeight = control -> JOptionPane.CANCEL_OPTION;
+        confirmStatusBarHeight = control -> JOptionPane.CANCEL_OPTION;
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
         activityListeners.clear();

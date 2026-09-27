@@ -44,11 +44,12 @@ public final class ConfigLoader {
         // palette.scopes once held the History scope's settings; the table is kept known so the
         // moved-to-a-plugin report below replaces the generic unknown-key warning.
         Map.entry(List.of("palette", "scopes"), Set.of()),
-        Map.entry(List.of("window"), Set.of("tab_height", "toolbar", "status_bar", "columns", "lines")),
+        Map.entry(List.of("window"), Set.of("tab_height", "rail_width", "toolbar", "toolbar_height", "status_bar",
+            "status_bar_height", "columns", "lines")),
         Map.entry(List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height")),
         Map.entry(List.of("ui"), Set.of("theme", "font")),
         Map.entry(List.of("ui", "font"), Set.of("family", "size")),
-        Map.entry(List.of("ui", "theme"), Set.of("variant", "terminal")),
+        Map.entry(List.of("ui", "theme"), Set.of("name", "terminal")),
         Map.entry(List.of("terminal"), Set.of("shell", "env", "scrollback", "option_as_meta", "cursor",
             "dim_inactive_panes", "copy_on_select", "bell", "on_exit", "shell_integration")),
         Map.entry(List.of("terminal", "shell"), Set.of("program", "args")),
@@ -60,14 +61,17 @@ public final class ConfigLoader {
     private final List<ConfigDiagnostic> diagnostics = new ArrayList<>();
     private boolean rejected;
     private int tabHeight = 30;
+    private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
+    private int toolbarHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
+    private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
     private ToolbarMode toolbar = ToolbarMode.ICONS_AND_LABELS;
     private boolean statusBar = true;
-    private boolean buddyEnabled = true;
+    private boolean buddyEnabled = false;
     private boolean backgroundEnabled;
     private int longCommandSeconds = 10;
     private int maxResults = PaletteSettings.DEFAULT_MAX_RESULTS;
-    private int columns = 150;
-    private int lines = 45;
+    private int columns = 100;
+    private int lines = 35;
     private String fontFamily = FontConfig.defaults().family();
     private float fontSize = 16f;
     private String uiFontFamily = UiFontConfig.defaults().family();
@@ -87,7 +91,7 @@ public final class ConfigLoader {
     private BellMode bell = BellMode.VISUAL;
     private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
     private ShellIntegrationMode shellIntegration = ShellIntegrationMode.AUTO;
-    private Appearance variant = Appearance.DARK;
+    private String theme = ConfigSnapshot.DEFAULT_THEME;
     private TerminalColors terminalColors = TerminalColors.MATCH;
     private Map<String, String> keybindings = Map.of();
     private Map<String, Map<String, Object>> plugins = Map.of();
@@ -113,10 +117,11 @@ public final class ConfigLoader {
         readTable(List.of(), toml);
         diagnostics.sort(Comparator.comparingInt(ConfigDiagnostic::line).thenComparingInt(ConfigDiagnostic::column));
         var snapshot = new ConfigSnapshot(tabHeight, toolbar, statusBar,
-            new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), variant, keybindings, columns, lines,
+            new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), theme, keybindings, columns, lines,
             new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
                 cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, new UiFontConfig(uiFontFamily, uiFontSize), terminalColors);
+                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, new UiFontConfig(uiFontFamily, uiFontSize), terminalColors, railWidth,
+                toolbarHeight, statusBarHeight);
         return new Result(snapshot, diagnostics, rejected);
     }
 
@@ -201,6 +206,12 @@ public final class ConfigLoader {
     private void readField(String name, List<String> path, Object value) {
         switch (name) {
             case "window.tab_height" -> tabHeight = clampedInteger(path, value, 20, 72, tabHeight);
+            case "window.rail_width" -> railWidth = clampedInteger(path, value,
+                ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH, railWidth);
+            case "window.toolbar_height" -> toolbarHeight = clampedInteger(path, value,
+                ConfigSnapshot.MIN_TOOLBAR_HEIGHT, ConfigSnapshot.MAX_TOOLBAR_HEIGHT, toolbarHeight);
+            case "window.status_bar_height" -> statusBarHeight = clampedInteger(path, value,
+                ConfigSnapshot.MIN_STATUS_BAR_HEIGHT, ConfigSnapshot.MAX_STATUS_BAR_HEIGHT, statusBarHeight);
             case "window.columns" -> columns = integer(path, value, 5, 500, columns);
             case "window.lines" -> lines = integer(path, value, 2, 200, lines);
             case "window.toolbar" -> toolbar = choice(path, value, Map.of(
@@ -221,8 +232,8 @@ public final class ConfigLoader {
             case "font.fallback" -> fallback = strings(path, value, ConfigLoader::fontName, fallback);
             case "font.ligatures" -> ligatures = bool(path, value, ligatures);
             case "font.line_height" -> lineHeight = number(path, value, .5, 3, lineHeight);
-            case "ui.theme.variant" -> variant = choice(path, value, Map.of(
-                "light", Appearance.LIGHT, "dark", Appearance.DARK), variant);
+            // Any name: whether a theme has it is known only to the theme catalog.
+            case "ui.theme.name" -> theme = string(path, value, ignored -> true, "", theme).strip();
             case "ui.theme.terminal" -> terminalColors = choice(path, value, Map.of(
                 "match", TerminalColors.MATCH, "light", TerminalColors.LIGHT, "dark", TerminalColors.DARK), terminalColors);
             case "terminal.shell.program" -> program = string(path, value,
