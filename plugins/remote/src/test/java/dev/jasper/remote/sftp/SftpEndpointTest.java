@@ -111,6 +111,13 @@ class SftpEndpointTest {
             try (var in = endpoint.read("/sparse", offset)) { assertThat(in.read()).isEqualTo(41); assertThat(in.read()).isEqualTo(-1); }
         }
     }
+    /** A failed write reaches the caller as itself, not as try-with-resources' "Self-suppression not permitted". */
+    @Test void aFailedWriteSurfacesItsOwnErrorThroughClose() throws Exception {
+        try (var fixture = new Fixture(new SftpSubsystemFactory()); var endpoint = fixture.endpoint(Duration.ofSeconds(3))) {
+            assertThatThrownBy(() -> { try (var out = endpoint.write("/overflow", Long.MAX_VALUE - 1, true)) { out.write(new byte[2]); } })
+                .isInstanceOf(java.io.IOException.class).hasMessageContaining("File offset overflow");
+        }
+    }
     @Test void unsupportedAtomicReplaceLeavesBothFilesUnchanged() throws Exception {
         try (var fixture = new Fixture(new SftpSubsystemFactory())) {
             org.apache.sshd.sftp.SftpModuleProperties.OPENSSH_EXTENSIONS.set(fixture.server.server, ",");
