@@ -299,3 +299,17 @@ app.platform. Icons select dark siblings live and preserve aspect ratio in a 16p
 The fake returns `FakeBundledIcon`; older hosts inherit an explicit unsupported default.
 Vault manager controls and Remote page chevrons now use semantic icons, removing their
 private painters. See [the catalog contract](sdk-icons.md).
+
+### Provider remote-directory hints (SDK 0.8.3)
+
+`PendingSession.reportRemoteDirectory(RemoteDirectory)` is a binary-compatible default
+method. The host accepts hints only from the pane's current attached attempt while its
+session is running. It posts to the EDT, stores the hint as display metadata, and includes
+it in `PaneInfo.remoteDirectory()` when the terminal has not reported OSC 7. Reconnect
+clears the hint; old attempts and closed panes cannot replace it. The local `Path` surface,
+command events and `CWD_CHANGED` retain their shell-reported semantics.
+
+Remote shares its existing SFTP directory follower with the active pane, so a followed
+SSH session can display its path without opening SFTP. Focus and Enter request the same
+bounded read-only probe. The saved host's follow setting remains authoritative; OSC 7
+ends probing and takes precedence. The fake host models the same fallback and lifetime.

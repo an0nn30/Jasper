@@ -71,6 +71,42 @@ class SessionPaneTest {
         return value;
     }
 
+    @Test void providerDirectoryIsDisplayOnlyAndOldAttemptsCannotChangeAReconnectedPane() throws Exception {
+        open(false);
+        edt(() -> assertThat(pane.locationLabel()).isEqualTo("build-host"));
+        var first = new Loopback();
+        var original = attempts.getFirst();
+        original.attach(first.connection());
+        until(() -> pane.view() != null);
+        original.reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("build-host", "/srv/one"));
+        until(() -> pane.snapshot().remoteDirectory().isPresent());
+        edt(() -> {
+            assertThat(pane.locationLabel()).isEqualTo("build-host:/srv/one");
+            assertThat(pane.snapshot().workingDirectory()).isEmpty();
+            assertThat(pane.directory()).isEqualTo(HOME);
+            assertThat(events).noneMatch(event -> event instanceof TerminalEvent.DirectoryChanged);
+        });
+        first.exit(0);
+        until(() -> pane.noticePrimary().isVisible());
+        edt(() -> pane.noticePrimary().doClick());
+        edt(() -> assertThat(pane.snapshot().remoteDirectory()).isEmpty());
+        var second = new Loopback();
+        attempts.getLast().attach(second.connection());
+        until(() -> pane.running());
+        original.reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("old", "/stale"));
+        edt(() -> assertThat(pane.snapshot().remoteDirectory()).isEmpty());
+        attempts.getLast().reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("new", "/srv/two"));
+        until(() -> pane.locationLabel().equals("new:/srv/two"));
+        second.remote.write("\033]7;file://shell-host/shell/path\007".getBytes(StandardCharsets.UTF_8));
+        second.remote.flush();
+        until(() -> pane.locationLabel().equals("shell-host:/shell/path"));
+        attempts.getLast().reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("new", "/must-not-win"));
+        edt(() -> assertThat(pane.locationLabel()).isEqualTo("shell-host:/shell/path"));
+        edt(() -> pane.close());
+        attempts.getLast().reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("new", "/closed"));
+        edt(() -> assertThat(pane.locationLabel()).isEqualTo("shell-host:/shell/path"));
+    }
+
     @Test void thePaneAppearsFirstThenShowsTheAttachedSessionAndTypesIntoIt() throws Exception {
         open(false);
         edt(() -> {

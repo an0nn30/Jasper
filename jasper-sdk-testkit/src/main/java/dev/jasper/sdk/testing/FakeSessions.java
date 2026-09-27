@@ -28,6 +28,7 @@ final class FakeSessions {
     /** What one pane knows about its provided session. */
     static final class Session {
         final FakePluginContext owner; final SessionSpec spec;
+        dev.jasper.sdk.terminal.RemoteDirectory directory;
         Attempt attempt; TerminalConnection connection; boolean everAttached; String state = "CONNECTING"; String status = "";
         Session(FakePluginContext owner, SessionSpec spec) { this.owner = owner; this.spec = spec; }
     }
@@ -51,6 +52,13 @@ final class FakeSessions {
             pane.session.connection = connection; pane.session.everAttached = true; pane.session.state = "RUNNING"; pane.session.status = "";
             pane.info = FakeTerminals.withState(pane.info, SessionState.RUNNING, OptionalInt.empty());
             host.publishApp(TerminalEvents.SESSION_STATE_CHANGED, new TerminalEvents.SessionStateChanged(pane.id, SessionState.RUNNING, OptionalInt.empty()));
+        }
+        @Override public void reportRemoteDirectory(dev.jasper.sdk.terminal.RemoteDirectory directory) {
+            Objects.requireNonNull(directory, "directory");
+            if (outcome.get() != Outcome.ATTACHED || pane.session.attempt != this || !pane.open
+                    || pane.session.connection == null || pane.session.connection.exited().isDone()
+                    || pane.info.remoteDirectory().isPresent()) return;
+            pane.session.directory = directory;
         }
         @Override public void fail(String message) {
             if (!outcome.compareAndSet(Outcome.PENDING, Outcome.FAILED) || pane.session.attempt != this) return;
@@ -106,6 +114,10 @@ final class FakeSessions {
         if (pane.session == null) pane.session = new Session(owner, spec);
         var attempt = new Attempt(pane);
         pane.session.attempt = attempt;
+        pane.session.directory = null;
+        var old = pane.info;
+        pane.info = new dev.jasper.sdk.terminal.PaneInfo(old.title(), old.workingDirectory(), java.util.Optional.empty(),
+            old.columns(), old.rows(), old.shellIntegration(), old.kind(), old.providerPluginId(), old.state(), old.exitStatus(), old.shell());
         pane.session.state = "CONNECTING"; pane.session.status = "";
         pane.info = FakeTerminals.withState(pane.info, SessionState.CONNECTING, OptionalInt.empty());
         host.publishApp(TerminalEvents.SESSION_STATE_CHANGED, new TerminalEvents.SessionStateChanged(pane.id, SessionState.CONNECTING, OptionalInt.empty()));

@@ -99,7 +99,12 @@ final class FakeTerminals implements Terminals {
         @Override public PaneInfo info() {
             require(Capabilities.TERMINAL_OBSERVE);
             context.requireOpen();
-            model().ifPresent(pane -> last = pane.info);
+            model().ifPresent(pane -> {
+                var info = pane.info;
+                var remote = info.remoteDirectory().or(() -> java.util.Optional.ofNullable(pane.session == null ? null : pane.session.directory));
+                last = new PaneInfo(info.title(), info.workingDirectory(), remote, info.columns(), info.rows(), info.shellIntegration(),
+                    info.kind(), info.providerPluginId(), info.state(), info.exitStatus(), info.shell());
+            });
             return last;
         }
         @Override public CompletableFuture<Optional<String>> foregroundJob() {

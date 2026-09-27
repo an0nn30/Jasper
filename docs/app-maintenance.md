@@ -308,3 +308,21 @@ underline remains. Workspace-region splitters remove their border/grip after eve
 update; terminal-internal splits keep their existing visible indicators. The standalone
 dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
 previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
+
+
+Status-bar breadcrumbs are rendered by `PathBreadcrumbs` from the focused pane's
+`PaneSnapshot`. Local paths abbreviate the home directory as `~`; remote paths stay
+strings, with the provider's saved host label as their first segment. Unknown remote
+directories show the host without a local-directory fallback. Ancestors collapse into
+an ellipsis as space shrinks, preserving the current folder; tooltips and accessibility
+retain the full path. Colors and icons follow the active theme. Breadcrumbs are display
+metadata, not shell navigation commands.
+
+Remote reuses SFTP's `DirectoryFollower` for the active SSH pane even when the SFTP
+panel is closed. SDK 0.8.3's `PendingSession.reportRemoteDirectory` carries the probe
+result through the host adapter to the current pane attempt. These hints affect display
+snapshots only, never local `Path`, command metadata, or `CWD_CHANGED`; actual OSC 7
+reports take precedence and stop probing. Reconnect clears the hint, and old attempts
+cannot update the replacement session. The existing host `followDirectory` setting,
+dedicated connections, OS support and failure limits still apply. `PathBreadcrumbsTest`
+saves light/dark local/remote/narrow previews under `build/render-preview`.

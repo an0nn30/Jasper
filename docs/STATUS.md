@@ -2,6 +2,20 @@
 
 ## Current state — 2026-09-23
 
+- **Local and SSH status breadcrumbs** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  status paths now render as theme-aware folder/host segments with chevrons. Narrow
+  windows collapse ancestors while retaining the current folder; tooltips and accessible
+  text keep the full path. Remote hosts appear once, and an unknown remote path never
+  falls back to the local home. Remote reuses SFTP's read-only folder follower for the
+  active SSH pane, including when SFTP is closed, respecting host follow settings and
+  existing OS support. SDK 0.8.3 adds an additive provider-directory hint: display only,
+  actual OSC 7 wins, reconnect clears it, and stale/closed attempts cannot overwrite it.
+  Headless local/remote/narrow light/dark previews inspected. Independent review caught
+  a Windows-invalid display fixture; production now uses typed snapshots only. A
+  failing large-font test led to content-aware status height; re-review is clean.
+  `check :jasper-app:packageDist` passed: 2,041 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
 - **Fluid workspace surfaces** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   removed rail, workspace-header, toolbar, tab-strip and status-bar boundary rules;
   selected-tab underlines remain. The terminal/tab column now has rounded upper

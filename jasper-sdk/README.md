@@ -32,7 +32,7 @@ var unlock = context.appearance().icon(IconName.UNLOCK);
 Import `dev.jasper.sdk.ui.IconName`. Plugins request only the meaning, without image paths.
 Icons use IntelliJ New UI artwork, selected centrally and fitted into a 16px square.
 SDK 0.8.2 also exposes all 885 catalog choices through `Appearance.icon(BundledIcon)`.
-Vault and Remote require `sdk = ">=0.8.2, <0.9"`. Other bundled plugins retain their 0.8.0 floor.
+Vault requires `sdk = ">=0.8.2, <0.9"`; Remote requires `sdk = ">=0.8.3, <0.9"`. Other bundled plugins retain their 0.8.0 floor.
 Older custom hosts inherit UnsupportedOperationException until they implement each catalog.
 See the [catalog, size rules and testkit example](../docs/sdk-icons.md).
 
@@ -49,3 +49,9 @@ to the plugin. Close the handle when finished.
 
 `FILE`, `LINK`, `UPLOAD`, `DOWNLOAD`, `UP`, `NEW_FOLDER`, `PAUSE` and `RESUME` extend the
 semantic icon catalog. All these additions arrived in SDK 0.7.5.
+
+SDK 0.8.3 adds `PendingSession.reportRemoteDirectory(RemoteDirectory)` for session
+providers that discover a remote shell's directory through their transport. The hint
+updates display and `PaneInfo.remoteDirectory()` only; shell OSC 7 reports take precedence.
+Reports before attachment, after exit/close, or from an old reconnect attempt are ignored.
+The hint never becomes a local `Path`, changes command history, or emits `CWD_CHANGED`.

@@ -561,8 +561,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         TerminalPane pane = currentPane();
         String size = pane == null || pane.session() == null ? "Starting terminal" :
             pane.session().columns() + " \u00d7 " + pane.session().rows();
-        chrome.status().setMetadata(pane == null ? "" : pane.shellLabel(), pane == null ? "" : pane.locationLabel(),
-            pane == null ? "" : size, pane != null && pane.running(), pane != null && pane.shellIntegrationDetected());
+        chrome.status().setMetadata(pane == null ? null : pane.snapshot(), pane == null ? "" : size, pane != null && pane.running());
         onTitle.accept(currentTab() == null ? "Jasper" : currentTab().title());
         updateActions(); refreshTabs(); onMinimumSizeChanged.run();
         if (terminals != null) terminals.refresh();

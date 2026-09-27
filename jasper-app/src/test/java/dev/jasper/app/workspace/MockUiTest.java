@@ -76,10 +76,10 @@ class MockUiTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var status = owner.status(); status.setSize(600, 30);
-            status.setMetadata("bash", "/tmp", "91 \u00d7 35", true, false); layoutTree(status);
+            DesktopTestSupport.setStatusMetadata(status, "bash", "/tmp", "91 \u00d7 35", true, false); layoutTree(status);
             BufferedImage before = paint(status);
             assertThat(before.getRGB(32, 30) & 0xffffff).isEqualTo(0xa8c58d);
-            status.setMetadata("bash", "/very-long-directory".repeat(100), "91 \u00d7 35", false, false); layoutTree(status);
+            DesktopTestSupport.setStatusMetadata(status, "bash", "/very-long-directory".repeat(100), "91 \u00d7 35", false, false); layoutTree(status);
             BufferedImage after = paint(status);
             assertThat(status.getMinimumSize().width).isZero();
             assertThat(status.getPreferredSize().width).isZero();
@@ -99,11 +99,11 @@ class MockUiTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var status = owner.status();
-            status.setMetadata("bash", "/tmp", "91 \u00d7 35", true, true);
+            DesktopTestSupport.setStatusMetadata(status, "bash", "/tmp", "91 \u00d7 35", true, true);
             assertThat(status.getText()).contains("bash \u25cf");
             assertThat(status.getAccessibleContext().getAccessibleDescription())
                 .contains("shell integration active");
-            status.setMetadata("bash", "/tmp", "91 \u00d7 35", true, false);
+            DesktopTestSupport.setStatusMetadata(status, "bash", "/tmp", "91 \u00d7 35", true, false);
             assertThat(status.getText()).contains("bash \u25cb");
             // A screen reader must hear what the glyph means, not "white circle".
             assertThat(status.getAccessibleContext().getAccessibleDescription())

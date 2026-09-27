@@ -93,6 +93,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     Runnable onPaneBlurred = () -> {};
     private final SessionRequest request;
     private SessionAttempt attempt;
+    /** Provider metadata belongs to this attempt and is read only on the EDT. */
+    private RemoteLocation providerDirectory;
     private final JLabel noticeLabel = new JLabel();
     private final JButton noticePrimary = new JButton();
     private final JButton noticeSecondary = new JButton();
@@ -256,11 +258,16 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         ShellLauncher.SessionDefaults defaults = launcher.sessionDefaults();
         var current = new SessionAttempt(id, defaults.columns(), defaults.lines(), request.cleanup(), SwingUtilities::invokeLater);
         attempt = current;
+        providerDirectory = null;
         current.onStatus = text -> { if (!closed && attempt == current) showPending(text); };
         current.onAttached = connection -> {
             // The pane may have closed, or moved on, between the attach and this hop to the EDT.
             if (closed || attempt != current) { connection.close().run(); return; }
             adopt(TerminalSession.attach(connection, new GridSize(defaults.columns(), defaults.lines()), defaults.scrollback()));
+        };
+        current.onRemoteDirectory = directory -> {
+            if (closed || attempt != current || !running() || session.remoteDirectory().isPresent()) return;
+            if (!directory.equals(providerDirectory)) { providerDirectory = directory; onChanged.run(); }
         };
         current.onFailed = message -> { if (!closed && attempt == current) showDisconnected(message); };
         showPending("Connecting…");
@@ -367,8 +374,16 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
             : session.remoteDirectory().map(directory -> new RemoteLocation(directory.host(), directory.path()));
     }
 
-    /** Where this pane is, for display: {@code host:path} when the program reports a remote directory. */
-    String locationLabel() { return remoteOf(session).map(RemoteLocation::label).orElseGet(() -> directory().toString()); }
+    private Optional<RemoteLocation> displayRemoteDirectory() {
+        if (attempt != null && attempt.state() != SessionAttempt.State.ATTACHED) return Optional.empty();
+        return remoteOf(session).or(() -> Optional.ofNullable(providerDirectory));
+    }
+
+    /** Where this pane is, for display; provider labels stand in until its remote path is known. */
+    String locationLabel() {
+        return displayRemoteDirectory().map(RemoteLocation::label)
+            .orElseGet(() -> request == null ? directory().toString() : shellLabel);
+    }
 
     /** The provider's tab icon, or {@code null} for a local shell or a provider that chose none. */
     javax.swing.Icon providedIcon() { return request == null ? null : request.icon(); }
@@ -386,7 +401,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         boolean exited = exit.isDone();
         Integer code = exited && !exit.isCompletedExceptionally() ? exit.getNow(null) : null;
         return new PaneSnapshot(title(), session.workingDirectory(), session.columns(), session.rows(), session.shellIntegrationDetected(),
-            exited ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING, code == null ? OptionalInt.empty() : OptionalInt.of(code), provider, remoteOf(session), shellLabel);
+            exited ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING, code == null ? OptionalInt.empty() : OptionalInt.of(code), provider, displayRemoteDirectory(), shellLabel);
     }
 
     /** The foreground job, asked off the EDT like the pane's own poll; empty when nothing runs here. */

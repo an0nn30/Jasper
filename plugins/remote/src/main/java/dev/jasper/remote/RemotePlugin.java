@@ -76,6 +76,7 @@ public class RemotePlugin implements Plugin {
     private dev.jasper.remote.ui.transfers.TransferUi transferUi;
     private dev.jasper.remote.ui.sftp.SftpUi sftpUi;
     private dev.jasper.remote.ui.sftp.DirectoryFollower follower;
+    private final Map<UUID, PendingSession> attachedPanes = new java.util.HashMap<>();
     private PluginAction sftpToggle;
     public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=dev.jasper.remote.ui.sftp.SftpUi.TOGGLE;
     private final Function<PluginContext, Optional<AgentClient>> agentFactory;
@@ -161,7 +162,7 @@ public class RemotePlugin implements Plugin {
         });
         transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui,window->sftpUi.reveal(window));
         sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::strip,transferUi::release);
-        follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id),sftpUi::directory,sftpUi::notice);
+        follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id)||context.terminals().activePane().map(pane->pane.id().equals(id)).orElse(false),this::probedDirectory,sftpUi::notice);
         sftpUi.onFollowRequested(follower::request);
         context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp","files","browse","remote")),invoked->{
             invoked.pane().flatMap(this::sftpPane).ifPresentOrElse(pane->sftpUi.show(invoked.window(),pane),()->sftpUi.show(invoked.window()));
@@ -193,7 +194,7 @@ public class RemotePlugin implements Plugin {
             event.paneId().ifPresent(id->{rememberPane(id);sftpFocused(id);}); refreshSplit();
         });
         context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> { rememberPane(event.paneId());sftpFocused(event.paneId()); });
-        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
+        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { attachedPanes.remove(event.paneId()); panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); refreshPanels(); });
         context.events().subscribe(TerminalEvents.WINDOW_CLOSED, event -> {
             for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
         });
@@ -247,15 +248,28 @@ public class RemotePlugin implements Plugin {
         var identity=paneIdentities.get(pane.id());if(identity==null)return Optional.empty();
         return Optional.of(new dev.jasper.remote.ui.sftp.SftpUi.PaneTarget(pane.id(),identity,pane.info().remoteDirectory().map(dev.jasper.sdk.terminal.RemoteDirectory::path).orElse("")));
     }
-    private void sftpFocused(UUID id) { context.terminals().pane(id).ifPresent(pane->sftpPane(pane).ifPresent(target->sftpUi.pane(pane.tab().window(),target))); }
-    /** Linux and macOS panes on a dedicated connection report their folder to SFTP follow; Windows hosts are not followed. */
+    private void sftpFocused(UUID id) {
+        context.terminals().pane(id).ifPresent(pane->sftpPane(pane).ifPresent(target->sftpUi.pane(pane.tab().window(),target)));
+        follower.request(id);
+    }
+    private void probedDirectory(UUID paneId, String path) {
+        var pending = attachedPanes.get(paneId);
+        var identity = paneIdentities.get(paneId);
+        if (pending == null || identity == null) return;
+        pending.reportRemoteDirectory(new dev.jasper.sdk.terminal.RemoteDirectory(identity.host().hostname(), path));
+        sftpUi.directory(paneId, path);
+    }
+    /** Dedicated supported shells share their folder with pane metadata and SFTP follow. */
     private void followFolder(UUID paneId, Connections.Shell shell, dev.jasper.remote.hosts.HostInfo info) {
         if (shell.folder().isEmpty() || "Windows".equals(info.os())) return;
         var folder = shell.folder().orElseThrow();
         follower.track(paneId, () -> CompletableFuture.supplyAsync(() -> {
             try { return folder.read(); } catch (IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
         }, context.background()));
-        folder.onEnter(() -> ui.execute(() -> follower.enter(paneId)));
+        var pending = attachedPanes.get(paneId);
+        folder.onEnter(() -> ui.execute(() -> {
+            if (attachedPanes.get(paneId) == pending) follower.enter(paneId);
+        }));
         follower.request(paneId);
     }
     static CompletableFuture<Void> validateResumeIdentity(dev.jasper.remote.client.ConnectionIdentity expected,CompletableFuture<dev.jasper.remote.client.ConnectionIdentity> source) {
@@ -337,8 +351,12 @@ public class RemotePlugin implements Plugin {
     private void attach(PendingSession pending, Connections.Shell shell) {
         if (stopped || pending.isCancelled()) { shell.connection().close().run(); return; }
         UUID paneId = pending.pane().id();
+        attachedPanes.put(paneId, pending);
+        follower.forget(paneId);
         panes.put(paneId, shell.hostId()); paneIdentities.put(paneId, shell.identity()); rememberPane(paneId);sftpFocused(paneId);
         shell.connection().exited().whenComplete((ignored, exit) -> ui.execute(() -> {
+            if (attachedPanes.get(paneId) != pending) return;
+            attachedPanes.remove(paneId);
             panes.remove(paneId); paneIdentities.remove(paneId); follower.forget(paneId); recentPanes.remove(paneId); refreshSplit();
             if (!stopped) { sftpUi.ended(paneId); refreshPanels(); }
         }));
@@ -346,7 +364,7 @@ public class RemotePlugin implements Plugin {
         RemoteHost authenticatedHost = shell.host();
         connections.inspect(shell).thenAccept(info -> {
             if (stopped) return;
-            ui.execute(() -> { if (!stopped && panes.containsKey(paneId)) followFolder(paneId, shell, info); });
+            ui.execute(() -> { if (!stopped && attachedPanes.get(paneId) == pending) followFolder(paneId, shell, info); });
             context.background().execute(() -> {
                 try { hostInfo.put(authenticatedHost, info); }
                 catch (IOException unavailable) { context.log().log(System.Logger.Level.DEBUG, "Host information cache: {0}", unavailable.getMessage()); }

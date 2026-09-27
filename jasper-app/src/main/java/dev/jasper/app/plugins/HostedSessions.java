@@ -68,6 +68,10 @@ final class HostedSessions {
             Objects.requireNonNull(connection, "connection");
             attempt.attach(new AttachedConnection(connection.output(), connection.input(), connection.resize(), connection.exited(), connection.close()));
         }
+        @Override public void reportRemoteDirectory(dev.jasper.sdk.terminal.RemoteDirectory directory) {
+            Objects.requireNonNull(directory, "directory");
+            attempt.reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation(directory.host(), directory.path()));
+        }
         @Override public void fail(String message) { attempt.fail(message); }
         @Override public boolean isCancelled() { return attempt.isCancelled(); }
         @Override public Subscription onCancelled(Runnable handler) {

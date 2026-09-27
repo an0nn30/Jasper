@@ -109,7 +109,7 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
   `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.8.0, <0.9"`
-  (Remote and Vault `>=0.8.2`, for the new icon meanings).
+  (Vault `>=0.8.2` for icon meanings; Remote `>=0.8.3` for remote directory hints).
   Jasper supplies IntelliJ New UI artwork; plugins need no artwork. Returned icons are 16px.
   SDK 0.8.2 exposes the complete catalog with `icon(BundledIcon)`, for example
   `context.appearance().icon(BundledIcon.TOOLWINDOWS_PROJECT)`.
@@ -588,3 +588,10 @@ state afterwards; owner closure or plugin stop cancels and discards the result. 
 native multiple-file picker and a themed directory picker. Paths are absolute and normalized;
 perform subsequent filesystem work in the background. Existing `WindowSurface.chooseFile`
 continues to select one file for window-owned workflows.
+
+Session providers that independently discover the attached shell's remote directory may
+call `pending.reportRemoteDirectory(new RemoteDirectory(host, path))` from any thread
+(SDK 0.8.3). The hint appears in the pane snapshot and window display until the shell
+reports OSC 7. It does not emit `CWD_CHANGED`, affect command events, or create a local
+working directory. Calls made before attach, after exit/close, or by an old reconnect
+attempt have no effect. Declare a minimum SDK of 0.8.3 when using this method.

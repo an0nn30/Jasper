@@ -45,6 +45,19 @@ public interface PendingSession {
     void attach(TerminalConnection connection);
 
     /**
+     * Supplies a remote working-directory hint for the attached session's display and pane snapshot.
+     * Shell-reported directories take precedence. Calls before attachment, after exit or close, or from
+     * an older reconnect attempt are ignored. This never sets a local working directory, changes command
+     * history, or emits {@link TerminalEvents#CWD_CHANGED}. Safe from any thread.
+     *
+     * @param directory the remote host and absolute path, for display only
+     * @since 0.8.3
+     */
+    default void reportRemoteDirectory(RemoteDirectory directory) {
+        java.util.Objects.requireNonNull(directory, "directory");
+    }
+
+    /**
      * Ends the attempt unsuccessfully; the pane shows the message and offers to try again.
      *
      * @param message why, for the user
