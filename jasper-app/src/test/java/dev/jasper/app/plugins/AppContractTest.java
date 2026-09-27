@@ -157,7 +157,8 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public List<String> panels() {
                 return onEdtValue(() -> contributions.panels().stream()
-                    .map(panel -> panel.id() + "|" + panel.title() + "|" + panel.defaultRegion()).toList());
+                    .map(panel -> panel.id() + "|" + panel.title() + "|" + panel.defaultRegion()
+                        + (panel.namedToggle() ? "|" + panel.toggleActionId() : "")).toList());
             }
             @Override public javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId) {
                 return onEdtValue(() -> contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()

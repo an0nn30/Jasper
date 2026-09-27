@@ -118,13 +118,22 @@ public final class Contributions {
 
     public PanelEntry addPanel(String id, String title, Icon icon, PanelRegion defaultRegion,
                                Function<PanelSite, JComponent> factory) {
+        return addPanel(id, title, icon, defaultRegion, Optional.empty(), factory);
+    }
+
+    /** A panel toggled by {@code toggleActionId} when present; otherwise the model registers {@code <id>.toggle}. */
+    public PanelEntry addPanel(String id, String title, Icon icon, PanelRegion defaultRegion, Optional<String> toggleActionId,
+                               Function<PanelSite, JComponent> factory) {
         requireEdt();
         Objects.requireNonNull(factory, "factory");
         if (panels.containsKey(id)) throw new IllegalArgumentException("Panel already registered: " + id);
-        var entry = new PanelEntry(this, id, title, icon, Objects.requireNonNull(defaultRegion, "defaultRegion"), factory);
+        String toggle = toggleActionId.orElse(id + ".toggle");
+        var entry = new PanelEntry(this, id, title, icon, Objects.requireNonNull(defaultRegion, "defaultRegion"),
+            toggle, toggleActionId.isPresent(), factory);
         panels.put(id, entry);
-        panelToggles.put(id, addAction(id + ".toggle", "Toggle " + title, icon, List.of("panel", "show", "hide"), Optional.empty(),
-            invocation -> requestPanel(new PanelRequest(invocation.windowId(), id, PanelRequest.Op.TOGGLE))));
+        if (toggleActionId.isEmpty())
+            panelToggles.put(id, addAction(toggle, "Toggle " + title, icon, List.of("panel", "show", "hide"), Optional.empty(),
+                invocation -> requestPanel(new PanelRequest(invocation.windowId(), id, PanelRequest.Op.TOGGLE))));
         rebuildPanelsMenu();
         changed(Kind.PANELS);
         return entry;
@@ -209,7 +218,7 @@ public final class Contributions {
         changed(Kind.PANELS);
     }
 
-    /** One app-owned View section, "Tools", listing every panel's toggle; gone when there are no panels. */
+    /** One app-owned View section, "Tools", listing every panel's toggle action; gone when there are no panels. */
     private void rebuildPanelsMenu() {
         if (panels.isEmpty()) {
             if (panelsMenu != null) { panelsMenu.close(); panelsMenu = null; }
@@ -217,7 +226,7 @@ public final class Contributions {
         }
         if (panelsMenu == null) panelsMenu = addMenuSection(MenuTarget.standard(MenuTarget.Slot.VIEW));
         List<MenuEntry> toggles = new ArrayList<>();
-        for (String id : panels.keySet()) toggles.add(new MenuEntry.Item(id + ".toggle"));
+        for (PanelEntry panel : panels.values()) toggles.add(new MenuEntry.Item(panel.toggleActionId()));
         panelsMenu.set(List.of(new MenuEntry.Submenu("Tools", toggles)));
     }
 

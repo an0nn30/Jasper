@@ -470,6 +470,20 @@ public abstract class PluginContractTest {
         assertThat(h.menu("TAB")).isEmpty();
     }
 
+    @Test void aPanelMayNameOneOfThePluginsOwnActionsAsItsToggle() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.show", "Toggle Hosts"), invoked -> { });
+            context.panels().register(new PanelSpec("test.alpha.hosts", "Hosts", new ImageIcon(), Anchor.LEFT)
+                .withToggleActionId("test.alpha.show"), host -> new JLabel());
+            context.panels().register(new PanelSpec("test.alpha.files", "Files", new ImageIcon(), Anchor.RIGHT), host -> new JLabel());
+            for (String toggle : List.of("test.alpha.absent", "test.beta.show", "new_tab"))
+                assertThatIllegalArgumentException().as(toggle).isThrownBy(() -> context.panels().register(
+                    new PanelSpec("test.alpha.other", "Other", new ImageIcon(), Anchor.LEFT).withToggleActionId(toggle), host -> new JLabel()));
+        });
+        assertThat(h.panels()).as("a failed assertion above stops the plugin and removes its panels")
+            .containsExactly("test.alpha.hosts|Hosts|LEFT|test.alpha.show", "test.alpha.files|Files|RIGHT");
+    }
+
     @Test void panelsAreNamespacedLazyPerWindowAndContained() {
         List<PanelHost> hosts = Collections.synchronizedList(new ArrayList<>());
         var registration = new AtomicReference<Subscription>();

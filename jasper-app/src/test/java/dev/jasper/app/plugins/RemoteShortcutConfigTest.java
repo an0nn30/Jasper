@@ -24,7 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Exercises the staged Remote jar through real TOML reload and the app's keybinding resolver. */
 class RemoteShortcutConfigTest {
-    private static final String HOSTS = "dev.jasper.remote.hosts", CONNECT = "dev.jasper.remote.connect";
+    private static final String HOSTS = "dev.jasper.remote.hosts", CONNECT = "dev.jasper.remote.connect",
+        SFTP_TOGGLE = "dev.jasper.remote.sftp.toggle";
     @TempDir Path root;
     private PluginRuntime runtime;
     private Contributions contributions;
@@ -90,6 +91,31 @@ class RemoteShortcutConfigTest {
         });
         reload("# Reset to defaults\n");
         onEdt(() -> assertThat(contributions.action(HOSTS).orElseThrow().defaultBinding()).contains("cmd+shift+s"));
+    }
+
+    @Test void eachRemotePanelHasOneToggleThatToolsListsWithItsShortcutAcrossReloads() throws Exception {
+        start();
+        onEdt(() -> {
+            assertThat(contributions.action("dev.jasper.remote.panel.toggle")).as("no app toggle beside Remote's").isEmpty();
+            assertThat(contributions.action("dev.jasper.remote.sftp.panel.toggle")).isEmpty();
+            assertThat(contributions.actions()).filteredOn(action -> action.id().startsWith("dev.jasper.remote.") && action.title().startsWith("Toggle "))
+                .extracting(action -> action.id() + "|" + action.title())
+                .containsExactlyInAnyOrder(HOSTS + "|Toggle SSH hosts", SFTP_TOGGLE + "|Toggle SFTP");
+            assertThat(tools()).contains(new MenuEntry.Item(HOSTS), new MenuEntry.Item(SFTP_TOGGLE));
+        });
+        reload("[shortcuts]\ntoggle_panel = 'ctrl+alt+s'\n");
+        onEdt(() -> {
+            assertThat(contributions.action(HOSTS).orElseThrow().defaultBinding()).contains("ctrl+alt+s");
+            assertThat(tools()).as("the replaced action keeps its Tools entry").contains(new MenuEntry.Item(HOSTS));
+        });
+    }
+
+    /** The entries of View > Tools. */
+    private java.util.List<MenuEntry> tools() {
+        return contributions.menus().stream().filter(menu -> menu.target().equals(MenuTarget.standard(MenuTarget.Slot.VIEW)))
+            .flatMap(menu -> menu.entries().stream())
+            .filter(entry -> entry instanceof MenuEntry.Submenu submenu && submenu.title().equals("Tools"))
+            .flatMap(entry -> ((MenuEntry.Submenu) entry).entries().stream()).toList();
     }
 
     @Test void badOrConflictingShortcutsDoNotDisplaceBuiltInKeys() throws Exception {

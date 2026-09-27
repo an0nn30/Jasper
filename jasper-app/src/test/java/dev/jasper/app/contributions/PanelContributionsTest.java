@@ -15,6 +15,30 @@ import static org.assertj.core.api.Assertions.*;
 class PanelContributionsTest {
     private final Contributions model = new Contributions();
 
+    @Test void aPanelThatNamesItsToggleIsListedByThatActionAndGetsNoneOfItsOwn() {
+        List<Contributions.PanelRequest> requests = new ArrayList<>();
+        model.onPanelRequest(requests::add);
+        ActionEntry show = model.addAction("dev.x.show", "Toggle Hosts", null, List.of(), Optional.of("cmd+shift+s"), invocation -> { });
+        PanelEntry hosts = model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), PanelRegion.LEFT, Optional.of("dev.x.show"), site -> new JLabel());
+        PanelEntry files = model.addPanel("dev.x.files", "Files", new ImageIcon(), PanelRegion.RIGHT, site -> new JLabel());
+        assertThat(hosts.toggleActionId()).isEqualTo("dev.x.show");
+        assertThat(hosts.namedToggle()).isTrue();
+        assertThat(files.toggleActionId()).isEqualTo("dev.x.files.toggle");
+        assertThat(files.namedToggle()).isFalse();
+        assertThat(model.action("dev.x.hosts.toggle")).as("no duplicate beside the named action").isEmpty();
+        assertThat(model.action("dev.x.files.toggle")).isPresent();
+        assertThat(model.actions()).filteredOn(action -> action.title().startsWith("Toggle ")).extracting(ActionEntry::id)
+            .containsExactlyInAnyOrder("dev.x.show", "dev.x.files.toggle");
+        assertThat(model.menus()).singleElement().satisfies(section -> assertThat(section.entries()).containsExactly(
+            new MenuEntry.Submenu("Tools", List.of(new MenuEntry.Item("dev.x.show"), new MenuEntry.Item("dev.x.files.toggle")))));
+
+        hosts.close();
+        assertThat(model.action("dev.x.show")).as("the plugin still owns its action").containsSame(show);
+        assertThat(model.menus()).singleElement().satisfies(section -> assertThat(section.entries()).containsExactly(
+            new MenuEntry.Submenu("Tools", List.of(new MenuEntry.Item("dev.x.files.toggle")))));
+        assertThat(requests).isEmpty();
+    }
+
     @Test void aPanelBringsItsToggleActionAndViewMenuEntryAndTakesThemWithIt() {
         List<Contributions.Kind> changes = new ArrayList<>();
         List<Contributions.PanelRequest> requests = new ArrayList<>();
