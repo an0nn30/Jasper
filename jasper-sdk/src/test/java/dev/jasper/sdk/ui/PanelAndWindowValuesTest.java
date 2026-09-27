@@ -14,6 +14,12 @@ class PanelAndWindowValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new PanelSpec("dev.x.tool.hosts", " ", new ImageIcon(), Anchor.LEFT));
         assertThatNullPointerException().isThrownBy(() -> new PanelSpec("dev.x.tool.hosts", "Hosts", null, Anchor.LEFT));
         assertThatNullPointerException().isThrownBy(() -> new PanelSpec("dev.x.tool.hosts", "Hosts", new ImageIcon(), null));
+        assertThat(spec.toggleActionId()).as("the application registers <id>.toggle").isEmpty();
+        var named = spec.withToggleActionId("dev.x.tool.show");
+        assertThat(named.toggleActionId()).contains("dev.x.tool.show");
+        assertThat(named.id()).isEqualTo(spec.id());
+        assertThat(named.withToggleActionId(null).toggleActionId()).isEmpty();
+        assertThatNullPointerException().isThrownBy(() -> new PanelSpec("dev.x.tool.hosts", "Hosts", new ImageIcon(), Anchor.LEFT, null));
     }
 
     @Test void windowAndDialogSpecsValidateAndCopyTheSize() {

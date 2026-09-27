@@ -1,0 +1,33 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "srgb:0.075,0.09,0.105,1",
+      "srgb:0.035,0.045,0.055,1"
+    ]
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "Jasper.png",
+          "name": "Jasper",
+          "glass": false
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}

@@ -23,7 +23,7 @@ class SftpPluginTest {
             var plugin=new TestRemotePlugin(Runnable::run,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
             var context=host.start(RemotePluginTest.INFO,Set.of(),Set.of(),plugin);
             assertThat(host.failures()).isEmpty();assertThat(host.menu("top:dev.jasper.remote.menu")).contains("item:dev.jasper.remote.sftp","item:dev.jasper.remote.transfers");
-            assertThat(host.panels()).contains("dev.jasper.remote.sftp.panel|SFTP|LEFT").noneMatch(panel->panel.startsWith("dev.jasper.remote.transfers.panel"));
+            assertThat(host.panels()).contains("dev.jasper.remote.sftp.panel|SFTP|LEFT|dev.jasper.remote.sftp.toggle").noneMatch(panel->panel.startsWith("dev.jasper.remote.transfers.panel"));
             assertThat(host.actions()).noneMatch(action->action.startsWith("dev.jasper.remote.transfers.toggle"));
             assertThat(host.openRequests()).isEmpty();assertThat(host.windows()).isEmpty();
             assertThat(plugin.transfers().job(restored).get(5,TimeUnit.SECONDS).state()).isEqualTo(TransferState.PAUSED);

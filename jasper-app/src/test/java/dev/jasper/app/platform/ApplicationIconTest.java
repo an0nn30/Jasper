@@ -14,6 +14,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ApplicationIconTest {
     private static final Path ICONS = Path.of(System.getProperty("jasper.projectDir"), "packaging", "icons");
 
+    @Test void packagedMacKeepsItsNativeIconWhileDevelopmentCanSetOne() {
+        assertThat(ApplicationIcon.usesBundleIcon(true, "/Applications/Jasper.app/Contents/MacOS/Jasper")).isTrue();
+        assertThat(ApplicationIcon.usesBundleIcon(true, null)).isFalse();
+        assertThat(ApplicationIcon.usesBundleIcon(true, "")).isFalse();
+        assertThat(ApplicationIcon.usesBundleIcon(false, "/opt/jasper/bin/Jasper")).isFalse();
+    }
+
     @Test void windowsContainerProvidesDecodableAlphaImagesForCommonDpiSizes() throws Exception {
         Path file = ICONS.resolve("Jasper.ico");
         assertThat(file).exists();
@@ -57,6 +64,12 @@ class ApplicationIconTest {
             assertThat(length).isGreaterThanOrEqualTo(8);
             assertThat(length - 8).isLessThanOrEqualTo(data.remaining());
             types.add(type);
+            if (type == 0x69633034 || type == 0x69633035) {
+                // Native small-size ARGB chunks use associated (premultiplied) alpha.
+                // Straight RGB here becomes a bright fringe when macOS decodes it.
+                ByteBuffer payload = data.slice(data.position(), length - 8);
+                assertPremultipliedArgb(payload, type == 0x69633034 ? 16 : 32);
+            }
             data.position(data.position() + length - 8);
         }
         assertThat(types).contains(0x69633034, 0x69633035,
@@ -73,6 +86,16 @@ class ApplicationIconTest {
         assertThat(windows.getRGB(0, 0) >>> 24).isZero();
     }
 
+    @Test void macFaceFillsTheNativeShapeWithoutTransparentOrSilverMargins() throws Exception {
+        BufferedImage mac = read("macos", 256);
+        // The terminal face reaches the native edge; no transparent inset or silver tile.
+        int surround = mac.getRGB(35, 128);
+        assertThat(surround >>> 24).isEqualTo(255);
+        assertThat((surround >>> 16) & 255).isLessThan(64);
+        assertThat((surround >>> 8) & 255).isLessThan(64);
+        assertThat(surround & 255).isLessThan(64);
+    }
+
     @Test void loadsAllPlatformImageSetsWithoutInitializingTheDesktop() {
         assertThat(ApplicationIcon.images("macos")).extracting(image -> image.getWidth(null))
             .contains(16, 32, 64, 128, 256, 512, 1024);
@@ -82,6 +105,25 @@ class ApplicationIconTest {
             .containsExactly(16, 24, 32, 48, 64, 96, 128, 256, 512, 1024);
         assertThat(ApplicationIcon.images()).isNotEmpty();
         ApplicationIcon.installTaskbarIcon(); // No native calls in headless test mode.
+    }
+
+    @Test void everyMacSizeContainsTheFaceAndBrightPromptIncludingRetina() throws Exception {
+        for (int size : new int[] {16, 32, 64, 128, 256, 512, 1024}) {
+            BufferedImage image = read("macos", size);
+            int opaque = 0, bright = 0;
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    int pixel = image.getRGB(x, y);
+                    if ((pixel >>> 24) >= 230) {
+                        opaque++;
+                        if (((pixel >>> 16) & 255) > 153 && ((pixel >>> 8) & 255) > 153
+                                && (pixel & 255) > 153) bright++;
+                    }
+                }
+            }
+            assertThat(opaque).as("%spx face", size).isGreaterThan(size * size / 3);
+            assertThat(bright).as("%spx prompt", size).isGreaterThan(size * size / 100);
+        }
     }
 
     @Test void linuxPackageAndDesktopIconsMatchTheRuntimeArtwork() throws Exception {
@@ -104,6 +146,33 @@ class ApplicationIconTest {
         var resource = ApplicationIconTest.class.getResource("/dev/jasper/app/icons/app/" + platform + "/icon-" + size + ".png");
         assertThat(resource).as(platform + " " + size).isNotNull();
         return ImageIO.read(resource);
+    }
+
+    private static void assertPremultipliedArgb(ByteBuffer payload, int size) {
+        assertThat(payload.getInt()).isEqualTo(0x41524742); // ARGB
+        byte[] planes = new byte[size * size * 4];
+        int position = 0;
+        while (payload.hasRemaining()) {
+            int tag = Byte.toUnsignedInt(payload.get());
+            int count = tag < 128 ? tag + 1 : tag - 125;
+            assertThat(position + count).isLessThanOrEqualTo(planes.length);
+            if (tag < 128) {
+                payload.get(planes, position, count);
+            } else {
+                java.util.Arrays.fill(planes, position, position + count, payload.get());
+            }
+            position += count;
+        }
+        assertThat(position).isEqualTo(planes.length);
+        int pixels = size * size;
+        for (int i = 0; i < pixels; i++) {
+            int alpha = Byte.toUnsignedInt(planes[i]);
+            for (int channel = 1; channel < 4; channel++) {
+                assertThat(Byte.toUnsignedInt(planes[channel * pixels + i]))
+                    .as("%spx ICNS pixel %s channel %s must be premultiplied", size, i, channel)
+                    .isLessThanOrEqualTo(alpha);
+            }
+        }
     }
 
     private static int firstOpaquePixel(BufferedImage image, int row) {

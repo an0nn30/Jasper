@@ -101,7 +101,8 @@ class TransferCoordinatorTest {
         }
     }
 
-    @Test void queuedSameDestinationDoesNotOccupyScannerNeededToFinishPriorJob() throws Exception {
+    @org.junit.jupiter.api.RepeatedTest(5)
+    void queuedSameDestinationDoesNotOccupyScannerNeededToFinishPriorJob() throws Exception {
         root=root.toRealPath();Path first=Files.write(root.resolve("a"),new byte[1024*1024]),second=Files.write(root.resolve("b"),new byte[1024*1024]),dest=Files.createDirectory(root.resolve("dest"));
         try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
             var coordinator=new TransferCoordinator(root.resolve("queue"),executor,Runnable::run,(ref,owner)->CompletableFuture.completedFuture(new LocalEndpoint()),()->2);
@@ -109,7 +110,56 @@ class TransferCoordinatorTest {
                 var a=coordinator.enqueue(new TransferRequest(EndpointRef.local(),List.of(first.toString()),EndpointRef.local(),dest.toString()),null).get(3,TimeUnit.SECONDS);
                 var b=coordinator.enqueue(new TransferRequest(EndpointRef.local(),List.of(second.toString()),EndpointRef.local(),dest.toString()),null).get(3,TimeUnit.SECONDS);
                 await(coordinator,a,TransferState.COMPLETED);await(coordinator,b,TransferState.COMPLETED);
+                assertThat(Files.mismatch(first,dest.resolve("a"))).isEqualTo(-1);
+                assertThat(Files.mismatch(second,dest.resolve("b"))).isEqualTo(-1);
             } finally { coordinator.close();coordinator.stopped().get(5,TimeUnit.SECONDS); }
+        }
+    }
+
+    @Test void resumedScannedJobGetsCopyTurnBeforeUnrelatedReservationHolderFinishes() throws Exception {
+        root=root.toRealPath();Path queue=root.resolve("queue"),bulk=Files.createDirectory(root.resolve("bulk"));
+        Path bulkDest=Files.createDirectory(root.resolve("bulk-dest")),resumedDest=Files.createDirectory(root.resolve("resumed-dest"));
+        Path resumedSource=Files.writeString(root.resolve("resumed"),"resume me");
+        var sources=new ArrayList<String>();
+        for(int i=0;i<64;i++) sources.add(Files.write(bulk.resolve("file-"+i),new byte[1024]).toString());
+        UUID resumed;
+        try(var store=new dev.jasper.remote.transfer.store.TransferStore(queue);
+            var source=new LocalEndpoint();var destination=new LocalEndpoint()) {
+            resumed=store.create(new TransferRequest(EndpointRef.local(),List.of(resumedSource.toString()),EndpointRef.local(),resumedDest.toString()));
+            TransferScan.scan(store,resumed,source,destination,new TransferControl());
+            store.intent(resumed,TransferJob.Intent.PAUSE);store.state(resumed,TransferState.PAUSED,"");
+        }
+        var permits=new Semaphore(0);var bulkStarted=new CountDownLatch(2);var resumedReading=new CountDownLatch(1);
+        try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
+            var coordinator=new TransferCoordinator(queue,executor,Runnable::run,(ref,owner)-> {
+                var local=new LocalEndpoint();
+                var endpoint=(FileEndpoint)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{FileEndpoint.class},(proxy,method,args)-> {
+                    if(method.getName().equals("abort")) permits.release(128);
+                    if(method.getName().equals("read")) {
+                        if(args[0].equals(resumedSource.toString())) resumedReading.countDown();
+                        if(Path.of((String)args[0]).startsWith(bulk)) {
+                            bulkStarted.countDown();
+                            if(!permits.tryAcquire(5,TimeUnit.SECONDS)) throw new java.io.IOException("Fixture read timed out");
+                        }
+                    }
+                    try { return method.invoke(local,args); }
+                    catch(java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+                });
+                return CompletableFuture.completedFuture(endpoint);
+            },()->2);
+            try {
+                var active=coordinator.enqueue(new TransferRequest(EndpointRef.local(),sources,EndpointRef.local(),bulkDest.toString()),null).get(3,TimeUnit.SECONDS);
+                assertThat(bulkStarted.await(5,TimeUnit.SECONDS)).isTrue();
+                coordinator.resume(resumed,null).get(3,TimeUnit.SECONDS);
+                // Free copy slots without allowing the 64-file holder to finish.
+                for(int i=0;i<24 && resumedReading.getCount()>0;i++) {
+                    permits.release();resumedReading.await(100,TimeUnit.MILLISECONDS);
+                }
+                assertThat(resumedReading.getCount()).as("resumed job receives a copy turn").isZero();
+                await(coordinator,resumed,TransferState.COMPLETED);
+                assertThat(Files.readString(resumedDest.resolve("resumed"))).isEqualTo("resume me");
+                assertThat(coordinator.job(active).get(3,TimeUnit.SECONDS).state().terminal()).isFalse();
+            } finally { coordinator.close();permits.release(128);coordinator.stopped().get(5,TimeUnit.SECONDS); }
         }
     }
 

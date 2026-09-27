@@ -182,10 +182,14 @@ public final class TransferCoordinator implements AutoCloseable {
     }
     private void schedule() throws IOException {
         var order=new ArrayList<>(runs.values());if(order.isEmpty()) return;Collections.rotate(order,rotation++%order.size());
-        // Holders of their paths first (stable, so rotation still orders each group): a queued run whose scan can only
-        // fail on a holder's reservation must not take the one scanner that holder needs to finalize, pass after pass.
-        order.sort(Comparator.comparing(run->run.reservation==null));
-        for(var run:order) {
+        // A queued reservation retry must not repeatedly take the scanner from its current
+        // owner, which needs that same lane to finalize and release the destination.
+        // Partition once: workers can acquire reservations while this snapshot is built.
+        var holders=new ArrayList<Run>();var waiting=new ArrayList<Run>();
+        for(var run:order) (run.reservation!=null?holders:waiting).add(run);
+        holders.addAll(waiting);
+        var copyCandidates=new HashMap<Run,List<TransferEntry>>();
+        for(var run:holders) {
             if(run.attention || !run.control.running() || run.finalizing) continue;
             var job=store.job(run.id);
             if(run.restartEntry!=null) { if(!run.activeScan && !scanning) dispatchRestart(run);continue; }
@@ -200,6 +204,11 @@ public final class TransferCoordinator implements AutoCloseable {
                 } else if(!scanning) finalizeDirectories(run);
                 continue;
             }
+            copyCandidates.put(run,pending);
+        }
+        // Copy slots retain round-robin admission, including resumed jobs with no lease yet.
+        for(var run:order) {
+            var pending=copyCandidates.get(run);if(pending==null) continue;
             int limit=Math.clamp(parallel.getAsInt(),1,8);
             for(var entry:pending) {
                 if(activeCopies.get()>=limit || run.busy.size()>=2 || run.reservation==null && !run.busy.isEmpty()) break;

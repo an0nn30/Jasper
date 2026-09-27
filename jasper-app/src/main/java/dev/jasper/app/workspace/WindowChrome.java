@@ -40,6 +40,8 @@ final class WindowChrome {
     private final List<JMenu> contributedMenus = new ArrayList<>();
     private final ToolbarSeparator pluginSeparator = new ToolbarSeparator();
     private WindowContributions contributions;
+    private boolean renderingMenus;
+    private boolean menusDirty;
 
     WindowChrome(WindowContent owner) {
         this.owner = owner;
@@ -199,6 +201,22 @@ final class WindowChrome {
     }
 
     void renderContributedMenus() {
+        menusDirty = true;
+        if (renderingMenus) return;
+        renderingMenus = true;
+        try {
+            // macOS/JBR can dispatch EDT callbacks while a native menu peer is changing.
+            // Finish this pass before handling a nested refresh, then use the latest model.
+            do {
+                menusDirty = false;
+                rebuildContributedMenus();
+            } while (menusDirty);
+        } finally {
+            renderingMenus = false;
+        }
+    }
+
+    private void rebuildContributedMenus() {
         contributedSections.forEach((menu, added) -> added.forEach(menu::remove));
         contributedSections.clear();
         contributedMenus.forEach(menuBar::remove);

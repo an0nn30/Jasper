@@ -32,6 +32,8 @@ public final class ApplicationIcon {
 
     /** Also gives development launches the correct Dock icon; call on the EDT. */
     public static void installTaskbarIcon() {
+        // Keep the system-rendered catalog icon throughout a packaged Mac launch.
+        if (usesBundleIcon(SystemInfo.isMacOS, System.getProperty("jpackage.app-path"))) return;
         if (GraphicsEnvironment.isHeadless() || !Taskbar.isTaskbarSupported()) return;
         try {
             Taskbar taskbar = Taskbar.getTaskbar();
@@ -41,6 +43,10 @@ public final class ApplicationIcon {
         } catch (UnsupportedOperationException | SecurityException failure) {
             LOG.log(System.Logger.Level.WARNING, "Desktop does not allow setting the application icon", failure);
         }
+    }
+
+    static boolean usesBundleIcon(boolean macos, String launcherPath) {
+        return macos && launcherPath != null && !launcherPath.isBlank();
     }
 
     private static List<Image> load(String platform, int... sizes) {

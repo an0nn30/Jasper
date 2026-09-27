@@ -255,7 +255,9 @@ final class HostedUi {
             guard("register");
             java.util.Objects.requireNonNull(factory, "factory");
             requireNamespace(spec.id(), "A panel");
-            var entry = model.addPanel(spec.id(), spec.title(), spec.icon(), PanelRegion.valueOf(spec.defaultAnchor().name()), site -> {
+            spec.toggleActionId().ifPresent(HostedUi.this::requireOwn);
+            var entry = model.addPanel(spec.id(), spec.title(), spec.icon(), PanelRegion.valueOf(spec.defaultAnchor().name()),
+                spec.toggleActionId(), site -> {
                 JComponent[] built = {null};
                 containment.run(pluginId, "panel " + spec.id(), () -> built[0] = factory.create(host(site)));
                 return built[0];

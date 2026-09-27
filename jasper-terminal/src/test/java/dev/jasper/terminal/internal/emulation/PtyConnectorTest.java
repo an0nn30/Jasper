@@ -24,6 +24,22 @@ class PtyConnectorTest {
     private static final boolean WINDOWS = System.getProperty("os.name").startsWith("Windows");
 
     @Test
+    @org.junit.jupiter.api.condition.EnabledOnOs(OS.WINDOWS)
+    void powershellStartsWithInheritedWindowsDriveEnvironment() throws Exception {
+        var environment = new java.util.HashMap<>(System.getenv());
+        environment.put("=C:", "C:\\Windows");
+        var options = SessionLaunchOptions.builder()
+            .command(List.of("powershell.exe", "-NoLogo", "-NoProfile", "-Command",
+                "[Console]::WriteLine('jasper-' + $env:TERM + '-' + $env:COLORTERM)"))
+            .environment(environment).workingDirectory(Path.of(System.getProperty("user.home"))).build();
+        try (TerminalSession session = TerminalSession.start(options)) {
+            Await.until(() -> screenText(session).contains("jasper-xterm-256color-truecolor"),
+                "PowerShell output with Windows hidden environment entries");
+            assertThat(session.exitFuture().get(10, TimeUnit.SECONDS)).isZero();
+        }
+    }
+
+    @Test
     void programOutputReachesTheScreenAndExitCodeIsReported() throws Exception {
         List<String> command = WINDOWS
             ? List.of("cmd.exe", "/c", "echo jasper-pty-ok")

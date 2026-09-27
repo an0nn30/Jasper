@@ -130,6 +130,48 @@ class WindowChromeContributionsTest {
         });
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void menuRefreshDuringNativeMenuMutationDoesNotDuplicateTopLevelMenus(boolean onRemoval) throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            try {
+                owner.connectContributions(model);
+                var connect = model.addAction("dev.x.connect", "Connect", null, List.of(), Optional.empty(), event -> {});
+                model.addAction("app.help", "Shortcuts", null, List.of(), Optional.empty(), event -> {});
+                var ssh = model.addMenuSection(MenuTarget.topLevel("dev.x.ssh", "SSH"));
+                ssh.set(List.of(new MenuEntry.Item("dev.x.connect")));
+                model.addMenuSection(MenuTarget.topLevel("app.help", "Help"))
+                    .set(List.of(new MenuEntry.Item("app.help")));
+                // JBR can dispatch an EDT callback while creating a native menu peer.
+                owner.menuBar().addContainerListener(new java.awt.event.ContainerAdapter() {
+                    private boolean refreshed;
+                    @Override public void componentAdded(java.awt.event.ContainerEvent event) {
+                        if (!onRemoval) refresh();
+                    }
+                    @Override public void componentRemoved(java.awt.event.ContainerEvent event) {
+                        if (onRemoval) refresh();
+                    }
+                    private void refresh() {
+                        if (refreshed) return;
+                        refreshed = true;
+                        connect.setEnabled(false);
+                        ssh.set(List.of(new MenuEntry.Item("dev.x.connect"), new MenuEntry.Item("app.help")));
+                    }
+                });
+
+                owner.chrome().renderContributedMenus();
+
+                assertThat(java.util.Arrays.stream(owner.menuBar().getComponents())
+                    .map(component -> ((JMenu) component).getText()).toList())
+                    .containsExactly("File", "Edit", "View", "Pane", "Tab", "SSH", "Help");
+                assertThat(menu(owner, "SSH").getItem(0).isEnabled()).isFalse();
+                assertThat(items(menu(owner, "SSH"))).containsExactly("Connect", "Shortcuts");
+            } finally { owner.close(); }
+        });
+    }
+
     @Test void sharedManagedIconsSizePerPlacementInMultipleWindows() throws Exception {
         edt(() -> {
             var theme = new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.LIGHT);

@@ -12,7 +12,7 @@ import java.util.Set;
  * Immutable process inputs. Builders validate but perform no I/O.
  * Command, environment and working directory are explicit; no shell or environment is inferred.
  * @param command executable followed by literal arguments; copied, no shell parsing
- * @param environment complete copied child environment; TERM and COLORTERM are forced at launch
+ * @param environment complete copied child environment; Windows hidden names may begin with {@code =}; TERM and COLORTERM are forced at launch
  * @param workingDirectory child directory; existence is checked by process creation
  * @param grid initial terminal size in cells
  * @param scrollback history capacity from 0 through 1,000,000 lines
@@ -30,8 +30,11 @@ public record SessionLaunchOptions(List<String> command, Map<String, String> env
             throw new IllegalArgumentException("command must name an executable");
         if (command.stream().anyMatch(value -> value.indexOf('\0') >= 0))
             throw new IllegalArgumentException("command must contain no NUL");
+        // Match the JDK's Windows environment rules: cmd.exe supplies hidden entries such as
+        // =C: (the current directory on that drive). Only the leading '=' is permitted.
+        int firstEqualsIndex = System.getProperty("os.name").startsWith("Windows") ? 1 : 0;
         environment.forEach((key, value) -> {
-            if (key.isEmpty() || key.indexOf('=') >= 0 || key.indexOf('\0') >= 0
+            if (key.isEmpty() || key.indexOf('=', firstEqualsIndex) >= 0 || key.indexOf('\0') >= 0
                     || value.indexOf('\0') >= 0)
                 throw new IllegalArgumentException("invalid environment entry");
         });

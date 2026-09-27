@@ -6,13 +6,11 @@
   and Windows since 2026-09-13 (last green `1db31b1b`). The logs showed no assertion text and
   Gradle stopped at the first failing module, so most failures were hidden. CI now prints full
   failures, runs `check --continue`, fails a test after 5 min and a job after 30.
-  - **Production fixes:** Remote's transfer scheduler let a queued same-destination job take the
-    one scanner the holder needed to finalize, pass after pass (Linux); `HandoffSocket.close()`
-    could mistake its own dying listener for a successor and leave its files (Linux); an SFTP
-    write's `close()` turned the real error into "Self-suppression not permitted"; ssh `Include`
-    globs threw on Windows; Windows refusals now read "Connection refused"; multi-line snippets
-    no longer get CRLF on Windows (tomlj writes the platform separator); `.gitattributes` checks
-    text out with LF.
+  - **Production fixes:** `HandoffSocket.close()` could mistake its own dying listener for a
+    successor and leave its files (Linux); an SFTP write's `close()` turned the real error into
+    "Self-suppression not permitted"; ssh `Include` globs threw on Windows; Windows refusals now
+    read "Connection refused"; multi-line snippets no longer get CRLF on Windows (tomlj writes the
+    platform separator); `.gitattributes` checks text out with LF.
   - **Tests:** no longer assume the host keymap, POSIX paths, or Debian's nounset-unsafe
     `/etc/bash.bashrc`. POSIX-only features (FIFOs, POSIX modes, the SFTP browser's `/` paths,
     OSC through a real PTY) are `@DisabledOnOs(WINDOWS)` or assert Windows' own behaviour.
@@ -22,8 +20,79 @@
     does not pass OSC through, so titles and shell integration probably do not work on Windows
     (ConPTY is the follow-up).
   - **Verified:** all three CI legs green at `e0197666`; local `check` 1,985 tests, 0 failures, 3 skipped.
+  - **Merged `main` (`71f96ed8`):** the transfer-scanner starvation this branch also found and fixed
+    is fixed on `main` too (entry below); the merge keeps `main`'s version, which also keeps copy
+    admission in rotating order. This branch fixes the Windows failures CI shows, which covers the
+    startup entry's list except six symlink tests: they pass on CI's administrator runner but fail
+    for a Windows account without the symlink privilege (open).
   - **Not done:** merge to `main`.
 
+- **Windows terminal startup** (branch `codex/fix-windows-terminal-startup`, 2026-09-27):
+  launching through `cmd.exe` supplies hidden environment entries such as `=C:`. The
+  session options validator rejected these before PowerShell could start. Validation now
+  follows the JDK's Windows rule (a leading `=` is allowed; embedded `=` and NUL remain
+  invalid), retaining the existing rules on other platforms. Unit and real headless
+  PowerShell PTY regressions failed before the fix and pass afterward. Independent review
+  found no actionable issues. The full Windows check exposed broader failures and a
+  stalled Remote test; see [verification details](windows-startup-verification.md).
+  User confirmed the fix and authorized integration/publication on 2026-09-27.
+  Merged into `main`; the broader Windows test findings remain open.
+
+- **macOS Local Network identity collision** (branch `codex/mac-network-identity`, 2026-09-27):
+  a user-retried Remote LAN connection produced `Local network denied by preference for Moray
+  (dev.moray.app)` in macOS `nehelper`. Installed Jasper, historical Moray and JBR's generic
+  jpackage launcher shared `LC_UUID` `25BA8067-AB3A-327B-8BE9-0C3162B915F5`; the usage description
+  was already present and the bundle signature valid. Packaging now derives an app-specific
+  launcher UUID from the bundle identifier and immutable SDK launcher before final signing.
+  `verifyPackage` checks it; portable binary regressions run under `check`. This supersedes the
+  earlier assumption below that a usage string and an ad-hoc signature were sufficient.
+  `./gradlew check` passed: 1,997 tests, zero failures/errors, three skips, plus the portable UUID
+  regression task. `packageDist` and strict signature verification passed; injecting the old UUID
+  made `verifyPackage` fail as intended, and restoring the executable passed. The mounted DMG
+  retains the corrected UUID and has a valid signature. Independent review found no issues.
+  Native prompt/LAN acceptance remains user-run; Apple-issued signing remains separate release
+  work (no valid identity on this Mac). The user authorized merging to `main` and pushing to
+  `origin` on 2026-09-27. See [verification](mac-local-network-verification.md).
+
+- **Original Steep application icon** (branch `codex/jasper-steep-icon`):
+  user-selected full-height 68-degree tab and Frost chevron replace Ember in
+  native packages and runtime assets. The exact SVG master and Inkscape generator
+  live in `packaging/icons`; `build/Jasper-icon-set.zip` contains macOS
+  ICNS/Retina assets, Windows 20-frame ICO with 24 PNG sizes, and Linux 18 sizes
+  plus scalable SVG. Work is isolated in the managed `jasper-steep-icon` worktree.
+  Follow-up: the user requested a full-canvas macOS variant with the steep tab
+  drawn into its top edge after rejecting an added surround. Icon Composer
+  supplies `Assets.car`; the ICNS/runtime PNGs contain the matching flattened
+  artwork. Packaged Mac launches retain the native Dock icon instead of replacing
+  it after Java starts. Windows/Linux retain the free-standing silhouette.
+  Full check/package passed: 1,997 tests, zero failures/errors, three skips.
+  Mounted DMG catalog/ICNS bytes and strict signature passed; native rendering
+  confirmed the edge-tab artwork. Independent review found no remaining issues.
+  See [verification](../packaging/icons/VERIFICATION.md) for final checks.
+  No desktop GUI launched. The user approved merging to main and pushing.
+
+- **Duplicate contributed menus on macOS** (branch `codex/fix-duplicate-plugin-menus`,
+  2026-09-26): investigation of the installed app's logs confirmed older user Remote/Vault
+  copies were skipped in favor of bundled versions, not loaded twice. `WindowChrome` could
+  re-enter its menu rebuild while JBR dispatched a callback during a native menu mutation,
+  duplicating SSH/Help on insertion or throwing during removal. Menu rendering now finishes
+  the active pass before processing nested refresh requests against the latest model.
+  Headless regressions reproduce both failures before the fix and pass afterward, including
+  a menu-content change during insertion. Independent review found no actionable issues.
+  `./gradlew check :jasper-app:packageDist` passed: 1,985 tests, zero failures/errors, three
+  skips before the SDK 0.8.1 update; the macOS DMG was rebuilt and the package image verified.
+  Native packaged-app acceptance remains user-run; no GUI was launched. Main integration
+  and publication are authorized.
+- **Transfer scanner starvation** (same branch, 2026-09-26): the menu integration check
+  exposed an intermittent Remote stall: queued reservation retries could repeatedly take
+  the scanner before the destination's current owner could finalize and release it.
+  User-authorized follow-up prioritizes reservation holders for scanner work while retaining
+  rotating copy admission, including already-scanned jobs resumed without a reservation.
+  The same-destination regression failed in two of five repetitions before the fix; a new
+  gated-copy regression caught and prevented starvation of an unrelated resumed job.
+  Both fixes passed independent review and an isolated `./gradlew check` after SDK 0.8.1:
+  1,994 tests, zero failures/errors, three skips. Concurrent icon work was excluded from
+  the verification checkout and these commits. Main integration and publication authorized.
 - **Full-height rail** (branch `worktree-rail-full-height`, 2026-09-25): the tab strip now sits
   over the terminal deck inside `WorkspaceRegions`' center, so the rail and the left/right panels
   run from the toolbar to the status bar and the bottom panel sits under the terminal only.
@@ -115,8 +184,11 @@
   which superseded the parent spec's grid ruling below); the rail defaults to its 28 px minimum and the
   status bar to 24 px; the toolbar stays 30 px. `buddy.enabled` now defaults to false (Jasper is opt-in).
 - **View → Tools:** the app's per-panel toggles submenu is now titled Tools (was Panels). Remote no
-  longer adds its own View items (SFTP panel, SSH Hosts), which duplicated those toggles; its actions
-  stay registered for their shortcuts, the SSH menu, the status item and the palette.
+  longer adds its own View items (SFTP panel, SSH Hosts), which duplicated those toggles. SDK 0.8.1
+  adds `PanelSpec.toggleActionId`: a panel may name one of its plugin's already registered actions as
+  its toggle, and the app then lists that action in Tools and registers no `<panel id>.toggle`.
+  Remote names its renamed actions (Toggle SSH hosts, with ⇧⌘S, and Toggle SFTP), so each panel has
+  one palette entry and Tools shows the shortcuts; Remote requires `>=0.8.1`.
 - **Rail width:** `window.rail_width` is 28–64 logical pixels, default 28, clamped the same way.
   Rail buttons stay square at width − 6, separators at width − 14. View → Rail width… and the
   `view.rail_width` command set a session-only width, like Tab height….
