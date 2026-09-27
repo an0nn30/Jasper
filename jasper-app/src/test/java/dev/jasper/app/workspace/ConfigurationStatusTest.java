@@ -66,7 +66,7 @@ class ConfigurationStatusTest {
                     status.setSize(600, 30); status.doLayout();
                     var image = new java.awt.image.BufferedImage(600, 30, java.awt.image.BufferedImage.TYPE_INT_RGB);
                     var graphics = image.createGraphics(); status.paint(graphics); graphics.dispose();
-                    assertThat(new Color(image.getRGB(300, 0))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.borderColor"));
+                    assertThat(new Color(image.getRGB(300, 0))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.background"));
                     assertThat(new Color(image.getRGB(300, 15))).as(theme.name()).isEqualTo(UIManager.getColor("StatusBar.background"));
                 }
             } finally { themes.configure(Theme.DARK); }

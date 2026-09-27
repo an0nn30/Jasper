@@ -51,7 +51,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             revealSelection = true;
         }
         if (selected != owner.currentTab()) { selected = owner.currentTab(); revealSelection = true; }
-        setBackground(UIManager.getColor("Jasper.titleBackground"));
+        setBackground(UIManager.getColor("ToolWindow.background"));
         boolean retitled = false;
         for (TerminalTab tab : order) retitled |= entries.get(tab).refresh();
         // A tab that grows can push the selected tab out; keep it shown if it was shown.
@@ -131,12 +131,6 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     }
 
     @Override public void close() { disposed = true; list.setEnabled(false); }
-
-    @Override protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        g.setColor(UIManager.getColor("Jasper.titleSeparator"));
-        g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
-    }
 
     private static void flat(JButton button) {
         button.putClientProperty("html.disable", true);

@@ -24,11 +24,17 @@ class WorkspaceRegionsTest {
         LayoutTestSupport.layoutTree(regions);
     }
 
-    @Test void theCenterFillsEverythingUntilARegionIsShownAndAgainAfterItIsHidden() {
+    @Test void theCenterKeepsItsRoundedFrameWhenPanelsOpenAndClose() {
         var deck = new JPanel();
         var regions = new WorkspaceRegions(deck);
+        deck.setMinimumSize(new java.awt.Dimension(420, 320));
+        assertThat(regions.getMinimumSize()).as("terminal minimum includes the surface gutter")
+            .isEqualTo(new java.awt.Dimension(432, 332));
+        deck.setMinimumSize(new java.awt.Dimension(500, 360));
+        assertThat(regions.getMinimumSize()).as("terminal font/split minimum changes propagate")
+            .isEqualTo(new java.awt.Dimension(512, 372));
         layout(regions);
-        assertThat(in(regions, deck)).isEqualTo(new Rectangle(0, 0, 1000, 600));
+        assertThat(in(regions, deck)).isEqualTo(new Rectangle(6, 6, 988, 588));
         assertThat(regions.content(PanelRegion.LEFT)).isNull();
         assertThat(regions.size(PanelRegion.LEFT)).isEqualTo(WorkspaceRegions.DEFAULT_SIDE);
 
@@ -38,13 +44,13 @@ class WorkspaceRegionsTest {
         assertThat(regions.content(PanelRegion.LEFT)).isSameAs(left);
         assertThat(in(regions, left.getParent()).width).isEqualTo(250);
         assertThat(in(regions, left.getParent()).x).isZero();
-        assertThat(in(regions, left)).as("content inset within its rounded host").isEqualTo(new Rectangle(6, 6, 238, 588));
+        assertThat(in(regions, left)).as("content inset within its rounded host").isEqualTo(new Rectangle(6, 6, 244, 588));
         assertThat(in(regions, deck).x).isGreaterThan(250);
-        assertThat(in(regions, deck).x + in(regions, deck).width).isEqualTo(1000);
+        assertThat(in(regions, deck).x + in(regions, deck).width).isEqualTo(994);
 
         regions.hide(PanelRegion.LEFT);
         layout(regions);
-        assertThat(in(regions, deck)).isEqualTo(new Rectangle(0, 0, 1000, 600));
+        assertThat(in(regions, deck)).isEqualTo(new Rectangle(6, 6, 988, 588));
         assertThat(regions.size(PanelRegion.LEFT)).as("the last size is remembered").isEqualTo(250);
     }
 
@@ -63,9 +69,9 @@ class WorkspaceRegionsTest {
         assertThat(in(regions, right.getParent()).height).isEqualTo(600);
         assertThat(in(regions, bottom.getParent()).height).isEqualTo(150);
         assertThat(in(regions, bottom.getParent()).y + 150).isEqualTo(600);
-        assertThat(in(regions, bottom.getParent()).x).isEqualTo(in(regions, deck).x);
-        assertThat(in(regions, bottom.getParent()).width).isEqualTo(in(regions, deck).width);
-        assertThat(in(regions, deck).y).isZero();
+        assertThat(in(regions, bottom.getParent()).x).isEqualTo(in(regions, deck.getParent()).x);
+        assertThat(in(regions, bottom.getParent()).width).isEqualTo(in(regions, deck.getParent()).width);
+        assertThat(in(regions, deck).y).isEqualTo(6);
 
         var replacement = new JLabel("other");
         regions.show(PanelRegion.RIGHT, replacement, 320);
@@ -74,6 +80,28 @@ class WorkspaceRegionsTest {
         assertThat(right.getParent()).isNull();
         assertThat(in(regions, replacement.getParent()).width).isEqualTo(320);
         assertThat(regions.size(PanelRegion.BOTTOM)).isEqualTo(150);
+    }
+
+    @Test void workspaceDividerIsAQuietDraggableGapAfterThemeChanges() throws Exception {
+        var original = javax.swing.UIManager.getLookAndFeel();
+        try {
+            var regions = new WorkspaceRegions(new JPanel());
+            var panel = new JPanel(); regions.show(PanelRegion.LEFT, panel, 250);
+            for (var theme : java.util.List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.Theme.LIGHT)) {
+                dev.jasper.app.appearance.ThemeTestSupport.install(theme);
+                SwingUtilities.updateComponentTreeUI(regions); regions.refreshTheme(); layout(regions);
+                var split = (javax.swing.JSplitPane) regions.getComponent(0);
+                var divider = ((javax.swing.plaf.basic.BasicSplitPaneUI) split.getUI()).getDivider();
+                var image = new java.awt.image.BufferedImage(divider.getWidth(), divider.getHeight(), 2);
+                var g = image.createGraphics(); g.setColor(split.getBackground()); g.fillRect(0, 0, image.getWidth(), image.getHeight()); divider.paint(g); g.dispose();
+                int chrome = javax.swing.UIManager.getColor("Jasper.titleBackground").getRGB();
+                for (int x = 0; x < image.getWidth(); x++) for (int y = 0; y < image.getHeight(); y++)
+                    assertThat(image.getRGB(x, y)).as("gap has no border or grip").isEqualTo(chrome);
+                split.setDividerLocation(320); layout(regions);
+                assertThat(regions.size(PanelRegion.LEFT)).isEqualTo(320);
+                assertThat(divider.getCursor().getType()).isEqualTo(java.awt.Cursor.E_RESIZE_CURSOR);
+            }
+        } finally { javax.swing.UIManager.setLookAndFeel(original); }
     }
 
     @Test void sizesAreClampedToAUsableMinimum() {

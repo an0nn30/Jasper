@@ -8,6 +8,7 @@ import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
+import static dev.jasper.app.testsupport.LayoutTestSupport.layoutTree;
 import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
@@ -24,4 +25,39 @@ class GraphiteChromeTest {
                 .map(child -> ((javax.swing.JButton) child).getToolTipText())).doesNotContain("Settings");
         }
     }
+    @Test void roundedWorkspaceSurfacesMeetContinuousChromeWithoutRules() throws Exception {
+        for (var theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+            try (var owner = content(launcher(new ArrayDeque<>()))) {
+                owner.selectTheme(theme);
+                var root = new javax.swing.JRootPane();
+                try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
+                    var panel = new javax.swing.JPanel(new java.awt.BorderLayout(0, 12));
+                    panel.setBorder(javax.swing.BorderFactory.createEmptyBorder(12, 12, 12, 12));
+                    panel.add(new javax.swing.JLabel("SSH hosts"), java.awt.BorderLayout.NORTH);
+                    var hosts = new javax.swing.JList<>(new String[]{"staging-01", "production"});
+                    hosts.setFixedCellHeight(28); hosts.setSelectedIndex(0); panel.add(hosts);
+                    owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, panel, 260);
+                    owner.rail().render(java.util.List.of(new WindowRail.PanelButton("hosts", "SSH hosts",
+                        dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.contributions.PanelRegion.LEFT, true)), java.util.List.of());
+                    owner.rail().setVisible(true);
+                    root.setSize(1000, 640); layoutTree(root); layoutTree(root);
+                    var image = new java.awt.image.BufferedImage(1000, 640, 2);
+                    var g = image.createGraphics(); root.printAll(g); g.dispose();
+                    int chrome = UIManager.getColor("Jasper.titleBackground").getRGB();
+                    var railEdge = javax.swing.SwingUtilities.convertPoint(owner.rail(), owner.rail().getWidth() - 1, 120, root);
+                    assertThat(image.getRGB(railEdge.x, railEdge.y)).as("no rail border").isEqualTo(chrome);
+                    assertThat(image.getRGB(500, header.getHeight() - 1)).as("no workspace header rule").isEqualTo(chrome);
+                    var strip = owner.windowTabs();
+                    var corner = javax.swing.SwingUtilities.convertPoint(strip, 0, 0, root);
+                    assertThat(image.getRGB(corner.x, corner.y)).as("rounded tab-strip shoulder").isEqualTo(chrome);
+                    var quiet = javax.swing.SwingUtilities.convertPoint(strip, strip.getWidth() - 50, strip.getHeight() - 1, root);
+                    assertThat(image.getRGB(quiet.x, quiet.y)).as("no tab-strip baseline outside selected tab")
+                        .isEqualTo(UIManager.getColor("ToolWindow.background").getRGB());
+                    var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
+                    javax.imageio.ImageIO.write(image, "png", output.resolve("fluid-workspace-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
+                }
+            }
+        }
+    }
+
 }

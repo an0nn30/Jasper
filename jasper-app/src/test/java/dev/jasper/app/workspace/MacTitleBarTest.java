@@ -117,7 +117,7 @@ class MacTitleBarTest {
                 Point toolbar = SwingUtilities.convertPoint(owner.toolbar(), 0, 0, root);
                 Point strip = SwingUtilities.convertPoint(tabs, 0, 0, root);
                 assertThat(toolbar.y).isZero();
-                assertThat(strip.y).isEqualTo(toolbar.y + owner.toolbar().getHeight());
+                assertThat(strip.y).isEqualTo(toolbar.y + owner.toolbar().getHeight() + 6);
                 assertThat(label(bar).isVisible()).isTrue();
                 assertThat(label(bar).getX() + label(bar).getWidth()).isLessThan(owner.toolbar().getX());
                 owner.newTab(HOME); layoutTree(root);

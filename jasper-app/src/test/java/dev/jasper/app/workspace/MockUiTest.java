@@ -31,12 +31,12 @@ class MockUiTest {
                 assertThat(title.getHeight()).isEqualTo(42);
                 assertThat(tabs).isEqualTo(30);
                 assertThat(owner.status().getHeight()).isEqualTo(24);
-                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 958 - toolbar - tabs - 24));
+                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958 - 12, 958 - toolbar - tabs - 24 - 12));
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
-                assertThat(image.getRGB(650, 41) & 0xffffff).as("title separator").isEqualTo(0x343a42);
+                assertThat(new Color(image.getRGB(650, 41))).as("continuous header surface").isEqualTo(UIManager.getColor("Jasper.titleBackground"));
                 assertThat(image.getRGB(650, toolbar / 2) & 0xffffff).as("toolbar surface").isEqualTo(0x25292e);
-                assertThat(image.getRGB(650, toolbar + tabs - 1) & 0xffffff).as("tab strip separator").isEqualTo(0x343a42);
+                assertThat(new Color(image.getRGB(650, toolbar + 6 + tabs - 1))).as("quiet tab strip baseline").isEqualTo(UIManager.getColor("ToolWindow.background"));
                 assertThat(new Color(image.getRGB(500, 940))).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             }
         });
@@ -126,9 +126,9 @@ class MockUiTest {
             buttons.getFirst().doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
             owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).as("default 30px tabs and 24px status bar").isEqualTo(446);
+            assertThat(owner.currentPane().getHeight()).as("30px tabs, 24px status bar and 12px exterior gutters").isEqualTo(434);
             owner.setToolbarMode(ToolbarMode.ICONS); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(416);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(404);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
         });
     }

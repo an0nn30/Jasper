@@ -2,6 +2,20 @@
 
 ## Current state — 2026-09-23
 
+- **Fluid workspace surfaces** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  removed rail, workspace-header, toolbar, tab-strip and status-bar boundary rules;
+  selected-tab underlines remain. The terminal/tab column now has rounded upper
+  shoulders alongside the rounded plugin panel; its bottom stays rectangular to
+  preserve terminal cells. Shared chrome forms 6px exterior gutters and plain 6px
+  draggable panel gaps, with no divider stroke or grip. Internal terminal split
+  indicators remain unchanged. Tab-strip and frame colors read the active theme.
+  Independent review caught a center-frame minimum-size regression; a failing-before
+  test reproduced it and the center now inherits the terminal's dynamic minimum.
+  Headless light/dark workspace previews inspected; re-review is clean. Updated old
+  edge-to-edge size and border assertions for the new gutters and continuous surfaces.
+  `check :jasper-app:packageDist` passed: 2,035 tests, zero failures/errors, five skips;
+  rebuilt DMG and signature/payload verification passed. No GUI launched.
+
 - **Tool-panel contrast and original rail icons** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   removed the rail's tab-accent selection override and alternate selected-icon variant;
   rail buttons now retain their original theme-aware icons and the active theme's

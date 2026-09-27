@@ -206,7 +206,7 @@ class WindowPanelsTest {
             assertThat(rail.y).as("the rail starts under the toolbar").isEqualTo(underToolbar);
             assertThat(leftBounds.y).as("the left panel starts under the toolbar").isEqualTo(underToolbar);
             assertThat(rightBounds.y).as("the right panel starts under the toolbar").isEqualTo(underToolbar);
-            assertThat(strip.y).isEqualTo(underToolbar);
+            assertThat(strip.y).isEqualTo(underToolbar + 6);
             assertThat(strip.x).as("the tabs start right of the left panel").isGreaterThanOrEqualTo(leftBounds.x + leftBounds.width);
             assertThat(strip.x + strip.width).as("the tabs end left of the right panel").isLessThanOrEqualTo(rightBounds.x);
             assertThat(strip.x).isEqualTo(deck.x);

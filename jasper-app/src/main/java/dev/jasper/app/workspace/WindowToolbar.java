@@ -130,11 +130,4 @@ final class WindowToolbar extends JToolBar {
         return false;
     }
 
-    @Override protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        if (!titleBar) {
-            g.setColor(UIManager.getColor("Separator.foreground"));
-            g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
-        }
-    }
 }

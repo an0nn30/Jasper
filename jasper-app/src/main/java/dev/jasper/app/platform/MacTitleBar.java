@@ -207,8 +207,10 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
             Color highlight = UIManager.getColor("Jasper.headerHighlight");
             if (highlight != null) { g.setColor(highlight); g.fillRect(0, 0, getWidth(), UIScale.scale(1)); }
         }
-        g.setColor(UIManager.getColor("Jasper.titleSeparator"));
-        g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
+        if (toolbar == null) {
+            g.setColor(UIManager.getColor("Jasper.titleSeparator"));
+            g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
+        }
     }
 
     @Override public void close() {

@@ -14,7 +14,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
-import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JMenuItem;
@@ -122,7 +121,6 @@ final class WindowRail extends JPanel {
 
     void refreshTheme() {
         setBackground(UIManager.getColor("Jasper.titleBackground"));
-        setBorder(BorderFactory.createMatteBorder(0, 0, 0, UIScale.scale(1), UIManager.getColor("Separator.foreground")));
         repaint();
     }
 }

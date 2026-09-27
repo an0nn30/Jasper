@@ -279,9 +279,12 @@ padding. Keep compact palette rows tall enough for these insets. Plugin forms in
 these defaults; upstream theme assets should not be edited to duplicate them.
 
 
-Tool-panel rounding belongs to `WorkspaceRegions.Host`, which adds a 6px chrome gutter
-around an 8px-radius surface. Region widths/heights and persisted splitter sizes include
-that gutter. Keep clipping and hit testing in the host, and route descendant repaints
+Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and
+rounded upper shoulders for the terminal/tab column. Exterior gutters are 6px; adjacent
+hosts omit their facing gutters so the plain 6px draggable splitter supplies the gap.
+Region widths/heights and persisted splitter sizes include exterior gutters. The center
+host derives its minimum size from the terminal column; plugin hosts retain their 120px
+minimum. Terminal cells at the bottom are not clipped by rounding. Keep clipping and hit testing in the host, and route descendant repaints
 through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
 owns theme-background propagation and preserves plugin-selected colors. The active theme's
 `ToolWindow.background` supplies the inner surface. Jasper Dark maps it and list/tree/table
@@ -297,3 +300,11 @@ that painting to composite plugin renderers by intercepting full-row fills of th
 selection color; it leaves their component hierarchy, layout and custom colors alone.
 The palette uses the same geometry for selections, hover and scope highlights.
 `SelectionRenderingTest` saves light/dark headless previews in `build/render-preview`.
+
+
+Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
+workspace title bar, tab strip and status bar have no edge strokes. The selected-tab
+underline remains. Workspace-region splitters remove their border/grip after every UI
+update; terminal-internal splits keep their existing visible indicators. The standalone
+dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
+previews to `build/render-preview/fluid-workspace-{dark,light}.png`.

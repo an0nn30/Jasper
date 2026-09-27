@@ -20,7 +20,7 @@ import javax.swing.UIManager;
  * The terminal column (the tab strip over the deck) with up to three panel regions around it. BOTTOM
  * wraps the center, RIGHT wraps that, LEFT wraps that, so the bottom region spans only the terminal
  * and the side regions run the full height beside the tabs. With no region shown the
- * center is the only child and the layout is exactly what it was before regions existed. EDT only.
+ * center retains its rounded frame and exterior gutter. EDT only.
  */
 final class WorkspaceRegions extends JPanel {
     static final int DEFAULT_SIDE = 260, DEFAULT_BOTTOM = 200, MINIMUM = 120;
@@ -29,17 +29,32 @@ final class WorkspaceRegions extends JPanel {
     private static final class Host extends JPanel {
         private static final int GUTTER = 6, ARC = 16;
 
-        Host() {
+        private final boolean roundBottom;
+
+        Host() { this(true); }
+        Host(boolean roundBottom) {
             super(new BorderLayout());
-            // Own the border rather than exposing a UIResource that a theme switch can remove.
-            setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(GUTTER, GUTTER, GUTTER, GUTTER), null));
-            setMinimumSize(new Dimension(UIScale.scale(MINIMUM), UIScale.scale(MINIMUM)));
+            this.roundBottom = roundBottom;
+            gutters(GUTTER, GUTTER, GUTTER, GUTTER);
+            if (roundBottom) setMinimumSize(new Dimension(UIScale.scale(MINIMUM), UIScale.scale(MINIMUM)));
         }
 
-        private RoundRectangle2D surface() {
-            int gutter = UIScale.scale(GUTTER), arc = UIScale.scale(ARC);
-            return new RoundRectangle2D.Double(gutter, gutter,
-                Math.max(0, getWidth() - 2 * gutter), Math.max(0, getHeight() - 2 * gutter), arc, arc);
+        void gutters(int top, int left, int bottom, int right) {
+            // An app-owned border keeps the gutter through look-and-feel switches.
+            setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(top, left, bottom, right), null));
+        }
+
+        private java.awt.Shape surface() {
+            var insets = getInsets();
+            int width = Math.max(0, getWidth() - insets.left - insets.right);
+            int height = Math.max(0, getHeight() - insets.top - insets.bottom), arc = UIScale.scale(ARC);
+            var rounded = new RoundRectangle2D.Double(insets.left, insets.top, width, height, arc, arc);
+            if (roundBottom) return rounded;
+            // Keep terminal cells rectangular at the bottom; only the tab-strip shoulders round.
+            var shape = new java.awt.geom.Area(rounded);
+            shape.add(new java.awt.geom.Area(new java.awt.geom.Rectangle2D.Double(
+                insets.left, insets.top + height / 2.0, width, height / 2.0)));
+            return shape;
         }
 
         @Override protected boolean isPaintingOrigin() { return true; }
@@ -51,7 +66,7 @@ final class WorkspaceRegions extends JPanel {
                 g.setColor(UIManager.getColor("Jasper.titleBackground"));
                 g.fillRect(0, 0, getWidth(), getHeight());
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(getBackground()); g.fill(surface());
+                g.setColor(roundBottom ? getBackground() : UIManager.getColor("ToolWindow.background")); g.fill(surface());
             } finally { g.dispose(); }
         }
 
@@ -69,9 +84,21 @@ final class WorkspaceRegions extends JPanel {
         Split(int orientation, JComponent first, JComponent second, boolean trailing, int size) {
             super(orientation, true, first, second);
             setBorder(null);
-            setDividerSize(UIScale.scale(5));
+            setDividerSize(UIScale.scale(6));
+            putClientProperty("FlatLaf.style", "style: plain");
             setResizeWeight(trailing ? 1.0 : 0.0);
             if (trailing) pendingTrailing = size; else setDividerLocation(size);
+        }
+
+        @Override public void updateUI() {
+            super.updateUI();
+            setBorder(null);
+            setBackground(UIManager.getColor("Jasper.titleBackground"));
+            setOpaque(true);
+            if (getUI() instanceof javax.swing.plaf.basic.BasicSplitPaneUI ui) {
+                ui.getDivider().setBorder(BorderFactory.createEmptyBorder());
+                ui.getDivider().setBackground(getBackground());
+            }
         }
 
         @Override public void doLayout() {
@@ -84,14 +111,14 @@ final class WorkspaceRegions extends JPanel {
         }
     }
 
-    private final JComponent center;
+    private final Host center = new Host(false);
     private final EnumMap<PanelRegion, JComponent> contents = new EnumMap<>(PanelRegion.class);
-    private final EnumMap<PanelRegion, JPanel> hosts = new EnumMap<>(PanelRegion.class);
+    private final EnumMap<PanelRegion, Host> hosts = new EnumMap<>(PanelRegion.class);
     private final EnumMap<PanelRegion, Integer> sizes = new EnumMap<>(PanelRegion.class);
 
     WorkspaceRegions(JComponent center) {
         super(new BorderLayout());
-        this.center = center;
+        this.center.add(center, BorderLayout.CENTER);
         rebuild();
     }
 
@@ -123,7 +150,10 @@ final class WorkspaceRegions extends JPanel {
     }
 
     private JPanel host(PanelRegion region) {
-        JPanel host = hosts.computeIfAbsent(region, key -> new Host());
+        Host host = hosts.computeIfAbsent(region, key -> new Host());
+        host.gutters(region == PanelRegion.BOTTOM ? 0 : 6,
+            region == PanelRegion.RIGHT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.LEFT) ? 0 : 6,
+            6, region == PanelRegion.LEFT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.RIGHT) ? 0 : 6);
         host.removeAll();
         host.add(contents.get(region), BorderLayout.CENTER);
         ToolWindowSurface.apply(host);
@@ -136,6 +166,8 @@ final class WorkspaceRegions extends JPanel {
     private void rebuild() {
         removeAll();
         hosts.values().forEach(JPanel::removeAll);
+        center.gutters(6, contents.containsKey(PanelRegion.LEFT) ? 0 : 6,
+            contents.containsKey(PanelRegion.BOTTOM) ? 0 : 6, contents.containsKey(PanelRegion.RIGHT) ? 0 : 6);
         JComponent current = center;
         if (contents.containsKey(PanelRegion.BOTTOM))
             current = new Split(JSplitPane.VERTICAL_SPLIT, current, host(PanelRegion.BOTTOM), true, sizes.get(PanelRegion.BOTTOM));

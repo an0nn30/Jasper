@@ -69,10 +69,11 @@ class ToolWindowSurfaceTest {
                     var graphics = image.createGraphics();
                     try { host.paint(graphics); } finally { graphics.dispose(); }
                     assertThat(new Color(image.getRGB(0, 0))).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
-                    assertThat(new Color(image.getRGB(6, 6))).as("opaque plugin cannot square the rounded corner")
+                    var insets = host.getInsets();
+                    assertThat(new Color(image.getRGB(insets.left, insets.top))).as("opaque plugin cannot square the rounded corner")
                         .isEqualTo(UIManager.getColor("Jasper.titleBackground"));
                     assertThat(new Color(image.getRGB(host.getWidth() / 2, host.getHeight() / 2))).isEqualTo(Color.MAGENTA);
-                    assertThat(host.contains(6, 6)).isFalse();
+                    assertThat(host.contains(insets.left, insets.top)).isFalse();
                     assertThat(host.contains(host.getWidth() / 2, host.getHeight() / 2)).isTrue();
                 }
                 renderToolPanels(theme);

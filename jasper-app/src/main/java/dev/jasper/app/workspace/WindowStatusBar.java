@@ -154,10 +154,6 @@ final class WindowStatusBar extends JPanel {
         Color colour = UIManager.getColor("StatusBar.background");
         return colour != null ? colour : UIManager.getColor("Panel.background");
     }
-    private static Color rule() {
-        Color colour = UIManager.getColor("StatusBar.borderColor");
-        return colour != null ? colour : UIManager.getColor("Jasper.titleSeparator");
-    }
     void refreshTheme() {
         setBackground(surface());
         left.refreshTheme(); right.refreshTheme();
@@ -230,8 +226,6 @@ final class WindowStatusBar extends JPanel {
     }
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(rule());
-        g.fillRect(0, 0, getWidth(), UIScale.scale(1));
         g.setColor(running ? UIManager.getColor("Jasper.runningForeground") : muted());
         var copy = (Graphics2D) g.create();
         try {
