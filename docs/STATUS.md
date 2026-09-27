@@ -2,6 +2,23 @@
 
 ## Current state — 2026-09-23
 
+- **IntelliJ New UI icons** (branch `codex/intellij-new-icons`, 2026-09-27): isolated in
+  `/Users/dustin/.codex/worktrees/intellij-new-icons/moray`. Vendored the complete platform
+  and Terminal `expui` collections at `60b8fbadc2f08ef18a6ecab0c138a849e14f13fb`: 1,744 SVGs,
+  885 catalog choices, upstream bytes, licenses/notices and SHA-256 provenance retained.
+  AppIcons/NamedIcons own artwork, caching, light/dark selection and proportional 16px sizing.
+  SDK 0.8.2 exposes `Appearance.icon(BundledIcon)` and adds 13 semantic names (47 total);
+  Vault and Remote now require 0.8.2 and use host icons instead of private painters.
+  Title bar/layout and application branding are unchanged. The sample's custom-SVG example
+  remains supported. Deviation: KEY retains the central Tabler key because this upstream set
+  has no key symbol; artwork/catalog/SDK changes form one integration commit.
+  Independent review found and fixed an Escape binding regression and a differing-dimensions
+  light/dark fitting issue, both with failing-before/passing-after tests; follow-up review clean.
+  `./gradlew check :jasper-app:installDist` passed: 2,009 tests, zero failures/errors, five skips.
+  Distribution membership, all asset hashes and Java source hygiene verified. Headless comparison:
+  `python3 tools/icons/render-preview.py`. [Details](new-ui-icons-verification.md).
+  Native visual acceptance is user-run; not merged or pushed.
+
 - **Three-platform CI** (branch `fix/ci-cross-platform`, 2026-09-27): `main` had been red on Linux
   and Windows since 2026-09-13 (last green `1db31b1b`). The logs showed no assertion text and
   Gradle stopped at the first failing module, so most failures were hidden. CI now prints full
