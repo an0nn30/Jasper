@@ -2,6 +2,21 @@
 
 ## Current state — 2026-09-23
 
+- **Windows setup wizard** (branch `codex/windows-setup-wizard`, 2026-09-27): approved
+  bounded packaging extension adds `:jasper-app:packageInstaller`, producing
+  `Jasper-<version>-windows-x64-setup.exe` alongside the existing ZIP. Uses the verified
+  JBR image, per-user installation, directory/shortcut dialogs, a stable upgrade UUID,
+  and standard Windows uninstall. User data outside the installation folder is preserved.
+  Built successfully with JBR SDK 25 x64 and WiX 3.14.1 on Windows ARM64 via emulation.
+  MSI metadata verification passes; negative checks reject wrong version/upgrade UUID
+  and machine-wide scope. The EXE's x64 architecture and all 20 official icon frames
+  were verified. Installer + ZIP builds and targeted packaged-resource/terminal tests
+  passed (12 tests: six passed, six Unix-only skips). Independent review found no issues.
+  The broader Windows failures recorded below remain open; this is not a green full-suite
+  claim. Setup remains unsigned. Interactive install/upgrade/uninstall acceptance is
+  user-run; no installer or GUI was launched. [Build and acceptance](packaging.md#windows-setup-wizard).
+  Not merged or pushed.
+
 - **Windows terminal startup** (branch `codex/fix-windows-terminal-startup`, 2026-09-27):
   launching through `cmd.exe` supplies hidden environment entries such as `=C:`. The
   session options validator rejected these before PowerShell could start. Validation now

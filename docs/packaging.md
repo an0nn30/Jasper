@@ -2,8 +2,8 @@
 
 Jasper packages a native image with the JetBrains Runtime. Packaging must run on
 the target operating system: macOS builds the macOS app and DMG, while Windows
-builds the portable Windows ZIP. Windows packaging has not yet been executed and
-remains a manual acceptance boundary.
+builds the portable Windows ZIP or setup wizard. Interactive installation and
+desktop acceptance remain user-run checks.
 
 Install a JBR **SDK** 25 whose architecture matches the host. Gradle normally
 finds it through Java toolchain discovery. If it does not, set `JAVA_HOME` and
@@ -35,6 +35,51 @@ in `image/`, and distributions are
 or `jasper-app/build/packaging/dist/Jasper-<version>-windows-x64.zip`. The unpacked
 image is `jasper-app/build/packaging/image/Jasper.app` on macOS and
 `jasper-app/build/packaging/image/Jasper` on Windows.
+
+## Windows setup wizard
+
+The opt-in `:jasper-app:packageInstaller` task builds
+`jasper-app/build/packaging/dist/Jasper-<version>-windows-x64-setup.exe` from the
+same verified application image as the ZIP. It bundles JBR, installs for the
+current user, offers an installation directory chooser and shortcut choices,
+and registers Jasper with Windows Installed apps for uninstall. No administrator
+installation is requested. The default installation folder is under the user's
+local application data directory. The portable ZIP task remains available.
+
+Build with **JBR SDK 25 x64** and **WiX on PATH**. WiX is a build-time requirement
+only; users need neither WiX nor Java. This path is verified with the portable
+[WiX 3.14.1 binaries](https://github.com/wixtoolset/wix3/releases/tag/wix3141rtm):
+extract `wix314-binaries.zip` and add the directory containing `candle.exe` and
+`light.exe` to the build shell's PATH. See the
+[JDK packaging prerequisites](https://docs.oracle.com/en/java/javase/25/jpackage/packaging-overview.html).
+
+```powershell
+$env:JAVA_HOME = 'C:\path\to\jbrsdk-25-x64'
+$env:PATH = "C:\path\to\wix;$env:JAVA_HOME\bin;$env:PATH"
+.\gradlew.bat "-Dorg.gradle.java.installations.paths=$env:JAVA_HOME" `
+    '-Dorg.gradle.java.installations.auto-detect=false' :jasper-app:packageInstaller
+```
+
+Selecting the x64 SDK explicitly matters when both ARM64 and x64 SDKs are installed.
+On Windows ARM64 the x64 build tools run under Windows emulation and still produce
+an **x64** installer, not a native ARM64 package. The Gradle JVM and selected JBR
+toolchain must both be x64. The task is not part of `check` and never opens the app
+or installs it on the build machine.
+
+Use `-PjasperVersion=1.0.1` (and increasing three-part versions thereafter) to build
+upgrades. Keep the `upgradeUuid` in `gradle/packaging.gradle` unchanged across releases.
+The installer detects the previous per-user installation and replaces its program
+files. Settings, Vault data, and plugins under `%APPDATA%\jasper` (or a custom Jasper
+home outside the installation folder) are not installer-owned and are preserved on upgrade and uninstall. Quit
+Jasper, including its background resident process, before upgrading or uninstalling.
+Installing the wizard does not remove a separately extracted portable copy.
+
+Before publishing the executable, the build inspects its generated MSI payload
+without installing it: product/version/upgrade identity, x64 architecture,
+per-user scope, directory/shortcut dialogs, shortcuts, and upgrade removal action.
+The build fails if those checks do not pass. Install, upgrade, and uninstall still
+need the interactive acceptance checks below. The generated setup is unsigned;
+Windows may show an unknown-publisher warning until release signing is configured.
 
 The package includes `jasper-app.jar`, `jasper-terminal.jar`, `jasper-buddy.jar`,
 their runtime dependencies and a JBR runtime; it needs no external Java.
@@ -125,6 +170,10 @@ acceptance remain unexecuted on macOS.
 
 ### Windows
 
+- [ ] Run the setup wizard as a standard user; confirm folder selection and shortcut choices.
+- [ ] Launch through the Start menu and optional desktop shortcut, with no external Java installed.
+- [ ] Install a higher version over an existing installation; confirm one Installed apps entry and preserved settings, Vault data, and plugins.
+- [ ] Uninstall through Windows Installed apps; confirm program files and shortcuts are removed while Jasper's user data remains.
 - [ ] Build on Windows with a JBR 25 x64 SDK, extract the entire ZIP to a path containing spaces, and launch `Jasper.exe` from Explorer.
 - [ ] Confirm the Ember Jasper icon in Explorer, the taskbar, Alt+Tab and titlebar at 100%, 150% and 200% display scale.
 - [ ] Confirm PowerShell/PTY input and resize behavior, including Unicode text.

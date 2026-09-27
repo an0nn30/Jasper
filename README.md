@@ -83,6 +83,11 @@ Versions use `X.Y.Z`: major 1–255, minor 0–255, patch 0–65535, with no lea
 
 ## Build a Windows portable ZIP
 
+For a setup wizard with per-user installation, shortcut choices, upgrades, and
+Windows uninstall support, use `:jasper-app:packageInstaller` instead. It produces
+`jasper-app\build\packaging\dist\Jasper-<version>-windows-x64-setup.exe` and requires
+WiX in addition to JBR SDK 25 x64. See the [installer build instructions](docs/packaging.md#windows-setup-wizard).
+
 Run this **on Windows x64**, with a JBR SDK 25 x64 installation. From the repository root in PowerShell:
 
 ```powershell

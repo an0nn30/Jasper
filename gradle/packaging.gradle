@@ -370,6 +370,57 @@ def verifyPackage = tasks.register('verifyPackage') {
 }
 
 if (normalizedHost().os == 'windows') {
+    // Stable across releases: changing this would install a second product instead of upgrading.
+    def upgradeUuid = 'c035e743-82bf-4ca6-aacf-5512d9831a09'
+    def installerVerifier = rootProject.file('packaging/windows/Verify-Installer.ps1')
+    tasks.register('packageInstaller') {
+        group = 'distribution'
+        description = 'Creates and verifies a per-user Windows setup wizard (requires WiX on PATH).'
+        dependsOn(verifyPackage)
+        inputs.dir(imageDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
+        inputs.file(installerVerifier).withPathSensitivity(PathSensitivity.RELATIVE)
+        inputs.property('version', version)
+        inputs.property('upgradeUuid', upgradeUuid)
+        outputs.file(version.map { new File(distributionDirectory.get().asFile, "Jasper-${it}-windows-x64-setup.exe") })
+        doLast {
+            def context = nativeContext()
+            File distDir = distributionDirectory.get().asFile
+            distDir.mkdirs()
+            File artifact = new File(distDir, "Jasper-${context.version}-windows-x64-setup.exe")
+            File temporary = new File(packagingRoot.get().asFile, 'installer-work')
+            delete(artifact, temporary)
+            temporary.mkdirs()
+            try {
+                File output = new File(temporary, 'output')
+                File work = new File(temporary, 'jpackage')
+                executeNative([context.jpackage.absolutePath, '--type', 'exe', '--name', 'Jasper',
+                    '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
+                    '--icon', nativeIcon.get().absolutePath,
+                    '--app-image', new File(imageDirectory.get().asFile, 'Jasper').absolutePath,
+                    '--dest', output.absolutePath, '--temp', work.absolutePath,
+                    '--win-per-user-install', '--install-dir', 'Jasper', '--win-dir-chooser',
+                    '--win-menu', '--win-menu-group', 'Jasper', '--win-shortcut', '--win-shortcut-prompt',
+                    '--win-upgrade-uuid', upgradeUuid], 'jpackage Windows setup (install WiX and add it to PATH)')
+                File generated = output.listFiles()?.find { it.name.endsWith('.exe') }
+                // WiX also leaves a working copy (wixobj/a.msi); verify the final payload
+                // that jpackage's EXE bundler embeds, not that intermediate copy.
+                File msi = new File(work, "msi/Jasper-${context.version}.msi")
+                if (generated == null || !msi.isFile()) {
+                    throw new GradleException("Unexpected jpackage output: setup=${generated}, missing MSI=${msi}; inspect ${temporary}")
+                }
+                def verification = executeNative(['powershell.exe', '-NoProfile', '-NonInteractive',
+                    '-ExecutionPolicy', 'Bypass', '-File', installerVerifier.absolutePath,
+                    '-MsiPath', msi.absolutePath, '-Version', context.version,
+                    '-UpgradeUuid', upgradeUuid], 'Windows installer verification')
+                logger.lifecycle(verification.stdout.trim())
+                Files.move(generated.toPath(), artifact.toPath())
+            } finally {
+                // Keep failed build inputs for diagnosis; never publish an unverified setup.
+                if (artifact.isFile()) delete(temporary)
+            }
+            logger.lifecycle("Created ${artifact}")
+        }
+    }
     tasks.register('packageDist', Zip) {
         group = 'distribution'
         description = 'Creates the portable Windows distribution after verifying its image.'
