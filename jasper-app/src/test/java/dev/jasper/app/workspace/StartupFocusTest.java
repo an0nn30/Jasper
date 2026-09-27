@@ -7,13 +7,16 @@ import java.util.ArrayDeque;
 import javax.swing.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class StartupFocusTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    @Test void defaultFocusTracksTheActiveTerminalBeforeAndAfterShellStartup() throws Exception {
+    // Starts DesktopTestSupport's /bin/sh shell, which Windows lacks (as MockUiTest's shell-starting test).
+    @Test @DisabledOnOs(OS.WINDOWS) void defaultFocusTracksTheActiveTerminalBeforeAndAfterShellStartup() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         var owners = new WindowContent[1];
         var policies = new FocusTraversalPolicy[1];
