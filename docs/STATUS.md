@@ -2,6 +2,18 @@
 
 ## Current state — 2026-09-23
 
+- **Duplicate contributed menus on macOS** (branch `codex/fix-duplicate-plugin-menus`,
+  2026-09-26): investigation of the installed app's logs confirmed older user Remote/Vault
+  copies were skipped in favor of bundled versions, not loaded twice. `WindowChrome` could
+  re-enter its menu rebuild while JBR dispatched a callback during a native menu mutation,
+  duplicating SSH/Help on insertion or throwing during removal. Menu rendering now finishes
+  the active pass before processing nested refresh requests against the latest model.
+  Headless regressions reproduce both failures before the fix and pass afterward, including
+  a menu-content change during insertion. Independent review found no actionable issues.
+  `./gradlew check :jasper-app:packageDist` passed: 1,985 tests, zero failures/errors, three
+  skips before the SDK 0.8.1 update; the macOS DMG was rebuilt and the package image verified.
+  Native packaged-app acceptance remains user-run; no GUI was launched. Main integration
+  and publication are authorized.
 - **Full-height rail** (branch `worktree-rail-full-height`, 2026-09-25): the tab strip now sits
   over the terminal deck inside `WorkspaceRegions`' center, so the rail and the left/right panels
   run from the toolbar to the status bar and the bottom panel sits under the terminal only.
