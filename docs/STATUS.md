@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-23
 
+- **Windows terminal startup** (branch `codex/fix-windows-terminal-startup`, 2026-09-27):
+  launching through `cmd.exe` supplies hidden environment entries such as `=C:`. The
+  session options validator rejected these before PowerShell could start. Validation now
+  follows the JDK's Windows rule (a leading `=` is allowed; embedded `=` and NUL remain
+  invalid), retaining the existing rules on other platforms. Unit and real headless
+  PowerShell PTY regressions failed before the fix and pass afterward. Independent review
+  found no actionable issues. The full Windows check exposed broader failures and a
+  stalled Remote test; see [verification details](windows-startup-verification.md).
+  GUI acceptance remains user-run. Not merged or pushed.
+
 - **Original Steep application icon** (branch `codex/jasper-steep-icon`):
   user-selected full-height 68-degree tab and Frost chevron replace Ember in
   native packages and runtime assets. The exact SVG master and Inkscape generator
