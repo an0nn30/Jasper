@@ -47,7 +47,7 @@ class ToolWindowSurfaceTest {
             SwingUtilities.updateComponentTreeUI(regions);
             regions.refreshTheme();
             Color dark = UIManager.getColor("ToolWindow.background");
-            assertThat(dark).isEqualTo(new Color(0x21252a));
+            assertThat(dark).isEqualTo(new Color(0x191c20));
             for (var component : List.of(content, inner, later)) assertThat(component.getBackground()).isEqualTo(dark);
             assertThat(fixed.getBackground()).isEqualTo(Color.MAGENTA);
         } finally { UIManager.setLookAndFeel(original); }
@@ -101,10 +101,18 @@ class ToolWindowSurfaceTest {
         var rail = new WindowRail(); rail.setRailWidth(36);
         rail.render(List.of(new WindowRail.PanelButton("sessions", "Sessions", dev.jasper.app.platform.AppIcons.named("SERVER"), PanelRegion.LEFT, true),
             new WindowRail.PanelButton("vault", "Vault", dev.jasper.app.platform.AppIcons.named("LOCK"), PanelRegion.LEFT, false)), List.of());
+        rail.refreshTheme();
+        assertThat(rail.buttons().getFirst().getSelectedIcon()).as("rail retains the original theme-aware icon").isNull();
         var root = new JPanel(new BorderLayout()); root.add(rail, BorderLayout.WEST); root.add(regions);
         root.setSize(820, 480);
         dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(root);
         dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(root);
+        var selectedButton = rail.buttons().getFirst();
+        var buttonImage = new java.awt.image.BufferedImage(selectedButton.getWidth(), selectedButton.getHeight(), 2);
+        var bg = buttonImage.createGraphics(); selectedButton.paint(bg); bg.dispose();
+        assertThat(new Color(buttonImage.getRGB(4, selectedButton.getHeight() / 2)))
+            .as("rail uses the active theme's neutral toolbar selection")
+            .isEqualTo(UIManager.getColor("ToggleButton.toolbar.selectedBackground"));
         var image = new java.awt.image.BufferedImage(1640, 960, 2); var g = image.createGraphics();
         try { g.scale(2, 2); root.printAll(g); } finally { g.dispose(); }
         var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);

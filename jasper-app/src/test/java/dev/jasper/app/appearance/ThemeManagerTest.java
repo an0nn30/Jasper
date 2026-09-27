@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.*;
 class ThemeManagerTest {
     /** Jasper Dark before the engine: FlatLaf Dark plus Jasper's former properties files. */
     private static final String[] TODAYS_DARK = {
-        "Panel.background", "#21252a", "List.background", "#21252a", "List.foreground", "#d5dee5",
+        "Panel.background", "#21252a", "List.background", "#191c20", "List.foreground", "#d5dee5",
         "List.selectionBackground", "#5e7293", "List.selectionForeground", "#ffffff", "List.selectionInactiveBackground", "#5e7293",
         "TextField.background", "#25292e", "TextField.foreground", "#d5dee5", "TextField.selectionBackground", "#3e4451",
         "TextArea.background", "#25292e", "PasswordField.background", "#25292e", "ComboBox.background", "#333841",
@@ -36,7 +36,7 @@ class ThemeManagerTest {
         "Component.focusedBorderColor", "#8eb8d2", "Component.focusColor", "#8eb8d2", "Component.accentColor", "#8eb8d2",
         "Component.linkColor", "#8eb8d2", "Separator.foreground", "#343a42", "ScrollBar.thumb", "#4d5262", "ScrollBar.track", "#2b2e37",
         "SplitPaneDivider.gripColor", "#d5dee5", "SplitPaneDivider.hoverColor", "#323942", "SplitPaneDivider.pressedColor", "#3e4451",
-        "ToolTip.background", "#15161a", "ToolTip.foreground", "#d5dee5", "Tree.background", "#21252a",
+        "ToolTip.background", "#15161a", "ToolTip.foreground", "#d5dee5", "Tree.background", "#191c20",
         "Tree.selectionBackground", "#3e4451", "CheckBox.background", "#21252a", "ProgressBar.foreground", "#8eb8d2",
         "Jasper.chromeForeground", "#d5dee5", "Jasper.configErrorForeground", "#ff858d", "Jasper.configSuccessForeground", "#a8c58d",
         "Jasper.configWarningForeground", "#e5c07b", "Jasper.findErrorBackground", "#5c3b3b", "Jasper.mutedForeground", "#a7b2bf",
@@ -115,7 +115,7 @@ class ThemeManagerTest {
                 assertThat(String.valueOf(UIManager.get(TODAYS_DARK_NUMBERS[i]))).as(TODAYS_DARK_NUMBERS[i]).isEqualTo(TODAYS_DARK_NUMBERS[i + 1]);
             // FlatLaf copies the list selection into menus; white text keeps it readable.
             assertColours(Map.of("MenuItem.selectionBackground", "#5e7293", "MenuItem.selectionForeground", "#ffffff"));
-            assertColours(Map.of("ToolWindow.background", "#21252a", "StatusBar.background", "#25292e",
+            assertColours(Map.of("ToolWindow.background", "#191c20", "Table.background", "#191c20", "StatusBar.background", "#25292e",
                 "SearchEverywhere.Tab.selectedBackground", "#3e4451", "List.hoverBackground", "#323942"));
         } finally { UIManager.setLookAndFeel(original); }
     }
@@ -155,7 +155,7 @@ class ThemeManagerTest {
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNotNull();
             ThemeManager.install(Theme.DARK);
             assertThat(UIManager.getColor("Plugins.hoverBackground")).isNull();
-            assertColours(Map.of("ToolWindow.background", "#21252a", "Jasper.titleBackground", "#25292e"));
+            assertColours(Map.of("ToolWindow.background", "#191c20", "Jasper.titleBackground", "#25292e"));
         } finally { UIManager.setLookAndFeel(original); }
     }
 

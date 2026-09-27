@@ -2,6 +2,18 @@
 
 ## Current state — 2026-09-23
 
+- **Tool-panel contrast and original rail icons** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  removed the rail's tab-accent selection override and alternate selected-icon variant;
+  rail buttons now retain their original theme-aware icons and the active theme's
+  toolbar selection color. Jasper Dark defines `toolWindowBackground` (`#191c20`) for
+  rounded tool panels and matching list/tree/table content, giving stronger contrast
+  against the chrome. All color values live in the scheme; UI code reads active theme
+  keys. Existing light-theme colors and explicit plugin overrides remain intact.
+  Headless dark/light previews inspected. Independent review caught one stale color
+  assertion, now updated. All checks pass: 2,033 tests, zero failures/errors, five skips.
+  Packaging retried successfully after a transient `.DS_Store` cleanup conflict;
+  rebuilt DMG and package signature/payload verification pass. No GUI launched.
+
 - **Rounded selections and highlights** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   shared theme defaults give list/tree/table, combo popup and menu selections a 4px
   radius and horizontal inset. Standard list/table padding keeps content inside the

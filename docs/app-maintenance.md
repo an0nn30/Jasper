@@ -283,7 +283,11 @@ Tool-panel rounding belongs to `WorkspaceRegions.Host`, which adds a 6px chrome 
 around an 8px-radius surface. Region widths/heights and persisted splitter sizes include
 that gutter. Keep clipping and hit testing in the host, and route descendant repaints
 through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
-owns theme-background propagation and preserves plugin-selected colors.
+owns theme-background propagation and preserves plugin-selected colors. The active theme's
+`ToolWindow.background` supplies the inner surface. Jasper Dark maps it and list/tree/table
+backgrounds to its `toolWindowBackground` color; edit the theme JSON to tune the contrast.
+Rail selection uses the theme's toolbar-button background and the original theme-aware icon;
+do not substitute the tab accent or a different selected icon variant.
 
 
 Selection geometry is shared through `ThemeManager.APP_DEFAULTS`: lists, trees, tables,

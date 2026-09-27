@@ -49,8 +49,7 @@ final class WindowRail extends JPanel {
         button.setText(null);
         button.setIcon(icon);
         button.putClientProperty("JButton.buttonType", "toolBarButton");
-        button.putClientProperty("FlatLaf.style", "arc: 10; toolbar.selectedBackground: $Jasper.tabUnderline");
-        button.setSelectedIcon(AppIcons.forBackground(icon, UIManager.getColor("Jasper.tabUnderline")));
+        button.putClientProperty("FlatLaf.style", "arc: 10");
         button.setMargin(new Insets(0, 0, 0, 0));
         button.setFocusable(false);
         button.setToolTipText(name);
@@ -123,8 +122,6 @@ final class WindowRail extends JPanel {
 
     void refreshTheme() {
         setBackground(UIManager.getColor("Jasper.titleBackground"));
-        for (var button : buttons)
-            button.setSelectedIcon(AppIcons.forBackground(button.getIcon(), UIManager.getColor("Jasper.tabUnderline")));
         setBorder(BorderFactory.createMatteBorder(0, 0, 0, UIScale.scale(1), UIManager.getColor("Separator.foreground")));
         repaint();
     }
