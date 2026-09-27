@@ -2,6 +2,28 @@
 
 ## Current state — 2026-09-23
 
+- **Three-platform CI** (branch `fix/ci-cross-platform`, 2026-09-27): `main` had been red on Linux
+  and Windows since 2026-09-13 (last green `1db31b1b`). The logs showed no assertion text and
+  Gradle stopped at the first failing module, so most failures were hidden. CI now prints full
+  failures, runs `check --continue`, fails a test after 5 min and a job after 30.
+  - **Production fixes:** Remote's transfer scheduler let a queued same-destination job take the
+    one scanner the holder needed to finalize, pass after pass (Linux); `HandoffSocket.close()`
+    could mistake its own dying listener for a successor and leave its files (Linux); an SFTP
+    write's `close()` turned the real error into "Self-suppression not permitted"; ssh `Include`
+    globs threw on Windows; Windows refusals now read "Connection refused"; multi-line snippets
+    no longer get CRLF on Windows (tomlj writes the platform separator); `.gitattributes` checks
+    text out with LF.
+  - **Tests:** no longer assume the host keymap, POSIX paths, or Debian's nounset-unsafe
+    `/etc/bash.bashrc`. POSIX-only features (FIFOs, POSIX modes, the SFTP browser's `/` paths,
+    OSC through a real PTY) are `@DisabledOnOs(WINDOWS)` or assert Windows' own behaviour.
+  - **Known Windows limits, pinned by tests:** resuming a paused transfer asks Restart or Skip,
+    because NTFS gives Java no file identity (user's choice to keep, 2026-09-27); SFTP downloads
+    record a metadata warning (no POSIX modes). Sessions run on winpty, pty4j's default, which
+    does not pass OSC through, so titles and shell integration probably do not work on Windows
+    (ConPTY is the follow-up).
+  - **Verified:** all three CI legs green at `e0197666`; local `check` 1,985 tests, 0 failures, 3 skipped.
+  - **Not done:** merge to `main`.
+
 - **Full-height rail** (branch `worktree-rail-full-height`, 2026-09-25): the tab strip now sits
   over the terminal deck inside `WorkspaceRegions`' center, so the rail and the left/right panels
   run from the toolbar to the status bar and the bottom panel sits under the terminal only.
