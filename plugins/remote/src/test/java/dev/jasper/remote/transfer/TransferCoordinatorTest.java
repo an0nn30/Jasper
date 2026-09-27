@@ -53,9 +53,10 @@ class TransferCoordinatorTest {
             var coordinator=new TransferCoordinator(root.resolve("queue"),executor,Runnable::run,(ref,owner)-> {
                 var local=new LocalEndpoint();
                 FileEndpoint delayed=(FileEndpoint)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{FileEndpoint.class},(proxy,method,args)-> {
-                    if(method.getName().equals("abort")) release.countDown();
                     try {
                         Object value=method.invoke(local,args);
+                        // Released after the real abort, as the handle's abort does, so the blocked write cannot land late.
+                        if(method.getName().equals("abort")) release.countDown();
                         if(method.getName().equals("write")) {
                             var output=(WriteHandle)value;
                             return new WriteHandle() {
