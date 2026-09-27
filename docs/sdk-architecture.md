@@ -303,4 +303,6 @@ Quit and restart ask plugin windows first: `JasperApplication.quit()` and `resta
 `AuxiliaryWindows.mayQuit()`, which asks every open plugin window's guards in creation order (not
 dialogs or overlays) without closing anything, before `quitting` is set and before
 `ApplicationShutdown` arms the exit deadline. A refusal leaves Jasper running; a refused restart
-records no relaunch. Signals and start-up failures do not go through `quit()` and are not asked.
+records no relaunch. Start-up rollback, a `--background` launch that cannot stay resident and the
+benchmark exit through `quitNow()`, which does not ask; a resident asked to retire by another
+launch goes through `quit()` and does.

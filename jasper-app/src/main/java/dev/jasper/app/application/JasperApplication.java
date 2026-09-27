@@ -478,7 +478,7 @@ public final class JasperApplication {
         if (!pluginWindowsMayClose()) return true;
         relaunch = planned.get();
         endpointOwner = resident;
-        quitConfirmed();
+        quitNow();
         return true;
     }
 
@@ -530,13 +530,14 @@ public final class JasperApplication {
     public void quit() {
         if (quitting || stopped) return;
         if (!pluginWindowsMayClose()) return;
-        quitConfirmed();
+        quitNow();
     }
 
     /** Plugin windows' closing guards, asked before quit or restart changes anything and before the exit deadline is armed. */
     private boolean pluginWindowsMayClose() { return auxiliary == null || auxiliary.mayQuit(); }
 
-    private void quitConfirmed() {
+    /** Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. EDT. */
+    public void quitNow() {
         quitting = true;
         for (TerminalWindow window : List.copyOf(windows)) window.close();
         requestShutdown();

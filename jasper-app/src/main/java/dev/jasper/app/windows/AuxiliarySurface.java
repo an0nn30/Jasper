@@ -107,7 +107,7 @@ public final class AuxiliarySurface {
     }
 
     /**
-     * Asks every closing guard without closing: quit uses this. One that throws cannot trap the window open.
+     * Asks every closing guard without closing: quit and restart use this. One that throws cannot trap the window open.
      *
      * @return whether the window may close
      */

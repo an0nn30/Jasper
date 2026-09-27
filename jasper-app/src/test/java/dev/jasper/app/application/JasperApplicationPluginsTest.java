@@ -231,6 +231,23 @@ class JasperApplicationPluginsTest {
         assertThat(spawned).as("the refused restart left no relaunch behind").isEmpty();
     }
 
+    @Test void quitNowDoesNotAskPluginWindows() throws Exception {
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("dev-plugin");
+        PluginJars.build(dev, "guard.jar", PluginJars.descriptor("dev.example.guard", "1.0.0", "fix.guard.Main"),
+            Map.of("fix.guard.Main", GUARD_FIXTURE), List.of());
+        Path data = dirs.plugins().resolve("dev.example.guard/data");
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].startPlugins(null, dev, false, dirs);
+        });
+        edt(application[0]::quitNow);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(data.resolve("asked")).as("the guard was never consulted").doesNotExist();
+    }
+
     @Test void anUnknownCommandLineLeavesJasperRunning() throws Exception {
         List<String> spawned = new CopyOnWriteArrayList<>();
         var terminated = new CountDownLatch(1);
