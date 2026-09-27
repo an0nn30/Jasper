@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-23
 
+- **Editor plugin, plan A** (branch `claude/editor-plugin`, plan
+  `docs/superpowers/plans/2026-09-27-jasper-editor-plugin-a.md`, spec
+  `docs/superpowers/specs/2026-09-27-jasper-editor-plugin-design.md`): SDK 0.8.2 adds
+  `PluginWindow.onCloseCommand`, quit and restart asking plugin windows' closing guards, and
+  `Windows.chooseSaveFile`. The bundled Editor (`plugins/editor`, RSyntaxTextArea 3.6.0) opens, edits
+  and safely saves local files in tabs in one window, with a TOML lexer, conflict checks and outside-change
+  polling. Planning decisions and deviations are in the plan's header. Not done: plan B (SFTP editing
+  through Remote), GUI acceptance ([checklist](editor-verification.md), user-run) and push. Merged into
+  `main` locally on 2026-09-27 after `origin/main`'s three-platform CI work.
+
 - **Three-platform CI** (branch `fix/ci-cross-platform`, 2026-09-27): `main` had been red on Linux
   and Windows since 2026-09-13 (last green `1db31b1b`). The logs showed no assertion text and
   Gradle stopped at the first failing module, so most failures were hidden. CI now prints full

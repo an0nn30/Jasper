@@ -327,12 +327,22 @@ final class HostedUi {
         @Override public void close() { subscription(surface::close).close(); }
     }
 
-    private final class OwnedWindow extends Surface implements PluginWindow { OwnedWindow(AuxiliarySurface surface) { super(surface); } }
+    private final class OwnedWindow extends Surface implements PluginWindow {
+        OwnedWindow(AuxiliarySurface surface) { super(surface); }
+        @Override public Subscription onCloseCommand(BooleanSupplier handler) {
+            requireUi("onCloseCommand");
+            return wrap(surface.onCloseCommand(() -> {
+                boolean[] handled = {false};
+                containment.run(pluginId, "close command", () -> handled[0] = handler.getAsBoolean());
+                return handled[0];
+            }));
+        }
+    }
     private final class OwnedDialog extends Surface implements PluginDialog { OwnedDialog(AuxiliarySurface surface) { super(surface); } }
 
     private final java.util.Map<AuxiliarySurface, OwnedWindow> ownedWindows = new java.util.HashMap<>();
 
-    private java.util.List<Path> choosePaths(WindowOwner owner, String title, Optional<Path> initial, boolean directory) {
+    private java.util.List<Path> choosePaths(WindowOwner owner, String title, Optional<Path> initial, dev.jasper.app.windows.PathChoice.Mode mode) {
         guard("choosePaths");
         java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial);
         var cancelled = new AtomicBoolean();
@@ -341,10 +351,10 @@ final class HostedUi {
         dev.jasper.app.windows.PathChoice choice;
         Subscription ownerClosed;
         if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window && window.surface.shown()) {
-            choice = new dev.jasper.app.windows.PathChoice(null, window.surface, title, initial, directory);
+            choice = new dev.jasper.app.windows.PathChoice(null, window.surface, title, initial, mode);
             ownerClosed = wrap(window.surface.onClosed(cancel));
         } else if (owner instanceof WindowHandle terminal && terminals.ownsOpenWindow(terminal)) {
-            choice = new dev.jasper.app.windows.PathChoice(terminal.id(), null, title, initial, directory);
+            choice = new dev.jasper.app.windows.PathChoice(terminal.id(), null, title, initial, mode);
             ownerClosed = wrap(terminals.onWindowClosed(terminal.id(), cancel));
         } else throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
         Subscription stopped = tracked(cancel);
@@ -361,10 +371,13 @@ final class HostedUi {
     Windows windows() {
         return new Windows() {
             @Override public java.util.List<Path> chooseFiles(WindowOwner owner, String title, Optional<Path> initial) {
-                return choosePaths(owner, title, initial, false);
+                return choosePaths(owner, title, initial, dev.jasper.app.windows.PathChoice.Mode.FILES);
             }
             @Override public Optional<Path> chooseDirectory(WindowOwner owner, String title, Optional<Path> initial) {
-                return choosePaths(owner, title, initial, true).stream().findFirst();
+                return choosePaths(owner, title, initial, dev.jasper.app.windows.PathChoice.Mode.DIRECTORY).stream().findFirst();
+            }
+            @Override public Optional<Path> chooseSaveFile(WindowOwner owner, String title, Optional<Path> initial) {
+                return choosePaths(owner, title, initial, dev.jasper.app.windows.PathChoice.Mode.SAVE).stream().findFirst();
             }
             @Override public PluginWindow create(WindowSpec spec) {
                 guard("create");

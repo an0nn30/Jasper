@@ -47,7 +47,8 @@ public interface WindowSurface extends Subscription {
 
     /**
      * Adds a guard consulted when the user tries to close the window. Overlays have no implicit user-close action. Any guard returning false keeps
-     * it open; a guard that throws is treated as allowing the close. Quit does not consult guards.
+     * it open; a guard that throws is treated as allowing the close. Since 0.8.2, quitting or restarting Jasper asks the guards of every open plugin window (not dialogs or
+     * overlays) first, and a refusal cancels the quit; nothing closes while they are asked.
      *
      * @param guard returns whether the window may close
      * @return the registration

@@ -254,12 +254,31 @@ final class FakeUi {
         }
         @Override public Subscription onClosing(BooleanSupplier guard) { guards.add(guard); return () -> guards.remove(guard); }
         @Override public Subscription onClosed(Runnable handler) { closedHandlers.add(handler); return () -> closedHandlers.remove(handler); }
-        boolean requestClose() {
-            if (id.equals("overlay")) return false;
+        final List<BooleanSupplier> closeCommands = new ArrayList<>();
+        @Override public Subscription onCloseCommand(BooleanSupplier handler) {
+            closeCommands.add(java.util.Objects.requireNonNull(handler));
+            return () -> closeCommands.remove(handler);
+        }
+        boolean closeCommand() {
+            if (closed) return true;
+            List<BooleanSupplier> handlers = new ArrayList<>(closeCommands);
+            java.util.Collections.reverse(handlers);
+            for (BooleanSupplier handler : handlers) {
+                try { if (handler.getAsBoolean()) return false; }
+                catch (RuntimeException failure) { host.recordFailure(pluginId() + " close command: " + failure); }
+            }
+            return requestClose();
+        }
+        boolean mayClose() {
             for (BooleanSupplier guard : List.copyOf(guards)) {
                 try { if (!guard.getAsBoolean()) return false; }
                 catch (RuntimeException failure) { host.recordFailure(pluginId() + " closing guard: " + failure); }
             }
+            return true;
+        }
+        boolean requestClose() {
+            if (id.equals("overlay")) return false;
+            if (!mayClose()) return false;
             close();
             return true;
         }
@@ -377,6 +396,9 @@ final class FakeUi {
                 return choosePaths(owner, title, initial);
             }
             @Override public java.util.Optional<java.nio.file.Path> chooseDirectory(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
+                return choosePaths(owner, title, initial).stream().findFirst();
+            }
+            @Override public java.util.Optional<java.nio.file.Path> chooseSaveFile(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
                 return choosePaths(owner, title, initial).stream().findFirst();
             }
             @Override public PluginWindow create(WindowSpec spec) {

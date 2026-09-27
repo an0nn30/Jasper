@@ -468,15 +468,18 @@ public final class JasperApplication {
      * releases the handoff endpoint, has finished. EDT.
      *
      * @param mode which launch flags the replacement keeps
-     * @return false, and nothing happens, when this process's command line cannot be determined
+     * @return false, and nothing happens, when this process's command line cannot be determined; otherwise
+     *     true. It also returns true, with nothing changed, when a plugin window's closing guard refuses the quit.
      */
     public boolean restart(RestartMode mode) {
         if (quitting || stopped) return true;
         Optional<List<String>> planned = restartPlanner.apply(mode);
         if (planned.isEmpty()) return false;
+        // A refusal leaves no relaunch behind: a later ordinary quit must not start a replacement.
+        if (!pluginWindowsMayClose()) return true;
         relaunch = planned.get();
         endpointOwner = resident;
-        quit();
+        quitNow();
         return true;
     }
 
@@ -524,7 +527,18 @@ public final class JasperApplication {
         pluginManager.open();
     }
 
+    /** Asks plugin windows first; any refusal leaves Jasper running with nothing changed. */
     public void quit() {
+        if (quitting || stopped) return;
+        if (!pluginWindowsMayClose()) return;
+        quitNow();
+    }
+
+    /** Plugin windows' closing guards, asked before quit or restart changes anything and before the exit deadline is armed. */
+    private boolean pluginWindowsMayClose() { return auxiliary == null || auxiliary.mayQuit(); }
+
+    /** Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. EDT. */
+    public void quitNow() {
         quitting = true;
         for (TerminalWindow window : List.copyOf(windows)) window.close();
         requestShutdown();

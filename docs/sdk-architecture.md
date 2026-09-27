@@ -289,3 +289,25 @@ Remote owns its SFTP endpoints and persistent SQLite transfer store. Its accepte
 loops start while the plugin context is live; stop signals them synchronously, and they
 quiesce endpoints and close the queue/lock without submitting new shutdown tasks. The app
 knows only the SDK contributions, not transfer state or SFTP classes.
+
+## Close command, quit guards and the save chooser (SDK 0.8.2)
+
+`PluginWindow.onCloseCommand` lets a plugin window's content handle File → Close Window and
+Cmd/Ctrl+W, for example by closing a tab. `NativeShells`' Close Window item calls
+`AuxiliarySurface.closeCommand()`, which asks the handlers newest first and otherwise closes like
+the close button, through the guards. The close button itself (`windowClosing`) still calls
+`requestClose()`. With the macOS screen menu bar, the menu accelerator fires before the content's
+key bindings see Cmd+W, so a key binding could not do this.
+
+Quit and restart ask plugin windows first: `JasperApplication.quit()` and `restart()` call
+`AuxiliaryWindows.mayQuit()`, which asks every open plugin window's guards in creation order (not
+dialogs or overlays) without closing anything, before `quitting` is set and before
+`ApplicationShutdown` arms the exit deadline. A refusal leaves Jasper running; a refused restart
+records no relaunch. Start-up rollback, a `--background` launch that cannot stay resident and the
+benchmark exit through `quitNow()`, which does not ask; a resident asked to retire by another
+launch goes through `quit()` and does.
+
+`Windows.chooseSaveFile` is the save-target twin of `chooseFiles`: `PathChoice.Mode.SAVE` makes
+`NativeShells` open an AWT `FileDialog` in `SAVE` mode, filling in a suggested file's folder and
+name; the platform dialog confirms replacing an existing file. The testkit answers it from the same
+`queuePathSelection` queue.
