@@ -370,3 +370,13 @@ visible titles reveal the active tab. The viewport paints a 16px fade from the a
 `ToolWindow.background` at each overflowing edge and owns child repaint origins so
 hover/close repaints preserve that overlay. `WindowTabsTest` saves dark/light selection
 and overflow previews under `build/render-preview`.
+
+
+Startup keyboard focus belongs to the active terminal. `WindowContent` provides the
+native frame's default focus traversal target: the pending `TerminalPane` until its
+`TerminalView` exists, then the view. The pending pane is focusable only until adoption.
+Do not request plugin-panel focus from hierarchy showing events: restored panels receive
+those events during initial frame display. The SSH panel requests list focus from an
+explicit visibility callback only if it is already showing, preserving deliberate
+panel opening without stealing startup focus. Session completion keeps the existing
+active-pane and command-palette guards.

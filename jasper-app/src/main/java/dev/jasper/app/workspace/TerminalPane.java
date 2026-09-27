@@ -172,6 +172,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         this.shellLabel = requestOrNull == null ? launcher.label() : requestOrNull.title();
         if (requestOrNull != null) reportedTitle = requestOrNull.title();
         setPreferredSize(new Dimension(958, 821));
+        setFocusable(true);
         add(new JLabel("Starting terminal…", SwingConstants.CENTER));
         setBackground(UIManager.getColor("Panel.background"));
         noticeLabel.putClientProperty("html.disable", Boolean.TRUE);
@@ -223,6 +224,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         if (session != null) session.removeListener(listener);
         session = created;
         view = new TerminalView(session, applicationOptions());
+        setFocusable(false);
         findBar = new FindBar(view);
         view.setOnCloseRequest(() -> onClose.run());
         view.addPropertyChangeListener("minimumSize", event -> onChanged.run());
@@ -444,7 +446,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         return TerminalTitle.singleLine(job.startsWith("-") ? job.substring(1) : job);
     }
     String shellLabel() { return shellLabel; }
-    void focusTerminal() { if (view != null) view.requestFocusInWindow(); }
+    void focusTerminal() { if (!closed) (view == null ? this : view).requestFocusInWindow(); }
     void setActive(boolean selected) {
         active = selected;
         setBorder(BorderFactory.createEmptyBorder(PADDING, PADDING, PADDING, PADDING));

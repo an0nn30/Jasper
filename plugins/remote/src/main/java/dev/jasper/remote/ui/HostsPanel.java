@@ -144,11 +144,15 @@ public final class HostsPanel extends JPanel {
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0 && isShowing()) {
                 selectFirstHost();
-                // Wait for the host to finish mounting/layout; a hide before then must not steal focus.
-                SwingUtilities.invokeLater(() -> { if (isShowing()) list.requestFocusInWindow(); });
             }
         });
         rebuild();
+    }
+
+    /** Focus an explicit opening in a visible window, never a restored panel before startup. */
+    public void focusWhenOpened() {
+        if (!isShowing()) return;
+        SwingUtilities.invokeLater(() -> { if (isShowing()) list.requestFocusInWindow(); });
     }
 
     public void setDefaultGroup(String name) { defaultGroup = name; rebuild(); }

@@ -2,6 +2,20 @@
 
 ## Current state — 2026-09-23
 
+- **Terminal-first startup focus** (`codex/intellij-new-icons`, 2026-09-27):
+  removed the SSH panel's deferred focus request on every hierarchy showing event,
+  which raced the window's startup terminal focus. Explicit panel visibility callbacks
+  request host-list focus only when already mounted in a showing window; restoring a
+  panel before window display only selects its first host. The native frame now uses
+  the workspace's active-terminal default focus policy. A pending shell has a focusable
+  pane placeholder, replaced by the terminal view when ready; the placeholder then
+  leaves keyboard traversal. The existing palette launch-focus guard remains intact.
+  Startup regression failed before the fix and now covers pending/ready terminals,
+  active-tab changes and disposal with a visible tool-panel field. Focused palette and
+  remote tests passed; independent review is clean. `check :jasper-app:packageDist`
+  passed: 2,068 tests, zero failures/errors, five skips; package verification passed and
+  DMG rebuilt. Native GUI focus checks remain manual; no GUI launched.
+
 - **Scrollable workspace tabs with edge fades** (`codex/intellij-new-icons`, 2026-09-27):
   replaced whole-tab wheel jumps with precise distance scrolling in a clipped viewport.
   Tabs retain their widths and can be partially visible at either edge; wheel/trackpad

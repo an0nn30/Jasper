@@ -144,6 +144,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
         super(new BorderLayout());
+        setFocusTraversalPolicyProvider(true);
+        setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
+            @Override public Component getDefaultComponent(Container root) {
+                TerminalPane pane = currentPane();
+                if (closed || pane == null) return null;
+                return pane.view() == null ? pane : pane.view();
+            }
+        });
         this.baseBindings = bindings;
         this.bindings = bindings;
         this.macOs = macOs;

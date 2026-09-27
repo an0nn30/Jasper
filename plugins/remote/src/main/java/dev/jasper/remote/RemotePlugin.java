@@ -514,6 +514,7 @@ public class RemotePlugin implements Plugin {
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
         panel.setHosts(store.hosts(), store.error());
         panels.put(window.id(), panel); panelHosts.put(window.id(), host);
+        host.onVisibility(visible -> { if (visible) panel.focusWhenOpened(); });
         host.onClosed(() -> { panels.remove(window.id()); panelHosts.remove(window.id()); });
         return panel;
     }
