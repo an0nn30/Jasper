@@ -277,3 +277,10 @@ Single-line input geometry is shared through `ThemeManager.APP_DEFAULTS`: text,
 password and formatted fields have 4px corner radii and 5px vertical / 8px horizontal
 padding. Keep compact palette rows tall enough for these insets. Plugin forms inherit
 these defaults; upstream theme assets should not be edited to duplicate them.
+
+
+Tool-panel rounding belongs to `WorkspaceRegions.Host`, which adds a 6px chrome gutter
+around an 8px-radius surface. Region widths/heights and persisted splitter sizes include
+that gutter. Keep clipping and hit testing in the host, and route descendant repaints
+through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
+owns theme-background propagation and preserves plugin-selected colors.

@@ -1,13 +1,20 @@
 package dev.jasper.app.workspace;
 
 import com.formdev.flatlaf.util.UIScale;
+import com.formdev.flatlaf.ui.FlatEmptyBorder;
 import dev.jasper.app.contributions.PanelRegion;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.RoundRectangle2D;
 import java.util.EnumMap;
+import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
+import javax.swing.UIManager;
 
 /**
  * The terminal column (the tab strip over the deck) with up to three panel regions around it. BOTTOM
@@ -17,6 +24,43 @@ import javax.swing.JSplitPane;
  */
 final class WorkspaceRegions extends JPanel {
     static final int DEFAULT_SIDE = 260, DEFAULT_BOTTOM = 200, MINIMUM = 120;
+
+    /** A shared frame around plugin-owned content; gutters belong to the workspace chrome. */
+    private static final class Host extends JPanel {
+        private static final int GUTTER = 6, ARC = 16;
+
+        Host() {
+            super(new BorderLayout());
+            // Own the border rather than exposing a UIResource that a theme switch can remove.
+            setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(GUTTER, GUTTER, GUTTER, GUTTER), null));
+            setMinimumSize(new Dimension(UIScale.scale(MINIMUM), UIScale.scale(MINIMUM)));
+        }
+
+        private RoundRectangle2D surface() {
+            int gutter = UIScale.scale(GUTTER), arc = UIScale.scale(ARC);
+            return new RoundRectangle2D.Double(gutter, gutter,
+                Math.max(0, getWidth() - 2 * gutter), Math.max(0, getHeight() - 2 * gutter), arc, arc);
+        }
+
+        @Override protected boolean isPaintingOrigin() { return true; }
+        @Override public boolean contains(int x, int y) { return surface().contains(x, y); }
+
+        @Override protected void paintComponent(Graphics graphics) {
+            var g = (Graphics2D) graphics.create();
+            try {
+                g.setColor(UIManager.getColor("Jasper.titleBackground"));
+                g.fillRect(0, 0, getWidth(), getHeight());
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(getBackground()); g.fill(surface());
+            } finally { g.dispose(); }
+        }
+
+        @Override protected void paintChildren(Graphics graphics) {
+            var clipped = (Graphics2D) graphics.create();
+            try { clipped.clip(surface()); super.paintChildren(clipped); }
+            finally { clipped.dispose(); }
+        }
+    }
 
     /** A split whose second component keeps a fixed size: the divider is placed once the split knows its own size. */
     private static final class Split extends JSplitPane {
@@ -79,11 +123,7 @@ final class WorkspaceRegions extends JPanel {
     }
 
     private JPanel host(PanelRegion region) {
-        JPanel host = hosts.computeIfAbsent(region, key -> {
-            var panel = new JPanel(new BorderLayout());
-            panel.setMinimumSize(new Dimension(UIScale.scale(MINIMUM), UIScale.scale(MINIMUM)));
-            return panel;
-        });
+        JPanel host = hosts.computeIfAbsent(region, key -> new Host());
         host.removeAll();
         host.add(contents.get(region), BorderLayout.CENTER);
         ToolWindowSurface.apply(host);

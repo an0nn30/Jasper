@@ -200,8 +200,8 @@ class WindowPanelsTest {
             LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner);
 
             Rectangle toolbar = in(owner, owner.toolbar()), rail = in(owner, owner.rail()), strip = in(owner, owner.windowTabs());
-            Rectangle deck = in(owner, owner.tabStrip()), leftBounds = in(owner, left), rightBounds = in(owner, right);
-            Rectangle bottomBounds = in(owner, bottom);
+            Rectangle deck = in(owner, owner.tabStrip()), leftBounds = in(owner, left.getParent()), rightBounds = in(owner, right.getParent());
+            Rectangle bottomBounds = in(owner, bottom.getParent());
             int underToolbar = toolbar.y + toolbar.height;
             assertThat(rail.y).as("the rail starts under the toolbar").isEqualTo(underToolbar);
             assertThat(leftBounds.y).as("the left panel starts under the toolbar").isEqualTo(underToolbar);

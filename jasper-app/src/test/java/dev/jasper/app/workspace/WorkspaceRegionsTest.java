@@ -36,8 +36,9 @@ class WorkspaceRegionsTest {
         regions.show(PanelRegion.LEFT, left, 250);
         layout(regions);
         assertThat(regions.content(PanelRegion.LEFT)).isSameAs(left);
-        assertThat(in(regions, left).width).isEqualTo(250);
-        assertThat(in(regions, left).x).isZero();
+        assertThat(in(regions, left.getParent()).width).isEqualTo(250);
+        assertThat(in(regions, left.getParent()).x).isZero();
+        assertThat(in(regions, left)).as("content inset within its rounded host").isEqualTo(new Rectangle(6, 6, 238, 588));
         assertThat(in(regions, deck).x).isGreaterThan(250);
         assertThat(in(regions, deck).x + in(regions, deck).width).isEqualTo(1000);
 
@@ -55,15 +56,15 @@ class WorkspaceRegionsTest {
         regions.show(PanelRegion.RIGHT, right, 300);
         regions.show(PanelRegion.BOTTOM, bottom, 150);
         layout(regions);
-        assertThat(in(regions, left).width).isEqualTo(200);
-        assertThat(in(regions, left).height).isEqualTo(600);
-        assertThat(in(regions, right).width).isEqualTo(300);
-        assertThat(in(regions, right).x + 300).isEqualTo(1000);
-        assertThat(in(regions, right).height).isEqualTo(600);
-        assertThat(in(regions, bottom).height).isEqualTo(150);
-        assertThat(in(regions, bottom).y + 150).isEqualTo(600);
-        assertThat(in(regions, bottom).x).isEqualTo(in(regions, deck).x);
-        assertThat(in(regions, bottom).width).isEqualTo(in(regions, deck).width);
+        assertThat(in(regions, left.getParent()).width).isEqualTo(200);
+        assertThat(in(regions, left.getParent()).height).isEqualTo(600);
+        assertThat(in(regions, right.getParent()).width).isEqualTo(300);
+        assertThat(in(regions, right.getParent()).x + 300).isEqualTo(1000);
+        assertThat(in(regions, right.getParent()).height).isEqualTo(600);
+        assertThat(in(regions, bottom.getParent()).height).isEqualTo(150);
+        assertThat(in(regions, bottom.getParent()).y + 150).isEqualTo(600);
+        assertThat(in(regions, bottom.getParent()).x).isEqualTo(in(regions, deck).x);
+        assertThat(in(regions, bottom.getParent()).width).isEqualTo(in(regions, deck).width);
         assertThat(in(regions, deck).y).isZero();
 
         var replacement = new JLabel("other");
@@ -71,7 +72,7 @@ class WorkspaceRegionsTest {
         layout(regions);
         assertThat(regions.content(PanelRegion.RIGHT)).isSameAs(replacement);
         assertThat(right.getParent()).isNull();
-        assertThat(in(regions, replacement).width).isEqualTo(320);
+        assertThat(in(regions, replacement.getParent()).width).isEqualTo(320);
         assertThat(regions.size(PanelRegion.BOTTOM)).isEqualTo(150);
     }
 

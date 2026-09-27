@@ -2,6 +2,18 @@
 
 ## Current state — 2026-09-23
 
+- **Rounded plugin tool panels** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  shared left/right/bottom region hosts provide 8px rounded surfaces and 6px chrome
+  gutters. Plugin content clips to the outline, including partial repaints, while
+  explicit plugin colors stay intact. Saved sizes still measure the outer region;
+  hiding, replacing and moving panels retain the existing lifecycle. Selected rail
+  controls use the theme accent and matching host icon variants. Dark/light headless
+  previews and all three region positions checked. A live-theme render test exposed
+  removal of the gutter border; an app-owned border wrapper preserves it across LAF
+  changes, with a passing regression. Independent re-review is clean.
+  `check :jasper-app:packageDist` passed: 2,031 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
 - **Softer, roomier inputs** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   text, password and formatted fields use 4px corner radii and 5px vertical / 8px
   horizontal padding through shared theme defaults, including plugin forms. Removed

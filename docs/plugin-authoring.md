@@ -135,6 +135,8 @@ Swing actions, mnemonics, focus and disabled states retain their behavior. Set t
 removed form cannot retain Enter-key ownership. Layout remains plugin-owned, and long labels
 or custom fonts can grow without clipping. The terminal toolbar keeps its independent geometry.
 
+Jasper supplies the rounded outer tool-panel surface and gutter; plugins need not draw their own outer frame.
+
 Plugins own their layout managers and spacing. Let buttons use their preferred sizes, avoid
 hard-coded colors or replacement UI delegates, and use `JRootPane.setDefaultButton` for a dialog's
 primary action where appropriate. Custom-painted controls and explicit appearance overrides are

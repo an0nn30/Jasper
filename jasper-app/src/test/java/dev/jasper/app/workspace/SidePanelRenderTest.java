@@ -82,8 +82,11 @@ class SidePanelRenderTest {
         var graphics = image.createGraphics();
         try { regions.paint(graphics); } finally { graphics.dispose(); }
         String name = theme.name() + " ";
+        int gutter = com.formdev.flatlaf.util.UIScale.scale(6);
+        assertThat(panel.root.getX()).as(name + "retains its gutter after theme changes").isEqualTo(gutter);
+        assertThat(panel.root.getY()).isEqualTo(gutter);
 
-        assertThat(pixel(image, regions, panel.header, 2, 2)).as(name + "panel").isEqualTo(UIManager.getColor("ToolWindow.background"));
+        assertThat(pixel(image, regions, panel.header, 12, 2)).as(name + "panel").isEqualTo(UIManager.getColor("ToolWindow.background"));
         var field = panel.search;
         assertThat(pixel(image, regions, field, field.getWidth() - 10, field.getHeight() / 2)).as(name + "search field")
             .isEqualTo(UIManager.getColor("TextField.background"));
