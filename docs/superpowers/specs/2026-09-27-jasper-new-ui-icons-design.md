@@ -1,0 +1,11 @@
+# IntelliJ New UI icons
+
+Scope authorized by the user's 2026-09-27 request: vendor the New UI collection in an isolated worktree, switch Jasper's icons, expose the collection to plugins, and centralize artwork choices. Title bar, window geometry and application branding stay unchanged. Desktop acceptance is user-run.
+
+Vendor every SVG from `platform/icons/src/expui` and the Terminal plugin's `resources/icons/expui` at intellij-community commit `60b8fbadc2f08ef18a6ecab0c138a849e14f13fb`. Preserve relative names, light/dark and size variants, copyright headers, Apache license, upstream notice, and SHA-256 provenance. This is the complete platform New UI catalog plus Terminal, not every language plugin's artwork. Runtime rendering is offline.
+
+Keep AppIcons as the app's manager and NamedIcons as its semantic mapping. App callers select semantic names; upstream resource paths live only in the manager/catalog. Extend SDK Appearance with an additive `icon(BundledIcon)` overload. Generate the JDK-only BundledIcon enum from vendored base SVG paths; dark siblings are selected automatically. A generated host index validates catalog IDs without importing SDK types outside app.plugins. Each existing IconName maps to New UI artwork except KEY, which retains its centrally tinted Tabler key because the platform collection has no key symbol. New meanings cover edit, more, previous/next, dropdown, close hover, match case, regex, search history, new window and exit. Remove superseded Tabler artwork (retain KEY and its license/provenance) and hand-drawn Vault/SFTP icons. Custom plugin artwork remains supported.
+
+All icons retain a 16-logical-pixel box; preserve aspect ratio for non-square catalog artwork. Cache host icons centrally and follow live dark/light switches. SDK/testkit version 0.8.2; updated plugins require 0.8.2. FakeBundledIcon records the requested enum. No new external dependencies.
+
+Verify manifest hashes and completeness, render every catalog entry in light/dark at 1x/2x (intentional empty artwork is allowed), verify live switching on a retained instance, invalid IDs, SDK defaults and class-loader isolation, and plugin semantic selections. Run headless `./gradlew check`, source hygiene, then independent branch review. Provide a headless contact sheet and the worktree launch command for visual acceptance.

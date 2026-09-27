@@ -109,8 +109,10 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
   `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.8.0, <0.9"`
-  (Remote `>=0.8.1`, for `PanelSpec.withToggleActionId`).
-  Jasper supplies IntelliJ-style artwork; plugins need no artwork. Returned icons are 16px.
+  (Vault `>=0.8.2` for icon meanings; Remote `>=0.8.3` for remote directory hints).
+  Jasper supplies IntelliJ New UI artwork; plugins need no artwork. Returned icons are 16px.
+  SDK 0.8.2 exposes the complete catalog with `icon(BundledIcon)`, for example
+  `context.appearance().icon(BundledIcon.TOOLWINDOWS_PROJECT)`.
   For custom artwork, draw a 16×16 SVG in the IntelliJ light palette (grey `#6E6E6E`, blue
   `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`) and load it with
   `icon("path/in/your/jar.svg")`: it is drawn in its own colours, and palette colours follow
@@ -132,6 +134,11 @@ Swing actions, mnemonics, focus and disabled states retain their behavior. Set t
 `JRootPane`'s default button when a form attaches and release it when the form detaches, so a
 removed form cannot retain Enter-key ownership. Layout remains plugin-owned, and long labels
 or custom fonts can grow without clipping. The terminal toolbar keeps its independent geometry.
+
+Jasper supplies the rounded outer tool-panel surface and gutter; plugins need not draw their own outer frame.
+Lists, trees, tables and popup selections inherit a small corner radius. Composite list renderers
+should fill their row using `list.getSelectionBackground()` when selected; Jasper rounds that
+fill while preserving renderer content and layout. Explicit custom colors remain plugin-owned.
 
 Plugins own their layout managers and spacing. Let buttons use their preferred sizes, avoid
 hard-coded colors or replacement UI delegates, and use `JRootPane.setDefaultButton` for a dialog's
@@ -581,3 +588,10 @@ state afterwards; owner closure or plugin stop cancels and discards the result. 
 native multiple-file picker and a themed directory picker. Paths are absolute and normalized;
 perform subsequent filesystem work in the background. Existing `WindowSurface.chooseFile`
 continues to select one file for window-owned workflows.
+
+Session providers that independently discover the attached shell's remote directory may
+call `pending.reportRemoteDirectory(new RemoteDirectory(host, path))` from any thread
+(SDK 0.8.3). The hint appears in the pane snapshot and window display until the shell
+reports OSC 7. It does not emit `CWD_CHANGED`, affect command events, or create a local
+working directory. Calls made before attach, after exit/close, or by an old reconnect
+attempt have no effect. Declare a minimum SDK of 0.8.3 when using this method.

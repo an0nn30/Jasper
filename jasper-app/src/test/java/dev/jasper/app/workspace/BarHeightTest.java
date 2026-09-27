@@ -26,7 +26,7 @@ class BarHeightTest {
             var owner = content(launcher(new ArrayDeque<>()));
             JToolBar toolbar = owner.toolbar();
             int labelledWidth = -1;
-            for (int height : new int[]{24, 30, 64}) {
+            for (int height : new int[]{28, 30, 64}) {
                 owner.setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
                 owner.setToolbarHeight(height);
                 assertThat(toolbar.getPreferredSize().height).as("height %d", height).isEqualTo(UIScale.scale(height));
@@ -36,8 +36,10 @@ class BarHeightTest {
                 JButton newTab = button(toolbar, "New tab");
                 assertThat(newTab.getHeight()).as("3 px above and below").isEqualTo(side);
                 assertThat(newTab.getY()).isEqualTo((UIScale.scale(height) - side) / 2);
-                if (labelledWidth < 0) labelledWidth = newTab.getWidth();
-                assertThat(newTab.getWidth()).as("a labelled button keeps its side padding").isEqualTo(labelledWidth);
+                assertThat(newTab.getWidth()).as("common built-ins stay square in either toolbar mode").isEqualTo(side);
+                JButton split = button(toolbar, "Split");
+                if (labelledWidth < 0) labelledWidth = split.getWidth();
+                assertThat(split.getWidth()).as("a labelled button keeps its side padding").isEqualTo(labelledWidth);
                 var separator = Arrays.stream(toolbar.getComponents())
                     .filter(child -> child instanceof JSeparator && child.isVisible()).findFirst().orElseThrow();
                 assertThat(separator.getHeight()).isEqualTo(UIScale.scale(height - 14));
@@ -48,6 +50,23 @@ class BarHeightTest {
                 assertThat(button(toolbar, "New tab").getSize()).as("icon-only buttons stay square")
                     .isEqualTo(new java.awt.Dimension(side, side));
                 assertThat(button(toolbar, "Split").getWidth()).as("room for the menu arrow").isEqualTo(side + UIScale.scale(10));
+            }
+        });
+    }
+
+    @Test void ordinaryToolbarSuppliesTopSpacingOnlyWhileVisible() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.setSize(900, 600);
+            var panel = new JPanel();
+            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, panel, 200);
+            var parent = panel.getParent();
+            for (var mode : new ToolbarMode[] {ToolbarMode.ICONS, ToolbarMode.HIDDEN, ToolbarMode.ICONS_AND_LABELS}) {
+                owner.setToolbarMode(mode);
+                dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+                int expected = mode == ToolbarMode.HIDDEN ? UIScale.scale(6) : owner.toolbar().getHeight();
+                assertThat(SwingUtilities.convertPoint(panel, 0, 0, owner).y).isEqualTo(expected);
+                assertThat(panel.getParent()).isSameAs(parent);
             }
         });
     }
@@ -77,6 +96,49 @@ class BarHeightTest {
         });
     }
 
+    @Test void statusContentsAreCenteredBetweenWorkspaceSurfacesAndWindowBottom() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            for (var theme : java.util.List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.Theme.LIGHT)) {
+                owner.selectTheme(theme);
+                for (int height : new int[]{20, 24, 48}) {
+                    owner.setStatusBarHeight(height); owner.setSize(1000, 600);
+                    dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+                    int top = SwingUtilities.convertPoint(owner.status(), 0, 0, owner).y;
+                    var grid = owner.tabStrip();
+                    int surfaceBottom = SwingUtilities.convertPoint(grid, 0, grid.getHeight(), owner).y + UIScale.scale(8);
+                    assertThat(surfaceBottom).as("no extra chrome gutter above the status bar").isEqualTo(top);
+                    var crumbs = WindowTabsTest.named(owner.status(), "pathBreadcrumbs");
+                    JLabel folder = Arrays.stream(crumbs.getComponents()).filter(JLabel.class::isInstance).map(JLabel.class::cast)
+                        .filter(label -> label.getIcon() != null).findFirst().orElseThrow();
+                    var insets = folder.getInsets();
+                    var view = new java.awt.Rectangle(insets.left, insets.top, folder.getWidth() - insets.left - insets.right,
+                        folder.getHeight() - insets.top - insets.bottom);
+                    var icon = new java.awt.Rectangle(); var text = new java.awt.Rectangle();
+                    SwingUtilities.layoutCompoundLabel(folder, folder.getFontMetrics(folder.getFont()), folder.getText(), folder.getIcon(),
+                        folder.getVerticalAlignment(), folder.getHorizontalAlignment(), folder.getVerticalTextPosition(),
+                        folder.getHorizontalTextPosition(), view, icon, text, folder.getIconTextGap());
+                    int iconTop = SwingUtilities.convertPoint(folder, 0, icon.y, owner).y;
+                    assertThat(Math.abs((iconTop - surfaceBottom) - (owner.getHeight() - iconTop - icon.height)))
+                        .as("breadcrumb icon has even space above and below").isLessThanOrEqualTo(1);
+                }
+            }
+            var left = new JPanel(); var bottom = new JPanel();
+            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, left, 250);
+            owner.regions().show(dev.jasper.app.contributions.PanelRegion.BOTTOM, bottom, 150);
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            int top = SwingUtilities.convertPoint(owner.status(), 0, 0, owner).y;
+            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).isEqualTo(top);
+            assertThat(SwingUtilities.convertPoint(bottom, 0, bottom.getHeight(), owner).y).isEqualTo(top);
+            var parent = left.getParent();
+            owner.setStatusVisible(false); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            assertThat(left.getParent()).isSameAs(parent);
+            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).isEqualTo(owner.getHeight() - UIScale.scale(6));
+            owner.setStatusVisible(true); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).isEqualTo(top);
+        });
+    }
+
     @Test void theWindowAppliesLiveHeightsAndRejectsValuesOutsideTheRange() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
@@ -93,7 +155,7 @@ class BarHeightTest {
             assertThat(changes.get()).isEqualTo(2);
             owner.setToolbarHeight(40); owner.setStatusBarHeight(26);
             assertThat(changes.get()).as("an unchanged height is not a change").isEqualTo(2);
-            for (int height : new int[]{23, 65, Integer.MIN_VALUE, Integer.MAX_VALUE}) {
+            for (int height : new int[]{27, 65, Integer.MIN_VALUE, Integer.MAX_VALUE}) {
                 assertThatIllegalArgumentException().isThrownBy(() -> owner.setToolbarHeight(height));
                 assertThat(owner.toolbarHeight()).isEqualTo(40);
             }
@@ -137,7 +199,7 @@ class BarHeightTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             exercise(owner, "Toolbar height…", "toolbarHeight", hook -> owner.confirmToolbarHeight = hook,
-                owner::toolbarHeight, owner::setToolbarHeight, 24, 64, 30);
+                owner::toolbarHeight, owner::setToolbarHeight, 28, 64, 30);
             exercise(owner, "Status bar height…", "statusBarHeight", hook -> owner.confirmStatusBarHeight = hook,
                 owner::statusBarHeight, owner::setStatusBarHeight, 20, 48, 24);
             assertThat(owner.commands().entries().stream().map(entry -> entry.command().id()))

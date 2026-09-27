@@ -14,7 +14,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
-import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JMenuItem;
@@ -26,7 +25,7 @@ import javax.swing.UIManager;
 
 /**
  * The single icon rail on the window's left edge: a toggle per panel grouped by region, then plain
- * action buttons, with Settings pinned at the bottom. It owns no state; the window re-renders it.
+ * action buttons. Settings lives in the workspace header. It owns no state; the window re-renders it.
  */
 final class WindowRail extends JPanel {
     record PanelButton(String id, String title, Icon icon, PanelRegion region, boolean selected) { }
@@ -34,14 +33,11 @@ final class WindowRail extends JPanel {
     Consumer<String> onToggle = id -> { };
     BiConsumer<String, PanelRegion> onMove = (id, region) -> { };
     private final List<AbstractButton> buttons = new ArrayList<>();
-    private final JButton settings;
     /** The rail's width in logical pixels; buttons, separators and spacing follow it. */
     private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
 
-    WindowRail(Action settingsAction) {
+    WindowRail() {
         super(null);
-        settings = new JButton(settingsAction);
-        style(settings, AppIcons.icon("settings"), (String) settingsAction.getValue(Action.NAME));
         getAccessibleContext().setAccessibleName("Window tools");
         render(List.of(), List.of());
         refreshTheme();
@@ -52,6 +48,7 @@ final class WindowRail extends JPanel {
         button.setText(null);
         button.setIcon(icon);
         button.putClientProperty("JButton.buttonType", "toolBarButton");
+        button.putClientProperty("FlatLaf.style", "arc: 10");
         button.setMargin(new Insets(0, 0, 0, 0));
         button.setFocusable(false);
         button.setToolTipText(name);
@@ -90,11 +87,10 @@ final class WindowRail extends JPanel {
             style(button, icon, (String) action.getValue(Action.NAME));
             buttons.add(button); add(button);
         }
-        add(settings);
         revalidate(); repaint();
     }
 
-    /** True when there is nothing but Settings, in which case the window hides the rail. */
+    /** True when there are no contributed tools, in which case the window hides the rail. */
     boolean empty() { return buttons.isEmpty(); }
 
     List<AbstractButton> buttons() { return List.copyOf(buttons); }
@@ -113,7 +109,6 @@ final class WindowRail extends JPanel {
         // Square buttons 3 px in from each side, 4 px apart; separators inset 7 px.
         int x = UIScale.scale(3), side = UIScale.scale(railWidth - 6), step = side + UIScale.scale(4), y = UIScale.scale(4);
         for (Component child : getComponents()) {
-            if (child == settings) continue;
             if (child instanceof JSeparator) {
                 child.setBounds(UIScale.scale(7), y + UIScale.scale(3), UIScale.scale(railWidth - 14), UIScale.scale(1));
                 y += UIScale.scale(8);
@@ -122,12 +117,10 @@ final class WindowRail extends JPanel {
                 y += step;
             }
         }
-        settings.setBounds(x, Math.max(y, getHeight() - step), side, side);
     }
 
     void refreshTheme() {
         setBackground(UIManager.getColor("Jasper.titleBackground"));
-        setBorder(BorderFactory.createMatteBorder(0, 0, 0, UIScale.scale(1), UIManager.getColor("Separator.foreground")));
         repaint();
     }
 }

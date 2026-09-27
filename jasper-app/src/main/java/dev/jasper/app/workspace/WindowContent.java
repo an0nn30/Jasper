@@ -59,6 +59,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private KeyboardFocusManager paletteFocusManager;
     private javax.swing.Timer paletteTailCleanup;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
+    private boolean unifiedHeader;
     private KeyBindings bindings;
     private final UUID id = UUID.randomUUID();
     private KeyBindings baseBindings;
@@ -143,6 +144,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
         super(new BorderLayout());
+        setFocusTraversalPolicyProvider(true);
+        setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
+            @Override public Component getDefaultComponent(Container root) {
+                TerminalPane pane = currentPane();
+                if (closed || pane == null) return null;
+                return pane.view() == null ? pane : pane.view();
+            }
+        });
         this.baseBindings = bindings;
         this.bindings = bindings;
         this.macOs = macOs;
@@ -164,9 +173,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         windowTabs = new WindowTabs(this);
         // The tabs belong to the terminal column, so the rail and the side panels reach the toolbar.
         var terminalColumn = new JPanel(new BorderLayout());
+        // The rounded host paints behind this layout-only container, including partial tab repaints.
+        terminalColumn.setOpaque(false);
         terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
         regions = new WorkspaceRegions(terminalColumn);
-        rail = new WindowRail(action(ActionId.OPEN_SETTINGS));
+        regions.setStatusVisible(chrome.status().isVisible());
+        regions.setHeaderVisible(chrome.toolbar().isVisible());
+        rail = new WindowRail();
         rail.setVisible(false);
         var body = new JPanel(new BorderLayout());
         body.add(rail, BorderLayout.WEST); body.add(regions, BorderLayout.CENTER);
@@ -187,10 +200,22 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
                                       Consumer<String> nativeTitle) {
         var bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), supported);
+        if (bar != null) {
+            content.unifiedHeader = true;
+            content.regions.setHeaderVisible(true);
+            content.remove(content.toolbar());
+            ((WindowToolbar) content.toolbar()).setTitleBar(true);
+            bar.setToolbar(content.toolbar());
+        }
         content.onTitle = value -> {
-            String display = TerminalTitle.windowTitle(value);
-            nativeTitle.accept(display);
-            if (bar != null) bar.setTitle(display);
+            TerminalPane pane = content.currentPane();
+            var context = WindowHeaderContext.from(pane == null ? null : pane.snapshot(),
+                Path.of(System.getProperty("user.home")), pane == null ? "" : pane.programTitle(),
+                pane == null ? "" : pane.commandLabel());
+            nativeTitle.accept(context.label());
+            if (bar != null) {
+                bar.setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
+            }
         };
         if (bar != null) {
             content.onThemeChanged = theme -> bar.setLight(!theme.chrome().dark());
@@ -388,9 +413,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         updateActions();
     }
 
-    /** The rail shows only when it has something besides Settings and the user has not hidden it. */
+    /** The rail shows only when it has contributed items and the user has not hidden it. */
     void syncRailVisibility() {
         boolean wanted = !rail.empty() && uiState.railVisible();
+        regions.setRailVisible(wanted);
         if (rail.isVisible() != wanted) { rail.setVisible(wanted); revalidate(); repaint(); }
     }
     boolean updatingActions() { return workspaceActions.updating(); }
@@ -551,8 +577,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         TerminalPane pane = currentPane();
         String size = pane == null || pane.session() == null ? "Starting terminal" :
             pane.session().columns() + " \u00d7 " + pane.session().rows();
-        chrome.status().setMetadata(pane == null ? "" : pane.shellLabel(), pane == null ? "" : pane.locationLabel(),
-            pane == null ? "" : size, pane != null && pane.running(), pane != null && pane.shellIntegrationDetected());
+        chrome.status().setMetadata(pane == null ? null : pane.snapshot(), pane == null ? "" : size, pane != null && pane.running());
         onTitle.accept(currentTab() == null ? "Jasper" : currentTab().title());
         updateActions(); refreshTabs(); onMinimumSizeChanged.run();
         if (terminals != null) terminals.refresh();
@@ -588,6 +613,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
             rail.refreshTheme();
             regions.refreshTheme();
+            regions.setTerminalBackground(theme.palette().background());
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
                 tab.setBackground(theme.palette().background());
@@ -665,10 +691,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         active = value; if (windowTabs != null) windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {
-        toolbarMode = mode; chrome.setToolbarMode(mode); updateActions(); revalidate(); onMinimumSizeChanged.run();
+        toolbarMode = mode; chrome.setToolbarMode(mode);
+        regions.setHeaderVisible(unifiedHeader || mode != ToolbarMode.HIDDEN);
+        updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
     void setStatusVisible(boolean visible) {
-        chrome.setStatusVisible(visible); updateActions(); revalidate(); onMinimumSizeChanged.run();
+        chrome.setStatusVisible(visible); regions.setStatusVisible(visible);
+        updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
 
     @Override public void close() {

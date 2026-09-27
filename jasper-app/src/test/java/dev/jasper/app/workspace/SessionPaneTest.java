@@ -71,6 +71,77 @@ class SessionPaneTest {
         return value;
     }
 
+    @Test void headerAndShortTabFollowCommandsProgramTitlesAndActivePane() throws Exception {
+        open(false);
+        var connection = new Loopback(); attempts.getFirst().attach(connection.connection());
+        until(() -> pane.view() != null);
+        var bar = new dev.jasper.app.platform.MacTitleBar[1];
+        var label = new javax.swing.JLabel[1];
+        edt(() -> {
+            bar[0] = WindowContent.installTitleBar(new javax.swing.JRootPane(), owner, true, title -> {});
+            label[0] = (javax.swing.JLabel) bar[0].getComponent(0);
+        });
+        try {
+            attempts.getFirst().reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("build-host", "/srv/app"));
+            String command = java.util.Base64.getEncoder().encodeToString("sleep 12".getBytes(StandardCharsets.UTF_8));
+            connection.remote.write(("\033]2;old prompt\007\033]1341;jasper;cmd;" + command + "\007\033]133;C\007").getBytes(StandardCharsets.UTF_8));
+            connection.remote.flush();
+            until(() -> label[0].getText().equals("build-host:/srv/app : sleep 12"));
+            edt(() -> assertThat(owner.currentTab().title()).isEqualTo("sleep 12"));
+            connection.remote.write("\033]2;Claude Code — Reviewing files\007".getBytes(StandardCharsets.UTF_8)); connection.remote.flush();
+            until(() -> label[0].getText().equals("Claude Code — Reviewing files"));
+            edt(() -> {
+                assertThat(owner.currentTab().title()).isEqualTo("Claude Code — Reviewing files");
+                var tab = owner.currentTab();
+                tab.split(SplitTree.Axis.RIGHT);
+                assertThat(label[0].getText()).isNotEqualTo("Claude Code — Reviewing files");
+                tab.focus(pane);
+                assertThat(label[0].getText()).isEqualTo("Claude Code — Reviewing files");
+                owner.newTab(HOME); owner.selectTab(tab);
+                assertThat(label[0].getText()).isEqualTo("Claude Code — Reviewing files");
+            });
+            connection.remote.write("\033]133;D;0\007".getBytes(StandardCharsets.UTF_8)); connection.remote.flush();
+            until(() -> label[0].getText().equals("build-host:/srv/app : Shell"));
+            edt(() -> assertThat(owner.currentTab().title()).isEqualTo("build-host"));
+        } finally { edt(() -> bar[0].close()); }
+    }
+
+    @Test void providerDirectoryIsDisplayOnlyAndOldAttemptsCannotChangeAReconnectedPane() throws Exception {
+        open(false);
+        edt(() -> assertThat(pane.locationLabel()).isEqualTo("build-host"));
+        var first = new Loopback();
+        var original = attempts.getFirst();
+        original.attach(first.connection());
+        until(() -> pane.view() != null);
+        original.reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("build-host", "/srv/one"));
+        until(() -> pane.snapshot().remoteDirectory().isPresent());
+        edt(() -> {
+            assertThat(pane.locationLabel()).isEqualTo("build-host:/srv/one");
+            assertThat(pane.snapshot().workingDirectory()).isEmpty();
+            assertThat(pane.directory()).isEqualTo(HOME);
+            assertThat(events).noneMatch(event -> event instanceof TerminalEvent.DirectoryChanged);
+        });
+        first.exit(0);
+        until(() -> pane.noticePrimary().isVisible());
+        edt(() -> pane.noticePrimary().doClick());
+        edt(() -> assertThat(pane.snapshot().remoteDirectory()).isEmpty());
+        var second = new Loopback();
+        attempts.getLast().attach(second.connection());
+        until(() -> pane.running());
+        original.reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("old", "/stale"));
+        edt(() -> assertThat(pane.snapshot().remoteDirectory()).isEmpty());
+        attempts.getLast().reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("new", "/srv/two"));
+        until(() -> pane.locationLabel().equals("new:/srv/two"));
+        second.remote.write("\033]7;file://shell-host/shell/path\007".getBytes(StandardCharsets.UTF_8));
+        second.remote.flush();
+        until(() -> pane.locationLabel().equals("shell-host:/shell/path"));
+        attempts.getLast().reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("new", "/must-not-win"));
+        edt(() -> assertThat(pane.locationLabel()).isEqualTo("shell-host:/shell/path"));
+        edt(() -> pane.close());
+        attempts.getLast().reportRemoteDirectory(new dev.jasper.app.terminals.RemoteLocation("new", "/closed"));
+        edt(() -> assertThat(pane.locationLabel()).isEqualTo("shell-host:/shell/path"));
+    }
+
     @Test void thePaneAppearsFirstThenShowsTheAttachedSessionAndTypesIntoIt() throws Exception {
         open(false);
         edt(() -> {

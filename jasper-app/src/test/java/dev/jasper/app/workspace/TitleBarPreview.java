@@ -19,20 +19,31 @@ public final class TitleBarPreview {
         try {
             edt(() -> {
                 var owner = content(launcher(new ArrayDeque<>()));
+                var model = new dev.jasper.app.contributions.Contributions();
+                owner.connectContributions(model);
+                model.addAction("preview.ssh", "Connect to host…", null, java.util.List.of(), java.util.Optional.empty(), event -> {});
+                model.addToolbar(new dev.jasper.app.contributions.ToolbarEntry.Dropdown(
+                    dev.jasper.app.platform.AppIcons.named("SERVER"), "Sessions", java.util.List.of("preview.ssh")));
                 var root = new JRootPane();
                 try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                     for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
                         owner.selectTheme(theme);
                         while (owner.tabStrip().getTabCount() > 1) owner.closeTab(owner.currentTab());
-                        owner.currentTab().rename("~ (-zsh)");
+                        owner.currentTab().rename("zsh");
                         render(bar, output, theme, "single", 830);
-                        owner.newTab(HOME); owner.currentTab().rename("~ (-zsh)");
+                        owner.newTab(HOME); owner.currentTab().rename("zsh");
                         render(bar, output, theme, "shell-tabs", 830);
-                        owner.currentTab().rename("Reviewing the notification implementation (tmux)");
+                        owner.currentTab().rename("Reviewing the notification implementation");
                         owner.selectTab((TerminalTab) owner.tabStrip().getComponentAt(0));
-                        owner.currentTab().rename("~ (tmux)");
+                        owner.currentTab().rename("tmux");
+                        bar.setContext("Claude Code — Reviewing the notification implementation", "Claude Code — Reviewing the notification implementation", dev.jasper.app.platform.AppIcons.named("TERMINAL"));
                         render(bar, output, theme, "tmux-tabs", 830);
                         render(bar, output, theme, "narrow", 450);
+                        bar.setContext("staging-01:/srv/app : make test", "staging-01:/srv/app : make test",
+                            dev.jasper.app.platform.AppIcons.named("SERVER"));
+                        render(bar, output, theme, "remote", 830);
+                        render(bar, output, theme, "remote-narrow", 450);
+                        owner.update();
                     }
                 }
             });
@@ -41,8 +52,9 @@ public final class TitleBarPreview {
     }
 
     private static void render(MacTitleBar bar, Path output, Theme theme, String name, int width) {
-        WindowTabsTest.layout(bar, width, 28);
-        var image = new BufferedImage(width * 2, 76, BufferedImage.TYPE_INT_RGB);
+        int height = bar.getPreferredSize().height;
+        WindowTabsTest.layout(bar, width, height);
+        var image = new BufferedImage(width * 2, height * 2, BufferedImage.TYPE_INT_RGB);
         var graphics = image.createGraphics();
         try { graphics.scale(2, 2); bar.printAll(graphics); }
         finally { graphics.dispose(); }

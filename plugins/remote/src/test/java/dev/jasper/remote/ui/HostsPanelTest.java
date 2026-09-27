@@ -11,6 +11,27 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class HostsPanelTest {
+    @Test void groupRowsUseFolderIconsWhenExpandedCollapsedAndRevealedBySearch() {
+        var folderIcons = new java.util.EnumMap<dev.jasper.sdk.ui.BundledIcon, javax.swing.Icon>(dev.jasper.sdk.ui.BundledIcon.class);
+        folderIcons.put(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER, new dev.jasper.sdk.testing.FakeBundledIcon(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER));
+        folderIcons.put(dev.jasper.sdk.ui.BundledIcon.GENERAL_OPEN, new dev.jasper.sdk.testing.FakeBundledIcon(dev.jasper.sdk.ui.BundledIcon.GENERAL_OPEN));
+        var panel = new HostsPanel(actions, folderIcons::get);
+        panel.setHosts(List.of(prod), Optional.empty());
+        java.util.function.Supplier<javax.swing.JLabel> group = () -> (javax.swing.JLabel) panel.list.getCellRenderer()
+            .getListCellRendererComponent(panel.list, panel.list.getModel().getElementAt(0), 0, true, false);
+        var open = group.get().getIcon();
+        assertThat(open).isSameAs(folderIcons.get(dev.jasper.sdk.ui.BundledIcon.GENERAL_OPEN));
+        assertThat(group.get().getText()).isEqualTo("Production   1");
+        panel.toggle(0);
+        var closed = group.get().getIcon();
+        assertThat(closed).isSameAs(folderIcons.get(dev.jasper.sdk.ui.BundledIcon.NODES_FOLDER));
+        panel.search.setText("prod");
+        assertThat(group.get().getIcon()).isSameAs(open);
+        assertThat(panel.collapsed()).containsExactly("Production");
+        panel.search.setText("");
+        assertThat(group.get().getIcon()).isSameAs(closed);
+    }
+
     final List<String> events = new ArrayList<>();
     final HostsPanel.Actions actions = new HostsPanel.Actions(h -> events.add("connect " + h.name()), h -> events.add("split " + h.name()),
         h -> events.add("edit " + h.map(RemoteHost::name).orElse("new")), h -> events.add("duplicate " + h.name()), h -> events.add("delete " + h.name()),

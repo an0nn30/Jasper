@@ -14,10 +14,10 @@ import javax.swing.plaf.ColorUIResource;
  */
 final class ChromeKeys {
     /** Every key this class can fill. */
-    static final List<String> KEYS = List.of("Jasper.titleBackground", "Jasper.titleForeground",
+    static final List<String> KEYS = List.of("Jasper.titleBackground", "Jasper.headerHighlight", "Jasper.titleForeground",
         "Jasper.titleInactiveForeground", "Jasper.titleSeparator", "Jasper.chromeForeground", "Jasper.mutedForeground",
         "Jasper.tabSelectedBackground", "Jasper.tabSelectedForeground", "Jasper.tabHoverBackground", "Jasper.tabUnderline",
-        "Jasper.tabUnderlineInactive", "Jasper.splitDivider", "Jasper.findErrorBackground", "Jasper.runningForeground",
+        "Jasper.tabUnderlineInactive", "Jasper.tabSelectedBorder", "Jasper.tabSelectedBorderInactive", "Jasper.splitDivider", "Jasper.findErrorBackground", "Jasper.runningForeground",
         "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground");
 
     private ChromeKeys() {}
@@ -28,6 +28,7 @@ final class ChromeKeys {
         Color foreground = first(defaults, "Label.foreground");
         put(defaults, added, "Jasper.titleBackground", first(defaults, "MainToolbar.background", "TitlePane.background"));
         Color title = defaults.getColor("Jasper.titleBackground");
+        put(defaults, added, "Jasper.headerHighlight", mix(foreground, title, .08));
         put(defaults, added, "Jasper.titleForeground", first(defaults, "TitlePane.foreground"));
         put(defaults, added, "Jasper.titleInactiveForeground",
             readable(first(defaults, "TitlePane.inactiveForeground"), title, 3, foreground));
@@ -42,6 +43,8 @@ final class ChromeKeys {
         put(defaults, added, "Jasper.tabUnderline", first(defaults, "EditorTabs.underlineColor", "TabbedPane.underlineColor"));
         put(defaults, added, "Jasper.tabUnderlineInactive",
             first(defaults, "EditorTabs.inactiveUnderlineColor", "TabbedPane.inactiveUnderlineColor"));
+        put(defaults, added, "Jasper.tabSelectedBorder", defaults.getColor("Jasper.tabUnderline"));
+        put(defaults, added, "Jasper.tabSelectedBorderInactive", defaults.getColor("Jasper.tabUnderlineInactive"));
         put(defaults, added, "Jasper.splitDivider",
             readable(first(defaults, "Borders.color", "Separator.foreground"), terminalBackground, 3, foreground));
         Color error = defaults.getColor("SearchField.errorBackground");

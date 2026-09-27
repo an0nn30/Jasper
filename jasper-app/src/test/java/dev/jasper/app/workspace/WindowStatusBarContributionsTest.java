@@ -32,7 +32,7 @@ class WindowStatusBarContributionsTest {
         hidden.setVisible(false);
 
         var bar = new WindowStatusBar();
-        bar.setMetadata("zsh", "/Users/someone/a/very/long/path/that/keeps/going/and/going", "120x40", true, true);
+        DesktopTestSupport.setStatusMetadata(bar, "zsh", "/Users/someone/a/very/long/path/that/keeps/going/and/going", "120x40", true, true);
         bar.setContributed(model.status(), Map.of("dev.x.run", run)::get);
         bar.setSize(900, 30);
         bar.doLayout();
@@ -117,7 +117,7 @@ class WindowStatusBarContributionsTest {
         var model = new Contributions();
         for (int i = 0; i < 6; i++) model.addStatus("dev.x.item" + i, i % 2 == 0, i).setText("A fairly long status item " + i);
         var bar = new WindowStatusBar();
-        bar.setMetadata("zsh", "/a/long/directory/name/that/would/like/more/room", "120x40", false, false);
+        DesktopTestSupport.setStatusMetadata(bar, "zsh", "/a/long/directory/name/that/would/like/more/room", "120x40", false, false);
         bar.setContributed(model.status(), id -> null);
         bar.setSize(420, 30);
         bar.doLayout();

@@ -41,6 +41,21 @@ public interface Appearance {
     }
 
     /**
+     * A choice from the complete host-owned New UI catalog. The host selects light/dark artwork
+     * and fits it proportionally inside a 16 by 16 box. Prefer {@link #icon(IconName)} when a
+     * semantic meaning exists. Custom plugin SVG loading remains {@link #icon(String)}.
+     * @param name catalog choice, including optional upstream size variants
+     * @return the host's icon
+     * @throws NullPointerException if name is null
+     * @throws UnsupportedOperationException if an older host has no bundled catalog
+     * @since 0.8.2
+     */
+    default Icon icon(BundledIcon name) {
+        java.util.Objects.requireNonNull(name, "name");
+        throw new UnsupportedOperationException("Host does not provide bundled icons");
+    }
+
+    /**
      * A 16 by 16 icon from an SVG in the plugin's own jars, drawn with its authored colours. Colours
      * from the IntelliJ light icon palette (grey {@code #6E6E6E}, blue {@code #389FD6}, green
      * {@code #59A869}, red {@code #DB5860}, yellow {@code #EDA200}) follow dark and light themes

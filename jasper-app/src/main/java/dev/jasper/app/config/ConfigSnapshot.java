@@ -21,8 +21,8 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     public static final String DEFAULT_THEME = "Jasper Dark";
     /** The rail's width in logical pixels without {@code window.rail_width}, and its limits. */
     public static final int DEFAULT_RAIL_WIDTH = 28, MIN_RAIL_WIDTH = 28, MAX_RAIL_WIDTH = 64;
-    /** The toolbar's height in logical pixels without {@code window.toolbar_height}, and its limits. */
-    public static final int DEFAULT_TOOLBAR_HEIGHT = 30, MIN_TOOLBAR_HEIGHT = 24, MAX_TOOLBAR_HEIGHT = 64;
+    /** The toolbar (and unified macOS title bar) height in logical pixels without {@code window.toolbar_height}, and its limits. */
+    public static final int DEFAULT_TOOLBAR_HEIGHT = 30, MIN_TOOLBAR_HEIGHT = 28, MAX_TOOLBAR_HEIGHT = 64;
     /** The status bar's height in logical pixels without {@code window.status_bar_height}, and its limits. */
     public static final int DEFAULT_STATUS_BAR_HEIGHT = 24, MIN_STATUS_BAR_HEIGHT = 20, MAX_STATUS_BAR_HEIGHT = 48;
 
@@ -34,7 +34,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
         if (tabHeight < 20 || tabHeight > 72) throw new IllegalArgumentException("Tab height must be 20–72.");
         if (railWidth < MIN_RAIL_WIDTH || railWidth > MAX_RAIL_WIDTH) throw new IllegalArgumentException("Rail width must be 28–64.");
         if (toolbarHeight < MIN_TOOLBAR_HEIGHT || toolbarHeight > MAX_TOOLBAR_HEIGHT)
-            throw new IllegalArgumentException("Toolbar height must be 24–64.");
+            throw new IllegalArgumentException("Toolbar height must be 28–64.");
         if (statusBarHeight < MIN_STATUS_BAR_HEIGHT || statusBarHeight > MAX_STATUS_BAR_HEIGHT)
             throw new IllegalArgumentException("Status bar height must be 20–48.");
         if (columns < 5 || columns > 500) throw new IllegalArgumentException("Columns must be 5–500.");

@@ -30,6 +30,339 @@
   user-run; no installer or GUI was launched. [Build and acceptance](packaging.md#windows-setup-wizard).
   Not merged or pushed.
 
+- **Terminal-first startup focus** (`codex/intellij-new-icons`, 2026-09-27):
+  removed the SSH panel's deferred focus request on every hierarchy showing event,
+  which raced the window's startup terminal focus. Explicit panel visibility callbacks
+  request host-list focus only when already mounted in a showing window; restoring a
+  panel before window display only selects its first host. The native frame now uses
+  the workspace's active-terminal default focus policy. A pending shell has a focusable
+  pane placeholder, replaced by the terminal view when ready; the placeholder then
+  leaves keyboard traversal. The existing palette launch-focus guard remains intact.
+  Startup regression failed before the fix and now covers pending/ready terminals,
+  active-tab changes and disposal with a visible tool-panel field. Focused palette and
+  remote tests passed; independent review is clean. `check :jasper-app:packageDist`
+  passed: 2,068 tests, zero failures/errors, five skips; package verification passed and
+  DMG rebuilt. Native GUI focus checks remain manual; no GUI launched.
+
+- **Scrollable workspace tabs with edge fades** (`codex/intellij-new-icons`, 2026-09-27):
+  replaced whole-tab wheel jumps with precise distance scrolling in a clipped viewport.
+  Tabs retain their widths and can be partially visible at either edge; wheel/trackpad
+  gestures over labels, close controls and the strip work without changing selection.
+  A 16px fade uses the active `ToolWindow.background` only where content overflows;
+  the tab-list control stays fixed outside the viewport. Selecting a tab (including
+  the current tab through the list), resizing and growing visible titles reveal it.
+  Child repaint origins preserve fades on hover. Drag drops outside the viewport are
+  ignored, including over the dropdown; scrolled reorder/close keep the same model.
+  Regression tests reproduced fractional-input and clipped-drag failures before fixes;
+  focused tests and dark/light headless previews pass. Independent review finding fixed
+  and re-reviewed clean. `check :jasper-app:packageDist` passed: 2,067 tests, zero
+  failures/errors, five skips; package verification passed and DMG rebuilt. No GUI launched.
+
+- **Title-bar vertical alignment** (`codex/intellij-new-icons`, 2026-09-27):
+  removed the redundant 6px workspace top gutter beneath a visible toolbar/native
+  header. Controls were already centered within the row; the extra chrome below made
+  them appear too high. Terminal and side-panel surfaces now begin at the header edge.
+  Hidden macOS actions retain the visible context row; hiding an ordinary toolbar
+  restores the top gutter. Panel parents and splitter sizes are preserved.
+  Regression tests reproduced the 6px error before the fix and now cover dark/light,
+  28/30/64px headers, side panels and toolbar visibility. Headless previews inspected;
+  independent review is clean. `check :jasper-app:packageDist` passed: 2,063 tests,
+  zero failures/errors, five skips; package verification passed and DMG rebuilt.
+  No GUI launched.
+
+- **Command palette scope spacing** (`codex/intellij-new-icons`, 2026-09-27):
+  inset the scope strip by 4 logical pixels on all sides so selected scope highlights
+  clear the rounded palette frame. Scope click targets remain 30px high and preferred
+  palette height includes the extra padding. Existing active-theme colors are retained.
+  Geometry/pixel regression failed before the change and passes afterward; dark/light
+  headless previews inspected and independent review is clean.
+  `check :jasper-app:packageDist` passed: 2,061 tests, zero failures/errors,
+  five skips; package verification passed and DMG rebuilt. No GUI launched.
+
+- **SSH group folder icons** (`codex/intellij-new-icons`, 2026-09-27):
+  replaced the text disclosure triangles with vendored `nodes/folder` for collapsed
+  groups and `general/open` for expanded groups. Remote supplies icons through the SDK
+  appearance catalog, retaining light/dark variants. Search-revealed groups show the open
+  icon without changing saved collapse state; group labels, counts and actions remain.
+  Regression failed before the change and now verifies both states plus search reveal.
+  Independent review is clean. `check :jasper-app:packageDist` passed: 2,061 tests,
+  zero failures/errors, five skips; package verification passed and DMG rebuilt.
+  No GUI launched.
+
+- **Terminal corner repaint repair** (`codex/intellij-new-icons`, 2026-09-27):
+  all four outer terminal corners retain the shared 8px radius. The top corners could
+  appear square because Swing skipped the rounded host background for dirty rectangles
+  entirely covered by the opaque tab/terminal layout container. Made that layout-only
+  container non-opaque so the host always paints behind clipped descendants. Actual
+  terminal/tab surfaces, geometry and theme colors are unchanged. A partial-paint
+  regression failed before the fix and now verifies all four corners in dark/light;
+  full headless previews inspected and independent review is clean.
+  `check :jasper-app:packageDist` passed: 2,060 tests, zero failures/errors, five skips.
+  Package verification passed and the DMG was rebuilt. No GUI launched.
+
+- **Command-aware header and short tabs** (`codex/intellij-new-icons`, 2026-09-27):
+  the user approved full `user@path : command` headers and short command/program tab
+  labels. SSH headers use saved host identity and remote path instead of local metadata.
+  OSC program titles override the complete automatic header/tab wording; manually named
+  tabs still win. Display overrides reset on command boundaries and reconnects, while
+  notification-title tracking is preserved. Native window metadata follows the header.
+  The title reserves 280–480px when available, with 24px before toolbar controls; narrow
+  windows retain clipping, full literal tooltips and action overflow. Headless dark/light
+  previews inspected. Test-first checks cover command text, foreground fallback, OSC and
+  tmux titles, SSH paths, pane/tab focus, spacing and literal HTML-looking tooltips.
+  Independent review completed and its tooltip finding fixed. `check :jasper-app:packageDist`
+  passed: 2,059 tests, zero failures/errors, five skips. Package verification passed and
+  the DMG was rebuilt. No GUI launched.
+
+- **UI branch refreshed from main** (`codex/intellij-new-icons`, 2026-09-27):
+  merged `origin/main` at `617ad248`, bringing in the editable keyboard-shortcuts
+  window (no new plugin in the incoming commits). Preserved both status histories
+  when resolving the only merge conflict. The editor inherits the branch's rounded
+  inputs and active theme; replaced its square etched frame with an 8px rounded,
+  theme-colored outline that refreshes on theme changes. Existing shortcut behavior
+  is unchanged. Dark/light headless previews at default and 18-point typography
+  inspected; independent integration review completed. `check :jasper-app:packageDist`
+  passed: 2,059 tests, zero failures/errors, five skips. Package signature/payload
+  verification passed and the DMG was rebuilt. No GUI launched or branch pushed.
+
+- **Centered status-bar spacing** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  removed the extra 6px exterior workspace gutter above a visible status bar so its
+  icons and text sit evenly between the workspace surfaces and window bottom. Hiding
+  the bar restores the gutter; plugin parents, panel sizes and the terminal's rounded
+  lower inset are preserved. Regression reproduced the offset before the fix and
+  verifies icon geometry in dark/light themes at 20/24/48px bar heights, panel edges,
+  and visibility changes. Headless previews inspected; independent review is clean.
+  `check :jasper-app:packageDist` passed: 2,044 tests, zero failures/errors, five skips.
+  Rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
+- **Centered rail spacing** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  rail icons were centered within their controls, but an extra 6px workspace gutter
+  made their right-side spacing wider. Visible rails now meet adjacent panel/terminal
+  surfaces without that duplicate gutter; hidden or empty rails restore the exterior
+  gutter. Borders update in place, retaining plugin parents, panel sizes and divider
+  positions. Regression first reproduced a 34px visual column for a 28px rail, then
+  verified even icon spacing at 28/36/64px and aligned terminal/bottom-panel edges.
+  Headless preview inspected; independent review is clean. `check :jasper-app:packageDist`
+  passed: 2,043 tests, zero failures/errors, five skips. Rebuilt DMG and package
+  signature/payload verification passed. No GUI launched.
+
+- **Rounded terminal bottom corners** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  the terminal/tab frame now rounds all four corners with the same 8px radius as tool
+  panels. A radius-sized lower inset keeps terminal cells and the cursor outside the
+  clipping curve; it continues the resolved terminal background, including independent
+  terminal-color changes. Workspace minimums include the inset, while panel gutters,
+  dividers and saved panel sizes retain their behavior. Headless dark/light previews
+  inspected; regression coverage checks both lower corners, an intact last grid row,
+  palette changes and dynamic minimums. Updated layout expectations for the 8px inset.
+  Independent review is clean. An initial full run lost generated build output mid-test;
+  clean test recompilation and `check :jasper-app:packageDist` then passed: 2,042 tests,
+  zero failures/errors, five skips. Rebuilt DMG and package signature/payload verification
+  passed. No GUI launched.
+
+- **Rounded selected workspace tabs** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  replaced the terminal-colored tab and underline with an inset 4px rounded selection
+  and 1px outline, matching the user's IntelliJ reference. Fill, text, border and icon
+  variants follow the active UI theme independently of terminal colors. Jasper Dark's
+  muted blue fill and border live in the scheme JSON; other themes derive outline
+  defaults from their existing active/inactive tab accent keys, preserving explicit
+  overrides. Hover uses the same rounded geometry; layout and hit targets are unchanged.
+  Failing-before/passing-after coverage includes rounded corners, insets, active/inactive
+  outline, live themes and independent terminal palettes. Dark/light headless previews
+  inspected; independent review is clean. `check :jasper-app:packageDist` passed:
+  2,041 tests, zero failures/errors, five skips; rebuilt DMG and package signature/payload
+  verification passed. No GUI launched.
+
+- **Configurable unified title-bar height** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  `window.toolbar_height` and View → Toolbar height now size the entire macOS header,
+  removing its fixed 42px floor. Default is 30px, with bounds of 28–64 logical pixels;
+  older values below 28 clamp with a config warning. Native JBR geometry and window
+  minimums update live, even with hidden toolbar controls. Standalone dialog titles
+  remain 28px. Existing height, config, dialog and full-window geometry tests reproduced
+  the old floor, then passed with the fix. Updated the separate tab-height test
+  to expect the new default too. Headless workspace preview inspected; independent
+  review found no issues.
+  `check :jasper-app:packageDist` passed: 2,041 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
+- **Local and SSH status breadcrumbs** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  status paths now render as theme-aware folder/host segments with chevrons. Narrow
+  windows collapse ancestors while retaining the current folder; tooltips and accessible
+  text keep the full path. Remote hosts appear once, and an unknown remote path never
+  falls back to the local home. Remote reuses SFTP's read-only folder follower for the
+  active SSH pane, including when SFTP is closed, respecting host follow settings and
+  existing OS support. SDK 0.8.3 adds an additive provider-directory hint: display only,
+  actual OSC 7 wins, reconnect clears it, and stale/closed attempts cannot overwrite it.
+  Headless local/remote/narrow light/dark previews inspected. Independent review caught
+  a Windows-invalid display fixture; production now uses typed snapshots only. A
+  failing large-font test led to content-aware status height; re-review is clean.
+  `check :jasper-app:packageDist` passed: 2,041 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
+- **Fluid workspace surfaces** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  removed rail, workspace-header, toolbar, tab-strip and status-bar boundary rules;
+  selected-tab underlines remain. The terminal/tab column now has rounded upper
+  shoulders alongside the rounded plugin panel; its bottom stays rectangular to
+  preserve terminal cells. Shared chrome forms 6px exterior gutters and plain 6px
+  draggable panel gaps, with no divider stroke or grip. Internal terminal split
+  indicators remain unchanged. Tab-strip and frame colors read the active theme.
+  Independent review caught a center-frame minimum-size regression; a failing-before
+  test reproduced it and the center now inherits the terminal's dynamic minimum.
+  Headless light/dark workspace previews inspected; re-review is clean. Updated old
+  edge-to-edge size and border assertions for the new gutters and continuous surfaces.
+  `check :jasper-app:packageDist` passed: 2,035 tests, zero failures/errors, five skips;
+  rebuilt DMG and signature/payload verification passed. No GUI launched.
+
+- **Tool-panel contrast and original rail icons** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  removed the rail's tab-accent selection override and alternate selected-icon variant;
+  rail buttons now retain their original theme-aware icons and the active theme's
+  toolbar selection color. Jasper Dark defines `toolWindowBackground` (`#191c20`) for
+  rounded tool panels and matching list/tree/table content, giving stronger contrast
+  against the chrome. All color values live in the scheme; UI code reads active theme
+  keys. Existing light-theme colors and explicit plugin overrides remain intact.
+  Headless dark/light previews inspected. Independent review caught one stale color
+  assertion, now updated. All checks pass: 2,033 tests, zero failures/errors, five skips.
+  Packaging retried successfully after a transient `.DS_Store` cleanup conflict;
+  rebuilt DMG and package signature/payload verification pass. No GUI launched.
+
+- **Rounded selections and highlights** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  shared theme defaults give list/tree/table, combo popup and menu selections a 4px
+  radius and horizontal inset. Standard list/table padding keeps content inside the
+  highlight. `AppListUI` extends FlatLaf's selection painting to composite plugin rows
+  (including SSH hosts and Vault), preserving renderer layout and custom colors.
+  Palette selected/hovered rows and scope highlights share the geometry. Light/dark
+  headless previews inspected; regression coverage includes live theme changes,
+  composite content, panel colors and palette hover. Independent review found no issues.
+  `check :jasper-app:packageDist` passed: 2,033 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
+- **Window-centered command palette** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  the screenshot showed the palette shifted into the terminal column when a tool panel
+  was open. Placement now uses the whole workspace's window bounds, including panels
+  and rail, for centering, available width and the stable top anchor. Native header
+  controls remain outside the placement area. A failing-before/passing-after regression
+  covers asymmetric panels, divider sizes, window resizing and both native-header modes;
+  existing scope-height and small-window tests pass. Independent review found no issues.
+  `check :jasper-app:packageDist` passed: 2,032 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
+- **Rounded plugin tool panels** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  shared left/right/bottom region hosts provide 8px rounded surfaces and 6px chrome
+  gutters. Plugin content clips to the outline, including partial repaints, while
+  explicit plugin colors stay intact. Saved sizes still measure the outer region;
+  hiding, replacing and moving panels retain the existing lifecycle. Selected rail
+  controls use the theme accent and matching host icon variants. Dark/light headless
+  previews and all three region positions checked. A live-theme render test exposed
+  removal of the gutter border; an app-owned border wrapper preserves it across LAF
+  changes, with a passing regression. Independent re-review is clean.
+  `check :jasper-app:packageDist` passed: 2,031 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
+- **Softer, roomier inputs** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  text, password and formatted fields use 4px corner radii and 5px vertical / 8px
+  horizontal padding through shared theme defaults, including plugin forms. Removed
+  conflicting dark-only geometry; existing font sizes and theme colors are retained.
+  Palette search/form rows grow by 4px to accommodate the larger controls. Dark/light
+  headless input previews inspected; independent review found no issues.
+  `check :jasper-app:packageDist` passed: 2,030 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
+- **Rounded command palette** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  matched the user's IntelliJ reference with 8px outer corner radii and the existing
+  theme border. Header/footer children clip within that outline, including partial
+  repaints; transparent corners use the corresponding rounded hit area. Insets,
+  keyboard behavior and placement are unchanged. Dark/light headless renders inspected;
+  independent review found no issues. `check :jasper-app:packageDist` passed: 2,030 tests,
+  zero failures/errors, five skips. Rebuilt DMG and package signature/payload checks pass.
+  No GUI launched.
+
+- **Unified workspace header and graphite chrome** (branch `codex/intellij-new-icons`, 2026-09-27):
+  continued in the user-selected icon worktree. macOS now combines native controls,
+  focused directory/host context and toolbar in a 42px default header, with tabs below.
+  Program titles still reach native window metadata; the visible context follows the
+  focused pane, retaining a provider's saved host/session label before remote OSC 7 arrives.
+  Whole toolbar controls move into a live ellipsis menu by stable priority, retaining
+  actions, shortcuts, toggles and dropdown grouping. Settings has one header home.
+  Jasper Dark uses graphite surfaces, silver foregrounds, a faint header highlight and
+  ice-blue tab accents. Selected tabs match the resolved terminal palette; authored host
+  icon variants and foregrounds remain readable with independent terminal colors.
+  Upstream icon files are unchanged. The optional angled tab shoulder is deferred.
+  The two notification fixes were carried forward as `a824e2a4` and `8deb2293`.
+  Inline implementation follows the [approved design](superpowers/specs/2026-09-27-jasper-unified-header-design.md).
+  Independent review caught mixed-palette tab contrast; regressions reproduced it, the
+  fix passes, and re-review is clean. `./gradlew check :jasper-app:packageDist
+  :jasper-app:mockUiPreview` passed: **2,030 tests, zero failures/errors, five skips**,
+  plus native notification/packaging checks. The mounted DMG contains the current app
+  JAR and passes strict deep signature verification. Headless local/remote, narrow/wide,
+  dark/light previews inspected; Java source hygiene and whitespace checks pass.
+  Native dragging, traffic lights, fullscreen and final presentation remain user-run
+  acceptance; no GUI launched. Work retained on this branch, not merged or pushed.
+
+- **IntelliJ New UI icons** (branch `codex/intellij-new-icons`, 2026-09-27): isolated in
+  `/Users/dustin/.codex/worktrees/intellij-new-icons/moray`. Vendored the complete platform
+  and Terminal `expui` collections at `60b8fbadc2f08ef18a6ecab0c138a849e14f13fb`: 1,744 SVGs,
+  885 catalog choices, upstream bytes, licenses/notices and SHA-256 provenance retained.
+  AppIcons/NamedIcons own artwork, caching, light/dark selection and proportional 16px sizing.
+  SDK 0.8.2 exposes `Appearance.icon(BundledIcon)` and adds 13 semantic names (47 total);
+  Vault and Remote now require 0.8.2 and use host icons instead of private painters.
+  Title bar/layout and application branding are unchanged. The sample's custom-SVG example
+  remains supported. Deviation: KEY retains the central Tabler key because this upstream set
+  has no key symbol; artwork/catalog/SDK changes form one integration commit.
+  Independent review found and fixed an Escape binding regression and a differing-dimensions
+  light/dark fitting issue, both with failing-before/passing-after tests; follow-up review clean.
+  `./gradlew check :jasper-app:installDist` passed: 2,009 tests, zero failures/errors, five skips.
+  Distribution membership, all asset hashes and Java source hygiene verified. Headless comparison:
+  `python3 tools/icons/render-preview.py`. [Details](new-ui-icons-verification.md).
+  Native visual acceptance is user-run; not merged or pushed.
+- **Completed notification command** (follow-up on `codex/mac-notification-icon`, 2026-09-27):
+  the user reported `sleep 12` completing as `~`. Completion reused the live terminal
+  title, which can contain a shell's directory. `CommandNotifier.finished` now uses
+  the captured command from the completion event, including arguments, for both the
+  native notice and completed Buddy card. Running-title updates remain live. Unit
+  regressions and a headless real-PTY burst reproduce the old `~` result and pass
+  with `sleep 12`; failure wording and multiline commands are covered too.
+  This supersedes the earlier final-program-title rule. `check` passed: 2,008 Java
+  tests, zero failures/errors, five skips, plus the native harness. `packageDist`
+  passed; the mounted DMG contains the current app JAR and passes strict deep signature
+  verification. Independent review found no issues. No GUI launched. Not merged or pushed.
+
+- **macOS notification icon** (branch `codex/mac-notification-icon`, 2026-09-27):
+  the screenshot's icon belongs to AppleScript: `NativeNotifier` launched `osascript`,
+  so the sender was not Jasper. Packaged macOS now posts through an in-process JNI
+  UserNotifications bridge, using `dev.jasper.app` and its bundle icon. The first
+  eligible notice requests Jasper's notification permission; denial is respected.
+  The existing threshold/visibility policy stays in Java; the native delegate permits
+  an eligible hidden-pane notice while Jasper is foreground. UTF-16 text stays data.
+  Packaging compiles/signs the bridge and verifies payload bytes, architecture and
+  signatures. `check` includes a macOS fake-center harness and real headless JNI load;
+  other platforms skip native compilation. Gradle/IDE launches send no native notices
+  because they have no Jasper bundle identity (the old AppleScript behavior is superseded).
+  The original sender-attribution regression failed before the fix. `./gradlew check`
+  passed: 2,006 Java tests, zero failures/errors, five skips, plus the native harness.
+  `packageDist` and strict package signature checks passed. Independent review found
+  no actionable issues. Native icon/permission acceptance remains user-run; no GUI
+  launched. Not merged or pushed.
+  See [maintenance and acceptance](app-maintenance.md#macos-notification-identity).
+- **Editable keyboard shortcuts** (branch `codex/shortcut-editor`, worktree
+  `/Users/dustin/.codex/worktrees/shortcut-editor/moray`, 2026-09-27): approved bounded
+  in-chat design, implemented inline with test-first coverage; no plan document.
+  Clicking a shortcut or Unassigned opens an inline recorder with Save, Cancel,
+  Remove and Restore default. Conflicts require explicit reassignment. App/plugin
+  bindings save to the active `config.toml`, preserve unrelated text and comments,
+  support symlink targets, and publish live to all windows. Contextual keys remain
+  read-only. Commands already registered `app.shortcuts`; its search terms now
+  include keymap and editing/settings aliases. Independent final review is complete;
+  the symlink test skips platforms without symlink privileges, and search/edit recorders
+  are mutually exclusive. The preview task now uses the theme ID in filenames (the
+  existing theme-object filename exceeded filesystem limits after the theme refactor).
+  `./gradlew check :jasper-app:installDist :jasper-app:shortcutHelpPreview` passed:
+  2,017 tests, zero failures/errors, five environment-specific skips. Architecture,
+  source hygiene and diff checks passed; light/dark previews at default and 18-point
+  typography were inspected. Native GUI acceptance is user-run.
+  Integrated into `main` on 2026-09-27 with user authorization to publish to
+  `origin/main`. Merged-result `./gradlew check :jasper-app:installDist` passed with
+  the same 2,017 tests and five skips. The worktree is retained.
+  See [shortcut guide](keyboard-shortcuts.md).
+
 - **Three-platform CI** (branch `fix/ci-cross-platform`, 2026-09-27): `main` had been red on Linux
   and Windows since 2026-09-13 (last green `1db31b1b`). The logs showed no assertion text and
   Gradle stopped at the first failing module, so most failures were hidden. CI now prints full

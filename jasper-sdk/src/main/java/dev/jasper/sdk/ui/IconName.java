@@ -84,5 +84,31 @@ public enum IconName {
      * A remote host or server session.
      * @since 0.7.6
      */
-    SERVER;
+    SERVER,
+    /** Edit. @since 0.8.2 */
+    EDIT,
+    /** More. @since 0.8.2 */
+    MORE,
+    /** Previous. @since 0.8.2 */
+    PREVIOUS,
+    /** Next. @since 0.8.2 */
+    NEXT,
+    /** Dropdown. @since 0.8.2 */
+    DROPDOWN,
+    /** Close hovered. @since 0.8.2 */
+    CLOSE_HOVERED,
+    /** Match case. @since 0.8.2 */
+    MATCH_CASE,
+    /** Regex. @since 0.8.2 */
+    REGEX,
+    /** Search history. @since 0.8.2 */
+    SEARCH_HISTORY,
+    /** New window. @since 0.8.2 */
+    NEW_WINDOW,
+    /** Exit. @since 0.8.2 */
+    EXIT,
+    /** Previous match. @since 0.8.2 */
+    PREVIOUS_MATCH,
+    /** Next match. @since 0.8.2 */
+    NEXT_MATCH;
 }

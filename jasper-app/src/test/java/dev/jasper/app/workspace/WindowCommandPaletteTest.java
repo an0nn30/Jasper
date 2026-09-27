@@ -42,13 +42,13 @@ class WindowCommandPaletteTest {
         var deck = new Rectangle(0, 100, 900, 600);
         int anchor = deck.y + deck.height / 5;
         for (int height : new int[] {96, 160, 304, 420}) {
-            var placed = WindowCommandPalette.positioned(deck, new Dimension(560, height), deck, 16);
+            var placed = WindowCommandPalette.positioned(deck, new Dimension(560, height), 16);
             assertThat(placed.y).as("card top for height %d", height).isEqualTo(anchor);
         }
     }
-    @Test void aCardTallerThanTheDeckIsPulledUpToStayOnScreen() {
+    @Test void aCardTallerThanTheWindowIsPulledUpToStayOnScreen() {
         var deck = new Rectangle(0, 100, 900, 300);
-        var placed = WindowCommandPalette.positioned(deck, new Dimension(560, 400), deck, 16);
+        var placed = WindowCommandPalette.positioned(deck, new Dimension(560, 400), 16);
         assertThat(placed.y).isEqualTo(deck.y + 16);
         assertThat(placed.height).isEqualTo(300 - 32);
     }
@@ -77,20 +77,49 @@ class WindowCommandPaletteTest {
             }
         });
     }
-    @Test void overlayDoesNotResizeTerminalAndAnchorsTheCardTopInTheWholeDeck() throws Exception {
+    @Test void overlayDoesNotResizeTerminalAndAnchorsTheCardTopInTheWholeWindow() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
                 var root = install(owner); var before = owner.tabStrip().getBounds();
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                 assertThat(owner.tabStrip().getBounds()).isEqualTo(before);
                 var palette = owner.commandPalette().component();
-                var deck = SwingUtilities.convertRectangle(owner.tabStrip().getParent(), before, palette.getParent());
+                var deck = SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), palette.getParent());
                 assertThat(Math.abs(palette.getBounds().getCenterX() - deck.getCenterX())).isLessThanOrEqualTo(1);
                 assertThat(palette.getBounds().y).isEqualTo(deck.y + deck.height / 5);
                 owner.setActive(false); assertThat(owner.commandPalette().isOpen()).isFalse();
             }
         });
     }
+    @Test void toolPanelsDoNotShiftOrConstrainTheWindowCenteredPalette() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            for (boolean nativeHeader : new boolean[]{false, true}) {
+                try (var owner = owner(new CommandHistory())) {
+                    var root = new JRootPane();
+                    try (var title = WindowContent.installTitleBar(root, owner, nativeHeader, value -> {})) {
+                        owner.installRootBindings(root); root.setSize(1200, 800);
+                        LayoutTestSupport.layoutTree(root);
+                        owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
+                        var palette = owner.commandPalette().component();
+                        int top = palette.getY();
+                        for (int sideWidth : new int[]{260, 400}) {
+                            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, new JPanel(), sideWidth);
+                            owner.regions().show(dev.jasper.app.contributions.PanelRegion.RIGHT, new JPanel(), 220);
+                            owner.regions().show(dev.jasper.app.contributions.PanelRegion.BOTTOM, new JPanel(), 180);
+                            LayoutTestSupport.layoutTree(root); LayoutTestSupport.layoutTree(root);
+                            assertThat(Math.abs(palette.getBounds().getCenterX() - root.getLayeredPane().getWidth() / 2.0))
+                                .as("centered across the window with tool panels").isLessThanOrEqualTo(1);
+                            assertThat(palette.getWidth()).isEqualTo(palette.getPreferredSize().width);
+                            assertThat(palette.getY()).isEqualTo(top);
+                        }
+                        root.setSize(900, 700); LayoutTestSupport.layoutTree(root); LayoutTestSupport.layoutTree(root);
+                        assertThat(Math.abs(palette.getBounds().getCenterX() - 450)).isLessThanOrEqualTo(1);
+                    }
+                }
+            }
+        });
+    }
+
     @Test void overlayShadowTintsTowardThePopupDropShadowColour() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
@@ -340,7 +369,7 @@ class WindowCommandPaletteTest {
                 palette.queryField().setText("custom"); root.setSize(350, 210); LayoutTestSupport.layoutTree(root);
                 root.dispatchEvent(new ComponentEvent(root, ComponentEvent.COMPONENT_RESIZED)); LayoutTestSupport.layoutTree(root);
                 assertThat(palette.getWidth()).isLessThanOrEqualTo(318);
-                assertThat(palette.queryField().getParent().getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(40));
+                assertThat(palette.queryField().getParent().getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(44));
                 PaletteTestSupport.selectRelative(palette, 4); LayoutTestSupport.layoutTree(root);
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.entryList(palette).getVisibleRect().intersects(dev.jasper.app.palette.PaletteTestSupport.rowBounds(palette, 4))).isTrue();
                 assertThat(palette.getHeight()).isLessThan(palette.getPreferredSize().height);

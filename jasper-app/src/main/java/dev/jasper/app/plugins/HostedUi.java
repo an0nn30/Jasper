@@ -242,6 +242,9 @@ final class HostedUi {
             @Override public Icon icon(dev.jasper.sdk.ui.IconName name) {
                 return AppIcons.named(java.util.Objects.requireNonNull(name, "name").name());
             }
+            @Override public Icon icon(dev.jasper.sdk.ui.BundledIcon name) {
+                return AppIcons.bundled(java.util.Objects.requireNonNull(name, "name").id());
+            }
             @Override public Icon icon(String svgResourcePath) { return AppIcons.plugin(loader, svgResourcePath); }
         };
     }

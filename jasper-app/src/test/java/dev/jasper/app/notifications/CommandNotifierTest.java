@@ -413,14 +413,38 @@ class CommandNotifierTest {
         assertThat(deck.notices().getFirst().title()).isEqualTo("Indexing the repository");
     }
 
-    @Test void finishedNoticesKeepTheirFinalProgramTitleAfterTheShellChangesBackToItsPrompt() {
+    @Test void finishedNoticesNameTheCommandAfterTheShellChangesBackToItsPrompt() {
         CommandNotifier notifier = notifier(10);
         notifier.started("a", "worker", () -> 0L, () -> {}, UNWATCHED);
         notifier.titleChanged("a", "Review complete");
         notifier.finished("a", "worker", OptionalInt.of(0), Duration.ofSeconds(11), HIDDEN_TAB, () -> {});
         notifier.titleChanged("a", "user@host: ~/projects");
-        assertThat(deck.notices().getFirst().title()).isEqualTo("Review complete");
-        assertThat(os).containsExactly(new Sent("Review complete", "Finished in 11s"));
+        assertThat(deck.notices().getFirst().title()).isEqualTo("worker");
+        assertThat(os).containsExactly(new Sent("worker", "Finished in 11s"));
+    }
+
+    @Test void aDirectoryTitleCannotReplaceTheCompletedCommand() {
+        CommandNotifier notifier = notifier(10);
+        notifier.started("pane", "sleep 12", () -> 0L, () -> {}, UNWATCHED);
+        notifier.titleChanged("pane", "~");
+
+        notifier.finished("pane", "sleep 12", OptionalInt.of(0), Duration.ofSeconds(12), HIDDEN_TAB, () -> {});
+
+        assertThat(os).containsExactly(new Sent("sleep 12", "Finished in 12s"));
+        assertThat(deck.notices().getFirst().title()).isEqualTo("sleep 12");
+    }
+
+    @Test void failedCommandsRetainArgumentsAndSanitizeMultilineCompletionTitles() {
+        CommandNotifier notifier = notifier(10);
+        String command = "  printf 'hello'\r\necho goodbye  ";
+        notifier.started("pane", command, () -> 0L, () -> {}, WATCHED);
+        notifier.titleChanged("pane", "/tmp/project");
+
+        notifier.finished("pane", command, OptionalInt.of(2), Duration.ofSeconds(12), HIDDEN_TAB, () -> {});
+
+        assertThat(os).containsExactly(new Sent("printf 'hello' ↵ echo goodbye", "Exited 2 · 12s"));
+        assertThat(deck.notices().getFirst().title()).isEqualTo("printf 'hello' ↵ echo goodbye");
+        assertThat(deck.notices().getFirst().state()).isEqualTo(BuddyNotice.State.FAILED);
     }
 
     @Test void changingATitleDoesNotResurrectADismissedRunningNotice() {

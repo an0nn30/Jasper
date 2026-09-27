@@ -21,6 +21,48 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FakeSessionsTest {
+    @Test void providerDirectoryIsAFallbackScopedToTheAttachedAttempt() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            var attempts = new ArrayList<PendingSession>();
+            PluginContext context = host.start(new PluginInfo("dev.x.ssh", "SSH", "1.0.0",
+                Set.of(Capabilities.SESSION_PROVIDE, Capabilities.TERMINAL_OBSERVE)), Set.of(), Set.of(), plugin -> { });
+            var directoryEvents = new ArrayList<dev.jasper.sdk.terminal.TerminalEvents.CwdChanged>();
+            context.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.CWD_CHANGED, directoryEvents::add);
+            PaneHandle pane = context.terminals().openTab(context.terminals().window(window).orElseThrow(),
+                OpenRequest.session(SessionSpec.of("host", pending -> {
+                    attempts.add(pending);
+                    pending.reportRemoteDirectory(new dev.jasper.sdk.terminal.RemoteDirectory("host", "/before"));
+                }))).orElseThrow();
+            assertThat(pane.info().remoteDirectory()).isEmpty();
+            var exit = new CompletableFuture<Integer>();
+            attempts.getFirst().attach(new TerminalConnection(new ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream(),
+                (columns, rows) -> { }, exit, () -> { }));
+            attempts.getFirst().reportRemoteDirectory(new dev.jasper.sdk.terminal.RemoteDirectory("host", "/one"));
+            assertThat(pane.info().remoteDirectory()).contains(new dev.jasper.sdk.terminal.RemoteDirectory("host", "/one"));
+            attempts.getFirst().reportRemoteDirectory(new dev.jasper.sdk.terminal.RemoteDirectory("host", "/two"));
+            assertThat(pane.info().remoteDirectory()).contains(new dev.jasper.sdk.terminal.RemoteDirectory("host", "/two"));
+            assertThat(pane.info().workingDirectory()).isEmpty();
+            host.flush();
+            assertThat(directoryEvents).isEmpty();
+            host.remoteCwdChanged(pane.id(), "shell", "/actual");
+            attempts.getFirst().reportRemoteDirectory(new dev.jasper.sdk.terminal.RemoteDirectory("host", "/ignored"));
+            assertThat(pane.info().remoteDirectory()).contains(new dev.jasper.sdk.terminal.RemoteDirectory("shell", "/actual"));
+            exit.complete(0); host.flush(); host.reconnectSession(pane.id());
+            attempts.getFirst().reportRemoteDirectory(new dev.jasper.sdk.terminal.RemoteDirectory("old", "/stale"));
+            assertThat(pane.info().remoteDirectory()).isEmpty();
+            attempts.getLast().attach(new TerminalConnection(new ByteArrayInputStream(new byte[0]), new ByteArrayOutputStream(),
+                (columns, rows) -> { }, new CompletableFuture<>(), () -> { }));
+            attempts.getFirst().reportRemoteDirectory(new dev.jasper.sdk.terminal.RemoteDirectory("old", "/stale"));
+            assertThat(pane.info().remoteDirectory()).isEmpty();
+            attempts.getLast().reportRemoteDirectory(new dev.jasper.sdk.terminal.RemoteDirectory("new", "/new"));
+            assertThat(pane.info().remoteDirectory()).contains(new dev.jasper.sdk.terminal.RemoteDirectory("new", "/new"));
+            host.closeTerminalPane(pane.id());
+            attempts.getLast().reportRemoteDirectory(new dev.jasper.sdk.terminal.RemoteDirectory("new", "/closed"));
+            assertThat(pane.info().remoteDirectory()).contains(new dev.jasper.sdk.terminal.RemoteDirectory("new", "/new"));
+        }
+    }
+
     @Test void aPluginProvidesASessionAndTheTestDrivesIt() {
         try (var host = new FakePluginHost()) {
             UUID window = host.addTerminalWindow();

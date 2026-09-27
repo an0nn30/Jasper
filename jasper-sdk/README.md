@@ -10,7 +10,7 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
-| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `Notices`, `Platform` |
+| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `IconName`, `BundledIcon`, `Panels`, `PanelSpec`, `PanelHost`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `Notices`, `Platform` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
 
@@ -30,10 +30,10 @@ var unlock = context.appearance().icon(IconName.UNLOCK);
 ```
 
 Import `dev.jasper.sdk.ui.IconName`. Plugins request only the meaning, without image paths.
-Icons are 16px, IntelliJ classic-UI SVG drawn as authored, with palette colours following
-the running theme. Bundled plugins declare `sdk = ">=0.8.0, <0.9"` (Remote `>=0.8.1`, for
-`PanelSpec.withToggleActionId`). Custom older hosts
-inherit UnsupportedOperationException for named requests until they implement the catalog.
+Icons use IntelliJ New UI artwork, selected centrally and fitted into a 16px square.
+SDK 0.8.2 also exposes all 885 catalog choices through `Appearance.icon(BundledIcon)`.
+Vault requires `sdk = ">=0.8.2, <0.9"`; Remote requires `sdk = ">=0.8.3, <0.9"`. Other bundled plugins retain their 0.8.0 floor.
+Older custom hosts inherit UnsupportedOperationException until they implement each catalog.
 See the [catalog, size rules and testkit example](../docs/sdk-icons.md).
 
 ## File workflows and progress (0.7.5)
@@ -49,3 +49,9 @@ to the plugin. Close the handle when finished.
 
 `FILE`, `LINK`, `UPLOAD`, `DOWNLOAD`, `UP`, `NEW_FOLDER`, `PAUSE` and `RESUME` extend the
 semantic icon catalog. All these additions arrived in SDK 0.7.5.
+
+SDK 0.8.3 adds `PendingSession.reportRemoteDirectory(RemoteDirectory)` for session
+providers that discover a remote shell's directory through their transport. The hint
+updates display and `PaneInfo.remoteDirectory()` only; shell OSC 7 reports take precedence.
+Reports before attachment, after exit/close, or from an old reconnect attempt are ignored.
+The hint never becomes a local `Path`, changes command history, or emits `CWD_CHANGED`.

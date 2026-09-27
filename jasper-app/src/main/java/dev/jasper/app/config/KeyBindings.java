@@ -186,7 +186,26 @@ public final class KeyBindings {
         }
     }
 
-    static Optional<KeyStroke> parse(String binding, boolean macOs) {
+    /** Serializes physical keys without cmd's non-macOS modifier translation. */
+    public static String format(KeyStroke stroke, boolean macOs) {
+        Objects.requireNonNull(stroke, "stroke");
+        var text = new StringBuilder();
+        int mods = stroke.getModifiers();
+        if ((mods & InputEvent.CTRL_DOWN_MASK) != 0) text.append("ctrl+");
+        if ((mods & InputEvent.ALT_DOWN_MASK) != 0) text.append("alt+");
+        if ((mods & InputEvent.SHIFT_DOWN_MASK) != 0) text.append("shift+");
+        if ((mods & InputEvent.META_DOWN_MASK) != 0) text.append(macOs ? "cmd+" : "meta+");
+        if ((mods & InputEvent.ALT_GRAPH_DOWN_MASK) != 0) text.append("altgraph+");
+        String key = NAMED_KEYS.entrySet().stream().filter(e -> e.getValue() == stroke.getKeyCode())
+            .map(Map.Entry::getKey).sorted().findFirst().orElseGet(() -> KeyEvent.getKeyText(stroke.getKeyCode()).toLowerCase(Locale.ROOT));
+        String binding = text.append(key).toString();
+        if (!parse(binding, macOs).filter(stroke::equals).isPresent())
+            throw new IllegalArgumentException("This key combination cannot be saved. Try another shortcut.");
+        return binding;
+    }
+
+    /** Parses a saved binding; none means explicitly unassigned. */
+    public static Optional<KeyStroke> parse(String binding, boolean macOs) {
         if (binding == null) {
             throw new IllegalArgumentException("keybinding must not be null");
         }
@@ -206,6 +225,8 @@ public final class KeyBindings {
                 case "cmd" -> modifiers |= macOs
                     ? InputEvent.META_DOWN_MASK
                     : InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
+                case "meta" -> modifiers |= InputEvent.META_DOWN_MASK;
+                case "altgraph" -> modifiers |= InputEvent.ALT_GRAPH_DOWN_MASK;
                 case "ctrl" -> modifiers |= InputEvent.CTRL_DOWN_MASK;
                 case "alt" -> modifiers |= InputEvent.ALT_DOWN_MASK;
                 case "shift" -> modifiers |= InputEvent.SHIFT_DOWN_MASK;

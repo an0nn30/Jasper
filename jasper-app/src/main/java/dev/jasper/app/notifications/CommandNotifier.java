@@ -122,8 +122,9 @@ public final class CommandNotifier implements AutoCloseable {
     public void finished(Object key, String command, OptionalInt exitStatus, Duration ran,
                   CommandNotice.Origin origin, Runnable activate) {
         if (!accepts(key)) return;
-        InFlight flight = inFlight.get(key);
-        String title = flight == null ? title(command) : flight.title;
+        // Shell/program titles can still name the working directory (for example "~").
+        // Completion events carry the command that actually ran, including its arguments.
+        String title = title(command);
         cancel(key);
         Duration wait = threshold.get();
         if (wait.isZero() || ran.compareTo(wait) < 0) return;

@@ -206,14 +206,16 @@ To support another theme-plugin layout, extend `ThemeArchive` and add a case to
 
 ## Maintaining SDK icons
 
-`IconName` artwork lives in `NamedIcons`: an IntelliJ SVG, or a tinted Tabler SVG under
-`icons/standard/` for names IntelliJ has no equivalent for. To add an `IconName`, add the SDK
-enum constant and a `NamedIcons` map entry; when it uses standard artwork, also add a manifest
-row to `icons/standard/assets.tsv` with its source hash, and preserve LICENSE.txt/NOTICE.md.
-LOCK/UNLOCK match Vault's original SVG bytes. NamedIconsTest and HostedUiTest verify all
-meanings, resource ownership and source integrity. Run SDK/testkit checks plus HostedUiTest
-and WindowChromeContributionsTest, then all architecture guards, check and installDist. Render
-headlessly; native application launch remains a user check.
+`NamedIcons` is the sole semantic-to-artwork mapping; `AppIcons` owns rendering and caching.
+All ordinary controls use vendored New UI artwork; KEY retains the centrally tinted Tabler
+key because the upstream set has no equivalent. No plugin needs to draw its own common icons.
+
+`tools/icons/fetch-intellij-icons.py` vendors the full platform and Terminal `expui` trees at
+pinned commit/tree IDs, verifies staged downloads, and generates `BundledIcon` plus the host
+index. Preserve Apache LICENSE.txt, upstream NOTICE.txt and assets.tsv hashes. Add semantic
+meanings to both `IconName` and `NamedIcons`; callers never choose physical SVG paths.
+See [SDK icons](sdk-icons.md). Run `./gradlew check` for complete-catalog light/dark rendering,
+provenance, SDK and plugin isolation checks. Native application launch remains user-run.
 
 ## Remote lives in a plugin
 
@@ -223,3 +225,158 @@ and config import; `trust` owns host-key matching; `agent` adapts the agent prot
 panels and the palette scope. The plugin consumes only `dev.jasper.vault.api`.
 Run `./gradlew :jasper-plugin-remote:test` for unit and embedded loopback-server tests.
 See [Remote](remote.md) for settings and native acceptance.
+
+### macOS notification identity
+
+`platform.NativeNotifier` dispatches off the EDT to `MacNotifications`, which loads
+`Contents/app/libjasper-notifications.dylib` beside the current jpackage launcher.
+The Objective-C bridge uses `UNUserNotificationCenter` in Jasper's process: identity,
+icon and permission belong to `dev.jasper.app`. Never restore an `osascript` fallback;
+its notices carry AppleScript's icon. Java text is copied as UTF-16, never evaluated.
+The native delegate allows banners for hidden panes while Jasper is foreground;
+the existing Java notification policy decides which completions qualify.
+
+`gradle/mac-notifications.gradle` compiles the bridge with the JBR JNI headers and
+Apple's command line tools on macOS. `check` runs its headless fake-center harness
+(permission granted/denied/error, deferred delivery, literal Unicode, unique requests,
+foreground presentation, non-bundle guard). Other platforms skip native compilation.
+Native packaging signs the dylib before signing Jasper and `verifyPackage` checks it.
+Gradle/IDE runs intentionally send no system notifications because they lack Jasper's
+bundle identity. Test a packaged app manually: run `sleep 12`, switch to another app,
+allow Jasper's notification request, then repeat and verify the Jasper icon. Also
+check a hidden tab with Jasper foreground, and denial in System Settings. GUI acceptance
+is user-run; headless tests never show a prompt or banner.
+
+API references: [Apple UserNotifications](https://developer.apple.com/documentation/usernotifications/unusernotificationcenter),
+[requesting permission](https://developer.apple.com/documentation/usernotifications/asking-permission-to-use-notifications).
+
+
+### Unified workspace header
+
+`WindowContent.installTitleBar` moves the existing `WindowToolbar` into `MacTitleBar` on
+macOS. The workspace computes `WindowHeaderContext` from the focused pane; the platform
+package stays independent of workspace and terminal types. Both the visible header and
+native window metadata show `user@path : command` locally, or saved SSH host plus remote
+path and command. Home paths abbreviate to `~`; remote paths never use local metadata.
+Explicit OSC titles replace the complete automatic header and tab title. Automatic tabs
+show only the running command or shell; user-renamed tabs keep their names. Command text
+from shell integration takes precedence over the foreground-process fallback. Display
+overrides reset at command boundaries and reconnects without changing notification-title
+tracking. The header reserves 280–480 logical pixels where space permits and a 24px gap
+before the toolbar; narrow windows clip the label and retain action overflow. The full
+title remains in a literal-text tooltip. Native drag hit testing applies to the
+context label and blank toolbar area, never command buttons. The unified row follows
+`window.toolbar_height` live (28–64 logical pixels, default 30), including when its
+toolbar is hidden. `MacTitleBar` updates the JBR custom-title height with the same
+geometry; standalone dialog titles remain 28px tall.
+
+`WindowToolbar` allocates whole buttons by stable priority and constructs overflow menus
+from the same Actions as their original placements. Do not retain a second plugin registry
+for overflow. Theme changes must retain selected-tab contrast when terminal colors differ
+from chrome. Host icons choose their authored light/dark variants for that surface; custom
+plugin icons remain plugin-owned.
+
+Run `./gradlew :jasper-app:titleBarPreview :jasper-app:mockUiPreview` for fixture-based
+headless renders. The title-bar previews include local/remote and narrow layouts, without
+fabricated native controls. For user-run GUI acceptance, resize with several plugins,
+exercise overflow submenus/shortcuts, change focus between local and SSH panes, change
+color/toolbar modes live, drag the blank header and context, double-click, and enter/leave
+fullscreen. Check native traffic lights at ordinary and scaled display settings.
+
+
+Single-line input geometry is shared through `ThemeManager.APP_DEFAULTS`: text,
+password and formatted fields have 4px corner radii and 5px vertical / 8px horizontal
+padding. Keep compact palette rows tall enough for these insets. Plugin forms inherit
+these defaults; upstream theme assets should not be edited to duplicate them.
+
+
+Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and
+matching rounded corners for the terminal/tab column. Keep the layout-only terminal
+column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
+skips the host background, leaving square corner pixels behind the clipped children.
+Corner regressions must exercise clipped `paint` calls as well as full-window previews.
+Exterior gutters are 6px, except
+beside a visible rail: the rail supplies its own balanced spacing, so the adjacent
+left/center/bottom surface has no additional leading gutter. Hiding or emptying the
+rail restores that gutter without reparenting plugin content. A visible status bar
+likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
+contents stay visually centered between the surfaces and window bottom. Hiding the
+status bar restores the 6px bottom gutter. A visible toolbar or unified native header
+also replaces the exterior top gutter, keeping its controls centered between the window
+top and workspace surfaces. Hiding toolbar actions retains this spacing on macOS because
+the context row remains; hiding an ordinary toolbar restores the 6px top gutter. Adjacent hosts omit
+their facing gutters so the plain 6px draggable splitter supplies the gap.
+Region widths/heights and persisted splitter sizes include exterior gutters. The center
+host derives its minimum size from the terminal column; plugin hosts retain their 120px
+minimum. The center reserves an 8px lower inset (the corner radius) below the terminal
+grid, so terminal cells stay rectangular and unclipped. The inset uses the resolved
+terminal palette, including independent terminal-color changes. Its height contributes
+to the workspace minimum and scales with the UI. Keep clipping and hit testing in the
+host, and route descendant repaints
+through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
+owns theme-background propagation and preserves plugin-selected colors. The active theme's
+`ToolWindow.background` supplies the inner surface. Jasper Dark maps it and list/tree/table
+backgrounds to its `toolWindowBackground` color; edit the theme JSON to tune the contrast.
+Rail selection uses the theme's toolbar-button background and the original theme-aware icon;
+do not substitute the tab accent or a different selected icon variant.
+
+
+Selection geometry is shared through `ThemeManager.APP_DEFAULTS`: lists, trees, tables,
+combo-box popups and menus use a 4px radius with a 4px horizontal inset. FlatLaf joins
+adjacent selected rows and maintains focus/selection repainting. `AppListUI` extends
+that painting to composite plugin renderers by intercepting full-row fills of the list's
+selection color; it leaves their component hierarchy, layout and custom colors alone.
+The palette uses the same geometry for selections, hover and scope highlights.
+`SelectionRenderingTest` saves light/dark headless previews in `build/render-preview`.
+
+
+Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
+workspace title bar, tab strip and status bar have no edge strokes. The selected tab
+uses an inset rounded selection instead of an underline. Workspace-region splitters remove their border/grip after every UI
+update; terminal-internal splits keep their existing visible indicators. The standalone
+dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
+previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
+
+
+Status-bar breadcrumbs are rendered by `PathBreadcrumbs` from the focused pane's
+`PaneSnapshot`. Local paths abbreviate the home directory as `~`; remote paths stay
+strings, with the provider's saved host label as their first segment. Unknown remote
+directories show the host without a local-directory fallback. Ancestors collapse into
+an ellipsis as space shrinks, preserving the current folder; tooltips and accessibility
+retain the full path. Colors and icons follow the active theme. Breadcrumbs are display
+metadata, not shell navigation commands.
+
+Remote reuses SFTP's `DirectoryFollower` for the active SSH pane even when the SFTP
+panel is closed. SDK 0.8.3's `PendingSession.reportRemoteDirectory` carries the probe
+result through the host adapter to the current pane attempt. These hints affect display
+snapshots only, never local `Path`, command metadata, or `CWD_CHANGED`; actual OSC 7
+reports take precedence and stop probing. Reconnect clears the hint, and old attempts
+cannot update the replacement session. The existing host `followDirectory` setting,
+dedicated connections, OS support and failure limits still apply. `PathBreadcrumbsTest`
+saves light/dark local/remote/narrow previews under `build/render-preview`.
+
+
+Selected workspace tabs read `Jasper.tabSelectedBackground` and
+`Jasper.tabSelectedForeground` from the active UI theme; host icons choose their variant
+against that fill. `Jasper.tabSelectedBorder` and `Jasper.tabSelectedBorderInactive`
+derive from the theme's active/inactive underline colors unless explicitly supplied.
+Jasper Dark defines its fill and outline in the scheme JSON. `WindowTabs` paints a 4px
+radius and 1px outline, with 2px horizontal and up to 4px vertical insets; short tabs
+reduce the vertical inset to preserve space for labels/icons. Hover uses the same
+rounded shape. Geometry scales with UI scale. Overflow uses a clipped viewport with
+full-width tabs and a fixed tab-list button; precise wheel/trackpad input over any tab
+control scrolls by distance without changing selection. Selection, resize and growing
+visible titles reveal the active tab. The viewport paints a 16px fade from the active
+`ToolWindow.background` at each overflowing edge and owns child repaint origins so
+hover/close repaints preserve that overlay. `WindowTabsTest` saves dark/light selection
+and overflow previews under `build/render-preview`.
+
+
+Startup keyboard focus belongs to the active terminal. `WindowContent` provides the
+native frame's default focus traversal target: the pending `TerminalPane` until its
+`TerminalView` exists, then the view. The pending pane is focusable only until adoption.
+Do not request plugin-panel focus from hierarchy showing events: restored panels receive
+those events during initial frame display. The SSH panel requests list focus from an
+explicit visibility callback only if it is already showing, preserving deliberate
+panel opening without stealing startup focus. Session completion keeps the existing
+active-pane and command-palette guards.

@@ -252,7 +252,7 @@ this method until they implement it.
 
 ### Chrome icons and session tab icons (SDK 0.7.6)
 
-- `IconName` gains `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Artwork is IntelliJ classic-UI SVG
+- `IconName` gains `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`. Artwork is now IntelliJ New UI SVG (0.8.2),
   vendored under `jasper-app/.../icons/intellij/` (Apache-2.0, hash-pinned in `assets.tsv`).
 - Behaviour change: `Appearance.icon(String)` no longer recolours to the chrome foreground. It
   draws the SVG as authored; FlatLaf's global colour filter maps IntelliJ light-palette colours
@@ -289,3 +289,27 @@ Remote owns its SFTP endpoints and persistent SQLite transfer store. Its accepte
 loops start while the plugin context is live; stop signals them synchronously, and they
 quiesce endpoints and close the queue/lock without submitting new shutdown tasks. The app
 knows only the SDK contributions, not transfer state or SFTP classes.
+
+### Full New UI icon catalog (SDK 0.8.2)
+
+`Appearance.icon(BundledIcon)` exposes 885 generated choices from the complete platform and
+Terminal New UI collections. HostedUi translates the enum to an app-native ID; AppIcons
+validates it against the generated index and caches the host-owned SVG. No SDK type enters
+app.platform. Icons select dark siblings live and preserve aspect ratio in a 16px square.
+The fake returns `FakeBundledIcon`; older hosts inherit an explicit unsupported default.
+Vault manager controls and Remote page chevrons now use semantic icons, removing their
+private painters. See [the catalog contract](sdk-icons.md).
+
+### Provider remote-directory hints (SDK 0.8.3)
+
+`PendingSession.reportRemoteDirectory(RemoteDirectory)` is a binary-compatible default
+method. The host accepts hints only from the pane's current attached attempt while its
+session is running. It posts to the EDT, stores the hint as display metadata, and includes
+it in `PaneInfo.remoteDirectory()` when the terminal has not reported OSC 7. Reconnect
+clears the hint; old attempts and closed panes cannot replace it. The local `Path` surface,
+command events and `CWD_CHANGED` retain their shell-reported semantics.
+
+Remote shares its existing SFTP directory follower with the active pane, so a followed
+SSH session can display its path without opening SFTP. Focus and Enter request the same
+bounded read-only probe. The saved host's follow setting remains authoritative; OSC 7
+ends probing and takes precedence. The fake host models the same fallback and lifetime.
