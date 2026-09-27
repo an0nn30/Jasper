@@ -33,6 +33,7 @@ class FakeContractTest extends PluginContractTest {
             @Override public List<String> windows() { return host.windows(); }
             @Override public boolean requestClose(String windowId) { return host.requestClose(windowId); }
             @Override public boolean closeCommand(String windowId) { return host.closeCommand(windowId); }
+            @Override public boolean requestQuit() { return host.requestQuit(); }
             @Override public java.util.UUID addTerminalWindow() { return host.addTerminalWindow(); }
             @Override public java.util.UUID addTerminalTab(java.util.UUID windowId, String title) { return host.addTerminalTab(windowId, title); }
             @Override public List<String> scopes() { return host.scopes(); }

@@ -201,7 +201,8 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
 - `PanelHost.onClosed` tells an instance its window is gone. `onVisibility` tells it when it
   is shown or hidden, which is the moment to start or stop refreshing.
 - `WindowSurface.onClosing` guards run when the user closes the window; returning false keeps
-  it open. Quitting Jasper does not consult them. `close()` closes at once.
+  it open. Since SDK 0.8.2, quitting or restarting Jasper asks the guards of your open windows first, so a guard
+  can offer to save; a guard that returns false keeps Jasper running. `close()` closes at once.
 - In SDK 0.8.2+, `window.onCloseCommand(() -> …)` lets your content handle File → Close Window and
   Cmd/Ctrl+W, for example by closing a tab; return true when you handled it and false to let the
   window close. The close button is not affected.

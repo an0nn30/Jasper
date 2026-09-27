@@ -298,3 +298,9 @@ Cmd/Ctrl+W, for example by closing a tab. `NativeShells`' Close Window item call
 the close button, through the guards. The close button itself (`windowClosing`) still calls
 `requestClose()`. With the macOS screen menu bar, the menu accelerator fires before the content's
 key bindings see Cmd+W, so a key binding could not do this.
+
+Quit and restart ask plugin windows first: `JasperApplication.quit()` and `restart()` call
+`AuxiliaryWindows.mayQuit()`, which asks every open plugin window's guards in creation order (not
+dialogs or overlays) without closing anything, before `quitting` is set and before
+`ApplicationShutdown` arms the exit deadline. A refusal leaves Jasper running; a refused restart
+records no relaunch. Signals and start-up failures do not go through `quit()` and are not asked.

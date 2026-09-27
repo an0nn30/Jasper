@@ -106,14 +106,25 @@ public final class AuxiliarySurface {
         if (!closed && shell != null) shell.toFront().run();
     }
 
-    /** A user's attempt to close: every guard is consulted; one that throws cannot trap the window open. */
-    public boolean requestClose() {
+    /**
+     * Asks every closing guard without closing: quit uses this. One that throws cannot trap the window open.
+     *
+     * @return whether the window may close
+     */
+    public boolean mayClose() {
         if (closed) return true;
-        if (kind == Kind.OVERLAY) return false;
         for (BooleanSupplier guard : List.copyOf(guards)) {
             try { if (!guard.getAsBoolean()) return false; }
             catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A window closing guard failed", failure); }
         }
+        return true;
+    }
+
+    /** A user's attempt to close: every guard is consulted; one that throws cannot trap the window open. */
+    public boolean requestClose() {
+        if (closed) return true;
+        if (kind == Kind.OVERLAY) return false;
+        if (!mayClose()) return false;
         close();
         return true;
     }

@@ -260,7 +260,7 @@ final class FakeUi {
             return () -> closeCommands.remove(handler);
         }
         boolean closeCommand() {
-            if (closed) return false;
+            if (closed) return true;
             List<BooleanSupplier> handlers = new ArrayList<>(closeCommands);
             java.util.Collections.reverse(handlers);
             for (BooleanSupplier handler : handlers) {
@@ -269,12 +269,16 @@ final class FakeUi {
             }
             return requestClose();
         }
-        boolean requestClose() {
-            if (id.equals("overlay")) return false;
+        boolean mayClose() {
             for (BooleanSupplier guard : List.copyOf(guards)) {
                 try { if (!guard.getAsBoolean()) return false; }
                 catch (RuntimeException failure) { host.recordFailure(pluginId() + " closing guard: " + failure); }
             }
+            return true;
+        }
+        boolean requestClose() {
+            if (id.equals("overlay")) return false;
+            if (!mayClose()) return false;
             close();
             return true;
         }

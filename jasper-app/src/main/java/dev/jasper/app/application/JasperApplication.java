@@ -474,9 +474,11 @@ public final class JasperApplication {
         if (quitting || stopped) return true;
         Optional<List<String>> planned = restartPlanner.apply(mode);
         if (planned.isEmpty()) return false;
+        // A refusal leaves no relaunch behind: a later ordinary quit must not start a replacement.
+        if (!pluginWindowsMayClose()) return true;
         relaunch = planned.get();
         endpointOwner = resident;
-        quit();
+        quitConfirmed();
         return true;
     }
 
@@ -524,7 +526,17 @@ public final class JasperApplication {
         pluginManager.open();
     }
 
+    /** Asks plugin windows first; any refusal leaves Jasper running with nothing changed. */
     public void quit() {
+        if (quitting || stopped) return;
+        if (!pluginWindowsMayClose()) return;
+        quitConfirmed();
+    }
+
+    /** Plugin windows' closing guards, asked before quit or restart changes anything and before the exit deadline is armed. */
+    private boolean pluginWindowsMayClose() { return auxiliary == null || auxiliary.mayQuit(); }
+
+    private void quitConfirmed() {
         quitting = true;
         for (TerminalWindow window : List.copyOf(windows)) window.close();
         requestShutdown();

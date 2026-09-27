@@ -589,6 +589,26 @@ public abstract class PluginContractTest {
         assertThat(h.windows()).isEmpty();
     }
 
+    @Test void quitAsksEveryPluginWindowsGuardsAndClosesNothing() {
+        var allow = new java.util.concurrent.atomic.AtomicBoolean(false);
+        List<String> asked = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            PluginWindow first = context.windows().create(new WindowSpec("test.alpha.first", "First", new Dimension(100, 100), false));
+            first.onClosing(() -> { asked.add("first"); return true; });
+            first.show();
+            PluginWindow second = context.windows().create(new WindowSpec("test.alpha.second", "Second", new Dimension(100, 100), false));
+            second.onClosing(() -> { asked.add("second"); return allow.get(); });
+            context.windows().dialog(new DialogSpec("Details", second, false)).onClosing(() -> { asked.add("dialog"); return false; });
+        });
+        h.ui(() -> assertThat(h.requestQuit()).isFalse());
+        assertThat(asked).containsExactly("first", "second");
+        allow.set(true);
+        asked.clear();
+        h.ui(() -> assertThat(h.requestQuit()).as("dialogs are not asked").isTrue());
+        assertThat(asked).containsExactly("first", "second");
+        assertThat(h.windows()).as("asking closes nothing").hasSize(3);
+    }
+
     private static PluginInfo info(String id, String... capabilities) { return new PluginInfo(id, id, "1.0.0", Set.of(capabilities)); }
 
     @Test void terminalsAreFoundThroughTheContextAndHandlesAreEqualById() {

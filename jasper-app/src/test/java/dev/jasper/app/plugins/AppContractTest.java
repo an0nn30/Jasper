@@ -181,6 +181,7 @@ class AppContractTest extends PluginContractTest {
                 return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
                     .map(dev.jasper.app.windows.AuxiliarySurface::closeCommand).orElse(false));
             }
+            @Override public boolean requestQuit() { return onEdtValue(auxiliary::mayQuit); }
             @Override public UUID addTerminalWindow() { return onEdtValue(terminalFixture::addWindow); }
             @Override public UUID addTerminalTab(UUID windowId, String title) { return onEdtValue(() -> terminalFixture.addTab(windowId, title)); }
             @Override public UUID addTerminalPane(UUID tabId, String title, java.nio.file.Path directory) {
