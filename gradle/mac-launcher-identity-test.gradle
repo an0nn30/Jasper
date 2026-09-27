@@ -1,0 +1,50 @@
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+
+// Portable binary fixtures: no macOS process, window, signing identity or network needed.
+def verifyIdentity = tasks.register('verifyMacLauncherIdentity') {
+    group = 'verification'
+    description = 'Checks Mach-O launcher identity isolation and malformed-input handling.'
+    doLast {
+        def fixture = { int cpu ->
+            byte[] bytes = new byte[96]
+            def b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+            b.putInt(0, (int) 0xfeedfacfL); b.putInt(4, cpu)
+            b.putInt(12, 2); b.putInt(16, 2); b.putInt(20, 32)
+            b.putInt(32, 27); b.putInt(36, 24) // LC_UUID
+            b.putLong(40, 123); b.putLong(48, 456)
+            b.putInt(56, 99); b.putInt(60, 8) // another load command
+            bytes[80] = 42 // executable payload must survive
+            bytes
+        }
+        byte[] original = fixture(0x0100000c) // arm64
+        byte[] patched = macLauncherWithIdentity(original, 'dev.jasper.app', original)
+        assert !Arrays.equals(original[40..<56] as byte[], patched[40..<56] as byte[]) : 'Packaged app retains the generic launcher UUID'
+        assert Arrays.equals(original[0..<40] as byte[], patched[0..<40] as byte[])
+        assert Arrays.equals(original[56..<96] as byte[], patched[56..<96] as byte[])
+        assert Arrays.equals(original, fixture(0x0100000c)) : 'Mutated the source launcher'
+        assert Arrays.equals(patched, macLauncherWithIdentity(original, 'dev.jasper.app', original)) : 'Build is not reproducible'
+        assert Arrays.equals(patched, macLauncherWithIdentity(patched, 'dev.jasper.app', original)) : 'Rewrite is not idempotent'
+        assert !Arrays.equals(patched[40..<56] as byte[], macLauncherWithIdentity(original, 'dev.moray.app', original)[40..<56] as byte[]) : 'Different apps share a UUID'
+        byte[] intel = fixture(0x01000007)
+        assert !Arrays.equals(patched[40..<56] as byte[], macLauncherWithIdentity(intel, 'dev.jasper.app', intel)[40..<56] as byte[]) : 'Different architectures share a UUID'
+        byte[] changed = original.clone(); changed[80] = 43
+        assert !Arrays.equals(patched[40..<56] as byte[], macLauncherWithIdentity(changed, 'dev.jasper.app', changed)[40..<56] as byte[]) : 'Different executable code shares a UUID'
+        def rejects = { byte[] bytes ->
+            try {
+                macLauncherWithIdentity(bytes, 'dev.jasper.app', original)
+                throw new AssertionError('Accepted malformed or unsupported Mach-O')
+            } catch (GradleException expected) { }
+        }
+        rejects(new byte[4])
+        byte[] badMagic = original.clone(); badMagic[0] = 0; rejects(badMagic)
+        byte[] missing = original.clone(); ByteBuffer.wrap(missing).order(ByteOrder.LITTLE_ENDIAN).putInt(32, 99); rejects(missing)
+        byte[] zeroSize = original.clone(); ByteBuffer.wrap(zeroSize).order(ByteOrder.LITTLE_ENDIAN).putInt(36, 0); rejects(zeroSize)
+        byte[] oversized = original.clone(); ByteBuffer.wrap(oversized).order(ByteOrder.LITTLE_ENDIAN).putInt(36, Integer.MAX_VALUE); rejects(oversized)
+        byte[] duplicate = original.clone()
+        def d = ByteBuffer.wrap(duplicate).order(ByteOrder.LITTLE_ENDIAN)
+        d.putInt(20, 48); d.putInt(56, 27); d.putInt(60, 24); rejects(duplicate)
+        logger.lifecycle('Verified launcher UUID isolation, reproducibility, idempotence, byte preservation and malformed-input rejection')
+    }
+}
+tasks.named('check') { dependsOn(verifyIdentity) }

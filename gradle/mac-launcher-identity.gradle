@@ -1,0 +1,42 @@
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+
+// jpackage copies one generic main executable into every app. macOS network privacy also uses
+// LC_UUID for attribution, so a different bundle identifier alone does not isolate its grants.
+// Only our supported thin, little-endian 64-bit launchers are accepted. Fail closed on a new format.
+ext.macLauncherWithIdentity = { byte[] executable, String bundleIdentifier, byte[] launcherTemplate ->
+    def malformed = { throw new GradleException('Unsupported or malformed macOS launcher: expected a thin 64-bit Mach-O with exactly one LC_UUID') }
+    if (executable.length < 32) malformed()
+    ByteBuffer header = ByteBuffer.wrap(executable).order(ByteOrder.LITTLE_ENDIAN)
+    if (header.getInt(0) != (int) 0xfeedfacfL || header.getInt(12) != 2 ||
+            !(header.getInt(4) in [0x0100000c, 0x01000007])) malformed()
+    int count = header.getInt(16), size = header.getInt(20)
+    if (count < 1 || size < 0 || size > executable.length - 32 || count > size / 8) malformed()
+    int end = 32 + size, offset = 32, uuidOffset = -1
+    for (int i = 0; i < count; i++) {
+        if (offset > end - 8) malformed()
+        int command = header.getInt(offset), length = header.getInt(offset + 4)
+        if (length < 8 || length % 8 != 0 || length > end - offset) malformed()
+        if (command == 27) { // LC_UUID
+            if (length != 24 || uuidOffset != -1) malformed()
+            uuidOffset = offset + 8
+        }
+        offset += length
+    }
+    if (offset != end || uuidOffset == -1) malformed()
+    if (bundleIdentifier == null || bundleIdentifier.isBlank() || bundleIdentifier.indexOf(0) >= 0) {
+        throw new GradleException('A nonempty bundle identifier is required for the launcher identity')
+    }
+    // Seed with the immutable SDK resource, not the already patched/signed output. This keeps
+    // verification independent of signing bytes and makes rewriting idempotent and reproducible.
+    MessageDigest digest = MessageDigest.getInstance('SHA-256')
+    digest.update(('jasper-launcher-uuid-v1\u0000' + bundleIdentifier + '\u0000').getBytes(StandardCharsets.UTF_8))
+    byte[] identity = digest.digest(launcherTemplate)
+    identity[6] = (byte) ((identity[6] & 0x0f) | 0x80)
+    identity[8] = (byte) ((identity[8] & 0x3f) | 0x80)
+    byte[] result = executable.clone()
+    System.arraycopy(identity, 0, result, uuidOffset, 16)
+    result
+}

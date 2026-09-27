@@ -2,6 +2,22 @@
 
 ## Current state — 2026-09-23
 
+- **macOS Local Network identity collision** (branch `codex/mac-network-identity`, 2026-09-27):
+  a user-retried Remote LAN connection produced `Local network denied by preference for Moray
+  (dev.moray.app)` in macOS `nehelper`. Installed Jasper, historical Moray and JBR's generic
+  jpackage launcher shared `LC_UUID` `25BA8067-AB3A-327B-8BE9-0C3162B915F5`; the usage description
+  was already present and the bundle signature valid. Packaging now derives an app-specific
+  launcher UUID from the bundle identifier and immutable SDK launcher before final signing.
+  `verifyPackage` checks it; portable binary regressions run under `check`. This supersedes the
+  earlier assumption below that a usage string and an ad-hoc signature were sufficient.
+  `./gradlew check` passed: 1,997 tests, zero failures/errors, three skips, plus the portable UUID
+  regression task. `packageDist` and strict signature verification passed; injecting the old UUID
+  made `verifyPackage` fail as intended, and restoring the executable passed. The mounted DMG
+  retains the corrected UUID and has a valid signature. Independent review found no issues.
+  Native prompt/LAN acceptance remains user-run; Apple-issued signing remains separate release
+  work (no valid identity on this Mac). The user authorized merging to `main` and pushing to
+  `origin` on 2026-09-27. See [verification](mac-local-network-verification.md).
+
 - **Original Steep application icon** (branch `codex/jasper-steep-icon`):
   user-selected full-height 68-degree tab and Frost chevron replace Ember in
   native packages and runtime assets. The exact SVG master and Inkscape generator
