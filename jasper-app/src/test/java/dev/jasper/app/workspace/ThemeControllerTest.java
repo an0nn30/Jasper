@@ -111,7 +111,7 @@ class ThemeControllerTest {
             owners[0].selectTab(retained[0]);
             assertThat(first[0].view().getBackground()).isEqualTo(new Color(0xfafafa));
             owners[1].selectTheme(Theme.DARK);
-            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0x282a36));
+            assertThat(first[0].view().getBackground()).isEqualTo(new Color(0x191c20));
             assertThat(first[0].findBar().result().error()).isNotNull();
             for (TerminalPane pane : retained[0].panes()) assertThat(pane.view().palette()).isEqualTo(Theme.DARK.palette());
             assertThat(first[0].session()).isSameAs(session[0]);
@@ -206,7 +206,7 @@ class ThemeControllerTest {
             assertThatThrownBy(() -> themes.configure(Theme.LIGHT)).isInstanceOf(IllegalStateException.class);
             assertThat(UIManager.getLookAndFeel()).isSameAs(before);
             assertThat(themes.current().chrome()).isEqualTo(Theme.DARK);
-            assertThat(owner.getBackground()).isEqualTo(new Color(0x282a36));
+            assertThat(owner.getBackground()).isEqualTo(new Color(0x191c20));
             assertThat(changed).isEmpty();
         });
     }

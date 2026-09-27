@@ -26,8 +26,14 @@ public record Theme(String id, String name, boolean dark, Palette palette, Sourc
     public static final Theme LIGHT = new Theme("intellij-light", "IntelliJ Light", false, Palette.jasperLight(),
         new Resource("intellij/Light.theme.json"));
     /** Jasper's own dark theme. */
-    public static final Theme DARK = new Theme("jasper-dark", "Jasper Dark", true, Palette.jasperDark(),
+    public static final Theme DARK = new Theme("jasper-dark", "Jasper Dark", true, graphitePalette(),
         new Resource("jasper-dark.theme.json"));
+
+    private static Palette graphitePalette() {
+        var ansi = Palette.jasperDark();
+        return new Palette(new java.awt.Color(0xd5dee5), new java.awt.Color(0x191c20),
+            new java.awt.Color(0xd5dee5), new java.awt.Color(0x35434e), ansi.ansi());
+    }
 
     public Theme {
         Objects.requireNonNull(id);

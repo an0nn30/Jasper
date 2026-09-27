@@ -27,16 +27,16 @@ class MockUiTest {
                 assertThat(title).isNotNull();
                 root.setSize(958, 958); layoutTree(root);
                 int toolbar = owner.toolbar().getHeight(), tabs = owner.windowTabs().getHeight();
-                assertThat(toolbar).isEqualTo(30);
-                assertThat(title.getHeight()).isEqualTo(28);
+                assertThat(toolbar).isEqualTo(42);
+                assertThat(title.getHeight()).isEqualTo(42);
                 assertThat(tabs).isEqualTo(30);
                 assertThat(owner.status().getHeight()).isEqualTo(24);
-                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 958 - 28 - toolbar - tabs - 24));
+                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 958 - toolbar - tabs - 24));
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
-                assertThat(image.getRGB(650, 27) & 0xffffff).as("title separator").isEqualTo(0x313439);
-                assertThat(image.getRGB(650, 28 + toolbar / 2) & 0xffffff).as("toolbar surface").isEqualTo(0x23262c);
-                assertThat(image.getRGB(650, 28 + toolbar + tabs - 1) & 0xffffff).as("tab strip separator").isEqualTo(0x313439);
+                assertThat(image.getRGB(650, 41) & 0xffffff).as("title separator").isEqualTo(0x343a42);
+                assertThat(image.getRGB(650, toolbar / 2) & 0xffffff).as("toolbar surface").isEqualTo(0x25292e);
+                assertThat(image.getRGB(650, toolbar + tabs - 1) & 0xffffff).as("tab strip separator").isEqualTo(0x343a42);
                 assertThat(new Color(image.getRGB(500, 940))).isEqualTo(UIManager.getColor("Jasper.titleBackground"));
             }
         });
@@ -84,13 +84,13 @@ class MockUiTest {
             assertThat(status.getMinimumSize().width).isZero();
             assertThat(status.getPreferredSize().width).isZero();
             assertThat(status.getText()).contains("/very-long-directory").contains("91 \u00d7 35");
-            assertThat(after.getRGB(32, 30) & 0xffffff).isEqualTo(0x848c9b);
+            assertThat(after.getRGB(32, 30) & 0xffffff).isEqualTo(0xa7b2bf);
             for (int y = 0; y < 60; y++) for (int x = 900; x < 1200; x++)
                 assertThat(after.getRGB(x, y)).as("right segment remains visible").isEqualTo(before.getRGB(x, y));
             // The slash remains subdued independently of the metadata text color.
             boolean foundSeparator = false;
             for (int y = 16; y < 44; y++) for (int x = 100; x < 156; x++)
-                foundSeparator |= (after.getRGB(x, y) & 0xffffff) == 0x353940;
+                foundSeparator |= (after.getRGB(x, y) & 0xffffff) == 0x343a42;
             assertThat(foundSeparator).isTrue();
         });
     }
@@ -117,8 +117,8 @@ class MockUiTest {
             var owner = content(launcher(pending)); owner.setSize(400, 500); layoutTree(owner);
             var buttons = java.util.Arrays.stream(owner.toolbar().getComponents()).filter(JButton.class::isInstance)
                 .map(JButton.class::cast).toList();
-            assertThat(buttons).hasSize(6);
-            assertThat(buttons).allSatisfy(button -> {
+            assertThat(buttons).hasSize(7);
+            assertThat(buttons.stream().filter(java.awt.Component::isVisible)).allSatisfy(button -> {
                 assertThat(button.getWidth()).isGreaterThanOrEqualTo(16);
                 assertThat(button.getX() + button.getWidth()).isLessThanOrEqualTo(400);
                 assertThat(button.getHeight()).isEqualTo(24);

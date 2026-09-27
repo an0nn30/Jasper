@@ -96,6 +96,26 @@ class WindowTabsTest {
         });
     }
 
+    @Test void selectedTabTracksIndependentTerminalColorsAndKeepsReadableText() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
+            for (Theme chrome : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+                owner.selectTheme(chrome);
+                for (var colors : dev.jasper.app.config.TerminalColors.values()) {
+                    owner.selectTerminalColors(colors);
+                    var strip = owner.windowTabs(); layout(strip, 800, 38);
+                    JComponent label = named(strip, "select:selected");
+                    assertThat(pixel(label.getParent(), 4)).isEqualTo(owner.theme().palette().background());
+                    assertThat(label.getForeground()).isEqualTo(owner.theme().palette().foreground());
+                    owner.setActive(false);
+                    assertThat(label.getForeground()).isEqualTo(owner.theme().palette().foreground());
+                    owner.setActive(true);
+                }
+            }
+        });
+    }
+
     @Test void controlsRetainIdentityAcrossMetadataSelectionReorderAndTheme() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));

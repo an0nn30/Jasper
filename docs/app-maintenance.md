@@ -249,3 +249,25 @@ is user-run; headless tests never show a prompt or banner.
 
 API references: [Apple UserNotifications](https://developer.apple.com/documentation/usernotifications/unusernotificationcenter),
 [requesting permission](https://developer.apple.com/documentation/usernotifications/asking-permission-to-use-notifications).
+
+
+### Unified workspace header
+
+`WindowContent.installTitleBar` moves the existing `WindowToolbar` into `MacTitleBar` on
+macOS. The workspace computes `WindowHeaderContext` from the focused pane; the platform
+package stays independent of workspace and terminal types. Native window metadata remains
+separate from the visible directory/host context. Native drag hit testing applies to the
+context label and blank toolbar area, never command buttons.
+
+`WindowToolbar` allocates whole buttons by stable priority and constructs overflow menus
+from the same Actions as their original placements. Do not retain a second plugin registry
+for overflow. Theme changes must retain selected-tab contrast when terminal colors differ
+from chrome. Host icons choose their authored light/dark variants for that surface; custom
+plugin icons remain plugin-owned.
+
+Run `./gradlew :jasper-app:titleBarPreview :jasper-app:mockUiPreview` for fixture-based
+headless renders. The title-bar previews include local/remote and narrow layouts, without
+fabricated native controls. For user-run GUI acceptance, resize with several plugins,
+exercise overflow submenus/shortcuts, change focus between local and SSH panes, change
+color/toolbar modes live, drag the blank header and context, double-click, and enter/leave
+fullscreen. Check native traffic lights at ordinary and scaled display settings.

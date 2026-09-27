@@ -36,8 +36,10 @@ class BarHeightTest {
                 JButton newTab = button(toolbar, "New tab");
                 assertThat(newTab.getHeight()).as("3 px above and below").isEqualTo(side);
                 assertThat(newTab.getY()).isEqualTo((UIScale.scale(height) - side) / 2);
-                if (labelledWidth < 0) labelledWidth = newTab.getWidth();
-                assertThat(newTab.getWidth()).as("a labelled button keeps its side padding").isEqualTo(labelledWidth);
+                assertThat(newTab.getWidth()).as("common built-ins stay square in either toolbar mode").isEqualTo(side);
+                JButton split = button(toolbar, "Split");
+                if (labelledWidth < 0) labelledWidth = split.getWidth();
+                assertThat(split.getWidth()).as("a labelled button keeps its side padding").isEqualTo(labelledWidth);
                 var separator = Arrays.stream(toolbar.getComponents())
                     .filter(child -> child instanceof JSeparator && child.isVisible()).findFirst().orElseThrow();
                 assertThat(separator.getHeight()).isEqualTo(UIScale.scale(height - 14));

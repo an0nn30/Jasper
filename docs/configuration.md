@@ -238,12 +238,27 @@ Denied permission leaves the drawer available.
 
 ### Automatic tab and notification titles
 
-With one session, Jasper hides the tab strip and centers its title in the macOS
-window title bar. With multiple sessions, equal-width tabs fill that bar after
-the native controls; the add button stays at its right edge. Tab titles are
-centered, close buttons appear on hover, and shortcut labels reflect the actual
-key bindings. Narrow windows scroll overflowing tabs, and keyboard selection
-reveals the selected tab. Tab height remains configurable (30 logical pixels by default, 20–72).
+On macOS, the title bar combines the native window controls, a compact working-context
+label and the toolbar in one row (42 logical pixels by default). The label follows the
+focused pane: a local directory basename (`~` for home), or a provided session's saved
+host/session name with its remote directory when available. Hover for the full context.
+Program titles and manual tab names do not replace this label. A remote OSC 7 report
+from a local shell can also supply remote context; Jasper does not infer SSH hosts by
+parsing command text.
+
+Tabs sit directly beneath the header. The selected tab shares its terminal's background,
+with an ice-blue indicator in Jasper Dark. Narrow windows scroll overflowing tabs, and
+keyboard selection reveals the selected tab. Tab height remains configurable (30 logical
+pixels by default, 20–72).
+
+Split and contributed dropdowns such as Sessions retain labels in `icons_and_labels` mode;
+familiar built-in actions use icons with tooltips. Whole controls move into **More actions**
+when the toolbar is crowded, preserving submenus, shortcuts and action state. Find and
+Settings receive the highest space priority; Settings has one toolbar home. The toolbar
+never wraps or shrinks click targets to fit. `toolbar_height` still sizes its controls;
+the unified macOS row is at least 42 pixels tall. Hiding the toolbar retains the context
+label and native controls. Other platforms keep their native title bar and a separate
+toolbar with the same overflow behavior.
 
 Applications can set the terminal title with OSC 0, 1 or 2. An automatic tab and
 the native window show that text plus the foreground job in parentheses, like

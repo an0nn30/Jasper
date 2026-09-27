@@ -47,7 +47,7 @@ class ToolWindowSurfaceTest {
             SwingUtilities.updateComponentTreeUI(regions);
             regions.refreshTheme();
             Color dark = UIManager.getColor("ToolWindow.background");
-            assertThat(dark).isEqualTo(new Color(0x21252b));
+            assertThat(dark).isEqualTo(new Color(0x21252a));
             for (var component : List.of(content, inner, later)) assertThat(component.getBackground()).isEqualTo(dark);
             assertThat(fixed.getBackground()).isEqualTo(Color.MAGENTA);
         } finally { UIManager.setLookAndFeel(original); }

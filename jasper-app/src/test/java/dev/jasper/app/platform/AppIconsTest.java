@@ -46,6 +46,26 @@ class AppIconsTest {
         });
     }
 
+    @Test void selectedSurfacesChooseUntintedVariantsWithoutChangingSharedIcons() throws Exception {
+        edt(() -> {
+            var themes = new ThemeController(Theme.LIGHT);
+            try {
+                var original = AppIcons.named("TERMINAL");
+                int[] light = IntellijIconsTest.pixels(original);
+                themes.configure(Theme.DARK);
+                int[] dark = IntellijIconsTest.pixels(original);
+                assertThat(dark).isNotEqualTo(light);
+                assertThat(IntellijIconsTest.pixels(AppIcons.forBackground(original, java.awt.Color.WHITE))).isEqualTo(light);
+                assertThat(IntellijIconsTest.pixels(original)).isEqualTo(dark);
+                themes.configure(Theme.LIGHT);
+                assertThat(IntellijIconsTest.pixels(AppIcons.forBackground(original, java.awt.Color.BLACK))).isEqualTo(dark);
+                assertThat(IntellijIconsTest.pixels(original)).isEqualTo(light);
+                var custom = new javax.swing.ImageIcon(new java.awt.image.BufferedImage(16, 16, 2));
+                assertThat(AppIcons.forBackground(custom, java.awt.Color.BLACK)).isSameAs(custom);
+            } finally { new ThemeController(); }
+        });
+    }
+
     @Test void bundledIconsKeepFlatLafDisabledRendering() throws Exception {
         edt(() -> {
             new ThemeController(Theme.LIGHT);

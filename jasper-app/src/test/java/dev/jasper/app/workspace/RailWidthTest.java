@@ -21,7 +21,7 @@ class RailWidthTest {
 
     @Test void theRailLaysOutItsButtonsFromItsWidth() throws Exception {
         edt(() -> {
-            var rail = new WindowRail(new AbstractAction("Settings") { @Override public void actionPerformed(ActionEvent event) {} });
+            var rail = new WindowRail();
             rail.render(List.of(new WindowRail.PanelButton("a", "A", null, PanelRegion.LEFT, false),
                 new WindowRail.PanelButton("b", "B", null, PanelRegion.RIGHT, false)), List.of());
             for (int width : new int[]{28, 36, 64}) {

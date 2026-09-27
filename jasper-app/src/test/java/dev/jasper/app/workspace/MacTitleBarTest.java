@@ -20,6 +20,49 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MacTitleBarTest {
+    @Test void workspaceToolbarSharesTheNativeTitleRowAndContextIgnoresTabNames() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var root = new JRootPane();
+            try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
+                root.setSize(959, 600); layoutTree(root);
+                assertThat(SwingUtilities.isDescendingFrom(owner.toolbar(), bar)).isTrue();
+                assertThat(bar.getPreferredSize().height).isEqualTo(42);
+                assertThat(SwingUtilities.convertPoint(owner.toolbar(), 0, 0, root).y).isZero();
+                assertThat(label(bar).getText()).isEqualTo("~");
+                assertThat(label(bar).getToolTipText()).isEqualTo(HOME.toString());
+                owner.currentTab().rename("arbitrary program title"); owner.update();
+                assertThat(label(bar).getText()).isEqualTo("~");
+                var first = owner.currentTab();
+                owner.newTab(HOME.resolve("projects/moray")); owner.update();
+                assertThat(label(bar).getText()).isEqualTo("moray");
+                owner.selectTab(first); owner.update();
+                assertThat(label(bar).getText()).isEqualTo("~");
+            }
+        });
+    }
+
+    @Test void workspaceHeaderFollowsLiveControlHeightAndRetainsContextWhenHidden() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var root = new JRootPane();
+            try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
+                root.setSize(600, 500); layoutTree(root);
+                for (int height : new int[] {64, 24, 30}) {
+                    owner.setToolbarHeight(height); layoutTree(root);
+                    assertThat(bar.getHeight()).isEqualTo(Math.max(42, height));
+                    assertThat(owner.toolbar().getHeight()).isEqualTo(bar.getHeight());
+                    for (var child : owner.toolbar().getComponents())
+                        if (child instanceof JButton && child.isVisible())
+                            assertThat(child.getHeight()).isEqualTo(height - 6);
+                }
+                owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(root);
+                assertThat(label(bar).getText()).isEqualTo("~");
+                assertThat(label(bar).getWidth()).isGreaterThan(300);
+            }
+        });
+    }
+
     @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new dev.jasper.app.appearance.ThemeController()); }
 
     @Test void supportedRootHidesOnlyNativeDrawingAndRetainsTitleMetadata() throws Exception {
@@ -34,10 +77,10 @@ class MacTitleBarTest {
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
                 owner.currentTab().rename("build logs"); owner.update();
                 assertThat(metadata.get()).isEqualTo("build logs");
-                assertThat(label(bar).getText()).isEqualTo("build logs");
+                assertThat(label(bar).getText()).isEqualTo("~");
                 assertThat(bar.getMouseListeners()).isEmpty();
-                assertThat(label(bar).getMouseListeners()).isEmpty();
-                assertThat(label(bar).getToolTipText()).isNull();
+                assertThat(label(bar).getMouseListeners()).isNotEmpty();
+                assertThat(label(bar).getToolTipText()).isEqualTo(HOME.toString());
             }
         });
     }
@@ -59,24 +102,24 @@ class MacTitleBarTest {
         });
     }
 
-    @Test void modernHeaderIsATitleRowAboveTheToolbarAndTheTabStrip() throws Exception {
+    @Test void modernHeaderContainsToolbarAboveTheTabStrip() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var root = new JRootPane();
             var minimumChanges = new AtomicInteger();
             owner.onMinimumSizeChanged = minimumChanges::incrementAndGet;
             try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
-                assertThat(bar.getPreferredSize().height).isEqualTo(28);
-                assertThat(bar.getComponentCount()).as("only the title").isEqualTo(1);
+                assertThat(bar.getPreferredSize().height).isEqualTo(42);
+                assertThat(bar.getComponentCount()).as("context and toolbar").isEqualTo(2);
                 JComponent tabs = WindowTabsTest.named(owner, "windowTabs");
                 assertThat(tabs).as("tabs live in the window content").isNotNull();
                 root.setSize(959, 600); layoutTree(root);
                 Point toolbar = SwingUtilities.convertPoint(owner.toolbar(), 0, 0, root);
                 Point strip = SwingUtilities.convertPoint(tabs, 0, 0, root);
-                assertThat(toolbar.y).isEqualTo(bar.getHeight());
+                assertThat(toolbar.y).isZero();
                 assertThat(strip.y).isEqualTo(toolbar.y + owner.toolbar().getHeight());
                 assertThat(label(bar).isVisible()).isTrue();
-                assertThat(label(bar).getX() * 2 + label(bar).getWidth()).isEqualTo(bar.getWidth());
+                assertThat(label(bar).getX() + label(bar).getWidth()).isLessThan(owner.toolbar().getX());
                 owner.newTab(HOME); layoutTree(root);
                 assertThat(label(bar).isVisible()).as("the title stays with many tabs").isTrue();
                 root.putClientProperty(FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(12, 6, 110, 34));
@@ -101,10 +144,10 @@ class MacTitleBarTest {
                 assertThat(bar).isNotNull();
                 owner.installRootBindings(root);
                 bar.setSize(400, 28);
-                assertThat(pixel(bar)).isEqualTo(new Color(0x23262c));
-                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x848c9b));
+                assertThat(pixel(bar)).isEqualTo(new Color(0x25292e));
+                assertThat(label(bar).getForeground()).isEqualTo(new Color(0xa7b2bf));
                 bar.setActive(false);
-                assertThat(label(bar).getForeground()).isEqualTo(new Color(0x848c9b));
+                assertThat(label(bar).getForeground()).isEqualTo(new Color(0xa7b2bf));
                 owner.selectTheme(Theme.LIGHT);
                 assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
                 assertThat(pixel(bar)).isEqualTo(new Color(0xf2f2f2));
@@ -113,7 +156,7 @@ class MacTitleBarTest {
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0x6e6e6e));
                 owner.setToolbarMode(ToolbarMode.HIDDEN);
                 assertThat(bar.isVisible()).isTrue();
-                assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 28);
+                assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 42);
             }
         });
     }
@@ -167,6 +210,6 @@ class MacTitleBarTest {
         var image = new BufferedImage(bar.getWidth(), bar.getHeight(), BufferedImage.TYPE_INT_RGB);
         var graphics = image.createGraphics();
         try { bar.paint(graphics); } finally { graphics.dispose(); }
-        return new Color(image.getRGB(0, 0));
+        return new Color(image.getRGB(0, 2));
     }
 }

@@ -166,7 +166,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var terminalColumn = new JPanel(new BorderLayout());
         terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
         regions = new WorkspaceRegions(terminalColumn);
-        rail = new WindowRail(action(ActionId.OPEN_SETTINGS));
+        rail = new WindowRail();
         rail.setVisible(false);
         var body = new JPanel(new BorderLayout());
         body.add(rail, BorderLayout.WEST); body.add(regions, BorderLayout.CENTER);
@@ -187,10 +187,20 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
                                       Consumer<String> nativeTitle) {
         var bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), supported);
+        if (bar != null) {
+            content.remove(content.toolbar());
+            ((WindowToolbar) content.toolbar()).setTitleBar(true);
+            bar.setToolbar(content.toolbar());
+        }
         content.onTitle = value -> {
             String display = TerminalTitle.windowTitle(value);
             nativeTitle.accept(display);
-            if (bar != null) bar.setTitle(display);
+            if (bar != null) {
+                TerminalPane pane = content.currentPane();
+                var context = WindowHeaderContext.from(pane == null ? null : pane.snapshot(),
+                    Path.of(System.getProperty("user.home")));
+                bar.setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
+            }
         };
         if (bar != null) {
             content.onThemeChanged = theme -> bar.setLight(!theme.chrome().dark());
@@ -388,7 +398,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         updateActions();
     }
 
-    /** The rail shows only when it has something besides Settings and the user has not hidden it. */
+    /** The rail shows only when it has contributed items and the user has not hidden it. */
     void syncRailVisibility() {
         boolean wanted = !rail.empty() && uiState.railVisible();
         if (rail.isVisible() != wanted) { rail.setVisible(wanted); revalidate(); repaint(); }

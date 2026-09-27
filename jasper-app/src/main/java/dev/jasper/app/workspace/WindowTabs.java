@@ -12,7 +12,7 @@ import javax.swing.*;
 
 /** IntelliJ-style editor tabs over WindowContent's retained Swing selection model. */
 final class WindowTabs extends JPanel implements AutoCloseable {
-    private static final int MIN_TAB = 80, MAX_TAB = 240, LIST_WIDTH = 24, EDGE = 8, GAP = 6, UNDERLINE = 3;
+    private static final int MIN_TAB = 80, MAX_TAB = 240, LIST_WIDTH = 24, EDGE = 8, GAP = 6, UNDERLINE = 2;
     /** Titles come from remote programs; tooltips and the tab list show at most this many characters. */
     private static final int TITLE_LIMIT = 200;
     private final WindowContent owner;
@@ -226,11 +226,15 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             String shortcut = owner.tabShortcut(order.indexOf(tab));
             String tip = capped(text);
             select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
-            select.setIcon(tab.icon());
+            Color surface = owner.theme().palette().background();
+            select.setIcon(tab == selected ? AppIcons.forBackground(tab.icon(), surface) : tab.icon());
+            close.setIcon(tab == selected ? AppIcons.forBackground(AppIcons.named("CLOSE"), surface) : AppIcons.named("CLOSE"));
+            close.setRolloverIcon(tab == selected ? AppIcons.forBackground(AppIcons.named("CLOSE_HOVERED"), surface)
+                : AppIcons.named("CLOSE_HOVERED"));
             select.setSelected(tab == selected);
             select.setFont(SystemFonts.ui(Font.PLAIN, 13f));
-            select.setForeground(UIManager.getColor(!active ? "Jasper.titleInactiveForeground"
-                : tab == selected ? "Jasper.tabSelectedForeground" : "Jasper.titleForeground"));
+            select.setForeground(tab == selected ? owner.theme().palette().foreground()
+                : UIManager.getColor(!active ? "Jasper.titleInactiveForeground" : "Jasper.titleForeground"));
             close.setVisible(tab == selected || hovered);
             return retitled;
         }
@@ -244,7 +248,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
 
         @Override protected void paintComponent(Graphics graphics) {
             if (tab == selected || hovered) {
-                graphics.setColor(UIManager.getColor(tab == selected ? "Jasper.tabSelectedBackground" : "Jasper.tabHoverBackground"));
+                graphics.setColor(tab == selected ? owner.theme().palette().background() : UIManager.getColor("Jasper.tabHoverBackground"));
                 graphics.fillRect(0, 0, getWidth(), getHeight());
             }
             super.paintComponent(graphics);

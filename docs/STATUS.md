@@ -2,6 +2,28 @@
 
 ## Current state — 2026-09-23
 
+- **Unified workspace header and graphite chrome** (branch `codex/intellij-new-icons`, 2026-09-27):
+  continued in the user-selected icon worktree. macOS now combines native controls,
+  focused directory/host context and toolbar in a 42px default header, with tabs below.
+  Program titles still reach native window metadata; the visible context follows the
+  focused pane, retaining a provider's saved host/session label before remote OSC 7 arrives.
+  Whole toolbar controls move into a live ellipsis menu by stable priority, retaining
+  actions, shortcuts, toggles and dropdown grouping. Settings has one header home.
+  Jasper Dark uses graphite surfaces, silver foregrounds, a faint header highlight and
+  ice-blue tab accents. Selected tabs match the resolved terminal palette; authored host
+  icon variants and foregrounds remain readable with independent terminal colors.
+  Upstream icon files are unchanged. The optional angled tab shoulder is deferred.
+  The two notification fixes were carried forward as `a824e2a4` and `8deb2293`.
+  Inline implementation follows the [approved design](superpowers/specs/2026-09-27-jasper-unified-header-design.md).
+  Independent review caught mixed-palette tab contrast; regressions reproduced it, the
+  fix passes, and re-review is clean. `./gradlew check :jasper-app:packageDist
+  :jasper-app:mockUiPreview` passed: **2,030 tests, zero failures/errors, five skips**,
+  plus native notification/packaging checks. The mounted DMG contains the current app
+  JAR and passes strict deep signature verification. Headless local/remote, narrow/wide,
+  dark/light previews inspected; Java source hygiene and whitespace checks pass.
+  Native dragging, traffic lights, fullscreen and final presentation remain user-run
+  acceptance; no GUI launched. Work retained on this branch, not merged or pushed.
+
 - **IntelliJ New UI icons** (branch `codex/intellij-new-icons`, 2026-09-27): isolated in
   `/Users/dustin/.codex/worktrees/intellij-new-icons/moray`. Vendored the complete platform
   and Terminal `expui` collections at `60b8fbadc2f08ef18a6ecab0c138a849e14f13fb`: 1,744 SVGs,

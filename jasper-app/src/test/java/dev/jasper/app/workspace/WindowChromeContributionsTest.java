@@ -58,7 +58,7 @@ class WindowChromeContributionsTest {
             model.addToolbar(new ToolbarEntry.Button("dev.x.never-registered"));
 
             List<String> after = buttons(owner);
-            assertThat(after).endsWith("Zoom pane", "Run Tool", "Tool", "Find", "Settings");
+            assertThat(after).endsWith("Zoom pane", "Run Tool", "Tool", "Find", "Settings", "More actions");
             assertThat(WindowTabsTest.named(owner.toolbar(), "pluginSeparator").isVisible()).isTrue();
             assertThat(after).hasSize(before.size() + 2);
             JButton button = null;

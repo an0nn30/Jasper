@@ -14,7 +14,7 @@ import javax.swing.plaf.ColorUIResource;
  */
 final class ChromeKeys {
     /** Every key this class can fill. */
-    static final List<String> KEYS = List.of("Jasper.titleBackground", "Jasper.titleForeground",
+    static final List<String> KEYS = List.of("Jasper.titleBackground", "Jasper.headerHighlight", "Jasper.titleForeground",
         "Jasper.titleInactiveForeground", "Jasper.titleSeparator", "Jasper.chromeForeground", "Jasper.mutedForeground",
         "Jasper.tabSelectedBackground", "Jasper.tabSelectedForeground", "Jasper.tabHoverBackground", "Jasper.tabUnderline",
         "Jasper.tabUnderlineInactive", "Jasper.splitDivider", "Jasper.findErrorBackground", "Jasper.runningForeground",
@@ -28,6 +28,7 @@ final class ChromeKeys {
         Color foreground = first(defaults, "Label.foreground");
         put(defaults, added, "Jasper.titleBackground", first(defaults, "MainToolbar.background", "TitlePane.background"));
         Color title = defaults.getColor("Jasper.titleBackground");
+        put(defaults, added, "Jasper.headerHighlight", mix(foreground, title, .08));
         put(defaults, added, "Jasper.titleForeground", first(defaults, "TitlePane.foreground"));
         put(defaults, added, "Jasper.titleInactiveForeground",
             readable(first(defaults, "TitlePane.inactiveForeground"), title, 3, foreground));

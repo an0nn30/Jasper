@@ -25,18 +25,18 @@ class TabHeightTest {
             var root = new JRootPane(); owner.installRootBindings(root);
             try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 root.setSize(958, 958); LayoutTestSupport.layoutTree(root);
-                assertThat(header.getHeight()).isEqualTo(28);
+                assertThat(header.getHeight()).isEqualTo(42);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(30);
                 int originalMinimum = root.getMinimumSize().height;
                 var changes = new AtomicInteger(); owner.onMinimumSizeChanged = changes::incrementAndGet;
                 owner.setTabHeight(44); LayoutTestSupport.layoutTree(root);
                 assertThat(changes.get()).isPositive();
                 assertThat(owner.tabHeight()).isEqualTo(44);
-                assertThat(header.getHeight()).isEqualTo(28);
+                assertThat(header.getHeight()).isEqualTo(42);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(44);
                 assertThat(root.getMinimumSize().height).isEqualTo(originalMinimum + 14);
                 owner.selectTheme(Theme.LIGHT); LayoutTestSupport.layoutTree(root);
-                assertThat(header.getHeight()).isEqualTo(28);
+                assertThat(header.getHeight()).isEqualTo(42);
                 assertThat(owner.windowTabs().getHeight()).isEqualTo(44);
                 assertThat(owner.currentTab()).isSameAs(tab);
                 assertThat(owner.currentPane().session()).isSameAs(session);

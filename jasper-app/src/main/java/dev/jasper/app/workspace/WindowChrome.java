@@ -25,7 +25,7 @@ import javax.swing.event.MenuListener;
 /** Menus, toolbar and status all route through the window's shared actions. */
 final class WindowChrome {
     private final WindowContent owner;
-    private final ReferenceToolbar toolbar;
+    private final WindowToolbar toolbar;
     private final WindowStatusBar status = new WindowStatusBar();
     private final JMenuBar menuBar = new JMenuBar();
     private final java.util.EnumMap<TerminalColors, JRadioButtonMenuItem> terminalItems = new java.util.EnumMap<>(TerminalColors.class);
@@ -45,7 +45,7 @@ final class WindowChrome {
 
     WindowChrome(WindowContent owner) {
         this.owner = owner;
-        toolbar = new ReferenceToolbar();
+        toolbar = new WindowToolbar(owner::updateActions);
         toolbar.setFloatable(false);
         toolbar.setBorder(BorderFactory.createEmptyBorder());
         JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
@@ -107,12 +107,20 @@ final class WindowChrome {
         toolbar.add(toolbarGlue);
         addButton(ActionId.FIND, "search");
         addButton(ActionId.OPEN_SETTINGS, "settings");
+        toolbar.finish();
     }
 
     private void addSplitButton() {
         JButton split = addButton(ActionId.SPLIT_RIGHT, "columns-2");
         split.setAction(null); split.setText("Split"); split.setIcon(AppIcons.icon("columns-2"));
         split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");
+        split.putClientProperty("keepLabel", true);
+        WindowToolbar.entry(split, 90, () -> {
+            var menu = new JMenu("Split");
+            menu.add(WindowToolbar.menuItem(owner.action(ActionId.SPLIT_RIGHT)));
+            menu.add(WindowToolbar.menuItem(owner.action(ActionId.SPLIT_DOWN)));
+            return menu;
+        });
         split.addActionListener(event -> {
             owner.updateActions(); JPopupMenu popup = new JPopupMenu();
             popup.add(owner.action(ActionId.SPLIT_RIGHT)); popup.add(owner.action(ActionId.SPLIT_DOWN));
@@ -140,6 +148,7 @@ final class WindowChrome {
         button.getAccessibleContext().setAccessibleName(label);
         button.setToolTipText(label);
         button.setFont(button.chromeFont());
+        if (action != null) WindowToolbar.entry(button, 30, () -> WindowToolbar.menuItem(action));
         return button;
     }
 
@@ -161,6 +170,13 @@ final class WindowChrome {
                         if (live.isEmpty()) break;
                         ReferenceButton button = contributedButton(null, dropdown.title(), dropdown.icon());
                         button.chevron = true;
+                        button.putClientProperty("keepLabel", true);
+                        WindowToolbar.entry(button, 80, () -> {
+                            var menu = new JMenu(dropdown.title());
+                            menu.putClientProperty("html.disable", true);
+                            live.forEach(action -> menu.add(WindowToolbar.menuItem(action)));
+                            return menu;
+                        });
                         button.addActionListener(event -> {
                             owner.updateActions();
                             JPopupMenu popup = new JPopupMenu();
@@ -319,6 +335,16 @@ final class WindowChrome {
         button.setIconTextGap(UIScale.scale(4));
         button.getAccessibleContext().setAccessibleName(id.label());
         button.setToolTipText(id.label());
+        boolean labelled = id == ActionId.SPLIT_RIGHT;
+        button.putClientProperty("keepLabel", labelled);
+        button.setHideActionText(!labelled);
+        if (!labelled) button.setText(null);
+        int priority = switch (id) {
+            case FIND, OPEN_SETTINGS -> 100;
+            case NEW_TAB, SPLIT_RIGHT -> 90;
+            default -> 10;
+        };
+        WindowToolbar.entry(button, priority, () -> WindowToolbar.menuItem(owner.action(id)));
         toolbar.add(button);
         return button;
     }
@@ -326,10 +352,10 @@ final class WindowChrome {
     /** An IntelliJ toolbar button: transparent at rest, a rounded fill on hover or press, a small arrow for menus. */
     private static final class ReferenceButton extends JButton {
         private final ActionId id;
-        private boolean compact;
+
         private boolean chevron;
         ReferenceButton(Action action, ActionId id) { super(action); this.id = id; setRolloverEnabled(true); }
-        private boolean labels() { return getText() != null && !compact; }
+        private boolean labels() { return getText() != null; }
         private boolean menu() { return id == ActionId.SPLIT_RIGHT || chevron; }
 
         /** The tooltip names the action and, while one is bound, its live shortcut. */
@@ -363,7 +389,7 @@ final class WindowChrome {
 
         /** The toolbar's button height; icon-only buttons are square. */
         private int side() {
-            return getParent() instanceof ReferenceToolbar bar ? bar.buttonSide() : ReferenceToolbar.buttonSide(ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT);
+            return getParent() instanceof WindowToolbar bar ? bar.buttonSide() : WindowToolbar.buttonSide(ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT);
         }
 
         @Override public Dimension getPreferredSize() {
@@ -417,66 +443,6 @@ final class WindowChrome {
         }
     }
 
-    /** An IntelliJ row; shrinks to icon controls before any action can disappear at narrow widths. */
-    private static final class ReferenceToolbar extends JToolBar {
-        /** Height in logical pixels; buttons sit 3 px in from each edge and separators 7 px. */
-        private int barHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
-
-        /** Sets the height in logical pixels; the caller validates the range. */
-        void setBarHeight(int height) {
-            if (barHeight == height) return;
-            barHeight = height;
-            revalidate(); repaint();
-        }
-
-        static int buttonSide(int barHeight) { return UIScale.scale(barHeight - 6); }
-        int buttonSide() { return buttonSide(barHeight); }
-
-        @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(barHeight)); }
-        @Override public Dimension getPreferredSize() { return getMinimumSize(); }
-        @Override public void doLayout() {
-            int available = Math.max(0, getWidth() - UIScale.scale(16));
-            int preferred = 0;
-            for (Component child : getComponents()) {
-                if (!child.isVisible()) continue;
-                if (child instanceof ReferenceButton button) { button.compact = false; preferred += button.getPreferredSize().width; }
-                else if (child instanceof JSeparator) preferred += UIScale.scale(9);
-                else preferred += child.getPreferredSize().width;
-            }
-            boolean compact = preferred > available;
-            int fixed = 0;
-            for (Component child : getComponents()) {
-                if (!child.isVisible()) continue;
-                if (child instanceof ReferenceButton button) { button.compact = compact; fixed += button.getPreferredSize().width; }
-                else if (child instanceof JSeparator) fixed += UIScale.scale(9);
-                else fixed += child.getPreferredSize().width;
-            }
-            // At extreme widths compress spacing/buttons together; menus retain the same actions.
-            double ratio = Math.min(1, available / (double) Math.max(1, fixed));
-            int x = UIScale.scale(8), side = buttonSide(), y = (getHeight() - side) / 2, rule = UIScale.scale(barHeight - 14);
-            for (Component child : getComponents()) {
-                if (!child.isVisible()) continue;
-                int width;
-                if (child instanceof JButton) {
-                    width = (int) Math.floor(child.getPreferredSize().width * ratio);
-                    child.setBounds(x, y, width, side);
-                } else if (child instanceof JSeparator) {
-                    width = (int) Math.floor(UIScale.scale(9) * ratio);
-                    child.setBounds(x + width / 2, (getHeight() - rule) / 2, UIScale.scale(1), rule);
-                } else {
-                    width = child.getPreferredSize().width > 0 ? (int) Math.floor(child.getPreferredSize().width * ratio) : Math.max(0, available - fixed);
-                    child.setBounds(x, 0, width, getHeight());
-                }
-                x += width;
-            }
-        }
-        @Override protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            g.setColor(UIManager.getColor("Separator.foreground"));
-            g.fillRect(0, getHeight() - UIScale.scale(1), getWidth(), UIScale.scale(1));
-        }
-    }
-
     JPopupMenu contextMenu() {
         owner.updateActions();
         JPopupMenu menu = new JPopupMenu();
@@ -497,7 +463,9 @@ final class WindowChrome {
     void setToolbarMode(ToolbarMode mode) {
         toolbar.setVisible(mode != ToolbarMode.HIDDEN);
         for (var component : toolbar.getComponents()) if (component instanceof JButton button) {
-            button.setText(mode == ToolbarMode.ICONS ? null : (String) button.getClientProperty("label"));
+            boolean label = !Boolean.FALSE.equals(button.getClientProperty("keepLabel"))
+                && !"toolbarOverflow".equals(button.getName());
+            button.setText(mode == ToolbarMode.ICONS || !label ? null : (String) button.getClientProperty("label"));
         }
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }

@@ -24,6 +24,7 @@ import javax.swing.UIManager;
 public final class AppIcons {
     private static final String BASE = "dev/jasper/app/icons/intellij/";
     private static final Set<String> CATALOG = readCatalog();
+    private static final Map<String, Icon> SURFACE_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, Icon> CACHE = new ConcurrentHashMap<>();
     private static final Map<String, String> CHROME = Map.ofEntries(
         Map.entry("square-plus", "ADD"), Map.entry("app-window", "NEW_WINDOW"),
@@ -53,6 +54,23 @@ public final class AppIcons {
     public static Icon named(String name) {
         String id = NamedIcons.id(name);
         return id.equals("standard/KEY") ? KEY : bundled(id);
+    }
+
+    /** Select authored host artwork for an independently coloured surface; custom icons stay intact. */
+    public static Icon forBackground(Icon icon, Color background) {
+        if (!(icon instanceof FittedIcon fitted) || !(fitted.source() instanceof FlatSVGIcon svg)
+                || svg.getName() == null) return icon;
+        boolean dark = (.2126 * background.getRed() + .7152 * background.getGreen()
+            + .0722 * background.getBlue()) < 128;
+        String name = svg.getName();
+        String key = name + ":" + dark + ":" + fitted.size();
+        return SURFACE_CACHE.computeIfAbsent(key, ignored -> {
+            String variant = dark ? name.substring(0, name.length() - 4) + "_dark.svg" : name;
+            var resource = AppIcons.class.getClassLoader().getResource(variant);
+            if (resource == null) resource = AppIcons.class.getClassLoader().getResource(name);
+            // URL loading fixes the variant without changing a shared icon or the global look and feel.
+            return new FittedIcon(new FlatSVGIcon(resource), fitted.size());
+        });
     }
 
     /** All supported catalog IDs, including explicit size choices but excluding automatic dark siblings. */
