@@ -18,6 +18,7 @@ final class TestEndpoint implements FileEndpoint {
     final CountDownLatch aborted = new CountDownLatch(1);
     volatile UnaryOperator<FileEntry> stats = UnaryOperator.identity();
     volatile IOException replaceFailure;
+    volatile IOException createFailure;
 
     TestEndpoint(FileEndpoint delegate) { this.delegate = delegate; }
 
@@ -33,7 +34,9 @@ final class TestEndpoint implements FileEndpoint {
         calls.add("write " + path); return delegate.write(path, offset, createExclusive);
     }
     @Override public WriteHandle create(String path, int permissions) throws IOException {
-        calls.add("create " + path + " " + Integer.toOctalString(permissions)); return delegate.create(path, permissions);
+        calls.add("create " + path + " " + Integer.toOctalString(permissions));
+        if (createFailure != null) throw createFailure;
+        return delegate.create(path, permissions);
     }
     @Override public boolean writable(String path) throws IOException { calls.add("writable " + path); return delegate.writable(path); }
     @Override public void truncate(String path, long size) throws IOException { calls.add("truncate " + path); delegate.truncate(path, size); }

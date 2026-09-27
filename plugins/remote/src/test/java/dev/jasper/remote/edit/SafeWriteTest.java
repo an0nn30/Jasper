@@ -46,6 +46,22 @@ class SafeWriteTest {
         }
     }
 
+    @Test void aTargetWithUnknownPermissionsIsWrittenInPlace() throws Exception {
+        Path file = Files.writeString(folder().resolve("app.conf"), "old contents");
+        try (var endpoint = new TestEndpoint(new LocalEndpoint())) {
+            // As SFTP reports when the server leaves out the permissions attribute.
+            endpoint.stats = entry -> entry.name().equals("app.conf")
+                ? new FileEntry(entry.name(), entry.kind(), entry.size(), entry.modifiedMillis(), -1,
+                    entry.linkTarget(), entry.fileKey(), entry.uid(), entry.gid())
+                : entry;
+            SafeWrite.write(endpoint, file.toString(), bytes("new"));
+            assertThat(Files.readString(file)).isEqualTo("new");
+            assertThat(endpoint.calls).contains("truncate " + file)
+                .noneMatch(call -> call.startsWith("create ") || call.startsWith("publish"));
+            assertThat(names(folder())).as("no sibling is created").containsExactly("app.conf");
+        }
+    }
+
     @Test void aNewFileIsCreatedWithTheDefaultMode() throws Exception {
         Path file = folder().resolve("new.txt");
         try (var endpoint = new TestEndpoint(new LocalEndpoint())) {
@@ -129,6 +145,17 @@ class SafeWriteTest {
             assertThat(endpoint.calls).contains("truncate " + file).noneMatch(call -> call.startsWith("publish"));
         } finally {
             Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
+    }
+
+    @Test void aNonPermissionCreateFailurePropagatesUnchanged() throws Exception {
+        Path file = Files.writeString(folder().resolve("app.conf"), "old contents");
+        try (var endpoint = new TestEndpoint(new LocalEndpoint())) {
+            IOException failure = new IOException("connection reset");
+            endpoint.createFailure = failure;
+            assertThatThrownBy(() -> SafeWrite.write(endpoint, file.toString(), bytes("new"))).isSameAs(failure);
+            assertThat(Files.readString(file)).as("left alone").isEqualTo("old contents");
+            assertThat(endpoint.calls).noneMatch(call -> call.equals("truncate " + file) || call.equals("write " + file));
         }
     }
 

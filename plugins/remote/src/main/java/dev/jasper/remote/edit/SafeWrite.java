@@ -51,9 +51,12 @@ public final class SafeWrite {
 
     /**
      * Replaces the file at {@code path}: resolve links; refuse a folder, a special file or a read-only file;
-     * write an owner-only hidden sibling, give it the target's permissions and atomically replace the target;
-     * write in place when the sibling cannot be created, would change the owner or group, or when atomic
-     * replacement is unavailable; create a missing target.
+     * write an owner-only hidden sibling, give it the target's permissions and atomically replace the target.
+     * Writes in place instead when the target's permissions are unknown (an owner-only sibling could not be
+     * restored to the same mode), when creating the sibling is denied (the folder disallows creating it
+     * though the file itself is writable), when the sibling would change the owner or group, or when atomic
+     * replacement is unavailable; creates a missing target. Any other failure creating the sibling is
+     * rethrown unchanged, not treated as a signal to write in place.
      *
      * @return a stat of the target after writing
      */
@@ -67,6 +70,8 @@ public final class SafeWrite {
             if (file.kind() != FileEntry.Kind.FILE) throw new FileSystemException(target, null, "Not a regular file");
             // The folder may allow the rename, but a read-only file is not replaced (as a write in place would fail).
             if (!endpoint.writable(target)) throw new AccessDeniedException(target);
+            // Unknown permissions could not be copied onto the sibling, so replacing it would silently narrow the mode.
+            if (file.permissions() < 0) return inPlace(endpoint, target, content);
         }
         String sibling = FilePaths.child(FilePaths.parent(target),
             "." + FilePaths.name(target) + ".jasper-" + Long.toHexString(ThreadLocalRandom.current().nextLong()) + ".tmp");
@@ -74,9 +79,14 @@ public final class SafeWrite {
         try {
             // Owner-only while it holds the new content; the target's own permissions are copied just before the rename.
             out = endpoint.create(sibling, existing.isPresent() ? 0600 : 0666);
-        } catch (IOException cannotCreate) {
-            if (existing.isEmpty()) throw cannotCreate;
-            return inPlace(endpoint, target, content);
+        } catch (AccessDeniedException denied) {
+            if (existing.isEmpty()) throw denied;
+            try {
+                return inPlace(endpoint, target, content);
+            } catch (IOException failed) {
+                failed.addSuppressed(denied);
+                throw failed;
+            }
         }
         boolean sameOwner;
         try {
