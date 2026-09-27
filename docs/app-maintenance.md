@@ -286,7 +286,10 @@ Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces
 matching rounded corners for the terminal/tab column. Exterior gutters are 6px, except
 beside a visible rail: the rail supplies its own balanced spacing, so the adjacent
 left/center/bottom surface has no additional leading gutter. Hiding or emptying the
-rail restores that gutter without reparenting plugin content. Adjacent hosts omit
+rail restores that gutter without reparenting plugin content. A visible status bar
+likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
+contents stay visually centered between the surfaces and window bottom. Hiding the
+status bar restores the 6px bottom gutter. Adjacent hosts omit
 their facing gutters so the plain 6px draggable splitter supplies the gap.
 Region widths/heights and persisted splitter sizes include exterior gutters. The center
 host derives its minimum size from the terminal column; plugin hosts retain their 120px

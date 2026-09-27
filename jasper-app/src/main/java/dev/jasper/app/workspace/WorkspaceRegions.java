@@ -113,6 +113,7 @@ final class WorkspaceRegions extends JPanel {
 
     private final Host center = new Host(false);
     private boolean railVisible;
+    private boolean statusVisible;
     private final EnumMap<PanelRegion, JComponent> contents = new EnumMap<>(PanelRegion.class);
     private final EnumMap<PanelRegion, Host> hosts = new EnumMap<>(PanelRegion.class);
     private final EnumMap<PanelRegion, Integer> sizes = new EnumMap<>(PanelRegion.class);
@@ -178,13 +179,22 @@ final class WorkspaceRegions extends JPanel {
         revalidate(); repaint();
     }
 
+    /** The visible status bar supplies the spacing below the workspace surfaces. */
+    void setStatusVisible(boolean visible) {
+        if (statusVisible == visible) return;
+        statusVisible = visible;
+        refreshGutters();
+        revalidate(); repaint();
+    }
+
     private void refreshGutters() {
         int leading = railVisible ? 0 : 6;
+        int trailing = statusVisible ? 0 : 6;
         center.gutters(6, contents.containsKey(PanelRegion.LEFT) ? 0 : leading,
-            contents.containsKey(PanelRegion.BOTTOM) ? 0 : 6, contents.containsKey(PanelRegion.RIGHT) ? 0 : 6);
+            contents.containsKey(PanelRegion.BOTTOM) ? 0 : trailing, contents.containsKey(PanelRegion.RIGHT) ? 0 : 6);
         hosts.forEach((region, host) -> host.gutters(region == PanelRegion.BOTTOM ? 0 : 6,
             region == PanelRegion.RIGHT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.LEFT) ? 0 : leading,
-            6, region == PanelRegion.LEFT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.RIGHT) ? 0 : 6));
+            trailing, region == PanelRegion.LEFT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.RIGHT) ? 0 : 6));
     }
 
     private void rebuild() {

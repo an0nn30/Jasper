@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-23
 
+- **Centered status-bar spacing** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  removed the extra 6px exterior workspace gutter above a visible status bar so its
+  icons and text sit evenly between the workspace surfaces and window bottom. Hiding
+  the bar restores the gutter; plugin parents, panel sizes and the terminal's rounded
+  lower inset are preserved. Regression reproduced the offset before the fix and
+  verifies icon geometry in dark/light themes at 20/24/48px bar heights, panel edges,
+  and visibility changes. Headless previews inspected; independent review is clean.
+  `check :jasper-app:packageDist` passed: 2,044 tests, zero failures/errors, five skips.
+  Rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
 - **Centered rail spacing** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   rail icons were centered within their controls, but an extra 6px workspace gutter
   made their right-side spacing wider. Visible rails now meet adjacent panel/terminal

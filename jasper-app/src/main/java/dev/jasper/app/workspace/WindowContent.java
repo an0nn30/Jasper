@@ -166,6 +166,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var terminalColumn = new JPanel(new BorderLayout());
         terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
         regions = new WorkspaceRegions(terminalColumn);
+        regions.setStatusVisible(chrome.status().isVisible());
         rail = new WindowRail();
         rail.setVisible(false);
         var body = new JPanel(new BorderLayout());
@@ -679,7 +680,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         toolbarMode = mode; chrome.setToolbarMode(mode); updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
     void setStatusVisible(boolean visible) {
-        chrome.setStatusVisible(visible); updateActions(); revalidate(); onMinimumSizeChanged.run();
+        chrome.setStatusVisible(visible); regions.setStatusVisible(visible);
+        updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
 
     @Override public void close() {

@@ -79,6 +79,49 @@ class BarHeightTest {
         });
     }
 
+    @Test void statusContentsAreCenteredBetweenWorkspaceSurfacesAndWindowBottom() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            for (var theme : java.util.List.of(dev.jasper.app.appearance.Theme.DARK, dev.jasper.app.appearance.Theme.LIGHT)) {
+                owner.selectTheme(theme);
+                for (int height : new int[]{20, 24, 48}) {
+                    owner.setStatusBarHeight(height); owner.setSize(1000, 600);
+                    dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+                    int top = SwingUtilities.convertPoint(owner.status(), 0, 0, owner).y;
+                    var grid = owner.tabStrip();
+                    int surfaceBottom = SwingUtilities.convertPoint(grid, 0, grid.getHeight(), owner).y + UIScale.scale(8);
+                    assertThat(surfaceBottom).as("no extra chrome gutter above the status bar").isEqualTo(top);
+                    var crumbs = WindowTabsTest.named(owner.status(), "pathBreadcrumbs");
+                    JLabel folder = Arrays.stream(crumbs.getComponents()).filter(JLabel.class::isInstance).map(JLabel.class::cast)
+                        .filter(label -> label.getIcon() != null).findFirst().orElseThrow();
+                    var insets = folder.getInsets();
+                    var view = new java.awt.Rectangle(insets.left, insets.top, folder.getWidth() - insets.left - insets.right,
+                        folder.getHeight() - insets.top - insets.bottom);
+                    var icon = new java.awt.Rectangle(); var text = new java.awt.Rectangle();
+                    SwingUtilities.layoutCompoundLabel(folder, folder.getFontMetrics(folder.getFont()), folder.getText(), folder.getIcon(),
+                        folder.getVerticalAlignment(), folder.getHorizontalAlignment(), folder.getVerticalTextPosition(),
+                        folder.getHorizontalTextPosition(), view, icon, text, folder.getIconTextGap());
+                    int iconTop = SwingUtilities.convertPoint(folder, 0, icon.y, owner).y;
+                    assertThat(Math.abs((iconTop - surfaceBottom) - (owner.getHeight() - iconTop - icon.height)))
+                        .as("breadcrumb icon has even space above and below").isLessThanOrEqualTo(1);
+                }
+            }
+            var left = new JPanel(); var bottom = new JPanel();
+            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, left, 250);
+            owner.regions().show(dev.jasper.app.contributions.PanelRegion.BOTTOM, bottom, 150);
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            int top = SwingUtilities.convertPoint(owner.status(), 0, 0, owner).y;
+            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).isEqualTo(top);
+            assertThat(SwingUtilities.convertPoint(bottom, 0, bottom.getHeight(), owner).y).isEqualTo(top);
+            var parent = left.getParent();
+            owner.setStatusVisible(false); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            assertThat(left.getParent()).isSameAs(parent);
+            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).isEqualTo(owner.getHeight() - UIScale.scale(6));
+            owner.setStatusVisible(true); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            assertThat(SwingUtilities.convertPoint(left, 0, left.getHeight(), owner).y).isEqualTo(top);
+        });
+    }
+
     @Test void theWindowAppliesLiveHeightsAndRejectsValuesOutsideTheRange() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));

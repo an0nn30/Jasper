@@ -31,7 +31,7 @@ class MockUiTest {
                 assertThat(title.getHeight()).isEqualTo(30);
                 assertThat(tabs).isEqualTo(30);
                 assertThat(owner.status().getHeight()).isEqualTo(24);
-                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958 - 12, 958 - toolbar - tabs - 24 - 12 - 8));
+                assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958 - 12, 958 - toolbar - tabs - 24 - 6 - 8));
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
                 assertThat(new Color(image.getRGB(650, toolbar - 1))).as("continuous header surface").isEqualTo(UIManager.getColor("Jasper.titleBackground"));
@@ -126,9 +126,9 @@ class MockUiTest {
             buttons.getFirst().doClick();
             assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
             owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).as("30px tabs, 24px status bar, 12px exterior gutters and 8px lower inset").isEqualTo(426);
+            assertThat(owner.currentPane().getHeight()).as("30px tabs, 24px status bar, 6px top gutter and 8px lower inset").isEqualTo(432);
             owner.setToolbarMode(ToolbarMode.ICONS); layoutTree(owner);
-            assertThat(owner.currentPane().getHeight()).isEqualTo(396);
+            assertThat(owner.currentPane().getHeight()).isEqualTo(402);
             assertThat(buttons).extracting(JButton::getText).containsOnlyNulls();
         });
     }
