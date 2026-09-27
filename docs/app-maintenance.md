@@ -283,11 +283,15 @@ these defaults; upstream theme assets should not be edited to duplicate them.
 
 
 Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and
-rounded upper shoulders for the terminal/tab column. Exterior gutters are 6px; adjacent
+matching rounded corners for the terminal/tab column. Exterior gutters are 6px; adjacent
 hosts omit their facing gutters so the plain 6px draggable splitter supplies the gap.
 Region widths/heights and persisted splitter sizes include exterior gutters. The center
 host derives its minimum size from the terminal column; plugin hosts retain their 120px
-minimum. Terminal cells at the bottom are not clipped by rounding. Keep clipping and hit testing in the host, and route descendant repaints
+minimum. The center reserves an 8px lower inset (the corner radius) below the terminal
+grid, so terminal cells stay rectangular and unclipped. The inset uses the resolved
+terminal palette, including independent terminal-color changes. Its height contributes
+to the workspace minimum and scales with the UI. Keep clipping and hit testing in the
+host, and route descendant repaints
 through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
 owns theme-background propagation and preserves plugin-selected colors. The active theme's
 `ToolWindow.background` supplies the inner surface. Jasper Dark maps it and list/tree/table

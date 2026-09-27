@@ -29,12 +29,12 @@ class WorkspaceRegionsTest {
         var regions = new WorkspaceRegions(deck);
         deck.setMinimumSize(new java.awt.Dimension(420, 320));
         assertThat(regions.getMinimumSize()).as("terminal minimum includes the surface gutter")
-            .isEqualTo(new java.awt.Dimension(432, 332));
+            .isEqualTo(new java.awt.Dimension(432, 340));
         deck.setMinimumSize(new java.awt.Dimension(500, 360));
         assertThat(regions.getMinimumSize()).as("terminal font/split minimum changes propagate")
-            .isEqualTo(new java.awt.Dimension(512, 372));
+            .isEqualTo(new java.awt.Dimension(512, 380));
         layout(regions);
-        assertThat(in(regions, deck)).isEqualTo(new Rectangle(6, 6, 988, 588));
+        assertThat(in(regions, deck)).isEqualTo(new Rectangle(6, 6, 988, 580));
         assertThat(regions.content(PanelRegion.LEFT)).isNull();
         assertThat(regions.size(PanelRegion.LEFT)).isEqualTo(WorkspaceRegions.DEFAULT_SIDE);
 
@@ -50,7 +50,7 @@ class WorkspaceRegionsTest {
 
         regions.hide(PanelRegion.LEFT);
         layout(regions);
-        assertThat(in(regions, deck)).isEqualTo(new Rectangle(6, 6, 988, 588));
+        assertThat(in(regions, deck)).isEqualTo(new Rectangle(6, 6, 988, 580));
         assertThat(regions.size(PanelRegion.LEFT)).as("the last size is remembered").isEqualTo(250);
     }
 

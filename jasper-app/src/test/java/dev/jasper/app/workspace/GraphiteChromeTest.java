@@ -25,6 +25,31 @@ class GraphiteChromeTest {
                 .map(child -> ((javax.swing.JButton) child).getToolTipText())).doesNotContain("Settings");
         }
     }
+    @Test void terminalBottomCornersRoundOutsideTheCellGridAndFollowTerminalColors() throws Exception {
+        for (var theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+            try (var owner = content(launcher(new ArrayDeque<>()))) {
+                owner.selectTheme(theme);
+                var root = new javax.swing.JRootPane();
+                try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
+                    for (var colors : dev.jasper.app.config.TerminalColors.values()) {
+                        owner.selectTerminalColors(colors);
+                        root.setSize(1000, 640); layoutTree(root); layoutTree(root);
+                        var grid = owner.tabStrip();
+                        var bottom = javax.swing.SwingUtilities.convertPoint(grid, 0, grid.getHeight(), root);
+                        var image = new java.awt.image.BufferedImage(1000, 640, 2);
+                        var g = image.createGraphics(); root.printAll(g); g.dispose();
+                        int chrome = UIManager.getColor("Jasper.titleBackground").getRGB();
+                        int terminal = owner.theme().palette().background().getRGB();
+                        assertThat(image.getRGB(bottom.x, bottom.y + 7)).as("lower left curve exposes chrome").isEqualTo(chrome);
+                        assertThat(image.getRGB(bottom.x + grid.getWidth() - 1, bottom.y + 7)).as("lower right curve exposes chrome").isEqualTo(chrome);
+                        assertThat(image.getRGB(bottom.x + grid.getWidth() / 2, bottom.y + 4)).as("inset continues terminal palette").isEqualTo(terminal);
+                        assertThat(image.getRGB(bottom.x, bottom.y - 1)).as("last grid row stays rectangular").isEqualTo(terminal);
+                        assertThat(image.getRGB(bottom.x + grid.getWidth() - 1, bottom.y - 1)).isEqualTo(terminal);
+                    }
+                }
+            }
+        }
+    }
     @Test void roundedWorkspaceSurfacesMeetContinuousChromeWithoutRules() throws Exception {
         for (var theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
             try (var owner = content(launcher(new ArrayDeque<>()))) {

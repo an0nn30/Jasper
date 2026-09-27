@@ -2,6 +2,19 @@
 
 ## Current state — 2026-09-23
 
+- **Rounded terminal bottom corners** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  the terminal/tab frame now rounds all four corners with the same 8px radius as tool
+  panels. A radius-sized lower inset keeps terminal cells and the cursor outside the
+  clipping curve; it continues the resolved terminal background, including independent
+  terminal-color changes. Workspace minimums include the inset, while panel gutters,
+  dividers and saved panel sizes retain their behavior. Headless dark/light previews
+  inspected; regression coverage checks both lower corners, an intact last grid row,
+  palette changes and dynamic minimums. Updated layout expectations for the 8px inset.
+  Independent review is clean. An initial full run lost generated build output mid-test;
+  clean test recompilation and `check :jasper-app:packageDist` then passed: 2,042 tests,
+  zero failures/errors, five skips. Rebuilt DMG and package signature/payload verification
+  passed. No GUI launched.
+
 - **Rounded selected workspace tabs** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   replaced the terminal-colored tab and underline with an inset 4px rounded selection
   and 1px outline, matching the user's IntelliJ reference. Fill, text, border and icon

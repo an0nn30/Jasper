@@ -29,14 +29,14 @@ final class WorkspaceRegions extends JPanel {
     private static final class Host extends JPanel {
         private static final int GUTTER = 6, ARC = 16;
 
-        private final boolean roundBottom;
+        private final boolean toolWindow;
 
         Host() { this(true); }
-        Host(boolean roundBottom) {
+        Host(boolean toolWindow) {
             super(new BorderLayout());
-            this.roundBottom = roundBottom;
+            this.toolWindow = toolWindow;
             gutters(GUTTER, GUTTER, GUTTER, GUTTER);
-            if (roundBottom) setMinimumSize(new Dimension(UIScale.scale(MINIMUM), UIScale.scale(MINIMUM)));
+            if (toolWindow) setMinimumSize(new Dimension(UIScale.scale(MINIMUM), UIScale.scale(MINIMUM)));
         }
 
         void gutters(int top, int left, int bottom, int right) {
@@ -48,13 +48,7 @@ final class WorkspaceRegions extends JPanel {
             var insets = getInsets();
             int width = Math.max(0, getWidth() - insets.left - insets.right);
             int height = Math.max(0, getHeight() - insets.top - insets.bottom), arc = UIScale.scale(ARC);
-            var rounded = new RoundRectangle2D.Double(insets.left, insets.top, width, height, arc, arc);
-            if (roundBottom) return rounded;
-            // Keep terminal cells rectangular at the bottom; only the tab-strip shoulders round.
-            var shape = new java.awt.geom.Area(rounded);
-            shape.add(new java.awt.geom.Area(new java.awt.geom.Rectangle2D.Double(
-                insets.left, insets.top + height / 2.0, width, height / 2.0)));
-            return shape;
+            return new RoundRectangle2D.Double(insets.left, insets.top, width, height, arc, arc);
         }
 
         @Override protected boolean isPaintingOrigin() { return true; }
@@ -66,7 +60,13 @@ final class WorkspaceRegions extends JPanel {
                 g.setColor(UIManager.getColor("Jasper.titleBackground"));
                 g.fillRect(0, 0, getWidth(), getHeight());
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(roundBottom ? getBackground() : UIManager.getColor("ToolWindow.background")); g.fill(surface());
+                g.setColor(toolWindow ? getBackground() : UIManager.getColor("ToolWindow.background")); g.fill(surface());
+                if (!toolWindow) {
+                    // The lower arc lives below the cell grid and continues its terminal palette.
+                    int radius = UIScale.scale(ARC / 2);
+                    g.clipRect(0, getHeight() - getInsets().bottom - radius, getWidth(), radius);
+                    g.setColor(getBackground()); g.fill(surface());
+                }
             } finally { g.dispose(); }
         }
 
@@ -119,8 +119,17 @@ final class WorkspaceRegions extends JPanel {
     WorkspaceRegions(JComponent center) {
         super(new BorderLayout());
         this.center.add(center, BorderLayout.CENTER);
+        var lowerInset = new JPanel() {
+            @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(Host.ARC / 2)); }
+            @Override public Dimension getMinimumSize() { return getPreferredSize(); }
+        };
+        lowerInset.setOpaque(false);
+        this.center.add(lowerInset, BorderLayout.SOUTH);
         rebuild();
     }
+
+    /** Continues the resolved terminal surface below its unclipped rectangular cell grid. */
+    void setTerminalBackground(java.awt.Color background) { center.setBackground(background); }
 
     void show(PanelRegion region, JComponent content, int size) {
         capture();
