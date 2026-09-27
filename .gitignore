@@ -1,5 +1,7 @@
 .gradle/
 build/
+# IntelliJ's "build" icon group is vendored artwork, not build output.
+!jasper-app/src/main/resources/dev/jasper/app/icons/intellij/build/
 out/
 .idea/
 *.iml
