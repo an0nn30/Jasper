@@ -271,3 +271,9 @@ fabricated native controls. For user-run GUI acceptance, resize with several plu
 exercise overflow submenus/shortcuts, change focus between local and SSH panes, change
 color/toolbar modes live, drag the blank header and context, double-click, and enter/leave
 fullscreen. Check native traffic lights at ordinary and scaled display settings.
+
+
+Single-line input geometry is shared through `ThemeManager.APP_DEFAULTS`: text,
+password and formatted fields have 4px corner radii and 5px vertical / 8px horizontal
+padding. Keep compact palette rows tall enough for these insets. Plugin forms inherit
+these defaults; upstream theme assets should not be edited to duplicate them.

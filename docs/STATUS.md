@@ -2,6 +2,15 @@
 
 ## Current state — 2026-09-23
 
+- **Softer, roomier inputs** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  text, password and formatted fields use 4px corner radii and 5px vertical / 8px
+  horizontal padding through shared theme defaults, including plugin forms. Removed
+  conflicting dark-only geometry; existing font sizes and theme colors are retained.
+  Palette search/form rows grow by 4px to accommodate the larger controls. Dark/light
+  headless input previews inspected; independent review found no issues.
+  `check :jasper-app:packageDist` passed: 2,030 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
 - **Rounded command palette** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   matched the user's IntelliJ reference with 8px outer corner radii and the existing
   theme border. Header/footer children clip within that outline, including partial

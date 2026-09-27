@@ -31,7 +31,7 @@ public final class ThemeManager {
         "IntelliJ", "intellij/intellijlaf.theme.json",
         "Darcula", "intellij/darcula.theme.json",
         "Jasper Dark", "jasper-dark.theme.json");
-    /** Theme-independent application defaults: form typography and the split divider. Every theme gets them. */
+    /** Theme-independent application defaults: form typography, input geometry and the split divider. Every theme gets them. */
     public static final Map<String, String> APP_DEFAULTS = appDefaults();
     private static final ThemeLoader LOADER = new ThemeLoader(ThemeManager::read, FILES);
     private static final Map<Theme, ThemeLoader.Resolved> RESOLVED = new HashMap<>();
@@ -84,6 +84,9 @@ public final class ThemeManager {
         // Reference form typography in logical points; FlatLaf applies display scaling.
         for (String component : List.of("Label", "List", "TextField", "PasswordField", "FormattedTextField", "TextArea", "ComboBox", "Button"))
             defaults.put(component + ".font", "12 $defaultFont");
+        defaults.put("TextComponent.arc", "8");
+        for (String component : List.of("TextField", "PasswordField", "FormattedTextField"))
+            defaults.put(component + ".margin", "5,8,5,8");
         defaults.put("SplitPane.dividerSize", "8");
         defaults.put("SplitPaneDivider.border", "dev.jasper.app.workspace.SplitDividerBorder");
         return Collections.unmodifiableMap(defaults);

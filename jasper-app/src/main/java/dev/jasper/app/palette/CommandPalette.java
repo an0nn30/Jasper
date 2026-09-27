@@ -59,11 +59,11 @@ public final class CommandPalette extends JPanel {
     static final int WIDTH = 680;
     private static final int CORNER_ARC = 16;
     static final int TAB_HEIGHT = 30;
-    static final int FIELD_HEIGHT = 40;
+    static final int FIELD_HEIGHT = 44;
     static final int ROW_HEIGHT = 24;
     static final int HEADER_HEIGHT = 22;
     static final int HINT_HEIGHT = 26;
-    static final int STEP_ROW_HEIGHT = 36;
+    static final int STEP_ROW_HEIGHT = 40;
     static final int MAX_VISIBLE_LINES = 15;
 
     /** A tab above the search field: All, or one scope. */

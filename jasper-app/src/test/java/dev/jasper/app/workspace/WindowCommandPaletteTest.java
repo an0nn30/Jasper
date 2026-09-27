@@ -340,7 +340,7 @@ class WindowCommandPaletteTest {
                 palette.queryField().setText("custom"); root.setSize(350, 210); LayoutTestSupport.layoutTree(root);
                 root.dispatchEvent(new ComponentEvent(root, ComponentEvent.COMPONENT_RESIZED)); LayoutTestSupport.layoutTree(root);
                 assertThat(palette.getWidth()).isLessThanOrEqualTo(318);
-                assertThat(palette.queryField().getParent().getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(40));
+                assertThat(palette.queryField().getParent().getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(44));
                 PaletteTestSupport.selectRelative(palette, 4); LayoutTestSupport.layoutTree(root);
                 assertThat(dev.jasper.app.palette.PaletteTestSupport.entryList(palette).getVisibleRect().intersects(dev.jasper.app.palette.PaletteTestSupport.rowBounds(palette, 4))).isTrue();
                 assertThat(palette.getHeight()).isLessThan(palette.getPreferredSize().height);
