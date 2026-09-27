@@ -49,6 +49,15 @@ class SftpEndpointTest {
             assertThat(surviving.session().isOpen()).isTrue();
         }
     }
+    @Test @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void sftpStatReportsOwnerAndGroup() throws Exception {
+        Path file = Files.writeString(root.resolve("owned"), "x");
+        try (var fixture = new Fixture(new SftpSubsystemFactory()); var endpoint = fixture.endpoint(Duration.ofSeconds(3))) {
+            var entry = endpoint.stat("/owned");
+            assertThat(entry.uid()).isEqualTo(Files.getAttribute(file, "unix:uid"));
+            assertThat(entry.gid()).isEqualTo(Files.getAttribute(file, "unix:gid"));
+        }
+    }
     @Test void sftpUsesProxyJumpAndLeavesItsShellAlive() throws Exception {
         try (var jump = new LoopbackServer(); var fixture = new Fixture(new SftpSubsystemFactory())) {
             var bastion = RemoteHost.create("jump", "127.0.0.1", jump.port(), "deploy", new Auth.Vault(UUID.randomUUID()), "", Optional.empty());
@@ -126,7 +135,8 @@ class SftpEndpointTest {
             try (var endpoint = fixture.endpoint(Duration.ofSeconds(3))) {
                 try (var out = endpoint.write("/original", 0, true)) { out.write(1); }
                 try (var out = endpoint.write("/temp", 0, true)) { out.write(2); }
-                assertThatThrownBy(() -> endpoint.publish("/temp", "/original", true)).isInstanceOf(IOException.class).hasMessageContaining("atomic replacement");
+                assertThatThrownBy(() -> endpoint.publish("/temp", "/original", true))
+                    .isInstanceOf(java.nio.file.AtomicMoveNotSupportedException.class).hasMessageContaining("atomic replacement");
                 assertThat(Files.readAllBytes(root.resolve("original"))).containsExactly(1);
                 assertThat(Files.readAllBytes(root.resolve("temp"))).containsExactly(2);
             }

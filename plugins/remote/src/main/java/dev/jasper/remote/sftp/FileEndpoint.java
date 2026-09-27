@@ -15,6 +15,14 @@ public interface FileEndpoint extends AutoCloseable {
     void list(String directory, Consumer<FileEntry> visitor) throws IOException;
     InputStream read(String path, long offset) throws IOException;
     WriteHandle write(String path, long offset, boolean createExclusive) throws IOException;
+    /**
+     * Creates {@code path} exclusively, with {@code ordinaryPermissions} (the low nine bits, reduced by the
+     * umask) applied as it is created, and opens it for writing from offset 0. Where POSIX modes are
+     * unsupported the file gets the platform's default access.
+     */
+    WriteHandle create(String path, int ordinaryPermissions) throws IOException;
+    /** Whether this user may write the regular file at {@code path}; SFTP opens and closes it without writing. */
+    boolean writable(String path) throws IOException;
     void truncate(String path, long size) throws IOException;
     void mkdir(String path) throws IOException;
     void symlink(String path, String target) throws IOException;

@@ -1,6 +1,6 @@
 # Editor plugin
 
-**Status:** Design approved in chat by the user on 2026-09-27. Written specification awaiting user review. No plans yet. Two plans will follow: **Plan A**, SDK 0.8.2 and the Editor for local files; **Plan B**, SFTP editing through Remote. Depends on the [plugin SDK](2026-09-21-jasper-plugin-sdk-design.md) and, for Plan B, on [Remote SFTP](2026-09-23-jasper-remote-sftp-design.md).
+**Status:** Approved by the user on 2026-09-27. Plan A (SDK 0.8.2 and the Editor for local files) is executed and merged. Plan B (SFTP editing through Remote) amends sections 4.4, 6.1, 6.2 and 6.4, as marked **Amended (Plan B)**, with the user's approval of that plan. Depends on the [plugin SDK](2026-09-21-jasper-plugin-sdk-design.md) and, for Plan B, on [Remote SFTP](2026-09-23-jasper-remote-sftp-design.md).
 
 ## Purpose and scope
 
@@ -249,12 +249,13 @@ The editor calls `document.read(limitBytes)` with `limitBytes = max_file_mib × 
 Documented on `EditorDocument.write`; `LocalDocument` and Remote's `SafeWrite` both follow it.
 
 1. **Resolve the real path.** Follow symbolic links from the document's path to the regular file they name, so a link stays a link and its target is what changes. More than 40 hops is an error.
-2. **Safe write:**
-   1. write the bytes to a new hidden sibling, `.<name>.jasper-<random>.tmp`, created exclusively in the same folder;
-   2. give it the target's permission bits;
-   3. atomically replace the target with it.
+2. **Safe write:** **Amended (Plan B)**
+   1. create a new hidden sibling, `.<name>.jasper-<random>.tmp`, exclusively in the same folder: owner-only (`rw-------`) when it will replace an existing file, so the new content is never readable by others while it is written;
+   2. write the bytes to it;
+   3. give it the target's permission bits;
+   4. atomically replace the target with it.
 
-   Any failure removes the sibling and leaves the target untouched.
+   Any failure removes the sibling and leaves the target untouched. A read-only target (one this user may not write) is refused with "permission denied", although its folder might allow the rename.
 3. **In-place fallback:** write the bytes over the target from offset 0 and truncate it to their length when:
    - the sibling cannot be created (the folder is not writable though the file is);
    - the sibling's owner or group differs from the target's;
@@ -284,12 +285,16 @@ Local specifics: the replacement is `Files.move(sibling, target, ATOMIC_MOVE, RE
 
 Remote's internal `sftp.FileEntry` gains `uid` and `gid` (−1 when unknown), filled from `SftpClient.Attributes` for SFTP and from `unix:uid`/`unix:gid` for `LocalEndpoint`. They exist for `SafeWrite`'s owner check.
 
+**Amended (Plan B):** `FileEndpoint` also gains:
+- `create(path, permissions)`: an exclusive create whose mode applies as the file is created. Over SFTP this is a hand-built `SSH_FXP_OPEN` with a permissions attribute, because MINA's `open` sends none.
+- `writable(path)`: `Files.isWritable` locally; over SFTP it opens the file for writing and closes it without writing.
+
 ### 6.2 `SafeWrite`
 
 A new package `dev.jasper.remote.edit` holds `SafeWrite`, the write contract (section 4.4) over any `FileEndpoint`:
 - it follows links itself, because `stat` does not follow them and `canonical` does not resolve the final path component;
-- the sibling is written with `write(sibling, 0, createExclusive = true)`, given the target's permissions with `metadata(sibling, -1, permissions)`, and published with `publish(sibling, target, replace = true)`;
-- `publish` failing because the server lacks posix-rename removes the sibling and falls back to writing in place.
+- **Amended (Plan B):** a read-only target is refused (`writable`). The sibling is created with `create(sibling, 0600)`, or `0666` for a missing target so the server's umask decides. It is then filled, given the target's permissions with `metadata(sibling, -1, permissions)`, and published with `publish(sibling, target, replace = true)`, or `replace = false` for a missing target;
+- `publish` reports a server without posix-rename as `AtomicMoveNotSupportedException`; `SafeWrite` then removes the sibling and falls back to writing in place.
 
 Being endpoint-generic, it is tested on `LocalEndpoint` and on SFTP against the existing test server.
 
@@ -307,7 +312,7 @@ Being endpoint-generic, it is tested on `LocalEndpoint` and on SFTP against the 
 
 - **Double-click or Enter** on exactly one entry:
   - a folder navigates, as today;
-  - a regular file opens in the Editor: a remote listing as a `RemoteDocument`, the local listing through `Editor.open(Path)`;
+  - a regular file opens in the Editor as a `RemoteDocument` (**Amended (Plan B):** the panel lists only remote hosts, so there is no local listing);
   - a link is resolved: a link to a folder navigates, a link to a regular file opens in the Editor.
 
   Without the Editor, a file does nothing and links behave as today.

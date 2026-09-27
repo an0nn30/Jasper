@@ -5,6 +5,9 @@ import dev.jasper.remote.trust.KnownHosts;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.attribute.FileTime;
 import java.time.Duration;
@@ -20,6 +23,7 @@ import org.apache.sshd.core.CoreModuleProperties;
 import org.apache.sshd.sftp.client.SftpClient;
 import org.apache.sshd.sftp.client.SftpVersionSelector;
 import org.apache.sshd.sftp.client.extensions.openssh.OpenSSHPosixRenameExtension;
+import org.apache.sshd.sftp.client.impl.DefaultCloseableHandle;
 import org.apache.sshd.sftp.client.impl.DefaultSftpClient;
 import org.apache.sshd.sftp.common.SftpConstants;
 import org.apache.sshd.sftp.common.SftpException;
@@ -76,10 +80,11 @@ public final class SftpEndpoint implements FileEndpoint {
         for (String part : text.split("/")) if (!part.isEmpty()) { at = FilePaths.child(at, part); directory(at); }
     }
     private FileEntry entry(String path, SftpClient.Attributes a) throws IOException {
+        boolean owner = a.getFlags().contains(SftpClient.Attribute.UidGid);
         return new FileEntry(FilePaths.name(path), a.isSymbolicLink() ? FileEntry.Kind.LINK : a.isDirectory() ? FileEntry.Kind.DIRECTORY
             : a.isRegularFile() ? FileEntry.Kind.FILE : FileEntry.Kind.SPECIAL, a.getSize(),
             a.getModifyTime() == null ? -1 : a.getModifyTime().toMillis(), a.getFlags().contains(SftpClient.Attribute.Perms) ? a.getPermissions() & 0777 : -1,
-            a.isSymbolicLink() ? client.readLink(path) : "");
+            a.isSymbolicLink() ? client.readLink(path) : "", "", owner ? a.getUserId() : -1, owner ? a.getGroupId() : -1);
     }
     @Override public FileEntry stat(String text) throws IOException { String path = path(text); ancestors(FilePaths.parent(path)); return entry(path, attributes(path)); }
     @Override public void list(String text, Consumer<FileEntry> visitor) throws IOException {
@@ -178,6 +183,40 @@ public final class SftpEndpoint implements FileEndpoint {
         if (offset < 0) throw new IOException("Negative offset");
         var handle = exclusive ? file(text, SftpClient.OpenMode.Write, SftpClient.OpenMode.Create, SftpClient.OpenMode.Exclusive)
             : file(text, SftpClient.OpenMode.Write);
+        return writer(handle, offset);
+    }
+    @Override public WriteHandle create(String text, int permissions) throws IOException {
+        String path = path(text); ancestors(FilePaths.parent(path));
+        // MINA's open() sends no attributes, so the mode travels in a hand-built SSH_FXP_OPEN and applies as the file is created.
+        var request = new ByteArrayBuffer();
+        request.putString(path);
+        request.putInt(SftpConstants.SSH_FXF_WRITE | SftpConstants.SSH_FXF_CREAT | SftpConstants.SSH_FXF_EXCL);
+        request.putInt(SftpConstants.SSH_FILEXFER_ATTR_PERMISSIONS);
+        request.putInt(permissions & 0777);
+        int id = client.send(SftpConstants.SSH_FXP_OPEN, request);
+        check(); Buffer reply = client.receive(id, timeout);
+        if (reply == null) throw new SocketTimeoutException("Timed out waiting for SFTP open");
+        if (reply.available() < 9) throw new IOException("Truncated SFTP response");
+        int length = reply.getInt(); int type = reply.getUByte(); int answered = reply.getInt();
+        if (length != reply.available() + 5 || answered != id) throw new IOException("Invalid SFTP response identity");
+        if (type == SftpConstants.SSH_FXP_STATUS) {
+            int code = status(reply);
+            String reason = reply.available() >= 4 ? reply.getString() : "";
+            throw switch (code) {
+                case SftpConstants.SSH_FX_FILE_ALREADY_EXISTS -> new FileAlreadyExistsException(path);
+                case SftpConstants.SSH_FX_NO_SUCH_FILE, SftpConstants.SSH_FX_NO_SUCH_PATH -> new NoSuchFileException(path);
+                case SftpConstants.SSH_FX_PERMISSION_DENIED -> new AccessDeniedException(path);
+                default -> new SftpException(code, reason.isEmpty() ? "SFTP open failed" : reason);
+            };
+        }
+        if (type != SftpConstants.SSH_FXP_HANDLE) throw new IOException("Unexpected SFTP response type");
+        return writer(new DefaultCloseableHandle(client, path, reply.getBytes()), 0);
+    }
+    @Override public boolean writable(String text) throws IOException {
+        try { file(text, SftpClient.OpenMode.Write).close(); return true; }
+        catch (SftpException refused) { if (refused.getStatus() == SftpConstants.SSH_FX_PERMISSION_DENIED) return false; throw refused; }
+    }
+    private WriteHandle writer(SftpClient.CloseableHandle handle, long offset) {
         return new WriteHandle() {
             final ArrayDeque<Pending> pending = new ArrayDeque<>();
             long next = offset, confirmed = offset;
@@ -236,7 +275,7 @@ public final class SftpEndpoint implements FileEndpoint {
         if (!replace) client.rename(from, to);
         else {
             var extension = client.getExtension(OpenSSHPosixRenameExtension.class);
-            if (extension == null || !extension.isSupported()) throw new IOException("Server does not support atomic replacement");
+            if (extension == null || !extension.isSupported()) throw new AtomicMoveNotSupportedException(from, to, "Server does not support atomic replacement");
             extension.posixRename(from, to);
         }
     }
