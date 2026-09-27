@@ -30,6 +30,7 @@ class EditorWindowTest {
     private final AtomicReference<EditorSettings> settings = new AtomicReference<>(new EditorSettings("Monospaced", 13, 4, false, 1));
     private EditorWindow window;
     private boolean windowClosed;
+    private Runnable duringWait = () -> { };
 
     @BeforeEach void open() {
         Languages.register();
@@ -37,7 +38,7 @@ class EditorWindowTest {
         PluginContext context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
         var environment = new EditorEnvironment(context, Runnable::run,
             owner -> question -> { asked.add(question); return answers.isEmpty() ? question.dismissed() : answers.removeFirst(); },
-            owner -> (message, saves) -> { asked.add(new Question("Wait", message, List.of("OK"))); drain(); return saves.getNow(false); },
+            owner -> (message, saves) -> { asked.add(new Question("Wait", message, List.of("OK"))); duringWait.run(); drain(); return saves.getNow(false); },
             settings::get, false);
         window = new EditorWindow(environment, () -> windowClosed = true);
     }
@@ -150,6 +151,49 @@ class EditorWindowTest {
         assertThat(tab.session().saving()).isTrue();
         assertThat(host.requestQuit()).as("waits for the running save and asks nothing").isTrue();
         assertThat(asked).extracting(Question::message).containsExactly("Saving 1 file…");
+        assertThat(Files.readString(file)).isEqualTo("a = 2\n");
+    }
+
+    @Test void closingATabWhoseSaveFinishedAsksAboutEditsMadeAfterItStarted() throws Exception {
+        Path file = file("config.toml", "a = 1\n");
+        EditorTab tab = opened(file);
+        tab.area().setText("a = 2\n");
+        window.save();
+        tab.area().setText("a = 3\n");
+        window.closeCurrent();
+        drain();
+        assertThat(asked.getLast()).isEqualTo(new Question("Unsaved changes", "Save changes to config.toml?", List.of("Save", "Don't Save", "Cancel")));
+        assertThat(window.sessions()).as("Cancel is the default dismissal").hasSize(1);
+        assertThat(Files.readString(file)).isEqualTo("a = 2\n");
+    }
+
+    @Test void waitingForRunningSavesDoesNotSilentlySaveEditsMadeAfterTheyFinish() throws Exception {
+        Path a = file("a.toml", "a = 1\n");
+        Path b = file("b.toml", "b = 1\n");
+        opened(a);
+        opened(b);
+        window.openLocal(a);
+        EditorTab tabA = window.selected().orElseThrow();
+        tabA.area().setText("a = 2\n");
+        window.save();
+        window.openLocal(b);
+        EditorTab tabB = window.selected().orElseThrow();
+        tabB.area().setText("b = 2\n");
+        window.save();
+        tabB.area().setText("b = 3\n");
+        assertThat(host.requestQuit()).isFalse();
+        assertThat(asked).extracting(Question::message).containsExactly("Saving 2 files…", "b.toml has unsaved changes.");
+        assertThat(Files.readString(b)).isEqualTo("b = 2\n");
+    }
+
+    @Test void savingAllWaitsThenAsksAgainAboutEditsMadeDuringTheWait() throws Exception {
+        Path file = file("config.toml", "a = 1\n");
+        EditorTab tab = opened(file);
+        tab.area().setText("a = 2\n");
+        answers.add("Save All");
+        duringWait = () -> tab.area().setText("a = 3\n");
+        assertThat(host.requestQuit()).isFalse();
+        assertThat(asked).extracting(Question::title).filteredOn("Unsaved changes"::equals).hasSize(2);
         assertThat(Files.readString(file)).isEqualTo("a = 2\n");
     }
 

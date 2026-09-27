@@ -182,13 +182,15 @@ public final class EditorWindow {
         DocumentSession session = tab.session();
         Optional<CompletableFuture<Boolean>> pending = session.pendingSave();
         if (pending.isPresent()) {
-            pending.get().thenAccept(saved -> environment.ui().execute(() -> { if (saved) remove(tab); }));
+            // Re-enters closeTab rather than removing outright: DocumentSession adopts the save's snapshot as
+            // the saved text, so edits typed during the save leave the tab dirty, and closing must ask again.
+            pending.get().thenAccept(saved -> environment.ui().execute(() -> { if (saved) closeTab(tab); }));
             return;
         }
         if (session.dirty()) {
             String answer = ask.apply(new Question("Unsaved changes", "Save changes to " + session.name() + "?", List.of("Save", "Don't Save", "Cancel")));
             if ("Don't Save".equals(answer)) remove(tab);
-            else if ("Save".equals(answer)) saveSession(session).thenAccept(saved -> environment.ui().execute(() -> { if (saved) remove(tab); }));
+            else if ("Save".equals(answer)) saveSession(session).thenAccept(saved -> environment.ui().execute(() -> { if (saved) closeTab(tab); }));
             return;
         }
         remove(tab);
@@ -245,17 +247,28 @@ public final class EditorWindow {
 
     /**
      * The closing guard (spec 2.3), asked when the window closes and when Jasper quits: waits for running saves,
-     * then asks about unsaved tabs, and saves them all when asked to.
+     * then asks about unsaved tabs, and saves them all when asked to. Re-checks after each wait, since edits made
+     * during it can leave a tab saving again or dirty again, rather than trusting a single pass to still hold.
      */
     boolean mayClose() {
-        List<DocumentSession> running = model.sessions().stream().filter(DocumentSession::saving).toList();
-        if (!running.isEmpty() && !await.apply(saving(running.size()), saveSessions(running))) return false;
-        List<DocumentSession> dirty = model.sessions().stream().filter(DocumentSession::dirty).toList();
-        if (dirty.isEmpty()) return true;
-        String answer = ask.apply(new Question("Unsaved changes", unsaved(dirty), List.of("Save All", "Discard", "Cancel")));
-        if ("Discard".equals(answer)) return true;
-        if (!"Save All".equals(answer)) return false;
-        return await.apply(saving(dirty.size()), saveSessions(dirty));
+        while (true) {
+            List<DocumentSession> running = model.sessions().stream().filter(DocumentSession::saving).toList();
+            if (!running.isEmpty()) {
+                // Waits only on the saves already in flight; it starts none of its own, so a tab whose save
+                // finishes and is then edited again is not silently written without asking.
+                List<CompletableFuture<Boolean>> inFlight = running.stream().map(session -> session.pendingSave().orElseThrow()).toList();
+                if (!await.apply(saving(running.size()), allSucceeded(inFlight))) return false;
+                continue;
+            }
+            List<DocumentSession> dirty = model.sessions().stream().filter(DocumentSession::dirty).toList();
+            if (dirty.isEmpty()) return true;
+            String answer = ask.apply(new Question("Unsaved changes", unsaved(dirty), List.of("Save All", "Discard", "Cancel")));
+            if ("Discard".equals(answer)) return true;
+            if (!"Save All".equals(answer)) return false;
+            if (!await.apply(saving(dirty.size()), saveSessions(dirty))) return false;
+            // Loops back rather than returning true: edits typed during the non-modal wait may have left a
+            // tab dirty again, and that must be asked about too.
+        }
     }
 
     private boolean closeCommand() {
@@ -298,6 +311,14 @@ public final class EditorWindow {
                 return step;
             });
         return chain;
+    }
+
+    /** Combines saves already in flight without starting any new ones; true only when every one succeeds. */
+    private static CompletableFuture<Boolean> allSucceeded(List<CompletableFuture<Boolean>> saves) {
+        CompletableFuture<Boolean> combined = CompletableFuture.completedFuture(true);
+        for (CompletableFuture<Boolean> save : saves)
+            combined = combined.thenCombine(save.handle((saved, error) -> error == null && Boolean.TRUE.equals(saved)), (a, b) -> a && b);
+        return combined;
     }
 
     private void add(DocumentSession session) {
