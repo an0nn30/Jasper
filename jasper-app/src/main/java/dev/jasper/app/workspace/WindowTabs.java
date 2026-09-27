@@ -12,7 +12,7 @@ import javax.swing.*;
 
 /** IntelliJ-style editor tabs over WindowContent's retained Swing selection model. */
 final class WindowTabs extends JPanel implements AutoCloseable {
-    private static final int MIN_TAB = 80, MAX_TAB = 240, LIST_WIDTH = 24, EDGE = 8, GAP = 6, UNDERLINE = 2;
+    private static final int MIN_TAB = 80, MAX_TAB = 240, LIST_WIDTH = 24, EDGE = 8, GAP = 6;
     /** Titles come from remote programs; tooltips and the tab list show at most this many characters. */
     private static final int TITLE_LIMIT = 200;
     private final WindowContent owner;
@@ -220,14 +220,14 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             String shortcut = owner.tabShortcut(order.indexOf(tab));
             String tip = capped(text);
             select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
-            Color surface = owner.theme().palette().background();
+            Color surface = UIManager.getColor("Jasper.tabSelectedBackground");
             select.setIcon(tab == selected ? AppIcons.forBackground(tab.icon(), surface) : tab.icon());
             close.setIcon(tab == selected ? AppIcons.forBackground(AppIcons.named("CLOSE"), surface) : AppIcons.named("CLOSE"));
             close.setRolloverIcon(tab == selected ? AppIcons.forBackground(AppIcons.named("CLOSE_HOVERED"), surface)
                 : AppIcons.named("CLOSE_HOVERED"));
             select.setSelected(tab == selected);
             select.setFont(SystemFonts.ui(Font.PLAIN, 13f));
-            select.setForeground(tab == selected ? owner.theme().palette().foreground()
+            select.setForeground(tab == selected ? UIManager.getColor("Jasper.tabSelectedForeground")
                 : UIManager.getColor(!active ? "Jasper.titleInactiveForeground" : "Jasper.titleForeground"));
             close.setVisible(tab == selected || hovered);
             return retitled;
@@ -241,16 +241,25 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         }
 
         @Override protected void paintComponent(Graphics graphics) {
-            if (tab == selected || hovered) {
-                graphics.setColor(tab == selected ? owner.theme().palette().background() : UIManager.getColor("Jasper.tabHoverBackground"));
-                graphics.fillRect(0, 0, getWidth(), getHeight());
-            }
             super.paintComponent(graphics);
-            if (tab == selected) {
-                int line = UIScale.scale(UNDERLINE);
-                graphics.setColor(UIManager.getColor(active ? "Jasper.tabUnderline" : "Jasper.tabUnderlineInactive"));
-                graphics.fillRect(0, getHeight() - line, getWidth(), line);
-            }
+            if (tab != selected && !hovered) return;
+            var g = (Graphics2D) graphics.create();
+            try {
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                float stroke = UIScale.scale(1f), horizontal = UIScale.scale(2f);
+                float vertical = Math.min(UIScale.scale(4f), Math.max(0, (getHeight() - UIScale.scale(20f)) / 2));
+                float width = getWidth() - 2 * horizontal - stroke, height = getHeight() - 2 * vertical - stroke;
+                if (width <= 0 || height <= 0) return;
+                var shape = new java.awt.geom.RoundRectangle2D.Float(horizontal + stroke / 2, vertical + stroke / 2,
+                    width, height, UIScale.scale(8f), UIScale.scale(8f));
+                g.setColor(UIManager.getColor(tab == selected ? "Jasper.tabSelectedBackground" : "Jasper.tabHoverBackground"));
+                g.fill(shape);
+                if (tab == selected) {
+                    g.setStroke(new BasicStroke(stroke));
+                    g.setColor(UIManager.getColor(active ? "Jasper.tabSelectedBorder" : "Jasper.tabSelectedBorderInactive"));
+                    g.draw(shape);
+                }
+            } finally { g.dispose(); }
         }
     }
 }

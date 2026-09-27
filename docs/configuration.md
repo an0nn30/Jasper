@@ -246,9 +246,10 @@ Program titles and manual tab names do not replace this label. A remote OSC 7 re
 from a local shell can also supply remote context; Jasper does not infer SSH hosts by
 parsing command text.
 
-Tabs sit directly beneath the header. The selected tab shares its terminal's background,
-with an ice-blue indicator in Jasper Dark. Narrow windows scroll overflowing tabs, and
-keyboard selection reveals the selected tab. Tab height remains configurable (30 logical
+Tabs sit directly beneath the header. The selected tab has an inset rounded fill and
+thin outline from the active UI theme, with a muted blue selection in Jasper Dark.
+Independent terminal colors do not change the tab's fill, text or icon variant. Narrow
+windows scroll overflowing tabs, and keyboard selection reveals the selected tab. Tab height remains configurable (30 logical
 pixels by default, 20–72).
 
 Split and contributed dropdowns such as Sessions retain labels in `icons_and_labels` mode;

@@ -79,24 +79,32 @@ class WindowTabsTest {
         });
     }
 
-    @Test void selectedTabPaintsAnAccentUnderlineThatGreysWhenInactiveAndFollowsTheTheme() throws Exception {
+    @Test void selectedTabHasAnInsetRoundedThemeFillAndOutline() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
-            var strip = owner.windowTabs(); layout(strip, 800, 38);
-            Container selected = named(strip, "select:second").getParent();
-            Container other = named(strip, "select:first").getParent();
-            assertThat(pixel(selected, 36)).isEqualTo(UIManager.getColor("Jasper.tabUnderline"));
-            assertThat(pixel(selected, 4)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
-            assertThat(pixel(other, 36)).isNotEqualTo(UIManager.getColor("Jasper.tabUnderline"));
-            owner.setActive(false);
-            assertThat(pixel(selected, 36)).isEqualTo(UIManager.getColor("Jasper.tabUnderlineInactive"));
-            owner.setActive(true); owner.selectTheme(Theme.LIGHT); layout(strip, 800, 38);
-            assertThat(pixel(selected, 36)).isEqualTo(UIManager.getColor("Jasper.tabUnderline"));
+            for (var theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+                owner.selectTheme(theme);
+                var strip = owner.windowTabs(); layout(strip, 800, 38);
+                Container selected = named(strip, "select:second").getParent();
+                int middle = selected.getWidth() / 2;
+                assertThat(pixel(selected, middle, 4)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBorder"));
+                assertThat(pixel(selected, middle, 6)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
+                for (var point : java.util.List.of(new Point(2, 4), new Point(middle, 0), new Point(middle, 37)))
+                    assertThat(pixel(selected, point.x, point.y)).as("outside the rounded selection")
+                        .isEqualTo(UIManager.getColor("ToolWindow.background"));
+                owner.setActive(false);
+                assertThat(pixel(selected, middle, 4)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBorderInactive"));
+                owner.setActive(true);
+                try {
+                    var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
+                    javax.imageio.ImageIO.write(render(strip), "png", output.resolve("rounded-tabs-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
+                } catch (java.io.IOException error) { throw new java.io.UncheckedIOException(error); }
+            }
         });
     }
 
-    @Test void selectedTabTracksIndependentTerminalColorsAndKeepsReadableText() throws Exception {
+    @Test void selectedTabKeepsUiThemeColorsWithIndependentTerminalPalettes() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.newTab(HOME); owner.currentTab().rename("selected"); owner.update();
@@ -106,10 +114,10 @@ class WindowTabsTest {
                     owner.selectTerminalColors(colors);
                     var strip = owner.windowTabs(); layout(strip, 800, 38);
                     JComponent label = named(strip, "select:selected");
-                    assertThat(pixel(label.getParent(), 4)).isEqualTo(owner.theme().palette().background());
-                    assertThat(label.getForeground()).isEqualTo(owner.theme().palette().foreground());
+                    assertThat(pixel(label.getParent(), label.getParent().getWidth() / 2, 6)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
+                    assertThat(label.getForeground()).isEqualTo(UIManager.getColor("Jasper.tabSelectedForeground"));
                     owner.setActive(false);
-                    assertThat(label.getForeground()).isEqualTo(owner.theme().palette().foreground());
+                    assertThat(label.getForeground()).isEqualTo(UIManager.getColor("Jasper.tabSelectedForeground"));
                     owner.setActive(true);
                 }
             }
@@ -256,10 +264,12 @@ class WindowTabsTest {
     private static void mouse(Component component, int id, int x, int y, int button) {
         component.dispatchEvent(new MouseEvent(component, id, 1, 0, x, y, 1, false, button));
     }
-    private static Color pixel(Container entry, int y) {
+    private static Color pixel(Container entry, int x, int y) { return new Color(render(entry).getRGB(x, y)); }
+    private static BufferedImage render(Container entry) {
         var image = new BufferedImage(entry.getWidth(), entry.getHeight(), BufferedImage.TYPE_INT_RGB);
         var g = image.createGraphics();
+        g.setColor(UIManager.getColor("ToolWindow.background")); g.fillRect(0, 0, image.getWidth(), image.getHeight());
         try { entry.paint(g); } finally { g.dispose(); }
-        return new Color(image.getRGB(2, y));
+        return image;
     }
 }

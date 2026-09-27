@@ -2,6 +2,19 @@
 
 ## Current state — 2026-09-23
 
+- **Rounded selected workspace tabs** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  replaced the terminal-colored tab and underline with an inset 4px rounded selection
+  and 1px outline, matching the user's IntelliJ reference. Fill, text, border and icon
+  variants follow the active UI theme independently of terminal colors. Jasper Dark's
+  muted blue fill and border live in the scheme JSON; other themes derive outline
+  defaults from their existing active/inactive tab accent keys, preserving explicit
+  overrides. Hover uses the same rounded geometry; layout and hit targets are unchanged.
+  Failing-before/passing-after coverage includes rounded corners, insets, active/inactive
+  outline, live themes and independent terminal palettes. Dark/light headless previews
+  inspected; independent review is clean. `check :jasper-app:packageDist` passed:
+  2,041 tests, zero failures/errors, five skips; rebuilt DMG and package signature/payload
+  verification passed. No GUI launched.
+
 - **Configurable unified title-bar height** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   `window.toolbar_height` and View → Toolbar height now size the entire macOS header,
   removing its fixed 42px floor. Default is 30px, with bounds of 28–64 logical pixels;

@@ -306,8 +306,8 @@ The palette uses the same geometry for selections, hover and scope highlights.
 
 
 Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
-workspace title bar, tab strip and status bar have no edge strokes. The selected-tab
-underline remains. Workspace-region splitters remove their border/grip after every UI
+workspace title bar, tab strip and status bar have no edge strokes. The selected tab
+uses an inset rounded selection instead of an underline. Workspace-region splitters remove their border/grip after every UI
 update; terminal-internal splits keep their existing visible indicators. The standalone
 dialog title bar retains its separator. `GraphiteChromeTest` writes headless full-window
 previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
@@ -329,3 +329,14 @@ reports take precedence and stop probing. Reconnect clears the hint, and old att
 cannot update the replacement session. The existing host `followDirectory` setting,
 dedicated connections, OS support and failure limits still apply. `PathBreadcrumbsTest`
 saves light/dark local/remote/narrow previews under `build/render-preview`.
+
+
+Selected workspace tabs read `Jasper.tabSelectedBackground` and
+`Jasper.tabSelectedForeground` from the active UI theme; host icons choose their variant
+against that fill. `Jasper.tabSelectedBorder` and `Jasper.tabSelectedBorderInactive`
+derive from the theme's active/inactive underline colors unless explicitly supplied.
+Jasper Dark defines its fill and outline in the scheme JSON. `WindowTabs` paints a 4px
+radius and 1px outline, with 2px horizontal and up to 4px vertical insets; short tabs
+reduce the vertical inset to preserve space for labels/icons. Hover uses the same
+rounded shape. Geometry scales with UI scale, while hit targets and tab layout stay
+unchanged. `WindowTabsTest` saves dark/light previews under `build/render-preview`.

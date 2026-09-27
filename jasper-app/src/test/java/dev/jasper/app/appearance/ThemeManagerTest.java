@@ -41,7 +41,7 @@ class ThemeManagerTest {
         "Jasper.chromeForeground", "#d5dee5", "Jasper.configErrorForeground", "#ff858d", "Jasper.configSuccessForeground", "#a8c58d",
         "Jasper.configWarningForeground", "#e5c07b", "Jasper.findErrorBackground", "#5c3b3b", "Jasper.mutedForeground", "#a7b2bf",
         "Jasper.runningForeground", "#a8c58d", "Jasper.splitDivider", "#77808f", "Jasper.tabHoverBackground", "#2c3036",
-        "Jasper.tabSelectedBackground", "#191c20", "Jasper.tabSelectedForeground", "#d5dee5", "Jasper.tabUnderline", "#8eb8d2",
+        "Jasper.tabSelectedBackground", "#293d51", "Jasper.tabSelectedForeground", "#d5dee5", "Jasper.tabUnderline", "#8eb8d2",
         "Jasper.tabUnderlineInactive", "#747a80", "Jasper.titleBackground", "#25292e", "Jasper.titleForeground", "#a7b2bf",
         "Jasper.titleInactiveForeground", "#a7b2bf", "Jasper.titleSeparator", "#343a42",
         // FlatLaf builds IntelliJ dark themes on its Darcula base; these keep FlatLaf Dark's values.
