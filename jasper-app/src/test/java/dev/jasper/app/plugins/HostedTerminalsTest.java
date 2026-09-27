@@ -160,7 +160,7 @@ class HostedTerminalsTest {
         assertThat(opened.tab().id()).isNotEqualTo(tab);
         PaneHandle split = terminals.split(terminals.paneHandle(only), Direction.DOWN, OpenRequest.local()).orElseThrow();
         assertThat(split.tab().id()).isEqualTo(tab);
-        assertThat(fixture.opened()).containsExactly("tab|" + window + "|/tmp", "split|" + only + "|DOWN|-");
+        assertThat(fixture.opened()).containsExactly("tab|" + window + "|" + Path.of("/tmp").toAbsolutePath(), "split|" + only + "|DOWN|-");
         assertThat(terminals.split(terminals.paneHandle(UUID.randomUUID()), Direction.RIGHT, OpenRequest.local())).isEmpty();
     }
 }

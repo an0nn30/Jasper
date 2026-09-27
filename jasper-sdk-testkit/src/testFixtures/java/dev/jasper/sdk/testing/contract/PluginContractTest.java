@@ -670,7 +670,7 @@ public abstract class PluginContractTest {
             PaneHandle split = terminals.split(terminals.pane(only).orElseThrow(), Direction.DOWN, OpenRequest.local()).orElseThrow();
             assertThat(split.tab().id()).isEqualTo(tab);
         });
-        assertThat(h.openRequests()).containsExactly("tab|" + window + "|/tmp", "split|" + only + "|DOWN|-");
+        assertThat(h.openRequests()).containsExactly("tab|" + window + "|" + Path.of("/tmp").toAbsolutePath(), "split|" + only + "|DOWN|-");
     }
 
     @Test void actionContextsCarryHandlesOfTheInvokingPlugin() {
