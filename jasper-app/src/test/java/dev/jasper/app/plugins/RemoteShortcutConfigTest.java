@@ -70,10 +70,9 @@ class RemoteShortcutConfigTest {
             assertThat(bindings.strokeFor(HOSTS)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
             assertThat(bindings.strokeFor(CONNECT)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
             assertThat(bindings.idFor(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).isEmpty();
-            assertThat(contributions.menus()).anySatisfy(menu -> {
-                assertThat(menu.target()).isEqualTo(MenuTarget.standard(MenuTarget.Slot.VIEW));
-                assertThat(menu.entries()).contains(new MenuEntry.Item(HOSTS));
-            });
+            assertThat(contributions.menus()).filteredOn(menu -> menu.target().equals(MenuTarget.standard(MenuTarget.Slot.VIEW)))
+                .as("View > Tools toggles the panel; Remote adds no View item of its own")
+                .allSatisfy(menu -> assertThat(menu.entries()).doesNotContain(new MenuEntry.Item(HOSTS)));
             assertThat(contributions.menus()).anySatisfy(menu -> {
                 assertThat(menu.target().key()).isEqualTo("dev.jasper.remote.menu");
                 assertThat(menu.entries()).contains(new MenuEntry.Item(HOSTS), new MenuEntry.Item(CONNECT));

@@ -142,7 +142,7 @@ outside automatic branding. No additional SDK factory or dependency is required.
 A panel is a Swing component in the left, right or bottom region of every terminal window.
 Register it once; Jasper asks your factory for one instance per window, the first time the
 panel is shown there, and gives the panel a rail icon, a `<panel id>.toggle` action and a
-View → Panels entry. One panel shows per region; the user can move a panel to another region
+View → Tools entry, so don't add a View menu item of your own that toggles it. One panel shows per region; the user can move a panel to another region
 from its rail icon, and Jasper remembers where it was and how big.
 
 A rail button runs one of your actions. A plugin window is a frame Jasper builds: icon, macOS
@@ -448,7 +448,7 @@ try (var host = new FakePluginHost()) {
 `host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.
 `host.panels()`, `host.openPanel(id, windowId)`, `host.rail()`, `host.windows()` and
 `host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
-`<panel id>.toggle` action or View → Panels menu.
+`<panel id>.toggle` action or View → Tools menu.
 `host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `activateTerminalWindow`,
 `focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,

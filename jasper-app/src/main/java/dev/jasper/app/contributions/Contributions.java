@@ -209,7 +209,7 @@ public final class Contributions {
         changed(Kind.PANELS);
     }
 
-    /** One app-owned View section, "Panels", listing every panel's toggle; gone when there are no panels. */
+    /** One app-owned View section, "Tools", listing every panel's toggle; gone when there are no panels. */
     private void rebuildPanelsMenu() {
         if (panels.isEmpty()) {
             if (panelsMenu != null) { panelsMenu.close(); panelsMenu = null; }
@@ -218,7 +218,7 @@ public final class Contributions {
         if (panelsMenu == null) panelsMenu = addMenuSection(MenuTarget.standard(MenuTarget.Slot.VIEW));
         List<MenuEntry> toggles = new ArrayList<>();
         for (String id : panels.keySet()) toggles.add(new MenuEntry.Item(id + ".toggle"));
-        panelsMenu.set(List.of(new MenuEntry.Submenu("Panels", toggles)));
+        panelsMenu.set(List.of(new MenuEntry.Submenu("Tools", toggles)));
     }
 
     void remove(ActionEntry entry) { if (actions.remove(entry.id(), entry)) changed(Kind.ACTIONS); }

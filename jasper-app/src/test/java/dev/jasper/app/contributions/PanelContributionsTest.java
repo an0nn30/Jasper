@@ -33,7 +33,7 @@ class PanelContributionsTest {
         assertThat(requests).containsExactly(new Contributions.PanelRequest(window, "dev.x.hosts", Contributions.PanelRequest.Op.TOGGLE));
         assertThat(model.menus()).singleElement().satisfies(section -> {
             assertThat(section.target()).isEqualTo(MenuTarget.standard(MenuTarget.Slot.VIEW));
-            assertThat(section.entries()).containsExactly(new MenuEntry.Submenu("Panels", List.of(new MenuEntry.Item("dev.x.hosts.toggle"))));
+            assertThat(section.entries()).containsExactly(new MenuEntry.Submenu("Tools", List.of(new MenuEntry.Item("dev.x.hosts.toggle"))));
         });
 
         hosts.close();

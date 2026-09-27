@@ -92,6 +92,9 @@
 - **Window defaults (2026-09-26, user's choice):** new windows open at 100 × 35 cells (was 150 × 45,
   which superseded the parent spec's grid ruling below); the rail defaults to its 28 px minimum and the
   status bar to 24 px; the toolbar stays 30 px. `buddy.enabled` now defaults to false (Jasper is opt-in).
+- **View → Tools:** the app's per-panel toggles submenu is now titled Tools (was Panels). Remote no
+  longer adds its own View items (SFTP panel, SSH Hosts), which duplicated those toggles; its actions
+  stay registered for their shortcuts, the SSH menu, the status item and the palette.
 - **Rail width:** `window.rail_width` is 28–64 logical pixels, default 28, clamped the same way.
   Rail buttons stay square at width − 6, separators at width − 14. View → Rail width… and the
   `view.rail_width` command set a session-only width, like Tab height….
