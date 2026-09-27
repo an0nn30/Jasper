@@ -1,7 +1,7 @@
 # App-owned workspace tabs and Editor integration
 
-Status: Draft for user review. Main-app file tabs by default, with separate windows optional,
-was confirmed on 2026-09-27. The remaining contracts below are proposed; no product code is changed.
+Status: Approved on 2026-09-27. User requested implementation using native inline execution,
+with no additional plan-review checkpoint. Main-app file tabs are the default; separate windows are optional.
 
 ## Outcome
 
