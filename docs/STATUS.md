@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-23
 
+- **SSH group folder icons** (`codex/intellij-new-icons`, 2026-09-27):
+  replaced the text disclosure triangles with vendored `nodes/folder` for collapsed
+  groups and `general/open` for expanded groups. Remote supplies icons through the SDK
+  appearance catalog, retaining light/dark variants. Search-revealed groups show the open
+  icon without changing saved collapse state; group labels, counts and actions remain.
+  Regression failed before the change and now verifies both states plus search reveal.
+  Independent review is clean. `check :jasper-app:packageDist` passed: 2,061 tests,
+  zero failures/errors, five skips; package verification passed and DMG rebuilt.
+  No GUI launched.
+
 - **Terminal corner repaint repair** (`codex/intellij-new-icons`, 2026-09-27):
   all four outer terminal corners retain the shared 8px radius. The top corners could
   appear square because Swing skipped the rounded host background for dirty rectangles

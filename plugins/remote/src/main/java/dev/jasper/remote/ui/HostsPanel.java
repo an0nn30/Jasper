@@ -2,6 +2,7 @@ package dev.jasper.remote.ui;
 
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.sdk.Subscription;
+import dev.jasper.sdk.ui.BundledIcon;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Font;
@@ -45,6 +46,7 @@ public final class HostsPanel extends JPanel {
     final JButton connect = new JButton("Connect"), edit = new JButton("Edit"), add = new JButton("+"), importButton = new JButton("Import");
     final JLabel empty = new JLabel("No hosts yet — Add or Import from ~/.ssh/config");
     private final Actions actions;
+    private final Function<BundledIcon, javax.swing.Icon> icons;
     private final DefaultListModel<HostRows.Row> model = new DefaultListModel<>();
     private final Set<String> collapsed = new HashSet<>();
     private final List<Runnable> collapseListeners = new ArrayList<>();
@@ -69,7 +71,12 @@ public final class HostsPanel extends JPanel {
     }
 
     public HostsPanel(Actions actions) {
+        this(actions, name -> javax.swing.UIManager.getIcon(name == BundledIcon.NODES_FOLDER ? "Tree.closedIcon" : "Tree.openIcon"));
+    }
+
+    public HostsPanel(Actions actions, Function<BundledIcon, javax.swing.Icon> icons) {
         super(new BorderLayout(0, 6));
+        this.icons = java.util.Objects.requireNonNull(icons);
         this.actions = actions; this.activate = actions.connect();
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         var header = new JPanel();
@@ -271,7 +278,10 @@ public final class HostsPanel extends JPanel {
             label.setFont(owner.getFont().deriveFont(Font.BOLD));
             label.setBorder(BorderFactory.createEmptyBorder(5, 4, 4, 4));
             if (value instanceof HostRows.Group group) {
-                label.setText((group.collapsed() ? "▸  " : "▾  ") + group.name() + "   " + group.count());
+                label.setIcon(icons.apply(group.collapsed() ? BundledIcon.NODES_FOLDER : BundledIcon.GENERAL_OPEN));
+                label.setIconTextGap(6);
+                label.setText(group.name() + "   " + group.count());
+                label.getAccessibleContext().setAccessibleDescription(group.collapsed() ? "Collapsed group" : "Expanded group");
                 if (group.name().equals(defaultGroup)) label.setToolTipText("Right-click to rename this group");
             } else if (value instanceof HostRows.Error error) label.setText(error.message());
             return label;

@@ -503,7 +503,7 @@ public class RemotePlugin implements Plugin {
         WindowHandle window = host.window();
         var panel = new HostsPanel(new HostsPanel.Actions(h -> openHost(window, h), h -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitHost(pane, h)),
             editing -> editHost(window, editing), h -> reportMutation(store.put(duplicate(h))), h -> deleteHost(window, h),
-            (h, favorite) -> reportMutation(store.put(h.withFavorite(favorite))), () -> importConfig(window)));
+            (h, favorite) -> reportMutation(store.put(h.withFavorite(favorite))), () -> importConfig(window)), context.appearance()::icon);
         panel.setCredentialLabels(this::credentialLabel);
         panel.setDefaultGroup(panelState.defaultGroup());
         panel.onRenameDefaultGroup(() -> renameDefaultGroup(window));
