@@ -109,7 +109,7 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
   `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.8.0, <0.9"`
-  (Remote `>=0.8.1`, for `PanelSpec.withToggleActionId`).
+  (Remote `>=0.8.1`, for `PanelSpec.withToggleActionId`; Editor `>=0.8.2`).
   Jasper supplies IntelliJ-style artwork; plugins need no artwork. Returned icons are 16px.
   For custom artwork, draw a 16×16 SVG in the IntelliJ light palette (grey `#6E6E6E`, blue
   `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`) and load it with
@@ -373,6 +373,10 @@ A managed `Credential` exposes owned `keyBytes()` and no `keyPath()`; legacy pat
 keep their existing API. Always close credentials after use to clear their bytes and passphrases.
 The batch method has a default unsupported result for older API implementations. This extension
 belongs to Vault's exported API; it does not expose Vault internals through the Jasper SDK.
+
+The Editor (`plugins/editor`) is the worked example for an exported interface that the *caller*
+implements: `dev.jasper.editor.api.EditorDocument` is written by whoever supplies a file (Remote, for
+SFTP), while the Editor publishes `Editor` and calls the document's futures from the UI thread.
 
 <!-- example:pluginpalette -->
 ```java

@@ -2,7 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/editor-plugin` (the spec is committed there as `4d693c2f`).
+**Status:** Executed 2026-09-27 on branch claude/editor-plugin, subagent-driven (one implementer and one reviewer per task). Deviations from the task text, from the task reviews:
+- Task 1 (ruling): the testkit's `FakeWindow.closeCommand()` returns true for an already-closed window, matching `AuxiliarySurface.closeCommand()` (applied in Task 2).
+- Task 2 (review fix): `JasperApplication.quitNow()` quits without asking plugin windows; start-up rollback, a `--background` launch that cannot stay resident and the benchmark exit use it, while user quit/restart and a resident's retire request keep `quit()`.
+- Task 5 (review fix, replaces planning decision 4): the TOML lexer carries line state in private negative end-of-line token types `-(1 + depth*3 + kind)` (array depth and multi-line string kind), as spec §3.2 first proposed, so nested arrays spanning lines keep their depth; `getClosestStandardTokenTypeForInternalType` maps them back.
+- Task 6 (review fix): `LocalFiles.write` also writes in place when `Files.move` reports `AtomicMoveNotSupportedException` (spec §4.4's fourth trigger); untested like the owner-mismatch fallback.
+- Task 7 (review fixes): a reload whose text changed while its read was in flight keeps the text and shows the CHANGED banner; save and Save As cancel an in-flight read; reloads, Revert and banner Reload do nothing while a save runs; Save As during a pending save chains after it.
+- Task 8 (review fix): the watcher also catches unchecked exceptions from a stat, so polling never stops.
+- Task 11 (deviation and review fixes): `FindBar` validates a regular expression itself (RSyntaxTextArea swallows invalid patterns), compiling exactly what `SearchEngine` compiles (`\b…\b` with whole word); Escape is bound once on the bar, so it closes from any control in it.
+- Task 12 (ruling): a shared `Forms.bind(component, condition, stroke, name, action)` replaces near-identical key-binding helpers in `LanguagePicker` and `FindBar`.
+- Task 13 (ruling and review fixes): `EditorTab.menuItem(Command)` builds menu items for the right-click menu and the ⋯ menu; closing a tab after its save re-checks for edits typed during the save; the closing guard loops — it waits only on running saves, asks about what is still unsaved, and re-checks after Save All.
+
+Not done: plan B (SFTP editing through Remote), GUI acceptance (user-run), merge and push.
 
 **Goal:** A bundled Editor plugin that opens, edits and saves local text files in tabs inside one Editor window, built on RSyntaxTextArea, on top of SDK 0.8.2 (quit asks plugin windows, a Close Window command handler, a save-file chooser).
 
@@ -36,7 +47,7 @@
 1. **`onCloseCommand` is on `PluginWindow`, not `WindowSurface`.** Spec §1.4 names `WindowSurface`, but only plugin windows have a Close Window command; dialogs and overlays have none.
 2. **⌘W is never put in an input map.** The Editor relies only on the window's Close Window accelerator, which is present on every platform, through `onCloseCommand`. This avoids closing two tabs if both the screen menu and the key binding fired.
 3. **Unsaved-changes tracking compares the text with the saved text using `String.equals`.** Spec §4.3 says length and hash. Equality is exact, and `equals` checks the length first.
-4. **The TOML lexer carries state in the string token types themselves.** A line ending inside `"""` ends with `LITERAL_STRING_DOUBLE_QUOTE`, one inside `'''` with `LITERAL_CHAR`, and one inside a multi-line array with a zero-length `SEPARATOR`. This is how RSyntaxTextArea's own Python lexer carries `"""`; spec §3.2 said private negative types, which are unnecessary.
+4. **The TOML lexer carries state in the string token types themselves.** A line ending inside `"""` ends with `LITERAL_STRING_DOUBLE_QUOTE`, one inside `'''` with `LITERAL_CHAR`, and one inside a multi-line array with a zero-length `SEPARATOR`. This is how RSyntaxTextArea's own Python lexer carries `"""`; spec §3.2 said private negative types, which are unnecessary. Superseded during execution: see the Status banner (Task 5).
 5. **`EditorSettings` lives in `dev.jasper.editor.ui`,** not the root package, so the root package (which wires the UI) and `ui` do not form a cycle.
 6. **Selections keep token colours.** `TextArea.selectionForeground` is not applied, because RSyntaxTextArea draws token colours over the selection background unless told otherwise, which is IntelliJ's look. The gutter border uses the gutter background, so no border line shows.
 7. **Wrong-type settings detection:** a value is "present but wrong" when another accessor (`string`, `integer`, `bool`, `stringList`, `table`) sees it. A float such as `13.5` has no accessor and is treated as absent.

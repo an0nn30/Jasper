@@ -2,6 +2,14 @@
 
 ## Current state — 2026-09-23
 
+- **Editor plugin, plan A** (branch `claude/editor-plugin`, plan
+  `docs/superpowers/plans/2026-09-27-jasper-editor-plugin-a.md`, spec
+  `docs/superpowers/specs/2026-09-27-jasper-editor-plugin-design.md`): SDK 0.8.2 adds
+  `PluginWindow.onCloseCommand`, quit and restart asking plugin windows' closing guards, and
+  `Windows.chooseSaveFile`. The bundled Editor (`plugins/editor`, RSyntaxTextArea 3.6.0) opens, edits
+  and safely saves local files in tabs in one window, with a TOML lexer, conflict checks and outside-change
+  polling. Planning decisions and deviations are in the plan's header. Not done: plan B (SFTP editing
+  through Remote), GUI acceptance ([checklist](editor-verification.md), user-run), merge and push.
 - **Full-height rail** (branch `worktree-rail-full-height`, 2026-09-25): the tab strip now sits
   over the terminal deck inside `WorkspaceRegions`' center, so the rail and the left/right panels
   run from the toolbar to the status bar and the bottom panel sits under the terminal only.

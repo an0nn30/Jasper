@@ -32,7 +32,8 @@ var unlock = context.appearance().icon(IconName.UNLOCK);
 Import `dev.jasper.sdk.ui.IconName`. Plugins request only the meaning, without image paths.
 Icons are 16px, IntelliJ classic-UI SVG drawn as authored, with palette colours following
 the running theme. Bundled plugins declare `sdk = ">=0.8.0, <0.9"` (Remote `>=0.8.1`, for
-`PanelSpec.withToggleActionId`). Custom older hosts
+`PanelSpec.withToggleActionId`; Editor `>=0.8.2`, for `onCloseCommand`, quit guards and
+`chooseSaveFile`). Custom older hosts
 inherit UnsupportedOperationException for named requests until they implement the catalog.
 See the [catalog, size rules and testkit example](../docs/sdk-icons.md).
 
