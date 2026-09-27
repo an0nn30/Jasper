@@ -12,7 +12,7 @@
   - Editor operations run one at a time per connection on one SFTP channel (`EditChannels`).
   - The spec's sections 4.4, 6.1, 6.2 and 6.4 carry the Plan B amendments.
   - Deviations from the task text, from the task reviews: `SafeWrite` falls back to writing in place when the target's permissions are unknown (−1) or when the sibling create is refused with `AccessDeniedException` (other create failures propagate); `EditChannels` settles a channel before failing its queued jobs, so work submitted from a failure callback is not lost; `plugins/remote/build.gradle.kts`'s first two comment lines were replaced, since the plan's replacement already carried the second line's text; a late link lookup in the SFTP panel navigates or reports only while the panel still shows the same host and folder, and Open in Editor still opens the selection's regular files when a link fails to resolve, naming the reason; Step 4's `docs/README.md` instruction was rephrased so no inline code in the plan holds Markdown link syntax, which `AppDocumentationTest` misread as a broken link from `docs/superpowers/plans/`.
-  - `./gradlew check` (2026-09-27): **BUILD SUCCESSFUL**. Totals across `*/build/test-results/test/` and `plugins/*/build/test-results/test/`: 2,188 tests, 2,188 passed, 0 failed, 5 skipped, 0 errors.
+  - `./gradlew check` (2026-09-27): **BUILD SUCCESSFUL**. Totals across `*/build/test-results/test/` and `plugins/*/build/test-results/test/`: 2,188 tests, 2,183 passed, 0 failed, 5 skipped, 0 errors.
   - Not done: GUI acceptance (items 12–19 of the [checklist](editor-verification.md), user-run), merge and push.
 
 - **Editor plugin, plan A** (branch `claude/editor-plugin`, plan

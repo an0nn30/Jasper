@@ -183,8 +183,9 @@ files.") when there were more. Without the Editor, double-clicking a file does n
 Saving follows the Editor's safe write. The new content goes to a hidden, owner-only sibling
 (`.<name>.jasper-<random>.tmp`) beside the file, which gets the file's permissions and atomically replaces it through
 the `posix-rename@openssh.com` extension. Remote writes the file in place instead, keeping its owner, group and links,
-when the folder does not allow the sibling, when the sibling would get another owner or group, or when the server has
-no atomic rename; an interrupted write in place may leave a partial file, and the tab stays unsaved so you can retry.
+when the folder does not allow the sibling, when the sibling would get another owner or group, when the server does not
+report the file's permissions, or when the server has no atomic rename; an interrupted write in place may leave a
+partial file, and the tab stays unsaved so you can retry.
 A read-only file is refused. Before saving, the Editor compares the file's modification time and size with what it
 opened and asks when someone else changed it; SFTP reports times to the second, so a change within the same second
 that keeps the size goes unnoticed. Remote files are not watched for outside changes; Revert re-reads them.
