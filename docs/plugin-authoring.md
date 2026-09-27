@@ -136,6 +136,9 @@ removed form cannot retain Enter-key ownership. Layout remains plugin-owned, and
 or custom fonts can grow without clipping. The terminal toolbar keeps its independent geometry.
 
 Jasper supplies the rounded outer tool-panel surface and gutter; plugins need not draw their own outer frame.
+Lists, trees, tables and popup selections inherit a small corner radius. Composite list renderers
+should fill their row using `list.getSelectionBackground()` when selected; Jasper rounds that
+fill while preserving renderer content and layout. Explicit custom colors remain plugin-owned.
 
 Plugins own their layout managers and spacing. Let buttons use their preferred sizes, avoid
 hard-coded colors or replacement UI delegates, and use `JRootPane.setDefaultButton` for a dialog's

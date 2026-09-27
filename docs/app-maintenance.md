@@ -284,3 +284,12 @@ around an 8px-radius surface. Region widths/heights and persisted splitter sizes
 that gutter. Keep clipping and hit testing in the host, and route descendant repaints
 through it so opaque plugin content cannot fill the corners. `ToolWindowSurface` still
 owns theme-background propagation and preserves plugin-selected colors.
+
+
+Selection geometry is shared through `ThemeManager.APP_DEFAULTS`: lists, trees, tables,
+combo-box popups and menus use a 4px radius with a 4px horizontal inset. FlatLaf joins
+adjacent selected rows and maintains focus/selection repainting. `AppListUI` extends
+that painting to composite plugin renderers by intercepting full-row fills of the list's
+selection color; it leaves their component hierarchy, layout and custom colors alone.
+The palette uses the same geometry for selections, hover and scope highlights.
+`SelectionRenderingTest` saves light/dark headless previews in `build/render-preview`.

@@ -95,6 +95,9 @@ class SidePanelRenderTest {
                 .isEqualTo(UIManager.getColor("Button.background"));
         assertThat(pixel(image, regions, panel.list, row(panel.list, 1))).as(name + "selected row")
             .isEqualTo(UIManager.getColor("List.selectionBackground"));
+        var selected = panel.list.getCellBounds(1, 1);
+        assertThat(pixel(image, regions, panel.list, selected.width - 5, selected.y))
+            .as(name + "rounded composite renderer corner").isEqualTo(panel.list.getBackground());
         assertThat(pixel(image, regions, panel.list, row(panel.list, 0))).as(name + "unselected row")
             .isEqualTo(UIManager.getColor("List.background"));
     }
@@ -102,7 +105,7 @@ class SidePanelRenderTest {
     /** A point near the right end of a row, clear of its text. */
     private static Point row(JList<?> list, int index) {
         Rectangle cell = list.getCellBounds(index, index);
-        return new Point(cell.x + cell.width - 4, cell.y + cell.height / 2);
+        return new Point(cell.x + cell.width - 12, cell.y + cell.height / 2);
     }
 
     private static Color pixel(BufferedImage image, JComponent root, Component component, Point at) {

@@ -84,6 +84,13 @@ public final class ThemeManager {
         // Reference form typography in logical points; FlatLaf applies display scaling.
         for (String component : List.of("Label", "List", "TextField", "PasswordField", "FormattedTextField", "TextArea", "ComboBox", "Button"))
             defaults.put(component + ".font", "12 $defaultFont");
+        defaults.put("ListUI", "dev.jasper.app.appearance.AppListUI");
+        for (String component : List.of("List", "Tree", "Table", "ComboBox", "MenuItem")) {
+            defaults.put(component + ".selectionArc", "8");
+            defaults.put(component + ".selectionInsets", "0,4,0,4");
+        }
+        defaults.put("List.cellMargins", "1,8,1,8");
+        defaults.put("Table.cellMargins", "2,8,2,8");
         defaults.put("TextComponent.arc", "8");
         for (String component : List.of("TextField", "PasswordField", "FormattedTextField"))
             defaults.put(component + ".margin", "5,8,5,8");

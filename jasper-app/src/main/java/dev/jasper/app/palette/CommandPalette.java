@@ -603,11 +603,20 @@ public final class CommandPalette extends JPanel {
 
         @Override protected void paintComponent(Graphics graphics) {
             if (selected && tabSelectedBackground != null) {
-                graphics.setColor(tabSelectedBackground);
-                graphics.fillRect(0, 0, getWidth(), getHeight());
+                paintHighlight(graphics, tabSelectedBackground, getWidth(), getHeight());
             }
             super.paintComponent(graphics);
         }
+    }
+
+    private static void paintHighlight(Graphics graphics, Color color, int width, int height) {
+        var g = (Graphics2D) graphics.create();
+        try {
+            g.setColor(color);
+            float radius = UIScale.scale(UIManager.getInt("List.selectionArc") / 2f);
+            com.formdev.flatlaf.ui.FlatUIUtils.paintSelection(g, 0, 0, width, height,
+                UIScale.scale(UIManager.getInsets("List.selectionInsets")), radius, radius, radius, radius, 0);
+        } finally { g.dispose(); }
     }
 
     private final class EntryRenderer extends JPanel implements ListCellRenderer<PaletteEntry> {
@@ -700,8 +709,7 @@ public final class CommandPalette extends JPanel {
             doLayout();
             Color fill = selected ? selectionBackground : hovered ? hoverBackground : null;
             if (fill != null) {
-                graphics.setColor(fill);
-                graphics.fillRect(0, 0, getWidth(), getHeight());
+                paintHighlight(graphics, fill, getWidth(), getHeight());
             }
             if (entry instanceof PaletteEntry.Header && !first) {
                 graphics.setColor(separatorColor);

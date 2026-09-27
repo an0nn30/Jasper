@@ -274,7 +274,7 @@ class CommandPaletteTest {
                     assertPixel(image, at(palette.queryField().getParent(), palette.queryField().getParent().getWidth() - 3, 2, palette),
                         "SearchEverywhere.SearchField.background", name);
                     Rectangle selected = list.getCellBounds(1, 1), plain = list.getCellBounds(2, 2), rule = list.getCellBounds(3, 3);
-                    assertPixel(image, at(list, selected.width - 3, selected.y + 3, palette), "List.selectionBackground", name);
+                    assertPixel(image, at(list, selected.width - 12, selected.y + 3, palette), "List.selectionBackground", name);
                     assertPixel(image, at(list, plain.width - 3, plain.y + 3, palette), "List.background", name);
                     assertPixel(image, at(list, rule.width - 3, rule.y, palette), "SearchEverywhere.List.separatorColor", name);
                     assertPixel(image, at(palette.hintBar(), palette.hintBar().getWidth() - 3, palette.hintBar().getHeight() / 2, palette),
@@ -339,10 +339,12 @@ class CommandPaletteTest {
                 Rectangle first = list.getCellBounds(0, 0), second = list.getCellBounds(1, 1);
                 list.dispatchEvent(new MouseEvent(list, MouseEvent.MOUSE_MOVED, 1L, 0, 4, second.y + 4, 0, false));
                 var image = paint(palette);
-                assertPixel(image, at(list, first.width - 3, first.y + 3, palette), "List.selectionBackground", "selected");
-                assertPixel(image, at(list, second.width - 3, second.y + 3, palette), "List.hoverBackground", "hovered");
+                assertPixel(image, at(list, first.width - 12, first.y + 3, palette), "List.selectionBackground", "selected");
+                assertPixel(image, at(list, second.width - 12, second.y + 3, palette), "List.hoverBackground", "hovered");
+                assertPixel(image, at(list, first.width - 5, first.y, palette), "List.background", "selected rounded corner");
+                assertPixel(image, at(list, second.width - 5, second.y, palette), "List.background", "hover rounded corner");
                 list.dispatchEvent(new MouseEvent(list, MouseEvent.MOUSE_EXITED, 1L, 0, 4, second.y + 4, 0, false));
-                assertPixel(paint(palette), at(list, second.width - 3, second.y + 3, palette), "List.background", "after the mouse left");
+                assertPixel(paint(palette), at(list, second.width - 12, second.y + 3, palette), "List.background", "after the mouse left");
             } finally {
                 try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new IllegalStateException(failure); }
             }

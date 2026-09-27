@@ -2,6 +2,17 @@
 
 ## Current state — 2026-09-23
 
+- **Rounded selections and highlights** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  shared theme defaults give list/tree/table, combo popup and menu selections a 4px
+  radius and horizontal inset. Standard list/table padding keeps content inside the
+  highlight. `AppListUI` extends FlatLaf's selection painting to composite plugin rows
+  (including SSH hosts and Vault), preserving renderer layout and custom colors.
+  Palette selected/hovered rows and scope highlights share the geometry. Light/dark
+  headless previews inspected; regression coverage includes live theme changes,
+  composite content, panel colors and palette hover. Independent review found no issues.
+  `check :jasper-app:packageDist` passed: 2,033 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
 - **Window-centered command palette** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   the screenshot showed the palette shifted into the terminal column when a tool panel
   was open. Placement now uses the whole workspace's window bounds, including panels
