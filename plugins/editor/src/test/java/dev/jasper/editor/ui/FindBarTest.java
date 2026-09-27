@@ -1,6 +1,10 @@
 package dev.jasper.editor.ui;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.util.Optional;
+import javax.swing.JComponent;
+import javax.swing.KeyStroke;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,6 +33,27 @@ class FindBarTest {
         bar.wholeWord().doClick();
         bar.findField().setText("fo");
         assertThat(bar.status()).as("whole words only").isEqualTo("No matches");
+    }
+
+    @Test void wholeWordRegexValidatesThePatternSearchEngineActuallyCompiles() {
+        bar.open(false);
+        bar.regex().doClick();
+        bar.wholeWord().doClick();
+        bar.matchCase().doClick();
+        bar.findField().setText("*foo");
+        assertThat(bar.status()).isEqualTo("2 matches");
+        bar.findField().setText("(");
+        assertThat(bar.status()).isEqualTo("Invalid pattern");
+    }
+
+    @Test void escapeClosesTheBarFromAnyFocusedChild() {
+        bar.open(false);
+        assertThat(bar.isVisible()).isTrue();
+        Object key = bar.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
+            .get(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0));
+        assertThat(key).isNotNull();
+        bar.getActionMap().get(key).actionPerformed(new ActionEvent(bar, ActionEvent.ACTION_PERFORMED, ""));
+        assertThat(bar.isVisible()).isFalse();
     }
 
     @Test void nextAndPreviousSelectMatches() {

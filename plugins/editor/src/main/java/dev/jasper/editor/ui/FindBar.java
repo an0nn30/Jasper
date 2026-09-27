@@ -67,7 +67,10 @@ public final class FindBar extends JPanel {
         key(find, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "next", this::next);
         key(find, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK), "previous", this::previous);
         key(replace, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "replace", this::replaceOne);
-        for (JTextField field : new JTextField[] {find, replace}) key(field, KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "close", this::close);
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "close");
+        getActionMap().put("close", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent event) { close(); }
+        });
         setVisible(false);
     }
 
@@ -144,7 +147,9 @@ public final class FindBar extends JPanel {
     private SearchContext context(boolean forward) {
         // RSyntaxTextArea's SearchEngine swallows an invalid regex internally (returns no match
         // instead of throwing), so validate the pattern ourselves and let guarded() report it.
-        if (regex.isSelected()) Pattern.compile(find.getText());
+        // SearchEngine's regex path wraps the pattern in "\b...\b" when whole-word is on
+        // (getNextMatchPosRegExImpl), so validate exactly what it compiles, not the raw text.
+        if (regex.isSelected()) Pattern.compile(wholeWord.isSelected() ? "\\b" + find.getText() + "\\b" : find.getText());
         var context = new SearchContext(find.getText());
         context.setMatchCase(matchCase.isSelected());
         context.setWholeWord(wholeWord.isSelected());
