@@ -186,6 +186,8 @@ the `posix-rename@openssh.com` extension. Remote writes the file in place instea
 when the folder does not allow the sibling, when the sibling would get another owner or group, when the server does not
 report the file's permissions, or when the server has no atomic rename; an interrupted write in place may leave a
 partial file, and the tab stays unsaved so you can retry.
+The atomic replacement gives the file a new inode: other hard links to it keep the old content (SFTP cannot report
+link counts), and a file bind-mounted into a container keeps showing the old content until the container reopens it.
 A read-only file is refused. Before saving, the Editor compares the file's modification time and size with what it
 opened and asks when someone else changed it; SFTP reports times to the second, so a change within the same second
 that keeps the size goes unnoticed. Remote files are not watched for outside changes; Revert re-reads them.

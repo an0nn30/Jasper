@@ -28,3 +28,4 @@ unverified.
 - [ ] 17. Saving a read-only remote file (`chmod 444`) fails with "permission denied" and leaves it unchanged.
 - [ ] 18. After the SSH connection ends (close its tabs and wait for it to drop), saving an edited remote tab reconnects, asking for sign-in in a terminal window if needed; with every terminal window closed, the save fails with "Reconnecting to <host> needs an open terminal window for the sign-in prompt."
 - [ ] 19. With the Editor disabled in the Plugins manager (after the restart), double-clicking a file in the SFTP browser does nothing and Open in Editor is not in the menu.
+- [ ] 20. On a host at least 50 ms away (ping), saving an edited remote file and Save All with about five remote tabs complete in reasonable time; note the times (each save currently costs several dozen sequential SFTP round trips).
