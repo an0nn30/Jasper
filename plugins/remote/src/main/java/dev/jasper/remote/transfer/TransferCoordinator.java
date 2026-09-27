@@ -182,6 +182,9 @@ public final class TransferCoordinator implements AutoCloseable {
     }
     private void schedule() throws IOException {
         var order=new ArrayList<>(runs.values());if(order.isEmpty()) return;Collections.rotate(order,rotation++%order.size());
+        // Holders of their paths first (stable, so rotation still orders each group): a queued run whose scan can only
+        // fail on a holder's reservation must not take the one scanner that holder needs to finalize, pass after pass.
+        order.sort(Comparator.comparing(run->run.reservation==null));
         for(var run:order) {
             if(run.attention || !run.control.running() || run.finalizing) continue;
             var job=store.job(run.id);
