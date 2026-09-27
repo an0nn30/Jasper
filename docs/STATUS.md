@@ -2,6 +2,18 @@
 
 ## Current state — 2026-09-23
 
+- **Title-bar vertical alignment** (`codex/intellij-new-icons`, 2026-09-27):
+  removed the redundant 6px workspace top gutter beneath a visible toolbar/native
+  header. Controls were already centered within the row; the extra chrome below made
+  them appear too high. Terminal and side-panel surfaces now begin at the header edge.
+  Hidden macOS actions retain the visible context row; hiding an ordinary toolbar
+  restores the top gutter. Panel parents and splitter sizes are preserved.
+  Regression tests reproduced the 6px error before the fix and now cover dark/light,
+  28/30/64px headers, side panels and toolbar visibility. Headless previews inspected;
+  independent review is clean. `check :jasper-app:packageDist` passed: 2,063 tests,
+  zero failures/errors, five skips; package verification passed and DMG rebuilt.
+  No GUI launched.
+
 - **Command palette scope spacing** (`codex/intellij-new-icons`, 2026-09-27):
   inset the scope strip by 4 logical pixels on all sides so selected scope highlights
   clear the rounded palette frame. Scope click targets remain 30px high and preferred

@@ -301,7 +301,10 @@ left/center/bottom surface has no additional leading gutter. Hiding or emptying 
 rail restores that gutter without reparenting plugin content. A visible status bar
 likewise supplies the lower spacing: exterior bottom gutters are omitted so the status
 contents stay visually centered between the surfaces and window bottom. Hiding the
-status bar restores the 6px bottom gutter. Adjacent hosts omit
+status bar restores the 6px bottom gutter. A visible toolbar or unified native header
+also replaces the exterior top gutter, keeping its controls centered between the window
+top and workspace surfaces. Hiding toolbar actions retains this spacing on macOS because
+the context row remains; hiding an ordinary toolbar restores the 6px top gutter. Adjacent hosts omit
 their facing gutters so the plain 6px draggable splitter supplies the gap.
 Region widths/heights and persisted splitter sizes include exterior gutters. The center
 host derives its minimum size from the terminal column; plugin hosts retain their 120px

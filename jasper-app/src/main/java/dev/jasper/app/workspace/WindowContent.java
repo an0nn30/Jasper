@@ -59,6 +59,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private KeyboardFocusManager paletteFocusManager;
     private javax.swing.Timer paletteTailCleanup;
     private ToolbarMode toolbarMode = ToolbarMode.ICONS_AND_LABELS;
+    private boolean unifiedHeader;
     private KeyBindings bindings;
     private final UUID id = UUID.randomUUID();
     private KeyBindings baseBindings;
@@ -169,6 +170,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
         regions = new WorkspaceRegions(terminalColumn);
         regions.setStatusVisible(chrome.status().isVisible());
+        regions.setHeaderVisible(chrome.toolbar().isVisible());
         rail = new WindowRail();
         rail.setVisible(false);
         var body = new JPanel(new BorderLayout());
@@ -191,6 +193,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                                       Consumer<String> nativeTitle) {
         var bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), supported);
         if (bar != null) {
+            content.unifiedHeader = true;
+            content.regions.setHeaderVisible(true);
             content.remove(content.toolbar());
             ((WindowToolbar) content.toolbar()).setTitleBar(true);
             bar.setToolbar(content.toolbar());
@@ -679,7 +683,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         active = value; if (windowTabs != null) windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {
-        toolbarMode = mode; chrome.setToolbarMode(mode); updateActions(); revalidate(); onMinimumSizeChanged.run();
+        toolbarMode = mode; chrome.setToolbarMode(mode);
+        regions.setHeaderVisible(unifiedHeader || mode != ToolbarMode.HIDDEN);
+        updateActions(); revalidate(); onMinimumSizeChanged.run();
     }
     void setStatusVisible(boolean visible) {
         chrome.setStatusVisible(visible); regions.setStatusVisible(visible);

@@ -54,6 +54,23 @@ class BarHeightTest {
         });
     }
 
+    @Test void ordinaryToolbarSuppliesTopSpacingOnlyWhileVisible() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.setSize(900, 600);
+            var panel = new JPanel();
+            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, panel, 200);
+            var parent = panel.getParent();
+            for (var mode : new ToolbarMode[] {ToolbarMode.ICONS, ToolbarMode.HIDDEN, ToolbarMode.ICONS_AND_LABELS}) {
+                owner.setToolbarMode(mode);
+                dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+                int expected = mode == ToolbarMode.HIDDEN ? UIScale.scale(6) : owner.toolbar().getHeight();
+                assertThat(SwingUtilities.convertPoint(panel, 0, 0, owner).y).isEqualTo(expected);
+                assertThat(panel.getParent()).isSameAs(parent);
+            }
+        });
+    }
+
     @Test void theStatusBarTakesItsConfiguredHeightButNeverClipsItsText() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));

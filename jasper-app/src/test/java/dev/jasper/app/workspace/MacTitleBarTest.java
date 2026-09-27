@@ -79,6 +79,40 @@ class MacTitleBarTest {
         });
     }
 
+    @Test void headerContentsAreCenteredBetweenWindowTopAndWorkspaceSurfaces() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            var root = new JRootPane();
+            var left = new JPanel(); var right = new JPanel();
+            owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, left, 200);
+            owner.regions().show(dev.jasper.app.contributions.PanelRegion.RIGHT, right, 200);
+            try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
+                root.setSize(1400, 600);
+                for (Theme theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+                    owner.selectTheme(theme);
+                    for (int height : new int[] {28, 30, 64}) {
+                        owner.setToolbarHeight(height); layoutTree(root);
+                        var tabs = WindowTabsTest.named(owner, "windowTabs");
+                        int surfaceTop = SwingUtilities.convertPoint(tabs, 0, 0, root).y;
+                        assertThat(surfaceTop).as("no extra gutter below the header").isEqualTo(bar.getHeight());
+                        for (var panel : java.util.List.of(left, right))
+                            assertThat(SwingUtilities.convertPoint(panel, 0, 0, root).y).isEqualTo(surfaceTop);
+                        assertThat(label(bar).getY() * 2 + label(bar).getHeight()).isEqualTo(surfaceTop);
+                        for (var child : owner.toolbar().getComponents()) {
+                            if (!(child instanceof JButton) || !child.isVisible()) continue;
+                            int top = SwingUtilities.convertPoint(child, 0, 0, root).y;
+                            assertThat(Math.abs(top - (surfaceTop - top - child.getHeight())))
+                                .as("toolbar controls have equal space above and below").isLessThanOrEqualTo(1);
+                        }
+                    }
+                }
+                owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(root);
+                assertThat(SwingUtilities.convertPoint(left, 0, 0, root).y)
+                    .as("the native context row remains visible when actions are hidden").isEqualTo(bar.getHeight());
+            }
+        });
+    }
+
     @AfterEach void cleanup() throws Exception { closeOwners(); edt(() -> new dev.jasper.app.appearance.ThemeController()); }
 
     @Test void supportedRootHidesOnlyNativeDrawingAndRetainsTitleMetadata() throws Exception {
@@ -133,7 +167,7 @@ class MacTitleBarTest {
                 Point toolbar = SwingUtilities.convertPoint(owner.toolbar(), 0, 0, root);
                 Point strip = SwingUtilities.convertPoint(tabs, 0, 0, root);
                 assertThat(toolbar.y).isZero();
-                assertThat(strip.y).isEqualTo(toolbar.y + owner.toolbar().getHeight() + 6);
+                assertThat(strip.y).isEqualTo(toolbar.y + owner.toolbar().getHeight());
                 assertThat(label(bar).isVisible()).isTrue();
                 assertThat(owner.toolbar().getX() - label(bar).getX() - label(bar).getWidth()).isGreaterThanOrEqualTo(24);
                 assertThat(label(bar).getWidth()).isGreaterThanOrEqualTo(280);
