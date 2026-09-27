@@ -20,4 +20,4 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Check
         shell: bash
-        run: ./gradlew check --stacktrace
+        run: ./gradlew check --continue --stacktrace
