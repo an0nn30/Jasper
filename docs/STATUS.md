@@ -14,6 +14,16 @@
   skips before the SDK 0.8.1 update; the macOS DMG was rebuilt and the package image verified.
   Native packaged-app acceptance remains user-run; no GUI was launched. Main integration
   and publication are authorized.
+- **Transfer scanner starvation** (same branch, 2026-09-26): the menu integration check
+  exposed an intermittent Remote stall: queued reservation retries could repeatedly take
+  the scanner before the destination's current owner could finalize and release it.
+  User-authorized follow-up prioritizes reservation holders for scanner work while retaining
+  rotating copy admission, including already-scanned jobs resumed without a reservation.
+  The same-destination regression failed in two of five repetitions before the fix; a new
+  gated-copy regression caught and prevented starvation of an unrelated resumed job.
+  Both fixes passed independent review and an isolated `./gradlew check` after SDK 0.8.1:
+  1,994 tests, zero failures/errors, three skips. Concurrent icon work was excluded from
+  the verification checkout and these commits. Main integration and publication authorized.
 - **Full-height rail** (branch `worktree-rail-full-height`, 2026-09-25): the tab strip now sits
   over the terminal deck inside `WorkspaceRegions`' center, so the rail and the left/right panels
   run from the toolbar to the status bar and the bottom panel sits under the terminal only.
