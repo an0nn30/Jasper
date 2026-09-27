@@ -76,7 +76,11 @@ class BundledSamplePluginTest {
     }
     @Test void remoteLoadsWithoutVaultAndUsesHostIconsForEveryPlacement() throws Exception {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins"));
-        Path remoteOnly = java.nio.file.Files.createDirectories(root.resolve("remote-only"));
+        // Not under @TempDir: sqlite-jdbc reads its version through a cached jar: URL it never closes, so this
+        // JVM holds the copied jar open until it exits and Windows cannot delete it. Beside build/plugins, not in it.
+        Path remoteOnly = staged.resolveSibling("remote-only-plugins");
+        PluginMaintenance.deleteRecursively(remoteOnly);
+        java.nio.file.Files.createDirectories(remoteOnly);
         Path source = staged.resolve("dev.jasper.remote");
         try (var paths = java.nio.file.Files.walk(source)) {
             for (Path path : paths.toList()) {

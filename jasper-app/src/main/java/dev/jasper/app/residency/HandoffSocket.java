@@ -17,6 +17,7 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -54,6 +55,7 @@ public final class HandoffSocket implements AutoCloseable {
     private final Path lockPath;
     private final String token;
     private final Function<LaunchRequest, LaunchRequest.Response> handler;
+    private final Thread acceptor;
     private volatile boolean closed;
 
     private HandoffSocket(ServerSocketChannel channel, Path socketPath, Path tokenPath, Path lockPath,
@@ -64,6 +66,7 @@ public final class HandoffSocket implements AutoCloseable {
         this.lockPath = lockPath;
         this.token = token;
         this.handler = handler;
+        this.acceptor = Thread.ofPlatform().name("jasper-handoff-accept").unstarted(this::acceptLoop);
     }
 
     /**
@@ -92,7 +95,7 @@ public final class HandoffSocket implements AutoCloseable {
                 opened.bind(UnixDomainSocketAddress.of(socketPath));
                 String token = writeToken(tokenPath);
                 var endpoint = new HandoffSocket(opened, socketPath, tokenPath, lockPath, token, handler);
-                Thread.ofPlatform().name("jasper-handoff-accept").start(endpoint::acceptLoop);
+                endpoint.acceptor.start();
                 return endpoint;
             }
         } catch (IOException | RuntimeException failure) {
@@ -183,6 +186,13 @@ public final class HandoffSocket implements AutoCloseable {
         if (closed) return;
         closed = true;
         try { channel.close(); } catch (IOException ignored) { }
+        // On Linux a thread blocked in accept() keeps the listening socket alive until it wakes, so our
+        // own dying listener could answer the probe below and pass for a successor. Serving is bounded
+        // by READ_TIMEOUT_MILLIS, so the acceptor is always gone well within this.
+        if (Thread.currentThread() != acceptor) {
+            try { acceptor.join(Duration.ofMillis(2 * READ_TIMEOUT_MILLIS)); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+        }
         // Under the same lock bind uses: if anything answers on our path now, a successor owns it
         // and these files are its, not ours.
         try (FileChannel lockChannel = FileChannel.open(lockPath, StandardOpenOption.CREATE,

@@ -83,10 +83,11 @@ class JasperApplicationPluginsTest {
 
     @Test void bindingProblemsSeparateUnknownUserIdsFromDroppedPluginDefaults() throws Exception {
         AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        // Free on both keymaps: off macOS cmd means ctrl+shift, so cmd+alt+g would be Find Previous.
         java.nio.file.Files.writeString(dirs.configFile(), """
             [keybindings]
             "dev.example.keys.bound" = "cmd+alt+b"
-            "dev.example.gone.action" = "cmd+alt+g"
+            "dev.example.gone.action" = "cmd+alt+j"
             """);
         Path dev = home.resolve("keys-plugin");
         PluginJars.build(dev, "keys.jar", PluginJars.descriptor("dev.example.keys", "1.0.0", "fix.keys.Main"),

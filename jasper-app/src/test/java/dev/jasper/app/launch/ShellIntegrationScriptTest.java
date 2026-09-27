@@ -265,8 +265,11 @@ class ShellIntegrationScriptTest {
     /** The wrapper files run before the rc file, so -u has to be set on the command line to reach them. */
     @Test void wrapperFilesStaySilentUnderNounsetSetBeforeTheyRun() throws Exception {
         if (Files.isExecutable(Path.of("/bin/bash"))) {
+            // Debian's /etc/bash.bashrc reads ${SUDO_USER} unguarded, which is not Jasper's to fix, and only
+            // --norc keeps it out (--rcfile does not), so the rc file is sourced as the first input instead.
+            // It starts in its home; bash takes long options first.
             ShellRun.Result bash = interactive("/bin/bash", "export RC_RAN=yes\nPS1='$ '\n",
-                "echo rc=$RC_RAN\n", List.of("-u", "-i"));
+                "source ./.bashrc\necho rc=$RC_RAN\n", List.of("--norc", "-u", "-i"));
             assertThat(bash.errors()).doesNotContain("unbound variable");
             assertThat(bash.output()).contains("rc=yes");
         }

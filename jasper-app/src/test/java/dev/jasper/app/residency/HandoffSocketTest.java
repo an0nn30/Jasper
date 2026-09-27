@@ -127,7 +127,9 @@ class HandoffSocketTest {
             try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
                 assertThat(HandoffSocket.bind(socket(), token(), lock(), request -> LaunchRequest.Response.OK))
                     .isNull();
-                DesktopTestSupport.until(() -> !records.isEmpty());
+                // One acceptor serves in order: a real reply proves the probe was served. Only POSIX reports the
+                // reply to the vanished probe as a failed write; Windows AF_UNIX may log nothing at all.
+                assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isTrue();
             }
         } finally {
             logger.removeHandler(handler);

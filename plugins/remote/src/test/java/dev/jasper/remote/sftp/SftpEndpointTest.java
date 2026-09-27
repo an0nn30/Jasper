@@ -106,9 +106,18 @@ class SftpEndpointTest {
             byte[] bytes = new byte[5 * 1024 * 1024 + 17]; new Random(42).nextBytes(bytes);
             try (var out = endpoint.write("/binary", 0, true)) { out.write(bytes); assertThat(out.checkpoint()).isEqualTo(bytes.length); }
             try (var in = endpoint.read("/binary", 13)) { assertThat(in.readAllBytes()).isEqualTo(Arrays.copyOfRange(bytes,13,bytes.length)); }
+            // MINA's test server opens files without SPARSE, so on NTFS it zero-fills the 3 GiB gap before acknowledging.
+            if (org.junit.jupiter.api.condition.OS.WINDOWS.isCurrentOs()) return;
             long offset = 3L * 1024 * 1024 * 1024;
             try (var out = endpoint.write("/sparse", offset, true)) { out.write(41); assertThat(out.checkpoint()).isEqualTo(offset + 1); }
             try (var in = endpoint.read("/sparse", offset)) { assertThat(in.read()).isEqualTo(41); assertThat(in.read()).isEqualTo(-1); }
+        }
+    }
+    /** A failed write reaches the caller as itself, not as try-with-resources' "Self-suppression not permitted". */
+    @Test void aFailedWriteSurfacesItsOwnErrorThroughClose() throws Exception {
+        try (var fixture = new Fixture(new SftpSubsystemFactory()); var endpoint = fixture.endpoint(Duration.ofSeconds(3))) {
+            assertThatThrownBy(() -> { try (var out = endpoint.write("/overflow", Long.MAX_VALUE - 1, true)) { out.write(new byte[2]); } })
+                .isInstanceOf(java.io.IOException.class).hasMessageContaining("File offset overflow");
         }
     }
     @Test void unsupportedAtomicReplaceLeavesBothFilesUnchanged() throws Exception {

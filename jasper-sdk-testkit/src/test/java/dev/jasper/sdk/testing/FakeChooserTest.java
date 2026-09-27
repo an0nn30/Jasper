@@ -14,12 +14,12 @@ class FakeChooserTest {
             var context = host.start(new PluginInfo("dev.x.chooser", "Chooser", "1", Set.of()), Set.of(), Set.of(), c -> {});
             var owner = context.windows().create(new WindowSpec("dev.x.chooser.window", "Upload", new Dimension(500,400), true));
             owner.show();
-            host.queuePathSelection(List.of(Path.of("/a"), Path.of("/b")));
-            assertThat(context.windows().chooseFiles(owner, "Files", Optional.empty())).containsExactly(Path.of("/a"),Path.of("/b"));
-            host.queuePathSelection(List.of(Path.of("/dest")));
-            assertThat(context.windows().chooseDirectory(owner, "Directory", Optional.empty())).contains(Path.of("/dest"));
+            host.queuePathSelection(List.of(Path.of("/a").toAbsolutePath(), Path.of("/b").toAbsolutePath()));
+            assertThat(context.windows().chooseFiles(owner, "Files", Optional.empty())).containsExactly(Path.of("/a").toAbsolutePath(),Path.of("/b").toAbsolutePath());
+            host.queuePathSelection(List.of(Path.of("/dest").toAbsolutePath()));
+            assertThat(context.windows().chooseDirectory(owner, "Directory", Optional.empty())).contains(Path.of("/dest").toAbsolutePath());
             assertThat(context.windows().chooseFiles(owner, "Cancel", Optional.empty())).isEmpty();
-            host.queuePathSelection(List.of(Path.of("/a")));
+            host.queuePathSelection(List.of(Path.of("/a").toAbsolutePath()));
             host.duringPathSelection(owner::close);
             assertThat(context.windows().chooseFiles(owner, "Closed", Optional.empty())).isEmpty();
             assertThatIllegalArgumentException().isThrownBy(() -> context.windows().chooseFiles(owner, "Stale", Optional.empty()));

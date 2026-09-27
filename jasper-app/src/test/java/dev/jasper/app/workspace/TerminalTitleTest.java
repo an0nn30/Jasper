@@ -8,7 +8,8 @@ class TerminalTitleTest {
     @Test void idleTitleUsesDirectoryAndLoginShellLikeITerm() {
         assertThat(TerminalTitle.tab("", Path.of(System.getProperty("user.home")), "-zsh")).isEqualTo("~ (-zsh)");
         assertThat(TerminalTitle.tab(null, Path.of("/projects/jasper"), "zsh")).isEqualTo("jasper (zsh)");
-        assertThat(TerminalTitle.tab("", Path.of("/"), "bash")).isEqualTo("/ (bash)");
+        Path root = Path.of("/").toAbsolutePath().getRoot(); // "/", or a drive root on Windows: a root shows as itself
+        assertThat(TerminalTitle.tab("", root, "bash")).isEqualTo(root + " (bash)");
     }
 
     @Test void jobAndProgramTitleRemainIndependentAndOpaque() {

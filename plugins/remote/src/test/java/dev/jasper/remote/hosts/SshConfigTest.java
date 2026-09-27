@@ -56,6 +56,9 @@ class SshConfigTest {
         Files.writeString(dir.resolve("config"), "Include conf.d/*\nHost two\n");
         SshConfig.Parsed parsed = SshConfig.parse(dir.resolve("config"));
         assertThat(parsed.entries()).extracting(SshConfig.Entry::alias).containsExactly("one", "two");
+        Files.writeString(dir.resolve("absolute"), "Include " + dir.resolve("conf.d") + "/o*\nInclude " + dir + "/c*/one\n");
+        assertThat(SshConfig.parse(dir.resolve("absolute")).entries()).as("a directory glob matches nothing")
+            .extracting(SshConfig.Entry::alias).containsExactly("one");
         assertThat(SshConfig.parse(dir.resolve("missing")).entries()).isEmpty();
     }
     @Test void appliesFirstValuesInFileOrderAcrossMatchingBlocks() {

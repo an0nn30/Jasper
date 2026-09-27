@@ -410,6 +410,6 @@ class ShellIntegrationSessionTest {
         connector.feed("\033]7;file://localhost/tmp\007");
         Await.until(() -> session.workingDirectory().isPresent(), "back on this machine");
         assertThat(session.remoteDirectory()).isEmpty();
-        assertThat(events).containsExactly("local /Users/me", "remote build-host:/srv/app local=false", "local /tmp");
+        assertThat(events).containsExactly("local " + Path.of("/Users/me"), "remote build-host:/srv/app local=false", "local " + Path.of("/tmp"));
     }
 }

@@ -126,7 +126,7 @@ class WindowContributionsTest {
 
         @Test void aContributedScopeIsInThisWindowsPaletteItsShortcutSwitchesWhileOpenAndRequestsAreRouted() throws Exception {
             edt(() -> {
-                try (WindowContent owner = CommandPaletteShortcutsTest.owner(true)) {
+                try (WindowContent owner = CommandPaletteShortcutsTest.owner(MAC)) {
                 var model = new Contributions();
                 CommandPaletteShortcutsTest.install(owner);
                 model.addAction("dev.x.open", "Open X", null, List.of(), Optional.of("cmd+alt+h"),

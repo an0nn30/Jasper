@@ -115,15 +115,36 @@ failed with `ExceptionInInitializerError`. `packageApp` removes the `plugins/` e
 
 ## macOS Local Network access
 
-macOS asks the user before an app may connect to hosts on the local network. Until the
-user allows it, connections to LAN addresses fail with `EHOSTUNREACH`, so Remote reports
-"No route to host" for a host that `ssh` in Terminal reaches. The Tailscale 100.x range
-and public addresses are not affected. `packageApp` adds `NSLocalNetworkUsageDescription`
-to `Info.plist` so the prompt explains why Jasper asks, and `verifyPackage` checks it. The
-grant belongs to the code signature. Development images carry only an ad-hoc signature,
-which changes with every build, so macOS may ask again or forget an earlier grant after a
-rebuild. A stable signing identity avoids this. `./gradlew :jasper-app:run` runs the JBR's
-own `java`, which needs its own grant under System Settings > Privacy & Security > Local Network.
+macOS asks before a Finder-launched app connects to the local network. A blocked connection
+can fail with `EHOSTUNREACH` ("No route to host"). `packageApp` adds
+`NSLocalNetworkUsageDescription` to explain the request; this string alone does not establish
+an app's identity or guarantee a prompt.
+
+macOS also uses the main executable's Mach-O `LC_UUID` to attribute network requests. JBR's
+jpackage copies a generic launcher UUID into every app. This caused Jasper's requests to be
+denied under the old **Moray** permission, with no Jasper prompt or Settings entry. After the
+SDK-version update and before signing, `packageApp` now gives the launcher an app-specific
+UUID derived from the bundle identifier and the selected SDK's original launcher bytes.
+Identical inputs produce the same UUID; other app identifiers and launcher templates produce
+different UUIDs. `verifyPackage` verifies this identity and the final bundle signature.
+`./gradlew check` includes portable binary regression checks, without launching an app.
+
+Development images still have an ad-hoc signature. Apple recommends an **Apple-issued signing
+identity** for reliable Local Network permission tracking; signing/notarization remain release
+work. A corrected UUID fixes the confirmed cross-app collision, but does not replace signing.
+Command-line tools launched from Apple's Terminal have a Local Network exception, so a
+successful `gradle run` there is not proof that the Finder-launched package has permission.
+
+To accept this fix, fully quit the old Jasper process, install the rebuilt app in Applications,
+launch it from Finder, and connect Remote to a LAN host. Allow Jasper when prompted and retry
+the connection if necessary. Confirm Jasper appears under System Settings → Privacy & Security
+→ Local Network. The new UUID is separate from Moray's old denied identity; do not edit the
+system privacy database. If no prompt appears, capture the network-service log while retrying
+and check which application identity it names. Multiple registered builds and ad-hoc signatures
+can still complicate macOS permission tracking.
+
+References: [Apple TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy)
+and [Apple TN3178](https://developer.apple.com/documentation/technotes/tn3178-checking-for-and-resolving-build-uuid-problems).
 
 ## Linux icon assets
 

@@ -1,6 +1,8 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.commands.CommandHistory;
+import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.session.SessionLaunchOptions;
@@ -36,6 +38,13 @@ public final class DesktopTestSupport {
     }
     public static WindowContent content(ShellLauncher launcher) {
         WindowContent owner = new WindowContent(launcher, HOME, path -> {}, () -> {}, () -> {});
+        OWNERS.add(owner);
+        return owner;
+    }
+    /** A window with one platform's keymap and shortcut text, whatever the host is. */
+    public static WindowContent content(ShellLauncher launcher, boolean macOs) {
+        WindowContent owner = new WindowContent(launcher, HOME, path -> {}, () -> {}, () -> {}, new ThemeController(),
+            KeyBindings.defaults(macOs), new CommandHistory(), macOs);
         OWNERS.add(owner);
         return owner;
     }

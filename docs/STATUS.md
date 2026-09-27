@@ -17,6 +17,33 @@
   user-run; no installer or GUI was launched. [Build and acceptance](packaging.md#windows-setup-wizard).
   Not merged or pushed.
 
+- **Three-platform CI** (branch `fix/ci-cross-platform`, 2026-09-27): `main` had been red on Linux
+  and Windows since 2026-09-13 (last green `1db31b1b`). The logs showed no assertion text and
+  Gradle stopped at the first failing module, so most failures were hidden. CI now prints full
+  failures, runs `check --continue`, fails a test after 5 min and a job after 30.
+  - **Production fixes:** `HandoffSocket.close()` could mistake its own dying listener for a
+    successor and leave its files (Linux); an SFTP write's `close()` turned the real error into
+    "Self-suppression not permitted"; ssh `Include` globs threw on Windows; Windows refusals now
+    read "Connection refused"; multi-line snippets no longer get CRLF on Windows (tomlj writes the
+    platform separator); `.gitattributes` checks text out with LF.
+  - **Tests:** no longer assume the host keymap, POSIX paths, or Debian's nounset-unsafe
+    `/etc/bash.bashrc`. POSIX-only features (FIFOs, POSIX modes, the SFTP browser's `/` paths,
+    OSC through a real PTY) are `@DisabledOnOs(WINDOWS)` or assert Windows' own behaviour.
+  - **Known Windows limits, pinned by tests:** resuming a paused transfer asks Restart or Skip,
+    because NTFS gives Java no file identity (user's choice to keep, 2026-09-27); SFTP downloads
+    record a metadata warning (no POSIX modes). Sessions run on winpty, pty4j's default, which
+    does not pass OSC through, so titles and shell integration probably do not work on Windows
+    (ConPTY is the follow-up).
+  - **Verified:** all three CI legs green at `8dd24bda` (after merging `main`); local `check` 2,002
+    tests, 0 failures, 5 skipped. `main`'s Windows PowerShell PTY test first ran in CI here: a cold
+    PowerShell start outlasted `Await`'s 10 s, so it now allows 30 s and reports the screen.
+  - **Merged `main` (`71f96ed8`):** the transfer-scanner starvation this branch also found and fixed
+    is fixed on `main` too (entry below); the merge keeps `main`'s version, which also keeps copy
+    admission in rotating order. This branch fixes the Windows failures CI shows, which covers the
+    startup entry's list except six symlink tests: they pass on CI's administrator runner but fail
+    for a Windows account without the symlink privilege (open).
+  - **Not done:** merge to `main`.
+
 - **Windows terminal startup** (branch `codex/fix-windows-terminal-startup`, 2026-09-27):
   launching through `cmd.exe` supplies hidden environment entries such as `=C:`. The
   session options validator rejected these before PowerShell could start. Validation now
@@ -27,6 +54,22 @@
   stalled Remote test; see [verification details](windows-startup-verification.md).
   User confirmed the fix and authorized integration/publication on 2026-09-27.
   Merged into `main`; the broader Windows test findings remain open.
+
+- **macOS Local Network identity collision** (branch `codex/mac-network-identity`, 2026-09-27):
+  a user-retried Remote LAN connection produced `Local network denied by preference for Moray
+  (dev.moray.app)` in macOS `nehelper`. Installed Jasper, historical Moray and JBR's generic
+  jpackage launcher shared `LC_UUID` `25BA8067-AB3A-327B-8BE9-0C3162B915F5`; the usage description
+  was already present and the bundle signature valid. Packaging now derives an app-specific
+  launcher UUID from the bundle identifier and immutable SDK launcher before final signing.
+  `verifyPackage` checks it; portable binary regressions run under `check`. This supersedes the
+  earlier assumption below that a usage string and an ad-hoc signature were sufficient.
+  `./gradlew check` passed: 1,997 tests, zero failures/errors, three skips, plus the portable UUID
+  regression task. `packageDist` and strict signature verification passed; injecting the old UUID
+  made `verifyPackage` fail as intended, and restoring the executable passed. The mounted DMG
+  retains the corrected UUID and has a valid signature. Independent review found no issues.
+  Native prompt/LAN acceptance remains user-run; Apple-issued signing remains separate release
+  work (no valid identity on this Mac). The user authorized merging to `main` and pushing to
+  `origin` on 2026-09-27. See [verification](mac-local-network-verification.md).
 
 - **Original Steep application icon** (branch `codex/jasper-steep-icon`):
   user-selected full-height 68-degree tab and Frost chevron replace Ember in

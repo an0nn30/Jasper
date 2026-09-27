@@ -5,6 +5,8 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
@@ -51,9 +53,10 @@ class TransferCoordinatorTest {
             var coordinator=new TransferCoordinator(root.resolve("queue"),executor,Runnable::run,(ref,owner)-> {
                 var local=new LocalEndpoint();
                 FileEndpoint delayed=(FileEndpoint)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{FileEndpoint.class},(proxy,method,args)-> {
-                    if(method.getName().equals("abort")) release.countDown();
                     try {
                         Object value=method.invoke(local,args);
+                        // Released after the real abort, as the handle's abort does, so the blocked write cannot land late.
+                        if(method.getName().equals("abort")) release.countDown();
                         if(method.getName().equals("write")) {
                             var output=(WriteHandle)value;
                             return new WriteHandle() {
@@ -279,7 +282,8 @@ class TransferCoordinatorTest {
             } finally { coordinator.close();coordinator.stopped().get(5,TimeUnit.SECONDS); }
         }
     }
-    @Test void retryFailedCopiesFixedItemsAndLeavesSkippedItemsSkipped() throws Exception {
+    /** Its failing item is a FIFO, which Windows does not have (Git Bash's mkfifo succeeds without making one). */
+    @Test @DisabledOnOs(OS.WINDOWS) void retryFailedCopiesFixedItemsAndLeavesSkippedItemsSkipped() throws Exception {
         root=root.toRealPath();Path source=Files.createDirectory(root.resolve("source")),dest=Files.createDirectories(root.resolve("dest/source")).getParent();
         Files.writeString(source.resolve("fresh"),"fresh");Files.writeString(source.resolve("keep"),"new");Files.writeString(dest.resolve("source/keep"),"old");
         fifo(source.resolve("pipe"));Path lone=root.resolve("lone");fifo(lone);

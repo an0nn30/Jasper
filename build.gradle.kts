@@ -30,6 +30,13 @@ subprojects {
         useJUnitPlatform()
         systemProperty("java.awt.headless", "true")
         jvmArgs("--enable-native-access=ALL-UNNAMED")
+        // A hung test fails by name instead of holding a CI runner until the job times out.
+        systemProperty("junit.jupiter.execution.timeout.default", "5m")
+        // CI logs are the only view of a Linux or Windows failure, so print the assertion message too.
+        testLogging {
+            events("failed")
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
     }
 }
 

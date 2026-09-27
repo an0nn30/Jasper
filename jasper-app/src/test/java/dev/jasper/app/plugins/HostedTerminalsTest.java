@@ -155,12 +155,12 @@ class HostedTerminalsTest {
     @Test void openingATabOrASplitReturnsTheNewPane() {
         HostedTerminals terminals = terminals(Capabilities.TERMINAL_OPEN);
         UUID window = fixture.addWindow(), tab = fixture.addTab(window, "build"), only = fixture.addPane(tab, "make", Path.of("/src"));
-        PaneHandle opened = terminals.openTab(terminals.windowHandle(window), OpenRequest.localIn(Path.of("/tmp"))).orElseThrow();
+        PaneHandle opened = terminals.openTab(terminals.windowHandle(window), OpenRequest.localIn(Path.of("/tmp").toAbsolutePath())).orElseThrow();
         assertThat(opened.isOpen()).isTrue();
         assertThat(opened.tab().id()).isNotEqualTo(tab);
         PaneHandle split = terminals.split(terminals.paneHandle(only), Direction.DOWN, OpenRequest.local()).orElseThrow();
         assertThat(split.tab().id()).isEqualTo(tab);
-        assertThat(fixture.opened()).containsExactly("tab|" + window + "|/tmp", "split|" + only + "|DOWN|-");
+        assertThat(fixture.opened()).containsExactly("tab|" + window + "|" + Path.of("/tmp").toAbsolutePath(), "split|" + only + "|DOWN|-");
         assertThat(terminals.split(terminals.paneHandle(UUID.randomUUID()), Direction.RIGHT, OpenRequest.local())).isEmpty();
     }
 }
