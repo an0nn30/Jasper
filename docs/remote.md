@@ -141,7 +141,7 @@ menus, palette and subsequent connection overlay follow the new family/size.
 
 ## SFTP browsing and transfers
 
-Remote 0.3 includes SFTP in the same plugin as SSH. Choose **SSH > SFTP**, **View > SFTP**,
+Remote 0.4 includes SFTP in the same plugin as SSH. Choose **SSH > SFTP**, **View > SFTP**,
 **Open SFTP here** in a terminal's context menu, or **Browse files** on a saved host.
 Connecting a shell does not automatically open the browser. There is one remote browser in
 each window, with an editable path, compact file list, Up, Upload, Download, Refresh,
@@ -171,6 +171,28 @@ closing the source terminal does not cancel a copy.
 - **Delete** requires confirmation and removes the captured selection recursively. It is
   cancellable, but already deleted entries cannot be recovered. Links themselves are deleted;
   their targets are not traversed. Copy path writes plain paths to the clipboard.
+
+### Editing remote files
+
+With the bundled Editor installed, double-click a file in the SFTP browser, or select it and press Enter, to open it
+in a tab of the Editor window; saving writes it back to the host. A link to a file opens the file it leads to (saving
+changes that file, and the link stays a link); a link to a folder navigates as before. **Open in Editor** in the
+right-click menu opens the selected files and links to files, at most 20 at a time, and says so ("Opened 20 of 57
+files.") when there were more. Without the Editor, double-clicking a file does nothing and the menu item is hidden.
+
+Saving follows the Editor's safe write. The new content goes to a hidden, owner-only sibling
+(`.<name>.jasper-<random>.tmp`) beside the file, which gets the file's permissions and atomically replaces it through
+the `posix-rename@openssh.com` extension. Remote writes the file in place instead, keeping its owner, group and links,
+when the folder does not allow the sibling, when the sibling would get another owner or group, or when the server has
+no atomic rename; an interrupted write in place may leave a partial file, and the tab stays unsaved so you can retry.
+A read-only file is refused. Before saving, the Editor compares the file's modification time and size with what it
+opened and asks when someone else changed it; SFTP reports times to the second, so a change within the same second
+that keeps the size goes unnoticed. Remote files are not watched for outside changes; Revert re-reads them.
+
+Editor operations for one connection run one at a time on one SFTP channel of the live SSH connection, opened for the
+first and closed when none are left. When the connection has closed, the next operation reconnects; sign-in prompts
+appear in the terminal window the file was opened from, or else in the active one. With no terminal window open it
+fails with "Reconnecting to prod-web needs an open terminal window for the sign-in prompt."
 
 Transfers appear at the bottom of the SFTP sidebar, in every window: what is copying and where,
 a progress bar, speed and time left, and **×** to cancel. A transfer that needs you shows one

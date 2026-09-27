@@ -2,7 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not executed. Plan A is merged into `main` (`0f9b960a`). Branch: `claude/editor-plugin-b`.
+**Status:** Executed 2026-09-27 on branch claude/editor-plugin-b, subagent-driven (one implementer and one reviewer per task). Deviations from the task text, from the task reviews:
+- Task 2 (review fixes, rulings): `SafeWrite` writes in place when the existing target's permissions are unknown (−1), which keeps its mode; it falls back in place only when the sibling create is refused with `AccessDeniedException`, and other create failures (e.g. an SFTP timeout) propagate, with the create failure attached if the in-place write then fails. The Editor's local `LocalFiles.write` still falls back on any create failure.
+- Task 3 (review fix): `EditChannels` settles a channel (clears the queue and runs `next`) before failing its jobs on an open failure or a missing sign-in window, so work submitted from a failure callback is never lost (planning decision 8).
+- Task 4 (ruling): in `plugins/remote/build.gradle.kts` the first two comment lines were replaced, since the plan's replacement already carried the second line's text.
+- Task 5 (ruling and review fixes): the panel test's compound `var` declaration was split (invalid Java); a late link lookup navigates or writes a message only while the panel still shows the same host and folder (opening a file stays unconditional); when Open in Editor cannot resolve a selected link, it still opens the selection's regular files and shows the reason (the "Opened 20 of N files." message only when every link resolved).
 
 **Goal:** Double-clicking a file in Remote's SFTP panel opens it in the Editor, and saving writes it back to the host through the Editor's write contract.
 

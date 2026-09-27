@@ -31,7 +31,7 @@ then assembles the application distribution. It opens no native window. Native
 - [Configuration](configuration.md): defaults, saved/live settings, data paths and shell integration.
 - [Themes](themes.md): choosing a theme, installing IntelliJ Marketplace themes and how a theme colours the terminal.
 - [Command palette](command-palette.md): commands, the bundled History and Snippets plugins, and scope registration.
-- [Editor](editor.md): editing local files in tabs in the Editor window, saving safely, and outside changes; [verification](editor-verification.md).
+- [Editor](editor.md): editing local and remote files in tabs in the Editor window, saving safely, and outside changes; [verification](editor-verification.md).
 - [Plugins](../README.md#plugins): where installed plugins live, File → Manage Plugins…, safe mode and `--plugin-dir`.
 - [Diagnostics](diagnostics.md): log storage, bounds and privacy.
 - [Packaging](packaging.md): native builds and user-run acceptance checklists.

@@ -1,6 +1,6 @@
 # Editor
 
-The bundled Editor plugin (`dev.jasper.editor`) edits text files in tabs in one Editor window,
+The bundled Editor plugin (`dev.jasper.editor`) edits local and remote text files in tabs in one Editor window,
 with syntax highlighting from RSyntaxTextArea. The [design](superpowers/specs/2026-09-27-jasper-editor-plugin-design.md)
 is the binding reference.
 
@@ -56,6 +56,13 @@ saves already running.
 While the window is open the Editor checks open local files every 2 seconds. A tab without unsaved
 changes reloads by itself; one with changes shows a banner offering **Reload** or **Keep Mine**, and
 a deleted file's banner offers **Close** or **Keep**.
+
+## Remote files
+
+With Remote installed, double-click a file in the SFTP browser to edit it here (see
+[Remote: editing remote files](remote.md#editing-remote-files)). A remote tab shows its host dimmed after the name,
+saves back to the host with the same safe write, and asks before overwriting a file someone else changed. Remote files
+are not watched for outside changes; Revert re-reads them. Save As writes a local copy.
 
 ## Languages
 

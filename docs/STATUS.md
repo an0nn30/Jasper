@@ -2,6 +2,19 @@
 
 ## Current state — 2026-09-23
 
+- **Editor plugin, plan B** (branch `claude/editor-plugin-b`, plan
+  `docs/superpowers/plans/2026-09-27-jasper-editor-plugin-b.md`): Remote 0.4.0 optionally requires the Editor.
+  - Double-click or Enter in the SFTP browser opens a file, or a link to a file, in the Editor; **Open in Editor** opens up to 20 selected files.
+  - Saving follows the write contract over SFTP (`dev.jasper.remote.edit.SafeWrite`):
+    - an owner-only sibling created with its mode through a hand-built `SSH_FXP_OPEN`;
+    - posix-rename, and writing in place otherwise;
+    - read-only files refused.
+  - Editor operations run one at a time per connection on one SFTP channel (`EditChannels`).
+  - The spec's sections 4.4, 6.1, 6.2 and 6.4 carry the Plan B amendments.
+  - Deviations from the task text, from the task reviews: `SafeWrite` falls back to writing in place when the target's permissions are unknown (−1) or when the sibling create is refused with `AccessDeniedException` (other create failures propagate); `EditChannels` settles a channel before failing its queued jobs, so work submitted from a failure callback is not lost; `plugins/remote/build.gradle.kts`'s first two comment lines were replaced, since the plan's replacement already carried the second line's text; a late link lookup in the SFTP panel navigates or reports only while the panel still shows the same host and folder, and Open in Editor still opens the selection's regular files when a link fails to resolve, naming the reason.
+  - `./gradlew check` (2026-09-27): **BUILD FAILED**. Totals across `*/build/test-results/test/` and `plugins/*/build/test-results/test/`: 2,188 tests, 2,187 passed, **1 failed**, 5 skipped, 0 errors. The one failure, `AppDocumentationTest.guideLinksResolveAndExamplesMatchCompiledSource`, is a pre-existing defect this task's full run exposed for the first time (Task 1 ran only `:jasper-plugin-remote:test`; nothing since has run the full `check`): the plan document's own Step 4 text quotes `` `- [Editor](editor.md): editing local files...` `` inside single backticks, and the guide-link scanner strips only fenced (triple-backtick) code blocks, so it reads that inline-code markdown as a real link from `docs/superpowers/plans/` and fails because `docs/superpowers/plans/editor.md` does not exist. Confirmed unrelated to Task 6's own doc edits (the same failure reproduces with them stashed out). Left unfixed: both the plan's Step 4 text and `AppDocumentationTest` are outside Task 6's file list (`docs/remote.md`, `docs/editor.md`, `docs/editor-verification.md`, `docs/README.md`, `AGENTS.md`, `docs/STATUS.md`, the plan's Status banner).
+  - Not done: GUI acceptance (items 12–19 of the [checklist](editor-verification.md), user-run), merge and push, and the `AppDocumentationTest` failure above.
+
 - **Editor plugin, plan A** (branch `claude/editor-plugin`, plan
   `docs/superpowers/plans/2026-09-27-jasper-editor-plugin-a.md`, spec
   `docs/superpowers/specs/2026-09-27-jasper-editor-plugin-design.md`): SDK 0.8.2 adds
