@@ -17,6 +17,8 @@ public class SftpPanel extends JPanel {
     public record Actions(Consumer<String> navigate,Runnable up,Runnable refresh,Consumer<Boolean> follow,
                           Runnable upload,Runnable uploadFolder,Runnable download,Runnable newFolder,
                           Runnable delete,Runnable copyPath,Runnable copyToHost,Runnable cancel,Consumer<Long> page) {}
+    /** What double-click, Enter and Open in Editor do with files and links; set only when the Editor is installed. */
+    public record Editing(Consumer<FileEntry> activate,Runnable open) {}
     private final Function<IconName,Icon> icons;
     private final JLabel host=label("Select an SSH host to browse files"),message=label(""),pageLabel=label(""),operationResult=label("");
     private final JTextField path=new JTextField();
@@ -26,6 +28,9 @@ public class SftpPanel extends JPanel {
     private final JButton previous=new JButton(new ChevronIcon(ChevronIcon.Direction.LEFT)),next=new JButton(new ChevronIcon(ChevronIcon.Direction.RIGHT)),cancel;
     private final Map<String,JButton> buttons=new LinkedHashMap<>();
     private final JPopupMenu popup=new JPopupMenu();
+    private final JMenuItem openInEditor;
+    private final JPopupMenu.Separator editingSeparator=new JPopupMenu.Separator();
+    private Editing editing;
     private List<FileEntry> entries=List.of();
     private Actions actions;
     private long offset,total;
@@ -62,6 +67,8 @@ public class SftpPanel extends JPanel {
             @Override public void mousePressed(MouseEvent event) { selectPopup(event); }
             @Override public void mouseReleased(MouseEvent event) { selectPopup(event); }
             @Override public void mouseClicked(MouseEvent event) { if(event.getClickCount()==2 && SwingUtilities.isLeftMouseButton(event)) activate(); } });
+        openInEditor=new JMenuItem("Open in Editor",icons.apply(IconName.FILE));openInEditor.addActionListener(event->{if(editing!=null) editing.open().run();});
+        openInEditor.setVisible(false);editingSeparator.setVisible(false);popup.add(openInEditor);popup.add(editingSeparator);
         item("Upload folder…",IconName.UPLOAD,()->actions.uploadFolder().run());item("Download selected…",IconName.DOWNLOAD,()->actions.download().run());item("Copy to host…",IconName.NETWORK,()->actions.copyToHost().run());popup.addSeparator();item("Copy paths",IconName.COPY,()->actions.copyPath().run());item("Delete selected…",IconName.DELETE,()->actions.delete().run());table.setComponentPopupMenu(popup);
         buttons.get("Upload files").setComponentPopupMenu(popup);
         addComponentListener(new ComponentAdapter() { @Override public void componentResized(ComponentEvent event) { columns(); } });selectionChanged();
@@ -72,6 +79,8 @@ public class SftpPanel extends JPanel {
     }
     private void item(String text,IconName name,Runnable action) { var item=new JMenuItem(text,icons.apply(name));item.addActionListener(event->{if(actions!=null) action.run();});popup.add(item); }
     public void actions(Actions actions) { this.actions=actions; }
+    /** Shows Open in Editor and sends files to {@code editing}: double-click and Enter on one file or link, and the menu item. */
+    public void editing(Editing editing) { this.editing=editing;openInEditor.setVisible(true);editingSeparator.setVisible(true);selectionChanged(); }
     public FileTable table() { return table; }
     public List<FileEntry> selection() { var result=new ArrayList<FileEntry>();for(int row:table.getSelectedRows()) if(row>=0 && row<entries.size()) result.add(entries.get(row));return List.copyOf(result); }
     public String directory() { return path.getText(); }
@@ -98,8 +107,15 @@ public class SftpPanel extends JPanel {
     String hostText() { return host.getText(); }
     String messageText() { return message.getText(); }
     public void enableBrowsing(boolean enabled) { path.setEnabled(enabled);follow.setEnabled(enabled);buttons.get("Refresh").setEnabled(enabled); }
-    private void activate() { if(actions==null) return;var selected=selection();if(selected.size()==1 && (selected.getFirst().kind()==FileEntry.Kind.DIRECTORY || selected.getFirst().kind()==FileEntry.Kind.LINK)) actions.navigate().accept(selected.getFirst().name()); }
-    private void selectionChanged() { boolean selected=!selection().isEmpty();for(String name:List.of("Download selected","Delete selected","Copy paths")) buttons.get(name).setEnabled(selected);buttons.get("Upload files").setEnabled(loaded);buttons.get("New folder").setEnabled(loaded); }
+    private void activate() {
+        if(actions==null) return;var selected=selection();if(selected.size()!=1) return;var entry=selected.getFirst();
+        if(entry.kind()==FileEntry.Kind.DIRECTORY || entry.kind()==FileEntry.Kind.LINK && editing==null) actions.navigate().accept(entry.name());
+        else if(editing!=null && (entry.kind()==FileEntry.Kind.FILE || entry.kind()==FileEntry.Kind.LINK)) editing.activate().accept(entry);
+    }
+    private void selectionChanged() {
+        var selection=selection();boolean selected=!selection.isEmpty();for(String name:List.of("Download selected","Delete selected","Copy paths")) buttons.get(name).setEnabled(selected);buttons.get("Upload files").setEnabled(loaded);buttons.get("New folder").setEnabled(loaded);
+        openInEditor.setEnabled(selection.stream().anyMatch(entry->entry.kind()==FileEntry.Kind.FILE || entry.kind()==FileEntry.Kind.LINK));
+    }
     private void columns() {
         boolean nextDetails=getWidth()>=460;if(nextDetails==details) return;details=nextDetails;
         if(details) { table.addColumn(sizeColumn);table.addColumn(modifiedColumn); }else { table.removeColumn(sizeColumn);table.removeColumn(modifiedColumn); }

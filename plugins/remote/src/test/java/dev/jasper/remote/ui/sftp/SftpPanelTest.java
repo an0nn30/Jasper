@@ -76,4 +76,34 @@ class SftpPanelTest {
         if(component instanceof Container container) for(var child:container.getComponents()) { var found=find(child,type,match);if(found.isPresent()) return found; }
         return Optional.empty();
     }
+
+    @Test void filesGoToTheEditorOnlyWhenItIsPresent() throws Exception {
+        SwingUtilities.invokeAndWait(()-> {
+            var panel=new SftpPanel(icon->new ImageIcon(new java.awt.image.BufferedImage(16,16,2)));var navigated=new ArrayList<String>();
+            panel.actions(new SftpPanel.Actions(navigated::add,()->{},()->{},f->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},()->{},p->{}));
+            var folder=new FileEntry("conf",FileEntry.Kind.DIRECTORY,0,1000,0755,"");var file=new FileEntry("notes.toml",FileEntry.Kind.FILE,6,1000,0644,"");var link=new FileEntry("alias",FileEntry.Kind.LINK,10,1000,0777,"notes.toml");
+            panel.showPage("host","/srv",List.of(folder,file,link),0,3,false);
+            var item=menuItem(panel.table().getComponentPopupMenu(),"Open in Editor");
+            assertThat(item.isVisible()).as("hidden without the Editor").isFalse();
+            enter(panel,1);assertThat(navigated).as("a file does nothing without the Editor").isEmpty();
+            enter(panel,2);assertThat(navigated).as("a link navigates as before").containsExactly("alias");
+            var activated=new ArrayList<String>();var opened=new int[1];
+            panel.editing(new SftpPanel.Editing(entry->activated.add(entry.name()),()->opened[0]++));
+            assertThat(item.isVisible()).isTrue();
+            enter(panel,0);assertThat(navigated).as("a folder still navigates").containsExactly("alias","conf");
+            enter(panel,1);enter(panel,2);assertThat(activated).containsExactly("notes.toml","alias");
+            doubleClick(panel,1);assertThat(activated).containsExactly("notes.toml","alias","notes.toml");
+            panel.table().setRowSelectionInterval(0,0);assertThat(item.isEnabled()).as("a folder alone holds no file").isFalse();
+            panel.table().setRowSelectionInterval(0,2);assertThat(item.isEnabled()).isTrue();
+            item.doClick();assertThat(opened[0]).isEqualTo(1);
+        });
+    }
+    private static void enter(SftpPanel panel,int row) { panel.table().setRowSelectionInterval(row,row);panel.table().getActionMap().get("browse").actionPerformed(null); }
+    private static void doubleClick(SftpPanel panel,int row) {
+        panel.table().setRowSelectionInterval(row,row);var cell=panel.table().getCellRect(row,0,true);
+        panel.table().dispatchEvent(new java.awt.event.MouseEvent(panel.table(),java.awt.event.MouseEvent.MOUSE_CLICKED,0,0,cell.x+2,cell.y+2,2,false,java.awt.event.MouseEvent.BUTTON1));
+    }
+    private static JMenuItem menuItem(JPopupMenu menu,String text) {
+        return Arrays.stream(menu.getComponents()).filter(JMenuItem.class::isInstance).map(JMenuItem.class::cast).filter(item->text.equals(item.getText())).findFirst().orElseThrow();
+    }
 }
