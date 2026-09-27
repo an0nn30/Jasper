@@ -221,7 +221,7 @@ class CommandPaletteTest {
             assertThat(palette.queryField().getParent().getHeight()).isEqualTo(UIScale.scale(40));
             assertThat(palette.hintBar().getHeight()).isEqualTo(UIScale.scale(26));
             assertThat(palette.itemHeight()).isEqualTo(UIScale.scale(24));
-            assertThat(palette.isOpaque()).isTrue();
+            assertThat(palette.isOpaque()).as("rounded corners expose the underlying workspace").isFalse();
             palette.setEntries(List.of(), null, "Nothing found");
             assertThat(palette.getPreferredSize().height).as("the empty line").isEqualTo(UIScale.scale(30 + 40 + 24 + 26) + insets.top + insets.bottom);
         });
@@ -262,9 +262,15 @@ class CommandPaletteTest {
                     var list = palette.entryList();
                     var allTab = labels(palette.tabStrip()).getFirst();
                     String name = theme.name();
-                    assertPixel(image, new Point(0, 0), "Popup.borderColor", name);
-                    assertPixel(image, at(allTab, 3, 3, palette), "SearchEverywhere.Tab.selectedBackground", name);
-                    assertPixel(image, at(palette.tabStrip(), palette.tabStrip().getWidth() - 3, 3, palette), "SearchEverywhere.Header.background", name);
+                    assertPixel(image, new Point(palette.getWidth() / 2, 0), "Popup.borderColor", name);
+                    for (Point corner : List.of(new Point(0, 0), new Point(palette.getWidth() - 1, 0),
+                            new Point(0, palette.getHeight() - 1), new Point(palette.getWidth() - 1, palette.getHeight() - 1))) {
+                        assertThat(image.getRGB(corner.x, corner.y) >>> 24).as("transparent rounded corner").isZero();
+                        assertThat(palette.contains(corner)).isFalse();
+                    }
+                    assertThat(palette.contains(palette.getWidth() / 2, 1)).isTrue();
+                    assertPixel(image, at(allTab, 12, 3, palette), "SearchEverywhere.Tab.selectedBackground", name);
+                    assertPixel(image, at(palette.tabStrip(), palette.tabStrip().getWidth() - 12, 3, palette), "SearchEverywhere.Header.background", name);
                     assertPixel(image, at(palette.queryField().getParent(), palette.queryField().getParent().getWidth() - 3, 2, palette),
                         "SearchEverywhere.SearchField.background", name);
                     Rectangle selected = list.getCellBounds(1, 1), plain = list.getCellBounds(2, 2), rule = list.getCellBounds(3, 3);

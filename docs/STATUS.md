@@ -2,6 +2,15 @@
 
 ## Current state — 2026-09-23
 
+- **Rounded command palette** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  matched the user's IntelliJ reference with 8px outer corner radii and the existing
+  theme border. Header/footer children clip within that outline, including partial
+  repaints; transparent corners use the corresponding rounded hit area. Insets,
+  keyboard behavior and placement are unchanged. Dark/light headless renders inspected;
+  independent review found no issues. `check :jasper-app:packageDist` passed: 2,030 tests,
+  zero failures/errors, five skips. Rebuilt DMG and package signature/payload checks pass.
+  No GUI launched.
+
 - **Unified workspace header and graphite chrome** (branch `codex/intellij-new-icons`, 2026-09-27):
   continued in the user-selected icon worktree. macOS now combines native controls,
   focused directory/host context and toolbar in a 42px default header, with tabs below.

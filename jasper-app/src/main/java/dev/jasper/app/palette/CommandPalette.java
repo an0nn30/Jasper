@@ -2,6 +2,7 @@ package dev.jasper.app.palette;
 
 import com.formdev.flatlaf.FlatClientProperties;
 import com.formdev.flatlaf.util.UIScale;
+import com.formdev.flatlaf.ui.FlatLineBorder;
 import dev.jasper.app.platform.AppIcons;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -12,6 +13,8 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.geom.RoundRectangle2D;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -54,6 +57,7 @@ import javax.swing.event.DocumentListener;
  */
 public final class CommandPalette extends JPanel {
     static final int WIDTH = 680;
+    private static final int CORNER_ARC = 16;
     static final int TAB_HEIGHT = 30;
     static final int FIELD_HEIGHT = 40;
     static final int ROW_HEIGHT = 24;
@@ -108,7 +112,7 @@ public final class CommandPalette extends JPanel {
         this.execute = Objects.requireNonNull(execute);
         this.tabSelected = Objects.requireNonNull(tabSelected);
         Objects.requireNonNull(queryChanged);
-        setOpaque(true);
+        setOpaque(false);
         // AWT retargets a press to the nearest ancestor that has mouse listeners. Without one here, a
         // press in the tab-strip gap, the hint bar's detail text or the field row's padding would bubble
         // past the palette to the overlay behind it, which dismisses on any press it receives.
@@ -172,6 +176,25 @@ public final class CommandPalette extends JPanel {
         add(hintBar, BorderLayout.SOUTH);
         setTabs(List.of(new Tab(PaletteScope.ALL_ID, "All", null, null)), PaletteScope.ALL_ID);
         refreshTheme();
+    }
+
+    // Repaint through this component so opaque header/footer children never square off its corners.
+    @Override protected boolean isPaintingOrigin() { return true; }
+
+    @Override protected void paintChildren(Graphics graphics) {
+        var clipped = (Graphics2D) graphics.create();
+        try {
+            int inset = UIScale.scale(1);
+            int arc = UIScale.scale(CORNER_ARC - 2);
+            clipped.clip(new RoundRectangle2D.Double(inset, inset,
+                Math.max(0, getWidth() - 2 * inset), Math.max(0, getHeight() - 2 * inset), arc, arc));
+            super.paintChildren(clipped);
+        } finally { clipped.dispose(); }
+    }
+
+    @Override public boolean contains(int x, int y) {
+        int arc = UIScale.scale(CORNER_ARC);
+        return new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), arc, arc).contains(x, y);
     }
 
     public JTextField queryField() { return query; }
@@ -375,7 +398,7 @@ public final class CommandPalette extends JPanel {
         monoFont = new Font(Font.MONOSPACED, Font.PLAIN, 13).deriveFont(font.getSize2D());
 
         setBackground(listBackground);
-        setBorder(BorderFactory.createLineBorder(border, UIScale.scale(1)));
+        setBorder(new FlatLineBorder(new Insets(1, 1, 1, 1), border, 1f, CORNER_ARC));
         tabStrip.setBackground(headerBackground);
         fieldRow.setBackground(fieldBackground);
         fieldRow.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(8), UIScale.scale(6), UIScale.scale(8)));
