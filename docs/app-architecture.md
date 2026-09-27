@@ -138,7 +138,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `workspace` | EDT windows, tabs, splits, panes, panel regions and the rail, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions. WindowContent closes subscriptions/panes; each pane closes its session. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
 | `palette` | EDT scope/query/step state, keyboard routing, the Swing palette popup and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
-| `config` | Immutable values and pure parsing; ConfigService owns background watch/reload work and marshals delivery to EDT. Application closes the service. |
+| `config` | Immutable values and pure parsing; ConfigService owns background watch/reload and explicit shortcut-save work and marshals delivery to EDT. Application closes the service. |
 | `contributions` | EDT model of what extensions contribute to the chrome, in app-native types. Application owns the single instance; the plugin runtime writes it and every window renders it. |
 | `appearance` | EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles. |
 | `launch` | Immutable launch capture and shell integration extraction; ShellLauncher starts off EDT and delivers on EDT. Receiving pane owns the session. |
@@ -149,7 +149,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `platform` | OS adapters, icons, fonts, title-bar paint and logging. Callers own registrations and native handles; Swing operations run on EDT and logging has its own worker. |
 | `persistence` | Bounded TOML reads and atomic writes; synchronous helpers own short-lived file handles. Caller chooses thread and lifecycle. |
 | `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. |
-| `shortcuthelp` | EDT read-only effective shortcut catalog, grouped search table and window-scoped key recorder. Application owns ShortcutHelp; its auxiliary surface owns subscriptions and capture cleanup. |
+| `shortcuthelp` | EDT effective shortcut catalog, grouped search table, pending binding editor and window-scoped key recorder. Application owns ShortcutHelp; its auxiliary surface owns subscriptions and capture cleanup. |
 | `pluginmanager` | The Plugins manager: passive view, consent view and an EDT controller over PluginRuntime's public records. Application owns the PluginManager; its window closes with AuxiliaryWindows. |
 | `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |

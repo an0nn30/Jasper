@@ -23,5 +23,7 @@ public final class ConfigurationTestSupport {
     public void accept(ConfigService.State state) { controller.accept(state); }
     public void onSnapshot(Consumer<ConfigSnapshot> listener) { controller.onSnapshot(listener); }
     public ConfigSnapshot snapshot() { return controller.snapshot(); }
+    public java.util.concurrent.CompletableFuture<Void> saveKeybindings(java.util.Map<String, java.util.Optional<String>> changes,
+            java.util.List<KeyBindings.Extension> extensions) { return controller.saveKeybindings(changes, extensions); }
     public void close() { controller.close(); }
 }

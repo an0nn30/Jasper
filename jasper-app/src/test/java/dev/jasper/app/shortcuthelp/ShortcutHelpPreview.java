@@ -27,15 +27,21 @@ public final class ShortcutHelpPreview {
             c.addAction("dev.jasper.vault.open", "Credential Vault", null, List.of(), Optional.empty(), ignored -> {});
             for (dev.jasper.app.appearance.Theme appearance : dev.jasper.app.appearance.ThemeManager.builtIns()) for (int size : new int[]{0, 18}) {
                 themes.configure(appearance, new UiFontConfig("system", size));
-                var panel = new ShortcutPanel();
+                var panel = new ShortcutPanel(true, changes -> { throw new AssertionError("Unexpected save"); });
                 panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), c.actions(),
                     Map.of("dev.jasper.remote", "Remote", "dev.jasper.vault", "Credential Vault"), true));
                 if (size != 0) panel.search.setText("remote");
+                else panel.search.setText("copy");
+                int editedRow = 0;
+                if (size != 0) while (!panel.table.getValueAt(editedRow, 0).equals("SSH Hosts")) editedRow++;
+                panel.table.setRowSelectionInterval(editedRow, editedRow);
+                panel.table.getActionMap().get("editShortcut").actionPerformed(null);
+                panel.capture(javax.swing.KeyStroke.getKeyStroke(size == 0 ? "meta V" : "ctrl shift H"));
                 panel.setSize(1000, 640); LayoutTestSupport.layoutTree(panel);
                 var image = new BufferedImage(1000, 640, BufferedImage.TYPE_INT_ARGB);
                 var g = image.createGraphics();
                 try { panel.printAll(g); } finally { g.dispose(); panel.close(); }
-                try { ImageIO.write(image, "png", output.resolve("shortcuts-" + appearance + "-" + size + ".png").toFile()); }
+                try { ImageIO.write(image, "png", output.resolve("shortcuts-" + appearance.id() + "-" + size + ".png").toFile()); }
                 catch (java.io.IOException error) { throw new java.io.UncheckedIOException(error); }
             }
         });
