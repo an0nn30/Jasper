@@ -12,6 +12,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 class TransferUiTest {
@@ -102,7 +104,8 @@ class TransferUiTest {
         }
     }
 
-    @Test void theActionButtonResumesAndRetriesFailedItems() throws Exception {
+    /** Its failing item is a FIFO, which Windows does not have (Git Bash's mkfifo succeeds without making one). */
+    @Test @DisabledOnOs(OS.WINDOWS) void theActionButtonResumesAndRetriesFailedItems() throws Exception {
         root = root.toRealPath();
         Path source = Files.writeString(root.resolve("report.txt"), "payload"), dest = Files.createDirectory(root.resolve("dest")), pipe = root.resolve("pipe");
         assertThat(new ProcessBuilder("mkfifo", pipe.toString()).inheritIO().start().waitFor()).isZero();

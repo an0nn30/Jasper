@@ -148,7 +148,7 @@ class LaunchSettingsTest {
             d.columns(), d.lines(), terminal, d.buddyEnabled(), d.maxResults());
         var settings = LaunchSettings.resolve(snapshot, "Mac OS X", Map.of(), 150, 45, Path.of("/opt/jasper/si"));
         assertThat(settings.environment()).containsEntry("JASPER_SHELL_INTEGRATION", "/my/own")
-            .containsEntry("ZDOTDIR", "/my/own/zsh");
+            .containsEntry("ZDOTDIR", Path.of("/my/own").resolve("zsh").toString());
     }
 
     @Test void userEnvOverlayCanStillOverrideTermProgram() {

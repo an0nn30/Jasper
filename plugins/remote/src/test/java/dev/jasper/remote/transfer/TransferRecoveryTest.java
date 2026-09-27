@@ -64,6 +64,10 @@ class TransferRecoveryTest {
             assertThatThrownBy(()->TransferCopy.copy(db,db.entry(id),src,dst,control,(done,total)->control.request(TransferJob.Intent.PAUSE))).isInstanceOf(TransferControl.Stopped.class);
             var paused=db.entry(id);assertThat(paused.confirmed()).isEqualTo(256*1024);
             Files.write(Path.of(paused.temporary()),new byte[]{9,9,9},StandardOpenOption.APPEND);
+            // Without a file identity (NTFS gives Java none) a partial that grew after its proof is not provably ours.
+            if(org.junit.jupiter.api.condition.OS.WINDOWS.isCurrentOs()) {
+                assertThatThrownBy(()->TransferCopy.copy(db,paused,src,dst,new TransferControl(),(done,total)->{})).isInstanceOf(TransferRecovery.Attention.class).hasMessageContaining("ownership is uncertain");return;
+            }
             TransferCopy.copy(db,paused,src,dst,new TransferControl(),(done,total)->{});
             assertThat(Files.readAllBytes(dir.resolve("source"))).isEqualTo(bytes);
             Files.delete(dir.resolve("source"));

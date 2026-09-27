@@ -1,12 +1,15 @@
 package dev.jasper.app.residency;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class LaunchRequestTest {
 
-    @Test void aRequestSurvivesEncodingIncludingPathsWithSeparatorsInThem() {
+    /** Windows paths cannot hold a tab or a newline, so there is nothing to carry. */
+    @Test @DisabledOnOs(OS.WINDOWS) void aRequestSurvivesEncodingIncludingPathsWithSeparatorsInThem() {
         // A tab separates fields and a newline ends the line, so a path containing either must
         // still arrive intact; that is what the base64 is for.
         Path awkward = Path.of("/Users/a b\tc/Jasper.app/Contents/app/jasper-app.jar");

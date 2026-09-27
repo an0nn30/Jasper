@@ -33,8 +33,8 @@ class ShellIntegrationScriptsTest {
         Files.writeString(zsh, "# stale\n");
         ShellIntegrationScripts.install(target);
         assertThat(Files.readAllBytes(zsh)).isEqualTo(ShellIntegrationScripts.bundled("jasper.zsh"));
-        assertThat(AppDirs.resolve("Mac OS X", Map.of(), Path.of("/Users/j")).shellIntegration())
-            .isEqualTo(Path.of("/Users/j/.config/jasper/shell-integration"));
+        assertThat(AppDirs.resolve("Mac OS X", Map.of(), dir).shellIntegration())
+            .isEqualTo(dir.resolve(".config/jasper/shell-integration"));
     }
 
     @Test void everyScriptIsGuardedAndSyntacticallyValidWhereShellsExist() throws Exception {

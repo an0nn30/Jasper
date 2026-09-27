@@ -61,7 +61,8 @@ class AttachedSessionTest {
 
     @Test void shellIntegrationWorksButNeverReportsALocalDirectory() throws Exception {
         attach();
-        List<String> events = Collections.synchronizedList(new ArrayList<>());
+        // Copy-on-write: the reader thread adds while Await streams over it; a synchronized list's stream() is unlocked.
+        List<String> events = new java.util.concurrent.CopyOnWriteArrayList<>();
         session.addListener(new TerminalSessionListener() {
             @Override public void workingDirectoryChanged(Path directory) { events.add("cwd " + directory); }
             @Override public void remoteDirectoryChanged(RemoteDirectory directory) { events.add("remote " + directory.host() + ":" + directory.path()); }

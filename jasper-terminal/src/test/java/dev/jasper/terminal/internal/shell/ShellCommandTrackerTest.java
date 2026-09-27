@@ -49,6 +49,6 @@ class ShellCommandTrackerTest {
     tracker.accept(List.of("jasper", "cwd", "file:///tmp"));
     assertThat(tracker.workingDirectory()).contains(java.nio.file.Path.of("/tmp"));
     assertThat(tracker.remoteDirectory()).isEmpty();
-    assertThat(events).containsExactly("local /home/me", "remote build-host:/srv/app", "local /tmp");
+    assertThat(events).containsExactly("local " + java.nio.file.Path.of("/home/me"), "remote build-host:/srv/app", "local " + java.nio.file.Path.of("/tmp"));
 }
 }

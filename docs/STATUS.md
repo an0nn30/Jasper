@@ -2,6 +2,33 @@
 
 ## Current state — 2026-09-23
 
+- **Three-platform CI** (branch `fix/ci-cross-platform`, 2026-09-27): `main` had been red on Linux
+  and Windows since 2026-09-13 (last green `1db31b1b`). The logs showed no assertion text and
+  Gradle stopped at the first failing module, so most failures were hidden. CI now prints full
+  failures, runs `check --continue`, fails a test after 5 min and a job after 30.
+  - **Production fixes:** `HandoffSocket.close()` could mistake its own dying listener for a
+    successor and leave its files (Linux); an SFTP write's `close()` turned the real error into
+    "Self-suppression not permitted"; ssh `Include` globs threw on Windows; Windows refusals now
+    read "Connection refused"; multi-line snippets no longer get CRLF on Windows (tomlj writes the
+    platform separator); `.gitattributes` checks text out with LF.
+  - **Tests:** no longer assume the host keymap, POSIX paths, or Debian's nounset-unsafe
+    `/etc/bash.bashrc`. POSIX-only features (FIFOs, POSIX modes, the SFTP browser's `/` paths,
+    OSC through a real PTY) are `@DisabledOnOs(WINDOWS)` or assert Windows' own behaviour.
+  - **Known Windows limits, pinned by tests:** resuming a paused transfer asks Restart or Skip,
+    because NTFS gives Java no file identity (user's choice to keep, 2026-09-27); SFTP downloads
+    record a metadata warning (no POSIX modes). Sessions run on winpty, pty4j's default, which
+    does not pass OSC through, so titles and shell integration probably do not work on Windows
+    (ConPTY is the follow-up).
+  - **Verified:** all three CI legs green at `8dd24bda` (after merging `main`); local `check` 2,002
+    tests, 0 failures, 5 skipped. `main`'s Windows PowerShell PTY test first ran in CI here: a cold
+    PowerShell start outlasted `Await`'s 10 s, so it now allows 30 s and reports the screen.
+  - **Merged `main` (`71f96ed8`):** the transfer-scanner starvation this branch also found and fixed
+    is fixed on `main` too (entry below); the merge keeps `main`'s version, which also keeps copy
+    admission in rotating order. This branch fixes the Windows failures CI shows, which covers the
+    startup entry's list except six symlink tests: they pass on CI's administrator runner but fail
+    for a Windows account without the symlink privilege (open).
+  - **Not done:** merge to `main`.
+
 - **Windows terminal startup** (branch `codex/fix-windows-terminal-startup`, 2026-09-27):
   launching through `cmd.exe` supplies hidden environment entries such as `=C:`. The
   session options validator rejected these before PowerShell could start. Validation now

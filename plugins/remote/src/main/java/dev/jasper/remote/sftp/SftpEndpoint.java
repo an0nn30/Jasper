@@ -214,7 +214,8 @@ public final class SftpEndpoint implements FileEndpoint {
             @Override public void flush() throws IOException { checkpoint(); }
             @Override public void abort() { SftpEndpoint.this.abort(); }
             @Override public void close() throws IOException {
-                if (failure != null) throw failure;
+                // A new exception: rethrowing the one write() threw makes try-with-resources fail on self-suppression.
+                if (failure != null) throw new IOException("Write already failed: " + failure.getMessage(), failure);
                 if (stopped) return;
                 try { checkpoint(); handle.close(); } catch (IOException problem) { throw failed(problem); }
                 finally { stopped = true; pending.clear(); }

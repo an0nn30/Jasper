@@ -46,7 +46,9 @@ final class SnippetFile {
 
     private static String string(TomlTable table, String key) {
         if (!(table.get(key) instanceof String text)) throw new IllegalArgumentException("'" + key + "' must be a string");
-        return text;
+        // tomlj writes each newline inside a multi-line string as the platform separator; a snippet's text
+        // must not depend on the OS (on Windows an escaped "\r\n" becomes "\n" too).
+        return text.replace(System.lineSeparator(), "\n");
     }
 
     private static List<String> strings(TomlTable table, String key) {

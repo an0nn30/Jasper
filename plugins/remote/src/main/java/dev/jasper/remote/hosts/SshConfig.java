@@ -3,6 +3,7 @@ package dev.jasper.remote.hosts;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.ArrayList;
@@ -35,14 +36,17 @@ public final class SshConfig {
         if (!Files.isRegularFile(config)) return new Parsed(List.of(), List.of());
         Path base = config.toAbsolutePath().getParent();
         return parse(Files.readString(config), include -> {
-            Path pattern = Path.of(include);
-            Path root = pattern.isAbsolute() ? pattern.getParent() : base.resolve(pattern).getParent();
-            PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + (pattern.isAbsolute() ? pattern : base.resolve(pattern)));
+            // Only the directory is a Path: Windows rejects a '*' in one, and reads '\' in a glob as an escape.
+            int slash = Math.max(include.lastIndexOf('/'), include.lastIndexOf(java.io.File.separatorChar));
             var texts = new ArrayList<String>();
-            if (root == null || !Files.isDirectory(root)) return texts;
+            Path root;
+            try { root = base.resolve(include.substring(0, slash + 1)); }
+            catch (InvalidPathException globbedDirectory) { return texts; } // a glob in a directory matches nothing anywhere
+            PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + include.substring(slash + 1));
+            if (!Files.isDirectory(root)) return texts;
             try (Stream<Path> files = Files.list(root)) {
                 for (Path file : files.sorted().toList())
-                    if (matcher.matches(file) && Files.isRegularFile(file)) texts.add(Files.readString(file));
+                    if (matcher.matches(file.getFileName()) && Files.isRegularFile(file)) texts.add(Files.readString(file));
             } catch (IOException unreadable) { return texts; }
             return texts;
         });

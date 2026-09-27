@@ -33,8 +33,13 @@ class PtyConnectorTest {
                 "[Console]::WriteLine('jasper-' + $env:TERM + '-' + $env:COLORTERM)"))
             .environment(environment).workingDirectory(Path.of(System.getProperty("user.home"))).build();
         try (TerminalSession session = TerminalSession.start(options)) {
-            Await.until(() -> screenText(session).contains("jasper-xterm-256color-truecolor"),
-                "PowerShell output with Windows hidden environment entries");
+            // A cold PowerShell start on a CI runner can outlast Await's 10 s; say what reached the screen if it never answers.
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (!screenText(session).contains("jasper-xterm-256color-truecolor")) {
+                if (System.nanoTime() > deadline) throw new AssertionError("PowerShell output never arrived; exit "
+                    + session.exitFuture().getNow(null) + ", screen:\n" + screenText(session));
+                Thread.sleep(10);
+            }
             assertThat(session.exitFuture().get(10, TimeUnit.SECONDS)).isZero();
         }
     }
