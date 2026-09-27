@@ -7,3 +7,6 @@ out/
 __pycache__/
 
 .worktrees/
+
+# Vendored icon category, not generated build output.
+!jasper-app/src/main/resources/dev/jasper/app/icons/intellij/build/

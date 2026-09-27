@@ -2,6 +2,14 @@
 
 ## Current state — 2026-09-23
 
+- **Local/remote integration and missing icon assets** (2026-09-27): merged
+  `origin/main` at `2d59d455` with the local keyboard-panel changes, retaining both
+  sets of status notes. Integration checks exposed 14 missing vendored SVGs under
+  `icons/intellij/build/`: the broad `build/` ignore rule had excluded that source
+  category from Git. Restored the exact files from the UI worktree, verified every
+  SHA-256 against `assets.tsv`, and added a source-only ignore exception.
+  Full `./gradlew check` passed: 2,266 tests, zero failures/errors, five skips.
+
 - **Thin shortcut disclosure chevrons** (`codex/keyboard-shortcuts-ui`, 2026-09-27):
   the shortcut tree now uses outlined chevrons instead of filled triangles: right when
   collapsed and down when expanded. Only the arrow shape is overridden; the active
