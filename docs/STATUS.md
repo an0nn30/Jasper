@@ -31,6 +31,12 @@
   package verification passed and the DMG was rebuilt. An initial unrelated asynchronous
   terminal-search timeout passed in isolation and in the final full suite. No GUI launched.
 
+- **Missing `build/` icons** (branch `claude/fix-build-icons`, 2026-09-27): the New UI catalog lists 7 icons
+  (14 SVGs) under `icons/intellij/build/`, which the root `.gitignore`'s `build/` rule kept out of Git, so
+  `IntellijIconsTest` and `HostedUiTest` failed on every clean checkout (CI red since `6bd1132d`). The 14 files
+  were fetched from `intellij-community` at the pinned commit and match `assets.tsv`'s SHA-256; `.gitignore`
+  now excepts that folder. `./gradlew check`: 2,262 tests, 2,257 passed, 0 failed, 5 skipped.
+
 - **Editor work merged with `origin/main`** (branch `claude/sync-origin`, 2026-09-27): local `main` (Editor
   plans A and B) and `origin/main` (28 commits: New UI icon catalog as SDK 0.8.2, remote-directory hints as
   SDK 0.8.3, workspace chrome, shortcut editor) had both numbered new SDK APIs 0.8.2. The Editor's additions
