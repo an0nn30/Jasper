@@ -13,6 +13,39 @@ import static org.assertj.core.api.Assertions.*;
 
 @ExtendWith(EdtTestExtension.class)
 class GraphiteChromeTest {
+    @Test void partialRepaintsKeepAllFourWorkspaceCornersRounded() throws Exception {
+        for (var theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+            try (var owner = content(launcher(new ArrayDeque<>()))) {
+                owner.selectTheme(theme);
+                var root = new javax.swing.JRootPane();
+                try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
+                    root.setSize(1000, 640); layoutTree(root); layoutTree(root);
+                    var strip = owner.windowTabs();
+                    var host = (javax.swing.JComponent) strip.getParent().getParent();
+                    var inset = host.getInsets();
+                    int left = inset.left, top = inset.top;
+                    int right = host.getWidth() - inset.right - 1, bottom = host.getHeight() - inset.bottom - 1;
+                    int chrome = UIManager.getColor("Jasper.titleBackground").getRGB();
+                    var image = new java.awt.image.BufferedImage(host.getWidth(), host.getHeight(), 2);
+                    // A damaged backing surface plus a tab-only dirty rectangle reproduces Swing's
+                    // opaque-child optimization. Full printAll snapshots do not exercise this path.
+                    for (int[] corner : new int[][]{{left, top}, {right - 7, top}, {left, bottom - 7}, {right - 7, bottom - 7}}) {
+                        var g = image.createGraphics();
+                        try {
+                            g.setColor(UIManager.getColor("ToolWindow.background"));
+                            g.fillRect(0, 0, image.getWidth(), image.getHeight());
+                            g.setClip(corner[0], corner[1], 8, 8);
+                            host.paint(g);
+                        } finally { g.dispose(); }
+                        int x = corner[0] == left ? left : right;
+                        int y = corner[1] == top ? top : bottom;
+                        assertThat(image.getRGB(x, y)).as("partial repaint corner (%s,%s), %s", x, y, theme).isEqualTo(chrome);
+                    }
+                }
+            }
+        }
+    }
+
     @Test void graphiteContentSurfacesContrastWithChromeAndSettingsHasOneHome() {
         try (var owner = content(launcher(new ArrayDeque<>()))) {
             owner.selectTheme(Theme.DARK);

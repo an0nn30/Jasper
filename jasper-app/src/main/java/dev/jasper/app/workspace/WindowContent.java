@@ -164,6 +164,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         windowTabs = new WindowTabs(this);
         // The tabs belong to the terminal column, so the rail and the side panels reach the toolbar.
         var terminalColumn = new JPanel(new BorderLayout());
+        // The rounded host paints behind this layout-only container, including partial tab repaints.
+        terminalColumn.setOpaque(false);
         terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
         regions = new WorkspaceRegions(terminalColumn);
         regions.setStatusVisible(chrome.status().isVisible());

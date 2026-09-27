@@ -291,7 +291,11 @@ these defaults; upstream theme assets should not be edited to duplicate them.
 
 
 Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and
-matching rounded corners for the terminal/tab column. Exterior gutters are 6px, except
+matching rounded corners for the terminal/tab column. Keep the layout-only terminal
+column non-opaque: otherwise Swing considers partial tab repaints fully obscured and
+skips the host background, leaving square corner pixels behind the clipped children.
+Corner regressions must exercise clipped `paint` calls as well as full-window previews.
+Exterior gutters are 6px, except
 beside a visible rail: the rail supplies its own balanced spacing, so the adjacent
 left/center/bottom surface has no additional leading gutter. Hiding or emptying the
 rail restores that gutter without reparenting plugin content. A visible status bar

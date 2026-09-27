@@ -2,6 +2,17 @@
 
 ## Current state — 2026-09-23
 
+- **Terminal corner repaint repair** (`codex/intellij-new-icons`, 2026-09-27):
+  all four outer terminal corners retain the shared 8px radius. The top corners could
+  appear square because Swing skipped the rounded host background for dirty rectangles
+  entirely covered by the opaque tab/terminal layout container. Made that layout-only
+  container non-opaque so the host always paints behind clipped descendants. Actual
+  terminal/tab surfaces, geometry and theme colors are unchanged. A partial-paint
+  regression failed before the fix and now verifies all four corners in dark/light;
+  full headless previews inspected and independent review is clean.
+  `check :jasper-app:packageDist` passed: 2,060 tests, zero failures/errors, five skips.
+  Package verification passed and the DMG was rebuilt. No GUI launched.
+
 - **Command-aware header and short tabs** (`codex/intellij-new-icons`, 2026-09-27):
   the user approved full `user@path : command` headers and short command/program tab
   labels. SSH headers use saved host identity and remote path instead of local metadata.
