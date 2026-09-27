@@ -12,8 +12,21 @@
   and machine-wide scope. The EXE's x64 architecture and all 20 official icon frames
   were verified. Installer + ZIP builds and targeted packaged-resource/terminal tests
   passed (12 tests: six passed, six Unix-only skips). Independent review found no issues.
-  The broader Windows failures recorded below remain open; this is not a green full-suite
-  claim. Setup remains unsigned. Interactive install/upgrade/uninstall acceptance is
+  Updated from `origin/main` at `90c2e574` in merge `7ce646f9`: preserved both status
+  entries at the sole conflict and applied main's LF checkout policy to existing files.
+  Rebuilt and verified the setup EXE and ZIP; packaged assets now have the pinned LF bytes.
+  Targeted resource, terminal integration, and startup verification passed (42 tests:
+  34 passed, eight skipped). Full `check --continue` also ran: seven tests require this
+  account to have Windows symlink privileges (listed below), and one reflow-search timeout
+  passed when its full test class was rerun. Initial checksum failures disappeared after
+  LF normalization. This is not a green full-suite claim. Remaining privilege failures:
+  `ShellIntegrationScriptsTest.installReplacesASymlinkRatherThanWritingThroughIt`,
+  `FileEndpointTest.localContract`, `FileEndpointTest.rejectsIntermediateLinksWithoutTouchingTheirReferents`,
+  `SftpEndpointTest.sftpV3ContractAndSubsystemCloseKeepsSharedSessionAlive`,
+  `TransferCoordinatorTest.folderTransferPreservesEmptyDirectoriesLinksAndUsesBoundedQueue`,
+  `KnownHostsTest.ownDanglingSymlinkIsNotAnEmptyTrustFile`, and
+  `FileOperationTest.recursiveDeleteNeverFollowsLinksAndTransferReservationsBlockIt`.
+  Setup remains unsigned. Interactive install/upgrade/uninstall acceptance is
   user-run; no installer or GUI was launched. [Build and acceptance](packaging.md#windows-setup-wizard).
   Not merged or pushed.
 
