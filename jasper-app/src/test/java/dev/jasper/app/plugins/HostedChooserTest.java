@@ -41,7 +41,11 @@ class HostedChooserTest {
         assertThat(disposed).isTrue();
         selected = List.of(Path.of("/dest"));
         assertThat(ui.windows().chooseDirectory(owner, "Download", Optional.empty())).contains(Path.of("/dest"));
-        assertThat(requests.getLast().directory()).isTrue();
+        assertThat(requests.getLast().mode()).isEqualTo(PathChoice.Mode.DIRECTORY);
+        selected = List.of(Path.of("/notes/new.toml"));
+        assertThat(ui.windows().chooseSaveFile(owner, "Save As", Optional.of(Path.of("/notes/old.toml")))).contains(Path.of("/notes/new.toml"));
+        assertThat(requests.getLast().mode()).isEqualTo(PathChoice.Mode.SAVE);
+        assertThat(requests.getLast().initial()).contains(Path.of("/notes/old.toml"));
         selected = List.of();
         assertThat(ui.windows().chooseFiles(owner, "Cancelled", Optional.empty())).isEmpty();
     }

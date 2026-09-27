@@ -549,7 +549,7 @@ public final class FakePluginHost implements AutoCloseable {
     private Runnable duringPathSelection = () -> {};
 
     /**
-     * Queues multiple files or one directory; an empty list scripts cancellation.
+     * Queues multiple files, one directory or one save target (chooseFiles, chooseDirectory, chooseSaveFile); an empty list scripts cancellation.
      * @param selection selected local paths
      * @since 0.7.5
      */

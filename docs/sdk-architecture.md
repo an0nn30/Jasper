@@ -306,3 +306,8 @@ dialogs or overlays) without closing anything, before `quitting` is set and befo
 records no relaunch. Start-up rollback, a `--background` launch that cannot stay resident and the
 benchmark exit through `quitNow()`, which does not ask; a resident asked to retire by another
 launch goes through `quit()` and does.
+
+`Windows.chooseSaveFile` is the save-target twin of `chooseFiles`: `PathChoice.Mode.SAVE` makes
+`NativeShells` open an AWT `FileDialog` in `SAVE` mode, filling in a suggested file's folder and
+name; the platform dialog confirms replacing an existing file. The testkit answers it from the same
+`queuePathSelection` queue.

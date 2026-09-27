@@ -585,3 +585,7 @@ state afterwards; owner closure or plugin stop cancels and discards the result. 
 native multiple-file picker and a themed directory picker. Paths are absolute and normalized;
 perform subsequent filesystem work in the background. Existing `WindowSurface.chooseFile`
 continues to select one file for window-owned workflows.
+
+SDK 0.8.2 adds `chooseSaveFile(owner, title, initial)` for a file to save to: pass a suggested file to
+fill in its folder and name, or a folder to start in. The platform dialog asks before replacing an
+existing file, so you need not ask again.

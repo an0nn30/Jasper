@@ -398,6 +398,9 @@ final class FakeUi {
             @Override public java.util.Optional<java.nio.file.Path> chooseDirectory(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
                 return choosePaths(owner, title, initial).stream().findFirst();
             }
+            @Override public java.util.Optional<java.nio.file.Path> chooseSaveFile(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
+                return choosePaths(owner, title, initial).stream().findFirst();
+            }
             @Override public PluginWindow create(WindowSpec spec) {
                 context.requireOpen();
                 requireNamespace(spec.id(), "A window");
