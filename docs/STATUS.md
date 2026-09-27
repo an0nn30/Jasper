@@ -2,6 +2,21 @@
 
 ## Current state — 2026-09-23
 
+- **Expandable keyboard shortcut sections** (`codex/keyboard-shortcuts-ui`, 2026-09-27):
+  replaced the flat four-column table with collapsible section/plugin groups, vendored
+  folder icons and right-aligned bindings. Panel, tree, viewport and editor share the
+  active theme's panel surface; selected rows retain the theme's rounded treatment.
+  Search temporarily opens matching sections and restores manual disclosure state when
+  cleared. Live refresh preserves selection by action ID; Enter edits actions or toggles
+  groups, and expand/collapse-all controls support browsing. Context remains in tooltips
+  and accessible descriptions; recording, conflict resolution and read-only keys retain
+  their existing behavior. Headless previews cover dark/light and larger UI fonts.
+  Regression checks cover disclosure, search, refresh, rendering and full-width row
+  clicks; independent review findings are fixed and the final review is clean.
+  `check :jasper-app:packageDist` passed: 2,072 tests, zero failures/errors, five skips;
+  package verification passed and the DMG was rebuilt. An initial unrelated asynchronous
+  terminal-search timeout passed in isolation and in the final full suite. No GUI launched.
+
 - **Terminal-first startup focus** (`codex/intellij-new-icons`, 2026-09-27):
   removed the SSH panel's deferred focus request on every hierarchy showing event,
   which raced the window's startup terminal focus. Explicit panel visibility callbacks

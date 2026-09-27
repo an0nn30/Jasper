@@ -380,3 +380,13 @@ those events during initial frame display. The SSH panel requests list focus fro
 explicit visibility callback only if it is already showing, preserving deliberate
 panel opening without stealing startup focus. Session completion keeps the existing
 active-pane and command-palette guards.
+
+
+The keyboard-shortcuts window groups its effective catalog in `ShortcutTree`. Section
+expansion is local to that window; filtering reveals matching sections without replacing
+those choices, and live catalog updates preserve selection by action ID. Enter toggles
+sections or edits actions; the existing key recorder, conflict checks and explicit save
+flow remain in `ShortcutPanel`/`ShortcutEditPanel`. The tree, viewport and scroll track
+use `Panel.background`; nested editor containers are transparent. Row selection, labels
+and icons use the active theme and bundled catalog. `shortcutHelpPreview` renders closed,
+expanded and editing states in both themes and larger UI type without opening a window.

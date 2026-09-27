@@ -84,22 +84,22 @@ class ShortcutHelpTest {
             var stroke = KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK);
             panel.setRows(List.of(new ShortcutEntry("remote.hosts", "Remote", "SSH Hosts", stroke, "Terminal window", "connect"),
                 new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Terminal window", "")));
-            panel.search.setText("remote"); assertThat(panel.table.getRowCount()).isEqualTo(1);
-            panel.search.setText("shift+command+h"); assertThat(panel.table.getRowCount()).isEqualTo(1);
-            panel.search.setText("cmd+h"); assertThat(panel.table.getRowCount()).isZero();
-            panel.search.setText("missing"); assertThat(panel.table.getRowCount()).isZero();
+            panel.search.setText("remote"); assertThat(panel.tree.getRowCount()).isEqualTo(2);
+            panel.search.setText("shift+command+h"); assertThat(panel.tree.getRowCount()).isEqualTo(2);
+            panel.search.setText("cmd+h"); assertThat(panel.tree.getRowCount()).isZero();
+            panel.search.setText("missing"); assertThat(panel.tree.getRowCount()).isZero();
             panel.record.doClick();
             var foreign = key(new JButton(), KeyEvent.KEY_PRESSED, KeyEvent.VK_H, InputEvent.META_DOWN_MASK);
             assertThat(panel.dispatch(foreign)).isFalse();
             var press = key(panel.search, KeyEvent.KEY_PRESSED, KeyEvent.VK_H, stroke.getModifiers());
             assertThat(panel.dispatch(press)).isTrue(); assertThat(press.isConsumed()).isTrue();
-            assertThat(panel.table.getRowCount()).isEqualTo(1);
-            assertThat(panel.table.getValueAt(0, 0)).isEqualTo("SSH Hosts");
+            assertThat(panel.tree.getRowCount()).isEqualTo(2);
+            assertThat(panel.tree.entryAt(1).name()).isEqualTo("SSH Hosts");
             assertThat(panel.dispatch(new KeyEvent(panel.search, KeyEvent.KEY_TYPED, 0, 0, KeyEvent.VK_UNDEFINED, 'h'))).isTrue();
             panel.record.doClick();
             assertThat(panel.dispatch(key(panel.search, KeyEvent.KEY_RELEASED, KeyEvent.VK_H, 0))).isTrue();
             assertThat(panel.dispatch(key(panel.search, KeyEvent.KEY_PRESSED, KeyEvent.VK_C, 0))).isFalse();
-            panel.clear.doClick(); assertThat(panel.table.getRowCount()).isEqualTo(2);
+            panel.clear.doClick(); assertThat(panel.tree.getRowCount()).isEqualTo(2);
             panel.close();
         });
     }
@@ -132,17 +132,17 @@ class ShortcutHelpTest {
             var help = new ShortcutHelp(windows, c, () -> base[0], () -> Map.of("dev.test", "Test Plugin"), true, changes -> { throw new AssertionError("Unexpected save"); });
             help.open(); var surface = windows.open().getFirst();
             var panel = (ShortcutPanel) surface.holder().getComponent(0);
-            panel.search.setText("hello"); assertThat(panel.table.getRowCount()).isZero();
+            panel.search.setText("hello"); assertThat(panel.tree.getRowCount()).isZero();
             var action = c.addAction("dev.test.hello", "Hello", null, List.of(), Optional.of("cmd+h"), ignored -> {});
-            assertThat(panel.table.getRowCount()).isEqualTo(1);
+            assertThat(panel.tree.getRowCount()).isEqualTo(2);
             base[0] = KeyBindings.withOverrides(true, Map.of("dev.test.hello", "ctrl+h")); help.refresh();
-            assertThat(panel.table.getValueAt(0, 1)).isEqualTo("Ctrl+H");
+            assertThat(ShortcutText.format(panel.tree.entryAt(1).stroke())).isEqualTo("Ctrl+H");
             help.open(); assertThat(windows.open()).containsExactly(surface);
             assertThat(panel.search.getText()).isEqualTo("hello");
-            action.close(); assertThat(panel.table.getRowCount()).isZero();
+            action.close(); assertThat(panel.tree.getRowCount()).isZero();
             surface.close();
             c.addAction("dev.test.hello", "Hello", null, List.of(), Optional.of("cmd+h"), ignored -> {});
-            assertThat(panel.table.getRowCount()).isZero();
+            assertThat(panel.tree.getRowCount()).isZero();
             help.open(); assertThat(windows.open()).hasSize(1).doesNotContain(surface);
             windows.close();
         });
@@ -172,12 +172,12 @@ class ShortcutHelpTest {
             var panel = new ShortcutPanel(true, changes -> { throw new AssertionError("Unexpected save"); });
             try {
                 panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
-                int normal = panel.table.getRowHeight();
+                int normal = panel.tree.getRowHeight();
                 themes.configure(dev.jasper.app.appearance.Theme.DARK, new dev.jasper.app.config.UiFontConfig("system", 18));
                 javax.swing.SwingUtilities.updateComponentTreeUI(panel);
                 panel.setSize(1000, 640);
                 dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(panel);
-                assertThat(panel.table.getRowHeight()).isGreaterThan(normal);
+                assertThat(panel.tree.getRowHeight()).isGreaterThan(normal);
                 assertThat(panel.search.getWidth()).isGreaterThan(200);
                 assertThat(panel.record.getWidth()).isGreaterThanOrEqualTo(panel.record.getPreferredSize().width);
                 assertThat(panel.search.getHeight()).isGreaterThanOrEqualTo(panel.search.getPreferredSize().height);

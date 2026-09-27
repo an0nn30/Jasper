@@ -7,10 +7,7 @@ import java.util.function.Function;
 
 import dev.jasper.app.platform.WindowInput;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.KeyboardFocusManager;
 import java.awt.KeyEventDispatcher;
 import java.awt.event.KeyEvent;
@@ -23,25 +20,21 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JRootPane;
 import javax.swing.JScrollPane;
-import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableCellRenderer;
 
-/** Editable grouped table and window-scoped capture. Native dispatch exists only while mounted. */
+/** Expandable shortcut sections and window-scoped capture. Native dispatch exists only while mounted. */
 final class ShortcutPanel extends JPanel implements AutoCloseable {
     final JTextField search = new JTextField();
     final JButton record = new JButton("Record shortcut");
     final JButton clear = new JButton("Clear");
-    final JTable table;
+    final ShortcutTree tree;
     final ShortcutEditPanel editor;
     private final JLabel status = new JLabel();
-    private final Rows model = new Rows();
     private List<ShortcutEntry> all = List.of();
     private List<ShortcutEntry> visible = List.of();
     private KeyStroke captured;
@@ -63,43 +56,43 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         super(new BorderLayout(0, 12));
         editor = new ShortcutEditPanel(macOs, writer, this::stopSearchRecording);
         setBorder(BorderFactory.createEmptyBorder(18, 18, 14, 18));
-        var top = new JPanel(new BorderLayout(10, 8));
+        var top = new JPanel(new BorderLayout(10, 8)); top.setOpaque(false);
         var label = new JLabel("Find a shortcut"); label.setLabelFor(search);
         top.add(label, BorderLayout.NORTH);
         search.putClientProperty("JTextField.placeholderText", "Search actions, plugins, or Cmd+Shift+H");
         search.getAccessibleContext().setAccessibleName("Search keyboard shortcuts");
         top.add(search, BorderLayout.CENTER);
-        var buttons = new JPanel(new java.awt.GridLayout(1, 2, 6, 0));
+        var buttons = new JPanel(new java.awt.GridLayout(1, 2, 6, 0)); buttons.setOpaque(false);
         buttons.add(record); buttons.add(clear); top.add(buttons, BorderLayout.EAST);
         add(top, BorderLayout.NORTH);
-        table = new JTable(model);
-        table.setFillsViewportHeight(true);
-        table.setShowGrid(false);
-        table.setIntercellSpacing(new Dimension(0, 0));
-        table.getTableHeader().setReorderingAllowed(false);
-        table.setDefaultRenderer(Object.class, new Cell());
-        table.getAccessibleContext().setAccessibleName("Keyboard shortcuts grouped by section or plugin");
-        int[] widths = {285, 165, 160, 290};
-        for (int i = 0; i < widths.length; i++) table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
-        table.addPropertyChangeListener("font", event -> sizeRows()); sizeRows();
-        var scroll = new JScrollPane(table);
-        scroll.setColumnHeaderView(table.getTableHeader());
-        add(scroll, BorderLayout.CENTER);
+        tree = new ShortcutTree(this::editRow);
+        javax.swing.ToolTipManager.sharedInstance().registerComponent(tree);
+        var scroll = new JScrollPane(tree) {
+            @Override public void updateUI() {
+                super.updateUI();
+                setBorder(BorderFactory.createEmptyBorder());
+                setBackground(UIManager.getColor("Panel.background"));
+                getViewport().setBackground(getBackground());
+            }
+        };
+        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.getVerticalScrollBar().putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE,
+            "track: $Panel.background; hoverTrackColor: $Panel.background; pressedTrackColor: $Panel.background");
+        var sections = new JPanel(new BorderLayout(0, 6)); sections.setOpaque(false);
+        var sectionTools = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING, 4, 0)); sectionTools.setOpaque(false);
+        for (boolean open : new boolean[] {true, false}) {
+            var button = new JButton(dev.jasper.app.platform.AppIcons.bundled(open ? "general/expandAll" : "general/collapseAll"));
+            button.setToolTipText(open ? "Expand all sections" : "Collapse all sections");
+            button.getAccessibleContext().setAccessibleName(button.getToolTipText());
+            button.putClientProperty("JButton.buttonType", "toolBarButton");
+            button.addActionListener(event -> tree.expandSections(open)); sectionTools.add(button);
+        }
+        sections.add(sectionTools, BorderLayout.NORTH); sections.add(scroll, BorderLayout.CENTER);
+        add(sections, BorderLayout.CENTER);
         status.getAccessibleContext().setAccessibleName("Shortcut search status");
-        var bottom = new JPanel(new BorderLayout(0, 8));
+        var bottom = new JPanel(new BorderLayout(0, 8)); bottom.setOpaque(false);
         bottom.add(editor, BorderLayout.CENTER); bottom.add(status, BorderLayout.SOUTH);
         add(bottom, BorderLayout.SOUTH);
-        table.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
-        table.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mouseClicked(java.awt.event.MouseEvent event) {
-                int row = table.rowAtPoint(event.getPoint());
-                if (row >= 0 && table.columnAtPoint(event.getPoint()) == 1) editRow(row);
-            }
-        });
-        table.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "editShortcut");
-        table.getActionMap().put("editShortcut", new javax.swing.AbstractAction() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent event) { editRow(table.getSelectedRow()); }
-        });
         search.getDocument().addDocumentListener(new DocumentListener() {
             private void changed() { if (!editingCapture) { captured = null; filter(); } }
             @Override public void insertUpdate(DocumentEvent event) { changed(); }
@@ -118,16 +111,11 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         filter();
     }
 
-    private void sizeRows() {
-        table.setRowHeight(table.getFontMetrics(table.getFont()).getHeight() + 12);
-    }
-
     void setRows(List<ShortcutEntry> rows) { all = List.copyOf(rows); editor.setRows(all); filter(); }
 
-    private void editRow(int index) {
-        if (index < 0 || index >= visible.size()) return;
+    private void editRow(ShortcutEntry entry) {
         stopSearchRecording();
-        editor.begin(visible.get(index)); filter();
+        editor.begin(entry); filter();
     }
 
     private void stopSearchRecording() {
@@ -136,10 +124,10 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
 
     private void filter() {
         visible = all.stream().filter(row -> ShortcutText.matches(row, search.getText(), captured)).toList();
-        model.fireTableDataChanged();
+        tree.showRows(visible, captured != null || !search.getText().isBlank());
         status.setText(recording ? "Press a shortcut to find it. Click Stop recording when finished."
             : visible.isEmpty() ? "No matching shortcuts. Try another name or key combination."
-            : visible.size() + (visible.size() == 1 ? " shortcut" : " shortcuts") + " · Click a shortcut to edit · Contextual keys are read-only");
+            : visible.size() + (visible.size() == 1 ? " shortcut" : " shortcuts") + " · Select an action to edit · Contextual keys are read-only");
     }
 
     boolean capture(KeyStroke stroke) {
@@ -206,34 +194,6 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         mountedRoot = null; held.clear(); swallowTyped = false;
     }
 
-    @Override public void close() { closed = true; recording = false; editor.close(); uninstall(); }
+    @Override public void close() { closed = true; recording = false; editor.close(); uninstall(); javax.swing.ToolTipManager.sharedInstance().unregisterComponent(tree); }
 
-    private final class Rows extends AbstractTableModel {
-        private static final String[] HEADINGS = {"Action", "Shortcut", "Section / Plugin", "Context"};
-        @Override public int getRowCount() { return visible.size(); }
-        @Override public int getColumnCount() { return HEADINGS.length; }
-        @Override public String getColumnName(int column) { return HEADINGS[column]; }
-        @Override public Object getValueAt(int row, int column) {
-            var item = visible.get(row);
-            return switch (column) {
-                case 0 -> item.name(); case 1 -> ShortcutText.format(item.stroke());
-                case 2 -> item.group(); default -> item.context();
-            };
-        }
-    }
-
-    private final class Cell extends DefaultTableCellRenderer {
-        @Override public Component getTableCellRendererComponent(JTable grid, Object value, boolean selected,
-                                                                 boolean focused, int row, int column) {
-            super.getTableCellRendererComponent(grid, value, selected, focused, row, column);
-            boolean start = row == 0 || !visible.get(row).group().equals(visible.get(row - 1).group());
-            Color line = UIManager.getColor("Component.borderColor");
-            if (line == null) line = grid.getForeground();
-            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(start ? 1 : 0, 0, 0, 0, line),
-                BorderFactory.createEmptyBorder(4, 8, 4, 8)));
-            setFont(grid.getFont().deriveFont(column == 2 ? Font.BOLD : Font.PLAIN));
-            setToolTipText(column == 1 ? visible.get(row).editable() ? "Click to change this shortcut" : "Fixed contextual key (read-only)" : String.valueOf(value));
-            return this;
-        }
-    }
 }

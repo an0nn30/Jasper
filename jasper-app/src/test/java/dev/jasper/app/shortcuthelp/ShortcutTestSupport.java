@@ -9,8 +9,8 @@ public final class ShortcutTestSupport {
     public static void save(AuxiliarySurface surface, String query, KeyStroke shortcut) {
         var panel = (ShortcutPanel) surface.holder().getComponent(0);
         panel.search.setText(query);
-        panel.table.setRowSelectionInterval(0, 0);
-        panel.table.getActionMap().get("editShortcut").actionPerformed(null);
+        panel.tree.setSelectionRow(1);
+        panel.tree.getActionMap().get("editShortcut").actionPerformed(null);
         if (!panel.capture(shortcut)) throw new AssertionError("not recording");
         panel.editor.save.doClick();
     }
