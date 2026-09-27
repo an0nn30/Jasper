@@ -1,0 +1,17 @@
+# Editor settings. Jasper reads this file live; changes apply at once to open tabs.
+
+# The editor font; it must be an installed family. Default: the first installed of
+# JetBrains Mono, Menlo, Consolas and DejaVu Sans Mono, else Monospaced.
+# font_family = "JetBrains Mono"
+
+# Font size in points, 8 to 48.
+# font_size = 13
+
+# Columns per tab stop, 1 to 16.
+# tab_size = 4
+
+# Wrap long lines in new tabs.
+# soft_wrap = false
+
+# Files larger than this many MiB (1 to 256) are refused.
+# max_file_mib = 10
