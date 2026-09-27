@@ -289,3 +289,12 @@ Remote owns its SFTP endpoints and persistent SQLite transfer store. Its accepte
 loops start while the plugin context is live; stop signals them synchronously, and they
 quiesce endpoints and close the queue/lock without submitting new shutdown tasks. The app
 knows only the SDK contributions, not transfer state or SFTP classes.
+
+## Close command, quit guards and the save chooser (SDK 0.8.2)
+
+`PluginWindow.onCloseCommand` lets a plugin window's content handle File → Close Window and
+Cmd/Ctrl+W, for example by closing a tab. `NativeShells`' Close Window item calls
+`AuxiliarySurface.closeCommand()`, which asks the handlers newest first and otherwise closes like
+the close button, through the guards. The close button itself (`windowClosing`) still calls
+`requestClose()`. With the macOS screen menu bar, the menu accelerator fires before the content's
+key bindings see Cmd+W, so a key binding could not do this.

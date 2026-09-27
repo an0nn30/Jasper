@@ -146,4 +146,20 @@ class AuxiliaryWindowsTest {
         manager.notifyActivated();
         assertThat(events).hasSize(3);
     }
+
+    @Test void theCloseCommandAsksHandlersNewestFirstThenCloses() {
+        AuxiliarySurface editor = windows.window("dev.x.editor", "Editor", new Dimension(640, 480), true);
+        List<String> asked = new ArrayList<>();
+        boolean[] handled = {true};
+        editor.onCloseCommand(() -> { asked.add("older"); return false; });
+        editor.onCloseCommand(() -> { asked.add("newer"); return handled[0]; });
+        editor.onCloseCommand(() -> { throw new IllegalStateException("boom"); });
+        editor.show();
+        assertThat(editor.closeCommand()).isFalse();
+        assertThat(asked).containsExactly("newer");
+        handled[0] = false;
+        assertThat(editor.closeCommand()).as("nothing handled it and no guard refused").isTrue();
+        assertThat(asked).containsExactly("newer", "newer", "older");
+        assertThat(editor.closed()).isTrue();
+    }
 }

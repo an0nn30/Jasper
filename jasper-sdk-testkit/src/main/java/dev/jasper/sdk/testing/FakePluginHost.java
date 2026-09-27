@@ -612,6 +612,20 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
+     * Runs the Close Window command of the first open window with this id, as File → Close Window or Cmd/Ctrl+W
+     * would: its close-command handlers newest first, then, when none handled it, its closing guards.
+     *
+     * @param windowId the window id
+     * @return true when the window closed; false when a handler handled the command, a guard vetoed or there is no such window
+     * @since 0.8.2
+     */
+    public boolean closeCommand(String windowId) {
+        for (FakePluginContext context : contexts.values())
+            for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows)) if (window.id.equals(windowId)) return window.closeCommand();
+        return false;
+    }
+
+    /**
      * Adds a terminal window. Windows, tabs and panes announce themselves on the terminal topics like the
      * application's, delivered by {@link #flush()}.
      *

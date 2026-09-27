@@ -202,6 +202,9 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
   is shown or hidden, which is the moment to start or stop refreshing.
 - `WindowSurface.onClosing` guards run when the user closes the window; returning false keeps
   it open. Quitting Jasper does not consult them. `close()` closes at once.
+- In SDK 0.8.2+, `window.onCloseCommand(() -> …)` lets your content handle File → Close Window and
+  Cmd/Ctrl+W, for example by closing a tab; return true when you handled it and false to let the
+  window close. The close button is not affected.
 - A modal dialog's `show()` returns after the dialog has closed.
 - In SDK 0.7.1+, call `window.chooseFile("Choose file", Optional.of(currentPath))` (or
   `dialog.chooseFile`) from a Browse button on the UI thread. Pass `Optional.empty()` when there

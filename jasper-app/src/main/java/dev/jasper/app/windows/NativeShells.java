@@ -249,7 +249,7 @@ public final class NativeShells {
         var close = new JMenuItem("Close Window");
         close.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, shortcut));
         close.addActionListener(event -> {
-            if (!dev.jasper.app.platform.WindowInput.captureShortcut(surface.holder(), close.getAccelerator())) surface.requestClose();
+            if (!dev.jasper.app.platform.WindowInput.captureShortcut(surface.holder(), close.getAccelerator())) surface.closeCommand();
         });
         file.add(open); file.add(close);
         if (!SystemInfo.isMacOS) {

@@ -561,6 +561,34 @@ public abstract class PluginContractTest {
         assertThat(h.windows()).isEmpty();
     }
 
+    @Test void theCloseCommandAsksTheContentNewestFirstBeforeTheGuards() {
+        var handled = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var allow = new java.util.concurrent.atomic.AtomicBoolean(false);
+        List<String> asked = Collections.synchronizedList(new ArrayList<>());
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            PluginWindow window = context.windows().create(new WindowSpec("test.alpha.editor", "Editor", new Dimension(640, 480), true));
+            window.onCloseCommand(() -> { asked.add("older"); return false; });
+            window.onCloseCommand(() -> { asked.add("newer"); return handled.get(); });
+            window.onCloseCommand(() -> { throw new IllegalStateException("handler failure"); });
+            window.onClosing(() -> { asked.add("guard"); return allow.get(); });
+            window.show();
+        });
+        h.ui(() -> assertThat(h.closeCommand("test.alpha.editor")).as("the newest handler that answers true keeps it open").isFalse());
+        assertThat(asked).containsExactly("newer");
+        asked.clear();
+        handled.set(false);
+        h.ui(() -> assertThat(h.closeCommand("test.alpha.editor")).as("unhandled, the guard still refuses").isFalse());
+        assertThat(asked).containsExactly("newer", "older", "guard");
+        asked.clear();
+        allow.set(true);
+        h.ui(() -> {
+            assertThat(h.closeCommand("test.alpha.editor")).isTrue();
+            assertThat(h.closeCommand("test.alpha.absent")).isFalse();
+        });
+        assertThat(asked).containsExactly("newer", "older", "guard");
+        assertThat(h.windows()).isEmpty();
+    }
+
     private static PluginInfo info(String id, String... capabilities) { return new PluginInfo(id, id, "1.0.0", Set.of(capabilities)); }
 
     @Test void terminalsAreFoundThroughTheContextAndHandlesAreEqualById() {

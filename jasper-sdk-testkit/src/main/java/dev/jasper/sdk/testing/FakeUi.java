@@ -254,6 +254,21 @@ final class FakeUi {
         }
         @Override public Subscription onClosing(BooleanSupplier guard) { guards.add(guard); return () -> guards.remove(guard); }
         @Override public Subscription onClosed(Runnable handler) { closedHandlers.add(handler); return () -> closedHandlers.remove(handler); }
+        final List<BooleanSupplier> closeCommands = new ArrayList<>();
+        @Override public Subscription onCloseCommand(BooleanSupplier handler) {
+            closeCommands.add(java.util.Objects.requireNonNull(handler));
+            return () -> closeCommands.remove(handler);
+        }
+        boolean closeCommand() {
+            if (closed) return false;
+            List<BooleanSupplier> handlers = new ArrayList<>(closeCommands);
+            java.util.Collections.reverse(handlers);
+            for (BooleanSupplier handler : handlers) {
+                try { if (handler.getAsBoolean()) return false; }
+                catch (RuntimeException failure) { host.recordFailure(pluginId() + " close command: " + failure); }
+            }
+            return requestClose();
+        }
         boolean requestClose() {
             if (id.equals("overlay")) return false;
             for (BooleanSupplier guard : List.copyOf(guards)) {

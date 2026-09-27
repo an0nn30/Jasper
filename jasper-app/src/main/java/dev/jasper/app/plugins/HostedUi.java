@@ -327,7 +327,17 @@ final class HostedUi {
         @Override public void close() { subscription(surface::close).close(); }
     }
 
-    private final class OwnedWindow extends Surface implements PluginWindow { OwnedWindow(AuxiliarySurface surface) { super(surface); } }
+    private final class OwnedWindow extends Surface implements PluginWindow {
+        OwnedWindow(AuxiliarySurface surface) { super(surface); }
+        @Override public Subscription onCloseCommand(BooleanSupplier handler) {
+            requireUi("onCloseCommand");
+            return wrap(surface.onCloseCommand(() -> {
+                boolean[] handled = {false};
+                containment.run(pluginId, "close command", () -> handled[0] = handler.getAsBoolean());
+                return handled[0];
+            }));
+        }
+    }
     private final class OwnedDialog extends Surface implements PluginDialog { OwnedDialog(AuxiliarySurface surface) { super(surface); } }
 
     private final java.util.Map<AuxiliarySurface, OwnedWindow> ownedWindows = new java.util.HashMap<>();
