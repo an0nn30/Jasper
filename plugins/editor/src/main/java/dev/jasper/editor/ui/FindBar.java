@@ -2,14 +2,12 @@ package dev.jasper.editor.ui;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
-import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
@@ -64,13 +62,10 @@ public final class FindBar extends JPanel {
             @Override public void changedUpdate(DocumentEvent event) { }
         });
         for (JToggleButton toggle : new JToggleButton[] {matchCase, wholeWord, regex}) toggle.addActionListener(event -> update());
-        key(find, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "next", this::next);
-        key(find, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK), "previous", this::previous);
-        key(replace, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "replace", this::replaceOne);
-        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "close");
-        getActionMap().put("close", new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent event) { close(); }
-        });
+        Forms.bind(find, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "next", this::next);
+        Forms.bind(find, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK), "previous", this::previous);
+        Forms.bind(replace, JComponent.WHEN_FOCUSED, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "replace", this::replaceOne);
+        Forms.bind(this, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "close", this::close);
         setVisible(false);
     }
 
@@ -177,12 +172,5 @@ public final class FindBar extends JPanel {
         var button = new JButton(text);
         button.addActionListener(event -> action.run());
         return button;
-    }
-
-    private static void key(JComponent component, KeyStroke stroke, String name, Runnable action) {
-        component.getInputMap(JComponent.WHEN_FOCUSED).put(stroke, name);
-        component.getActionMap().put(name, new AbstractAction() {
-            @Override public void actionPerformed(ActionEvent event) { action.run(); }
-        });
     }
 }
