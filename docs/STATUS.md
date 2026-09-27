@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-23
 
+- **App-hosted Editor tabs** (`codex/plugin-workspace-tabs`, in progress, 2026-09-27):
+  Editor files now use the main workspace's tab strip, rounded content frame, commands,
+  status and breadcrumbs. The tab menu moves live content to/from a separate app-owned
+  workspace, preserving undo and unsaved edits. SDK 0.8.5 supplies hosted content handles,
+  asynchronous close guards and semantic editor palettes; Editor 0.2.0 and Remote 0.4.1
+  require it. SFTP passes the originating workspace. Native inline implementation follows
+  the approved hosted-workspace-tabs spec/plan. Rulings: reuse the whole WindowContent for
+  shell-free detached windows; use stable session keys across Save As; defer individual
+  close/move commands during batch approval. Final verification and review pending.
+
 - **Local/remote integration and missing icon assets** (2026-09-27): merged
   `origin/main` at `2d59d455` with the local keyboard-panel changes, retaining both
   sets of status notes. Integration checks exposed 14 missing vendored SVGs under

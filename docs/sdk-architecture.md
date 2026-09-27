@@ -335,3 +335,30 @@ launch goes through `quit()` and does.
 `NativeShells` open an AWT `FileDialog` in `SAVE` mode, filling in a suggested file's folder and
 name; the platform dialog confirms replacing an existing file. The testkit answers it from the same
 `queuePathSelection` queue.
+
+### Hosted document tabs (SDK 0.8.5)
+
+`Windows.openTab(ContentSpec, WindowOwner, JComponent)` mounts specialized plugin content
+in an application workspace. The application owns tabs, rounded frames, overflow, menus,
+status controls and native window lifetime. Keys are scoped to the contributing plugin;
+opening an existing key selects its live tab. Null or closed originating windows use the
+last main workspace, creating one when needed. Foreign owners are rejected.
+
+`ContentTab` updates literal presentation, commands and typed status items, supplies its
+focus callback, and moves its retained component between main and separate workspaces.
+It is a dynamic dialog/picker owner: future prompts follow the current host. Moves are
+ignored while a close decision or modal prompt is pending. A move never disposes content.
+`requestClose` consults the plugin's asynchronous `Windows.onTabsClosing` guard; exceptions
+and false decisions leave content intact. The guard receives the affected subset and a
+batch flag for window close, quit and restart. Repeated tab-close requests share the pending
+result; final `close` is reserved for shutdown and disposes exactly once without prompting.
+Closed handles cannot reattach or take focus.
+
+The application translates SDK values to `contributions.ContentRegistry`/`ContentEntry`.
+`WindowContent` hosts both terminal and plugin components; `WindowTabs` and
+`WorkspaceRegions` remain the single renderer. Separate document windows reuse those same
+owners without starting a shell. Terminal enumeration and active-pane APIs continue to
+report terminal content only. Plugins must tolerate an empty active pane while editing.
+
+`Appearance.editorPalette()` provides semantic surface, text, caret, selection, current-line
+and gutter colors. Jasper derives missing theme tokens; plugins retain syntax classification.

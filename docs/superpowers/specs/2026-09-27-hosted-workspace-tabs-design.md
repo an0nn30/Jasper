@@ -58,10 +58,10 @@ windows, arbitrary docking or editor splits. Same-window tab reorder remains ava
 
 ## Ownership and architecture
 
-Extract the existing tab renderer and rounded content frame from their terminal-specific
-owners into a shared, app-internal UI package with an acyclic dependency direction. Main
-workspace and auxiliary window hosts both consume it. Do not copy the renderer or expose
-application classes to plugins.
+Main and detached windows share the existing WindowContent, WindowTabs and WorkspaceRegions
+owners. Detached windows start without a terminal shell. Reusing the full workspace preserves
+one renderer and an acyclic package graph without extracting a second hosting implementation.
+Do not copy the renderer or expose application classes to plugins.
 
 The workspace selection model represents terminal tabs and hosted content tabs explicitly.
 TerminalTab continues owning its SplitTree and terminal sessions. Hosted tabs own plugin
