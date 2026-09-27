@@ -496,12 +496,14 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * Registered panels, registration order.
      *
-     * @return lines of the form {@code id|title|LEFT|RIGHT|BOTTOM}, the last field being the default anchor
+     * @return lines of the form {@code id|title|LEFT|RIGHT|BOTTOM} (the default anchor), followed by
+     *         {@code |actionId} when the panel names its own toggle action
      */
     public List<String> panels() {
         List<String> lines = new ArrayList<>();
         for (FakePluginContext context : contexts.values())
-            for (FakeUi.Panel panel : context.ui.panels) lines.add(panel.spec.id() + "|" + panel.spec.title() + "|" + panel.spec.defaultAnchor());
+            for (FakeUi.Panel panel : context.ui.panels) lines.add(panel.spec.id() + "|" + panel.spec.title() + "|" + panel.spec.defaultAnchor()
+                + panel.spec.toggleActionId().map(toggle -> "|" + toggle).orElse(""));
         return lines;
     }
 

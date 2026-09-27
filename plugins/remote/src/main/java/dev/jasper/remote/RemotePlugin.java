@@ -77,7 +77,7 @@ public class RemotePlugin implements Plugin {
     private dev.jasper.remote.ui.sftp.SftpUi sftpUi;
     private dev.jasper.remote.ui.sftp.DirectoryFollower follower;
     private PluginAction sftpToggle;
-    public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=SFTP+".toggle";
+    public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=dev.jasper.remote.ui.sftp.SftpUi.TOGGLE;
     private final Function<PluginContext, Optional<AgentClient>> agentFactory;
     private final BiFunction<Duration, Runnable, Runnable> schedule;
     private final Path sshDir;
@@ -143,6 +143,8 @@ public class RemotePlugin implements Plugin {
         connections.onChanged(this::refreshStatus);
         icon = context.appearance().icon(dev.jasper.sdk.ui.IconName.NETWORK);
         serverIcon = context.appearance().icon(dev.jasper.sdk.ui.IconName.SERVER);
+        // Before the panels: each names its toggle action, which must already be registered.
+        configureShortcuts();
 
         sftpSettings=RemoteSettings.sftp(context.config());
         Executor transferBackground=transferExecutor.apply(context);
@@ -165,20 +167,19 @@ public class RemotePlugin implements Plugin {
             invoked.pane().flatMap(this::sftpPane).ifPresentOrElse(pane->sftpUi.show(invoked.window(),pane),()->sftpUi.show(invoked.window()));
         });
         context.menus().terminalContext().add(SFTP);
-        configureShortcuts();
         splitAction = context.actions().register(ActionSpec.of(SPLIT, "Split with Same Host").withKeywords(List.of("ssh", "split")), invoked -> invoked.pane().ifPresent(this::splitSameHost));
         splitAction.setEnabled(false);
         context.actions().register(ActionSpec.of(IMPORT, "Import from ~/.ssh/config...").withKeywords(List.of("ssh", "import", "config")), invoked -> importConfig(invoked.window()));
         PluginMenu menu = context.menus().create(MENU, "SSH");
         menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(IMPORT);
         menu.addSeparator();menu.add(SFTP);menu.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
-        // View > Tools already toggles both panels; these actions stay for their shortcuts, the SSH menu and the palette.
+        // View > Tools lists HOSTS and SFTP_TOGGLE: the panels name them as their toggles.
 
         scope = new RemoteScope(store::hosts, store::error, this::openHost, this::splitHost, (window, host) -> editHost(window, Optional.of(host)));
         context.palette().register(scope);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 60));
         status.setIcon(icon); status.setAction(HOSTS); status.setVisible(false);
-        context.panels().register(new PanelSpec(PANEL, "SSH hosts", icon, Anchor.LEFT), this::createPanel);
+        context.panels().register(new PanelSpec(PANEL, "SSH hosts", icon, Anchor.LEFT).withToggleActionId(HOSTS), this::createPanel);
         sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> {
             PanelHost panel = panelHosts.get(window.id());
             if (panel == null) showPanel(window); else panel.show();
@@ -218,13 +219,14 @@ public class RemotePlugin implements Plugin {
         }
         if (shortcuts == null || !next.togglePanel().equals(shortcuts.togglePanel())) {
             if (hostsAction != null) hostsAction.close();
-            hostsAction = context.actions().register(ActionSpec.of(HOSTS, "SSH Hosts").withIcon(icon)
-                .withKeywords(List.of("ssh", "hosts", "panel")).withDefaultBinding(next.togglePanel().orElse(null)),
+            hostsAction = context.actions().register(ActionSpec.of(HOSTS, "Toggle SSH hosts").withIcon(icon)
+                .withKeywords(List.of("ssh", "hosts", "panel", "show", "hide")).withDefaultBinding(next.togglePanel().orElse(null)),
                 invoked -> showPanel(invoked.window()));
         }
         if(shortcuts==null || !next.toggleSftp().equals(shortcuts.toggleSftp())) {
             if(sftpToggle!=null)sftpToggle.close();
-            sftpToggle=context.actions().register(ActionSpec.of(SFTP_TOGGLE,"SFTP panel").withDefaultBinding(next.toggleSftp().orElse(null)),invoked->sftpUi.toggle(invoked.window()));
+            sftpToggle=context.actions().register(ActionSpec.of(SFTP_TOGGLE,"Toggle SFTP")
+                .withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp", "files", "panel", "show", "hide")).withDefaultBinding(next.toggleSftp().orElse(null)),invoked->sftpUi.toggle(invoked.window()));
         }
         shortcuts = next;
     }

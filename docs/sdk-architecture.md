@@ -81,8 +81,10 @@ strip over the deck: bottom wraps the column, right wraps that, left wraps that,
 the side panels run from the toolbar to the status bar), and renders `WindowRail`. A window with nothing
 contributed has no rail and its old layout. Requests to show, hide or toggle a panel travel
 through the model tagged with a window id, so an action or a `PanelHost` reaches exactly one
-window. Every panel gets an application-registered `<panel id>.toggle` action and a View →
-Panels entry.
+window. Every panel gets a View → Tools entry for its toggle action: the application-registered
+`<panel id>.toggle`, or, since SDK 0.8.1, the plugin's own action named by
+`PanelSpec.toggleActionId` (which must already be registered by that plugin), so a plugin action
+that toggles a panel appears once in the menu and the palette.
 
 Plugin windows follow the `TerminalWindow`/`WindowContent` split: `AuxiliarySurface` holds the
 content, title, closing guards and lifetime and is fully tested headlessly; `NativeShells`

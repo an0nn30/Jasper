@@ -313,6 +313,7 @@ final class FakeUi {
             context.requireOpen();
             java.util.Objects.requireNonNull(factory, "factory");
             requireNamespace(spec.id(), "A panel");
+            spec.toggleActionId().ifPresent(FakeUi.this::requireOwn);
             for (Panel existing : panels) if (existing.spec.id().equals(spec.id())) throw new IllegalArgumentException("Panel already registered: " + spec.id());
             var panel = new Panel(spec, factory);
             panels.add(panel);

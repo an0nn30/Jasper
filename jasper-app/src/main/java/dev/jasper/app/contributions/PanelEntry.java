@@ -12,18 +12,25 @@ public final class PanelEntry {
     private final Icon icon;
     private final PanelRegion defaultRegion;
     private final Function<PanelSite, JComponent> factory;
+    private final String toggleActionId;
+    private final boolean namedToggle;
     private boolean closed;
 
     PanelEntry(Contributions owner, String id, String title, Icon icon, PanelRegion defaultRegion,
-               Function<PanelSite, JComponent> factory) {
+               String toggleActionId, boolean namedToggle, Function<PanelSite, JComponent> factory) {
         this.owner = owner; this.id = id; this.title = title; this.icon = icon;
         this.defaultRegion = defaultRegion; this.factory = factory;
+        this.toggleActionId = toggleActionId; this.namedToggle = namedToggle;
     }
 
     public String id() { return id; }
     public String title() { return title; }
     public Icon icon() { return icon; }
     public PanelRegion defaultRegion() { return defaultRegion; }
+    /** The action View > Tools lists: the one the contributor named, or the application's {@code <id>.toggle}. */
+    public String toggleActionId() { return toggleActionId; }
+    /** Whether the contributor named its own toggle, so the application registered none. */
+    public boolean namedToggle() { return namedToggle; }
     /** May return null or throw; the window then shows a placeholder. */
     public Function<PanelSite, JComponent> factory() { return factory; }
 

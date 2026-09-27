@@ -20,6 +20,8 @@ import javax.swing.*;
 /** Per-window explorers and captured picker flows; the coordinator owns all queued jobs. */
 public final class SftpUi implements AutoCloseable {
     public static final String PANEL="dev.jasper.remote.sftp.panel";
+    /** The action that toggles the panel; registered by the plugin before this UI, so View &gt; Tools lists it once. */
+    public static final String TOGGLE="dev.jasper.remote.sftp.toggle";
     public record PaneTarget(UUID pane,ConnectionIdentity identity,String directory) {}
     private record View(PanelHost host,SftpPanel panel,SftpController controller,FileOperationController operations) {}
     private final PluginContext context;
@@ -44,7 +46,7 @@ public final class SftpUi implements AutoCloseable {
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,JComponent> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard) {
         this.context=context;this.ui=ui;this.background=background;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.transferStrip=transferStrip;this.releaseStrip=releaseStrip;this.clipboard=clipboard;
-        context.panels().register(new PanelSpec(PANEL,"SFTP",context.appearance().icon(IconName.FOLDER),Anchor.LEFT),this::create);
+        context.panels().register(new PanelSpec(PANEL,"SFTP",context.appearance().icon(IconName.FOLDER),Anchor.LEFT).withToggleActionId(TOGGLE),this::create);
     }
     private JComponent create(PanelHost host) {
         var panel=new SftpPanel(context.appearance()::icon);var window=host.window();

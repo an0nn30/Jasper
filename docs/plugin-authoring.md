@@ -108,7 +108,8 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
-  `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.8.0, <0.9"`.
+  `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.8.0, <0.9"`
+  (Remote `>=0.8.1`, for `PanelSpec.withToggleActionId`).
   Jasper supplies IntelliJ-style artwork; plugins need no artwork. Returned icons are 16px.
   For custom artwork, draw a 16×16 SVG in the IntelliJ light palette (grey `#6E6E6E`, blue
   `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`) and load it with
@@ -142,7 +143,10 @@ outside automatic branding. No additional SDK factory or dependency is required.
 A panel is a Swing component in the left, right or bottom region of every terminal window.
 Register it once; Jasper asks your factory for one instance per window, the first time the
 panel is shown there, and gives the panel a rail icon, a `<panel id>.toggle` action and a
-View → Tools entry, so don't add a View menu item of your own that toggles it. One panel shows per region; the user can move a panel to another region
+View → Tools entry, so don't add a View menu item of your own that toggles it. If you already have
+an action that toggles the panel, for example to give it a shortcut, register it first and name it
+with `PanelSpec.withToggleActionId(id)` (SDK 0.8.1): Tools and the palette then list your action,
+with its shortcut, and Jasper registers no `<panel id>.toggle`. One panel shows per region; the user can move a panel to another region
 from its rail icon, and Jasper remembers where it was and how big.
 
 A rail button runs one of your actions. A plugin window is a frame Jasper builds: icon, macOS
@@ -448,7 +452,8 @@ try (var host = new FakePluginHost()) {
 `host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.
 `host.panels()`, `host.openPanel(id, windowId)`, `host.rail()`, `host.windows()` and
 `host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
-`<panel id>.toggle` action or View → Tools menu.
+`<panel id>.toggle` action or View → Tools menu; `host.panels()` appends `|<action id>` for a panel
+that names its own toggle.
 `host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `activateTerminalWindow`,
 `focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
