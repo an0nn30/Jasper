@@ -51,8 +51,12 @@ class FileEndpointTest {
         var entries = new ArrayList<FileEntry>(); endpoint.list(root, entries::add);
         assertThat(entries).extracting(FileEntry::name).containsExactlyInAnyOrder("final", "dangling", "empty");
         endpoint.remove(root + "/dangling", false); endpoint.remove(root + "/empty", true);
-        endpoint.metadata(target, 1_700_000_000_000L, 0640);
-        assertThat(endpoint.stat(target).permissions() & 0777).isEqualTo(0640);
+        // NTFS has no POSIX modes: LocalEndpoint refuses them once the time is set (a transfer records a
+        // metadata warning), and MINA's server reports every Windows file as 0666.
+        boolean posix = !org.junit.jupiter.api.condition.OS.WINDOWS.isCurrentOs();
+        if (posix || !(endpoint instanceof LocalEndpoint)) endpoint.metadata(target, 1_700_000_000_000L, 0640);
+        else assertThatThrownBy(() -> endpoint.metadata(target, 1_700_000_000_000L, 0640)).isInstanceOf(IOException.class).hasMessageContaining("POSIX");
+        if (posix) assertThat(endpoint.stat(target).permissions() & 0777).isEqualTo(0640);
         assertThat(endpoint.stat(target).modifiedMillis()).isEqualTo(1_700_000_000_000L);
     }
 

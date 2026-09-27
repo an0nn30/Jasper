@@ -5,6 +5,8 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
@@ -229,7 +231,8 @@ class TransferCoordinatorTest {
             } finally { coordinator.close();coordinator.stopped().get(5,TimeUnit.SECONDS); }
         }
     }
-    @Test void retryFailedCopiesFixedItemsAndLeavesSkippedItemsSkipped() throws Exception {
+    /** Its failing item is a FIFO, which Windows does not have (Git Bash's mkfifo succeeds without making one). */
+    @Test @DisabledOnOs(OS.WINDOWS) void retryFailedCopiesFixedItemsAndLeavesSkippedItemsSkipped() throws Exception {
         root=root.toRealPath();Path source=Files.createDirectory(root.resolve("source")),dest=Files.createDirectories(root.resolve("dest/source")).getParent();
         Files.writeString(source.resolve("fresh"),"fresh");Files.writeString(source.resolve("keep"),"new");Files.writeString(dest.resolve("source/keep"),"old");
         fifo(source.resolve("pipe"));Path lone=root.resolve("lone");fifo(lone);
