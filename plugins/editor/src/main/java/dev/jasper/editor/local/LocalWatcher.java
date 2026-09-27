@@ -50,7 +50,7 @@ public final class LocalWatcher {
                 List<Optional<Revision>> revisions = new ArrayList<>();
                 for (Path file : files) {
                     try { revisions.add(LocalFiles.revision(file)); }
-                    catch (IOException unreadable) { revisions.add(null); }
+                    catch (IOException | RuntimeException unreadable) { revisions.add(null); }
                 }
                 ui.execute(() -> {
                     running = false;
