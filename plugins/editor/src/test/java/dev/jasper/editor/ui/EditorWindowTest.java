@@ -73,10 +73,29 @@ class EditorWindowTest {
         return window.selected().orElseThrow();
     }
 
+    @Test void filesUseHostedTabsAndMovingPreservesDirtyTextAndUndo() throws Exception {
+        var tab = opened(file("hosted.txt", "before"));
+        assertThat(host.windows()).isEmpty();
+        assertThat(host.contentTabs()).hasSize(1);
+        var handle = host.contentTabs().getFirst();
+        var component = host.contentComponent(handle);
+        tab.area().append(" after");
+        handle.move(true);
+        assertThat(handle.isSeparate()).isTrue();
+        assertThat(host.contentComponent(handle)).isSameAs(component);
+        assertThat(tab.area().getText()).isEqualTo("before after");
+        assertThat(tab.session().dirty()).isTrue();
+        tab.area().undoLastAction();
+        assertThat(tab.area().getText()).isEqualTo("before");
+        handle.move(false);
+        assertThat(handle.isSeparate()).isFalse();
+    }
+
     @Test void openingAFileThatIsStillLoadingSelectsItsTab() throws Exception {
         Path file = file("config.toml", "a = 1\n");
         window.openLocal(file);
-        assertThat(host.windows()).containsExactly("dev.jasper.editor.window|Editor|true");
+        assertThat(host.windows()).isEmpty();
+        assertThat(host.contentTabs()).hasSize(1);
         assertThat(window.selected().orElseThrow().session().state()).isEqualTo(DocumentSession.State.LOADING);
         window.openLocal(file);
         assertThat(window.sessions()).hasSize(1);
@@ -103,16 +122,17 @@ class EditorWindowTest {
         EditorTab second = opened(file("b.toml", "b = 1\n"));
         second.area().setText("b = 2\n");
         answers.add("Cancel");
-        assertThat(host.closeCommand(EditorWindow.WINDOW_ID)).as("handled by asking about the tab").isFalse();
+        assertThat(host.contentTabs().getLast().requestClose().join()).as("handled by asking about the tab").isFalse();
         assertThat(asked.getLast()).isEqualTo(new Question("Unsaved changes", "Save changes to b.toml?", List.of("Save", "Don't Save", "Cancel")));
         assertThat(window.sessions()).hasSize(2);
         answers.add("Don't Save");
-        assertThat(host.closeCommand(EditorWindow.WINDOW_ID)).isFalse();
+        assertThat(host.contentTabs().getLast().requestClose().join()).isTrue();
         assertThat(window.sessions()).hasSize(1);
-        assertThat(host.closeCommand(EditorWindow.WINDOW_ID)).isFalse();
+        assertThat(host.contentTabs().getLast().requestClose().join()).isTrue();
         assertThat(window.sessions()).isEmpty();
         assertThat(window.showingEmpty()).isTrue();
-        assertThat(host.closeCommand(EditorWindow.WINDOW_ID)).as("with no tabs the window closes").isTrue();
+        assertThat(host.contentTabs()).isEmpty();
+        window.dispose();
         assertThat(windowClosed).isTrue();
     }
 
@@ -129,7 +149,7 @@ class EditorWindowTest {
         assertThat(Files.readString(file)).isEqualTo("a = 2\n");
         tab.area().setText("a = 3\n");
         answers.add("Discard");
-        assertThat(host.requestClose(EditorWindow.WINDOW_ID)).isTrue();
+        assertThat(host.requestQuit()).isTrue();
         assertThat(Files.readString(file)).isEqualTo("a = 2\n");
     }
 
@@ -211,7 +231,7 @@ class EditorWindowTest {
         assertThat(Files.readString(file)).isEqualTo("a = 2\n");
     }
 
-    @Test void saveAllSkipsATabClosedWithDontSaveDuringTheWait() throws Exception {
+    @Test void saveAllDefersIndividualCloseWhileTheBatchIsPending() throws Exception {
         Path a = file("a.toml", "a = 1\n");
         Path b = file("b.toml", "b = 1\n");
         opened(a).area().setText("a = 2\n");
@@ -221,7 +241,8 @@ class EditorWindowTest {
         duringWait = () -> window.closeTab(second);
         assertThat(host.requestQuit()).isTrue();
         assertThat(Files.readString(a)).isEqualTo("a = 2\n");
-        assertThat(Files.readString(b)).as("closed without saving").isEqualTo("b = 1\n");
+        assertThat(Files.readString(b)).as("batch retains and saves both tabs").isEqualTo("b = 2\n");
+        assertThat(host.contentTabs()).hasSize(2);
     }
 
     @Test void cancellingTheSaveAllWaitStartsNoFurtherSaves() throws Exception {
@@ -292,7 +313,8 @@ class EditorWindowTest {
         picker.filter("tom");
         picker.chooseSelected();
         assertThat(tab.session().style()).isEqualTo(Languages.TOML);
-        assertThat(host.windows()).containsExactly("dev.jasper.editor.window|Editor|true");
+        assertThat(host.windows()).isEmpty();
+        assertThat(host.contentTabs()).hasSize(1);
         window.toggleWrap();
         assertThat(tab.area().getLineWrap()).isTrue();
         window.goToLine();
@@ -317,12 +339,22 @@ class EditorWindowTest {
         EditorTab tab = opened(file("a.json", "{}\n"));
         assertThat(window.menu().getComponents()).extracting(item -> ((JMenuItem) item).getText())
             .contains("Save", "Save As…", "Save All", "Open…", "New File", "Close Tab", "Find…", "Replace…", "Go to Line…",
-                "Toggle Comment", "Next Tab", "Previous Tab", "Revert to Saved", "Language…", "Toggle Soft Wrap");
+                "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap");
         settings.set(new EditorSettings("Monospaced", 18, 2, false, 1));
         window.apply();
         assertThat(tab.area().getFont().getSize()).isEqualTo(18);
         assertThat(tab.area().getTabSize()).isEqualTo(2);
         assertThat(tab.area().getInputMap().get(KeyNames.stroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.SHIFT_DOWN_MASK)))
             .as("Save As overrides RSyntaxTextArea's macro binding").isEqualTo("save-as");
+    }
+    @Test void saveAsDoesNotAliasTheOriginalFileToTheRenamedTab() throws Exception {
+        Path original = file("original.txt", "original");
+        opened(original);
+        host.queuePathSelection(List.of(home.resolve("renamed.txt")));
+        window.saveAs(); drain();
+        opened(original);
+        assertThat(host.contentTabs()).hasSize(2);
+        assertThat(window.sessions()).extracting(DocumentSession::name).containsExactly("renamed.txt", "original.txt");
+        assertThat(host.contentComponent(host.contentTabs().getFirst())).isNotSameAs(host.contentComponent(host.contentTabs().getLast()));
     }
 }

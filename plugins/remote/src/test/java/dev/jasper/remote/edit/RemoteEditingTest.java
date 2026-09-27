@@ -37,11 +37,13 @@ class RemoteEditingTest {
         owners.add(owner);
         return CompletableFuture.completedFuture(new LocalEndpoint());
     }, identity -> connected, background, ui);
+    final List<dev.jasper.sdk.WindowOwner> editorOwners = new ArrayList<>();
     final List<EditorDocument> documents = new ArrayList<>();
     final List<String> notices = new ArrayList<>();
     volatile RuntimeException editorFailure;
     final Editor editor = new Editor() {
         @Override public void open(Path file) { throw new AssertionError("Remote opens documents, not local paths"); }
+        @Override public void open(EditorDocument document, dev.jasper.sdk.WindowOwner owner) { editorOwners.add(owner); open(document); }
         @Override public void open(EditorDocument document) { if (editorFailure != null) throw editorFailure; documents.add(document); }
     };
     volatile Optional<WindowHandle> active = Optional.empty();
@@ -58,6 +60,7 @@ class RemoteEditingTest {
 
     @Test void openHandsTheEditorARemoteDocument() throws Exception {
         onUi(() -> { editing.open(prod, "/etc/hosts", origin); return null; });
+        assertThat(editorOwners).containsExactly(origin);
         assertThat(documents).singleElement().satisfies(document -> {
             assertThat(document).isInstanceOf(RemoteDocument.class);
             assertThat(document.key()).isEqualTo(RemoteDocument.key(prod, "/etc/hosts"));
