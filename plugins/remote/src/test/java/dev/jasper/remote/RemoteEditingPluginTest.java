@@ -231,20 +231,25 @@ class RemoteEditingPluginTest {
         var blocked = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         try (var server = new LoopbackServer(); var host = new FakePluginHost()) {
-            var panel = browse(host, server, files, dir, Optional.of(editor), 3, blockingLstat("/conf-link", blocked, release));
-            enter(panel, "conf-link");
-            await(host, () -> blocked.getCount() == 0, "the link lookup reached the server and is now blocked there");
-            enter(panel, "other");
-            await(host, () -> panel.directory().equals("/other"), "navigating elsewhere while the lookup is still in flight");
-            release.countDown();
-            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-            while (System.nanoTime() < deadline) {
-                RemotePluginTest.settle(host);
-                assertThat(panel.directory()).as("a late link result must not pull a view that moved on").isEqualTo("/other");
-                Thread.sleep(20);
+            try {
+                var panel = browse(host, server, files, dir, Optional.of(editor), 3, blockingLstat("/conf-link", blocked, release));
+                enter(panel, "conf-link");
+                await(host, () -> blocked.getCount() == 0, "the link lookup reached the server and is now blocked there");
+                enter(panel, "other");
+                await(host, () -> panel.directory().equals("/other"), "navigating elsewhere while the lookup is still in flight");
+                release.countDown();
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+                while (System.nanoTime() < deadline) {
+                    RemotePluginTest.settle(host);
+                    assertThat(panel.directory()).as("a late link result must not pull a view that moved on").isEqualTo("/other");
+                    Thread.sleep(20);
+                }
+                host.stopAll();
+                assertThat(host.failures()).isEmpty();
+            } finally {
+                // A failed assertion must not leave the server's SFTP thread parked on the latch.
+                release.countDown();
             }
-            host.stopAll();
-            assertThat(host.failures()).isEmpty();
         }
     }
 }

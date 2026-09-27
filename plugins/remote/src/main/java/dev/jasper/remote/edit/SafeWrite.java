@@ -11,6 +11,8 @@ import java.nio.file.FileSystemException;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayDeque;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -28,7 +30,37 @@ public final class SafeWrite {
      */
     public record Resolved(String path, Optional<FileEntry> entry) { }
 
+    /**
+     * Marks a failed write that could not remove its hidden sibling: attached to the write's failure as a suppressed
+     * exception, so the failure keeps its own type and message.
+     */
+    public static final class SiblingLeft extends IOException {
+        private final String path;
+
+        SiblingLeft(String path, Throwable cause) {
+            super("Could not remove " + path, cause);
+            this.path = path;
+        }
+
+        /** @return the sibling's path, which is still on the endpoint */
+        public String path() { return path; }
+    }
+
     private SafeWrite() { }
+
+    /**
+     * @param failure a failure of {@link #write}, possibly wrapped by a future
+     * @return the path of the hidden sibling that the failed write left behind, or empty
+     */
+    public static Optional<String> leftover(Throwable failure) {
+        Throwable at = failure;
+        while ((at instanceof CompletionException || at instanceof ExecutionException) && at.getCause() != null) at = at.getCause();
+        if (at == null) return Optional.empty();
+        for (Throwable suppressed : at.getSuppressed()) {
+            if (suppressed instanceof SiblingLeft left) return Optional.of(left.path());
+        }
+        return Optional.empty();
+    }
 
     /**
      * Follows every symbolic link in {@code path}, relative ones from their own folder.
@@ -56,7 +88,10 @@ public final class SafeWrite {
      * restored to the same mode), when creating the sibling is denied (the folder disallows creating it
      * though the file itself is writable), when the sibling would change the owner or group, or when atomic
      * replacement is unavailable; creates a missing target. Any other failure creating the sibling is
-     * rethrown unchanged, not treated as a signal to write in place.
+     * rethrown unchanged, not treated as a signal to write in place. Any failure after the sibling exists removes
+     * it; when that fails too (an aborted SFTP endpoint refuses every later call), the failure carries a
+     * {@link SiblingLeft} (see {@link #leftover}). A sibling that cannot be removed before writing in place fails
+     * the save with the removal failure, marked the same way, and the target stays unchanged.
      *
      * @return a stat of the target after writing
      */
@@ -88,17 +123,27 @@ public final class SafeWrite {
                 throw failed;
             }
         }
-        boolean sameOwner;
+        boolean sameOwner = true;
         try {
-            sameOwner = existing.isEmpty() || sameOwner(endpoint.stat(sibling), existing.orElseThrow());
+            if (existing.isPresent()) {
+                FileEntry created = endpoint.stat(sibling);
+                sameOwner = sameOwner(created, existing.orElseThrow());
+                // A server that ignored the create's mode would let others read the new content as it is written.
+                if (sameOwner && created.permissions() >= 0 && (created.permissions() & 077) != 0) endpoint.metadata(sibling, -1, 0600);
+            }
         } catch (IOException | RuntimeException failure) {
-            try { out.close(); } catch (IOException suppressed) { failure.addSuppressed(suppressed); }
+            try { out.close(); } catch (IOException | RuntimeException suppressed) { failure.addSuppressed(suppressed); }
             remove(endpoint, sibling, failure);
             throw failure;
         }
         if (!sameOwner) {
-            out.close();
-            endpoint.remove(sibling, false);
+            try {
+                out.close();
+            } catch (IOException | RuntimeException failure) {
+                remove(endpoint, sibling, failure);
+                throw failure;
+            }
+            discard(endpoint, sibling);
             return inPlace(endpoint, target, content);
         }
         boolean atomicUnavailable = false;
@@ -119,7 +164,7 @@ public final class SafeWrite {
             throw failure;
         }
         if (atomicUnavailable) {
-            endpoint.remove(sibling, false);
+            discard(endpoint, sibling);
             return inPlace(endpoint, target, content);
         }
         return endpoint.stat(target);
@@ -184,7 +229,23 @@ public final class SafeWrite {
         return sibling.uid() == target.uid() && sibling.gid() == target.gid();
     }
 
+    /** Removes the sibling after {@code failure}; a sibling it cannot remove is marked on the failure. */
     private static void remove(FileEndpoint endpoint, String sibling, Exception failure) {
-        try { endpoint.remove(sibling, false); } catch (IOException suppressed) { failure.addSuppressed(suppressed); }
+        try {
+            endpoint.remove(sibling, false);
+        } catch (IOException | RuntimeException left) {
+            failure.addSuppressed(new SiblingLeft(sibling, left));
+        }
+    }
+
+    /** Removes the sibling before writing in place; a sibling it cannot remove fails the save, marked. */
+    private static void discard(FileEndpoint endpoint, String sibling) throws IOException {
+        try {
+            endpoint.remove(sibling, false);
+        } catch (IOException | RuntimeException left) {
+            // The removal failure is what the save throws, so its marker has no cause: the chain would loop.
+            left.addSuppressed(new SiblingLeft(sibling, null));
+            throw left;
+        }
     }
 }

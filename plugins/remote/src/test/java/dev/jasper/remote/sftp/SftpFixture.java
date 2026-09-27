@@ -37,10 +37,13 @@ public final class SftpFixture implements AutoCloseable {
     public final RemoteHost host;
     public final Connections connections;
 
-    public SftpFixture(Path directory) throws Exception {
+    public SftpFixture(Path directory) throws Exception { this(directory, new SftpSubsystemFactory()); }
+
+    /** @param factory the server's SFTP subsystem, for tests that change how it answers */
+    public SftpFixture(Path directory, SftpSubsystemFactory factory) throws Exception {
         files = Files.createDirectories(directory.resolve("files")).toRealPath();
         server.server.setFileSystemFactory(new VirtualFileSystemFactory(files));
-        server.server.setSubsystemFactories(List.of(new SftpSubsystemFactory()));
+        server.server.setSubsystemFactories(List.of(factory));
         host = RemoteHost.create("files", "127.0.0.1", server.port(), "deploy", new Auth.Vault(UUID.randomUUID()), "", Optional.empty());
         var settings = new RemoteSettings(Duration.ofSeconds(5), Duration.ofSeconds(5), Duration.ZERO, Duration.ZERO, false, false);
         connections = new Connections(() -> settings, new KnownHosts(directory.resolve("known_hosts"), Optional.empty()), Optional.empty(),

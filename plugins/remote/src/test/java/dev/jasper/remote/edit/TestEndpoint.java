@@ -11,7 +11,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
-/** Forwards to another endpoint, records each call, and lets a test change stats or fail a replacing publish. */
+/**
+ * Forwards to another endpoint, records each call (and each write to a created file, as {@code bytes <path>}), and
+ * lets a test change stats or fail a replacing publish, a create, a remove or closing a created file.
+ */
 final class TestEndpoint implements FileEndpoint {
     final FileEndpoint delegate;
     final List<String> calls = new CopyOnWriteArrayList<>();
@@ -19,6 +22,8 @@ final class TestEndpoint implements FileEndpoint {
     volatile UnaryOperator<FileEntry> stats = UnaryOperator.identity();
     volatile IOException replaceFailure;
     volatile IOException createFailure;
+    volatile IOException removeFailure;
+    volatile IOException closeFailure;
 
     TestEndpoint(FileEndpoint delegate) { this.delegate = delegate; }
 
@@ -36,13 +41,17 @@ final class TestEndpoint implements FileEndpoint {
     @Override public WriteHandle create(String path, int permissions) throws IOException {
         calls.add("create " + path + " " + Integer.toOctalString(permissions));
         if (createFailure != null) throw createFailure;
-        return delegate.create(path, permissions);
+        return recorded(path, delegate.create(path, permissions));
     }
     @Override public boolean writable(String path) throws IOException { calls.add("writable " + path); return delegate.writable(path); }
     @Override public void truncate(String path, long size) throws IOException { calls.add("truncate " + path); delegate.truncate(path, size); }
     @Override public void mkdir(String path) throws IOException { delegate.mkdir(path); }
     @Override public void symlink(String path, String target) throws IOException { delegate.symlink(path, target); }
-    @Override public void remove(String path, boolean directory) throws IOException { calls.add("remove " + path); delegate.remove(path, directory); }
+    @Override public void remove(String path, boolean directory) throws IOException {
+        calls.add("remove " + path);
+        if (removeFailure != null) throw removeFailure;
+        delegate.remove(path, directory);
+    }
     @Override public void publish(String temporary, String target, boolean replace) throws IOException {
         calls.add("publish " + target);
         if (replace && replaceFailure != null) throw replaceFailure;
@@ -56,4 +65,18 @@ final class TestEndpoint implements FileEndpoint {
     @Override public String home() throws IOException { return delegate.home(); }
     @Override public void abort() { calls.add("abort"); aborted.countDown(); delegate.abort(); }
     @Override public void close() { abort(); }
+
+    private WriteHandle recorded(String path, WriteHandle out) {
+        return new WriteHandle() {
+            @Override public void write(int value) throws IOException { write(new byte[] {(byte) value}, 0, 1); }
+            @Override public void write(byte[] data, int off, int length) throws IOException { calls.add("bytes " + path); out.write(data, off, length); }
+            @Override public long checkpoint() throws IOException { return out.checkpoint(); }
+            @Override public void flush() throws IOException { out.flush(); }
+            @Override public void abort() { out.abort(); }
+            @Override public void close() throws IOException {
+                out.close();
+                if (closeFailure != null) throw closeFailure;
+            }
+        };
+    }
 }

@@ -4,6 +4,8 @@ import dev.jasper.remote.sftp.FileEntry;
 import dev.jasper.remote.sftp.LocalEndpoint;
 import dev.jasper.remote.sftp.SftpFixture;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -12,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -28,6 +31,15 @@ class SafeWriteTest {
     static byte[] bytes(String text) { return text.getBytes(StandardCharsets.UTF_8); }
     static List<String> names(Path folder) throws IOException {
         try (Stream<Path> list = Files.list(folder)) { return list.map(path -> path.getFileName().toString()).sorted().toList(); }
+    }
+    /** The hidden sibling the write created, from its recorded {@code create} call. */
+    static String sibling(TestEndpoint endpoint) {
+        return endpoint.calls.stream().filter(call -> call.startsWith("create ")).findFirst().orElseThrow()
+            .replaceFirst("^create (.*) [0-7]+$", "$1");
+    }
+    static FileEntry withPermissions(FileEntry entry, int permissions) {
+        return new FileEntry(entry.name(), entry.kind(), entry.size(), entry.modifiedMillis(), permissions,
+            entry.linkTarget(), entry.fileKey(), entry.uid(), entry.gid());
     }
 
     @Test void aSafeWriteReplacesTheFileAndKeepsItsPermissions() throws Exception {
@@ -195,6 +207,108 @@ class SafeWriteTest {
         }
     }
 
+    /** Final review F1: over SFTP a failed write aborts the endpoint, so removing the sibling fails too. */
+    @Test void aSiblingThatCannotBeRemovedIsMarkedOnTheOriginalFailure() throws Exception {
+        Path file = Files.writeString(folder().resolve("app.conf"), "old");
+        try (var endpoint = new TestEndpoint(new LocalEndpoint())) {
+            var failure = new SocketTimeoutException("Timed out waiting for SFTP response");
+            endpoint.replaceFailure = failure;
+            endpoint.removeFailure = new IOException("SFTP operation cancelled");
+            Throwable thrown = catchThrowable(() -> SafeWrite.write(endpoint, file.toString(), bytes("new")));
+            String sibling = sibling(endpoint);
+            assertThat(thrown).as("the original failure keeps its type and message").isSameAs(failure);
+            assertThat(SafeWrite.leftover(thrown)).contains(sibling);
+            assertThat(SafeWrite.leftover(new CompletionException(thrown))).as("unwrapped from a future").contains(sibling);
+            assertThat(thrown.getSuppressed()).anySatisfy(marker -> assertThat(marker).isInstanceOf(SafeWrite.SiblingLeft.class)
+                .hasMessage("Could not remove " + sibling).hasCause(endpoint.removeFailure));
+            assertThat(Files.readString(file)).isEqualTo("old");
+            assertThat(names(folder())).as("the sibling is still there").hasSize(2).contains("app.conf");
+            assertThat(SafeWrite.leftover(new IOException("unrelated"))).isEmpty();
+        }
+    }
+
+    @Test void aFailedOwnerCheckMarksASiblingItCannotRemove() throws Exception {
+        Path file = Files.writeString(folder().resolve("app.conf"), "old");
+        try (var endpoint = new TestEndpoint(new LocalEndpoint())) {
+            var failure = new UncheckedIOException(new IOException("stat failed"));
+            endpoint.stats = entry -> { if (entry.name().startsWith(".app.conf.jasper-")) throw failure; return entry; };
+            endpoint.removeFailure = new IOException("SFTP operation cancelled");
+            Throwable thrown = catchThrowable(() -> SafeWrite.write(endpoint, file.toString(), bytes("new")));
+            assertThat(thrown).isSameAs(failure);
+            assertThat(SafeWrite.leftover(thrown)).contains(sibling(endpoint));
+            assertThat(Files.readString(file)).isEqualTo("old");
+        }
+    }
+
+    @Test void withoutAtomicReplacementASiblingThatCannotBeRemovedFailsTheSaveAndLeavesTheTarget() throws Exception {
+        Path file = Files.writeString(folder().resolve("app.conf"), "old contents");
+        try (var endpoint = new TestEndpoint(new LocalEndpoint())) {
+            endpoint.replaceFailure = new AtomicMoveNotSupportedException(null, null, "Server does not support atomic replacement");
+            var removal = new IOException("SFTP operation cancelled");
+            endpoint.removeFailure = removal;
+            Throwable thrown = catchThrowable(() -> SafeWrite.write(endpoint, file.toString(), bytes("new")));
+            assertThat(thrown).isSameAs(removal);
+            assertThat(SafeWrite.leftover(thrown)).contains(sibling(endpoint));
+            assertThat(Files.readString(file)).as("not written in place").isEqualTo("old contents");
+            assertThat(endpoint.calls).noneMatch(call -> call.equals("write " + file) || call.equals("truncate " + file));
+        }
+    }
+
+    @Test void anOwnerMismatchWhoseSiblingFailsToCloseStillRemovesIt() throws Exception {
+        Path file = Files.writeString(folder().resolve("shared.conf"), "old contents");
+        try (var endpoint = new TestEndpoint(new LocalEndpoint())) {
+            endpoint.stats = entry -> entry.name().startsWith(".shared.conf.jasper-")
+                ? new FileEntry(entry.name(), entry.kind(), entry.size(), entry.modifiedMillis(), entry.permissions(),
+                    entry.linkTarget(), entry.fileKey(), entry.uid() + 1, entry.gid())
+                : entry;
+            var failure = new IOException("close failed");
+            endpoint.closeFailure = failure;
+            Throwable thrown = catchThrowable(() -> SafeWrite.write(endpoint, file.toString(), bytes("new")));
+            assertThat(thrown).isSameAs(failure);
+            assertThat(SafeWrite.leftover(thrown)).isEmpty();
+            assertThat(endpoint.calls).contains("remove " + sibling(endpoint));
+            assertThat(names(folder())).as("the sibling is removed").containsExactly("shared.conf");
+            assertThat(Files.readString(file)).isEqualTo("old contents");
+        }
+    }
+
+    @Test void anOwnerMismatchWhoseSiblingCannotBeRemovedFailsTheSaveAndLeavesTheTarget() throws Exception {
+        Path file = Files.writeString(folder().resolve("shared.conf"), "old contents");
+        try (var endpoint = new TestEndpoint(new LocalEndpoint())) {
+            endpoint.stats = entry -> entry.name().startsWith(".shared.conf.jasper-")
+                ? new FileEntry(entry.name(), entry.kind(), entry.size(), entry.modifiedMillis(), entry.permissions(),
+                    entry.linkTarget(), entry.fileKey(), entry.uid() + 1, entry.gid())
+                : entry;
+            var removal = new IOException("SFTP operation cancelled");
+            endpoint.removeFailure = removal;
+            Throwable thrown = catchThrowable(() -> SafeWrite.write(endpoint, file.toString(), bytes("new")));
+            assertThat(thrown).isSameAs(removal);
+            assertThat(SafeWrite.leftover(thrown)).contains(sibling(endpoint));
+            assertThat(Files.readString(file)).as("not written in place").isEqualTo("old contents");
+            assertThat(endpoint.calls).noneMatch(call -> call.equals("write " + file) || call.equals("truncate " + file));
+        }
+    }
+
+    /** Final review M2: a server that ignores the create's mode must not expose the new content while it is written. */
+    @Test void aSiblingCreatedReadableByOthersIsNarrowedBeforeAnyByteIsWritten() throws Exception {
+        Path file = Files.writeString(folder().resolve("app.conf"), "old");
+        Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-r-----"));
+        try (var endpoint = new TestEndpoint(new LocalEndpoint())) {
+            endpoint.stats = entry -> entry.name().startsWith(".app.conf.jasper-") ? withPermissions(entry, 0644) : entry;
+            SafeWrite.write(endpoint, file.toString(), bytes("new"));
+            String sibling = sibling(endpoint);
+            assertThat(endpoint.calls).containsSubsequence("create " + sibling + " 600", "stat " + sibling, "metadata " + sibling,
+                "bytes " + sibling, "metadata " + sibling, "publish " + file);
+            assertThat(Files.readString(file)).isEqualTo("new");
+            assertThat(Files.getPosixFilePermissions(file)).isEqualTo(PosixFilePermissions.fromString("rw-r-----"));
+        }
+        try (var endpoint = new TestEndpoint(new LocalEndpoint())) {
+            SafeWrite.write(endpoint, file.toString(), bytes("again"));
+            assertThat(endpoint.calls).as("an owner-only sibling is left as created, then given the target's mode")
+                .filteredOn(call -> call.startsWith("metadata ")).hasSize(1);
+        }
+    }
+
     @Test void overSftpItReplacesAtomicallyRefusesReadOnlyFilesAndFallsBackWithoutPosixRename() throws Exception {
         try (var fixture = new SftpFixture(temp)) {
             Path file = Files.writeString(fixture.files.resolve("site.conf"), "old");
@@ -210,12 +324,22 @@ class SafeWriteTest {
                 assertThat(Files.readString(file)).isEqualTo("new text");
                 Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-r-----"));
             }
+            Path locked = Files.createDirectory(fixture.files.resolve("locked"));
+            Path inLocked = Files.writeString(locked.resolve("app.conf"), "a much longer old text");
+            Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("r-xr-xr-x"));
+            try (var endpoint = new TestEndpoint(fixture.endpoint())) {
+                SafeWrite.write(endpoint, "/locked/app.conf", bytes("short"));
+                assertThat(Files.readString(inLocked)).as("the server refused the sibling, so written in place").isEqualTo("short");
+                assertThat(endpoint.calls).contains("truncate /locked/app.conf").noneMatch(call -> call.startsWith("publish"));
+            } finally {
+                Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwxr-xr-x"));
+            }
             org.apache.sshd.sftp.SftpModuleProperties.OPENSSH_EXTENSIONS.set(fixture.server.server, ",");
             try (var endpoint = new TestEndpoint(fixture.endpoint())) {
-                SafeWrite.write(endpoint, "/site.conf", bytes("in place"));
-                assertThat(Files.readString(file)).isEqualTo("in place");
+                SafeWrite.write(endpoint, "/site.conf", bytes("short"));
+                assertThat(Files.readString(file)).as("written over and truncated").isEqualTo("short");
                 assertThat(endpoint.calls).contains("truncate /site.conf");
-                assertThat(names(fixture.files)).containsExactly("site.conf");
+                assertThat(names(fixture.files)).containsExactly("locked", "site.conf");
             }
         }
     }

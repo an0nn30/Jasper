@@ -77,14 +77,18 @@ public final class LocalEndpoint implements FileEndpoint {
         int permissions = -1;
         try { permissions = permissions(Files.readAttributes(file, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS).permissions()); }
         catch (UnsupportedOperationException ignored) { /* reported as unavailable */ }
+        int[] owner = owner(file);
         return new FileEntry(file.getFileName() == null ? "/" : file.getFileName().toString(),
             a.isSymbolicLink() ? FileEntry.Kind.LINK : a.isDirectory() ? FileEntry.Kind.DIRECTORY : a.isRegularFile() ? FileEntry.Kind.FILE : FileEntry.Kind.SPECIAL,
             a.size(), a.lastModifiedTime().toMillis(), permissions, a.isSymbolicLink() ? Files.readSymbolicLink(file).toString() : "",
-            a.fileKey() == null ? "" : a.fileKey().toString(), unix(file, "unix:uid"), unix(file, "unix:gid"));
+            a.fileKey() == null ? "" : a.fileKey().toString(), owner[0], owner[1]);
     }
-    private static int unix(Path file, String attribute) throws IOException {
-        try { return ((Number) Files.getAttribute(file, attribute, LinkOption.NOFOLLOW_LINKS)).intValue(); }
-        catch (UnsupportedOperationException | IllegalArgumentException unavailable) { return -1; }
+    /** @return the uid and gid, or -1 each where the platform reports none */
+    private static int[] owner(Path file) throws IOException {
+        try {
+            var ids = Files.readAttributes(file, "unix:uid,gid", LinkOption.NOFOLLOW_LINKS);
+            return new int[] {((Number) ids.get("uid")).intValue(), ((Number) ids.get("gid")).intValue()};
+        } catch (UnsupportedOperationException | IllegalArgumentException unavailable) { return new int[] {-1, -1}; }
     }
     @Override public void list(String text, Consumer<FileEntry> visitor) throws IOException {
         Path dir = path(text); ancestors(dir);

@@ -136,7 +136,7 @@ class SftpEndpointTest {
                 try (var out = endpoint.write("/original", 0, true)) { out.write(1); }
                 try (var out = endpoint.write("/temp", 0, true)) { out.write(2); }
                 assertThatThrownBy(() -> endpoint.publish("/temp", "/original", true))
-                    .isInstanceOf(java.nio.file.AtomicMoveNotSupportedException.class).hasMessageContaining("atomic replacement");
+                    .isInstanceOf(java.nio.file.AtomicMoveNotSupportedException.class).hasMessage("Server does not support atomic replacement");
                 assertThat(Files.readAllBytes(root.resolve("original"))).containsExactly(1);
                 assertThat(Files.readAllBytes(root.resolve("temp"))).containsExactly(2);
             }

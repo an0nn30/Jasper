@@ -6,6 +6,7 @@ import dev.jasper.remote.client.ConnectionIdentity;
 import dev.jasper.remote.sftp.EndpointFactory;
 import dev.jasper.remote.sftp.LocalEndpoint;
 import dev.jasper.remote.sftp.SftpFixture;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -16,9 +17,18 @@ import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.sshd.server.channel.ChannelSession;
+import org.apache.sshd.server.command.Command;
+import org.apache.sshd.sftp.common.SftpConstants;
+import org.apache.sshd.sftp.common.SftpException;
+import org.apache.sshd.sftp.server.Handle;
+import org.apache.sshd.sftp.server.SftpSubsystem;
+import org.apache.sshd.sftp.server.SftpSubsystemFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -90,6 +100,24 @@ class RemoteDocumentTest {
         assertThat(opened).anySatisfy(endpoint -> assertThat(endpoint.calls).anyMatch(call -> call.startsWith("publish ")));
     }
 
+    @Test void cancellingAQueuedWriteWithdrawsIt() throws Exception {
+        Path file = Files.writeString(temp.toRealPath().resolve("app.toml"), "a = 1\n");
+        var document = document(file);
+        var gate = new CountDownLatch(1);
+        try {
+            var ahead = ui.submit(() -> channels.submit(prod, Optional::empty, endpoint -> { gate.await(); return null; })).get(10, TimeUnit.SECONDS);
+            var written = ui.submit(() -> document.write("a = 2\n".getBytes(StandardCharsets.UTF_8))).get(10, TimeUnit.SECONDS);
+            assertThat(ui.submit(() -> written.cancel(true)).get(10, TimeUnit.SECONDS)).isTrue();
+            gate.countDown();
+            ahead.get(10, TimeUnit.SECONDS);
+            assertThat(await(document::revision)).as("queued behind the withdrawn write").isPresent();
+            assertThat(Files.readString(file)).isEqualTo("a = 1\n");
+            assertThat(opened).allSatisfy(endpoint -> assertThat(endpoint.calls).noneMatch(call -> call.startsWith("create ")));
+        } finally {
+            gate.countDown();
+        }
+    }
+
     @Test void overSftpItReadsAndWritesThroughTheQueue() throws Exception {
         try (var fixture = new SftpFixture(temp)) {
             Path file = Files.writeString(fixture.files.resolve("site.yaml"), "port: 80\n");
@@ -108,5 +136,52 @@ class RemoteDocumentTest {
                 fixture.onUi(() -> { sftp.close(); return null; });
             }
         }
+    }
+
+    /**
+     * Final review F1: a failed write over SFTP aborts the endpoint, as a full disk does (OpenSSH answers the write
+     * with SSH_FX_FAILURE), so SafeWrite cannot remove its sibling; a cleanup queued behind the write removes it.
+     */
+    @Test void aSaveThatFailsOverSftpLeavesNoSiblingBehind() throws Exception {
+        var refused = new CopyOnWriteArrayList<String>();
+        try (var fixture = new SftpFixture(temp, refusingSiblingWrites(refused))) {
+            Path file = Files.writeString(fixture.files.resolve("site.yaml"), "port: 80\n");
+            var endpoints = new EndpointFactory(fixture.connections, fixture.background, fixture.ui, () -> Duration.ofSeconds(5));
+            var sftp = new EditChannels((identity, owner) -> endpoints.open(Optional.of(identity), owner.orElse(null), status -> {}),
+                fixture.connections::authenticated, fixture.background, fixture.ui);
+            try (var held = fixture.lease()) {
+                var document = new RemoteDocument(held.identity(), "/site.yaml", sftp, Optional::empty);
+                var written = fixture.onUi(() -> document.write("port: 8080\n".getBytes(StandardCharsets.UTF_8)));
+                assertThatThrownBy(() -> written.get(10, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class).cause()
+                    .isInstanceOfSatisfying(SftpException.class, failure -> assertThat(failure.getStatus()).isEqualTo(SftpConstants.SSH_FX_FAILURE));
+                assertThat(refused).as("the write reached the sibling").singleElement().asString().matches("\\.site\\.yaml\\.jasper-[0-9a-f]+\\.tmp");
+                // The cleanup was queued before the failure was reported, so this operation runs after it.
+                assertThat(fixture.onUi(document::revision).get(10, TimeUnit.SECONDS)).isPresent();
+                assertThat(SafeWriteTest.names(fixture.files)).as("the sibling is removed").containsExactly("site.yaml");
+                assertThat(Files.readString(file)).isEqualTo("port: 80\n");
+            } finally {
+                fixture.onUi(() -> { sftp.close(); return null; });
+            }
+        }
+    }
+
+    /** Fails every write to a file named like a sibling, as a full disk or an exceeded quota would. */
+    static SftpSubsystemFactory refusingSiblingWrites(List<String> refused) {
+        return new SftpSubsystemFactory() {
+            @Override public Command createSubsystem(ChannelSession channel) {
+                return new SftpSubsystem(channel, this) {
+                    @Override protected void doWrite(int id, String handle, long offset, int length, byte[] data, int off, int remaining)
+                            throws IOException {
+                        Handle open = handles.get(handle);
+                        String name = open == null ? "" : open.getFile().getFileName().toString();
+                        if (name.contains(".jasper-")) {
+                            refused.add(name);
+                            throw new IOException("No space left on device");
+                        }
+                        super.doWrite(id, handle, offset, length, data, off, remaining);
+                    }
+                };
+            }
+        };
     }
 }

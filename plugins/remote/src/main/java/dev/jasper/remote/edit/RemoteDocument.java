@@ -62,8 +62,28 @@ public final class RemoteDocument implements EditorDocument {
         return channels.submit(identity, owner, endpoint -> SafeWrite.resolve(endpoint, path).entry().map(RemoteDocument::revision));
     }
 
+    /**
+     * A failed write that left its hidden sibling (an SFTP write failure aborts the endpoint, so SafeWrite cannot
+     * remove it) queues a best-effort removal before the failure is reported. The removal never prompts: it fails
+     * when the connection is gone, and its outcome is ignored. Cancelling the result withdraws or aborts the write.
+     */
     @Override public CompletableFuture<Revision> write(byte[] content) {
-        return channels.submit(identity, owner, endpoint -> revision(SafeWrite.write(endpoint, path, content)));
+        CompletableFuture<Revision> written = channels.submit(identity, owner, endpoint -> revision(SafeWrite.write(endpoint, path, content)));
+        var result = new CompletableFuture<Revision>();
+        // Nothing else sees written, so this runs where EditChannels completes it: on the UI thread, as submit requires.
+        written.whenComplete((revision, failure) -> {
+            if (failure == null) {
+                result.complete(revision);
+                return;
+            }
+            SafeWrite.leftover(failure).ifPresent(sibling -> channels.submit(identity, Optional::empty, endpoint -> {
+                endpoint.remove(sibling, false);
+                return null;
+            }));
+            result.completeExceptionally(failure);
+        });
+        result.whenComplete((revision, failure) -> { if (result.isCancelled()) written.cancel(true); });
+        return result;
     }
 
     /** Resolves links, checks the size before transferring anything, then reads at most the limit. */

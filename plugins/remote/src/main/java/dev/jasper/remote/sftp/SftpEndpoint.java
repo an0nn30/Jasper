@@ -275,7 +275,7 @@ public final class SftpEndpoint implements FileEndpoint {
         if (!replace) client.rename(from, to);
         else {
             var extension = client.getExtension(OpenSSHPosixRenameExtension.class);
-            if (extension == null || !extension.isSupported()) throw new AtomicMoveNotSupportedException(from, to, "Server does not support atomic replacement");
+            if (extension == null || !extension.isSupported()) throw new AtomicMoveNotSupportedException(null, null, "Server does not support atomic replacement");
             extension.posixRename(from, to);
         }
     }
