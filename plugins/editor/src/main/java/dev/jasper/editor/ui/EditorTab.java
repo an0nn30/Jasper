@@ -147,12 +147,7 @@ public final class EditorTab extends JPanel {
     public void addToPopup(List<Command> commands) {
         JPopupMenu popup = area.getPopupMenu();
         popup.addSeparator();
-        for (Command command : commands) {
-            var item = new JMenuItem(command.title());
-            command.stroke().ifPresent(item::setAccelerator);
-            item.addActionListener(event -> command.run().run());
-            popup.add(item);
-        }
+        for (Command command : commands) popup.add(menuItem(command));
     }
 
     /**
@@ -163,6 +158,17 @@ public final class EditorTab extends JPanel {
         return new AbstractAction(command.title()) {
             @Override public void actionPerformed(ActionEvent event) { command.run().run(); }
         };
+    }
+
+    /**
+     * @param command a command
+     * @return a menu item titled with it, with its shortcut as the accelerator, running it
+     */
+    public static JMenuItem menuItem(Command command) {
+        var item = new JMenuItem(command.title());
+        command.stroke().ifPresent(item::setAccelerator);
+        item.addActionListener(event -> command.run().run());
+        return item;
     }
 
     boolean showingText() { return showing.equals(TEXT); }
