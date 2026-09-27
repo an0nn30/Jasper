@@ -55,6 +55,7 @@ public final class DocumentSession {
     private String notice = "";
     private String reloadNotice = "";
     private CompletableFuture<Content> loading;
+    private String reloadBase = "";
     private CompletableFuture<Boolean> pendingSave;
     private String detached = "";
     private Supplier<String> text = () -> detached;
@@ -107,9 +108,12 @@ public final class DocumentSession {
         fetch(false);
     }
 
-    /** Re-reads the document while the tab stays usable; a failure asks and keeps the current text. */
+    /**
+     * Re-reads the document while the tab stays usable; a failure asks and keeps the current text. Does
+     * nothing while a save is in flight, so a completing save cannot be overwritten by a stale read.
+     */
     public void reload() {
-        if (document == null || state != State.READY) return;
+        if (document == null || state != State.READY || saving) return;
         fetch(true);
     }
 
@@ -130,16 +134,17 @@ public final class DocumentSession {
         changed();
     }
 
-    /** Revert to Saved: confirms when there are edits, then re-reads the document. */
+    /** Revert to Saved: confirms when there are edits, then re-reads the document. Does nothing while saving. */
     public void revert() {
-        if (document == null || state != State.READY) return;
+        if (document == null || state != State.READY || saving) return;
         if (dirty() && !DISCARD.equals(environment.ask().apply(new Question("Revert to Saved",
                 "Discard your changes to " + name() + "?", List.of(DISCARD, "Cancel"))))) return;
         reload();
     }
 
     /**
-     * Saves to the document, checking first whether it changed since it was read.
+     * Saves to the document, checking first whether it changed since it was read. A read in flight is
+     * cancelled first: an explicit save keeps the user's edits, where a reload would discard them.
      *
      * @return completes with true when saved, false when cancelled or failed (already reported)
      */
@@ -147,19 +152,29 @@ public final class DocumentSession {
         if (document == null) throw new IllegalStateException("An untitled document is saved with saveAs");
         if (pendingSave != null) return pendingSave;
         if (state != State.READY) return CompletableFuture.completedFuture(false);
+        if (loading != null) cancelLoad();
         return write(document, true);
     }
 
     /**
-     * Saves to another document, which this tab then edits; the caller has confirmed any replacement.
+     * Saves to another document, which this tab then edits; the caller has confirmed any replacement. While
+     * another save is pending, waits for it and then saves to the target, rather than joining and reporting
+     * that unrelated save's result.
      *
      * @param target the new file
      * @return completes with true when saved, false when cancelled or failed (already reported)
      */
     public CompletableFuture<Boolean> saveAs(EditorDocument target) {
         Objects.requireNonNull(target);
-        if (pendingSave != null) return pendingSave;
+        if (pendingSave != null) {
+            CompletableFuture<Boolean> pending = pendingSave;
+            var chained = new CompletableFuture<Boolean>();
+            pending.whenComplete((value, error) -> environment.ui().execute(() -> saveAs(target)
+                .whenComplete((v, e) -> { if (e != null) chained.completeExceptionally(e); else chained.complete(v); })));
+            return chained;
+        }
         if (state != State.READY) return CompletableFuture.completedFuture(false);
+        if (loading != null) cancelLoad();
         return write(target, false);
     }
 
@@ -194,8 +209,9 @@ public final class DocumentSession {
         changed();
     }
 
-    /** Reload from the banner. */
+    /** Reload from the banner. Leaves the banner up while a save is in flight. */
     public void reloadFromBanner() {
+        if (saving) return;
         banner = Banner.NONE;
         changed();
         reload();
@@ -253,6 +269,7 @@ public final class DocumentSession {
 
     private void fetch(boolean again) {
         cancelLoad();
+        if (again) reloadBase = text.get();
         CompletableFuture<Content> read = document.read(environment.limitBytes().getAsLong());
         loading = read;
         read.whenComplete((content, error) -> {
@@ -281,6 +298,15 @@ public final class DocumentSession {
             failure = Failures.describe(name(), error);
             retryable = Failures.retryable(error);
             state = State.FAILED;
+            changed();
+            return;
+        }
+        if (again && !text.get().equals(reloadBase)) {
+            // Typed during the read: keep the tab's text and revision, and let the banner offer the reload instead.
+            reported = Optional.of(at);
+            banner = Banner.CHANGED;
+            reloadNotice = "";
+            notice = "";
             changed();
             return;
         }

@@ -270,4 +270,84 @@ class DocumentSessionTest {
         assertThat(session.dirty()).isFalse();
         assertThat(asked).isEmpty();
     }
+
+    @Test void anOutsideReloadDoesNotOverwriteTypingWhileTheReadIsInFlight() {
+        var document = new FakeDocument("app.py", null).text("a\n");
+        var session = open(document);
+        document.holdReads = true;
+        document.change("b\n");
+        session.externalChange(Optional.of(document.now()));
+        type(session, "mine\n");
+        document.heldRead.complete(new Content(document.bytes.clone(), document.now()));
+        assertThat(buffer).hasToString("mine\n");
+        assertThat(session.banner()).isEqualTo(DocumentSession.Banner.CHANGED);
+        session.keepMine();
+        assertThat(session.save()).isCompletedWithValue(true);
+        assertThat(asked).isEmpty();
+        assertThat(document.text()).isEqualTo("mine\n");
+    }
+
+    @Test void revertDuringAHeldReadDoesNotOverwriteLaterTyping() {
+        var document = new FakeDocument("app.py", null).text("saved\n");
+        var session = open(document);
+        type(session, "mine\n");
+        document.holdReads = true;
+        answers.add(DocumentSession.DISCARD);
+        session.revert();
+        type(session, "mine again\n");
+        document.heldRead.complete(new Content("saved\n".getBytes(StandardCharsets.UTF_8), document.now()));
+        assertThat(buffer).hasToString("mine again\n");
+        assertThat(session.banner()).isEqualTo(DocumentSession.Banner.CHANGED);
+    }
+
+    @Test void savingWhileAReloadIsInFlightCancelsTheReloadAndWritesTypedText() {
+        var document = new FakeDocument("app.py", null).text("a\n");
+        var session = open(document);
+        document.holdReads = true;
+        session.reload();
+        type(session, "mine\n");
+        assertThat(session.save()).isCompletedWithValue(true);
+        assertThat(document.text()).isEqualTo("mine\n");
+        var revisionAfterSave = session.revision();
+        var bannerAfterSave = session.banner();
+        var bufferAfterSave = buffer.toString();
+        document.heldRead.complete(new Content("a\n".getBytes(StandardCharsets.UTF_8), document.now()));
+        assertThat(buffer).hasToString(bufferAfterSave);
+        assertThat(session.revision()).isEqualTo(revisionAfterSave);
+        assertThat(session.banner()).isEqualTo(bannerAfterSave);
+    }
+
+    @Test void revertReloadAndBannerReloadDoNothingWhileASaveIsInFlight() {
+        var document = new FakeDocument("app.py", null).text("a\n");
+        var session = open(document);
+        type(session, "mine\n");
+        document.holdWrites = true;
+        session.save();
+        assertThat(session.saving()).isTrue();
+        int reads = document.reads;
+        session.revert();
+        session.reload();
+        session.reloadFromBanner();
+        assertThat(document.reads).isEqualTo(reads);
+        assertThat(asked).isEmpty();
+    }
+
+    @Test void saveAsWhileASaveIsPendingChainsAfterItCompletes() {
+        var document = new FakeDocument("config.toml", null).text("a = 1\n");
+        var session = open(document);
+        type(session, "a = 2\n");
+        document.holdWrites = true;
+        var first = session.save();
+        var target = new FakeDocument("copy.toml", null);
+        target.exists = false;
+        var second = session.saveAs(target);
+        assertThat(second).isNotSameAs(first);
+        document.heldWrite.complete(new Revision(9_000, 6));
+        assertThat(first).isCompletedWithValue(true);
+        assertThat(second).isCompletedWithValue(true);
+        assertThat(target.text()).isEqualTo("a = 2\n");
+        assertThat(session.key()).isEqualTo(target.key());
+        assertThat(session.name()).isEqualTo("copy.toml");
+        assertThat(session.dirty()).isFalse();
+    }
 }
