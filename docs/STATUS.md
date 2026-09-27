@@ -17,7 +17,10 @@
   `./gradlew check :jasper-app:installDist :jasper-app:shortcutHelpPreview` passed:
   2,017 tests, zero failures/errors, five environment-specific skips. Architecture,
   source hygiene and diff checks passed; light/dark previews at default and 18-point
-  typography were inspected. Native GUI acceptance is user-run. Not merged or pushed.
+  typography were inspected. Native GUI acceptance is user-run.
+  Integrated into `main` on 2026-09-27 with user authorization to publish to
+  `origin/main`. Merged-result `./gradlew check :jasper-app:installDist` passed with
+  the same 2,017 tests and five skips. The worktree is retained.
   See [shortcut guide](keyboard-shortcuts.md).
 
 - **Three-platform CI** (branch `fix/ci-cross-platform`, 2026-09-27): `main` had been red on Linux
