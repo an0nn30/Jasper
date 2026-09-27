@@ -40,6 +40,7 @@ public final class AuxiliarySurface {
     private final Function<AuxiliarySurface, Shell> shells;
     private final JPanel holder = new JPanel(new BorderLayout());
     private final List<BooleanSupplier> guards = new ArrayList<>();
+    private final List<BooleanSupplier> closeCommands = new ArrayList<>();
     private final List<Runnable> closedListeners = new ArrayList<>();
     private final List<Runnable> activatedListeners = new ArrayList<>();
     private String title;
@@ -105,16 +106,49 @@ public final class AuxiliarySurface {
         if (!closed && shell != null) shell.toFront().run();
     }
 
-    /** A user's attempt to close: every guard is consulted; one that throws cannot trap the window open. */
-    public boolean requestClose() {
+    /**
+     * Asks every closing guard without closing: quit and restart use this. One that throws cannot trap the window open.
+     *
+     * @return whether the window may close
+     */
+    public boolean mayClose() {
         if (closed) return true;
-        if (kind == Kind.OVERLAY) return false;
         for (BooleanSupplier guard : List.copyOf(guards)) {
             try { if (!guard.getAsBoolean()) return false; }
             catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A window closing guard failed", failure); }
         }
+        return true;
+    }
+
+    /** A user's attempt to close: every guard is consulted; one that throws cannot trap the window open. */
+    public boolean requestClose() {
+        if (closed) return true;
+        if (kind == Kind.OVERLAY) return false;
+        if (!mayClose()) return false;
         close();
         return true;
+    }
+
+    /**
+     * The window's Close Window command: handlers newest first; the first that returns true has handled it and
+     * the window stays open. Otherwise this is a user's close. One that throws has not handled it.
+     *
+     * @return true when the window closed
+     */
+    public boolean closeCommand() {
+        if (closed) return true;
+        List<BooleanSupplier> handlers = new ArrayList<>(closeCommands);
+        java.util.Collections.reverse(handlers);
+        for (BooleanSupplier handler : handlers) {
+            try { if (handler.getAsBoolean()) return false; }
+            catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A window close command handler failed", failure); }
+        }
+        return requestClose();
+    }
+
+    public Subscription onCloseCommand(BooleanSupplier handler) {
+        closeCommands.add(java.util.Objects.requireNonNull(handler));
+        return new Subscription(() -> closeCommands.remove(handler));
     }
 
     /** Closes at once, without consulting guards. Idempotent. */
@@ -126,6 +160,7 @@ public final class AuxiliarySurface {
             shell.dispose().run();
         }
         guards.clear();
+        closeCommands.clear();
         for (Runnable listener : List.copyOf(closedListeners)) {
             try { listener.run(); }
             catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A window closed listener failed", failure); }

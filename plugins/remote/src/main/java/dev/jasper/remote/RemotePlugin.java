@@ -76,6 +76,7 @@ public class RemotePlugin implements Plugin {
     private dev.jasper.remote.ui.transfers.TransferUi transferUi;
     private dev.jasper.remote.ui.sftp.SftpUi sftpUi;
     private dev.jasper.remote.ui.sftp.DirectoryFollower follower;
+    private dev.jasper.remote.edit.EditChannels editChannels;
     private final Map<UUID, PendingSession> attachedPanes = new java.util.HashMap<>();
     private PluginAction sftpToggle;
     public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=dev.jasper.remote.ui.sftp.SftpUi.TOGGLE;
@@ -162,6 +163,13 @@ public class RemotePlugin implements Plugin {
         });
         transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui,window->sftpUi.reveal(window));
         sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::strip,transferUi::release);
+        try {
+            var editor=context.services().find(dev.jasper.editor.api.Editor.class);
+            if(editor.isPresent()) {
+                editChannels=new dev.jasper.remote.edit.EditChannels((identity,owner)->endpoints.open(Optional.of(identity),owner.orElse(null),status->{}),connections::authenticated,transferBackground,ui);
+                sftpUi.editing(new dev.jasper.remote.edit.RemoteEditing(editor.orElseThrow(),editChannels,()->context.terminals().activeWindow(),context.notices()::error));
+            }
+        } catch(NoClassDefFoundError absent) { /* the Editor is not installed: files in the SFTP panel do not open */ }
         follower=new dev.jasper.remote.ui.sftp.DirectoryFollower(ui,schedule,id->sftpUi.following(id)||context.terminals().activePane().map(pane->pane.id().equals(id)).orElse(false),this::probedDirectory,sftpUi::notice);
         sftpUi.onFollowRequested(follower::request);
         context.actions().register(ActionSpec.of(SFTP,"Open SFTP here").withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp","files","browse","remote")),invoked->{
@@ -234,7 +242,7 @@ public class RemotePlugin implements Plugin {
 
     @Override public void stop() {
         stopped = true;
-        if(follower!=null)follower.close();if(sftpUi!=null)sftpUi.close();if(transferUi!=null)transferUi.close();if(transfers!=null)transfers.close();
+        if(follower!=null)follower.close();if(sftpUi!=null)sftpUi.close();if(editChannels!=null)editChannels.close();if(transferUi!=null)transferUi.close();if(transfers!=null)transfers.close();
         if (configImport != null) configImport.close();
         for (var attempt : Set.copyOf(attempts)) attempt.close();
         for (var question : Set.copyOf(questions)) question.cancel(true);

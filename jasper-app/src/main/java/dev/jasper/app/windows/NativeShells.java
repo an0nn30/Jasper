@@ -179,16 +179,22 @@ public final class NativeShells {
         return owner.closed() ? Optional.empty() : selected;
     }
 
-    /** Owner-based multiple-file or single-directory selection, without global chooser properties. */
+    /** Owner-based multiple-file, single-directory or save-target selection, without global chooser properties. */
     public java.util.List<Path> choosePaths(PathChoice choice, java.util.function.Consumer<Runnable> cancellation) {
         Window owner = choice.terminalOwner() != null ? terminalWindows.apply(choice.terminalOwner()) : natives.get(choice.auxiliaryOwner());
         if (owner == null || !owner.isShowing()) throw new IllegalArgumentException("Picker requires a shown owner");
-        if (!choice.directory()) {
-            FileDialog chooser = owner instanceof Dialog dialog ? new FileDialog(dialog, choice.title(), FileDialog.LOAD)
-                : new FileDialog((Frame) owner, choice.title(), FileDialog.LOAD);
+        if (choice.mode() != PathChoice.Mode.DIRECTORY) {
+            int mode = choice.mode() == PathChoice.Mode.SAVE ? FileDialog.SAVE : FileDialog.LOAD;
+            FileDialog chooser = owner instanceof Dialog dialog ? new FileDialog(dialog, choice.title(), mode)
+                : new FileDialog((Frame) owner, choice.title(), mode);
             try {
-                chooser.setMultipleMode(true);
-                choice.initial().ifPresent(path -> chooser.setDirectory(path.toString()));
+                chooser.setMultipleMode(choice.mode() == PathChoice.Mode.FILES);
+                choice.initial().ifPresent(path -> {
+                    if (choice.mode() == PathChoice.Mode.SAVE && !java.nio.file.Files.isDirectory(path)) {
+                        if (path.getParent() != null) chooser.setDirectory(path.getParent().toString());
+                        if (path.getFileName() != null) chooser.setFile(path.getFileName().toString());
+                    } else chooser.setDirectory(path.toString());
+                });
                 cancellation.accept(chooser::dispose);
                 chooser.setVisible(true);
                 return java.util.Arrays.stream(chooser.getFiles()).map(file -> file.toPath().toAbsolutePath().normalize()).toList();
@@ -249,7 +255,7 @@ public final class NativeShells {
         var close = new JMenuItem("Close Window");
         close.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, shortcut));
         close.addActionListener(event -> {
-            if (!dev.jasper.app.platform.WindowInput.captureShortcut(surface.holder(), close.getAccelerator())) surface.requestClose();
+            if (!dev.jasper.app.platform.WindowInput.captureShortcut(surface.holder(), close.getAccelerator())) surface.closeCommand();
         });
         file.add(open); file.add(close);
         if (!SystemInfo.isMacOS) {

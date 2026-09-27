@@ -19,6 +19,9 @@ class FakeChooserTest {
             host.queuePathSelection(List.of(Path.of("/dest").toAbsolutePath()));
             assertThat(context.windows().chooseDirectory(owner, "Directory", Optional.empty())).contains(Path.of("/dest").toAbsolutePath());
             assertThat(context.windows().chooseFiles(owner, "Cancel", Optional.empty())).isEmpty();
+            host.queuePathSelection(List.of(Path.of("/notes/new.toml").toAbsolutePath()));
+            assertThat(context.windows().chooseSaveFile(owner, "Save As", Optional.of(Path.of("/notes/old.toml").toAbsolutePath()))).contains(Path.of("/notes/new.toml").toAbsolutePath());
+            assertThat(context.windows().chooseSaveFile(owner, "Save As", Optional.empty())).as("nothing queued cancels").isEmpty();
             host.queuePathSelection(List.of(Path.of("/a").toAbsolutePath()));
             host.duringPathSelection(owner::close);
             assertThat(context.windows().chooseFiles(owner, "Closed", Optional.empty())).isEmpty();

@@ -1,5 +1,5 @@
-// A plugin compiles against the SDK and the exported API of plugins it requires; the application
-// supplies both at run time. Bundled: Apache MINA sshd (with slf4j routed to JUL), BouncyCastle so MINA
+// A plugin compiles against the SDK and the exported API of plugins it requires (Vault, and the Editor
+// for editing remote files); the application supplies both at run time. Bundled: Apache MINA sshd (with slf4j routed to JUL), BouncyCastle so MINA
 // reads every OpenSSH key format the Vault produces, and tomlj for hosts.toml. stagePlugins copies the
 // runtime classpath beside the plugin jar, and PluginClassLoader loads it.
 plugins { `java-library` }
@@ -7,6 +7,7 @@ plugins { `java-library` }
 dependencies {
     compileOnly(project(":jasper-sdk"))
     compileOnly(project(":jasper-plugin-vault"))
+    compileOnly(project(":jasper-plugin-editor"))
     implementation("org.apache.sshd:sshd-core:2.19.0")
     implementation("org.apache.sshd:sshd-sftp:2.19.0")
     implementation("org.xerial:sqlite-jdbc:3.53.4.0")
@@ -16,4 +17,5 @@ dependencies {
     testImplementation(project(":jasper-sdk"))
     testImplementation(project(":jasper-sdk-testkit"))
     testImplementation(project(":jasper-plugin-vault"))
+    testImplementation(project(":jasper-plugin-editor"))
 }

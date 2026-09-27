@@ -237,6 +237,13 @@ public final class Connections {
         return Optional.of(new SessionLease(shared.identity,shared.session,()->ui.execute(()->release(shared))));
     }
 
+    /** UI-only: whether an authenticated route to {@code identity} is open, so leasing it needs no sign-in prompt. */
+    public boolean authenticated(ConnectionIdentity identity) {
+        if (closed || !identity.resolved()) return false;
+        Shared shared = sessions.get(Key.shared(identity));
+        return shared != null && shared.session != null && shared.session.isOpen() && shared.session.isAuthenticated();
+    }
+
     public CompletableFuture<SessionLease> lease(ConnectionIdentity identity, WindowHandle owner, Consumer<String> status) {
         return lease(identity, owner, status, false);
     }

@@ -91,7 +91,7 @@ public final class ApplicationBootstrap {
                         LOG.log(System.Logger.Level.WARNING, standalone
                             ? "Started with --background, but a --config, --safe-mode, --plugin-dir or --standalone launch is always standalone and cannot be resident; exiting"
                             : "Started with --background but the handoff endpoint is unavailable; exiting");
-                        application.quit();
+                        application.quitNow();
                     } else application.warmUp();
                 });
         } catch (RuntimeException | Error failure) {
@@ -136,7 +136,7 @@ public final class ApplicationBootstrap {
         try {
             CommandHistory history = acquired.own(openHistory.get());
             JasperApplication application = openApplication.apply(history);
-            acquired.own((AutoCloseable) application::quit);
+            acquired.own((AutoCloseable) application::quitNow);
             acquired.release(history); acquired.release(service);
             HandoffSocket endpoint = bindEndpoint.apply(application);
             if (endpoint != null) {

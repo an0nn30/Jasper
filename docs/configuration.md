@@ -340,6 +340,12 @@ file is an empty scope; disable the plugin in File → Manage Plugins… to remo
 shortcut is the action `"dev.jasper.snippets.open"`. See [Snippets](command-palette.md#snippets) for its format and the fill-in and
 name steps.
 
+### Editor
+
+The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see [Plugins](#plugins)):
+`font_family`, `font_size`, `tab_size`, `soft_wrap` and `max_file_mib`, applied live. See
+[Editor](editor.md#settings) for defaults and ranges.
+
 ### Live settings and temporary choices
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.

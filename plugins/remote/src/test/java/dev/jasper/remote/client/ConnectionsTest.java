@@ -143,6 +143,18 @@ class ConnectionsTest {
         }
     }
 
+    @Test void authenticatedReportsALiveRouteWithoutTakingALease(@TempDir Path dir) throws Exception {
+        try (var server = new LoopbackServer()) {
+            connections(dir, Optional.empty());
+            var host = host("target", server.port(), "deploy", new Auth.Vault(passwordCredential()), Optional.empty());
+            var identity = onUi(() -> connections.identity(host.id()));
+            assertThat(onUi(() -> connections.authenticated(identity))).isFalse();
+            var lease = onUi(() -> connections.lease(identity, null, status -> {})).get(10, TimeUnit.SECONDS);
+            assertThat(onUi(() -> connections.authenticated(identity))).isTrue();
+            lease.close();
+        }
+    }
+
     @Test void effectiveVaultUsernameChangesCannotReuseOldSession(@TempDir Path dir) throws Exception {
         try (var server = new LoopbackServer()) {
             server.server.setPasswordAuthenticator((user, password, session) -> password.equals("s3cret"));

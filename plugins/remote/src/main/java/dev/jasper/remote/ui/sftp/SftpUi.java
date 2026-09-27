@@ -1,6 +1,7 @@
 package dev.jasper.remote.ui.sftp;
 
 import dev.jasper.remote.client.*;
+import dev.jasper.remote.edit.RemoteEditing;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.sftp.*;
 import dev.jasper.remote.transfer.*;
@@ -38,6 +39,7 @@ public final class SftpUi implements AutoCloseable {
     private final Set<PluginDialog> dialogs=new HashSet<>();
     private final Map<UUID,CompletableFuture<ConnectionIdentity>> browsing=new HashMap<>();
     private Consumer<UUID> followRequested=pane->{};
+    private RemoteEditing editing;
     private volatile boolean closed;
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,JComponent> transferStrip,Consumer<WindowHandle> releaseStrip) {
@@ -57,6 +59,7 @@ public final class SftpUi implements AutoCloseable {
         var operations=new FileOperationController(context.dataDirectory().resolve("browser-cache"),background,ui,open,transfers.get().reservations(),panel::operationStatus,controller::refresh);
         var view=new View(host,panel,controller,operations);views.put(window.id(),view);
         controller.operations(new SftpController.Operations(()->upload(view,false),()->upload(view,true),()->download(view),()->newFolder(view),()->delete(view),()->copyPaths(view),()->copyHost(view),operations::cancel));
+        if(editing!=null) panel.editing(new SftpPanel.Editing(entry->activate(view,entry),()->openSelected(view)));
         controller.visible(host.visible());
         host.onVisibility(visible->{controller.visible(visible);if(visible) activePane.apply(window).ifPresent(pane->controller.open(pane.pane(),pane.identity(),pane.directory(),false));});
         host.onClosed(()-> { releaseStrip.accept(window);cancelBrowse(window.id());views.remove(window.id());controller.close();operations.close(); });return panel;
@@ -88,6 +91,8 @@ public final class SftpUi implements AutoCloseable {
     public void ended(UUID pane) { for(var view:views.values()) view.controller().ended(pane); }
     /** Receives the pane whose shell folder a view wants now: shown, focused, or follow turned back on. */
     public void onFollowRequested(Consumer<UUID> listener) { followRequested=listener; }
+    /** Sends files to the Editor. Call before any panel opens, and only when the Editor is installed. */
+    public void editing(RemoteEditing editing) { this.editing=editing; }
     /** True while any visible view follows {@code pane}. */
     public boolean following(UUID pane) { return views.values().stream().anyMatch(view->view.controller().following(pane)); }
     public void notice(UUID pane,String text) { for(var view:views.values()) view.controller().notice(pane,text); }
@@ -162,6 +167,49 @@ public final class SftpUi implements AutoCloseable {
             id->connections.resolveIdentity(id,owner),identity->endpoints.open(Optional.of(identity),owner,status->{}),destination->{dialog.close();background(()->new Queued(new TransferRequest(EndpointRef.remote(source.identity()),paths(source),EndpointRef.remote(destination.identity()),destination.directory()),source.selection().stream().map(FileEntry::name).toList()),owner);},
             destination->nameDialog(owner,destination,operations::mkdir),operations::cancel,dialog::close);
         pickerReference.set(picker);dialog.onClosed(()-> { picker.close();operations.close(); });dialog.setContent(picker);dialog.show();
+    }
+    /** Whether {@code view} is still {@code owner}'s open view, showing the same identity and directory {@code capture} was taken from: a late result from the per-identity {@link RemoteEditing} queue must not act on a view that moved on in the meantime. */
+    private boolean stillShowing(View view,WindowHandle owner,SftpController.Capture capture) {
+        return views.get(owner.id())==view && view.controller().capture().filter(now->now.identity().equals(capture.identity()) && now.directory().equals(capture.directory())).isPresent();
+    }
+    /** Double-click or Enter on one file or link: a file opens in the Editor; a link opens when it leads to a file and navigates when it leads to a folder. */
+    private void activate(View view,FileEntry entry) {
+        var captured=view.controller().capture();if(captured.isEmpty() || closed || editing==null) return;var capture=captured.orElseThrow();WindowHandle owner=view.host().window();
+        String path;try { path=FilePaths.child(capture.directory(),entry.name()); } catch(IOException invalid) { view.panel().error(invalid.getMessage());return; }
+        if(entry.kind()==FileEntry.Kind.FILE) { editing.open(capture.identity(),path,owner);return; }
+        editing.kinds(capture.identity(),List.of(path),owner).whenComplete((kinds,failure)->ui.execute(()-> {
+            if(closed || !owner.isOpen()) return;
+            if(failure!=null) { if(stillShowing(view,owner,capture)) view.panel().error(message(failure));return; }
+            var kind=kinds.getFirst();
+            if(kind.isEmpty()) { if(stillShowing(view,owner,capture)) view.panel().error(entry.name()+": its target does not exist"); }
+            else if(kind.orElseThrow()==FileEntry.Kind.FILE) editing.open(capture.identity(),path,owner);
+            else if(kind.orElseThrow()==FileEntry.Kind.DIRECTORY) { if(stillShowing(view,owner,capture)) view.controller().manual(path); }
+            else if(stillShowing(view,owner,capture)) view.panel().error(entry.name()+" is not a regular file");
+        }));
+    }
+    /** Open in Editor: the selected files and links to files, at most {@link RemoteEditing#MAX_OPEN}. A failed link resolution still opens the selection's regular files. */
+    private void openSelected(View view) {
+        var captured=view.controller().capture();if(captured.isEmpty() || closed || editing==null) return;var capture=captured.orElseThrow();WindowHandle owner=view.host().window();
+        var candidates=capture.selection().stream().filter(entry->entry.kind()==FileEntry.Kind.FILE || entry.kind()==FileEntry.Kind.LINK).toList();if(candidates.isEmpty()) return;
+        var paths=new ArrayList<String>();var links=new ArrayList<String>();
+        try { for(var entry:candidates) { String path=FilePaths.child(capture.directory(),entry.name());paths.add(path);if(entry.kind()==FileEntry.Kind.LINK) links.add(path); } }
+        catch(IOException invalid) { view.panel().error(invalid.getMessage());return; }
+        CompletableFuture<List<Optional<FileEntry.Kind>>> resolved=links.isEmpty()?CompletableFuture.completedFuture(List.of()):editing.kinds(capture.identity(),links,owner);
+        resolved.whenComplete((kinds,failure)->ui.execute(()-> {
+            if(closed || !owner.isOpen()) return;
+            var files=new ArrayList<String>();
+            if(failure==null) {
+                int link=0;
+                for(int i=0;i<candidates.size();i++) {
+                    if(candidates.get(i).kind()==FileEntry.Kind.FILE) files.add(paths.get(i));
+                    else if(kinds.get(link++).filter(kind->kind==FileEntry.Kind.FILE).isPresent()) files.add(paths.get(i));
+                }
+            } else for(int i=0;i<candidates.size();i++) if(candidates.get(i).kind()==FileEntry.Kind.FILE) files.add(paths.get(i));
+            for(String path:files.subList(0,Math.min(files.size(),RemoteEditing.MAX_OPEN))) editing.open(capture.identity(),path,owner);
+            if(!stillShowing(view,owner,capture)) return;
+            if(failure!=null) view.panel().error(message(failure));
+            else if(files.size()>RemoteEditing.MAX_OPEN) view.panel().error("Opened "+RemoteEditing.MAX_OPEN+" of "+files.size()+" files.");
+        }));
     }
     private static String message(Throwable failure) { while((failure instanceof CompletionException || failure instanceof ExecutionException) && failure.getCause()!=null) failure=failure.getCause();return failure.getMessage()==null?"SFTP operation failed":failure.getMessage(); }
     @Override public void close() { if(closed) return;closed=true;for(var request:List.copyOf(browsing.values())) request.cancel(true);browsing.clear();for(var dialog:List.copyOf(dialogs)) dialog.close();for(var view:List.copyOf(views.values())) { view.controller().close();view.operations().close(); }views.clear(); }

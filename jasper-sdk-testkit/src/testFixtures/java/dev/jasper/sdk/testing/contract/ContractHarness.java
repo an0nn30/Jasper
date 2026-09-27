@@ -69,6 +69,15 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: closes the first open window with this id as the user would; false when vetoed or absent. */
     boolean requestClose(String windowId);
 
+    /**
+     * UI thread: runs the Close Window command of the first open window with this id: its close-command
+     * handlers newest first, then its closing guards. True when the window closed.
+     */
+    boolean closeCommand(String windowId);
+
+    /** UI thread: asks every open plugin window's closing guards as quitting Jasper does, closing nothing; true when the quit may go ahead. */
+    boolean requestQuit();
+
     /** UI thread: adds a terminal window, which announces itself on the terminal topics. */
     java.util.UUID addTerminalWindow();
 

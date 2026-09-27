@@ -64,8 +64,8 @@ public final class LocalEndpoint implements FileEndpoint {
                 secure = found;
             } catch (IOException | RuntimeException failure) { if (found != null) found.close(); else stream.close(); throw failure; }
         }
-        FileChannel open(Set<OpenOption> options) throws IOException {
-            var channel = secure == null ? Files.newByteChannel(file, options) : secure.newByteChannel(name, options);
+        FileChannel open(Set<OpenOption> options, FileAttribute<?>... attributes) throws IOException {
+            var channel = secure == null ? Files.newByteChannel(file, options, attributes) : secure.newByteChannel(name, options, attributes);
             if (!(channel instanceof FileChannel result)) { channel.close(); throw new IOException("Provider cannot force transfer checkpoints"); }
             handles.add(result); if (closed) { result.close(); throw new IOException("Cancelled"); } return result;
         }
@@ -77,10 +77,18 @@ public final class LocalEndpoint implements FileEndpoint {
         int permissions = -1;
         try { permissions = permissions(Files.readAttributes(file, PosixFileAttributes.class, LinkOption.NOFOLLOW_LINKS).permissions()); }
         catch (UnsupportedOperationException ignored) { /* reported as unavailable */ }
+        int[] owner = owner(file);
         return new FileEntry(file.getFileName() == null ? "/" : file.getFileName().toString(),
             a.isSymbolicLink() ? FileEntry.Kind.LINK : a.isDirectory() ? FileEntry.Kind.DIRECTORY : a.isRegularFile() ? FileEntry.Kind.FILE : FileEntry.Kind.SPECIAL,
             a.size(), a.lastModifiedTime().toMillis(), permissions, a.isSymbolicLink() ? Files.readSymbolicLink(file).toString() : "",
-            a.fileKey() == null ? "" : a.fileKey().toString());
+            a.fileKey() == null ? "" : a.fileKey().toString(), owner[0], owner[1]);
+    }
+    /** @return the uid and gid, or -1 each where the platform reports none */
+    private static int[] owner(Path file) throws IOException {
+        try {
+            var ids = Files.readAttributes(file, "unix:uid,gid", LinkOption.NOFOLLOW_LINKS);
+            return new int[] {((Number) ids.get("uid")).intValue(), ((Number) ids.get("gid")).intValue()};
+        } catch (UnsupportedOperationException | IllegalArgumentException unavailable) { return new int[] {-1, -1}; }
     }
     @Override public void list(String text, Consumer<FileEntry> visitor) throws IOException {
         Path dir = path(text); ancestors(dir);
@@ -109,20 +117,33 @@ public final class LocalEndpoint implements FileEndpoint {
             var channel = parent.open(options);
             try { channel.position(offset); }
             catch (IOException failure) { handles.remove(channel); channel.close(); throw failure; }
-            return new WriteHandle() {
-                @Override public void write(int b) throws IOException { write(new byte[]{(byte) b}); }
-                @Override public void write(byte[] b, int off, int len) throws IOException {
-                    check(); var buffer = ByteBuffer.wrap(b, off, len);
-                    while (buffer.hasRemaining()) { check(); channel.write(buffer); }
-                }
-                @Override public long checkpoint() throws IOException { check(); channel.force(true); return channel.position(); }
-                @Override public void flush() throws IOException { checkpoint(); }
-                @Override public void abort() { try { channel.close(); } catch (IOException ignored) {} finally { handles.remove(channel); } }
-                @Override public void close() throws IOException {
-                    try { if (channel.isOpen() && !closed) channel.force(true); } finally { channel.close(); handles.remove(channel); }
-                }
-            };
+            return writer(channel);
         }
+    }
+    @Override public WriteHandle create(String text, int mode) throws IOException {
+        Path file = path(text);
+        try (var parent = new Parent(file)) {
+            Set<OpenOption> options = Set.of(StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW, LinkOption.NOFOLLOW_LINKS);
+            // The mode is part of the create itself, so the file is never more open than asked.
+            return writer(file.getFileSystem().supportedFileAttributeViews().contains("posix")
+                ? parent.open(options, PosixFilePermissions.asFileAttribute(bits(mode))) : parent.open(options));
+        }
+    }
+    @Override public boolean writable(String text) throws IOException { return Files.isWritable(path(text)); }
+    private WriteHandle writer(FileChannel channel) {
+        return new WriteHandle() {
+            @Override public void write(int b) throws IOException { write(new byte[]{(byte) b}); }
+            @Override public void write(byte[] b, int off, int len) throws IOException {
+                check(); var buffer = ByteBuffer.wrap(b, off, len);
+                while (buffer.hasRemaining()) { check(); channel.write(buffer); }
+            }
+            @Override public long checkpoint() throws IOException { check(); channel.force(true); return channel.position(); }
+            @Override public void flush() throws IOException { checkpoint(); }
+            @Override public void abort() { try { channel.close(); } catch (IOException ignored) {} finally { handles.remove(channel); } }
+            @Override public void close() throws IOException {
+                try { if (channel.isOpen() && !closed) channel.force(true); } finally { channel.close(); handles.remove(channel); }
+            }
+        };
     }
     @Override public void truncate(String text, long size) throws IOException {
         if (size < 0) throw new IOException("Negative size");
@@ -165,13 +186,16 @@ public final class LocalEndpoint implements FileEndpoint {
                 var posix = parent.secure == null ? Files.getFileAttributeView(parent.file, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS)
                     : parent.secure.getFileAttributeView(parent.name, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
                 if (posix == null) throw new IOException("POSIX permissions unsupported by destination");
-                var bits = java.util.EnumSet.noneOf(PosixFilePermission.class);
-                for (var bit : PosixFilePermission.values()) if ((mode & (1 << (8 - bit.ordinal()))) != 0) bits.add(bit);
-                posix.setPermissions(bits);
+                posix.setPermissions(bits(mode));
             }
         }
     }
     private static int permissions(Set<PosixFilePermission> bits) { int result = 0; for (var bit : bits) result |= 1 << (8 - bit.ordinal()); return result; }
+    private static Set<PosixFilePermission> bits(int mode) {
+        var bits = java.util.EnumSet.noneOf(PosixFilePermission.class);
+        for (var bit : PosixFilePermission.values()) if ((mode & (1 << (8 - bit.ordinal()))) != 0) bits.add(bit);
+        return bits;
+    }
     @Override public String canonical(String text) throws IOException {
         Path file = path(text); return (file.getParent() == null ? file.toRealPath() : file.getParent().toRealPath().resolve(file.getFileName())).toString();
     }
