@@ -212,8 +212,8 @@ class ExpandedConfigTest {
 
     @Test void defaultsAndOldConstructorRetainAppDefaultsAndRuntimeConversion() {
         var snapshot = parse("").snapshot();
-        assertThat(snapshot.columns()).isEqualTo(150);
-        assertThat(snapshot.lines()).isEqualTo(45);
+        assertThat(snapshot.columns()).isEqualTo(100);
+        assertThat(snapshot.lines()).isEqualTo(35);
         assertThat(snapshot.font()).isEqualTo(new FontConfig("JetBrains Mono", 16f,
             List.of("Symbols Nerd Font Mono", "Apple Color Emoji"), true, 1f));
         assertThat(snapshot.terminal()).isEqualTo(new TerminalConfig(new TerminalConfig.Shell("", List.of()),

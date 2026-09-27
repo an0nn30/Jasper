@@ -66,12 +66,12 @@ public final class ConfigLoader {
     private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
     private ToolbarMode toolbar = ToolbarMode.ICONS_AND_LABELS;
     private boolean statusBar = true;
-    private boolean buddyEnabled = true;
+    private boolean buddyEnabled = false;
     private boolean backgroundEnabled;
     private int longCommandSeconds = 10;
     private int maxResults = PaletteSettings.DEFAULT_MAX_RESULTS;
-    private int columns = 150;
-    private int lines = 45;
+    private int columns = 100;
+    private int lines = 35;
     private String fontFamily = FontConfig.defaults().family();
     private float fontSize = 16f;
     private String uiFontFamily = UiFontConfig.defaults().family();

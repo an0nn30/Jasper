@@ -6,7 +6,7 @@
 # Live across open windows. Range: 20-72 logical pixels; out-of-range values use the nearest limit.
 tab_height = 30
 # Live across open windows. Range: 28-64 logical pixels; out-of-range values use the nearest limit.
-rail_width = 36
+rail_width = 28
 # Live across open windows. Options: "icons_and_labels", "icons", or "hidden".
 toolbar = "icons_and_labels"
 # Live across open windows. Range: 24-64 logical pixels; out-of-range values use the nearest limit.
@@ -14,15 +14,15 @@ toolbar_height = 30
 # Live across open windows.
 status_bar = true
 # Live across open windows. Range: 20-48 logical pixels; out-of-range values use the nearest limit.
-status_bar_height = 30
+status_bar_height = 24
 # Initial grid for new windows only. Columns: 5-500; lines: 2-200.
-columns = 150
-lines = 45
+columns = 100
+lines = 35
 
 [buddy]
 # Live. Show the pixel-art Jasper floating above your windows while a terminal is open.
 # View > Show Jasper (also in the command palette) and right-click > Hide Jasper toggle him for the session.
-enabled = true
+enabled = false
 
 [notifications]
 # Live. Notify when a command that ran at least this long finishes in a pane you are not looking at.

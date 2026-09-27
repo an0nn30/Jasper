@@ -82,7 +82,7 @@ class BarHeightTest {
             var owner = content(launcher(new ArrayDeque<>()));
             var changes = new AtomicInteger(); owner.onMinimumSizeChanged = changes::incrementAndGet;
             assertThat(owner.toolbarHeight()).isEqualTo(30);
-            assertThat(owner.statusBarHeight()).isEqualTo(30);
+            assertThat(owner.statusBarHeight()).isEqualTo(24);
             owner.setToolbarHeight(40);
             assertThat(owner.toolbarHeight()).isEqualTo(40);
             assertThat(owner.toolbar().getPreferredSize().height).isEqualTo(UIScale.scale(40));
@@ -110,7 +110,7 @@ class BarHeightTest {
             assertThat(owner.status().getPreferredSize().height).isEqualTo(UIScale.scale(34));
             var fresh = content(launcher(new ArrayDeque<>()));
             assertThat(fresh.toolbarHeight()).isEqualTo(30);
-            assertThat(fresh.statusBarHeight()).isEqualTo(30);
+            assertThat(fresh.statusBarHeight()).isEqualTo(24);
         });
     }
 
@@ -137,9 +137,9 @@ class BarHeightTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             exercise(owner, "Toolbar height…", "toolbarHeight", hook -> owner.confirmToolbarHeight = hook,
-                owner::toolbarHeight, owner::setToolbarHeight, 24, 64);
+                owner::toolbarHeight, owner::setToolbarHeight, 24, 64, 30);
             exercise(owner, "Status bar height…", "statusBarHeight", hook -> owner.confirmStatusBarHeight = hook,
-                owner::statusBarHeight, owner::setStatusBarHeight, 20, 48);
+                owner::statusBarHeight, owner::setStatusBarHeight, 20, 48, 24);
             assertThat(owner.commands().entries().stream().map(entry -> entry.command().id()))
                 .contains("view.toolbar_height", "view.status_bar_height");
         });
@@ -160,7 +160,7 @@ class BarHeightTest {
 
     /** Drives one size dialog through OK with a typed value, Cancel, Reset and an out-of-range entry. */
     private static void exercise(WindowContent owner, String itemText, String name, Consumer<ToIntFunction<JComponent>> confirm,
-                                 IntSupplier current, IntConsumer set, int min, int max) {
+                                 IntSupplier current, IntConsumer set, int min, int max, int defaultValue) {
         String reset = "reset" + Character.toUpperCase(name.charAt(0)) + name.substring(1);
         set.accept(40);
         JMenuItem item = item(owner, itemText);
@@ -177,16 +177,16 @@ class BarHeightTest {
         item.doClick(); assertThat(current.getAsInt()).isEqualTo(44);
         confirm.accept(panel -> {
             ((JButton) WindowTabsTest.named(panel, reset)).doClick();
-            assertThat(spinner(panel, name).getValue()).isEqualTo(30);
+            assertThat(spinner(panel, name).getValue()).isEqualTo(defaultValue);
             return JOptionPane.OK_OPTION;
         });
-        item.doClick(); assertThat(current.getAsInt()).isEqualTo(30);
+        item.doClick(); assertThat(current.getAsInt()).isEqualTo(defaultValue);
         var errors = new ArrayList<String>(); owner.onError = errors::add;
         confirm.accept(panel -> {
             ((JSpinner.DefaultEditor) spinner(panel, name).getEditor()).getTextField().setText("99");
             return JOptionPane.OK_OPTION;
         });
-        item.doClick(); assertThat(current.getAsInt()).isEqualTo(30);
+        item.doClick(); assertThat(current.getAsInt()).isEqualTo(defaultValue);
         assertThat(errors).singleElement().asString().contains(String.valueOf(min)).contains(String.valueOf(max));
     }
 

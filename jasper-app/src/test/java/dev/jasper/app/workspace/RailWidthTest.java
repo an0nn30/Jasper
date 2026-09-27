@@ -45,7 +45,7 @@ class RailWidthTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var changes = new AtomicInteger(); owner.onMinimumSizeChanged = changes::incrementAndGet;
-            assertThat(owner.railWidth()).isEqualTo(36);
+            assertThat(owner.railWidth()).isEqualTo(28);
             owner.setRailWidth(48);
             assertThat(owner.railWidth()).isEqualTo(48);
             assertThat(owner.rail().getPreferredSize().width).isEqualTo(UIScale.scale(48));
@@ -54,7 +54,7 @@ class RailWidthTest {
                 assertThatIllegalArgumentException().isThrownBy(() -> owner.setRailWidth(width));
                 assertThat(owner.railWidth()).isEqualTo(48);
             }
-            assertThat(content(launcher(new ArrayDeque<>())).railWidth()).isEqualTo(36);
+            assertThat(content(launcher(new ArrayDeque<>())).railWidth()).isEqualTo(28);
         });
     }
 
@@ -89,16 +89,16 @@ class RailWidthTest {
             item.doClick(); assertThat(owner.railWidth()).isEqualTo(50);
             owner.confirmRailWidth = panel -> {
                 ((JButton) WindowTabsTest.named(panel, "resetRailWidth")).doClick();
-                assertThat(spinner(panel).getValue()).isEqualTo(36);
+                assertThat(spinner(panel).getValue()).isEqualTo(28);
                 return JOptionPane.OK_OPTION;
             };
-            item.doClick(); assertThat(owner.railWidth()).isEqualTo(36);
+            item.doClick(); assertThat(owner.railWidth()).isEqualTo(28);
             var errors = new ArrayList<String>(); owner.onError = errors::add;
             owner.confirmRailWidth = panel -> {
                 ((JSpinner.DefaultEditor) spinner(panel).getEditor()).getTextField().setText("99");
                 return JOptionPane.OK_OPTION;
             };
-            item.doClick(); assertThat(owner.railWidth()).isEqualTo(36);
+            item.doClick(); assertThat(owner.railWidth()).isEqualTo(28);
             assertThat(errors).singleElement().asString().contains("28").contains("64");
             assertThat(owner.commands().entries().stream().map(entry -> entry.command().id())).contains("view.rail_width");
         });

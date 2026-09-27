@@ -24,12 +24,12 @@ class InitialWindowSizeTest {
         var f = FontConfig.defaults();
         var natural = new FontSet(f.family(), f.size(), f.fallback(), f.ligatures());
         var defaults = InitialWindowSize.terminalArea(ConfigSnapshot.defaults());
-        assertThat(defaults).isEqualTo(new Dimension(150 * natural.cellWidth() + 8, 45 * natural.cellHeight() + 8));
+        assertThat(defaults).isEqualTo(new Dimension(100 * natural.cellWidth() + 8, 35 * natural.cellHeight() + 8));
         var large = new FontConfig("Monospaced", 24, java.util.List.of(), false, 1.8f);
         var fonts = new FontSet(large.family(), large.size(), large.fallback(), large.ligatures(), large.lineHeight());
         assertThat(InitialWindowSize.terminalArea(withGridAndFont(80, 30, large)))
             .isEqualTo(new Dimension(80 * fonts.cellWidth() + 8, 30 * fonts.cellHeight() + 8));
-        assertThat(InitialWindowSize.terminalArea(withGridAndFont(151, 46, f)))
+        assertThat(InitialWindowSize.terminalArea(withGridAndFont(101, 36, f)))
             .isEqualTo(new Dimension(defaults.width + natural.cellWidth(), defaults.height + natural.cellHeight()));
     }
 

@@ -26,7 +26,7 @@ public final class ConfigTemplate {
             # Tab height in logical pixels, 20-72; out-of-range values use the nearest limit. Updates live.
             # tab_height = 30
             # Panel rail width in logical pixels, 28-64; out-of-range values use the nearest limit. Updates live.
-            # rail_width = 36
+            # rail_width = 28
             # Toolbar: "icons_and_labels", "icons", or "hidden"; updates live.
             # toolbar = "icons_and_labels"
             # Toolbar height in logical pixels, 24-64; out-of-range values use the nearest limit. Updates live.
@@ -34,17 +34,17 @@ public final class ConfigTemplate {
             # Show the status bar; updates live.
             # status_bar = true
             # Status bar height in logical pixels, 20-48; never shorter than its text. Updates live.
-            # status_bar_height = 30
+            # status_bar_height = 24
 
             # Initial terminal grid for new windows only; existing windows keep their size.
-            # columns = 150
-            # lines = 45
+            # columns = 100
+            # lines = 35
             # Columns: 5-500; lines: 2-200. The window is clamped to the usable screen.
 
             [buddy]
-            # Show the pixel-art Jasper floating above your windows while a terminal is open; updates live.
-            # View > Show Jasper and a right-click on Jasper toggle him for this session only.
-            # enabled = true
+            # Show the pixel-art Jasper floating above your windows while a terminal is open; off by default,
+            # updates live. View > Show Jasper and a right-click on Jasper toggle him for this session only.
+            # enabled = false
 
             [notifications]
             # Live. Notify when a command that ran at least this long finishes in a pane you are not

@@ -89,11 +89,14 @@
   the minimum at 1 to avoid overlap).
 - **Tab height:** `window.tab_height` is 20–72 logical pixels, default 30; out-of-range values clamp
   to the nearest limit with a warning instead of falling back to the default.
-- **Rail width:** `window.rail_width` is 28–64 logical pixels, default 36, clamped the same way.
+- **Window defaults (2026-09-26, user's choice):** new windows open at 100 × 35 cells (was 150 × 45,
+  which superseded the parent spec's grid ruling below); the rail defaults to its 28 px minimum and the
+  status bar to 24 px; the toolbar stays 30 px. `buddy.enabled` now defaults to false (Jasper is opt-in).
+- **Rail width:** `window.rail_width` is 28–64 logical pixels, default 28, clamped the same way.
   Rail buttons stay square at width − 6, separators at width − 14. View → Rail width… and the
   `view.rail_width` command set a session-only width, like Tab height….
 - **Toolbar and status bar height:** `window.toolbar_height` (24–64, default 30) and
-  `window.status_bar_height` (20–48, default 30) clamp the same way and have matching session-only
+  `window.status_bar_height` (20–48, default 24) clamp the same way and have matching session-only
   View dialogs and `view.toolbar_height` / `view.status_bar_height` commands. Toolbar buttons are the
   height − 6 (icon-only buttons square; labelled buttons keep their side padding), separators the
   height − 14. The status bar is exactly its configured height unless the status font's line is taller,

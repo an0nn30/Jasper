@@ -110,9 +110,9 @@ class ConfigLoaderTest {
         assertThat(parse("window.toolbar='icons_and_labels'").diagnostics()).isEmpty();
     }
 
-    @Test void railWidthDefaultsToThirtySixAndClampsOutOfRangeValuesWithAWarning() {
-        assertThat(parse("").snapshot().railWidth()).isEqualTo(36);
-        assertThat(ConfigSnapshot.defaults().railWidth()).isEqualTo(36);
+    @Test void railWidthDefaultsToTwentyEightAndClampsOutOfRangeValuesWithAWarning() {
+        assertThat(parse("").snapshot().railWidth()).isEqualTo(28);
+        assertThat(ConfigSnapshot.defaults().railWidth()).isEqualTo(28);
         for (int width : new int[]{28, 36, 64}) assertThat(parse("window.rail_width=" + width).snapshot().railWidth()).isEqualTo(width);
         for (int[] example : new int[][]{{10, 28}, {27, 28}, {65, 64}, {200, 64}}) {
             var result = parse("[window]\nrail_width = " + example[0] + "\n");
@@ -141,9 +141,9 @@ class ConfigLoaderTest {
         assertThatIllegalArgumentException().isThrownBy(() -> ConfigSnapshot.defaults().toBuilder().toolbarHeight(65).build());
     }
 
-    @Test void statusBarHeightDefaultsToThirtyAndClampsOutOfRangeValuesWithAWarning() {
-        assertThat(parse("").snapshot().statusBarHeight()).isEqualTo(30);
-        assertThat(ConfigSnapshot.defaults().statusBarHeight()).isEqualTo(30);
+    @Test void statusBarHeightDefaultsToTwentyFourAndClampsOutOfRangeValuesWithAWarning() {
+        assertThat(parse("").snapshot().statusBarHeight()).isEqualTo(24);
+        assertThat(ConfigSnapshot.defaults().statusBarHeight()).isEqualTo(24);
         for (int height : new int[]{20, 30, 48}) assertThat(parse("window.status_bar_height=" + height).snapshot().statusBarHeight()).isEqualTo(height);
         for (int[] example : new int[][]{{0, 20}, {19, 20}, {49, 48}, {200, 48}}) {
             var result = parse("[window]\nstatus_bar_height = " + example[0] + "\n");
@@ -324,10 +324,14 @@ class ConfigLoaderTest {
         assertThat(off.rejected()).isFalse();
         assertThat(off.diagnostics()).isEmpty();
         assertThat(off.snapshot().buddyEnabled()).isFalse();
-        assertThat(ConfigSnapshot.defaults().buddyEnabled()).isTrue();
+        assertThat(parse("").snapshot().buddyEnabled()).as("Jasper is opt-in").isFalse();
+        assertThat(ConfigSnapshot.defaults().buddyEnabled()).isFalse();
+        var on = parse("[buddy]\nenabled = true\n");
+        assertThat(on.diagnostics()).isEmpty();
+        assertThat(on.snapshot().buddyEnabled()).isTrue();
         var bad = parse("[buddy]\nenabled = 1\n");
         assertThat(bad.rejected()).isTrue();
-        assertThat(bad.snapshot().buddyEnabled()).isTrue();
+        assertThat(bad.snapshot().buddyEnabled()).isFalse();
         assertDiagnostic(bad, "buddy.enabled", 2, 1, ConfigDiagnostic.Severity.ERROR);
         var unknown = parse("[buddy]\nvisible = true\n");
         assertDiagnostic(unknown, "buddy.visible", 2, 1, ConfigDiagnostic.Severity.WARNING);

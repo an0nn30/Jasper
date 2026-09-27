@@ -20,11 +20,11 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     /** The theme a configuration without {@code ui.theme.name} uses. */
     public static final String DEFAULT_THEME = "Jasper Dark";
     /** The rail's width in logical pixels without {@code window.rail_width}, and its limits. */
-    public static final int DEFAULT_RAIL_WIDTH = 36, MIN_RAIL_WIDTH = 28, MAX_RAIL_WIDTH = 64;
+    public static final int DEFAULT_RAIL_WIDTH = 28, MIN_RAIL_WIDTH = 28, MAX_RAIL_WIDTH = 64;
     /** The toolbar's height in logical pixels without {@code window.toolbar_height}, and its limits. */
     public static final int DEFAULT_TOOLBAR_HEIGHT = 30, MIN_TOOLBAR_HEIGHT = 24, MAX_TOOLBAR_HEIGHT = 64;
     /** The status bar's height in logical pixels without {@code window.status_bar_height}, and its limits. */
-    public static final int DEFAULT_STATUS_BAR_HEIGHT = 30, MIN_STATUS_BAR_HEIGHT = 20, MAX_STATUS_BAR_HEIGHT = 48;
+    public static final int DEFAULT_STATUS_BAR_HEIGHT = 24, MIN_STATUS_BAR_HEIGHT = 20, MAX_STATUS_BAR_HEIGHT = 48;
 
     public ConfigSnapshot {
         if (longCommandSeconds < 0 || longCommandSeconds > 3600)
@@ -117,7 +117,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                    FontConfig font, String theme, Map<String, String> keybindings,
                    int columns, int lines, TerminalConfig terminal) {
-        this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, true);
+        this(tabHeight, toolbar, statusBar, font, theme, keybindings, columns, lines, terminal, false);
     }
 
     public ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
@@ -139,7 +139,7 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
 
     public static ConfigSnapshot defaults() {
         return new ConfigSnapshot(30, ToolbarMode.ICONS_AND_LABELS, true,
-            FontConfig.defaults(), DEFAULT_THEME, Map.of(), 150, 45, TerminalConfig.defaults());
+            FontConfig.defaults(), DEFAULT_THEME, Map.of(), 100, 35, TerminalConfig.defaults());
     }
 
     public KeyBindings bindings(boolean macOs) {

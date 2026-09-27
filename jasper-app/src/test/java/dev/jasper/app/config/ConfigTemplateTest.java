@@ -81,11 +81,14 @@ class ConfigTemplateTest {
             assertThat(all.snapshot().tabHeight()).isEqualTo(30);
             assertThat(all.snapshot().toolbar()).isEqualTo(ToolbarMode.ICONS_AND_LABELS);
             assertThat(all.snapshot().statusBar()).isTrue();
-            assertThat(all.snapshot().buddyEnabled()).isTrue();
+            assertThat(all.snapshot().buddyEnabled()).isFalse();
             assertThat(all.snapshot().maxResults()).isEqualTo(5);
             assertThat(all.snapshot().fontSize()).isEqualTo(16f);
-            assertThat(all.snapshot().columns()).isEqualTo(150);
-            assertThat(all.snapshot().lines()).isEqualTo(45);
+            assertThat(all.snapshot().columns()).isEqualTo(100);
+            assertThat(all.snapshot().lines()).isEqualTo(35);
+            assertThat(all.snapshot().railWidth()).isEqualTo(28);
+            assertThat(all.snapshot().toolbarHeight()).isEqualTo(30);
+            assertThat(all.snapshot().statusBarHeight()).isEqualTo(24);
             assertThat(all.snapshot().font()).isEqualTo(FontConfig.defaults());
             assertThat(all.snapshot().terminal()).isEqualTo(TerminalConfig.defaults());
             assertThat(all.snapshot().theme()).isEqualTo("Jasper Dark");
