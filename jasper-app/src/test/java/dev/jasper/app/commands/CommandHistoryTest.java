@@ -235,9 +235,14 @@ class CommandHistoryTest {
             deliveries.runNext();
 
             assertRecent(history, "new_tab");
+            // POSIX fails the read through a regular file (ENOTDIR) and logs it; Windows reports the path as
+            // not found, which reads as "no history yet". The save fails, and is logged, on both.
+            List<String> expected = System.getProperty("os.name").startsWith("Windows")
+                ? List.of("Could not save command history")
+                : List.of("Could not read command history", "Could not save command history");
             assertThat(logs.records)
                 .extracting(LogRecord::getMessage)
-                .containsExactly("Could not read command history", "Could not save command history");
+                .containsExactlyElementsOf(expected);
             assertThat(logs.records)
                 .allSatisfy(record -> assertThat(record.getThrown())
                     .isInstanceOf(java.io.IOException.class));
