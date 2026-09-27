@@ -664,7 +664,7 @@ public abstract class PluginContractTest {
         h.start(info("test.alpha", Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), alpha::set);
         h.ui(() -> {
             var terminals = alpha.get().terminals();
-            PaneHandle opened = terminals.openTab(terminals.window(window).orElseThrow(), OpenRequest.localIn(Path.of("/tmp"))).orElseThrow();
+            PaneHandle opened = terminals.openTab(terminals.window(window).orElseThrow(), OpenRequest.localIn(Path.of("/tmp").toAbsolutePath())).orElseThrow();
             assertThat(opened.isOpen()).isTrue();
             assertThat(opened.tab().id()).isNotEqualTo(tab);
             PaneHandle split = terminals.split(terminals.pane(only).orElseThrow(), Direction.DOWN, OpenRequest.local()).orElseThrow();
