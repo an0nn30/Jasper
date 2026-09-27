@@ -98,6 +98,7 @@ tasks.register<JavaExec>("mockUiPreview") {
 // Explicit opt-in verification tools. They use real app components from the test
 // runtime, but check never runs them and they never create a native window.
 for ((taskName, entryPoint) in listOf(
+    "hostedContentPreview" to "HostedContentPreview",
     "commandPalettePreview" to "CommandPalettePreview",
     "titleBarPreview" to "TitleBarPreview",
     "commandSearchMeasurement" to "CommandSearchMeasurement",
@@ -108,6 +109,7 @@ for ((taskName, entryPoint) in listOf(
         dependsOn(tasks.testClasses)
         classpath = sourceSets["test"].runtimeClasspath
         mainClass = when (entryPoint) {
+            "HostedContentPreview" -> "dev.jasper.app.workspace.$entryPoint"
             "CommandPalettePreview" -> "dev.jasper.app.workspace.$entryPoint"
             "TitleBarPreview" -> "dev.jasper.app.workspace.$entryPoint"
             "CommandSearchMeasurement" -> "dev.jasper.app.commands.$entryPoint"

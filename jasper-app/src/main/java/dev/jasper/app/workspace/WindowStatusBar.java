@@ -19,6 +19,9 @@ final class WindowStatusBar extends JPanel {
     private final JButton configButton = new JButton("Built-in defaults");
     private final Segment right = new Segment(configButton);
     private final java.util.Map<String, JComponent> itemViews = new java.util.HashMap<>();
+    private final Box contentItems = Box.createHorizontalBox();
+    private java.util.List<dev.jasper.app.contributions.ContentStatus> contentStatus = java.util.List.of();
+    private boolean showingContent;
     private final Box leftItems = Box.createHorizontalBox();
     private final Box rightItems = Box.createHorizontalBox();
     Runnable onConfigurationDetails = () -> {};
@@ -38,7 +41,7 @@ final class WindowStatusBar extends JPanel {
         configButton.setContentAreaFilled(false); configButton.setOpaque(false);
         configButton.setEnabled(false); configButton.putClientProperty("html.disable", true);
         configButton.addActionListener(event -> onConfigurationDetails.run());
-        add(left); add(leftItems); add(rightItems); add(right); refreshTheme();
+        add(left); add(leftItems); add(rightItems); add(right); add(contentItems); refreshTheme();
         getAccessibleContext().setAccessibleName("Terminal status");
     }
 
@@ -60,6 +63,37 @@ final class WindowStatusBar extends JPanel {
         left.setToolTipText(directory);
         left.setFirstToolTip(shell.isEmpty() ? null : integration ? "Shell integration active" : "Shell integration not detected");
         updateText();
+    }
+
+    void setContent(dev.jasper.app.contributions.ContentEntry entry) {
+        showingContent = entry != null;
+        var items = entry == null ? java.util.List.<dev.jasper.app.contributions.ContentStatus>of() : entry.status();
+        if (!items.equals(contentStatus)) {
+            contentStatus = items; contentItems.removeAll();
+            for (var item : items) {
+                var button = new JButton(item.text()); button.putClientProperty("html.disable", true);
+                button.setToolTipText(item.tooltip()); button.setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5));
+                button.setContentAreaFilled(false); button.setFocusable(false); button.setFont(statusFont());
+                button.setForeground(muted()); if (item.run() != null) button.addActionListener(event -> item.run().run());
+                contentItems.add(button);
+            }
+        }
+        if (entry != null) {
+            var crumbs = new ArrayList<PathBreadcrumbs.Crumb>();
+            if (!entry.host().isEmpty()) crumbs.add(new PathBreadcrumbs.Crumb(entry.host(), entry.host(), "SERVER"));
+            String path = entry.location();
+            if (!entry.host().isEmpty() && path.indexOf(":/") >= 0) path = path.substring(path.indexOf(":/") + 1);
+            // A location supplied by a plugin stays text, including on remote hosts.
+            String[] parts = path.replace('\\', '/').split("/");
+            String built = path.startsWith("/") ? "/" : "";
+            for (String part : parts) if (!part.isEmpty()) {
+                built += (built.isEmpty() || built.endsWith("/") ? "" : "/") + part;
+                crumbs.add(new PathBreadcrumbs.Crumb(part, built, crumbs.isEmpty() ? "FOLDER" : null));
+            }
+            breadcrumbs.setLocation(new PathBreadcrumbs.Location(crumbs, path));
+            left.setParts("", path); dimensions = ""; updateText();
+        }
+        revalidate(); repaint();
     }
 
     void setConfiguration(ConfigService.State state) {
@@ -162,7 +196,7 @@ final class WindowStatusBar extends JPanel {
     void refreshTheme() {
         setBackground(surface());
         left.refreshTheme(); right.refreshTheme(); breadcrumbs.refreshTheme();
-        for (Box row : new Box[]{leftItems, rightItems})
+        for (Box row : new Box[]{leftItems, rightItems, contentItems})
             for (Component child : row.getComponents()) if (child instanceof JButton item) {
                 item.setForeground(muted());
                 item.setFont(statusFont());
@@ -214,12 +248,16 @@ final class WindowStatusBar extends JPanel {
         int available = Math.max(0, getWidth() - edge * 2);
         int rightWidth = Math.min(available, right.getPreferredSize().width);
         right.setBounds(Math.max(edge, getWidth() - edge - rightWidth), 0, rightWidth, getHeight());
-        int remaining = Math.max(0, right.getX() - leftInset - edge);
+        int rightEdge = right.getX();
+        int documentWidth = Math.min(contentItems.getPreferredSize().width, Math.max(0, (rightEdge - leftInset) * 2 / 3));
+        contentItems.setBounds(Math.max(leftInset, rightEdge - documentWidth), 0, documentWidth, getHeight());
+        if (documentWidth > 0) rightEdge -= documentWidth + gap;
+        int remaining = Math.max(0, rightEdge - leftInset - edge);
         int rightItemsWidth = rightItems.getComponentCount() == 0 ? 0 : Math.min(rightItems.getPreferredSize().width, remaining / 3);
         int rightItemsSpace = rightItemsWidth == 0 ? 0 : rightItemsWidth + gap;
         // An empty row collapses at the origin: no child may ever extend past the bar, however narrow it is.
         if (rightItemsWidth == 0) rightItems.setBounds(0, 0, 0, 0);
-        else rightItems.setBounds(right.getX() - rightItemsSpace, 0, rightItemsWidth, getHeight());
+        else rightItems.setBounds(rightEdge - rightItemsSpace, 0, rightItemsWidth, getHeight());
         remaining -= rightItemsSpace;
         int leftItemsWidth = leftItems.getComponentCount() == 0 ? 0 : Math.min(leftItems.getPreferredSize().width, remaining / 4);
         int leftItemsSpace = leftItemsWidth == 0 ? 0 : leftItemsWidth + gap;
@@ -231,6 +269,7 @@ final class WindowStatusBar extends JPanel {
     }
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+        if (showingContent) return;
         g.setColor(running ? UIManager.getColor("Jasper.runningForeground") : muted());
         var copy = (Graphics2D) g.create();
         try {

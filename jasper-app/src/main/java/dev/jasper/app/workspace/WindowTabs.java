@@ -16,8 +16,8 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     /** Titles come from remote programs; tooltips and the tab list show at most this many characters. */
     private static final int TITLE_LIMIT = 200;
     private final WindowContent owner;
-    private final IdentityHashMap<TerminalTab, Entry> entries = new IdentityHashMap<>();
-    private final List<TerminalTab> order = new ArrayList<>();
+    private final IdentityHashMap<Component, Entry> entries = new IdentityHashMap<>();
+    private final List<Component> order = new ArrayList<>();
     private final JButton list = new JButton();
     private final JPanel viewport = new JPanel(null) {
         // Child hover/close repaints must also repaint the fade above them.
@@ -27,7 +27,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             paintOverflow((Graphics2D) graphics);
         }
     };
-    private TerminalTab selected;
+    private Component selected;
     private double scrollOffset;
     private int contentWidth;
     private int layoutWidth = -1;
@@ -53,20 +53,20 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     }
 
     void refresh() {
-        var updated = new ArrayList<TerminalTab>();
-        for (int i = 0; i < owner.tabStrip().getTabCount(); i++) updated.add((TerminalTab) owner.tabStrip().getComponentAt(i));
+        var updated = new ArrayList<Component>();
+        for (int i = 0; i < owner.tabStrip().getTabCount(); i++) updated.add((Component) owner.tabStrip().getComponentAt(i));
         if (!updated.equals(order)) {
-            for (TerminalTab tab : List.copyOf(order)) if (!updated.contains(tab)) viewport.remove(entries.remove(tab));
+            for (Component tab : List.copyOf(order)) if (!updated.contains(tab)) viewport.remove(entries.remove(tab));
             order.clear(); order.addAll(updated);
-            for (TerminalTab tab : order) if (!entries.containsKey(tab)) {
+            for (Component tab : order) if (!entries.containsKey(tab)) {
                 Entry entry = new Entry(tab); entries.put(tab, entry); viewport.add(entry);
             }
             revealSelection = true;
         }
-        if (selected != owner.currentTab()) { selected = owner.currentTab(); revealSelection = true; }
+        if (selected != owner.selectedComponent()) { selected = owner.selectedComponent(); revealSelection = true; }
         setBackground(UIManager.getColor("ToolWindow.background"));
         boolean retitled = false;
-        for (TerminalTab tab : order) retitled |= entries.get(tab).refresh();
+        for (Component tab : order) retitled |= entries.get(tab).refresh();
         // A tab that grows can push the selected tab out; keep it shown if it was shown.
         Entry current = entries.get(selected);
         if (retitled && current != null && current.isVisible()) revealSelection = true;
@@ -90,8 +90,8 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     /** Every tab in order, titles literal; choosing one selects and reveals it. */
     JPopupMenu tabList() {
         var menu = new JPopupMenu();
-        for (TerminalTab tab : order) {
-            var item = new JCheckBoxMenuItem(capped(tab.title()), tab.icon(), tab == selected);
+        for (Component tab : order) {
+            var item = new JCheckBoxMenuItem(capped(owner.tabTitle(tab)), owner.tabIcon(tab), tab == selected);
             item.putClientProperty("html.disable", true);
             item.addActionListener(event -> { if (!disposed) { revealSelection = true; owner.selectTab(tab); revalidate(); repaint(); } });
             menu.add(item);
@@ -173,7 +173,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
     }
 
     private final class Entry extends JPanel {
-        private final TerminalTab tab;
+        private final Component tab;
         private final JButton close = new JButton();
         private final JButton select = new JButton() {
             // Swing creates a fresh tip that does not inherit html.disable from its component.
@@ -187,7 +187,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         private boolean hovered;
         private Point origin;
 
-        Entry(TerminalTab tab) {
+        Entry(Component tab) {
             super(null);
             this.tab = tab;
             setOpaque(false);
@@ -201,6 +201,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             close.setToolTipText("Close tab"); close.getAccessibleContext().setAccessibleName("Close tab");
             close.addActionListener(event -> { if (!disposed) owner.closeTab(tab); });
             MouseAdapter gestures = new MouseAdapter() {
+                private void popup(MouseEvent event) { owner.tabMenu(tab).show(event.getComponent(), event.getX(), event.getY()); }
                 @Override public void mouseEntered(MouseEvent event) { hover(true); }
                 @Override public void mouseExited(MouseEvent event) {
                     hover(contains(SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), Entry.this)));
@@ -208,6 +209,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
                 @Override public void mousePressed(MouseEvent event) {
                     origin = null;
                     if (disposed) return;
+                    if (event.isPopupTrigger()) { popup(event); return; }
                     if (SwingUtilities.isMiddleMouseButton(event)) { owner.closeTab(tab); return; }
                     if (SwingUtilities.isLeftMouseButton(event) && event.getComponent() != close) {
                         owner.selectTab(tab);
@@ -215,6 +217,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
                     }
                 }
                 @Override public void mouseReleased(MouseEvent event) {
+                    if (event.isPopupTrigger()) { popup(event); return; }
                     Point start = origin; origin = null;
                     if (disposed || start == null || !SwingUtilities.isLeftMouseButton(event)) return;
                     Point end = SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), WindowTabs.this);
@@ -242,23 +245,23 @@ final class WindowTabs extends JPanel implements AutoCloseable {
 
         int tabWidth() {
             FontMetrics metrics = select.getFontMetrics(select.getFont());
-            int content = UIScale.scale(EDGE + 16 + GAP) + metrics.stringWidth(tab.title()) + UIScale.scale(GAP + 16 + EDGE);
+            int content = UIScale.scale(EDGE + 16 + GAP) + metrics.stringWidth(owner.tabTitle(tab)) + UIScale.scale(GAP + 16 + EDGE);
             return Math.max(UIScale.scale(MIN_TAB), Math.min(UIScale.scale(MAX_TAB), content));
         }
 
         /** Returns whether the title changed. */
         boolean refresh() {
-            String text = tab.title();
+            String text = owner.tabTitle(tab);
             boolean retitled = !text.equals(select.getText());
             if (retitled) {
                 select.setText(text); select.getAccessibleContext().setAccessibleName(text);
                 select.setName("select:" + text); close.setName("close:" + text);
             }
             String shortcut = owner.tabShortcut(order.indexOf(tab));
-            String tip = capped(text);
+            String tip = capped(owner.tabTooltip(tab));
             select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
             Color surface = UIManager.getColor("Jasper.tabSelectedBackground");
-            select.setIcon(tab == selected ? AppIcons.forBackground(tab.icon(), surface) : tab.icon());
+            select.setIcon(tab == selected ? AppIcons.forBackground(owner.tabIcon(tab), surface) : owner.tabIcon(tab));
             close.setIcon(tab == selected ? AppIcons.forBackground(AppIcons.named("CLOSE"), surface) : AppIcons.named("CLOSE"));
             close.setRolloverIcon(tab == selected ? AppIcons.forBackground(AppIcons.named("CLOSE_HOVERED"), surface)
                 : AppIcons.named("CLOSE_HOVERED"));

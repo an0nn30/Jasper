@@ -179,7 +179,7 @@ final class WindowContributions implements AutoCloseable {
         persist(panel);
         renderRail();
         panel.site.notifyVisibility(false);
-        if (owner.currentTab() != null) owner.currentTab().focusTerminal();
+        owner.focusSelected();
     }
 
     void movePanel(String id, PanelRegion region) {

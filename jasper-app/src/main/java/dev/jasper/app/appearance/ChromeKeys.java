@@ -18,7 +18,8 @@ final class ChromeKeys {
         "Jasper.titleInactiveForeground", "Jasper.titleSeparator", "Jasper.chromeForeground", "Jasper.mutedForeground",
         "Jasper.tabSelectedBackground", "Jasper.tabSelectedForeground", "Jasper.tabHoverBackground", "Jasper.tabUnderline",
         "Jasper.tabUnderlineInactive", "Jasper.tabSelectedBorder", "Jasper.tabSelectedBorderInactive", "Jasper.splitDivider", "Jasper.findErrorBackground", "Jasper.runningForeground",
-        "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground");
+        "Jasper.editorBackground", "Jasper.editorForeground", "Jasper.editorCaret", "Jasper.editorSelection",
+        "Jasper.editorCurrentLine", "Jasper.editorGutter", "Jasper.editorLineNumbers", "Jasper.configSuccessForeground", "Jasper.configWarningForeground", "Jasper.configErrorForeground");
 
     private ChromeKeys() {}
 
@@ -55,6 +56,14 @@ final class ChromeKeys {
         put(defaults, added, "Jasper.configSuccessForeground", readable(first(defaults, "Actions.Green"), status, 4.5, foreground));
         put(defaults, added, "Jasper.configWarningForeground", readable(first(defaults, "Actions.Yellow"), status, 4.5, foreground));
         put(defaults, added, "Jasper.configErrorForeground", readable(first(defaults, "Actions.Red"), status, 4.5, foreground));
+        put(defaults, added, "Jasper.editorBackground", terminalBackground);
+        put(defaults, added, "Jasper.editorForeground", first(defaults, "TextArea.foreground", "Label.foreground"));
+        put(defaults, added, "Jasper.editorCaret", first(defaults, "TextArea.caretForeground", "TextArea.foreground", "Label.foreground"));
+        put(defaults, added, "Jasper.editorSelection", first(defaults, "TextArea.selectionBackground", "List.selectionBackground"));
+        Color editor = defaults.getColor("Jasper.editorBackground");
+        put(defaults, added, "Jasper.editorCurrentLine", mix(foreground, editor, .06));
+        put(defaults, added, "Jasper.editorGutter", editor);
+        put(defaults, added, "Jasper.editorLineNumbers", first(defaults, "Label.disabledForeground"));
         return added;
     }
 

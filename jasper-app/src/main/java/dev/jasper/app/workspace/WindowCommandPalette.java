@@ -96,7 +96,7 @@ final class WindowCommandPalette implements AutoCloseable {
         overlay.setVisible(overlay.swallowing);
         if (restorePriorFocus && priorFocus != null && priorFocus.isShowing()
                 && SwingUtilities.isDescendingFrom(priorFocus, owner)) priorFocus.requestFocusInWindow();
-        else if (owner.currentPane() != null) owner.currentPane().focusTerminal();
+        else owner.focusSelected();
         priorFocus = null; originTab = null; originPane = null;
     }
 

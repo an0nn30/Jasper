@@ -26,7 +26,7 @@ public final class TerminalWindow implements AutoCloseable {
     private final MacTitleBar titleBar;
     private boolean closed;
     private final WindowAdapter events = new WindowAdapter() {
-        @Override public void windowClosing(WindowEvent event) { close(); }
+        @Override public void windowClosing(WindowEvent event) { if (content.mayClose()) close(); }
         @Override public void windowActivated(WindowEvent event) { setActive(true); callbacks.activated().accept(TerminalWindow.this); }
         @Override public void windowDeactivated(WindowEvent event) { setActive(false); }
         @Override public void windowOpened(WindowEvent event) { reportState(); }
@@ -41,7 +41,7 @@ public final class TerminalWindow implements AutoCloseable {
         content = new WindowContent(launcher, directory, callbacks.newWindow(), callbacks.quit(), this::close, themes,
             KeyBindings.defaults(SystemInfo.isMacOS), history, SystemInfo.isMacOS);
         if (initial != null) {
-            content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(initial));
+            if (content.currentPane() != null) content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(initial));
             content.applyConfiguration(initial, SystemInfo.isMacOS);
         }
         titleBar = WindowContent.installTitleBar(frame.getRootPane(), content, MacTitleBar.isSupported(), frame::setTitle);
@@ -97,7 +97,7 @@ public final class TerminalWindow implements AutoCloseable {
     public void toFront() {
         if ((frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0) frame.setExtendedState(frame.getExtendedState() & ~java.awt.Frame.ICONIFIED);
         frame.toFront(); frame.requestFocus();
-        if (content.currentTab() != null) content.currentTab().focusTerminal();
+        content.focusSelected();
     }
 
     /** Whether {@code component} is this window's frame or sits inside it; used to filter toolkit key events. */
@@ -112,7 +112,7 @@ public final class TerminalWindow implements AutoCloseable {
     public java.awt.Window nativeWindow() { return frame; }
     public void resize(Dimension size) { frame.setSize(size); }
 
-    public void show() { frame.setVisible(true); reportState(); if (content.currentTab() != null) content.currentTab().focusTerminal(); }
+    public void show() { frame.setVisible(true); reportState(); content.focusSelected(); }
 
     @Override public void close() {
         if (closed) return;

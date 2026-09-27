@@ -36,6 +36,12 @@ final class WorkspaceActions {
             && id != ActionId.COMMAND_PALETTE) return;
         update();
         if (!action(id).isEnabled()) return;
+        var content = owner.selectedContent();
+        if (content != null) {
+            if (id == ActionId.CLOSE_TAB || id == ActionId.CLOSE_PANE) { content.requestClose(); return; }
+            String key = contentCommand(id);
+            if (key != null) { content.commands().stream().filter(c -> c.id().equals(key) && c.enabled()).findFirst().ifPresent(c -> c.run().run()); return; }
+        }
         TerminalTab tab = owner.currentTab();
         TerminalPane pane = owner.currentPane();
         TerminalView view = pane == null ? null : pane.view();
@@ -81,6 +87,14 @@ final class WorkspaceActions {
         owner.update();
     }
 
+    private static String contentCommand(ActionId id) {
+        return switch (id) {
+            case FIND -> "find"; case FIND_NEXT -> "find-next"; case FIND_PREVIOUS -> "find-previous";
+            case COPY -> "copy"; case PASTE -> "paste";
+            default -> null;
+        };
+    }
+
     private void selectRelative(int delta) {
         if (owner.tabStrip().getTabCount() > 0) owner.tabStrip().setSelectedIndex(Math.floorMod(owner.tabStrip().getSelectedIndex() + delta, owner.tabStrip().getTabCount()));
     }
@@ -90,10 +104,14 @@ final class WorkspaceActions {
         try {
             TerminalPane pane = owner.currentPane();
             boolean present = pane != null;
+            var content = owner.selectedContent();
             boolean ready = present && pane.view() != null;
             boolean running = present && pane.running();
             for (ActionId id : ActionId.values()) {
-                boolean enabled = !owner.closed() && switch (id) {
+                String contentKey = contentCommand(id);
+                boolean contentEnabled = content != null && (id == ActionId.CLOSE_TAB || id == ActionId.CLOSE_PANE
+                    || id == ActionId.NEXT_TAB || id == ActionId.PREVIOUS_TAB || contentKey != null && content.commands().stream().anyMatch(c -> c.id().equals(contentKey) && c.enabled()));
+                boolean enabled = !owner.closed() && (contentEnabled || switch (id) {
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
                     case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, QUIT -> true;
@@ -105,7 +123,7 @@ final class WorkspaceActions {
                          SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
                         id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < owner.tabStrip().getTabCount();
                     default -> present;
-                };
+                });
                 action(id).setEnabled(enabled);
             }
             if (owner.windowCommands() != null && owner.chrome() != null) owner.windowCommands().refresh();
