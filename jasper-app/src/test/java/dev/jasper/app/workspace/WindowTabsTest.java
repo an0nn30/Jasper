@@ -68,7 +68,7 @@ class WindowTabsTest {
 
     @Test void tooltipsCarryTheTitleAndTheLiveSelectShortcut() throws Exception {
         edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
+            var owner = content(launcher(new ArrayDeque<>()), true);
             owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
             var strip = owner.windowTabs();
             assertThat(named(strip, "select:second").getToolTipText()).isEqualTo("second (⌘2)");
@@ -116,7 +116,7 @@ class WindowTabsTest {
 
     @Test void tooltipsAndTheTabListStayLiteralAndBounded() throws Exception {
         edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
+            var owner = content(launcher(new ArrayDeque<>()), true);
             String title = "<html><img src=http://example.invalid/x.png>" + "x".repeat(1000);
             owner.currentTab().rename(title); owner.update();
             var strip = owner.windowTabs();
