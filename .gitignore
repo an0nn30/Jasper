@@ -1,5 +1,7 @@
 .gradle/
 build/
+# Source artwork has a literal build/ category; it is not a Gradle output folder.
+!jasper-app/src/main/resources/dev/jasper/app/icons/intellij/build/
 out/
 .idea/
 *.iml

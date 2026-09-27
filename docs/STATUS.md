@@ -26,6 +26,14 @@
   `TransferCoordinatorTest.folderTransferPreservesEmptyDirectoriesLinksAndUsesBoundedQueue`,
   `KnownHostsTest.ownDanglingSymlinkIsNotAnEmptyTrustFile`, and
   `FileOperationTest.recursiveDeleteNeverFollowsLinksAndTransferReservationsBlockIt`.
+  Refreshed again from `origin/main` at `da81da80` in merge `d0c0551e`. Restored 14
+  manifest-pinned `build/` icons omitted by the global build-directory ignore rule;
+  a source-only exception now keeps them tracked. Replaced the startup-focus test's
+  Unix shell fixture with an idle attached terminal session. Focused resource, icon,
+  startup, tab and terminal tests pass: 38 tests, 32 passed, six Unix-only skips.
+  Setup EXE and ZIP rebuilt successfully; MSI verification and all 14 restored asset
+  hashes in the packaged JAR pass. Independent review found no issues. Full `check`
+  was not rerun for this refresh; the earlier privilege limitations above still apply.
   Setup remains unsigned. Interactive install/upgrade/uninstall acceptance is
   user-run; no installer or GUI was launched. [Build and acceptance](packaging.md#windows-setup-wizard).
   Not merged or pushed.

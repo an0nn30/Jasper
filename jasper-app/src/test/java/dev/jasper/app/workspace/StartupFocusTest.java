@@ -2,6 +2,8 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.testsupport.IdleTerminalSession;
 import java.awt.FocusTraversalPolicy;
 import java.util.ArrayDeque;
 import javax.swing.*;
@@ -18,7 +20,8 @@ class StartupFocusTest {
         var owners = new WindowContent[1];
         var policies = new FocusTraversalPolicy[1];
         edt(() -> {
-            var owner = owners[0] = content(launcher(pending));
+            var owner = owners[0] = content(new ShellLauncher(pending::add,
+                directory -> IdleTerminalSession.start(), "idle-test-session"));
             var model = new Contributions();
             owner.connectContributions(model);
             model.addPanel("focus.panel", "Tool panel", new ImageIcon(), PanelRegion.LEFT, site -> new JTextField("Search hosts"));
