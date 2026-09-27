@@ -19,7 +19,9 @@
     record a metadata warning (no POSIX modes). Sessions run on winpty, pty4j's default, which
     does not pass OSC through, so titles and shell integration probably do not work on Windows
     (ConPTY is the follow-up).
-  - **Verified:** all three CI legs green at `e0197666`; local `check` 1,985 tests, 0 failures, 3 skipped.
+  - **Verified:** all three CI legs green at `8dd24bda` (after merging `main`); local `check` 2,002
+    tests, 0 failures, 5 skipped. `main`'s Windows PowerShell PTY test first ran in CI here: a cold
+    PowerShell start outlasted `Await`'s 10 s, so it now allows 30 s and reports the screen.
   - **Merged `main` (`71f96ed8`):** the transfer-scanner starvation this branch also found and fixed
     is fixed on `main` too (entry below); the merge keeps `main`'s version, which also keeps copy
     admission in rotating order. This branch fixes the Windows failures CI shows, which covers the
