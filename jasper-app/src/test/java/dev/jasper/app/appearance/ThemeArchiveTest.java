@@ -216,9 +216,8 @@ class ThemeArchiveTest {
     @Test void aCorruptJarInLibDoesNotHideTheOthers() {
         byte[] good = jarBytes(entries("META-INF/plugin.xml", pluginXml("Good", "/g.theme.json"),
             "g.theme.json", theme("Good", true, null, "#000000")));
+        // Truncating the jar to half its length corrupts it
         byte[] corrupt = java.util.Arrays.copyOf(good, good.length / 2);
-        // Overwrite the compressed data to ensure corruption on stream
-        for (int i = good.length / 2; i < corrupt.length; i++) corrupt[i] = (byte) 0xFF;
         var contents = ThemeArchive.read(jar(directory.resolve("Mixed.zip"), entries(
             "P/lib/a-corrupt.jar", corrupt, "P/lib/b-good.jar", good)));
         assertThat(contents.themes()).extracting(ThemeArchive.Found::label)

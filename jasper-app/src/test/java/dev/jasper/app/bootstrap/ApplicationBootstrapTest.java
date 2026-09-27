@@ -53,7 +53,7 @@ class ApplicationBootstrapTest {
         } finally { if (received.get() != null) received.get().close(); }
     }
 
-    @Test void explicitConfigurationSuppliesTheSavedThemeVariant() throws Exception {
+    @Test void explicitConfigurationSuppliesTheSavedThemeName() throws Exception {
         Path config = directory.resolve("elsewhere/config.toml");
         Files.createDirectories(config.getParent());
         Files.writeString(config, "ui.theme.name='IntelliJ Light'");
