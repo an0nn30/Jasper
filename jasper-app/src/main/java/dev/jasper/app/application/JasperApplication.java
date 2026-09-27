@@ -468,7 +468,8 @@ public final class JasperApplication {
      * releases the handoff endpoint, has finished. EDT.
      *
      * @param mode which launch flags the replacement keeps
-     * @return false, and nothing happens, when this process's command line cannot be determined
+     * @return false, and nothing happens, when this process's command line cannot be determined; otherwise
+     *     true. It also returns true, with nothing changed, when a plugin window's closing guard refuses the quit.
      */
     public boolean restart(RestartMode mode) {
         if (quitting || stopped) return true;

@@ -4,8 +4,10 @@ import dev.jasper.editor.api.Content;
 import dev.jasper.editor.api.Revision;
 import dev.jasper.editor.api.TooLargeException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -16,6 +18,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -44,15 +47,22 @@ public final class LocalFiles {
     /**
      * @param path a file
      * @param limitBytes the largest size accepted
-     * @return its content, refused before reading when it is larger than the limit
-     * @throws IOException for a folder, a missing or unreadable file, or {@link TooLargeException}
+     * @return its content, refused before reading when it is larger than the limit; never more than the limit is read
+     * @throws IOException for a folder or another file that is not a regular file, a missing or unreadable file, or
+     *     {@link TooLargeException}
      */
     public static Content read(Path path, long limitBytes) throws IOException {
         BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class);
         if (attributes.isDirectory()) throw new FileSystemException(path.toString(), null, "Is a folder");
+        // A device or FIFO reports size 0 and could be read forever.
+        if (!attributes.isRegularFile()) throw new FileSystemException(path.toString(), null, "Not a regular file");
         if (attributes.size() > limitBytes) throw new TooLargeException(attributes.size(), limitBytes);
-        byte[] bytes = Files.readAllBytes(path);
-        if (bytes.length > limitBytes) throw new TooLargeException(bytes.length, limitBytes);
+        byte[] bytes;
+        try (InputStream in = Files.newInputStream(path)) {
+            // One byte past the limit shows that the file grew beyond it after the size check.
+            bytes = in.readNBytes((int) Math.min(limitBytes, Integer.MAX_VALUE - 9L) + 1);
+        }
+        if (bytes.length > limitBytes) throw new TooLargeException(Math.max(bytes.length, sizeNow(path)), limitBytes);
         return new Content(bytes, new Revision(attributes.lastModifiedTime().toMillis(), bytes.length));
     }
 
@@ -82,13 +92,12 @@ public final class LocalFiles {
         Path target = resolve(path);
         boolean exists = Files.exists(target, LinkOption.NOFOLLOW_LINKS);
         if (exists && Files.isDirectory(target)) throw new FileSystemException(target.toString(), null, "Is a folder");
+        // The folder may allow the rename, but a read-only file is not replaced (as a write in place would fail).
+        if (exists && !Files.isWritable(target)) throw new AccessDeniedException(target.toString());
         if (exists && links(target) > 1) return inPlace(target, content);
-        Path parent = target.getParent();
-        if (parent == null) throw new FileSystemException(target.toString(), null, "Has no folder");
         Path sibling;
         try {
-            sibling = Files.createFile(parent.resolve("." + target.getFileName() + ".jasper-"
-                + Long.toHexString(ThreadLocalRandom.current().nextLong()) + ".tmp"));
+            sibling = createSibling(target, exists);
         } catch (IOException cannotCreate) {
             if (!exists) throw cannotCreate;
             return inPlace(target, content);
@@ -121,6 +130,29 @@ public final class LocalFiles {
             return inPlace(target, content);
         }
         return revision(target).orElseThrow(() -> new NoSuchFileException(target.toString()));
+    }
+
+    /**
+     * Creates the hidden sibling a safe write fills and renames over the target. For an existing file it is
+     * created owner-only, so a private file's content is never readable by others while it is written; the
+     * target's own permissions are copied to it just before the rename.
+     *
+     * @param target the resolved file
+     * @param exists whether the target exists
+     * @return the new, empty sibling
+     * @throws IOException when it cannot be created
+     */
+    static Path createSibling(Path target, boolean exists) throws IOException {
+        Path parent = target.getParent();
+        if (parent == null) throw new FileSystemException(target.toString(), null, "Has no folder");
+        Path sibling = parent.resolve("." + target.getFileName() + ".jasper-" + Long.toHexString(ThreadLocalRandom.current().nextLong()) + ".tmp");
+        if (exists && Files.getFileAttributeView(target, PosixFileAttributeView.class) != null)
+            return Files.createFile(sibling, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+        return Files.createFile(sibling);
+    }
+
+    private static long sizeNow(Path path) {
+        try { return Files.size(path); } catch (IOException unknown) { return 0; }
     }
 
     /** Keeps the owner, group, hard links and extended attributes; not atomic. */

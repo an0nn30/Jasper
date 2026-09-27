@@ -2,6 +2,7 @@ package dev.jasper.editor.local;
 
 import dev.jasper.editor.api.Revision;
 import dev.jasper.editor.api.TooLargeException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,6 +30,27 @@ class LocalFilesTest {
         assertThat(Files.readAttributes(file, BasicFileAttributes.class).fileKey()).as("a new file replaced the old one").isNotEqualTo(before);
         assertThat(revision).isEqualTo(LocalFiles.revision(file).orElseThrow());
         try (var files = Files.list(folder)) { assertThat(files).as("no sibling left behind").containsExactly(file); }
+    }
+
+    @Test void theSiblingOfAnExistingFileIsCreatedOwnerOnlyBeforeAnyContentIsWritten() throws Exception {
+        Path file = Files.writeString(folder.resolve("credentials"), "secret\n");
+        Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-------"));
+        Path sibling = LocalFiles.createSibling(file, true);
+        try {
+            assertThat(Files.size(sibling)).as("nothing written yet").isZero();
+            assertThat(Files.getPosixFilePermissions(sibling)).isEqualTo(PosixFilePermissions.fromString("rw-------"));
+        } finally { Files.deleteIfExists(sibling); }
+    }
+
+    @Test void aReadOnlyFileIsNotReplaced() throws Exception {
+        assumeFalse("root".equals(System.getProperty("user.name")), "root ignores file permissions");
+        Path file = Files.writeString(folder.resolve("locked.conf"), "original\n");
+        Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("r--r--r--"));
+        try {
+            assertThatExceptionOfType(AccessDeniedException.class).isThrownBy(() -> LocalFiles.write(file, "new\n".getBytes(UTF_8)));
+            assertThat(Files.readString(file)).isEqualTo("original\n");
+            try (var files = Files.list(folder)) { assertThat(files).as("no sibling left behind").containsExactly(file); }
+        } finally { Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-r--r--")); }
     }
 
     @Test void aSymlinkStaysALinkAndItsTargetChanges() throws Exception {
@@ -83,6 +105,11 @@ class LocalFilesTest {
     @Test void aFolderIsRefused() {
         assertThatExceptionOfType(FileSystemException.class).isThrownBy(() -> LocalFiles.read(folder, 1024))
             .withMessageContaining("Is a folder");
+    }
+
+    @Test void aFileThatIsNotRegularIsRefused() {
+        assertThatExceptionOfType(FileSystemException.class).isThrownBy(() -> LocalFiles.read(Path.of("/dev/null"), 10))
+            .withMessageContaining("Not a regular file");
     }
 
     @Test void revisionsFollowTheFileAndAreEmptyOnceItIsGone() throws Exception {

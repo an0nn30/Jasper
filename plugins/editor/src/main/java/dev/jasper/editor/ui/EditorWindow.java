@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import javax.swing.Action;
@@ -72,6 +73,7 @@ public final class EditorWindow {
     private final Timer noticeTimer;
     private final Icon fileIcon, serverIcon, closeIcon;
     private boolean showingEmpty = true;
+    private boolean guarding;
 
     /**
      * Creates the window, not yet shown.
@@ -168,7 +170,9 @@ public final class EditorWindow {
     public void saveAs() { selected().ifPresent(tab -> saveAsSession(tab.session())); }
 
     /** @return completes with true when every tab with unsaved changes was saved */
-    public CompletableFuture<Boolean> saveAll() { return saveSessions(model.sessions().stream().filter(DocumentSession::dirty).toList()); }
+    public CompletableFuture<Boolean> saveAll() {
+        return saveSessions(model.sessions().stream().filter(DocumentSession::dirty).toList(), new AtomicBoolean());
+    }
 
     public void openChooser() {
         Optional<Path> near = selected().flatMap(tab -> localFile(tab.session())).map(Path::getParent);
@@ -249,25 +253,41 @@ public final class EditorWindow {
      * The closing guard (spec 2.3), asked when the window closes and when Jasper quits: waits for running saves,
      * then asks about unsaved tabs, and saves them all when asked to. Re-checks after each wait, since edits made
      * during it can leave a tab saving again or dirty again, rather than trusting a single pass to still hold.
+     * Refuses while it is already asking or waiting: a quit or close that arrives during its prompt or wait
+     * would otherwise wait on saves that cannot finish until the outer prompt returns.
      */
     boolean mayClose() {
-        while (true) {
-            List<DocumentSession> running = model.sessions().stream().filter(DocumentSession::saving).toList();
-            if (!running.isEmpty()) {
-                // Waits only on the saves already in flight; it starts none of its own, so a tab whose save
-                // finishes and is then edited again is not silently written without asking.
-                List<CompletableFuture<Boolean>> inFlight = running.stream().map(session -> session.pendingSave().orElseThrow()).toList();
-                if (!await.apply(saving(running.size()), allSucceeded(inFlight))) return false;
-                continue;
+        if (guarding) {
+            window.toFront();
+            return false;
+        }
+        guarding = true;
+        try {
+            while (true) {
+                List<DocumentSession> running = model.sessions().stream().filter(DocumentSession::saving).toList();
+                if (!running.isEmpty()) {
+                    // Waits only on the saves already in flight; it starts none of its own, so a tab whose save
+                    // finishes and is then edited again is not silently written without asking.
+                    List<CompletableFuture<Boolean>> inFlight = running.stream().map(session -> session.pendingSave().orElseThrow()).toList();
+                    if (!await.apply(saving(running.size()), allSucceeded(inFlight))) return false;
+                    continue;
+                }
+                List<DocumentSession> dirty = model.sessions().stream().filter(DocumentSession::dirty).toList();
+                if (dirty.isEmpty()) return true;
+                String answer = ask.apply(new Question("Unsaved changes", unsaved(dirty), List.of("Save All", "Discard", "Cancel")));
+                if ("Discard".equals(answer)) return true;
+                if (!"Save All".equals(answer)) return false;
+                var cancelled = new AtomicBoolean();
+                if (!await.apply(saving(dirty.size()), saveSessions(dirty, cancelled))) {
+                    // Saves already running finish; the ones still queued do not start.
+                    cancelled.set(true);
+                    return false;
+                }
+                // Loops back rather than returning true: edits typed during the non-modal wait may have left a
+                // tab dirty again, and that must be asked about too.
             }
-            List<DocumentSession> dirty = model.sessions().stream().filter(DocumentSession::dirty).toList();
-            if (dirty.isEmpty()) return true;
-            String answer = ask.apply(new Question("Unsaved changes", unsaved(dirty), List.of("Save All", "Discard", "Cancel")));
-            if ("Discard".equals(answer)) return true;
-            if (!"Save All".equals(answer)) return false;
-            if (!await.apply(saving(dirty.size()), saveSessions(dirty))) return false;
-            // Loops back rather than returning true: edits typed during the non-modal wait may have left a
-            // tab dirty again, and that must be asked about too.
+        } finally {
+            guarding = false;
         }
     }
 
@@ -299,15 +319,29 @@ public final class EditorWindow {
         return session.saveAs(new LocalDocument(chosen.get(), context.background()));
     }
 
-    /** One after another, so each conflict prompt appears on its own; true only when every save succeeded. */
-    private CompletableFuture<Boolean> saveSessions(List<DocumentSession> pending) {
+    /**
+     * One after another, so each conflict prompt appears on its own; true only when every save succeeded. Once
+     * {@code cancelled} is set, or for a tab closed meanwhile, a step starts no save; a step that throws fails.
+     */
+    private CompletableFuture<Boolean> saveSessions(List<DocumentSession> pending, AtomicBoolean cancelled) {
         CompletableFuture<Boolean> chain = CompletableFuture.completedFuture(true);
         for (DocumentSession session : pending)
             chain = chain.thenCompose(ok -> {
                 var step = new CompletableFuture<Boolean>();
-                environment.ui().execute(() -> session.pendingSave()
-                    .orElseGet(() -> session.dirty() ? saveSession(session) : CompletableFuture.completedFuture(true))
-                    .whenComplete((saved, error) -> step.complete(ok && error == null && Boolean.TRUE.equals(saved))));
+                environment.ui().execute(() -> {
+                    if (cancelled.get() || !model.sessions().contains(session)) {
+                        step.complete(ok);
+                        return;
+                    }
+                    try {
+                        session.pendingSave()
+                            .orElseGet(() -> session.dirty() ? saveSession(session) : CompletableFuture.completedFuture(true))
+                            .whenComplete((saved, error) -> step.complete(ok && error == null && Boolean.TRUE.equals(saved)));
+                    } catch (RuntimeException failure) {
+                        // Completes the step so the chain, and the wait on it, cannot hang.
+                        step.complete(false);
+                    }
+                });
                 return step;
             });
         return chain;

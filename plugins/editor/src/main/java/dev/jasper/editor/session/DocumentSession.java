@@ -55,6 +55,7 @@ public final class DocumentSession {
     private String notice = "";
     private String reloadNotice = "";
     private CompletableFuture<Content> loading;
+    private boolean silentReload;
     private String reloadBase = "";
     private CompletableFuture<Boolean> pendingSave;
     private String detached = "";
@@ -105,16 +106,19 @@ public final class DocumentSession {
         state = State.LOADING;
         failure = "";
         changed();
-        fetch(false);
+        fetch(false, false);
     }
 
     /**
      * Re-reads the document while the tab stays usable; a failure asks and keeps the current text. Does
      * nothing while a save is in flight, so a completing save cannot be overwritten by a stale read.
      */
-    public void reload() {
+    public void reload() { reload(false); }
+
+    /** @param silent the watcher started it, so a failure shows the banner rather than asking */
+    private void reload(boolean silent) {
         if (document == null || state != State.READY || saving) return;
-        fetch(true);
+        fetch(true, silent);
     }
 
     /** Stops a read in progress; its late result is ignored. */
@@ -123,6 +127,7 @@ public final class DocumentSession {
         if (read == null) return;
         // Cleared first: cancel() runs the completion callback at once, and it must find the read superseded.
         loading = null;
+        silentReload = false;
         read.cancel(true);
     }
 
@@ -138,7 +143,7 @@ public final class DocumentSession {
     public void revert() {
         if (document == null || state != State.READY || saving) return;
         if (dirty() && !DISCARD.equals(environment.ask().apply(new Question("Revert to Saved",
-                "Discard your changes to " + name() + "?", List.of(DISCARD, "Cancel"))))) return;
+                "Discard your changes to " + name() + "?", List.of(DISCARD, "Cancel"), true)))) return;
         reload();
     }
 
@@ -179,7 +184,8 @@ public final class DocumentSession {
     }
 
     /**
-     * The document's revision as a watcher saw it.
+     * The document's revision as a watcher saw it. A clean tab reloads without asking; when that read fails,
+     * the tab keeps its text and the banner offers Reload or Keep Mine, with the reason as the notice.
      *
      * @param current the revision now, or empty when the file is gone
      */
@@ -190,7 +196,7 @@ public final class DocumentSession {
         if (current.isEmpty()) { banner = Banner.DELETED; changed(); return; }
         if (dirty()) { banner = Banner.CHANGED; changed(); return; }
         reloadNotice = "Reloaded: changed on disk";
-        reload();
+        reload(true);
     }
 
     /** Keep Mine: adopts the revision seen on disk, so the next save overwrites without asking. */
@@ -267,8 +273,9 @@ public final class DocumentSession {
         return folder.substring(previous + 1);
     }
 
-    private void fetch(boolean again) {
+    private void fetch(boolean again, boolean silent) {
         cancelLoad();
+        silentReload = silent;
         if (again) reloadBase = text.get();
         CompletableFuture<Content> read = document.read(environment.limitBytes().getAsLong());
         loading = read;
@@ -288,8 +295,18 @@ public final class DocumentSession {
     private void fetched(CompletableFuture<Content> read, DecodedText decoded, Revision at, Throwable error, boolean again) {
         if (loading != read) return;
         loading = null;
+        boolean silent = silentReload;
+        silentReload = false;
         if (error != null) {
             reloadNotice = "";
+            if (silent) {
+                // Asking here would open a dialog nobody asked for, and a steadily growing file would open one on
+                // every watcher tick; the banner offers Reload (which asks on failure) or Keep Mine instead.
+                banner = Banner.CHANGED;
+                notice = "Could not reload: " + Failures.reason(error);
+                changed();
+                return;
+            }
             if (again) {
                 environment.ask().apply(new Question("Reload failed", "Could not reload " + name() + ": " + Failures.sentence(Failures.reason(error)), List.of("OK")));
                 changed();
@@ -358,11 +375,11 @@ public final class DocumentSession {
             if (error != null) { failed(result, error); return; }
             if (current.isEmpty() && revision.isPresent()) {
                 String answer = environment.ask().apply(new Question("File deleted", name() + " no longer exists " + where() + ".",
-                    List.of(SAVE_ANYWAY, "Cancel")));
+                    List.of(SAVE_ANYWAY, "Cancel"), true));
                 if (!SAVE_ANYWAY.equals(answer)) { finish(result, false); return; }
             } else if (current.isPresent() && !current.equals(revision)) {
                 String answer = environment.ask().apply(new Question("File changed", name() + " changed " + where() + " since you opened it.",
-                    List.of(OVERWRITE, RELOAD, "Cancel")));
+                    List.of(OVERWRITE, RELOAD, "Cancel"), true));
                 if (RELOAD.equals(answer)) { finish(result, false); reload(); return; }
                 if (!OVERWRITE.equals(answer)) { finish(result, false); return; }
             }

@@ -12,6 +12,7 @@
 - Task 11 (deviation and review fixes): `FindBar` validates a regular expression itself (RSyntaxTextArea swallows invalid patterns), compiling exactly what `SearchEngine` compiles (`\b…\b` with whole word); Escape is bound once on the bar, so it closes from any control in it.
 - Task 12 (ruling): a shared `Forms.bind(component, condition, stroke, name, action)` replaces near-identical key-binding helpers in `LanguagePicker` and `FindBar`.
 - Task 13 (ruling and review fixes): `EditorTab.menuItem(Command)` builds menu items for the right-click menu and the ⋯ menu; closing a tab after its save re-checks for edits typed during the save; the closing guard loops — it waits only on running saves, asks about what is still unsaved, and re-checks after Save All.
+- Final review (fix wave): the safe-write sibling is created owner-only before any bytes are written; a read-only target is refused; a failed automatic reload shows the banner instead of a dialog; Save All honours Cancel and closed tabs; the closing guard refuses re-entry; destructive questions default to Cancel; non-regular files are refused and reads are bounded; package-info files name their dependencies.
 
 Not done: plan B (SFTP editing through Remote), GUI acceptance (user-run), merge and push.
 

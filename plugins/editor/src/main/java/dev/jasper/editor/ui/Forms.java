@@ -34,7 +34,7 @@ final class Forms {
         });
     }
 
-    /** A question's content: its message and one button per choice, the first the default. */
+    /** A question's content: its message and one button per choice, {@link #defaultChoice} the default. */
     static JPanel question(Question question, Consumer<String> answer) {
         var message = new JTextArea(question.message());
         message.setEditable(false);
@@ -45,19 +45,25 @@ final class Forms {
         message.setColumns(36);
         message.setFont(UIManager.getFont("Label.font"));
         var buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        JButton first = null;
+        String preferred = defaultChoice(question);
+        JButton chosen = null;
         for (String choice : question.choices()) {
             var button = new JButton(choice);
             button.addActionListener(event -> answer.accept(choice));
             buttons.add(button);
-            if (first == null) first = button;
+            if (chosen == null && choice.equals(preferred)) chosen = button;
         }
         var content = new JPanel(new BorderLayout(0, 12));
         content.setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
         content.add(message, BorderLayout.CENTER);
         content.add(buttons, BorderLayout.SOUTH);
-        defaultButton(content, first);
+        defaultButton(content, chosen);
         return content;
+    }
+
+    /** @return the choice whose button Enter presses: the last (Cancel) for a destructive question, else the first */
+    static String defaultChoice(Question question) {
+        return question.destructive() ? question.dismissed() : question.choices().getFirst();
     }
 
     /** "Saving 3 files…" over an indeterminate bar, with Cancel. */

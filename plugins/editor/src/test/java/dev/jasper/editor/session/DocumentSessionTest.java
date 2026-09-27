@@ -129,7 +129,7 @@ class DocumentSessionTest {
         answers.add("Cancel");
         assertThat(session.save()).isCompletedWithValue(false);
         assertThat(asked.getLast()).isEqualTo(new Question("File changed", "config.toml changed on prod-web since you opened it.",
-            List.of(DocumentSession.OVERWRITE, DocumentSession.RELOAD, "Cancel")));
+            List.of(DocumentSession.OVERWRITE, DocumentSession.RELOAD, "Cancel"), true));
         assertThat(document.text()).isEqualTo("theirs\n");
         assertThat(session.dirty()).isTrue();
         answers.add(DocumentSession.OVERWRITE);
@@ -151,7 +151,8 @@ class DocumentSessionTest {
         document.exists = false;
         answers.add("Cancel");
         assertThat(session.save()).isCompletedWithValue(false);
-        assertThat(asked.getLast().message()).isEqualTo("config.toml no longer exists on prod-web.");
+        assertThat(asked.getLast()).isEqualTo(new Question("File deleted", "config.toml no longer exists on prod-web.",
+            List.of(DocumentSession.SAVE_ANYWAY, "Cancel"), true));
         answers.add(DocumentSession.SAVE_ANYWAY);
         assertThat(session.save()).isCompletedWithValue(true);
         assertThat(document.exists).isTrue();
@@ -211,6 +212,25 @@ class DocumentSessionTest {
         assertThat(document.text()).isEqualTo("mine\n");
     }
 
+    @Test void aFailedAutomaticReloadShowsTheBannerInsteadOfAsking() {
+        var document = new FakeDocument("app.log", null).text("a\n");
+        var session = open(document);
+        var before = session.revision();
+        document.change("x".repeat(2048));
+        session.externalChange(Optional.of(document.now()));
+        assertThat(asked).as("the user did not ask for this reload").isEmpty();
+        assertThat(session.banner()).isEqualTo(DocumentSession.Banner.CHANGED);
+        assertThat(session.notice()).hasValueSatisfying(notice -> assertThat(notice).startsWith("Could not reload:"));
+        assertThat(buffer).hasToString("a\n");
+        assertThat(session.revision()).isEqualTo(before);
+        assertThat(session.state()).isEqualTo(DocumentSession.State.READY);
+        session.externalChange(Optional.of(document.now()));
+        assertThat(asked).as("the same change is not reported twice").isEmpty();
+        assertThat(session.banner()).isEqualTo(DocumentSession.Banner.CHANGED);
+        session.reloadFromBanner();
+        assertThat(asked).as("a reload the user started still asks").extracting(Question::title).containsExactly("Reload failed");
+    }
+
     @Test void aDeletedFileShowsItsBannerAndKeepRecreatesItOnSave() {
         var document = new FakeDocument("app.py", null).text("a\n");
         var session = open(document);
@@ -241,6 +261,8 @@ class DocumentSessionTest {
         type(session, "mine\n");
         answers.add("Cancel");
         session.revert();
+        assertThat(asked.getLast()).isEqualTo(new Question("Revert to Saved", "Discard your changes to app.py?",
+            List.of(DocumentSession.DISCARD, "Cancel"), true));
         assertThat(buffer).hasToString("mine\n");
         answers.add(DocumentSession.DISCARD);
         session.revert();

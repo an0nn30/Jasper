@@ -27,4 +27,11 @@ class FormsTest {
         buttons.get(1).doClick();
         assertThat(answers).containsExactly("Discard");
     }
+
+    @Test void enterPicksTheFirstChoiceUnlessTheQuestionIsDestructive() {
+        assertThat(Forms.defaultChoice(new Question("Unsaved changes", "a.txt has unsaved changes.", List.of("Save All", "Discard", "Cancel"))))
+            .isEqualTo("Save All");
+        assertThat(Forms.defaultChoice(new Question("File changed", "a.txt changed on disk since you opened it.",
+            List.of("Overwrite", "Reload", "Cancel"), true))).isEqualTo("Cancel");
+    }
 }

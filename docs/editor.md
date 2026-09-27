@@ -44,7 +44,8 @@ Saving checks first whether the file changed since it was opened, and asks **Ove
 **Reload** (discarding your edits) or **Cancel**; a deleted file asks **Save Anyway**. A save writes a
 hidden sibling file and atomically replaces the original, keeping its permissions and any
 symbolic link; for a hard-linked file, a folder you cannot write, or a different owner, it writes in
-place instead. Text the file's encoding cannot hold offers **Convert to UTF-8 and Save**.
+place instead. A read-only file is not replaced: the save fails with "permission denied" and the
+file is left as it was. Text the file's encoding cannot hold offers **Convert to UTF-8 and Save**.
 
 Closing a tab with unsaved changes asks **Save**, **Don't Save** or **Cancel**. Closing the Editor
 window, or quitting or restarting Jasper, asks **Save All**, **Discard** or **Cancel** and waits for

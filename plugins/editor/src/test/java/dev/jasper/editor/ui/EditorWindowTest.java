@@ -31,14 +31,28 @@ class EditorWindowTest {
     private EditorWindow window;
     private boolean windowClosed;
     private Runnable duringWait = () -> { };
+    private Runnable duringAsk = () -> { };
+    private boolean cancelWait;
 
     @BeforeEach void open() {
         Languages.register();
         host = new FakePluginHost(home.resolve("plugins"));
         PluginContext context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
         var environment = new EditorEnvironment(context, Runnable::run,
-            owner -> question -> { asked.add(question); return answers.isEmpty() ? question.dismissed() : answers.removeFirst(); },
-            owner -> (message, saves) -> { asked.add(new Question("Wait", message, List.of("OK"))); duringWait.run(); drain(); return saves.getNow(false); },
+            owner -> question -> {
+                asked.add(question);
+                Runnable hook = duringAsk;
+                duringAsk = () -> { };
+                hook.run();
+                return answers.isEmpty() ? question.dismissed() : answers.removeFirst();
+            },
+            owner -> (message, saves) -> {
+                asked.add(new Question("Wait", message, List.of("OK")));
+                if (cancelWait) return false;
+                duringWait.run();
+                drain();
+                return saves.getNow(false);
+            },
             settings::get, false);
         window = new EditorWindow(environment, () -> windowClosed = true);
     }
@@ -194,6 +208,53 @@ class EditorWindowTest {
         duringWait = () -> tab.area().setText("a = 3\n");
         assertThat(host.requestQuit()).isFalse();
         assertThat(asked).extracting(Question::title).filteredOn("Unsaved changes"::equals).hasSize(2);
+        assertThat(Files.readString(file)).isEqualTo("a = 2\n");
+    }
+
+    @Test void saveAllSkipsATabClosedWithDontSaveDuringTheWait() throws Exception {
+        Path a = file("a.toml", "a = 1\n");
+        Path b = file("b.toml", "b = 1\n");
+        opened(a).area().setText("a = 2\n");
+        EditorTab second = opened(b);
+        second.area().setText("b = 2\n");
+        answers.addAll(List.of("Save All", "Don't Save"));
+        duringWait = () -> window.closeTab(second);
+        assertThat(host.requestQuit()).isTrue();
+        assertThat(Files.readString(a)).isEqualTo("a = 2\n");
+        assertThat(Files.readString(b)).as("closed without saving").isEqualTo("b = 1\n");
+    }
+
+    @Test void cancellingTheSaveAllWaitStartsNoFurtherSaves() throws Exception {
+        Path a = file("a.toml", "a = 1\n");
+        Path b = file("b.toml", "b = 1\n");
+        opened(a).area().setText("a = 2\n");
+        opened(b).area().setText("b = 2\n");
+        answers.add("Save All");
+        cancelWait = true;
+        assertThat(host.requestQuit()).isFalse();
+        drain();
+        assertThat(Files.readString(a)).as("the save already running finishes").isEqualTo("a = 2\n");
+        assertThat(Files.readString(b)).as("no save starts after Cancel").isEqualTo("b = 1\n");
+        assertThat(asked).extracting(Question::title).containsExactly("Unsaved changes", "Wait");
+    }
+
+    @Test void aSaveAllStepThatThrowsFailsTheSaveInsteadOfHanging() throws Exception {
+        window.newUntitled();
+        window.selected().orElseThrow().area().setText("x\n");
+        host.duringPathSelection(() -> { throw new IllegalStateException("the chooser failed"); });
+        answers.add("Save All");
+        assertThat(host.requestQuit()).isFalse();
+        assertThat(host.failures()).isEmpty();
+    }
+
+    @Test void quittingAgainWhileTheClosingGuardAsksIsRefused() throws Exception {
+        Path file = file("config.toml", "a = 1\n");
+        opened(file).area().setText("a = 2\n");
+        List<Boolean> inner = new ArrayList<>();
+        duringAsk = () -> inner.add(host.requestQuit());
+        answers.add("Save All");
+        assertThat(host.requestQuit()).isTrue();
+        assertThat(inner).as("the inner quit is refused").containsExactly(false);
         assertThat(Files.readString(file)).isEqualTo("a = 2\n");
     }
 
