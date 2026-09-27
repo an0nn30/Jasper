@@ -401,6 +401,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** The rail shows only when it has contributed items and the user has not hidden it. */
     void syncRailVisibility() {
         boolean wanted = !rail.empty() && uiState.railVisible();
+        regions.setRailVisible(wanted);
         if (rail.isVisible() != wanted) { rail.setVisible(wanted); revalidate(); repaint(); }
     }
     boolean updatingActions() { return workspaceActions.updating(); }

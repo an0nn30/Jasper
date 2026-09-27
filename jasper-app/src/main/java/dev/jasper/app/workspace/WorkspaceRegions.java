@@ -112,6 +112,7 @@ final class WorkspaceRegions extends JPanel {
     }
 
     private final Host center = new Host(false);
+    private boolean railVisible;
     private final EnumMap<PanelRegion, JComponent> contents = new EnumMap<>(PanelRegion.class);
     private final EnumMap<PanelRegion, Host> hosts = new EnumMap<>(PanelRegion.class);
     private final EnumMap<PanelRegion, Integer> sizes = new EnumMap<>(PanelRegion.class);
@@ -160,9 +161,6 @@ final class WorkspaceRegions extends JPanel {
 
     private JPanel host(PanelRegion region) {
         Host host = hosts.computeIfAbsent(region, key -> new Host());
-        host.gutters(region == PanelRegion.BOTTOM ? 0 : 6,
-            region == PanelRegion.RIGHT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.LEFT) ? 0 : 6,
-            6, region == PanelRegion.LEFT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.RIGHT) ? 0 : 6);
         host.removeAll();
         host.add(contents.get(region), BorderLayout.CENTER);
         ToolWindowSurface.apply(host);
@@ -172,11 +170,26 @@ final class WorkspaceRegions extends JPanel {
     /** Reapplies the tool window colour after a theme change reset the region backgrounds. */
     void refreshTheme() { hosts.values().forEach(ToolWindowSurface::apply); }
 
+    /** The visible rail already supplies balanced spacing; do not add a second gutter beside it. */
+    void setRailVisible(boolean visible) {
+        if (railVisible == visible) return;
+        railVisible = visible;
+        refreshGutters();
+        revalidate(); repaint();
+    }
+
+    private void refreshGutters() {
+        int leading = railVisible ? 0 : 6;
+        center.gutters(6, contents.containsKey(PanelRegion.LEFT) ? 0 : leading,
+            contents.containsKey(PanelRegion.BOTTOM) ? 0 : 6, contents.containsKey(PanelRegion.RIGHT) ? 0 : 6);
+        hosts.forEach((region, host) -> host.gutters(region == PanelRegion.BOTTOM ? 0 : 6,
+            region == PanelRegion.RIGHT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.LEFT) ? 0 : leading,
+            6, region == PanelRegion.LEFT || region == PanelRegion.BOTTOM && contents.containsKey(PanelRegion.RIGHT) ? 0 : 6));
+    }
+
     private void rebuild() {
         removeAll();
         hosts.values().forEach(JPanel::removeAll);
-        center.gutters(6, contents.containsKey(PanelRegion.LEFT) ? 0 : 6,
-            contents.containsKey(PanelRegion.BOTTOM) ? 0 : 6, contents.containsKey(PanelRegion.RIGHT) ? 0 : 6);
         JComponent current = center;
         if (contents.containsKey(PanelRegion.BOTTOM))
             current = new Split(JSplitPane.VERTICAL_SPLIT, current, host(PanelRegion.BOTTOM), true, sizes.get(PanelRegion.BOTTOM));
@@ -184,6 +197,7 @@ final class WorkspaceRegions extends JPanel {
             current = new Split(JSplitPane.HORIZONTAL_SPLIT, current, host(PanelRegion.RIGHT), true, sizes.get(PanelRegion.RIGHT));
         if (contents.containsKey(PanelRegion.LEFT))
             current = new Split(JSplitPane.HORIZONTAL_SPLIT, host(PanelRegion.LEFT), current, false, sizes.get(PanelRegion.LEFT));
+        refreshGutters();
         add(current, BorderLayout.CENTER);
         revalidate(); repaint();
     }

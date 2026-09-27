@@ -41,6 +41,45 @@ class RailWidthTest {
         });
     }
 
+    @Test void visibleRailHasBalancedSpacingToTheAdjacentSurface() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            owner.rail().render(List.of(new WindowRail.PanelButton("files", "Files",
+                dev.jasper.app.platform.AppIcons.named("FOLDER"), PanelRegion.LEFT, true)), List.of());
+            owner.syncRailVisibility();
+            var panel = new JPanel(); owner.regions().show(PanelRegion.LEFT, panel, 250);
+            for (int width : new int[]{28, 36, 64}) {
+                owner.setRailWidth(width); owner.setSize(1000, 600);
+                dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+                dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+                int left = SwingUtilities.convertPoint(owner.rail(), 0, 0, owner).x;
+                int surface = SwingUtilities.convertPoint(panel, 0, 0, owner).x;
+                assertThat(surface - left).as("no extra gutter on the icons' right").isEqualTo(owner.rail().getWidth());
+                var button = owner.rail().buttons().getFirst();
+                var insets = button.getInsets();
+                var view = new Rectangle(insets.left, insets.top, button.getWidth() - insets.left - insets.right,
+                    button.getHeight() - insets.top - insets.bottom);
+                var icon = new Rectangle(); var text = new Rectangle();
+                SwingUtilities.layoutCompoundLabel(button, button.getFontMetrics(button.getFont()), button.getText(), button.getIcon(),
+                    button.getVerticalAlignment(), button.getHorizontalAlignment(), button.getVerticalTextPosition(),
+                    button.getHorizontalTextPosition(), view, icon, text, button.getIconTextGap());
+                int iconLeft = SwingUtilities.convertPoint(button, icon.x, 0, owner).x;
+                assertThat(Math.abs((iconLeft - left) - (surface - iconLeft - icon.width))).as("icon centered between window edge and panel").isLessThanOrEqualTo(1);
+            }
+            var originalParent = panel.getParent();
+            owner.setRailVisible(false); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            assertThat(panel.getParent()).as("visibility does not reparent plugin content").isSameAs(originalParent);
+            assertThat(SwingUtilities.convertPoint(panel, 0, 0, owner).x).isEqualTo(UIScale.scale(6));
+            owner.setRailVisible(true); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            assertThat(SwingUtilities.convertPoint(panel, 0, 0, owner).x).isEqualTo(owner.rail().getWidth());
+            owner.regions().hide(PanelRegion.LEFT); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            assertThat(SwingUtilities.convertPoint(owner.tabStrip(), 0, 0, owner).x).as("terminal follows the same rail edge").isEqualTo(owner.rail().getWidth());
+            var bottom = new JPanel(); owner.regions().show(PanelRegion.BOTTOM, bottom, 150);
+            dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner); dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(owner);
+            assertThat(SwingUtilities.convertPoint(bottom, 0, 0, owner).x).as("bottom panels use the same edge").isEqualTo(owner.rail().getWidth());
+        });
+    }
+
     @Test void theWindowAppliesALiveWidthAndRejectsValuesOutsideTheRange() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));

@@ -283,8 +283,11 @@ these defaults; upstream theme assets should not be edited to duplicate them.
 
 
 Workspace rounding belongs to `WorkspaceRegions.Host`: 8px-radius panel surfaces and
-matching rounded corners for the terminal/tab column. Exterior gutters are 6px; adjacent
-hosts omit their facing gutters so the plain 6px draggable splitter supplies the gap.
+matching rounded corners for the terminal/tab column. Exterior gutters are 6px, except
+beside a visible rail: the rail supplies its own balanced spacing, so the adjacent
+left/center/bottom surface has no additional leading gutter. Hiding or emptying the
+rail restores that gutter without reparenting plugin content. Adjacent hosts omit
+their facing gutters so the plain 6px draggable splitter supplies the gap.
 Region widths/heights and persisted splitter sizes include exterior gutters. The center
 host derives its minimum size from the terminal column; plugin hosts retain their 120px
 minimum. The center reserves an 8px lower inset (the corner radius) below the terminal

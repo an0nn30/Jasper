@@ -64,7 +64,7 @@ class GraphiteChromeTest {
                     owner.regions().show(dev.jasper.app.contributions.PanelRegion.LEFT, panel, 260);
                     owner.rail().render(java.util.List.of(new WindowRail.PanelButton("hosts", "SSH hosts",
                         dev.jasper.app.platform.AppIcons.named("SERVER"), dev.jasper.app.contributions.PanelRegion.LEFT, true)), java.util.List.of());
-                    owner.rail().setVisible(true);
+                    owner.syncRailVisibility();
                     root.setSize(1000, 640); layoutTree(root); layoutTree(root);
                     var image = new java.awt.image.BufferedImage(1000, 640, 2);
                     var g = image.createGraphics(); root.printAll(g); g.dispose();

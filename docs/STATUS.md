@@ -2,6 +2,17 @@
 
 ## Current state — 2026-09-23
 
+- **Centered rail spacing** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  rail icons were centered within their controls, but an extra 6px workspace gutter
+  made their right-side spacing wider. Visible rails now meet adjacent panel/terminal
+  surfaces without that duplicate gutter; hidden or empty rails restore the exterior
+  gutter. Borders update in place, retaining plugin parents, panel sizes and divider
+  positions. Regression first reproduced a 34px visual column for a 28px rail, then
+  verified even icon spacing at 28/36/64px and aligned terminal/bottom-panel edges.
+  Headless preview inspected; independent review is clean. `check :jasper-app:packageDist`
+  passed: 2,043 tests, zero failures/errors, five skips. Rebuilt DMG and package
+  signature/payload verification passed. No GUI launched.
+
 - **Rounded terminal bottom corners** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   the terminal/tab frame now rounds all four corners with the same 8px radius as tool
   panels. A radius-sized lower inset keeps terminal cells and the cursor outside the
