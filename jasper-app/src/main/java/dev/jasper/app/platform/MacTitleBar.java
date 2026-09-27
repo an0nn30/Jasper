@@ -157,7 +157,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
 
     private int titleHeight() {
         return toolbar == null ? UIScale.scale(TITLE_HEIGHT)
-            : Math.max(UIScale.scale(42), toolbar.getPreferredSize().height);
+            : Math.max(UIScale.scale(TITLE_HEIGHT), toolbar.getPreferredSize().height);
     }
 
     @Override public Dimension getMinimumSize() {

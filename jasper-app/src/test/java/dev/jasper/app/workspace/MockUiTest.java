@@ -27,14 +27,14 @@ class MockUiTest {
                 assertThat(title).isNotNull();
                 root.setSize(958, 958); layoutTree(root);
                 int toolbar = owner.toolbar().getHeight(), tabs = owner.windowTabs().getHeight();
-                assertThat(toolbar).isEqualTo(42);
-                assertThat(title.getHeight()).isEqualTo(42);
+                assertThat(toolbar).isEqualTo(30);
+                assertThat(title.getHeight()).isEqualTo(30);
                 assertThat(tabs).isEqualTo(30);
                 assertThat(owner.status().getHeight()).isEqualTo(24);
                 assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958 - 12, 958 - toolbar - tabs - 24 - 12));
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
-                assertThat(new Color(image.getRGB(650, 41))).as("continuous header surface").isEqualTo(UIManager.getColor("Jasper.titleBackground"));
+                assertThat(new Color(image.getRGB(650, toolbar - 1))).as("continuous header surface").isEqualTo(UIManager.getColor("Jasper.titleBackground"));
                 assertThat(image.getRGB(650, toolbar / 2) & 0xffffff).as("toolbar surface").isEqualTo(0x25292e);
                 assertThat(new Color(image.getRGB(650, toolbar + 6 + tabs - 1))).as("quiet tab strip baseline").isEqualTo(UIManager.getColor("ToolWindow.background"));
                 assertThat(new Color(image.getRGB(500, 940))).isEqualTo(UIManager.getColor("Jasper.titleBackground"));

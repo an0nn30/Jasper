@@ -27,7 +27,7 @@ class MacTitleBarTest {
             try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 root.setSize(959, 600); layoutTree(root);
                 assertThat(SwingUtilities.isDescendingFrom(owner.toolbar(), bar)).isTrue();
-                assertThat(bar.getPreferredSize().height).isEqualTo(42);
+                assertThat(bar.getPreferredSize().height).isEqualTo(30);
                 assertThat(SwingUtilities.convertPoint(owner.toolbar(), 0, 0, root).y).isZero();
                 assertThat(label(bar).getText()).isEqualTo("~");
                 assertThat(label(bar).getToolTipText()).isEqualTo(HOME.toString());
@@ -48,15 +48,18 @@ class MacTitleBarTest {
             var root = new JRootPane();
             try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                 root.setSize(600, 500); layoutTree(root);
-                for (int height : new int[] {64, 24, 30}) {
+                for (int height : new int[] {64, 28, 36, 30}) {
                     owner.setToolbarHeight(height); layoutTree(root);
-                    assertThat(bar.getHeight()).isEqualTo(Math.max(42, height));
+                    assertThat(bar.getHeight()).isEqualTo(height);
                     assertThat(owner.toolbar().getHeight()).isEqualTo(bar.getHeight());
                     for (var child : owner.toolbar().getComponents())
                         if (child instanceof JButton && child.isVisible())
                             assertThat(child.getHeight()).isEqualTo(height - 6);
                 }
                 owner.setToolbarMode(ToolbarMode.HIDDEN); layoutTree(root);
+                owner.setToolbarHeight(28); layoutTree(root);
+                assertThat(bar.getHeight()).isEqualTo(28);
+                assertThat(bar.getMinimumSize().height).isEqualTo(28);
                 assertThat(label(bar).getText()).isEqualTo("~");
                 assertThat(label(bar).getWidth()).isGreaterThan(300);
             }
@@ -109,7 +112,7 @@ class MacTitleBarTest {
             var minimumChanges = new AtomicInteger();
             owner.onMinimumSizeChanged = minimumChanges::incrementAndGet;
             try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
-                assertThat(bar.getPreferredSize().height).isEqualTo(42);
+                assertThat(bar.getPreferredSize().height).isEqualTo(30);
                 assertThat(bar.getComponentCount()).as("context and toolbar").isEqualTo(2);
                 JComponent tabs = WindowTabsTest.named(owner, "windowTabs");
                 assertThat(tabs).as("tabs live in the window content").isNotNull();
@@ -156,7 +159,7 @@ class MacTitleBarTest {
                 assertThat(label(bar).getForeground()).isEqualTo(new Color(0x6e6e6e));
                 owner.setToolbarMode(ToolbarMode.HIDDEN);
                 assertThat(bar.isVisible()).isTrue();
-                assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 42);
+                assertThat(root.getMinimumSize().height).isGreaterThanOrEqualTo(owner.getMinimumSize().height + 30);
             }
         });
     }

@@ -26,7 +26,7 @@ class BarHeightTest {
             var owner = content(launcher(new ArrayDeque<>()));
             JToolBar toolbar = owner.toolbar();
             int labelledWidth = -1;
-            for (int height : new int[]{24, 30, 64}) {
+            for (int height : new int[]{28, 30, 64}) {
                 owner.setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
                 owner.setToolbarHeight(height);
                 assertThat(toolbar.getPreferredSize().height).as("height %d", height).isEqualTo(UIScale.scale(height));
@@ -95,7 +95,7 @@ class BarHeightTest {
             assertThat(changes.get()).isEqualTo(2);
             owner.setToolbarHeight(40); owner.setStatusBarHeight(26);
             assertThat(changes.get()).as("an unchanged height is not a change").isEqualTo(2);
-            for (int height : new int[]{23, 65, Integer.MIN_VALUE, Integer.MAX_VALUE}) {
+            for (int height : new int[]{27, 65, Integer.MIN_VALUE, Integer.MAX_VALUE}) {
                 assertThatIllegalArgumentException().isThrownBy(() -> owner.setToolbarHeight(height));
                 assertThat(owner.toolbarHeight()).isEqualTo(40);
             }
@@ -139,7 +139,7 @@ class BarHeightTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             exercise(owner, "Toolbar height…", "toolbarHeight", hook -> owner.confirmToolbarHeight = hook,
-                owner::toolbarHeight, owner::setToolbarHeight, 24, 64, 30);
+                owner::toolbarHeight, owner::setToolbarHeight, 28, 64, 30);
             exercise(owner, "Status bar height…", "statusBarHeight", hook -> owner.confirmStatusBarHeight = hook,
                 owner::statusBarHeight, owner::setStatusBarHeight, 20, 48, 24);
             assertThat(owner.commands().entries().stream().map(entry -> entry.command().id()))

@@ -99,7 +99,7 @@ terminal = "match"
 | `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
 | `window.rail_width` | `28` | Integer 28–64 logical pixels; the panel rail's buttons scale with it; out-of-range values use the nearest limit with a warning | Live |
 | `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
-| `window.toolbar_height` | `30` | Integer 24–64 logical pixels; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning | Live |
+| `window.toolbar_height` | `30` | Integer 28–64 logical pixels; also sets the unified macOS title-bar height; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning | Live |
 | `window.status_bar` | `true` | Boolean | Live |
 | `window.status_bar_height` | `24` | Integer 20–48 logical pixels; the bar grows past it only when a large UI font needs the room; out-of-range values use the nearest limit with a warning | Live |
 | `window.columns` | `100` | Integer 5–500 | New windows |
@@ -239,7 +239,7 @@ Denied permission leaves the drawer available.
 ### Automatic tab and notification titles
 
 On macOS, the title bar combines the native window controls, a compact working-context
-label and the toolbar in one row (42 logical pixels by default). The label follows the
+label and the toolbar in one row (30 logical pixels by default). The label follows the
 focused pane: a local directory basename (`~` for home), or a provided session's saved
 host/session name with its remote directory when available. Hover for the full context.
 Program titles and manual tab names do not replace this label. A remote OSC 7 report
@@ -255,10 +255,11 @@ Split and contributed dropdowns such as Sessions retain labels in `icons_and_lab
 familiar built-in actions use icons with tooltips. Whole controls move into **More actions**
 when the toolbar is crowded, preserving submenus, shortcuts and action state. Find and
 Settings receive the highest space priority; Settings has one toolbar home. The toolbar
-never wraps or shrinks click targets to fit. `toolbar_height` still sizes its controls;
-the unified macOS row is at least 42 pixels tall. Hiding the toolbar retains the context
-label and native controls. Other platforms keep their native title bar and a separate
-toolbar with the same overflow behavior.
+never wraps or shrinks click targets to fit. `toolbar_height` sizes both its controls
+and the entire unified macOS row, with a 28–64 pixel range (default 30). Changes apply
+live, including while the toolbar is hidden; the context label and native controls
+remain visible. Other platforms keep their native title bar and a separate toolbar
+with the same overflow behavior.
 
 Applications can set the terminal title with OSC 0, 1 or 2. An automatic tab and
 the native window show that text plus the foreground job in parentheses, like

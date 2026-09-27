@@ -2,6 +2,18 @@
 
 ## Current state — 2026-09-23
 
+- **Configurable unified title-bar height** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
+  `window.toolbar_height` and View → Toolbar height now size the entire macOS header,
+  removing its fixed 42px floor. Default is 30px, with bounds of 28–64 logical pixels;
+  older values below 28 clamp with a config warning. Native JBR geometry and window
+  minimums update live, even with hidden toolbar controls. Standalone dialog titles
+  remain 28px. Existing height, config, dialog and full-window geometry tests reproduced
+  the old floor, then passed with the fix. Updated the separate tab-height test
+  to expect the new default too. Headless workspace preview inspected; independent
+  review found no issues.
+  `check :jasper-app:packageDist` passed: 2,041 tests, zero failures/errors, five skips;
+  rebuilt DMG and package signature/payload verification passed. No GUI launched.
+
 - **Local and SSH status breadcrumbs** (follow-up on `codex/intellij-new-icons`, 2026-09-27):
   status paths now render as theme-aware folder/host segments with chevrons. Narrow
   windows collapse ancestors while retaining the current folder; tooltips and accessible

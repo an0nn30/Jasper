@@ -257,7 +257,10 @@ API references: [Apple UserNotifications](https://developer.apple.com/documentat
 macOS. The workspace computes `WindowHeaderContext` from the focused pane; the platform
 package stays independent of workspace and terminal types. Native window metadata remains
 separate from the visible directory/host context. Native drag hit testing applies to the
-context label and blank toolbar area, never command buttons.
+context label and blank toolbar area, never command buttons. The unified row follows
+`window.toolbar_height` live (28–64 logical pixels, default 30), including when its
+toolbar is hidden. `MacTitleBar` updates the JBR custom-title height with the same
+geometry; standalone dialog titles remain 28px tall.
 
 `WindowToolbar` allocates whole buttons by stable priority and constructs overflow menus
 from the same Actions as their original placements. Do not retain a second plugin registry
