@@ -363,5 +363,10 @@ derive from the theme's active/inactive underline colors unless explicitly suppl
 Jasper Dark defines its fill and outline in the scheme JSON. `WindowTabs` paints a 4px
 radius and 1px outline, with 2px horizontal and up to 4px vertical insets; short tabs
 reduce the vertical inset to preserve space for labels/icons. Hover uses the same
-rounded shape. Geometry scales with UI scale, while hit targets and tab layout stay
-unchanged. `WindowTabsTest` saves dark/light previews under `build/render-preview`.
+rounded shape. Geometry scales with UI scale. Overflow uses a clipped viewport with
+full-width tabs and a fixed tab-list button; precise wheel/trackpad input over any tab
+control scrolls by distance without changing selection. Selection, resize and growing
+visible titles reveal the active tab. The viewport paints a 16px fade from the active
+`ToolWindow.background` at each overflowing edge and owns child repaint origins so
+hover/close repaints preserve that overlay. `WindowTabsTest` saves dark/light selection
+and overflow previews under `build/render-preview`.

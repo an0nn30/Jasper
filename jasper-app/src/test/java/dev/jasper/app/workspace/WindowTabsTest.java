@@ -171,7 +171,7 @@ class WindowTabsTest {
             layout(strip, 330, 38);
             var selected = owner.currentTab();
             assertThat(named(strip, "select:c").getParent().isVisible()).as("c is the rightmost visible tab").isTrue();
-            assertThat(named(strip, "select:d").getParent().isVisible()).isFalse();
+            assertThat(named(strip, "select:d").getParent().isVisible()).as("the next tab is partially visible").isTrue();
             selected.rename("vim somefile.txt with a much longer title than before"); owner.update();
             layout(strip, 330, 38);
             assertThat(named(strip, "select:" + selected.title()).getParent().isVisible()).isTrue();
@@ -210,7 +210,7 @@ class WindowTabsTest {
             owner.invoke(ActionId.SELECT_TAB_1); layout(tabs, 330, 38);
             JComponent selected = named(tabs, "select:" + owner.currentTab().title());
             assertThat(selected.getParent().isVisible()).isTrue();
-            tabs.scrollTabs(1); layout(tabs, 330, 38);
+            wheel(tabs, 6); layout(tabs, 330, 38);
             assertThat(selected.getParent().isVisible()).isFalse();
             owner.invoke(ActionId.NEXT_TAB); layout(tabs, 330, 38);
             assertThat(named(tabs, "select:" + owner.currentTab().title()).getParent().isVisible()).isTrue();
@@ -236,6 +236,129 @@ class WindowTabsTest {
             layout(strip, 250, 38);
             assertThat(named(strip, "select:selected").getParent().isVisible()).isTrue();
         });
+    }
+
+    @Test void preciseWheelScrollsPartialTabsOverLabelsAndCloseButtonsAndClampsAtEnds() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            for (int i = 0; i < 8; i++) {
+                if (i > 0) owner.newTab(HOME);
+                owner.currentTab().rename("Tab " + i + " with a longer title");
+            }
+            owner.invoke(ActionId.SELECT_TAB_1); owner.update();
+            var strip = owner.windowTabs(); layout(strip, 430, 38);
+            var first = named(strip, "select:" + owner.currentTab().title());
+            var entry = first.getParent();
+            int naturalWidth = entry.getWidth();
+            wheel(first, 0.25); layout(strip, 430, 38);
+            assertThat(entry.getX()).as("fractional wheel input moves tabs without snapping").isBetween(-30, -1);
+            assertThat(entry.getWidth()).as("edge tabs clip instead of shrinking").isEqualTo(naturalWidth);
+            int before = entry.getX();
+            wheel(named(strip, "close:" + owner.currentTab().title()), 0.25); layout(strip, 430, 38);
+            assertThat(entry.getX()).isLessThan(before);
+            assertThat(owner.tabStrip().getSelectedIndex()).as("scrolling does not select another tab").isZero();
+            wheel(strip, -1000); layout(strip, 430, 38);
+            assertThat(entry.getX()).isZero();
+            wheel(strip, 1000); layout(strip, 430, 38);
+            var last = named(strip, "select:Tab 7 with a longer title").getParent();
+            assertThat(last.getX() + last.getWidth()).isEqualTo(last.getParent().getWidth());
+            assertThat(named(strip, "tabList").getBounds()).isEqualTo(new Rectangle(406, 0, 24, 38));
+            assertThat(SwingUtilities.getDeepestComponentAt(strip, 418, 19)).isSameAs(named(strip, "tabList"));
+            ((JMenuItem) strip.tabList().getComponent(0)).doClick(); layout(strip, 430, 38);
+            assertThat(entry.getX()).as("choosing the already-selected tab reveals it again").isZero();
+            layout(strip, 2200, 38);
+            assertThat(entry.getX()).isZero();
+            wheel(first, 1000); layout(strip, 2200, 38);
+            assertThat(entry.getX()).as("no movement when all tabs fit").isZero();
+        });
+    }
+
+    @Test void overflowFadesOnlyClippedEdgesUsingTheActiveThemeSurface() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            for (int i = 0; i < 5; i++) {
+                if (i > 0) owner.newTab(HOME);
+                owner.currentTab().rename("wide selected tab " + i);
+            }
+            var strip = owner.windowTabs();
+            for (var theme : java.util.List.of(Theme.DARK, Theme.LIGHT)) {
+                owner.selectTheme(theme); owner.invoke(ActionId.SELECT_TAB_1); owner.update();
+                layout(strip, 380, 38);
+                var first = named(strip, "select:wide selected tab 0");
+                wheel(first, 0.5); layout(strip, 380, 38);
+                var viewport = first.getParent().getParent();
+                Color surface = UIManager.getColor("ToolWindow.background");
+                assertThat(pixel(viewport, 0, 6)).as("left edge fades into the active surface").isEqualTo(surface);
+                assertThat(pixel(viewport, 24, 6)).as("selection beyond the fade is unchanged")
+                    .isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
+                var output = java.nio.file.Path.of("build/render-preview");
+                try {
+                    java.nio.file.Files.createDirectories(output);
+                    javax.imageio.ImageIO.write(render(strip), "png", output.resolve("scrolling-tabs-" + (theme.dark() ? "dark" : "light") + ".png").toFile());
+                } catch (java.io.IOException error) { throw new java.io.UncheckedIOException(error); }
+                // Scroll near the end so the selected final tab is clipped at the right edge.
+                ((JMenuItem) strip.tabList().getComponent(4)).doClick(); layout(strip, 380, 38);
+                wheel(strip, -0.5); layout(strip, 380, 38);
+                assertThat(pixel(viewport, viewport.getWidth() - 1, 6)).isEqualTo(surface);
+                assertThat(pixel(viewport, viewport.getWidth() - 25, 6)).isEqualTo(UIManager.getColor("Jasper.tabSelectedBackground"));
+            }
+        });
+    }
+
+    @Test void scrolledTabsKeepDragCloseAndSelectionGeometry() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            for (int i = 0; i < 6; i++) {
+                if (i > 0) owner.newTab(HOME);
+                owner.currentTab().rename("tab-" + i);
+            }
+            var strip = owner.windowTabs(); layout(strip, 330, 38);
+            var selected = owner.currentTab();
+            var source = named(strip, "select:tab-5");
+            var target = named(strip, "select:tab-4");
+            Point end = SwingUtilities.convertPoint(target, 10, 10, source);
+            mouse(source, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
+            mouse(source, MouseEvent.MOUSE_RELEASED, end.x, end.y, MouseEvent.BUTTON1);
+            assertThat(owner.tabStrip().getComponentAt(4)).isSameAs(selected);
+            layout(strip, 330, 38);
+            var bounds = SwingUtilities.convertRectangle(source.getParent(), source.getBounds(), source.getParent().getParent());
+            assertThat(bounds.x).isGreaterThanOrEqualTo(0);
+            assertThat(bounds.x + bounds.width).isLessThanOrEqualTo(306);
+            ((AbstractButton) named(strip, "close:tab-5")).doClick(); layout(strip, 330, 38);
+            assertThat(owner.tabStrip().getTabCount()).isEqualTo(5);
+            var remaining = named(strip, "select:" + owner.currentTab().title()).getParent();
+            assertThat(remaining.isVisible()).isTrue();
+            assertThat(remaining.getX()).isGreaterThanOrEqualTo(0);
+            assertThat(remaining.getX() + remaining.getWidth()).isLessThanOrEqualTo(306);
+        });
+    }
+
+    @Test void droppingOverTheFixedListDoesNotTargetAClippedTab() throws Exception {
+        edt(() -> {
+            var owner = content(launcher(new ArrayDeque<>()));
+            for (int i = 0; i < 5; i++) {
+                if (i > 0) owner.newTab(HOME);
+                owner.currentTab().rename("long tab title number " + i);
+            }
+            owner.invoke(ActionId.SELECT_TAB_1); owner.update();
+            var first = owner.currentTab();
+            var strip = owner.windowTabs(); layout(strip, 330, 38);
+            var source = named(strip, "select:" + first.title());
+            for (int x : new int[] {318, 345, -8}) {
+                Point end = SwingUtilities.convertPoint(strip, x, 19, source);
+                mouse(source, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
+                mouse(source, MouseEvent.MOUSE_RELEASED, end.x, end.y, MouseEvent.BUTTON1);
+                assertThat(owner.tabStrip().getComponentAt(0)).as("drop outside viewport at %d", x).isSameAs(first);
+            }
+        });
+    }
+
+    private static void wheel(Component component, double rotation) {
+        var event = new java.awt.event.MouseWheelEvent(component, MouseEvent.MOUSE_WHEEL, 1, 0,
+            10, 10, 10, 10, 0, false, java.awt.event.MouseWheelEvent.WHEEL_UNIT_SCROLL, 3,
+            (int) rotation, rotation);
+        component.dispatchEvent(event);
+        assertThat(event.isConsumed()).as("the tab strip owns its scroll gesture").isTrue();
     }
 
     @Test void closedOwnerDisablesTheTabList() throws Exception {

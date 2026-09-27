@@ -2,6 +2,20 @@
 
 ## Current state — 2026-09-23
 
+- **Scrollable workspace tabs with edge fades** (`codex/intellij-new-icons`, 2026-09-27):
+  replaced whole-tab wheel jumps with precise distance scrolling in a clipped viewport.
+  Tabs retain their widths and can be partially visible at either edge; wheel/trackpad
+  gestures over labels, close controls and the strip work without changing selection.
+  A 16px fade uses the active `ToolWindow.background` only where content overflows;
+  the tab-list control stays fixed outside the viewport. Selecting a tab (including
+  the current tab through the list), resizing and growing visible titles reveal it.
+  Child repaint origins preserve fades on hover. Drag drops outside the viewport are
+  ignored, including over the dropdown; scrolled reorder/close keep the same model.
+  Regression tests reproduced fractional-input and clipped-drag failures before fixes;
+  focused tests and dark/light headless previews pass. Independent review finding fixed
+  and re-reviewed clean. `check :jasper-app:packageDist` passed: 2,067 tests, zero
+  failures/errors, five skips; package verification passed and DMG rebuilt. No GUI launched.
+
 - **Title-bar vertical alignment** (`codex/intellij-new-icons`, 2026-09-27):
   removed the redundant 6px workspace top gutter beneath a visible toolbar/native
   header. Controls were already centered within the row; the extra chrome below made
