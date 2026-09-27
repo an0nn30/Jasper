@@ -24,6 +24,28 @@ class TomlTokenMakerTest {
         return new TomlTokenMaker().getLastTokenTypeOnLine(new Segment(chars, 0, chars.length), initial);
     }
 
+    /**
+     * Lexes each line in order, carrying the end state from one line into the next exactly as RSyntaxTextArea
+     * does (its own {@code getLastTokenTypeOnLine} becomes the following call's {@code initialTokenType}), and
+     * returns each line's visible tokens.
+     */
+    private static List<List<String>> lexLines(String... lines) {
+        List<List<String>> out = new ArrayList<>();
+        int state = Token.NULL;
+        for (String line : lines) {
+            out.add(tokens(line, state));
+            state = endState(line, state);
+        }
+        return out;
+    }
+
+    /** The state left after lexing every line in order; {@link Token#NULL} means the last line closes cleanly. */
+    private static int chainState(String... lines) {
+        int state = Token.NULL;
+        for (String line : lines) state = endState(line, state);
+        return state;
+    }
+
     private static String name(int type) {
         return switch (type) {
             case Token.COMMENT_EOL -> "COMMENT";
@@ -80,29 +102,66 @@ class TomlTokenMakerTest {
     }
 
     @Test void multiLineBasicStringsCarryAcrossLines() {
-        assertThat(tokens("text = \"\"\"first")).containsExactly("KEY:text", "OP:=", "STRING:\"\"\"first");
-        assertThat(endState("text = \"\"\"first", Token.NULL)).isEqualTo(Token.LITERAL_STRING_DOUBLE_QUOTE);
-        assertThat(tokens("still \"inside\"", Token.LITERAL_STRING_DOUBLE_QUOTE)).containsExactly("STRING:still \"inside\"");
-        assertThat(endState("", Token.LITERAL_STRING_DOUBLE_QUOTE)).as("an empty line stays inside").isEqualTo(Token.LITERAL_STRING_DOUBLE_QUOTE);
-        assertThat(tokens("end\"\"\" # done", Token.LITERAL_STRING_DOUBLE_QUOTE)).containsExactly("STRING:end\"\"\"", "COMMENT:# done");
-        assertThat(endState("end\"\"\" # done", Token.LITERAL_STRING_DOUBLE_QUOTE)).isEqualTo(Token.NULL);
+        var lines = lexLines("text = \"\"\"first", "still \"inside\"", "", "end\"\"\" # done");
+        assertThat(lines.get(0)).containsExactly("KEY:text", "OP:=", "STRING:\"\"\"first");
+        assertThat(lines.get(1)).containsExactly("STRING:still \"inside\"");
+        assertThat(lines.get(2)).as("an empty line stays inside").isEmpty();
+        assertThat(lines.get(3)).containsExactly("STRING:end\"\"\"", "COMMENT:# done");
+        assertThat(chainState("text = \"\"\"first", "still \"inside\"", "", "end\"\"\" # done"))
+            .as("the string closes cleanly").isEqualTo(Token.NULL);
         assertThat(tokens("a = \"\"\"x \\\"\"\" y\"\"\"")).as("an escaped quote does not close").endsWith("STRING:\"\"\"x \\\"\"\" y\"\"\"");
         assertThat(tokens("q = \"\"\"a\"\"\"\"")).as("a quote before the delimiter").endsWith("STRING:\"\"\"a\"\"\"\"");
     }
 
     @Test void multiLineLiteralStringsCarryAcrossLines() {
-        assertThat(endState("raw = '''one", Token.NULL)).isEqualTo(Token.LITERAL_CHAR);
-        assertThat(tokens("two'''", Token.LITERAL_CHAR)).containsExactly("LITERAL:two'''");
-        assertThat(endState("two'''", Token.LITERAL_CHAR)).isEqualTo(Token.NULL);
+        var lines = lexLines("raw = '''one", "two'''");
+        assertThat(lines.get(0)).containsExactly("KEY:raw", "OP:=", "LITERAL:'''one");
+        assertThat(lines.get(1)).containsExactly("LITERAL:two'''");
+        assertThat(chainState("raw = '''one", "two'''")).isEqualTo(Token.NULL);
     }
 
     @Test void arraysOpenedOnAnEarlierLineKeepValueContext() {
-        assertThat(endState("ports = [", Token.NULL)).isEqualTo(Token.SEPARATOR);
-        assertThat(tokens("  8080,", Token.SEPARATOR)).containsExactly("INT:8080", "SEP:,");
-        assertThat(endState("  8080,", Token.SEPARATOR)).isEqualTo(Token.SEPARATOR);
-        assertThat(tokens("  [1, 2],", Token.SEPARATOR)).as("not a table header inside an array")
+        var lines = lexLines("ports = [", "  8080,", "  [1, 2],", "]");
+        assertThat(lines.get(0)).containsExactly("KEY:ports", "OP:=", "SEP:[");
+        assertThat(lines.get(1)).containsExactly("INT:8080", "SEP:,");
+        assertThat(lines.get(2)).as("not a table header inside an array")
             .containsExactly("SEP:[", "INT:1", "SEP:,", "INT:2", "SEP:]", "SEP:,");
-        assertThat(endState("]", Token.SEPARATOR)).isEqualTo(Token.NULL);
+        assertThat(lines.get(3)).containsExactly("SEP:]");
+        assertThat(chainState("ports = [", "  8080,", "  [1, 2],", "]")).isEqualTo(Token.NULL);
+    }
+
+    @Test void nestedArraysThatSpanLinesKeepTheirDepth() {
+        var lines = lexLines("matrix = [", "  [", "    1, 2", "  ],", "  [3, 4],", "]");
+        assertThat(lines.get(0)).containsExactly("KEY:matrix", "OP:=", "SEP:[");
+        assertThat(lines.get(1)).containsExactly("SEP:[");
+        assertThat(lines.get(2)).containsExactly("INT:1", "SEP:,", "INT:2");
+        assertThat(lines.get(3)).containsExactly("SEP:]", "SEP:,");
+        assertThat(lines.get(4)).as("depth 1 restored, not a table header")
+            .containsExactly("SEP:[", "INT:3", "SEP:,", "INT:4", "SEP:]", "SEP:,");
+        assertThat(lines.get(5)).containsExactly("SEP:]");
+        assertThat(chainState("matrix = [", "  [", "    1, 2", "  ],", "  [3, 4],", "]")).isEqualTo(Token.NULL);
+    }
+
+    @Test void multiLineStringInsideAMultiLineArrayKeepsArrayDepth() {
+        var lines = lexLines("xs = [", "  \"\"\"a", "  b\"\"\",", "  1,", "]");
+        assertThat(lines.get(0)).containsExactly("KEY:xs", "OP:=", "SEP:[");
+        assertThat(lines.get(1)).containsExactly("STRING:\"\"\"a");
+        assertThat(lines.get(2)).as("line 3 ends the string").containsExactly("STRING:  b\"\"\"", "SEP:,");
+        assertThat(lines.get(3)).containsExactly("INT:1", "SEP:,");
+        assertThat(lines.get(4)).containsExactly("SEP:]");
+        assertThat(chainState("xs = [", "  \"\"\"a", "  b\"\"\",", "  1,", "]")).isEqualTo(Token.NULL);
+    }
+
+    @Test void internalLineStatesMapToStandardTokenTypes() {
+        var maker = new TomlTokenMaker();
+        int insideBasicString = endState("text = \"\"\"first", Token.NULL);
+        int insideLiteralString = endState("raw = '''one", Token.NULL);
+        int insideArray = endState("ports = [", Token.NULL);
+        assertThat(maker.getClosestStandardTokenTypeForInternalType(insideBasicString)).isEqualTo(Token.LITERAL_STRING_DOUBLE_QUOTE);
+        assertThat(maker.getClosestStandardTokenTypeForInternalType(insideLiteralString)).isEqualTo(Token.LITERAL_CHAR);
+        assertThat(maker.getClosestStandardTokenTypeForInternalType(insideArray)).isEqualTo(Token.SEPARATOR);
+        assertThat(maker.getClosestStandardTokenTypeForInternalType(Token.RESERVED_WORD)).as("a real type is unchanged")
+            .isEqualTo(Token.RESERVED_WORD);
     }
 
     @Test void theCommentDelimiterMakesToggleCommentWork() {

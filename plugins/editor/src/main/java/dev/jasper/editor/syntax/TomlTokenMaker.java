@@ -6,9 +6,16 @@ import org.fife.ui.rsyntaxtextarea.Token;
 import org.fife.ui.rsyntaxtextarea.TokenMakerBase;
 
 /**
- * A hand-written TOML lexer (spec 3.2). A line ending inside {@code """} ends with a basic-string token, one
- * inside {@code '''} with a literal-string token, and one inside an array opened on an earlier line with a
- * zero-length separator; RSyntaxTextArea hands that type back as the next line's initial type.
+ * A hand-written TOML lexer (spec 3.2). A line's own characters always keep their real token types; a line
+ * that ends with open {@code [}/{@code {} brackets, inside a multi-line {@code """} string or inside a
+ * multi-line {@code '''} string ends with one extra zero-length token, appended after its last real token,
+ * whose type is a private negative int encoding both the open-bracket depth and which kind of multi-line
+ * string (if any) is unterminated (see {@code encodeState}/{@code decodeState}). RSyntaxTextArea does not
+ * paint non-positive types ({@code isPaintable()} is {@code type > Token.NULL}) and hands this type back as
+ * the next line's {@code initialTokenType}, the same way its own HTML and JSP lexers carry embedded-language
+ * state across lines. A single positive/negative bit is not enough on its own: a nested multi-line array
+ * needs its full bracket depth restored, not just "some bracket is open", or a line like {@code ],} at a
+ * deeper nesting would wrongly pop all the way out.
  */
 public final class TomlTokenMaker extends TokenMakerBase {
     private static final Pattern DECIMAL = Pattern.compile("[+-]?(0|[1-9](_?\\d)*)");
@@ -18,9 +25,22 @@ public final class TomlTokenMaker extends TokenMakerBase {
         "\\d{4}-\\d{2}-\\d{2}([Tt ]\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?([Zz]|[+-]\\d{2}:\\d{2})?)?|\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?");
     private static final Pattern LOCAL_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
 
+    /** The open-bracket depth an encoded end-of-line state can carry; deeper nesting is capped here. */
+    private static final int MAX_DEPTH = 64;
+
     @Override public String[] getLineCommentStartAndEnd(int languageIndex) { return new String[] {"#", null}; }
 
     @Override public boolean getMarkOccurrencesOfTokenType(int type) { return type == Token.VARIABLE; }
+
+    @Override
+    public int getClosestStandardTokenTypeForInternalType(int type) {
+        if (type >= Token.NULL) return type;
+        return switch (decodeState(type).kind()) {
+            case 1 -> Token.LITERAL_STRING_DOUBLE_QUOTE;
+            case 2 -> Token.LITERAL_CHAR;
+            default -> Token.SEPARATOR;
+        };
+    }
 
     @Override
     public Token getTokenList(Segment text, int initialTokenType, int startOffset) {
@@ -30,12 +50,21 @@ public final class TomlTokenMaker extends TokenMakerBase {
         int i = from;
         StringBuilder brackets = new StringBuilder();
         boolean value = false, seen = false;
-        if (initialTokenType == Token.SEPARATOR) { brackets.append('['); value = true; }
-        else if (initialTokenType == Token.LITERAL_STRING_DOUBLE_QUOTE || initialTokenType == Token.LITERAL_CHAR) {
-            int close = closeMultiline(a, from, end, initialTokenType == Token.LITERAL_STRING_DOUBLE_QUOTE ? '"' : '\'');
-            if (close < 0) { add(a, from, end, initialTokenType, shift); return firstToken; }
-            add(a, from, close, initialTokenType, shift);
-            i = close;
+        if (initialTokenType < Token.NULL) {
+            LineState state = decodeState(initialTokenType);
+            for (int d = 0; d < state.depth(); d++) brackets.append('[');
+            if (state.kind() != 0) {
+                char quote = state.kind() == 1 ? '"' : '\'';
+                int type = state.kind() == 1 ? Token.LITERAL_STRING_DOUBLE_QUOTE : Token.LITERAL_CHAR;
+                int close = closeMultiline(a, from, end, quote);
+                if (close < 0) {
+                    add(a, from, end, type, shift);
+                    appendState(a, end, shift, brackets.length(), state.kind());
+                    return firstToken;
+                }
+                add(a, from, close, type, shift);
+                i = close;
+            }
             value = true;
             seen = true;
         }
@@ -59,7 +88,11 @@ public final class TomlTokenMaker extends TokenMakerBase {
                 int type = c == '"' ? Token.LITERAL_STRING_DOUBLE_QUOTE : Token.LITERAL_CHAR;
                 if (value && i + 2 < end && a[i + 1] == c && a[i + 2] == c) {
                     int close = closeMultiline(a, i + 3, end, c);
-                    if (close < 0) { add(a, start, end, type, shift); return firstToken; }
+                    if (close < 0) {
+                        add(a, start, end, type, shift);
+                        appendState(a, end, shift, brackets.length(), c == '"' ? 1 : 2);
+                        return firstToken;
+                    }
                     add(a, start, close, type, shift);
                     i = close;
                     continue;
@@ -107,13 +140,28 @@ public final class TomlTokenMaker extends TokenMakerBase {
             add(a, i, i + 1, Token.ERROR_IDENTIFIER, shift);
             i++;
         }
-        if (!brackets.isEmpty()) { addToken(a, end, end - 1, Token.SEPARATOR, end + shift); return firstToken; }
+        if (!brackets.isEmpty()) { appendState(a, end, shift, brackets.length(), 0); return firstToken; }
         addNullToken();
         return firstToken;
     }
 
     /** Adds a token over {@code a[start, end)}; RSyntaxTextArea's end index is inclusive. */
     private void add(char[] a, int start, int end, int type, int shift) { addToken(a, start, end - 1, type, start + shift); }
+
+    /** Appends the zero-length token that carries {@code depth} open brackets and {@code kind} to the next line. */
+    private void appendState(char[] a, int pos, int shift, int depth, int kind) { add(a, pos, pos, encodeState(depth, kind), shift); }
+
+    /**
+     * A line's end-of-line state beyond a fresh start (a plain {@code Token.NULL}): how many {@code [}/{@code {}
+     * brackets are still open, and whether the line ends inside a multi-line string (0 = no, 1 = inside
+     * {@code """}, 2 = inside {@code '''}).
+     */
+    private record LineState(int depth, int kind) { }
+
+    /** Encodes a {@link LineState} as the private negative token type carried between lines; depth is capped at {@link #MAX_DEPTH}. */
+    private static int encodeState(int depth, int kind) { return -(1 + Math.min(depth, MAX_DEPTH) * 3 + kind); }
+
+    private static LineState decodeState(int state) { int n = -state - 1; return new LineState(n / 3, n % 3); }
 
     static int classify(String word) {
         if (word.equals("true") || word.equals("false")) return Token.LITERAL_BOOLEAN;

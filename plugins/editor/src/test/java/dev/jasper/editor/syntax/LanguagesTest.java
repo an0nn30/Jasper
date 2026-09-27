@@ -23,4 +23,14 @@ class LanguagesTest {
         assertThat(first.getType()).isEqualTo(Token.VARIABLE);
         assertThat(first.getLexeme()).isEqualTo("port");
     }
+
+    @Test void nestedMultiLineArraysDoNotMisreadAsHeaders() {
+        Languages.register();
+        var area = new RSyntaxTextArea();
+        area.setSyntaxEditingStyle(Languages.TOML);
+        area.setText("matrix = [\n  [\n    1, 2\n  ],\n  [3, 4],\n]\n");
+        Token line5 = area.getTokenListForLine(4);
+        while (line5.getType() == Token.WHITESPACE) line5 = line5.getNextToken();
+        assertThat(line5.getType()).as("not a table header").isEqualTo(Token.SEPARATOR);
+    }
 }
