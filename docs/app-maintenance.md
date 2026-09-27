@@ -225,3 +225,27 @@ and config import; `trust` owns host-key matching; `agent` adapts the agent prot
 panels and the palette scope. The plugin consumes only `dev.jasper.vault.api`.
 Run `./gradlew :jasper-plugin-remote:test` for unit and embedded loopback-server tests.
 See [Remote](remote.md) for settings and native acceptance.
+
+### macOS notification identity
+
+`platform.NativeNotifier` dispatches off the EDT to `MacNotifications`, which loads
+`Contents/app/libjasper-notifications.dylib` beside the current jpackage launcher.
+The Objective-C bridge uses `UNUserNotificationCenter` in Jasper's process: identity,
+icon and permission belong to `dev.jasper.app`. Never restore an `osascript` fallback;
+its notices carry AppleScript's icon. Java text is copied as UTF-16, never evaluated.
+The native delegate allows banners for hidden panes while Jasper is foreground;
+the existing Java notification policy decides which completions qualify.
+
+`gradle/mac-notifications.gradle` compiles the bridge with the JBR JNI headers and
+Apple's command line tools on macOS. `check` runs its headless fake-center harness
+(permission granted/denied/error, deferred delivery, literal Unicode, unique requests,
+foreground presentation, non-bundle guard). Other platforms skip native compilation.
+Native packaging signs the dylib before signing Jasper and `verifyPackage` checks it.
+Gradle/IDE runs intentionally send no system notifications because they lack Jasper's
+bundle identity. Test a packaged app manually: run `sleep 12`, switch to another app,
+allow Jasper's notification request, then repeat and verify the Jasper icon. Also
+check a hidden tab with Jasper foreground, and denial in System Settings. GUI acceptance
+is user-run; headless tests never show a prompt or banner.
+
+API references: [Apple UserNotifications](https://developer.apple.com/documentation/usernotifications/unusernotificationcenter),
+[requesting permission](https://developer.apple.com/documentation/usernotifications/asking-permission-to-use-notifications).

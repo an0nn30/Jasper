@@ -231,7 +231,10 @@ you. Double-clicking him still raises the terminal and right-clicking still open
 
 A **system notification** is sent as well, unless the command finished in the pane you were actually
 typing in. That includes a command finishing in a visible but unfocused split pane, which is easy to
-miss. System notifications are macOS-only; elsewhere the drawer is the only channel.
+miss. System notifications require the packaged macOS `Jasper.app`; elsewhere (including Gradle/IDE
+launches) the drawer is the only channel. macOS uses Jasper's app icon and notification settings.
+The first eligible notice asks for permission; allow Jasper in System Settings → Notifications.
+Denied permission leaves the drawer available.
 
 ### Automatic tab and notification titles
 

@@ -19,6 +19,24 @@
   `python3 tools/icons/render-preview.py`. [Details](new-ui-icons-verification.md).
   Native visual acceptance is user-run; not merged or pushed.
 
+- **macOS notification icon** (branch `codex/mac-notification-icon`, 2026-09-27):
+  the screenshot's icon belongs to AppleScript: `NativeNotifier` launched `osascript`,
+  so the sender was not Jasper. Packaged macOS now posts through an in-process JNI
+  UserNotifications bridge, using `dev.jasper.app` and its bundle icon. The first
+  eligible notice requests Jasper's notification permission; denial is respected.
+  The existing threshold/visibility policy stays in Java; the native delegate permits
+  an eligible hidden-pane notice while Jasper is foreground. UTF-16 text stays data.
+  Packaging compiles/signs the bridge and verifies payload bytes, architecture and
+  signatures. `check` includes a macOS fake-center harness and real headless JNI load;
+  other platforms skip native compilation. Gradle/IDE launches send no native notices
+  because they have no Jasper bundle identity (the old AppleScript behavior is superseded).
+  The original sender-attribution regression failed before the fix. `./gradlew check`
+  passed: 2,006 Java tests, zero failures/errors, five skips, plus the native harness.
+  `packageDist` and strict package signature checks passed. Independent review found
+  no actionable issues. Native icon/permission acceptance remains user-run; no GUI
+  launched. Not merged or pushed.
+  See [maintenance and acceptance](app-maintenance.md#macos-notification-identity).
+
 - **Three-platform CI** (branch `fix/ci-cross-platform`, 2026-09-27): `main` had been red on Linux
   and Windows since 2026-09-13 (last green `1db31b1b`). The logs showed no assertion text and
   Gradle stopped at the first failing module, so most failures were hidden. CI now prints full

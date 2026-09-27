@@ -1,5 +1,11 @@
 # Finished-command notifications — design
 
+**2026-09-27 notification icon correction:** The user requested Jasper's app icon in native
+notices. The `osascript` transport below is superseded by an in-process UserNotifications
+bridge in the packaged macOS app, with Jasper's own permission. Gradle/IDE launches have
+no Jasper bundle identity and do not send native notices. Threshold and visibility rules
+are unchanged. See [maintenance](../../app-maintenance.md#macos-notification-identity).
+
 **Status:** Implemented. Development branch: `claude/command-notifications`, from main `1f1afeb`.
 
 **Builds on:** the [desk buddy design](2026-09-14-jasper-desk-buddy-design.md) (the floating window, sprite strip, animator and bubble) and the [shell integration design](2026-09-16-jasper-shell-integration-design.md) (the OSC 133 C and D marks that bracket a command).
