@@ -58,7 +58,8 @@ import javax.swing.event.DocumentListener;
 public final class CommandPalette extends JPanel {
     static final int WIDTH = 680;
     private static final int CORNER_ARC = 16;
-    static final int TAB_HEIGHT = 30;
+    private static final int TAB_PADDING = 4;
+    static final int TAB_HEIGHT = 30 + 2 * TAB_PADDING;
     static final int FIELD_HEIGHT = 44;
     static final int ROW_HEIGHT = 24;
     static final int HEADER_HEIGHT = 22;
@@ -400,6 +401,8 @@ public final class CommandPalette extends JPanel {
         setBackground(listBackground);
         setBorder(new FlatLineBorder(new Insets(1, 1, 1, 1), border, 1f, CORNER_ARC));
         tabStrip.setBackground(headerBackground);
+        int tabPadding = UIScale.scale(TAB_PADDING);
+        tabStrip.setBorder(BorderFactory.createEmptyBorder(tabPadding, tabPadding, tabPadding, tabPadding));
         fieldRow.setBackground(fieldBackground);
         fieldRow.setBorder(BorderFactory.createEmptyBorder(UIScale.scale(6), UIScale.scale(8), UIScale.scale(6), UIScale.scale(8)));
         query.putClientProperty(FlatClientProperties.STYLE, "background: " + hex(fieldBackground)
@@ -585,7 +588,7 @@ public final class CommandPalette extends JPanel {
         private final boolean selected;
 
         TabLabel(Tab tab, boolean selected) {
-            super(tab.label(), TAB_HEIGHT);
+            super(tab.label(), TAB_HEIGHT - 2 * TAB_PADDING);
             this.id = tab.id();
             this.selected = selected;
             setIcon(tab.icon());

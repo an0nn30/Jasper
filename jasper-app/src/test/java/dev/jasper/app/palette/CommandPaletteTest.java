@@ -216,14 +216,14 @@ class CommandPaletteTest {
             layoutTree(palette);
             Insets insets = palette.getInsets();
             assertThat(palette.getPreferredSize().width).isEqualTo(UIScale.scale(680));
-            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(30 + 44 + 22 + 2 * 24 + 26) + insets.top + insets.bottom);
-            assertThat(palette.tabStrip().getHeight()).isEqualTo(UIScale.scale(30));
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(38 + 44 + 22 + 2 * 24 + 26) + insets.top + insets.bottom);
+            assertThat(palette.tabStrip().getHeight()).isEqualTo(UIScale.scale(38));
             assertThat(palette.queryField().getParent().getHeight()).isEqualTo(UIScale.scale(44));
             assertThat(palette.hintBar().getHeight()).isEqualTo(UIScale.scale(26));
             assertThat(palette.itemHeight()).isEqualTo(UIScale.scale(24));
             assertThat(palette.isOpaque()).as("rounded corners expose the underlying workspace").isFalse();
             palette.setEntries(List.of(), null, "Nothing found");
-            assertThat(palette.getPreferredSize().height).as("the empty line").isEqualTo(UIScale.scale(30 + 44 + 24 + 26) + insets.top + insets.bottom);
+            assertThat(palette.getPreferredSize().height).as("the empty line").isEqualTo(UIScale.scale(38 + 44 + 24 + 26) + insets.top + insets.bottom);
         });
     }
 
@@ -234,7 +234,7 @@ class CommandPaletteTest {
             for (int i = 0; i < 30; i++) rows.add(item(HISTORY, "r" + i));
             palette.setEntries(rows, null, null);
             Insets insets = palette.getInsets();
-            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(30 + 44 + 15 * 24 + 26) + insets.top + insets.bottom);
+            assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(38 + 44 + 15 * 24 + 26) + insets.top + insets.bottom);
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
             palette.selectRelative(29);
@@ -269,6 +269,12 @@ class CommandPaletteTest {
                         assertThat(palette.contains(corner)).isFalse();
                     }
                     assertThat(palette.contains(palette.getWidth() / 2, 1)).isTrue();
+                    assertThat(allTab.getY()).as("scope has top padding").isEqualTo(UIScale.scale(4));
+                    assertThat(palette.tabStrip().getHeight() - allTab.getY() - allTab.getHeight())
+                        .as("scope has matching bottom padding").isEqualTo(UIScale.scale(4));
+                    assertThat(allTab.getX()).as("scope has left padding").isEqualTo(UIScale.scale(4));
+                    assertPixel(image, at(palette.tabStrip(), allTab.getX() + 12, 2, palette),
+                        "SearchEverywhere.Header.background", name);
                     assertPixel(image, at(allTab, 12, 3, palette), "SearchEverywhere.Tab.selectedBackground", name);
                     assertPixel(image, at(palette.tabStrip(), palette.tabStrip().getWidth() - 12, 3, palette), "SearchEverywhere.Header.background", name);
                     assertPixel(image, at(palette.queryField().getParent(), palette.queryField().getParent().getWidth() - 3, 2, palette),
@@ -471,7 +477,7 @@ class CommandPaletteTest {
                 assertThat(palette.stepTitle().getText()).isEqualTo("Rebase");
                 assertThat(palette.hintBar().isVisible()).isFalse();
                 Insets insets = palette.getInsets();
-                assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(30 + 44 + 22 + 2 * 40) + insets.top + insets.bottom);
+                assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(38 + 44 + 22 + 2 * 40) + insets.top + insets.bottom);
                 palette.focusStepField(1);
                 assertThat(palette.stepFocusIndex()).isEqualTo(1);
                 palette.focusStepField(1);
@@ -482,7 +488,7 @@ class CommandPaletteTest {
                 assertThat(palette.stepValues()).hasSize(2).containsEntry("branch", "main").containsEntry("remote", "origin");
                 palette.setStepError("Nope");
                 assertThat(palette.stepError().isVisible()).isTrue();
-                assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(30 + 44 + 22 + 2 * 40 + 22) + insets.top + insets.bottom);
+                assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(38 + 44 + 22 + 2 * 40 + 22) + insets.top + insets.bottom);
                 palette.setStepError(null);
                 assertThat(palette.stepError().isVisible()).isFalse();
                 palette.hideStep();

@@ -2,6 +2,15 @@
 
 ## Current state — 2026-09-23
 
+- **Command palette scope spacing** (`codex/intellij-new-icons`, 2026-09-27):
+  inset the scope strip by 4 logical pixels on all sides so selected scope highlights
+  clear the rounded palette frame. Scope click targets remain 30px high and preferred
+  palette height includes the extra padding. Existing active-theme colors are retained.
+  Geometry/pixel regression failed before the change and passes afterward; dark/light
+  headless previews inspected and independent review is clean.
+  `check :jasper-app:packageDist` passed: 2,061 tests, zero failures/errors,
+  five skips; package verification passed and DMG rebuilt. No GUI launched.
+
 - **SSH group folder icons** (`codex/intellij-new-icons`, 2026-09-27):
   replaced the text disclosure triangles with vendored `nodes/folder` for collapsed
   groups and `general/open` for expanded groups. Remote supplies icons through the SDK
