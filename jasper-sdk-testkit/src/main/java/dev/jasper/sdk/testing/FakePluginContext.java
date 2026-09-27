@@ -178,6 +178,9 @@ public final class FakePluginContext implements PluginContext {
             @Override public javax.swing.Icon icon(dev.jasper.sdk.ui.IconName name) {
                 return new FakeNamedIcon(java.util.Objects.requireNonNull(name, "name"));
             }
+            @Override public javax.swing.Icon icon(dev.jasper.sdk.ui.BundledIcon name) {
+                return new FakeBundledIcon(java.util.Objects.requireNonNull(name, "name"));
+            }
             @Override public javax.swing.Icon icon(String svgResourcePath) {
                 if (svgResourcePath == null || plugin.getClass().getClassLoader().getResource(svgResourcePath) == null)
                     throw new IllegalArgumentException("No such icon resource: " + svgResourcePath);

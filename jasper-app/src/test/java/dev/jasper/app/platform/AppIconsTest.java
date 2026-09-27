@@ -17,14 +17,14 @@ class AppIconsTest {
             new ThemeController(Theme.LIGHT);
             try {
                 for (String name : ICONS) {
-                    FlatSVGIcon icon = (FlatSVGIcon) AppIcons.icon(name);
-                    assertThat(icon.hasFound()).as(name).isTrue();
-                    assertThat(icon.getName()).as(name).startsWith("dev/jasper/app/icons/intellij/");
+                    var icon = AppIcons.icon(name);
                     assertThat(icon.getIconWidth()).isEqualTo(16);
-                    assertThat(icon.getColorFilter()).as(name + " keeps its authored colours").isNull();
+                    assertThat(icon.getIconHeight()).isEqualTo(16);
+                    assertThat(Arrays.stream(IntellijIconsTest.pixels(icon)).anyMatch(pixel -> (pixel >>> 24) != 0)).isTrue();
                 }
-                assertThat(Arrays.stream(IntellijIconsTest.pixels(AppIcons.icon("search")))
-                    .anyMatch(pixel -> pixel == 0xff6e6e6e)).as("IntelliJ light grey").isTrue();
+                var expected = new FlatSVGIcon("dev/jasper/app/icons/intellij/general/search.svg", 16, 16);
+                assertThat(IntellijIconsTest.pixels(AppIcons.icon("search")))
+                    .isEqualTo(IntellijIconsTest.pixels(expected));
             } finally { new ThemeController(); }
         });
     }
@@ -38,15 +38,31 @@ class AppIconsTest {
                 themes.configure(Theme.DARK);
                 int[] dark = IntellijIconsTest.pixels(icon);
                 assertThat(dark).isNotEqualTo(light);
-                assertThat(Arrays.stream(dark).anyMatch(pixel -> pixel == 0xff6e6e6e)).isFalse();
+                themes.configure(Theme.LIGHT);
+                assertThat(IntellijIconsTest.pixels(icon)).isEqualTo(light);
+                assertThat(AppIcons.dropdown().getIconWidth()).isEqualTo(8);
+                assertThat(Arrays.stream(dark).anyMatch(pixel -> pixel == 0xff6c707e)).isFalse();
+            } finally { new ThemeController(); }
+        });
+    }
+
+    @Test void bundledIconsKeepFlatLafDisabledRendering() throws Exception {
+        edt(() -> {
+            new ThemeController(Theme.LIGHT);
+            try {
+                var icon = AppIcons.icon("search");
+                var disabled = javax.swing.UIManager.getLookAndFeel().getDisabledIcon(new javax.swing.JLabel(), icon);
+                assertThat(disabled).isNotNull();
+                assertThat(disabled.getIconWidth()).isEqualTo(16);
+                assertThat(IntellijIconsTest.pixels(disabled)).isNotEqualTo(IntellijIconsTest.pixels(icon));
             } finally { new ThemeController(); }
         });
     }
 
     @Test void chromeResolvesIntellijNamesAndRejectsUnknownOnes() throws Exception {
         edt(() -> {
-            assertThat(AppIcons.chrome("closeHovered").getIconWidth()).isEqualTo(16);
-            assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.chrome("absent")).withMessageContaining("absent");
+            assertThat(AppIcons.named("CLOSE_HOVERED").getIconWidth()).isEqualTo(16);
+            assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.named("absent")).withMessageContaining("absent");
         });
     }
 
@@ -55,7 +71,7 @@ class AppIconsTest {
             for (String name : new String[]{"square-plus", "app-window", "columns-2", "maximize", "search", "settings",
                     "refresh", "command", "history", "bookmark", "close", "exit"}) {
                 var icon = AppIcons.icon(name);
-                assertThat(icon).as(name).isInstanceOf(com.formdev.flatlaf.extras.FlatSVGIcon.class);
+                assertThat(icon).as(name).isInstanceOf(com.formdev.flatlaf.FlatLaf.DisabledIconProvider.class);
                 assertThat(icon.getIconWidth()).as(name).isEqualTo(16);
             }
             assertThatIllegalArgumentException().isThrownBy(() -> AppIcons.icon("unknown")).withMessageContaining("unknown");

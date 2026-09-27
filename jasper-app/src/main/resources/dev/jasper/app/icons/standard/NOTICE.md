@@ -1,17 +1,9 @@
-# Host-owned modern icon catalog
+# Key fallback
 
-LOCK.svg and UNLOCK.svg are unmodified copies of Jasper Vault's existing modern artwork.
-They keep the plugin's established shapes when using the semantic SDK catalog.
+KEY.svg is byte-identical Tabler outline artwork from commit
+0239805680a36bab4e1070529b6744924402d804 of https://github.com/tabler/tabler-icons.
+It remains because the vendored IntelliJ platform New UI collection has no key symbol.
+The central icon manager tints it to the running theme's chrome foreground.
 
-Other icons are Tabler outline artwork from https://github.com/tabler/tabler-icons.
-ADD, BOOKMARK, CLOSE, HISTORY, REFRESH, SEARCH and SETTINGS were copied unmodified from
-Jasper's former bundled resources, which took Tabler commit
-6d128ed935d4546607b1e4d5d08c8b27bdbe7758 with the currentColor stroke replaced by #6e6e6e;
-the rest were downloaded unmodified at commit 0239805680a36bab4e1070529b6744924402d804.
-Tabler is MIT licensed; the pinned upstream LICENSE is included as LICENSE.txt and covers
-every Tabler icon here. No runtime download is performed.
-
-assets.tsv records every original source path/URL and SHA-256 of unmodified SVG bytes.
-
-File and transfer icons were copied unmodified from the user-supplied
-~/projects/tabler-icons/icons/outline collection (MIT), on 2026-09-23.
+Tabler is MIT licensed; its pinned upstream license is included as LICENSE.txt.
+assets.tsv records the original source URL and SHA-256. No runtime download occurs.

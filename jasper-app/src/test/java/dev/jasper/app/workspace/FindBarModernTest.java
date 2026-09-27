@@ -24,6 +24,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FindBarModernTest {
     @AfterEach void reset() throws Exception { edt(() -> new ThemeController()); }
 
+    @Test void escapeResolvesTheCloseActionAndHidesTheBar() throws Exception {
+        try (TerminalSession session = shell(HOME)) {
+            edt(() -> {
+                var bar = new FindBar(new TerminalView(session, TerminalOptions.defaults()));
+                try {
+                    bar.setVisible(true);
+                    Object key = bar.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
+                        .get(KeyStroke.getKeyStroke("ESCAPE"));
+                    var action = bar.getActionMap().get(key);
+                    assertThat(action).as("Escape resolves a registered action").isNotNull();
+                    action.actionPerformed(new java.awt.event.ActionEvent(bar, 0, "escape"));
+                    assertThat(bar.isVisible()).isFalse();
+                } finally { bar.dispose(); }
+            });
+        }
+    }
+
     @Test void modernBarIsOneRowWithInFieldTogglesAndIconOnlyNavigation() throws Exception {
         try (TerminalSession session = shell(HOME)) {
             edt(() -> {

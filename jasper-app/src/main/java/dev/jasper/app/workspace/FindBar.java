@@ -71,13 +71,13 @@ final class FindBar extends JPanel {
     private void build() {
         setLayout(new BorderLayout(UIScale.scale(6), 0));
         setBorder(BorderFactory.createEmptyBorder(UIScale.scale(2), UIScale.scale(6), UIScale.scale(3), UIScale.scale(6)));
-        JButton history = iconButton("findHistory", "Recent searches", "Recent searches", "searchWithHistory", null);
+        JButton history = iconButton("findHistory", "Recent searches", "Recent searches", "SEARCH_HISTORY", null);
         history.addActionListener(event -> recentMenu().show(history, 0, history.getHeight()));
-        configure(clear, "clearFind", "Clear search", "Clear search", "close");
+        configure(clear, "clearFind", "Clear search", "Clear search", "CLOSE");
         clear.addActionListener(event -> { query.setText(""); query.requestFocusInWindow(); });
         clear.setVisible(false);
-        configure(caseSensitive, "caseSensitive", "Case sensitive", "Match case", "matchCase");
-        configure(regex, "regex", "Regular expression", "Regular expression", "regex");
+        configure(caseSensitive, "caseSensitive", "Case sensitive", "Match case", "MATCH_CASE");
+        configure(regex, "regex", "Regular expression", "Regular expression", "REGEX");
         var trailing = new JToolBar();
         trailing.setFloatable(false); trailing.setOpaque(false); trailing.setBorder(BorderFactory.createEmptyBorder());
         trailing.add(clear); trailing.addSeparator(); trailing.add(caseSensitive); trailing.add(regex);
@@ -88,10 +88,10 @@ final class FindBar extends JPanel {
         var controls = new JPanel(new FlowLayout(FlowLayout.LEADING, UIScale.scale(4), 0));
         controls.setOpaque(false);
         controls.add(count);
-        controls.add(iconButton("previousMatch", "Previous", "Previous match (Shift+Enter)", "previousOccurence", this::previous));
-        controls.add(iconButton("nextMatch", "Next", "Next match (Enter)", "nextOccurence", this::next));
+        controls.add(iconButton("previousMatch", "Previous", "Previous match (Shift+Enter)", "PREVIOUS_MATCH", this::previous));
+        controls.add(iconButton("nextMatch", "Next", "Next match (Enter)", "NEXT_MATCH", this::next));
         controls.add(Box.createHorizontalStrut(UIScale.scale(16)));
-        controls.add(iconButton("closeFind", "Close", "Close (Escape)", "close", this::close));
+        controls.add(iconButton("closeFind", "Close", "Close (Escape)", "CLOSE", this::close));
         add(query, BorderLayout.CENTER);
         add(controls, BorderLayout.EAST);
     }
@@ -107,7 +107,7 @@ final class FindBar extends JPanel {
         button.setName(name);
         // AbstractButton normalizes a constructor-supplied null to "" but honors an explicit setText(null).
         button.setText(null);
-        button.setIcon(AppIcons.chrome(artwork));
+        button.setIcon(AppIcons.named(artwork));
         button.setToolTipText(tooltip);
         button.getAccessibleContext().setAccessibleName(accessible);
         button.setFocusable(false);

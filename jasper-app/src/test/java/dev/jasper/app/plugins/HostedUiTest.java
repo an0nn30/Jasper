@@ -169,7 +169,7 @@ class HostedUiTest {
         assertThat(changes).containsExactly(Variant.LIGHT);
         watching.close();
         assertThat(themeHandlers).isEmpty();
-        assertThat(ui.appearance().icon("dev/jasper/app/icons/intellij/find.svg").getIconWidth()).isPositive();
+        assertThat(ui.appearance().icon("dev/jasper/app/icons/intellij/general/search.svg").getIconWidth()).isPositive();
         assertThatIllegalArgumentException().isThrownBy(() -> ui.appearance().icon("nope.svg"));
     }
 
@@ -288,8 +288,15 @@ class HostedUiTest {
                 assertThat(icon.getIconWidth()).isEqualTo(16);
                 assertThat(icon.getIconHeight()).isEqualTo(16);
             }
+            assertThat(java.util.Arrays.stream(dev.jasper.sdk.ui.BundledIcon.values()).map(dev.jasper.sdk.ui.BundledIcon::id))
+                .containsExactlyInAnyOrderElementsOf(dev.jasper.app.platform.AppIcons.bundledIds());
+            for (var name : dev.jasper.sdk.ui.BundledIcon.values()) {
+                assertThat(isolated.appearance().icon(name))
+                    .isSameAs(dev.jasper.app.platform.AppIcons.bundled(name.id()));
+            }
+            assertThatNullPointerException().isThrownBy(() -> isolated.appearance().icon((dev.jasper.sdk.ui.BundledIcon) null));
             assertThatNullPointerException().isThrownBy(() -> isolated.appearance().icon((dev.jasper.sdk.ui.IconName) null));
-            assertThatIllegalArgumentException().isThrownBy(() -> isolated.appearance().icon("dev/jasper/app/icons/intellij/find.svg"));
+            assertThatIllegalArgumentException().isThrownBy(() -> isolated.appearance().icon("dev/jasper/app/icons/intellij/general/search.svg"));
         } finally { isolated.closeAll(); new dev.jasper.app.appearance.ThemeController(); }
     }
 }

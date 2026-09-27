@@ -206,14 +206,16 @@ To support another theme-plugin layout, extend `ThemeArchive` and add a case to
 
 ## Maintaining SDK icons
 
-`IconName` artwork lives in `NamedIcons`: an IntelliJ SVG, or a tinted Tabler SVG under
-`icons/standard/` for names IntelliJ has no equivalent for. To add an `IconName`, add the SDK
-enum constant and a `NamedIcons` map entry; when it uses standard artwork, also add a manifest
-row to `icons/standard/assets.tsv` with its source hash, and preserve LICENSE.txt/NOTICE.md.
-LOCK/UNLOCK match Vault's original SVG bytes. NamedIconsTest and HostedUiTest verify all
-meanings, resource ownership and source integrity. Run SDK/testkit checks plus HostedUiTest
-and WindowChromeContributionsTest, then all architecture guards, check and installDist. Render
-headlessly; native application launch remains a user check.
+`NamedIcons` is the sole semantic-to-artwork mapping; `AppIcons` owns rendering and caching.
+All ordinary controls use vendored New UI artwork; KEY retains the centrally tinted Tabler
+key because the upstream set has no equivalent. No plugin needs to draw its own common icons.
+
+`tools/icons/fetch-intellij-icons.py` vendors the full platform and Terminal `expui` trees at
+pinned commit/tree IDs, verifies staged downloads, and generates `BundledIcon` plus the host
+index. Preserve Apache LICENSE.txt, upstream NOTICE.txt and assets.tsv hashes. Add semantic
+meanings to both `IconName` and `NamedIcons`; callers never choose physical SVG paths.
+See [SDK icons](sdk-icons.md). Run `./gradlew check` for complete-catalog light/dark rendering,
+provenance, SDK and plugin isolation checks. Native application launch remains user-run.
 
 ## Remote lives in a plugin
 

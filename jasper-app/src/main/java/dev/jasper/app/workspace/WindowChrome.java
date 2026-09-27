@@ -402,9 +402,8 @@ final class WindowChrome {
                 }
                 if (menu()) {
                     x += UIScale.scale(3);
-                    int y = getHeight() / 2 - UIScale.scale(1), w = UIScale.scale(5), h = UIScale.scale(3);
-                    g.setColor(UIManager.getColor("Jasper.mutedForeground"));
-                    g.fillPolygon(new int[]{x, x + w, x + w / 2}, new int[]{y, y, y + h}, 3);
+                    Icon arrow = AppIcons.dropdown();
+                    arrow.paintIcon(this, g, x, (getHeight() - arrow.getIconHeight()) / 2);
                 }
             } finally { g.dispose(); }
         }

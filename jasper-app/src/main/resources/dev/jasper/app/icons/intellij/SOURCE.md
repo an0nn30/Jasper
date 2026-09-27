@@ -1,16 +1,17 @@
-# IntelliJ Platform classic-UI icons
+# IntelliJ New UI artwork
 
-Source: https://github.com/JetBrains/intellij-community, directory `platform/icons/src`.
-Commit: f7377708b654b73b206da40bb382ecb4d44e8f12, fetched 2026-09-24 with
-`tools/icons/fetch-intellij-icons.py`.
-License: Apache License 2.0 (LICENSE.txt, the canonical text; upstream's root LICENSE.txt holds
-JetBrains' open-source build terms for its IDE binaries and is not vendored); upstream notice in
-NOTICE.txt.
+Byte-identical SVGs from JetBrains/intellij-community commit `60b8fbadc2f08ef18a6ecab0c138a849e14f13fb`.
+Complete `platform/icons/src/expui` plus `plugins/terminal/resources/icons/expui`
+(the latter under `terminal/`): 1744 SVGs, 885 base/size choices.
+Dark siblings are automatic; size variants are individually available. Intentional
+empty/stub assets are preserved. This includes upstream plugin/file-type marks;
+these assets do not replace Jasper's application branding.
 
-Files are byte-identical copies. assets.tsv records each file's upstream path and SHA-256.
-`_dark.svg` siblings are upstream dark variants; FlatLaf's FlatSVGIcon selects them under a dark
-look and feel. Other icons use IntelliJ's light palette, which FlatLaf's global colour filter maps
-to the running theme's Actions.* and Objects.* colours.
+Artwork copyright and Apache-2.0 notices are retained in each SVG. LICENSE.txt is
+the canonical Apache-2.0 text; NOTICE.txt is upstream's notice. The upstream root
+LICENSE.txt contains IDE build terms and is not this artwork's license.
 
-No JetBrains product logos are included. Refresh by editing ICONS in the script and rerunning it
-from the repository root.
+assets.tsv records source paths and SHA-256. catalog.txt and SDK BundledIcon are
+generated together. Refresh with `python3 tools/icons/fetch-intellij-icons.py`.
+The script pins tree IDs, verifies Git blob hashes, stages downloads, and only
+then replaces managed SVGs. Builds and runtime do not access the network.

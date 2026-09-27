@@ -1,5 +1,6 @@
 package dev.jasper.vault.ui;
 
+import dev.jasper.sdk.ui.IconName;
 import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Auth;
 import dev.jasper.vault.model.Grant;
@@ -29,9 +30,7 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
     final JList<Grant> grants = new JList<>(new DefaultListModel<>());
     final JTextField search = new JTextField();
     final JComboBox<String> kind = new JComboBox<>(new String[]{"All Types", "Login", "SSH Key", "Secure Note"});
-    final JButton add = action("Add entry", VaultIcons.Shape.ADD), edit = action("Edit entry", VaultIcons.Shape.EDIT);
-    final JButton delete = action("Delete entry", VaultIcons.Shape.DELETE), copyPublic = action("Copy public key", VaultIcons.Shape.COPY);
-    final JButton lock = action("Lock vault", VaultIcons.Shape.LOCK), more = action("More vault actions", VaultIcons.Shape.MORE);
+    final JButton add, edit, delete, copyPublic, lock, more;
     final JButton unlock = new JButton("Unlock"), revoke = new JButton("Revoke"), closeButton = new JButton("Okay"), cancelButton = new JButton("Cancel");
     final JLabel status = new JLabel(" ");
     final JPopupMenu addMenu = new JPopupMenu(), moreMenu = new JPopupMenu();
@@ -46,12 +45,19 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
     ManagerPanel(Function<UUID, Optional<Object>> entry, Consumer<VaultManager.Type> onAdd,
                  Consumer<UUID> onEdit, Consumer<UUID> onDelete, Consumer<UUID> onCopy,
                  Consumer<Grant> onRevoke, Runnable onGenerate, Runnable onChangePassword,
-                 Runnable onLock, Runnable onUnlock) {
+                 Runnable onLock, Runnable onUnlock, Function<IconName, Icon> icons) {
         super(new BorderLayout(0, 18)); this.entry = entry;
+        add = action("Add entry", icons.apply(IconName.ADD));
+        edit = action("Edit entry", icons.apply(IconName.EDIT));
+        delete = action("Delete entry", icons.apply(IconName.DELETE));
+        copyPublic = action("Copy public key", icons.apply(IconName.COPY));
+        lock = action("Lock vault", icons.apply(IconName.LOCK));
+        more = action("More vault actions", icons.apply(IconName.MORE));
+        unlock.setIcon(icons.apply(IconName.UNLOCK));
         setBorder(BorderFactory.createEmptyBorder(18, 20, 10, 20));
         rows.setSelectionMode(ListSelectionModel.SINGLE_SELECTION); grants.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         rows.setCellRenderer(new RowRenderer());
-        search.putClientProperty("JTextField.leadingIcon", new VaultIcons(VaultIcons.Shape.SEARCH));
+        search.putClientProperty("JTextField.leadingIcon", icons.apply(IconName.SEARCH));
         search.getAccessibleContext().setAccessibleName("Search vault");
         search.setToolTipText("Search names, usernames and key fingerprints");
         kind.getAccessibleContext().setAccessibleName("Filter credential type");
@@ -110,8 +116,8 @@ final class ManagerPanel extends JPanel implements AutoCloseable {
         });
         kind.addActionListener(event -> filter()); updateActions(); revoke.setEnabled(false);
     }
-    private static JButton action(String title, VaultIcons.Shape shape) {
-        var button = new JButton(new VaultIcons(shape)); button.setToolTipText(title);
+    private static JButton action(String title, Icon icon) {
+        var button = new JButton(icon); button.setToolTipText(title);
         button.getAccessibleContext().setAccessibleName(title); button.putClientProperty("JButton.buttonType", "toolBarButton");
         button.setPreferredSize(new Dimension(24, 24)); return button;
     }

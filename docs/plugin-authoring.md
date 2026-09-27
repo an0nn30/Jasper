@@ -109,8 +109,10 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
   `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.8.0, <0.9"`
-  (Remote `>=0.8.1`, for `PanelSpec.withToggleActionId`).
-  Jasper supplies IntelliJ-style artwork; plugins need no artwork. Returned icons are 16px.
+  (Remote and Vault `>=0.8.2`, for the new icon meanings).
+  Jasper supplies IntelliJ New UI artwork; plugins need no artwork. Returned icons are 16px.
+  SDK 0.8.2 exposes the complete catalog with `icon(BundledIcon)`, for example
+  `context.appearance().icon(BundledIcon.TOOLWINDOWS_PROJECT)`.
   For custom artwork, draw a 16×16 SVG in the IntelliJ light palette (grey `#6E6E6E`, blue
   `#389FD6`, green `#59A869`, red `#DB5860`, yellow `#EDA200`) and load it with
   `icon("path/in/your/jar.svg")`: it is drawn in its own colours, and palette colours follow

@@ -32,7 +32,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         setName("windowTabs");
         flat(list);
         list.setName("tabList");
-        list.setIcon(AppIcons.chrome("arrowDown"));
+        list.setIcon(AppIcons.named("DROPDOWN"));
         list.setToolTipText("Show all tabs"); list.getAccessibleContext().setAccessibleName("Show all tabs");
         list.addActionListener(event -> tabList().show(list, 0, list.getHeight()));
         add(list);
@@ -167,8 +167,8 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             select.setHorizontalAlignment(SwingConstants.LEADING);
             select.setIconTextGap(UIScale.scale(GAP));
             select.addActionListener(event -> { if (!disposed) owner.selectTab(tab); });
-            close.setIcon(AppIcons.chrome("close"));
-            close.setRolloverIcon(AppIcons.chrome("closeHovered"));
+            close.setIcon(AppIcons.named("CLOSE"));
+            close.setRolloverIcon(AppIcons.named("CLOSE_HOVERED"));
             close.setRolloverEnabled(true);
             close.setToolTipText("Close tab"); close.getAccessibleContext().setAccessibleName("Close tab");
             close.addActionListener(event -> { if (!disposed) owner.closeTab(tab); });
