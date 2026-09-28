@@ -8,6 +8,10 @@ Record every deviation from this text here and in `docs/STATUS.md`.
 Deviations so far:
 - Task 4: the test and the implementation were written before the first run, so its failing run was not observed.
 - Task 5: `SchemaPage.Spec.settings()` uses an explicit `<Setting<?>>map` type witness.
+- Task 7: the apply test calls `refreshNow()` after marking the fake page modified (a fake page cannot notify the dialog);
+  `SettingsView` falls back to grey when the theme has no `Separator.foreground`.
+- Task 9's README instruction no longer spells out a Markdown link in this plan, because `AppDocumentationTest`
+  resolves every link in `docs/`, plans included.
 
 **Goal:** An IntelliJ-style Settings dialog, opened by Cmd+, and the macOS Settings… menu item, that edits
 every core setting through schema-generated pages, with search, highlighting, Apply/OK/Cancel and banners.
@@ -3459,7 +3463,7 @@ System Settings shows the file's location with Open in Editor, Reveal, Reload fr
 Keymap and Plugins open their own windows for now.
 ```
 
-In `README.md`, in the paragraph that begins "The root [config.example.toml]", add before it: `Settings (Cmd+,) edits every setting in a dialog; see [the Settings dialog](docs/configuration.md#settings-dialog).`
+In `README.md`, before the paragraph that introduces the root example configuration file, add one sentence: "Settings (Cmd+,) edits every setting in a dialog; see the Settings dialog.", making "the Settings dialog" a Markdown link to `docs/configuration.md` with the anchor `settings-dialog`.
 
 In `docs/app-architecture.md`, add to the package table after the `settings` row:
 
