@@ -24,6 +24,7 @@ public final class Vim {
     }
 
     private final Options options = new Options();
+    private final VimHost host;
     private final Registers registers;
     private final KeyHandlers handlers = new KeyHandlers();
     private final VimCommands commands = VimCommands.standard();
@@ -42,7 +43,13 @@ public final class Vim {
     record GlobalMark(VimEditor editor, Pos pos) { }
 
     /** @param host what the engine needs from the Editor */
-    public Vim(VimHost host) { registers = new Registers(host); }
+    public Vim(VimHost host) {
+        this.host = host;
+        registers = new Registers(host);
+    }
+
+    /** @return what the engine needs from the Editor */
+    VimHost host() { return host; }
 
     /** @return the global options */
     public Options options() { return options; }

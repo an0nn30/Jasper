@@ -320,6 +320,9 @@ public final class VimEditor {
             }
             look();
             fire();
+            List<Runnable> after = List.copyOf(afterKey);
+            afterKey.clear();
+            for (Runnable work : after) work.run();
         }
     }
 
@@ -850,6 +853,23 @@ public final class VimEditor {
     }
 
     String documentName() { return documentName.get(); }
+
+    /** @return the cursor's line, 1-based */
+    int cursorLine() { return cursor().line + 1; }
+
+    /** Work for after the key being handled ({@code :q} closes the tab once the key is done); at once outside a key. */
+    void afterKey(Runnable work) {
+        if (busy) afterKey.add(work);
+        else work.run();
+    }
+
+    private final List<Runnable> afterKey = new ArrayList<>();
+
+    /** A message given outside a key (a save that completed later): shown at once. */
+    void announce(String text) {
+        message(text, false);
+        if (!busy) fire();
+    }
 
     boolean documentModified() { return documentModified.getAsBoolean(); }
 }

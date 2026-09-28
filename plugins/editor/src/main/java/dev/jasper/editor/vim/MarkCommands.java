@@ -71,6 +71,13 @@ final class MarkCommands {
     static Target go(Context c, boolean linewise) {
         int name = c.argumentChar();
         if (name < 0) throw Context.fail();
+        if (name >= 'A' && name <= 'Z' || name >= '0' && name <= '9') {
+            Vim.GlobalMark mark = c.vim.globalMarks().get((char) name);
+            if (mark != null && mark.editor() != c.editor) {
+                elsewhere(c, mark, linewise);
+                throw VimFailure.quiet();
+            }
+        }
         Pos pos = get(c.editor, (char) name);
         pos = check(c.buffer, pos);
         if (linewise) {
@@ -81,6 +88,25 @@ final class MarkCommands {
         int col = Math.min(pos.col, line.length());
         if (!c.inVisual() && col >= line.length() && !line.isEmpty()) col = Text.last(line);
         return Target.exclusive(new Pos(pos.line, col)).asJump().usingRegisterOne().withoutAdjust();
+    }
+
+    /**
+     * An uppercase mark in another tab (spec 3.6): its tab is selected and its cursor goes to the mark. An operator
+     * or Visual mode cannot reach into another tab, so there the command fails.
+     */
+    private static void elsewhere(Context c, Vim.GlobalMark mark, boolean linewise) {
+        if (c.operator != null || c.inVisual()) throw Context.fail();
+        VimEditor other = mark.editor();
+        var buffers = c.vim.host().documents().buffers().apply(other);
+        var buffer = buffers.stream().filter(VimHost.Buffer::current).findFirst().orElseThrow(() -> new VimFailure("E20: Mark not set"));
+        Pos pos = check(other.buffer(), mark.pos());
+        String line = other.buffer().line(pos.line);
+        int col = linewise ? Text.firstNonBlank(line) : Math.min(pos.col, line.length());
+        if (col >= line.length() && !line.isEmpty()) col = Text.last(line);
+        other.marks().setpcmark(other.cursor());
+        other.setCursor(new Pos(pos.line, col));
+        other.forgetColumn();
+        c.vim.host().documents().select().accept(buffer.number());
     }
 
     /** check_mark: E20 for a mark that is not set, E19 for one past the last line. */
