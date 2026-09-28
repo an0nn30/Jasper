@@ -97,7 +97,7 @@ class ConfigurationControllerTest {
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
-    void unrelatedChangesPreserveTemporaryChoicesAndNewOwnersUseSavedDefaults() throws Exception {
+    void reloadsReapplyTheSavedChromeKeepPaneFontSizesAndNewOwnersUseSavedDefaults() throws Exception {
         start("[terminal.font]\nsize=19\n"); edt(this::owner); launchAll();
         var first = owners.getFirst();
         edt(() -> {
@@ -106,9 +106,10 @@ class ConfigurationControllerTest {
         });
         reload("# comment\n[terminal.font]\nsize=19\nunknown=1\n");
         edt(() -> {
-            assertThat(first.tabHeight()).isEqualTo(60); assertThat(first.toolbar().isVisible()).isFalse();
-            assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(Theme.DARK);
-            assertThat(first.currentPane().view().fontSize()).isEqualTo(28);
+            assertThat(first.tabHeight()).as("the saved chrome is reapplied").isEqualTo(30);
+            assertThat(first.toolbar().isVisible()).isTrue();
+            assertThat(first.status().isVisible()).isTrue(); assertThat(first.theme().chrome()).isEqualTo(Theme.DARK);
+            assertThat(first.currentPane().view().fontSize()).as("a pane's own size stays").isEqualTo(28);
             var next = owner(); assertThat(next.tabHeight()).isEqualTo(30);
             assertThat(next.toolbar().isVisible()).isTrue(); assertThat(next.status().isVisible()).isTrue();
             assertThat(next.theme().chrome()).isEqualTo(Theme.DARK);

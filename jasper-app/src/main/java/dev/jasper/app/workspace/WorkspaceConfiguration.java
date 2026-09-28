@@ -2,7 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.TerminalConfig;
-/** Applies changed saved values on the EDT without resetting unrelated temporary choices. */
+/** Applies saved values on the EDT: window chrome always takes them; a pane's own font size survives reloads that keep the saved size. */
 final class WorkspaceConfiguration {
     private final WindowContent owner;
     private ConfigSnapshot configured;
@@ -15,12 +15,12 @@ final class WorkspaceConfiguration {
         if (owner.closed()) return;
         ConfigSnapshot previous = configured;
         configured = next;
-        if (previous == null || previous.tabHeight() != next.tabHeight()) owner.setTabHeight(next.tabHeight());
-        if (previous == null || previous.railWidth() != next.railWidth()) owner.setRailWidth(next.railWidth());
-        if (previous == null || previous.toolbarHeight() != next.toolbarHeight()) owner.setToolbarHeight(next.toolbarHeight());
-        if (previous == null || previous.statusBarHeight() != next.statusBarHeight()) owner.setStatusBarHeight(next.statusBarHeight());
-        if (previous == null || previous.toolbar() != next.toolbar()) owner.setToolbarMode(next.toolbar());
-        if (previous == null || previous.statusBar() != next.statusBar()) owner.setStatusVisible(next.statusBar());
+        owner.setTabHeight(next.tabHeight());
+        owner.setRailWidth(next.railWidth());
+        owner.setToolbarHeight(next.toolbarHeight());
+        owner.setStatusBarHeight(next.statusBarHeight());
+        if (owner.toolbarMode() != next.toolbar()) owner.setToolbarMode(next.toolbar());
+        if (owner.status().isVisible() != next.statusBar()) owner.setStatusVisible(next.statusBar());
         boolean sizeChanged = previous == null || previous.fontSize() != next.fontSize();
         boolean optionsChanged = previous == null || !previous.font().equals(next.font())
             || liveBehaviorChanged(previous.terminal(), next.terminal());

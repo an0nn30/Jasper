@@ -95,7 +95,7 @@ class RailWidthTest {
         });
     }
 
-    @Test void theSavedWidthAppliesLiveAndAnUnrelatedReloadKeepsTheSessionChoice() throws Exception {
+    @Test void theSavedWidthAppliesOnEveryReload() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var saved = ConfigSnapshot.defaults().toBuilder().railWidth(44).build();
@@ -103,7 +103,7 @@ class RailWidthTest {
             assertThat(owner.railWidth()).isEqualTo(44);
             owner.setRailWidth(52);
             owner.applyConfiguration(saved.toBuilder().tabHeight(40).build(), true);
-            assertThat(owner.railWidth()).as("an unrelated change keeps the session width").isEqualTo(52);
+            assertThat(owner.railWidth()).as("the saved width is the only width").isEqualTo(44);
             owner.applyConfiguration(saved.toBuilder().tabHeight(40).railWidth(30).build(), true);
             assertThat(owner.railWidth()).isEqualTo(30);
         });

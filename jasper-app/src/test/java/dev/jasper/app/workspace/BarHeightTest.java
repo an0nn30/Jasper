@@ -171,7 +171,7 @@ class BarHeightTest {
         });
     }
 
-    @Test void savedHeightsApplyLiveAndAnUnrelatedReloadKeepsTheSessionChoice() throws Exception {
+    @Test void savedHeightsApplyOnEveryReload() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var saved = ConfigSnapshot.defaults().toBuilder().toolbarHeight(40).statusBarHeight(26).build();
@@ -180,12 +180,10 @@ class BarHeightTest {
             assertThat(owner.statusBarHeight()).isEqualTo(26);
             owner.setToolbarHeight(50); owner.setStatusBarHeight(34);
             owner.applyConfiguration(saved.toBuilder().tabHeight(40).build(), true);
-            assertThat(owner.toolbarHeight()).as("an unrelated change keeps the session height").isEqualTo(50);
-            assertThat(owner.statusBarHeight()).isEqualTo(34);
-            owner.applyConfiguration(saved.toBuilder().tabHeight(40).toolbarHeight(44).build(), true);
-            assertThat(owner.toolbarHeight()).isEqualTo(44);
-            assertThat(owner.statusBarHeight()).as("only the key that changed applies").isEqualTo(34);
+            assertThat(owner.toolbarHeight()).as("the saved height is the only height").isEqualTo(40);
+            assertThat(owner.statusBarHeight()).isEqualTo(26);
             owner.applyConfiguration(saved.toBuilder().tabHeight(40).toolbarHeight(44).statusBarHeight(22).build(), true);
+            assertThat(owner.toolbarHeight()).isEqualTo(44);
             assertThat(owner.statusBarHeight()).isEqualTo(22);
         });
     }

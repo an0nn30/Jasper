@@ -19,13 +19,13 @@ class TerminalColorsThemeTest {
             var palettes = new ArrayList<Palette>();
             themes.subscribe((theme, chromeChanged) -> { chromeFlags.add(chromeChanged); palettes.add(theme.palette()); });
             installs.clear(); chromeFlags.clear(); palettes.clear();
-            themes.selectTerminalColors(TerminalColors.DARK);
+            themes.configureTerminal(TerminalColors.DARK);
             assertThat(installs).isEmpty();
             assertThat(chromeFlags).containsExactly(false);
             assertThat(palettes).containsExactly(Palette.jasperDark());
             assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperDark()));
             assertThat(themes.terminalColors()).isEqualTo(TerminalColors.DARK);
-            themes.selectTerminalColors(TerminalColors.DARK);
+            themes.configureTerminal(TerminalColors.DARK);
             assertThat(chromeFlags).as("repeating the same choice is quiet").hasSize(1);
         } finally { new ThemeController(); }
     }

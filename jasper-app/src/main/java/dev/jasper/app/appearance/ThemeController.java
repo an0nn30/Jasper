@@ -51,14 +51,14 @@ public final class ThemeController {
     public ResolvedTheme current() { requireEdt(); return state.resolve(); }
     /** The configured theme. */
     public Theme choice() { requireEdt(); return state.choice(); }
-    /** The effective terminal colours. */
+    /** The configured terminal colours. */
     public TerminalColors terminalColors() { requireEdt(); return state.terminalChoice(); }
-    /** A temporary View choice for every window. */
-    public void selectTerminalColors(TerminalColors choice) {
-        requireEdt(); apply(state.chooseTerminal(Objects.requireNonNull(choice)));
+    /** Applies configured terminal colours to every window; the chrome is unchanged. */
+    public void configureTerminal(TerminalColors terminal) {
+        requireEdt(); apply(state.configureTerminal(Objects.requireNonNull(terminal)));
     }
     public void configure(Theme saved) { configure(saved, uiFont); }
-    public void configure(Theme saved, UiFontConfig font) { configure(saved, state.terminalSaved(), font); }
+    public void configure(Theme saved, UiFontConfig font) { configure(saved, state.terminalChoice(), font); }
     public void configure(Theme saved, TerminalColors terminal, UiFontConfig font) {
         requireEdt();
         apply(state.configure(Objects.requireNonNull(saved)).configureTerminal(Objects.requireNonNull(terminal)),
