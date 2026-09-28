@@ -10,15 +10,18 @@ import javax.swing.text.BadLocationException;
 
 /** Document status descriptions; the app creates and styles the actual controls. */
 public final class StatusLine {
-    private final Runnable languageAction, wrapAction;
+    private final Runnable languageAction, wrapAction, vimAction;
     private String notice="",position="",language="",encoding="",separator="",indent="";
-    private boolean ready,wrap;
+    private boolean ready,wrap,vim;
     /** @param chooseLanguage opens the language chooser
-     * @param toggleWrap toggles soft wrapping */
-    public StatusLine(Runnable chooseLanguage,Runnable toggleWrap){languageAction=chooseLanguage;wrapAction=toggleWrap;}
+     * @param toggleWrap toggles soft wrapping
+     * @param toggleVim toggles Vim mode */
+    public StatusLine(Runnable chooseLanguage,Runnable toggleWrap,Runnable toggleVim){languageAction=chooseLanguage;wrapAction=toggleWrap;vimAction=toggleVim;}
     /** @param tab selected document, or empty
-     * @param tabSize configured indentation width */
-    public void display(Optional<EditorTab> tab,int tabSize){
+     * @param tabSize configured indentation width
+     * @param vimOn whether Vim mode is on */
+    public void display(Optional<EditorTab> tab,int tabSize,boolean vimOn){
+        vim=vimOn;
         ready=tab.isPresent()&&tab.get().session().state()==DocumentSession.State.READY;
         if(tab.isEmpty()){notice="";return;}
         var session=tab.get().session();var area=tab.get().area();
@@ -36,11 +39,12 @@ public final class StatusLine {
         var items=new ArrayList<ContentStatus>();
         if(!notice.isEmpty())items.add(item(notice,null));
         if(ready){items.add(item(position,null));items.add(item(language,languageAction));items.add(item(encoding,null));
-            items.add(item(separator,null));items.add(item(indent,null));items.add(item(wrap?"Wrap: On":"Wrap: Off",wrapAction));}
+            items.add(item(separator,null));items.add(item(indent,null));items.add(item(wrap?"Wrap: On":"Wrap: Off",wrapAction));
+            items.add(item(vim?"Vim: On":"Vim: Off",vimAction));}
         return List.copyOf(items);
     }
     private static ContentStatus item(String text,Runnable action){return new ContentStatus(text,text,action);}
     String positionText(){return position;} String languageText(){return language;} String encodingText(){return encoding;}
     String separatorText(){return separator;} String indentText(){return indent;} String noticeText(){return notice;}
-    boolean wrapSelected(){return wrap;}
+    boolean wrapSelected(){return wrap;} boolean vimSelected(){return vim;}
 }

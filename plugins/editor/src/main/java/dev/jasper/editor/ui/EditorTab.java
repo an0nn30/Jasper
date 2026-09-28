@@ -1,6 +1,11 @@
 package dev.jasper.editor.ui;
 
 import dev.jasper.editor.session.DocumentSession;
+import dev.jasper.editor.vim.EditorDefaults;
+import dev.jasper.editor.vim.Vim;
+import dev.jasper.editor.vim.VimEditor;
+import dev.jasper.editor.vim.VimTextArea;
+import dev.jasper.editor.vim.ui.VimBar;
 import dev.jasper.sdk.Variant;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -10,6 +15,7 @@ import java.awt.Font;
 import java.awt.GridBagLayout;
 import java.awt.event.ActionEvent;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -26,14 +32,17 @@ import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
-import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rtextarea.RTextScrollPane;
 
-/** One tab's view (spec 2, 2.3): the text area bound to its session, the loading and failure states, and the banner. */
+/**
+ * One tab's view (spec 2, 2.3): the text area bound to its session, the loading and failure states, the banner, and
+ * with Vim mode on the Vim bar (Vim spec 5.2).
+ */
 public final class EditorTab extends JPanel {
     private static final String TEXT = "text", STATE = "state";
     private final DocumentSession session;
-    private final RSyntaxTextArea area = new RSyntaxTextArea();
+    private final VimTextArea area = new VimTextArea();
+    private final VimBar vimBar = new VimBar();
     private final RTextScrollPane scroll;
     private final CardLayout cards = new CardLayout();
     private final JPanel body = new JPanel(cards);
@@ -48,6 +57,8 @@ public final class EditorTab extends JPanel {
     private final boolean debounce;
     private boolean replacing;
     private String showing = STATE;
+    private VimEditor vim;
+    private int tabSize = 4;
 
     /**
      * @param session the tab's document
@@ -90,7 +101,11 @@ public final class EditorTab extends JPanel {
         stack.add(buttons);
         var state = new JPanel(new GridBagLayout());
         state.add(stack);
-        body.add(scroll, TEXT);
+        var text = new JPanel(new BorderLayout());
+        text.add(scroll, BorderLayout.CENTER);
+        text.add(vimBar, BorderLayout.SOUTH);
+        vimBar.setVisible(false);
+        body.add(text, TEXT);
         body.add(state, STATE);
         retry.addActionListener(event -> session.load());
         dismiss.addActionListener(event -> { session.cancelLoad(); close.accept(this); });
@@ -114,11 +129,36 @@ public final class EditorTab extends JPanel {
         refresh();
     }
 
-    /** Stops a pending typing notification on final disposal (not on a move). */
-    public void dispose() { edits.stop(); }
+    /** Stops a pending typing notification and Vim mode on final disposal (not on a move). */
+    public void dispose() {
+        edits.stop();
+        vim(Optional.empty());
+    }
 
     public DocumentSession session() { return session; }
-    public RSyntaxTextArea area() { return area; }
+    public VimTextArea area() { return area; }
+
+    /**
+     * Turns Vim mode on or off for this tab; the text and its undo history stay.
+     *
+     * @param global Vim's global state to turn it on with, or empty to turn it off
+     */
+    public void vim(Optional<Vim> global) {
+        if (global.isPresent() == (vim != null)) return;
+        if (global.isPresent()) {
+            vim = new VimEditor(global.get(), area, defaults());
+            vimBar.attach(vim);
+        } else {
+            vimBar.detach();
+            vim.close();
+            vim = null;
+        }
+        vimBar.setVisible(vim != null);
+        revalidate();
+    }
+
+    /** @return this tab's Vim editor while Vim mode is on */
+    public Optional<VimEditor> vimEditor() { return Optional.ofNullable(vim); }
     public RTextScrollPane scroll() { return scroll; }
 
     /**
@@ -137,6 +177,9 @@ public final class EditorTab extends JPanel {
         area.setFont(font);
         scroll.getGutter().setLineNumberFont(font);
         area.setTabSize(settings.tabSize());
+        tabSize = settings.tabSize();
+        vimBar.apply(font);
+        if (vim != null) vim.editorDefaults(defaults());
         Color rule = UIManager.getColor("Separator.foreground");
         banner.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 1, 0, rule == null ? Color.GRAY : rule), BorderFactory.createEmptyBorder(6, 10, 6, 10)));
@@ -180,6 +223,7 @@ public final class EditorTab extends JPanel {
     }
 
     boolean showingText() { return showing.equals(TEXT); }
+    boolean vimBarVisible() { return vimBar.isVisible(); }
     String stateText() { return stateText.getText(); }
     JButton retryButton() { return retry; }
     JButton dismissButton() { return dismiss; }
@@ -202,7 +246,11 @@ public final class EditorTab extends JPanel {
         area.discardAllEdits();
         try { area.setCaretPosition(area.getLineStartOffset(Math.min(line, area.getLineCount() - 1))); }
         catch (BadLocationException impossible) { area.setCaretPosition(0); }
+        if (vim != null) vim.textReplaced();
     }
+
+    /** Vim's tab options start from the Editor's tab size and the tab's Tabs or Spaces (Vim spec 3.8). */
+    private EditorDefaults defaults() { return new EditorDefaults(tabSize, !session.tabs(), true); }
 
     private void refresh() {
         switch (session.state()) {
@@ -224,6 +272,7 @@ public final class EditorTab extends JPanel {
         area.setLineWrap(session.wrap());
         area.setWrapStyleWord(true);
         area.setTabsEmulated(!session.tabs());
+        if (vim != null) vim.editorDefaults(defaults());
         switch (session.banner()) {
             case NONE -> banner.setVisible(false);
             case CHANGED -> banner(session.name() + " changed on disk.", "Reload", "Keep Mine");

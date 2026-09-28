@@ -7,6 +7,8 @@ import dev.jasper.editor.session.DocumentSession;
 import dev.jasper.editor.session.EditorModel;
 import dev.jasper.editor.session.Question;
 import dev.jasper.editor.session.SessionEnvironment;
+import dev.jasper.editor.vim.Vim;
+import dev.jasper.editor.vim.VimHost;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.IconName;
@@ -19,6 +21,7 @@ import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -63,6 +66,9 @@ public final class EditorWindow {
     private final Icon fileIcon, serverIcon;
     private boolean showingEmpty = true;
     private boolean guarding;
+    private final Vim vim = new Vim(new VimHost(SystemClipboard::read, SystemClipboard::write));
+    /** Vim mode as toggled in this session, until the settings file says the same; null to follow the settings. */
+    private Boolean vimToggled;
 
     /**
      * Creates the window, not yet shown.
@@ -79,7 +85,7 @@ public final class EditorWindow {
         ask = question -> environment.askers().apply(owner()).apply(question);
         await = (message, saves) -> environment.waits().apply(owner()).apply(message, saves);
         findBar = new FindBar(() -> selected().map(EditorTab::area));
-        status = new StatusLine(this::chooseLanguage, this::toggleWrap);
+        status = new StatusLine(this::chooseLanguage, this::toggleWrap, this::toggleVim);
         commands = List.of(
             command("save", "Save", KeyEvent.VK_S, 0, this::save),
             command("save-as", "Save As…", KeyEvent.VK_S, InputEvent.SHIFT_DOWN_MASK, this::saveAs),
@@ -95,7 +101,8 @@ public final class EditorWindow {
             command("toggle-comment", "Toggle Comment", KeyEvent.VK_SLASH, 0, this::toggleComment),
             new Command("revert", "Revert to Saved", Optional.empty(), false, this::revert),
             new Command("language", "Language…", Optional.empty(), false, this::chooseLanguage),
-            new Command("wrap", "Toggle Soft Wrap", Optional.empty(), false, this::toggleWrap));
+            new Command("wrap", "Toggle Soft Wrap", Optional.empty(), false, this::toggleWrap),
+            new Command("toggle-vim", "Toggle Vim Mode", Optional.empty(), false, this::toggleVim));
         watcher = new LocalWatcher(context.background(), environment.ui(), model::sessions);
         ticker = new Timer(2000, event -> watcher.tick());
         noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> tab.session().clearNotice()));
@@ -151,8 +158,32 @@ public final class EditorWindow {
     /** Settings or the theme changed: applies them to every tab. */
     public void apply() {
         EditorSettings settings = environment.settings().get();
-        for (EditorTab tab : editorTabs()) tab.apply(settings, theme, context.appearance().variant(), context.appearance().editorPalette());
+        if (vimToggled != null && vimToggled == settings.vim()) vimToggled = null;
+        for (EditorTab tab : editorTabs()) {
+            tab.apply(settings, theme, context.appearance().variant(), context.appearance().editorPalette());
+            tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
+        }
         refreshStatus();
+    }
+
+    /** @return whether Vim mode is on: as toggled here, or as the settings say */
+    public boolean vimOn() { return vimToggled != null ? vimToggled : environment.settings().get().vim(); }
+
+    /**
+     * Toggle Vim Mode and the Vim status item: switches every tab at once and writes {@code vim} to the settings
+     * file so the choice lasts (Vim spec 1.2).
+     */
+    public void toggleVim() {
+        boolean on = !vimOn();
+        vimToggled = on;
+        for (EditorTab tab : editorTabs()) tab.vim(on ? Optional.of(vim) : Optional.empty());
+        refreshStatus();
+        try {
+            SettingsFile.setBoolean(context.config().file(), "vim", on);
+        } catch (IOException | RuntimeException failed) {
+            ask.apply(new Question("Vim mode", "Vim mode is " + (on ? "on" : "off") + " until Jasper restarts: the setting could not be saved ("
+                + failed.getMessage() + ").", List.of("OK")));
+        }
     }
 
     /** Checks open local files for outside changes; the window's timer calls this every 2 s. */
@@ -344,6 +375,7 @@ public final class EditorWindow {
         session.setWrap(settings.softWrap());
         var tab = new EditorTab(session, this::closeTab, environment.timers());
         tab.apply(settings, theme, context.appearance().variant(), context.appearance().editorPalette());
+        tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         var tabCommands = commands.stream().map(command -> new Command(command.id(), command.title(), command.stroke(), command.bound(),
             () -> { activate(tab); command.run().run(); })).toList();
         tab.bind(tabCommands);
@@ -403,7 +435,7 @@ public final class EditorWindow {
     }
 
     private void refreshStatus() {
-        status.display(selected(), environment.settings().get().tabSize());
+        status.display(selected(), environment.settings().get().tabSize(), vimOn());
         if (selectedTab != null && hosted.containsKey(selectedTab)) {
             var tab = selectedTab;
             hosted.get(tab).setStatus(status.items().stream().map(item -> new dev.jasper.sdk.ui.ContentStatus(

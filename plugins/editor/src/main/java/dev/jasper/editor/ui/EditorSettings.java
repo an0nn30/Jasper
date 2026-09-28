@@ -14,8 +14,9 @@ import java.util.Set;
  * @param tabSize columns per tab stop, 1 to 16
  * @param softWrap whether new tabs wrap long lines
  * @param maxFileMib the largest file opened, 1 to 256 MiB
+ * @param vim whether Vim mode is on (Vim spec 9)
  */
-public record EditorSettings(String fontFamily, int fontSize, int tabSize, boolean softWrap, int maxFileMib) {
+public record EditorSettings(String fontFamily, int fontSize, int tabSize, boolean softWrap, int maxFileMib, boolean vim) {
     /** Tried in order for the default font. */
     public static final List<String> PREFERRED_FONTS = List.of("JetBrains Mono", "Menlo", "Consolas", "DejaVu Sans Mono");
 
@@ -35,7 +36,8 @@ public record EditorSettings(String fontFamily, int fontSize, int tabSize, boole
         int tab = number(config, "tab_size", 4, 1, 16);
         boolean wrap = flag(config, "soft_wrap", false);
         int max = number(config, "max_file_mib", 10, 1, 256);
-        return new EditorSettings(font, size, tab, wrap, max);
+        boolean vim = flag(config, "vim", false);
+        return new EditorSettings(font, size, tab, wrap, max, vim);
     }
 
     /** @return {@link #maxFileMib()} in bytes */

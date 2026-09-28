@@ -25,9 +25,10 @@ import static org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_PYTHON;
 class EditorWindowTest {
     @TempDir Path home;
     private FakePluginHost host;
+    private PluginContext context;
     private final Deque<String> answers = new ArrayDeque<>();
     private final List<Question> asked = new ArrayList<>();
-    private final AtomicReference<EditorSettings> settings = new AtomicReference<>(new EditorSettings("Monospaced", 13, 4, false, 1));
+    private final AtomicReference<EditorSettings> settings = new AtomicReference<>(new EditorSettings("Monospaced", 13, 4, false, 1, false));
     private EditorWindow window;
     private boolean windowClosed;
     private Runnable duringWait = () -> { };
@@ -37,7 +38,7 @@ class EditorWindowTest {
     @BeforeEach void open() {
         Languages.register();
         host = new FakePluginHost(home.resolve("plugins"));
-        PluginContext context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
+        context = host.start(new PluginInfo("dev.jasper.editor", "Editor", "0.1.0", Set.of()), Set.of(), Set.of(), c -> { });
         var environment = new EditorEnvironment(context, Runnable::run,
             owner -> question -> {
                 asked.add(question);
@@ -339,14 +340,44 @@ class EditorWindowTest {
         EditorTab tab = opened(file("a.json", "{}\n"));
         assertThat(window.menu().getComponents()).extracting(item -> ((JMenuItem) item).getText())
             .contains("Save", "Save As…", "Save All", "Open…", "New File", "Close Tab", "Find…", "Replace…", "Go to Line…",
-                "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap");
-        settings.set(new EditorSettings("Monospaced", 18, 2, false, 1));
+                "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap", "Toggle Vim Mode");
+        settings.set(new EditorSettings("Monospaced", 18, 2, false, 1, false));
         window.apply();
         assertThat(tab.area().getFont().getSize()).isEqualTo(18);
         assertThat(tab.area().getTabSize()).isEqualTo(2);
         assertThat(tab.area().getInputMap().get(KeyNames.stroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.SHIFT_DOWN_MASK)))
             .as("Save As overrides RSyntaxTextArea's macro binding").isEqualTo("save-as");
     }
+    @Test void toggleVimModeSwitchesEveryTabAndWritesTheSetting() throws Exception {
+        EditorTab first = opened(file("one.txt", "one\n"));
+        EditorTab second = opened(file("two.txt", "two\n"));
+        assertThat(first.vimEditor()).isEmpty();
+        window.toggleVim();
+        assertThat(first.vimEditor()).isPresent();
+        assertThat(second.vimEditor()).isPresent();
+        assertThat(Files.readString(context.config().file())).contains("vim = true");
+        var item = host.contentStatus(host.contentTabs().getLast()).stream().filter(status -> status.text().startsWith("Vim:")).findFirst().orElseThrow();
+        assertThat(item.text()).isEqualTo("Vim: On");
+        assertThat(opened(file("three.txt", "three\n")).vimEditor()).as("a new tab follows").isPresent();
+        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        window.apply();
+        assertThat(window.vimOn()).isTrue();
+        item.run().run();
+        assertThat(first.vimEditor()).isEmpty();
+        assertThat(Files.readString(context.config().file())).contains("vim = false");
+    }
+
+    @Test void vimKeysEditTheDocumentAndUndoItsChange() throws Exception {
+        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        EditorTab tab = opened(file("vim.txt", "one two\n"));
+        var vim = tab.vimEditor().orElseThrow();
+        for (var key : dev.jasper.editor.vim.KeyInput.parse("dw")) vim.feed(key);
+        assertThat(tab.area().getText()).isEqualTo("two\n");
+        assertThat(tab.session().dirty()).isTrue();
+        for (var key : dev.jasper.editor.vim.KeyInput.parse("u")) vim.feed(key);
+        assertThat(tab.area().getText()).isEqualTo("one two\n");
+    }
+
     @Test void saveAsDoesNotAliasTheOriginalFileToTheRenamedTab() throws Exception {
         Path original = file("original.txt", "original");
         opened(original);

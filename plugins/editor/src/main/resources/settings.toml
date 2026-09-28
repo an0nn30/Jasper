@@ -15,3 +15,6 @@
 
 # Files larger than this many MiB (1 to 256) are refused.
 # max_file_mib = 10
+
+# Vim mode: modal editing as in IdeaVim. The Vim item in the status bar and Toggle Vim Mode set this.
+# vim = false

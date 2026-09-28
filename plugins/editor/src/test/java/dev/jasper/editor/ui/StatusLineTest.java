@@ -19,9 +19,9 @@ class StatusLineTest {
         tab.area().setCaretPosition(6);
         session.setStyle(Languages.TOML);
         session.setWrap(true);
-        int[] clicked = {0, 0};
-        var status = new StatusLine(() -> clicked[0]++, () -> clicked[1]++);
-        status.display(Optional.of(tab), 4);
+        int[] clicked = {0, 0, 0};
+        var status = new StatusLine(() -> clicked[0]++, () -> clicked[1]++, () -> clicked[2]++);
+        status.display(Optional.of(tab), 4, true);
         assertThat(status.positionText()).isEqualTo("Ln 2, Col 3");
         assertThat(status.languageText()).isEqualTo("TOML");
         assertThat(status.encodingText()).isEqualTo("UTF-8");
@@ -29,7 +29,11 @@ class StatusLineTest {
         assertThat(status.indentText()).isEqualTo("Spaces: 4");
         assertThat(status.wrapSelected()).isTrue();
         assertThat(status.noticeText()).isEmpty();
-        status.display(Optional.empty(), 4);
+        assertThat(status.vimSelected()).isTrue();
+        var vim = status.items().stream().filter(item -> item.text().equals("Vim: On")).findFirst().orElseThrow();
+        vim.run().run();
+        assertThat(clicked[2]).isEqualTo(1);
+        status.display(Optional.empty(), 4, false);
         assertThat(status.noticeText()).isEmpty();
     }
 }

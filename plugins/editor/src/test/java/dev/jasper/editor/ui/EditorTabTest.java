@@ -53,6 +53,21 @@ class EditorTabTest {
         assertThat(tab.session().dirty()).isTrue();
     }
 
+    @Test void vimModeShowsTheVimBarAndTurnsOffCleanly() throws Exception {
+        var tab = open(Files.writeString(folder.resolve("v.txt"), "one\n"));
+        drain();
+        assertThat(tab.vimBarVisible()).isFalse();
+        tab.vim(Optional.of(new dev.jasper.editor.vim.Vim(dev.jasper.editor.vim.VimHost.detached())));
+        assertThat(tab.vimEditor()).isPresent();
+        assertThat(tab.vimBarVisible()).isTrue();
+        assertThat(tab.area().vim()).isPresent();
+        tab.vim(Optional.empty());
+        assertThat(tab.vimEditor()).isEmpty();
+        assertThat(tab.vimBarVisible()).isFalse();
+        assertThat(tab.area().vim()).isEmpty();
+        assertThat(tab.area().getText()).isEqualTo("one\n");
+    }
+
     @Test void aFailureShowsRetryAndCloseAndABinaryFileHasNoRetry() throws Exception {
         var missing = open(folder.resolve("gone.txt"));
         drain();
@@ -108,7 +123,7 @@ class EditorTabTest {
 
     @Test void settingsApplyTheFontAndTabSize() {
         var tab = new EditorTab(DocumentSession.untitled("Untitled", environment), closed::add, false);
-        tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10), new EditorTheme(), Variant.DARK);
+        tab.apply(new EditorSettings("Monospaced", 17, 2, false, 10, false), new EditorTheme(), Variant.DARK);
         assertThat(tab.area().getFont().getSize()).isEqualTo(17);
         assertThat(tab.area().getTabSize()).isEqualTo(2);
     }
