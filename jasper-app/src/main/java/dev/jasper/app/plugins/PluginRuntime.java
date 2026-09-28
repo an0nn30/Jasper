@@ -1,6 +1,8 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.settingsui.PageContext;
+import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.sdk.JasperSdk;
@@ -549,4 +551,54 @@ public final class PluginRuntime {
             if (candidate == null) throw new IOException("No such plugin: " + id);
             PluginSettingsFiles.prepare(options.userDirectory(), candidate, null);
         }
+
+    /**
+     * Settings pages for plugins: one for each running plugin with declared settings or a page of its own, and a stub
+     * for each plugin the user meant to run that is not running. Sorted by title. UI thread.
+     *
+     * @param context what the pages may ask of Settings
+     * @return the pages, each under {@link #TOOLS}
+     */
+    public List<SettingsPage> settingsPages(PageContext context) {
+        PluginHost current = host;
+        PluginCatalog.Launch started = launch;
+        if (current == null || started == null) return List.of();
+        var pages = new ArrayList<SettingsPage>(current.settingsPages(context));
+        for (PluginStatus status : started.statuses())
+            if (stubbed(status)) pages.add(new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id())));
+        pages.sort(java.util.Comparator.comparing(SettingsPage::title, String.CASE_INSENSITIVE_ORDER));
+        return pages;
+    }
+
+    /**
+     * Whether a running plugin has a page in Settings. UI thread.
+     *
+     * @param pluginId the plugin
+     * @return true when it declared settings or gave a page of its own
+     */
+    public boolean hasSettingsPage(String pluginId) {
+        PluginHost current = host;
+        return current != null && current.hasSettingsPage(pluginId);
+    }
+
+    /** Not running although the user meant it to: waiting for review, skipped, failed, or held back by safe mode. */
+    static boolean stubbed(PluginStatus status) {
+        return switch (status.state()) {
+            case NEEDS_CONSENT, SKIPPED, FAILED -> true;
+            case DISABLED -> status.reason().equals("safe mode");
+            case ACTIVE -> false;
+        };
+    }
+
+    /** Seeds and opens a plugin's settings file off the UI thread; a failure becomes a notice. */
+    private void openSettingsFile(String id) {
+        Thread.ofVirtual().name("jasper-plugin-settings-open").start(() -> {
+            try {
+                prepareSettings(id);
+                editor.accept(PluginSettingsFiles.file(options.userDirectory(), id));
+            } catch (IOException | RuntimeException failure) {
+                SwingUtilities.invokeLater(() -> notice.accept(failure.getMessage() == null ? failure.toString() : failure.getMessage()));
+            }
+        });
+    }
 }

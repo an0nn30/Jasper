@@ -139,16 +139,27 @@ final class PluginHost {
         return pending;
     }
 
-    /** Settings pages for running plugins that declared settings, in start order. UI thread. */
+    /** Settings pages for running plugins that declared settings or gave a page of their own, in start order. UI thread. */
     List<SettingsPage> settingsPages(PageContext context) {
         requireUi();
         var pages = new ArrayList<SettingsPage>();
         for (HostedContext hosted : contexts.values()) {
-            if (hosted.state != HostedContext.State.ACTIVE || !hosted.declared.declaresAnything()) continue;
+            if (hosted.state != HostedContext.State.ACTIVE) continue;
             var info = hosted.hosted.info();
-            pages.add(new PluginSettingsPage(info.id(), info.name(), hosted.declared, context));
+            var panel = hosted.declared.panel();
+            if (panel.isPresent())
+                pages.add(new PluginPanelPage(info.id(), info.name(), hosted.declared, panel.get(), containment, context));
+            else if (hosted.declared.declaresAnything())
+                pages.add(new PluginSettingsPage(info.id(), info.name(), hosted.declared, context));
         }
         return pages;
+    }
+
+    /** Whether a running plugin has a page in Settings. UI thread. */
+    boolean hasSettingsPage(String pluginId) {
+        HostedContext hosted = contexts.get(pluginId);
+        return hosted != null && hosted.state == HostedContext.State.ACTIVE
+            && (hosted.declared.panel().isPresent() || hosted.declared.declaresAnything());
     }
 
     String executing() { return containment.executing(); }
