@@ -29,9 +29,9 @@ class VersionRangeTest {
             assertThatIllegalArgumentException().as(bad).isThrownBy(() -> VersionRange.parse(bad));
     }
 
-    @Test void pluginsBuiltForSdkZeroSevenAreIncompatibleWithZeroEight() {
+    @Test void pluginsBuiltForSdkZeroEightAreIncompatibleWithZeroNine() {
         var host = Version.parse(dev.jasper.sdk.JasperSdk.VERSION);
-        assertThat(VersionRange.parse(">=0.7.4, <0.8").contains(host)).isFalse();
-        assertThat(VersionRange.parse(">=0.8.0, <0.9").contains(host)).isTrue();
+        assertThat(VersionRange.parse(">=0.8.5, <0.9").contains(host)).isFalse();
+        assertThat(VersionRange.parse(">=0.9.0, <0.10").contains(host)).isTrue();
     }
 }

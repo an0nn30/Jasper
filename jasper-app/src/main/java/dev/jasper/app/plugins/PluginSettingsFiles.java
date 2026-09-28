@@ -20,7 +20,6 @@ import java.util.jar.JarFile;
 import org.tomlj.Toml;
 import org.tomlj.TomlParseError;
 import org.tomlj.TomlParseResult;
-import org.tomlj.TomlPosition;
 
 /**
  * Each plugin's settings file, {@code plugins/<id>/<id>.toml}: seeded once when missing, read into the
@@ -33,8 +32,6 @@ final class PluginSettingsFiles {
     private static final System.Logger LOG = System.getLogger(PluginSettingsFiles.class.getName());
 
     private record Fingerprint(FileTime modified, long size) { }
-    /** A 1-based line and column in a plugin's settings file. */
-    record Position(int line, int column) { }
 
     private static final class Known { Fingerprint fingerprint; Map<String, Object> values = Map.of(); String text = ""; TomlParseResult parsed; boolean broken; }
 
@@ -43,14 +40,6 @@ final class PluginSettingsFiles {
     private final Map<String, Known> known = new HashMap<>();
 
     PluginSettingsFiles(Path userDirectory, Consumer<ConfigDiagnostic> report) { this.userDirectory = userDirectory; this.report = report; }
-
-    /** Where {@code path} is in the plugin's file as last read successfully. */
-    synchronized Optional<Position> position(String id, List<String> path) {
-        Known state = known.get(id);
-        if (state == null || state.parsed == null) return Optional.empty();
-        TomlPosition position = state.parsed.inputPositionOf(path);
-        return position == null ? Optional.empty() : Optional.of(new Position(position.line(), position.column()));
-    }
 
     static Path folder(Path userDirectory, String id) { return userDirectory.resolve(id); }
     static Path file(Path userDirectory, String id) { return folder(userDirectory, id).resolve(id + ".toml"); }

@@ -28,7 +28,7 @@ class StagedTransferLifecycleTest {
         List<Path> jars;try(var files=Files.list(staged.resolve("dev.jasper.remote"))) { jars=files.filter(p->p.toString().endsWith(".jar")).toList(); }
         try(var loader=new PluginClassLoader("dev.jasper.remote",jars,getClass().getClassLoader(),Map.of())) {
             Class<?> endpointType=loader.loadClass("dev.jasper.remote.sftp.FileEndpoint"),localType=loader.loadClass("dev.jasper.remote.sftp.LocalEndpoint"),coordinatorType=loader.loadClass("dev.jasper.remote.transfer.TransferCoordinator"),refType=loader.loadClass("dev.jasper.remote.transfer.EndpointRef"),requestType=loader.loadClass("dev.jasper.remote.transfer.TransferRequest");
-            var host=AppContractTest.host(root.resolve("home"),Map.of(),Duration.ofSeconds(3));var coordinator=new AtomicReference<Object>();var database=new AtomicReference<Path>();
+            var host=AppContractTest.host(root.resolve("home"),Duration.ofSeconds(3));var coordinator=new AtomicReference<Object>();var database=new AtomicReference<Path>();
             var blocked=new CountDownLatch(1);var release=new CountDownLatch(1);var once=new AtomicBoolean();
             BiFunction<Object,WindowHandle,CompletableFuture<Object>> opener=(ref,owner)-> {
                 try {

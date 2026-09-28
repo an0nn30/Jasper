@@ -74,6 +74,7 @@ import dev.jasper.sdk.settings.SettingSpec;
 import dev.jasper.sdk.settings.SettingKind;
 import dev.jasper.sdk.settings.Setting;
 import dev.jasper.sdk.settings.PluginSettings;
+import dev.jasper.sdk.settings.SettingsPanel;
 
 import static dev.jasper.sdk.activity.ActivityEvent.State.FAILED;
 import static dev.jasper.sdk.activity.ActivityEvent.State.PROGRESS;
@@ -1132,6 +1133,18 @@ public abstract class PluginContractTest {
         assertThat(h.active("test.declare")).isTrue();
         h.ui(() -> assertThatIllegalStateException()
             .isThrownBy(() -> settings.get().declare(SettingSpec.of("late", SettingKind.bool(), false).label("Late"))));
+    }
+
+    @Test void aPluginGivesOneSettingsPageAndOnlyWhileStarting() {
+        var settings = new AtomicReference<PluginSettings>();
+        SettingsPanel panel = panelHost -> new JLabel("Mine");
+        h.start(info("test.page"), Set.of(), Set.of(), context -> {
+            settings.set(context.settings());
+            context.settings().page(panel);
+            assertThatIllegalStateException().isThrownBy(() -> context.settings().page(panel));
+        });
+        assertThat(h.active("test.page")).isTrue();
+        h.ui(() -> assertThatIllegalStateException().isThrownBy(() -> settings.get().page(panel)));
     }
 
     @Test void setSavesTheValueAndItsListenersHearIt() throws Exception {

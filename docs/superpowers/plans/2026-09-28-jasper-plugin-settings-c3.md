@@ -5,6 +5,15 @@
 **Status:** Written 2026-09-28 on `claude/plugin-settings-c3`; not executed.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
+Deviations so far:
+- Task 5: `jasper-app`'s `RemoteShortcutConfigTest`, which the plan missed, drove Remote's `[shortcuts]` table
+  through the staged jar and the app's key resolver. It now checks the default bindings, app overrides, menu
+  placement, one toggle per panel in View > Tools, and that an old `[shortcuts]` table replaces nothing. Its "bad
+  or conflicting shortcut" case is gone: an app override with a bad key or a collision is rejected when the
+  configuration is read, and `KeyBindingsTest.builtInsBeatPluginDefaultsAndEarlierPluginsBeatLaterOnes` already covers
+  plugin defaults that collide.
+- Task 5: `BundledSamplePluginTest` expected the Sample at version 0.1.0; it now expects 0.2.0.
+
 Scope notes (decided while writing this plan):
 - The plugins move to declarations first (Tasks 1–4), while `PluginConfig` still exists and the SDK is still 0.8.5,
   so `check` stays green after every task. Task 5 is the break: it removes `PluginConfig` and

@@ -41,8 +41,8 @@ class AppContractTest extends PluginContractTest {
         }
     }
 
-    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace) {
-        return host(data, tables, drainGrace, onEdtValue(Contributions::new), new java.util.concurrent.atomic.AtomicBoolean(true));
+    static PluginHost host(Path data, Duration drainGrace) {
+        return host(data, drainGrace, onEdtValue(Contributions::new), new java.util.concurrent.atomic.AtomicBoolean(true));
     }
 
     static <T> T onEdtValue(java.util.function.Supplier<T> supplier) {
@@ -51,27 +51,26 @@ class AppContractTest extends PluginContractTest {
         return value.get();
     }
 
-    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
+    static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark) {
-        return host(data, tables, drainGrace, contributions, dark, onEdtValue(AppContractTest::headlessWindows), onEdtValue(TerminalRegistry::new),
+        return host(data, drainGrace, contributions, dark, onEdtValue(AppContractTest::headlessWindows), onEdtValue(TerminalRegistry::new),
             new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>());
     }
 
-    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
+    static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
                            TerminalRegistry terminals, List<String> notices, List<Path> edited) {
-        return host(data, tables, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, new CopyOnWriteArrayList<>());
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, new CopyOnWriteArrayList<>());
     }
 
     /** As above; configuration problems land in {@code diagnostics}, and a file's reload or save clears that file's. */
-    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
+    static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
                            TerminalRegistry terminals, List<String> notices, List<Path> edited,
                            List<dev.jasper.app.config.ConfigDiagnostic> diagnostics) {
         var files = new PluginSettingsFiles(data, diagnostics::add);
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
-            SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()), id -> data.resolve(id + ".toml"),
-            (id, path) -> java.util.Optional.empty(), diagnostics::add, drainGrace, contributions, dark::get, auxiliary, terminals,
+            SwingUtilities::isEventDispatchThread, data::resolve, diagnostics::add, drainGrace, contributions, dark::get, auxiliary, terminals,
             notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)))));
     }
 
@@ -103,7 +102,7 @@ class AppContractTest extends PluginContractTest {
         List<String> notices = new CopyOnWriteArrayList<>();
         List<Path> edited = new CopyOnWriteArrayList<>();
         List<dev.jasper.app.config.ConfigDiagnostic> diagnostics = new CopyOnWriteArrayList<>();
-        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited,
+        PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited,
             diagnostics);
         PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();

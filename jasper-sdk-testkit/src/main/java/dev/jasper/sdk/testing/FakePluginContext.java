@@ -11,7 +11,6 @@ import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
-import dev.jasper.sdk.plugin.PluginConfig;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.services.ServiceUnavailableException;
 import dev.jasper.sdk.services.Services;
@@ -49,8 +48,6 @@ public final class FakePluginContext implements PluginContext {
     final Set<String> requires;
     final Plugin plugin;
     volatile State state = State.STARTING;
-    volatile Map<String, Object> table = Map.of();
-    final CopyOnWriteArrayList<Runnable> configListeners = new CopyOnWriteArrayList<>();
     final Map<Class<?>, Object> services = new ConcurrentHashMap<>();
     private final List<Subscription> owned = new ArrayList<>();
     final FakeTerminals terminals;
@@ -83,12 +80,6 @@ public final class FakePluginContext implements PluginContext {
         // The application's layout: <plugins>/<id>/data.
         try { return Files.createDirectories(host.dataRoot().resolve(info.id()).resolve("data")); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
-    }
-
-    @Override public PluginConfig config() {
-        return new FakePluginConfig(() -> table, "", configListeners,
-            (key, message) -> host.reports.add(info.id() + ": " + key + ": " + message),
-            host.dataRoot().resolve(info.id()).resolve(info.id() + ".toml"));
     }
 
     @Override public dev.jasper.sdk.settings.PluginSettings settings() { return settings; }

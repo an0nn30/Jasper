@@ -40,7 +40,7 @@ class DeclaredSettingsTest {
     private PluginHost host;
 
     @BeforeEach void open() {
-        host = AppContractTest.host(data, Map.of(), Duration.ofMillis(200), onEdtValue(Contributions::new), new AtomicBoolean(true),
+        host = AppContractTest.host(data, Duration.ofMillis(200), onEdtValue(Contributions::new), new AtomicBoolean(true),
             onEdtValue(AppContractTest::headlessWindows), onEdtValue(TerminalRegistry::new), new CopyOnWriteArrayList<>(),
             new CopyOnWriteArrayList<>(), diagnostics);
     }
@@ -98,12 +98,10 @@ class DeclaredSettingsTest {
             "WARNING mystery 3 Unknown setting or table; ignored.");
     }
 
-    @Test void aPluginThatDeclaresNothingGetsNoReports() throws Exception {
+    @Test void aPluginThatDeclaresNothingHasItsKeysReportedAsUnknown() throws Exception {
         write("greeting = \"hello\"\n");
         start(settings -> { });
-        write("greeting = \"later\"\n");
-        reload();
-        assertThat(reports()).as("its keys are read through PluginConfig until SDK 0.9").isEmpty();
+        assertThat(reports()).containsExactly("WARNING greeting 1 Unknown setting or table; ignored.");
     }
 
     @Test void everyKindTranslates() throws Exception {

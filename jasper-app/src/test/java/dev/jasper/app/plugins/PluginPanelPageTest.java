@@ -51,7 +51,7 @@ class PluginPanelPageTest {
         () -> changes[0]++);
 
     @BeforeEach void open() {
-        host = AppContractTest.host(data, Map.of(), Duration.ofMillis(200), onEdtValue(Contributions::new), new AtomicBoolean(true),
+        host = AppContractTest.host(data, Duration.ofMillis(200), onEdtValue(Contributions::new), new AtomicBoolean(true),
             onEdtValue(AppContractTest::headlessWindows), onEdtValue(TerminalRegistry::new), new CopyOnWriteArrayList<>(),
             new CopyOnWriteArrayList<>(), diagnostics);
     }

@@ -69,9 +69,7 @@ public final class FakePluginHost implements AutoCloseable {
         final List<String> notices = new ArrayList<>();
         final List<Path> openedInEditor = new ArrayList<>();
         private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
-    private final Map<String, Map<String, Object>> presets = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
-    final List<String> reports = new CopyOnWriteArrayList<>();
     final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<String, List<String>> settingsReports = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<UUID, FakeUi.FakeWindow> overlays = new HashMap<>();
@@ -105,7 +103,6 @@ public final class FakePluginHost implements AutoCloseable {
         var all = new java.util.HashSet<>(requires);
         all.addAll(optional);
         var context = new FakePluginContext(this, info, Set.copyOf(all), Objects.requireNonNull(plugin));
-        context.table = presets.getOrDefault(info.id(), Map.of());
         contexts.put(info.id(), context);
         for (String required : requires) {
             if (!active(required)) {
@@ -174,21 +171,6 @@ public final class FakePluginHost implements AutoCloseable {
      * @param <T> payload type
      */
     public <T> void publishApp(Topic<T> topic, T payload) { publish(APP, topic, payload); }
-
-    /**
-     * Replaces a plugin's configuration table. Before the plugin starts this is its initial table;
-     * afterwards its change listeners run.
-     *
-     * @param pluginId the plugin
-     * @param table values of type String, Long, Boolean, List of String, or nested Map
-     */
-    public void setConfig(String pluginId, Map<String, Object> table) {
-        presets.put(pluginId, Map.copyOf(table));
-        FakePluginContext context = contexts.get(pluginId);
-        if (context == null) return;
-        context.table = Map.copyOf(table);
-        for (Runnable listener : context.configListeners) listener.run();
-    }
 
     Map<String, Object> settingFile(String pluginId) {
         return settingFiles.computeIfAbsent(pluginId, id -> new java.util.LinkedHashMap<>());
@@ -286,13 +268,6 @@ public final class FakePluginHost implements AutoCloseable {
      * @return one line per failure
      */
     public List<String> failures() { return List.copyOf(failures); }
-
-    /**
-     * Configuration problems plugins reported.
-     *
-     * @return lines of the form {@code pluginId: key: message}
-     */
-    public List<String> reports() { return List.copyOf(reports); }
 
     /** Stops every active plugin in reverse start order. */
     public void stopAll() {
