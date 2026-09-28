@@ -7,6 +7,8 @@ import dev.jasper.app.settingsui.SettingsDraft;
 import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.sdk.settings.SettingsPanel;
 import dev.jasper.sdk.settings.SettingsPanelHost;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 
 /**
  * A plugin's own page in Settings: its component, standard rows for its declared settings over the plugin's own
@@ -33,7 +36,11 @@ final class PluginPanelPage implements SettingsPage {
     private final List<SchemaPage> rows = new ArrayList<>();
     private final Runnable stopListening;
     private final dev.jasper.app.lifecycle.Subscription draftListening;
+    private final JLabel message = PluginPageBody.message();
+    private JComponent content;
     private JComponent body;
+    /** Whether the page applied successfully and nothing changed since, so there is nothing for the panel to drop. */
+    private boolean applied;
 
     PluginPanelPage(String pluginId, String title, DeclaredSettings declared, SettingsPanel panel, Containment containment,
                     PageContext context) {
@@ -41,9 +48,20 @@ final class PluginPanelPage implements SettingsPage {
         this.containment = containment; this.context = context;
         draft = new SettingsDraft(declared.values());
         own = new PageContext(draft, context.navigate(), context.closeThen(), context.chooseFile(), context.changed(), context.surface());
-        stopListening = declared.onReloaded(() -> { draft.rebase(declared.values()); context.changed().run(); });
-        draftListening = draft.onChanged(context.changed());
+        stopListening = declared.onReloaded(() -> {
+            draft.rebase(declared.values());
+            PluginPageBody.showMessage(message, declared);
+            context.changed().run();
+        });
+        draftListening = draft.onChanged(() -> {
+            if (draft.modified()) applied = false;
+            context.changed().run();
+        });
     }
+
+    /** The plugin's component, or the message saying why it could not be built; null until {@link #component}. */
+    JComponent content() { return content; }
+    JLabel message() { return message; }
 
     @Override public String id() { return PluginRuntime.settingsPageId(pluginId); }
     @Override public String title() { return title; }
@@ -68,12 +86,16 @@ final class PluginPanelPage implements SettingsPage {
         if (body != null) return body;
         var made = new AtomicReference<JComponent>();
         Throwable failure = containment.attempt(pluginId, "settings page", () -> { made.set(panel.create(new Host())); return null; });
-        body = failure == null && made.get() != null ? made.get() : failed(failure);
+        content = failure == null && made.get() != null ? made.get() : failed(failure);
+        body = new PluginPageBody(message, content);
+        PluginPageBody.showMessage(message, declared);
         return body;
     }
 
     private static JComponent failed(Throwable failure) {
-        var label = new JLabel("This page could not be shown: " + (failure == null ? "it returned nothing." : failure.getMessage()));
+        String why = failure == null ? "it returned nothing."
+            : failure.getMessage() != null ? failure.getMessage() : failure.toString();
+        var label = new JLabel("This page could not be shown: " + why);
         label.putClientProperty("html.disable", true);
         label.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
         return label;
@@ -86,7 +108,8 @@ final class PluginPanelPage implements SettingsPage {
         return changed[0];
     }
 
-    @Override public boolean valid() { return !declared.rejected() && rows.stream().allMatch(SchemaPage::valid); }
+    /** A rejected file holds up only this page's own edits to its declared settings, which could not be saved to it. */
+    @Override public boolean valid() { return !(declared.rejected() && draft.modified()) && rows.stream().allMatch(SchemaPage::valid); }
 
     @Override public void reset() {
         rows.forEach(SchemaPage::reset);
@@ -100,6 +123,7 @@ final class PluginPanelPage implements SettingsPage {
         return saved.thenRun(() -> {
             Throwable failure = containment.attempt(pluginId, "settings page apply", () -> { panel.apply(); return null; });
             if (failure != null) throw new CompletionException(failure);
+            applied = true;
         });
     }
 
@@ -108,10 +132,12 @@ final class PluginPanelPage implements SettingsPage {
         containment.run(pluginId, "settings page highlight", () -> panel.highlight(query));
     }
 
+    /** Lets the panel drop state of its own that was not applied, then release it. */
     @Override public void dispose() {
         stopListening.run();
         draftListening.close();
         rows.forEach(SchemaPage::dispose);
+        if (!applied) containment.run(pluginId, "settings page reset", panel::reset);
         containment.run(pluginId, "settings page dispose", panel::dispose);
     }
 
@@ -123,7 +149,7 @@ final class PluginPanelPage implements SettingsPage {
             PluginSettingsPage.row(spec, handle);
             SchemaPage page = spec.build(own);
             rows.add(page);
-            return page.component();
+            return new KeepsHeight(page.component());
         }
 
         @SuppressWarnings("unchecked")
@@ -136,9 +162,29 @@ final class PluginPanelPage implements SettingsPage {
         @Override public <T> void stage(dev.jasper.sdk.settings.Setting<T> setting, T value) {
             DeclaredSetting<T> handle = declared.handle(setting);
             handle.spec().kind().check(value).ifPresent(problem -> { throw new IllegalArgumentException(problem); });
-            draft.stage((Setting<Object>) handle.appSetting(), Optional.of(handle.toApp(value)));
+            var app = (Setting<Object>) handle.appSetting();
+            Object staged = handle.toApp(value);
+            boolean unsetDefault = staged.equals(app.defaultValue()) && draft.saved(app).isEmpty();
+            applied = false;
+            draft.stage(app, unsetDefault ? Optional.empty() : Optional.of(staged));
         }
 
-        @Override public void changed() { context.changed().run(); }
+        @Override public void changed() {
+            applied = false;
+            context.changed().run();
+        }
+    }
+
+    /** A standard row that keeps its preferred height, so a plugin's vertical box cannot stretch it. */
+    private static final class KeepsHeight extends JPanel {
+        KeepsHeight(JComponent row) {
+            super(new BorderLayout());
+            setOpaque(false);
+            add(row, BorderLayout.CENTER);
+        }
+
+        @Override public Dimension getMaximumSize() {
+            return isMaximumSizeSet() ? super.getMaximumSize() : new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+        }
     }
 }

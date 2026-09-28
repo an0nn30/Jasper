@@ -10,6 +10,7 @@ import dev.jasper.app.settings.TomlDocument;
 import dev.jasper.app.settingsui.PageContext;
 import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.app.terminals.TerminalRegistry;
+import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.settings.Setting;
@@ -32,7 +33,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.BoxLayout;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -138,13 +141,149 @@ class PluginPanelPageTest {
             settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode"));
             settings.page(rows -> { throw new IllegalStateException("boom"); });
         });
-        var page = onEdtValue(() -> host.settingsPages(context)).getFirst();
+        var page = (PluginPanelPage) onEdtValue(() -> host.settingsPages(context)).getFirst();
         onEdt(() -> {
-            var component = page.component();
-            assertThat(component).isInstanceOf(JLabel.class);
-            assertThat(((JLabel) component).getText()).isEqualTo("This page could not be shown: boom");
+            assertThat(page.component()).isNotNull();
+            assertThat(page.content()).isInstanceOf(JLabel.class);
+            assertThat(((JLabel) page.content()).getText()).isEqualTo("This page could not be shown: boom");
         });
         assertThat(host.failures(ID)).isPositive();
+    }
+
+    @Test void aFailureWithoutAMessageShowsWhatItWas() {
+        start(settings -> {
+            settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode"));
+            settings.page(rows -> { throw new IllegalStateException(); });
+        });
+        var page = (PluginPanelPage) onEdtValue(() -> host.settingsPages(context)).getFirst();
+        onEdt(() -> {
+            page.component();
+            assertThat(((JLabel) page.content()).getText())
+                .isEqualTo("This page could not be shown: java.lang.IllegalStateException");
+        });
+    }
+
+    @Test void aRejectedFileShowsItsMessageAndBlocksOnlyThisPagesEdits() throws Exception {
+        write("font_size = \"big\"\n");
+        var panel = startWithPanel();
+        var page = (PluginPanelPage) onEdtValue(() -> host.settingsPages(context)).getFirst();
+        onEdt(() -> {
+            page.component();
+            assertThat(page.message().isVisible()).isTrue();
+            assertThat(page.message().getText()).contains("has errors");
+            assertThat(page.valid()).as("an untouched page does not hold up the dialog").isTrue();
+            panel.host.stage(panel.size, 20);
+            assertThat(page.valid()).as("an edit cannot be saved to a rejected file").isFalse();
+            page.reset();
+            assertThat(page.valid()).isTrue();
+        });
+        write("font_size = 20\n");
+        reload();
+        onEdt(() -> {
+            assertThat(page.message().isVisible()).isFalse();
+            assertThat(panel.host.pending(panel.size)).isEqualTo(20);
+            page.dispose();
+        });
+    }
+
+    /** A plugin page laid out like the Sample's: standard rows in a vertical box. */
+    private static final class BoxPanel implements SettingsPanel {
+        final Setting<Boolean> vim;
+        final Setting<Integer> size;
+        final List<JComponent> rows = new ArrayList<>();
+        BoxPanel(Setting<Boolean> vim, Setting<Integer> size) { this.vim = vim; this.size = size; }
+        @Override public JComponent create(SettingsPanelHost host) {
+            var page = new JPanel();
+            page.setLayout(new BoxLayout(page, BoxLayout.Y_AXIS));
+            for (var setting : List.<Setting<?>>of(vim, size)) {
+                JComponent row = host.row(setting);
+                row.setAlignmentX(0);
+                rows.add(row);
+                page.add(row);
+            }
+            return page;
+        }
+    }
+
+    @Test void rowsStayTogetherAtTheTopOfATallPage() {
+        var panel = new AtomicReference<BoxPanel>();
+        start(settings -> {
+            var vim = settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode"));
+            var size = settings.declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size"));
+            panel.set(new BoxPanel(vim, size));
+            settings.page(panel.get());
+        });
+        var page = onEdtValue(() -> host.settingsPages(context)).getFirst();
+        onEdt(() -> {
+            var scroll = new JScrollPane(page.component());
+            scroll.setSize(700, 1400);
+            LayoutTestSupport.layoutTree(scroll);
+            JComponent first = panel.get().rows.get(0), second = panel.get().rows.get(1);
+            assertThat(first.getHeight()).isEqualTo(first.getPreferredSize().height);
+            assertThat(second.getY()).as("the second row follows the first")
+                .isLessThan(first.getY() + first.getPreferredSize().height + 100);
+            assertThat(second.getHeight()).isEqualTo(second.getPreferredSize().height);
+            page.dispose();
+        });
+    }
+
+    @Test void closingWithoutApplyResetsThePanelAndClosingAfterApplyDoesNot() throws Exception {
+        var panel = startWithPanel();
+        var cancelled = onEdtValue(() -> host.settingsPages(context)).getFirst();
+        onEdt(() -> {
+            cancelled.component();
+            panel.ownModified = true;
+            cancelled.dispose();
+            assertThat(panel.calls).containsExactly("reset", "dispose");
+            panel.calls.clear();
+        });
+        var applied = onEdtValue(() -> host.settingsPages(context)).getFirst();
+        onEdt(() -> {
+            applied.component();
+            panel.host.stage(panel.size, 20);
+            panel.ownModified = true;
+        });
+        var saving = new AtomicReference<java.util.concurrent.CompletableFuture<Void>>();
+        onEdt(() -> saving.set(applied.apply()));
+        saving.get().get(5, TimeUnit.SECONDS);
+        onEdt(() -> { });
+        onEdt(() -> {
+            applied.dispose();
+            assertThat(panel.calls).containsExactly("apply", "dispose");
+        });
+    }
+
+    @Test void stagingTheDefaultOfAnUnsetKeyLeavesThePageUnmodified() {
+        var panel = startWithPanel();
+        var page = onEdtValue(() -> host.settingsPages(context)).getFirst();
+        onEdt(() -> {
+            page.component();
+            panel.host.stage(panel.size, 20);
+            assertThat(page.modified()).isTrue();
+            panel.host.stage(panel.size, 13);
+            assertThat(page.modified()).isFalse();
+            page.dispose();
+        });
+    }
+
+    @Test void eachPluginGetsOnePageAndASupersededCopyGetsNone() {
+        assertThat(PluginRuntime.stubbed(status("dev.example.x", PluginStatus.State.SKIPPED,
+            "superseded by version 2.0.0 from DEVELOPMENT"))).isFalse();
+        var running = new PluginStubPage("dev.example.run", "Run", "", () -> { });
+        var statuses = List.of(
+            status("dev.example.run", PluginStatus.State.ACTIVE, ""),
+            status("dev.example.run", PluginStatus.State.DISABLED, "safe mode"),
+            status("dev.example.quiet", PluginStatus.State.ACTIVE, ""),
+            status("dev.example.quiet", PluginStatus.State.DISABLED, "safe mode"),
+            status("dev.example.old", PluginStatus.State.SKIPPED, "superseded by version 2.0.0 from USER"),
+            status("dev.example.two", PluginStatus.State.NEEDS_CONSENT, "not reviewed yet"),
+            status("dev.example.two", PluginStatus.State.NEEDS_CONSENT, "not reviewed yet"),
+            status("dev.example.gap", PluginStatus.State.SKIPPED, "requires dev.example.none, which is not installed"));
+        var pages = PluginRuntime.withStubs(List.of(running), statuses,
+            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> { }));
+        assertThat(pages).map(SettingsPage::id).doesNotHaveDuplicates()
+            .containsExactlyInAnyOrder("plugin.dev.example.run", "plugin.dev.example.two", "plugin.dev.example.gap");
+        assertThat(pages).contains(running);
     }
 
     @Test void pluginsThatAreNotRunningGetAStubAndOnlyWhenTheUserMeantThemToRun() {
@@ -167,7 +306,22 @@ class PluginPanelPageTest {
         assertThat(PluginRuntime.stubbed(status(PluginStatus.State.ACTIVE, ""))).isFalse();
     }
 
-    private static PluginStatus status(PluginStatus.State state, String reason) {
-        return new PluginStatus("dev.example.x", "X", "1.0.0", PluginCandidate.Origin.USER, state, reason);
+    private static PluginStatus status(PluginStatus.State state, String reason) { return status("dev.example.x", state, reason); }
+
+    private static PluginStatus status(String id, PluginStatus.State state, String reason) {
+        return new PluginStatus(id, id.substring(id.lastIndexOf('.') + 1), "1.0.0", PluginCandidate.Origin.USER, state, reason);
+    }
+
+    private void write(String text) throws Exception {
+        Files.createDirectories(data.resolve(ID));
+        Files.writeString(data.resolve(ID).resolve(ID + ".toml"), text);
+    }
+
+    private void reload() {
+        onEdt(() -> {
+            var changed = host.environment.settingsFiles().refresh(true);
+            for (String id : changed) host.environment.clearReports().accept(host.environment.settingsFiles().file(id));
+            host.settingsChanged(changed);
+        });
     }
 }

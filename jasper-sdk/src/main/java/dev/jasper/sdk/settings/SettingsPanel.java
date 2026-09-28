@@ -45,12 +45,15 @@ public interface SettingsPanel {
     default void apply() { }
 
     /**
-     * Drops unsaved state of the plugin's own.
+     * Drops unsaved state of the plugin's own. Settings calls it when the user resets the page, and, just before
+     * {@link #dispose}, whenever it closes the page without a successful Apply since the page last changed, as on
+     * Cancel. The panel outlives each opening of Settings, so this is where unapplied state of its own goes away.
      */
     default void reset() { }
 
     /**
-     * Settings closed the page; release listeners.
+     * Settings closed the page; release listeners. Unapplied state of the plugin's own was already dropped through
+     * {@link #reset}.
      */
     default void dispose() { }
 }

@@ -563,9 +563,23 @@ public final class PluginRuntime {
         PluginHost current = host;
         PluginCatalog.Launch started = launch;
         if (current == null || started == null) return List.of();
-        var pages = new ArrayList<SettingsPage>(current.settingsPages(context));
-        for (PluginStatus status : started.statuses())
-            if (stubbed(status)) pages.add(new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id())));
+        return withStubs(current.settingsPages(context), started.statuses(),
+            status -> new PluginStubPage(status.id(), status.name(), status.reason(), () -> openSettingsFile(status.id())));
+    }
+
+    /**
+     * The running plugins' pages and a stub for each other plugin the user meant to run, sorted by title: at most one
+     * page per plugin, and none for a plugin that runs, whatever became of its other copies.
+     */
+    static List<SettingsPage> withStubs(List<SettingsPage> running, List<PluginStatus> statuses,
+                                        java.util.function.Function<PluginStatus, SettingsPage> stub) {
+        var pages = new ArrayList<SettingsPage>(running);
+        var taken = new java.util.HashSet<String>();
+        for (SettingsPage page : running) taken.add(page.id());
+        for (PluginStatus status : statuses)
+            if (status.state() == PluginStatus.State.ACTIVE) taken.add(settingsPageId(status.id()));
+        for (PluginStatus status : statuses)
+            if (stubbed(status) && taken.add(settingsPageId(status.id()))) pages.add(stub.apply(status));
         pages.sort(java.util.Comparator.comparing(SettingsPage::title, String.CASE_INSENSITIVE_ORDER));
         return pages;
     }
@@ -581,8 +595,12 @@ public final class PluginRuntime {
         return current != null && current.hasSettingsPage(pluginId);
     }
 
-    /** Not running although the user meant it to: waiting for review, skipped, failed, or held back by safe mode. */
+    /**
+     * Not running although the user meant it to: waiting for review, skipped, failed, or held back by safe mode. A copy
+     * that lost to another copy of the same plugin is not the plugin the user meant to run.
+     */
     static boolean stubbed(PluginStatus status) {
+        if (status.superseded()) return false;
         return switch (status.state()) {
             case NEEDS_CONSENT, SKIPPED, FAILED -> true;
             case DISABLED -> status.reason().equals("safe mode");

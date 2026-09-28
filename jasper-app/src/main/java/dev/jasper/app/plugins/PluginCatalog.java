@@ -104,7 +104,7 @@ final class PluginCatalog {
     /** A superseded copy has a status of its own; the row is about the copy that won. */
     private static Optional<PluginStatus> status(List<PluginStatus> statuses, String id) {
         return statuses.stream().filter(status -> status.id().equals(id))
-            .filter(status -> !status.reason().startsWith("superseded by")).findFirst();
+            .filter(status -> !status.superseded()).findFirst();
     }
 
     private static List<String> requires(PluginDescriptor descriptor) {

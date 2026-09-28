@@ -8,19 +8,13 @@ import dev.jasper.app.settingsui.SettingsDraft;
 import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.sdk.settings.Choice;
 import dev.jasper.sdk.settings.EditorHint;
-import java.awt.BorderLayout;
-import java.awt.Color;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.Scrollable;
-import javax.swing.UIManager;
 
 /**
  * The page Settings generates for a running plugin's declared settings: rows in declaration order under their
@@ -33,7 +27,7 @@ final class PluginSettingsPage implements SettingsPage {
     private final SchemaPage inner;
     private final Runnable stopListening;
     private final dev.jasper.app.lifecycle.Subscription draftListening;
-    private final JLabel message = new JLabel("This plugin's settings file has errors; fix them before changing its settings here.");
+    private final JLabel message = PluginPageBody.message();
     private JComponent body;
 
     PluginSettingsPage(String pluginId, String title, DeclaredSettings declared, PageContext context) {
@@ -42,9 +36,6 @@ final class PluginSettingsPage implements SettingsPage {
         draft = new SettingsDraft(declared.values());
         var own = new PageContext(draft, context.navigate(), context.closeThen(), context.chooseFile(), context.changed(), context.surface());
         inner = spec(PluginRuntime.settingsPageId(pluginId), title, declared.handles()).build(own);
-        message.putClientProperty("html.disable", true);
-        Color red = UIManager.getColor("Jasper.configErrorForeground");
-        message.setForeground(red != null ? red : Color.RED);
         stopListening = declared.onReloaded(() -> {
             draft.rebase(declared.values());
             showMessage();
@@ -107,14 +98,15 @@ final class PluginSettingsPage implements SettingsPage {
 
     @Override public JComponent component() {
         if (body == null) {
-            body = new Holder(message, inner.component());
+            body = new PluginPageBody(message, inner.component());
             showMessage();
         }
         return body;
     }
 
     @Override public boolean modified() { return draft.modified(); }
-    @Override public boolean valid() { return !declared.rejected() && inner.valid(); }
+    /** A rejected file holds up only this page's own edits, which could not be saved to it. */
+    @Override public boolean valid() { return !(declared.rejected() && draft.modified()) && inner.valid(); }
     @Override public void reset() { inner.reset(); }
 
     /** Saves the draft; the plugin's reload moves the draft's baseline, which drops the edits now saved. */
@@ -136,21 +128,5 @@ final class PluginSettingsPage implements SettingsPage {
         inner.dispose();
     }
 
-    private void showMessage() { message.setVisible(declared.rejected()); }
-
-    /** The message above the rows; follows the dialog's width like the rows do. */
-    private static final class Holder extends JPanel implements Scrollable {
-        Holder(JComponent message, JComponent rows) {
-            super(new BorderLayout());
-            setOpaque(false);
-            message.setBorder(BorderFactory.createEmptyBorder(12, 20, 0, 20));
-            add(message, BorderLayout.NORTH);
-            add(rows, BorderLayout.CENTER);
-        }
-        @Override public java.awt.Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
-        @Override public int getScrollableUnitIncrement(java.awt.Rectangle visible, int orientation, int direction) { return 16; }
-        @Override public int getScrollableBlockIncrement(java.awt.Rectangle visible, int orientation, int direction) { return visible.height; }
-        @Override public boolean getScrollableTracksViewportWidth() { return true; }
-        @Override public boolean getScrollableTracksViewportHeight() { return false; }
-    }
+    private void showMessage() { PluginPageBody.showMessage(message, declared); }
 }

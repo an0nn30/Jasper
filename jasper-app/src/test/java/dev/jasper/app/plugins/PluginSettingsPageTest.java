@@ -131,19 +131,23 @@ class PluginSettingsPageTest {
         onEdt(() -> assertThat(page.modified()).as("the draft follows the saved file").isFalse());
     }
 
-    @Test @SuppressWarnings("unchecked") void aRejectedFileShowsItsMessageAndBlocksApplyUntilFixed() throws Exception {
+    @Test @SuppressWarnings("unchecked") void aRejectedFileShowsItsMessageAndBlocksItsEditsUntilFixed() throws Exception {
         write(ID, "font_size = \"big\"\n");
         start(ID, "Pages", PluginSettingsPageTest::declareEditor);
         var page = page();
+        var size = (Setting<Integer>) page.declared().handles().get(0).appSetting();
         onEdt(() -> {
             page.component();
-            assertThat(page.valid()).isFalse();
+            assertThat(page.valid()).as("an untouched page does not hold up the dialog").isTrue();
             assertThat(page.message().isVisible()).isTrue();
             assertThat(page.message().getText()).contains("has errors");
+            page.draft().stage(size, Optional.of(15));
+            assertThat(page.valid()).as("an edit cannot be saved to a rejected file").isFalse();
+            page.reset();
+            assertThat(page.valid()).isTrue();
         });
         write(ID, "font_size = 20\n");
         reload();
-        var size = (Setting<Integer>) page.declared().handles().get(0).appSetting();
         onEdt(() -> {
             assertThat(page.valid()).isTrue();
             assertThat(page.message().isVisible()).isFalse();

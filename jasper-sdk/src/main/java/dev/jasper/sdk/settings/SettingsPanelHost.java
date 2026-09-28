@@ -35,7 +35,7 @@ public interface SettingsPanelHost {
     <T> void stage(Setting<T> setting, T value);
 
     /**
-     * Tells Settings that the page's modified state or validity changed.
+     * Tells Settings that the page's modified state changed.
      */
     void changed();
 }
