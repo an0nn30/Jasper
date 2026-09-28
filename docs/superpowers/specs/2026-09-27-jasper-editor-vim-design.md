@@ -1,6 +1,6 @@
 # Editor Vim mode
 
-**Status:** Approved by the user on 2026-09-27. Plan V1a (`docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`) amends sections 3.8, 4.1 and 13, as marked **Amended (V1a)**. Plan V1b (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`) amends sections 3.5, 3.6, 3.8, 5.2, 5.3, 11.1 and 13, as marked **Amended (V1b)**. Plan V1c (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1c.md`) amends sections 3.1, 4.1 and 11.1, as marked **Amended (V1c)**. Plan V2a (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2a.md`) amends sections 3.8, 5.2, 6.1, 6.2, 6.3, 11.1, 12 and 13, as marked **Amended (V2a)**. Amends the [Editor plugin](2026-09-27-jasper-editor-plugin-design.md) spec (settings, key handling, package layout) as hosted by [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md). Branch `claude/vim-mode`.
+**Status:** Approved by the user on 2026-09-27. Plan V1a (`docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`) amends sections 3.8, 4.1 and 13, as marked **Amended (V1a)**. Plan V1b (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`) amends sections 3.5, 3.6, 3.8, 5.2, 5.3, 11.1 and 13, as marked **Amended (V1b)**. Plan V1c (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1c.md`) amends sections 3.1, 4.1 and 11.1, as marked **Amended (V1c)**. Plan V2a (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2a.md`) amends sections 3.8, 5.2, 6.1, 6.2, 6.3, 11.1, 12 and 13, as marked **Amended (V2a)**. Plan V2b (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2b.md`) amends sections 3.6, 5.4, 6.1, 6.2 and 12, as marked **Amended (V2b)**. Amends the [Editor plugin](2026-09-27-jasper-editor-plugin-design.md) spec (settings, key handling, package layout) as hosted by [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md). Branch `claude/vim-mode`.
 
 ## Purpose and scope
 
@@ -122,7 +122,7 @@ Each register holds text and a type: charwise, linewise or blockwise (with width
 
 ### 3.6 Marks, jumplist and change list
 
-- `a`–`z` per tab; `A`–`Z` global, remembering the document key, so `'A` selects (or opens) that document's tab. **Amended (V1b):** until plan V2's buffer commands, an uppercase mark works within its own tab.
+- `a`–`z` per tab; `A`–`Z` global, remembering the document key, so `'A` selects (or opens) that document's tab. **Amended (V1b):** until plan V2's buffer commands, an uppercase mark works within its own tab. **Amended (V2b):** `'A` and `` `A `` in another tab select the mark's tab and go to it; after an operator or in Visual mode they fail.
 - Special marks: `` ` `` / `'` (previous context), `[` `]` (last change or yank), `<` `>` (last visual), `.` (last change), `^` (last insert exit), `"` (position when the tab was last left).
 - Marks move with edits: an insertion or deletion before a mark shifts it; deleting the mark's line removes a lowercase mark (as Vim does for `:d`, and keeps it for character deletes).
 - Jumplist: up to 100 entries per tab, filled by the motions Vim calls jumps (`G`, `gg`, `/`, `?`, `n`, `N`, `%`, `(`, `)`, `{`, `}`, `[[`, `]]`, `H`, `M`, `L`, `'x`, `` `x ``, `*`, `#`, `:{N}`), walked by `<C-o>`/`<C-i>` (with `<Tab>` = `<C-i>`). Change list: `g;`/`g,`.
@@ -217,7 +217,7 @@ A one-line strip at the bottom of each `EditorTab`, shown only while Vim mode is
 
 ### 5.4 Line numbers
 
-`number` maps to the gutter's line numbers. `relativenumber` replaces RSyntaxTextArea's line number list with a Vim-owned gutter component showing distances, with the current line absolute when `number` is also on. It follows folds, wrap and the theme's gutter colours.
+`number` maps to the gutter's line numbers. `relativenumber` replaces RSyntaxTextArea's line number list with a Vim-owned gutter component showing distances, with the current line absolute when `number` is also on. It follows folds, wrap and the theme's gutter colours. **Amended (V2b):** 'relativenumber' is RSyntaxTextArea's own gutter with a line-number formatter, not a component of its own; the cursor line's number is right-aligned like the others; 'number' starts on, as the Editor shows line numbers.
 
 ### 5.5 Status and commands
 
@@ -228,7 +228,7 @@ A one-line strip at the bottom of each `EditorTab`, shown only while Vim mode is
 
 ### 6.1 Editing the command line
 
-`<Left> <Right> <S-Left> <S-Right> <Home> <End> <BS> <Del> <C-w> <C-u> <C-b> <C-e>`; `<C-r>{reg}`, `<C-r><C-w>` (word under the cursor), `<C-r><C-a>`; `<Up>`/`<Down>` walk history filtered by the typed prefix (separate histories for `:` and search, 50 entries each, kept for the plugin's lifetime); `<Tab>`/`<S-Tab>` complete command names, option names after `:set`, and paths after `:e`, `:w`, `:r`, `:source` (**Amended (V2a):** completion comes with plan V2b; until then `<Tab>` types a tab); `<Esc>` and `<C-c>` cancel; `<BS>` on an empty line cancels.
+`<Left> <Right> <S-Left> <S-Right> <Home> <End> <BS> <Del> <C-w> <C-u> <C-b> <C-e>`; `<C-r>{reg}`, `<C-r><C-w>` (word under the cursor), `<C-r><C-a>`; `<Up>`/`<Down>` walk history filtered by the typed prefix (separate histories for `:` and search, 50 entries each, kept for the plugin's lifetime); `<Tab>`/`<S-Tab>` complete command names, option names after `:set`, and paths after `:e`, `:w`, `:r`, `:source` (**Amended (V2a):** completion comes with plan V2b; until then `<Tab>` types a tab. **Amended (V2b):** Jasper completes the commands and options it has (with `no` and `inv`, and an option's value after `=`), paths after the file commands and tab names after `:b`, cycling as Vim's 'wildmode' "full" without 'wildmenu'; where nothing completes, and in `/` and `?`, `<Tab>` types a tab; `:source`'s paths come with V3); `<Esc>` and `<C-c>` cancel; `<BS>` on an empty line cancels.
 
 ### 6.2 Ranges and commands
 
@@ -247,7 +247,7 @@ A one-line strip at the bottom of each `EditorTab`, shown only while Vim mode is
 | Options | `:set`, `:setlocal`, `:setglobal` (section 6.3) |
 | Vimrc | the vimrc commands of section 7, typed interactively |
 
-`:w` and friends call `VimHost`, so they use the Editor's save path, conflict checks, remote write contract and dialogs unchanged. `:q` on an unsaved tab fails with `E37: No write since last change (add ! to override)`; `:q!` discards through the Editor's close path without asking.
+`:w` and friends call `VimHost`, so they use the Editor's save path, conflict checks, remote write contract and dialogs unchanged. `:q` on an unsaved tab fails with `E37: No write since last change (add ! to override)`; `:q!` discards through the Editor's close path without asking. **Amended (V2b):** each Editor tab is a buffer and a tab page, numbered while it is open; `:e file` opens the file in a tab or selects its tab (a missing file gets an empty tab its first save creates), `:w file` saves the tab as the file, `:q` closes the tab and never quits Jasper, and no command needs `!` to leave a tab with changes. Relative names start from the current file's folder (the home folder for an untitled tab); `%`, `#` and `~` work in them. Also `:sav[eas]`, `:exi[t]`, `:quita[ll]`, `:files`, `:bN[ext]`, `:tabN[ext]`, `:tabe[dit]`, `gt` and `gT`; `:2,5w file`, `:w >>`, `:w !cmd` and `:r !cmd` fail with E319. The corpus cannot record these commands; `ExFilesTest` runs them against a fake set of tabs and `EditorWindowTest` through the Editor.
 
 The `c` flag asks in the Vim bar with the current match highlighted: `replace with X (y/n/a/q/l/^E/^Y)?`.
 
@@ -371,7 +371,7 @@ GUI checks are the user's: a new section in `docs/editor-verification.md` (typin
 | `dev.jasper.editor.vim.ui` | `VimBar`, `BlockHighlighter`, `RelativeGutter`, caret styles | `vim`, `vim.ex`, RSyntaxTextArea, Swing |
 | `dev.jasper.editor.ui` (existing) | `EditorTab` uses `VimTextArea` and `VimBar`; `EditorWindow` builds `VimHost` | adds `vim`, `vim.ui` |
 
-**Amended (V2a):** the Ex classes (`Ex`, `ExTable`, `ExCommand`, `ExInfo`, `ExLines`, `ExSubstitute`, `ExGlobal`) live in `dev.jasper.editor.vim`, not `vim.ex`: they use the engine's package-private API, and a separate package would need a public API or a dependency cycle. `vim.ui` depends on `vim` only.
+**Amended (V2a):** the Ex classes (`Ex`, `ExTable`, `ExCommand`, `ExInfo`, `ExLines`, `ExSubstitute`, `ExGlobal`) live in `dev.jasper.editor.vim`, not `vim.ex`: they use the engine's package-private API, and a separate package would need a public API or a dependency cycle. `vim.ui` depends on `vim` only. **Amended (V2b):** `VimHost.Documents` (a record of callbacks) is how the engine reaches the Editor's tabs; `ExFiles`, `Completion` and `LineNumbers` join `dev.jasper.editor.vim`, and there is no `RelativeGutter`.
 
 No SDK change is needed.
 

@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-28
 
+- **Editor Vim mode, plan V2b** (branch `claude/vim-v2b`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2b.md`, written 2026-09-28): the Editor's tabs as Vim's buffers — `:w :wq :x :exi :sav :wa :xa :wqa :q :qa
+  :quita :e :ene :r :ls :buffers :files :b :bn :bN :bp :tabn :tabN :tabp :tabnew :tabe`, `ZZ`, `ZQ`, `gt`, `gT`,
+  through the Editor's save, conflict and close paths (`VimHost.Documents`, implemented by `EditorWindow`); `<Tab>`
+  completion of commands, options, paths and tab names; 'number' and 'relativenumber' on the gutter; uppercase marks
+  that select their tab. Every file in the plan was compiled and run before the plan was written: 1582 corpus
+  cases against Vim 9.1 (17 new), and the tab commands in `ExFilesTest` and `EditorWindowTest`.
+  - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
+  - `./gradlew check`: 4,135 tests, 0 failed, 0 errors, 5 skipped.
+  - Not done: GUI checks 61–70 of the [checklist](editor-verification.md) (user-run); plans V3 and V4; merge; push.
 - **Editor Vim mode, plan V2a** (branch `claude/vim-v2a`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2a.md`, written 2026-09-28): the Ex command line — ranges (`;`, searches, marks, folds, `*`), `|`, Vim's 600
   command names for abbreviations (E319 for those Jasper lacks), `:s` with every flag including confirmation, `:&`,

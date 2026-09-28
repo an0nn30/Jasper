@@ -51,7 +51,26 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
   section 3.8 that Jasper has; an option Vim has and Jasper lacks fails with `E518: Unknown option`, and `:set` and
   `:set all` list only Jasper's. 'hlsearch' starts on (Vim's default is off); `:noh` hides the highlight until the next
   search.
-- **Tab on the command line** types a tab until plan V2b brings completion.
+- **Tabs are the buffers.** Each Editor tab is a buffer and a tab page. `:e file` opens the file in a tab, or selects
+  its tab, where Vim edits it in the window; `:w file` saves the tab as the file, which it then edits, where Vim
+  writes a copy; `:q` closes the tab, and closing the last one leaves Jasper running. A tab never has to be written
+  before another is shown, so `:e`, `:b` and `:bn` never need `!` ('hidden' as it were), and `:ls` shows every tab as
+  loaded and shown (`a`), named by its location. `:w` on an untitled tab asks where to save it, as the Editor's Save
+  does, where Vim fails with `E32`. `:e newfile` opens an empty tab its first save creates.
+- **Relative file names** start from the current file's folder (the home folder for an untitled tab), as Jasper has no
+  current directory.
+- **Only whole files are written.** `:2,5w file`, `:w >> file`, `:w !cmd` and `:r !cmd` fail with E319.
+- **The write message counts UTF-8.** `"a.txt" 2L, 8B written` counts the text's lines and UTF-8 bytes; Vim counts the
+  bytes written, in the file's encoding and line endings.
+- **`:e!` starts a new undo history**, as the Editor's reload does; Vim keeps the text before the reload for undo.
+- **Completion.** `<Tab>` on the `:` command line completes the commands and options Jasper has, paths after the file
+  commands and tab names after `:b`, cycling through the matches as Vim does without 'wildmenu'. Where nothing
+  completes (`:s/a/b`) it types a tab, as Vim does, and in a search (`/`, `?`) it always types a tab, where Vim 9.1
+  completes words from the text.
+- **Line numbers.** 'number' starts on, as the Editor shows line numbers. With 'number' and 'relativenumber' the
+  cursor line's number is right-aligned like the others; Vim puts it on the left.
+- **Uppercase marks across tabs.** `'A` and `` `A `` select the tab the mark is in and go there; after an operator or
+  in Visual mode they fail, where Vim also cannot operate across files.
 - **Folds are the Editor's code folds.** There are no manual folds (`zf`, `zd`, `zE`); `zo`, `zc` and the other fold
   commands act on the folds the Editor finds in the code. A closed fold shows its first line with the Editor's fold
   marker, where Vim shows a one-line summary such as `+--  4 lines: void f() {`.

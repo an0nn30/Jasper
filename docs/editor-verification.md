@@ -81,3 +81,16 @@ unverified.
 - [ ] 58. After `/pattern`, every match is highlighted in the theme's mark-all colour; `:noh` hides them until the next `n`.
 - [ ] 59. `:g/TODO/d` deletes matching lines, `:v/./d` deletes blank lines, `:%norm A;` appends to every line and `:sort u` sorts and removes duplicates.
 - [ ] 60. `:5,1d` asks `Backwards range given, OK to swap (y/n)?` in the bar; `y` deletes lines 1 to 5.
+
+## Vim mode (plan V2b)
+
+- [ ] 61. In a changed file, `:w` saves it (the tab's dot goes) and the Vim bar says `"…" NL, NB written`; `:w` in an untitled tab opens the Save As dialog.
+- [ ] 62. `:e other.txt` (next to the current file) opens it in a new tab next to the current one; `:e` of a file already open selects its tab; `:e new.txt` opens an empty tab that `:w` creates on disk.
+- [ ] 63. `:q` in a changed tab says `E37: No write since last change (add ! to override)`; `:q!` closes it without asking and without saving; `:wq` and `ZZ` save and close.
+- [ ] 64. With three tabs, `:ls` lists them with numbers, `%a` on the current one and `#` on the one before; `:b 2`, `:bn`, `:bp`, `:tabn`, `gt`, `3gt` and `gT` select the tabs, including tabs moved to another workspace.
+- [ ] 65. `:qa` with a changed tab says `E162`; `:qa!` closes every Editor tab without asking; the terminal tabs stay.
+- [ ] 66. `:e ` then `<Tab>` completes file names from the current file's folder (folders end with `/`), `<Tab>` again cycles, `<S-Tab>` goes back; `:set sh<Tab>` cycles through the options; `:tabn<Tab>` completes `tabnew`, then `tabnext`.
+- [ ] 67. `:set rnu` shows distances from the cursor line in the gutter, updating as the cursor moves; `:set nonu` shows 0 on the cursor line; `:set nonu nornu` hides the numbers; turning Vim off brings the Editor's numbers back.
+- [ ] 68. `mA` in one tab, then `'A` in another tab, selects the first tab with the cursor on the mark.
+- [ ] 69. `:r other.txt` puts the other file's lines below the cursor; `u` takes them away.
+- [ ] 70. A remote file saved with `:w` goes through the Editor's remote save (conflict check and all).
