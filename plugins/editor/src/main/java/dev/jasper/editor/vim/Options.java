@@ -29,9 +29,13 @@ public final class Options {
     static final List<Def> DEFS = List.of(
         new Def("autoindent", "ai", Type.BOOLEAN, false, true),
         new Def("backspace", "bs", Type.STRING, "indent,eol,start", false),
+        new Def("belloff", "bo", Type.STRING, "", false),
         new Def("clipboard", "cb", Type.STRING, "", false),
         new Def("comments", "com", Type.STRING, "s1:/*,mb:*,ex:*/,://,b:#,:%,:XCOMM,n:>,fb:-", true),
+        new Def("compatible", "cp", Type.BOOLEAN, false, false),
+        new Def("encoding", "enc", Type.STRING, "utf-8", false),
         new Def("expandtab", "et", Type.BOOLEAN, false, true),
+        new Def("fileformat", "ff", Type.STRING, "unix", true),
         new Def("foldopen", "fdo", Type.STRING, "block,hor,mark,percent,quickfix,search,tag,undo", false),
         new Def("formatoptions", "fo", Type.STRING, "tcq", true),
         new Def("gdefault", "gd", Type.BOOLEAN, false, false),
@@ -40,12 +44,15 @@ public final class Options {
         new Def("incsearch", "is", Type.BOOLEAN, true, false),
         new Def("iskeyword", "isk", Type.STRING, "@,48-57,_,192-255", true),
         new Def("joinspaces", "js", Type.BOOLEAN, true, false),
+        new Def("laststatus", "ls", Type.NUMBER, 1, false),
         new Def("matchpairs", "mps", Type.STRING, "(:),{:},[:]", true),
         new Def("maxmapdepth", "mmd", Type.NUMBER, 1000, false),
+        new Def("mouse", "mouse", Type.STRING, "", false),
         new Def("nrformats", "nf", Type.STRING, "bin,octal,hex", true),
         new Def("number", "nu", Type.BOOLEAN, true, true),
         new Def("relativenumber", "rnu", Type.BOOLEAN, false, true),
         new Def("report", "report", Type.NUMBER, 2, false),
+        new Def("ruler", "ru", Type.BOOLEAN, false, false),
         new Def("scrolljump", "sj", Type.NUMBER, 1, false),
         new Def("scrolloff", "so", Type.NUMBER, 0, false),
         new Def("shiftround", "sr", Type.BOOLEAN, false, false),
@@ -57,11 +64,16 @@ public final class Options {
         new Def("smartcase", "scs", Type.BOOLEAN, false, false),
         new Def("softtabstop", "sts", Type.NUMBER, 0, true),
         new Def("startofline", "sol", Type.BOOLEAN, true, false),
+        new Def("syntax", "syn", Type.STRING, "", true),
         new Def("tabstop", "ts", Type.NUMBER, 8, true),
         new Def("textwidth", "tw", Type.NUMBER, 0, true),
         new Def("tildeop", "top", Type.BOOLEAN, false, false),
         new Def("timeout", "to", Type.BOOLEAN, true, false),
         new Def("timeoutlen", "tm", Type.NUMBER, 1000, false),
+        new Def("ttimeout", "ttimeout", Type.BOOLEAN, false, false),
+        new Def("ttimeoutlen", "ttm", Type.NUMBER, -1, false),
+        new Def("undolevels", "ul", Type.NUMBER, 1000, false),
+        new Def("visualbell", "vb", Type.BOOLEAN, false, false),
         new Def("whichwrap", "ww", Type.STRING, "b,s", false),
         new Def("wrap", "wrap", Type.BOOLEAN, true, true),
         new Def("wrapscan", "ws", Type.BOOLEAN, true, false));
@@ -238,7 +250,8 @@ public final class Options {
         if (nextchar == '?' || prefix == 0 && "=:&<".indexOf(nextchar) < 0 && def.type() != Type.BOOLEAN) {
             shown.add(showOne(def, scope));
             if (nextchar != '?' && nextchar != 0 && !isWhite(afterchar)) throw new IllegalArgumentException("E488: Trailing characters");
-            return i + len;
+            // After "opt?" the index is already on the "?".
+            return nextchar == '?' ? i + 1 : i + len;
         }
         Object old = value(def, scope);
         if (def.type() == Type.BOOLEAN) {
@@ -399,8 +412,12 @@ public final class Options {
         }
     }
 
+    /** The number options Vim lets go below zero ('ttimeoutlen' -1 is "use 'timeoutlen'", 'undolevels' -1 no undo). */
+    private static final List<String> NEGATIVE = List.of("laststatus", "maxmapdepth", "ttimeoutlen", "undolevels");
+
     private static int checkNumber(Def def, int value) {
-        if (value < 0 || def.name().equals("tabstop") && value == 0) throw new IllegalArgumentException("E487: Argument must be positive");
+        if (value < 0 && !NEGATIVE.contains(def.name()) || def.name().equals("tabstop") && value == 0)
+            throw new IllegalArgumentException("E487: Argument must be positive");
         return value;
     }
 
@@ -509,12 +526,15 @@ public final class Options {
             case BOOLEAN -> (Boolean) value;
             case NUMBER -> {
                 int number = (Integer) value;
-                if (number < 0 || def.name().equals("tabstop") && number == 0) throw new IllegalArgumentException("E487: Argument must be positive: " + def.name() + "=" + number);
+                if (number < 0 && !NEGATIVE.contains(def.name()) || def.name().equals("tabstop") && number == 0)
+                    throw new IllegalArgumentException("E487: Argument must be positive: " + def.name() + "=" + number);
                 yield number;
             }
             case STRING -> {
                 String text = (String) value;
                 if (def.name().equals("iskeyword")) Keywords.parse(text);
+                if (def.name().equals("fileformat") && !List.of("unix", "dos", "mac").contains(text))
+                    throw new IllegalArgumentException("E474: Invalid argument");
                 yield text;
             }
         };

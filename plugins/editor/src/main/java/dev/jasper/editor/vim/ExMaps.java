@@ -75,8 +75,10 @@ final class ExMaps {
         String rhsText = p < keys.length() ? keys.substring(Ex.skipWhite(keys, p + 1)) : "";
         boolean hasKey = !lhsText.isEmpty(), hasArg = !rhsText.isEmpty();
         if (unmap && !hasKey) throw new VimFailure("E474: Invalid argument");
-        List<KeyInput> lhs = parse(lhsText, true);
-        List<KeyInput> rhs = rhsText.equalsIgnoreCase("<Nop>") ? List.of() : parse(rhsText, false);
+        Vim vim = editor.vim();
+        String leader = vim.leader("mapleader"), localLeader = vim.leader("maplocalleader");
+        List<KeyInput> lhs = parse(lhsText, true, leader, localLeader);
+        List<KeyInput> rhs = rhsText.equalsIgnoreCase("<Nop>") ? List.of() : parse(rhsText, false, leader, localLeader);
         if (hasKey && byteLength(lhs) > MAXMAPLEN) throw new VimFailure("E474: Invalid argument");
         if (!unmap && (!hasKey || !hasArg)) {
             list(editor, mappings, mode, hasKey ? lhs : null);
@@ -206,14 +208,21 @@ final class ExMaps {
         return out.append('>').toString();
     }
 
+    /** {@link #parse(String, boolean, String, String)} with no {@code mapleader}: {@code <Leader>} is a backslash. */
+    static List<KeyInput> parse(String text, boolean lhs) { return parse(text, lhs, "\\", "\\"); }
+
     /**
      * replace_termcodes: a left- or right-hand side as typed after {@code :map}, as keys. {@code <>} names a key
-     * ({@code <lt>} is {@code <}); {@code <Leader>} and {@code <LocalLeader>} are a backslash (there is no
-     * {@code mapleader} yet); {@code <Nop>} is no key; CTRL-V takes the next character literally (a CTRL-V ending a
-     * left-hand side stays); a left-hand side starting {@code #1} is {@code <F1>}. A control character is its CTRL
-     * key. A backslash is an ordinary character, as with Vim's default 'cpoptions'.
+     * ({@code <lt>} is {@code <}); {@code <Leader>} and {@code <LocalLeader>} are {@code leader} and
+     * {@code localLeader}; {@code <Nop>} is no key; CTRL-V takes the next character
+     * literally (a CTRL-V ending a left-hand side stays); a left-hand side starting {@code #1} is
+     * {@code <F1>}. A control character is its CTRL key. A backslash is an ordinary character, as with Vim's default
+     * 'cpoptions'.
+     *
+     * @param leader what {@code <Leader>} stands for ({@code g:mapleader}, a backslash when it is not set)
+     * @param localLeader what {@code <LocalLeader>} stands for ({@code g:maplocalleader})
      */
-    static List<KeyInput> parse(String text, boolean lhs) {
+    static List<KeyInput> parse(String text, boolean lhs, String leader, String localLeader) {
         List<KeyInput> keys = new ArrayList<>();
         int i = 0;
         if (lhs && text.length() >= 2 && text.charAt(0) == '#' && Character.isDigit(text.charAt(1))) {
@@ -227,7 +236,7 @@ final class ExMaps {
                 if (close > i + 1) {
                     String body = text.substring(i + 1, close).toLowerCase(Locale.ROOT);
                     if (body.equals("leader") || body.equals("localleader")) {
-                        keys.add(KeyInput.of('\\'));
+                        keys.addAll(KeyCodes.keys(body.equals("leader") ? leader : localLeader));
                         i = close + 1;
                         continue;
                     }

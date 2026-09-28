@@ -159,6 +159,10 @@ final class Ex {
         def("omapclear", EXTRA | TRLBAR, Addr.NONE, "remove every Operator-pending mapping", ExMaps::mapclear);
         def("imapclear", EXTRA | TRLBAR, Addr.NONE, "remove every Insert-mode mapping", ExMaps::mapclear);
         def("cmapclear", EXTRA | TRLBAR, Addr.NONE, "remove every command-line mapping", ExMaps::mapclear);
+        def("let", EXTRA | NOTRLCOM, Addr.NONE, "`:let mapleader = \",\"`, `:let @a = \"…\"`, `:let &tw = 80`, `:let g:name = …`: a variable, register or option", ExVimrc::let);
+        def("messages", RANGE | EXTRA | TRLBAR, Addr.OTHER, "the message history: errors, and the vimrc's skipped lines; `:messages clear`", ExVimrc::messages);
+        def("syntax", EXTRA | NOTRLCOM | TRLBAR, Addr.NONE, "accepted and ignored: the Editor highlights by language", ExVimrc::ignored);
+        def("filetype", EXTRA | TRLBAR, Addr.NONE, "accepted and ignored: the Editor knows each file's language", ExVimrc::ignored);
     }
 
     /** @return the commands Jasper implements, in the reference's order */

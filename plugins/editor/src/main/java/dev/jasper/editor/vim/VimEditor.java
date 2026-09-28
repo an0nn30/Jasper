@@ -508,6 +508,7 @@ public final class VimEditor {
 
     void message(String text, boolean error) {
         messageLog.add(text);
+        if (error) vim.remember(text);
         if (collecting != null) {
             collecting.add(new OutputLine(text, error));
             return;

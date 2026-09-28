@@ -29,6 +29,10 @@ public final class Vim {
     private final KeyHandlers handlers = new KeyHandlers();
     private final Mappings mappings = new Mappings();
     private final Macros macros = new Macros();
+    /** The global variables {@code :let} sets ({@code g:mapleader}, extension settings), by name without {@code g:}. */
+    private final java.util.Map<String, Object> variables = new java.util.HashMap<>();
+    /** The message history {@code :messages} shows, oldest first (Vim's 'msghistory', 500). */
+    private final java.util.List<String> messages = new java.util.ArrayList<>();
     private final VimCommands commands = VimCommands.standard();
     private Consumer<String> coverage = id -> { };
     private Find lastFind;
@@ -61,6 +65,29 @@ public final class Vim {
 
     /** @return the handler table */
     public KeyHandlers handlers() { return handlers; }
+
+    /** @return the global variables, by name without {@code g:} */
+    java.util.Map<String, Object> variables() { return variables; }
+
+    /**
+     * @param name {@code mapleader} or {@code maplocalleader}
+     * @return what {@code <Leader>} or {@code <LocalLeader>} stands for: the variable, or a backslash when it is
+     *     not set, empty or longer than Vim's 48 bytes
+     */
+    String leader(String name) {
+        Object value = variables.get(name);
+        String text = value == null ? "" : value.toString();
+        return text.isEmpty() || text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 48 ? "\\" : text;
+    }
+
+    /** An error given, or a line the vimrc skipped, joins the message history. */
+    void remember(String message) {
+        messages.add(message);
+        if (messages.size() > 500) messages.removeFirst();
+    }
+
+    /** @return the message history, oldest first */
+    java.util.List<String> messages() { return messages; }
 
     /** @return macro recording and execution */
     Macros macros() { return macros; }

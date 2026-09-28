@@ -29,6 +29,11 @@ class ExMapsTest {
             .containsExactly(KeyInput.of('A'), KeyInput.of('B'), KeyInput.named("Plug"), KeyInput.ctrl('a'));
     }
 
+    @Test void theLeadersAreTheirText() {
+        assertThat(ExMaps.parse("<Leader>x<LocalLeader>", true, ",", " ")).isEqualTo(KeyInput.parse(",x<Space>"));
+        assertThat(ExMaps.parse("<leader>\\", false, "\u00e9", "\\")).as("any text, even a backslash").isEqualTo(KeyInput.parse("\u00e9\\"));
+    }
+
     @Test void showsKeysAsVimsListingDoes() {
         assertThat(ExMaps.display(KeyInput.parse("<Space>a b<Space>"), false)).isEqualTo("<Space>a b<Space>");
         assertThat(ExMaps.display(KeyInput.parse("a b"), true)).isEqualTo("a<Space>b");

@@ -1,0 +1,511 @@
+# The vimrc's commands typed on the command line: let, the vimrc options, syntax, filetype and messages.
+
+=== let sets a register
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let @a = "xy"<CR>"ap
+registers: a
+--- vim 9.1
+expect-text:
+  oxyne two three
+  four five six
+  seven eight nine
+expect-cursor: 1,3
+expect-mode: normal
+expect-register a: c "xy"
+
+=== let sets a register linewise with a trailing line break
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let @a = "new\n"<CR>"ap
+registers: a
+--- vim 9.1
+expect-text:
+  one two three
+  new
+  four five six
+  seven eight nine
+expect-cursor: 2,1
+expect-mode: normal
+expect-register a: l "new\n"
+
+=== let with a single-quoted string
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let @a = 'it''s \n'<CR>"ap
+registers: a
+--- vim 9.1
+expect-text:
+  oit's \nne two three
+  four five six
+  seven eight nine
+expect-cursor: 1,8
+expect-mode: normal
+expect-register a: c "it's \\n"
+
+=== let with escapes
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let @a = "a\tb\x41\u00e9"<CR>"ap
+registers: a
+--- vim 9.1
+expect-text:
+  oa	bAéne two three
+  four five six
+  seven eight nine
+expect-cursor: 1,6
+expect-mode: normal
+expect-register a: c "a\tbAé"
+
+=== let with a special key runs as a macro
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let @a = "A!\<lt>Esc>j"<CR>@a@a
+registers: a
+--- vim 9.1
+expect-text:
+  one two three!
+  four five six!
+  seven eight nine
+expect-cursor: 3,14
+expect-mode: normal
+expect-register a: c "A!\u001bj"
+
+=== let an upper-case register appends
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let @a = "x"<CR>:let @A = "y"<CR>"ap
+registers: a
+--- vim 9.1
+expect-text:
+  oxyne two three
+  four five six
+  seven eight nine
+expect-cursor: 1,3
+expect-mode: normal
+expect-register a: c "xy"
+
+=== let a number into a register
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let @a = 42<CR>"ap
+registers: a
+--- vim 9.1
+expect-text:
+  o42ne two three
+  four five six
+  seven eight nine
+expect-cursor: 1,3
+expect-mode: normal
+expect-register a: c "42"
+
+=== let sets the search register
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let @/ = "eight"<CR>n
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 3,7
+expect-mode: normal
+
+=== let with a comment after the value
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let @a = "q" " a comment<CR>"ap
+registers: a
+--- vim 9.1
+expect-text:
+  oqne two three
+  four five six
+  seven eight nine
+expect-cursor: 1,2
+expect-mode: normal
+expect-register a: c "q"
+
+=== let mapleader changes the Leader of later mappings
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let mapleader = ","<CR>:nmap <lt>Leader>d dd<CR>,d:nmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  ,d            dd
+
+=== let g:mapleader is mapleader
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let g:mapleader = "_"<CR>:nmap <lt>Leader>x dd<CR>_x
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a space as mapleader
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let mapleader = "\<lt>Space>"<CR>:nmap <lt>Leader>w dd<CR> w
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== let maplocalleader
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let maplocalleader = ";"<CR>:nmap <lt>LocalLeader>x dd<CR>:nmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  ;x            dd
+
+=== mapleader applies when the mapping is made
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :nmap <lt>Leader>d dd<CR>:let mapleader = ","<CR>\d
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== let an option
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let &tw = 20<CR>:set tw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    textwidth=20
+
+=== let a local option
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let &l:sw = 3<CR>:set sw?<CR>>>
+output: yes
+--- vim 9.1
+expect-text:
+     one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,4
+expect-mode: normal
+expect-output:
+    shiftwidth=3
+
+=== let a boolean option
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let &ic = 1<CR>:set ic?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    ignorecase
+
+=== let a variable does nothing visible
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :let g:loaded_foo = 1<CR>:let answer = 'yes'<CR>x
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== syntax and filetype do nothing
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :syntax on<CR>:filetype plugin indent on<CR>x
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+
+=== the vimrc options Vim has
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :set enc? ff? ru? ls? mouse? bo? ttimeout? ttm? vb? ul? cp? syntax?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    encoding=utf-8
+    fileformat=unix
+  noruler
+    laststatus=1
+    mouse=
+    belloff=
+  nottimeout
+    ttimeoutlen=-1
+  novisualbell
+    undolevels=1000
+  nocompatible
+    syntax=
+
+=== setting the vimrc options
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :set nocompatible encoding=utf-8 ruler laststatus=2 mouse=a belloff=all ttimeout ttimeoutlen=50 visualbell undolevels=500 syntax=off<CR>:set cp? enc? ru? ls? mouse? bo? ttimeout? ttm? vb? ul? syntax?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  nocompatible
+    encoding=utf-8
+    ruler
+    laststatus=2
+    mouse=a
+    belloff=all
+    ttimeout
+    ttimeoutlen=50
+    visualbell
+    undolevels=500
+    syntax=off
+
+=== several options queried at once
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :set ts? sw? tw? ic?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    tabstop=8
+    shiftwidth=8
+    textwidth=0
+  noignorecase
+
+=== negative ttimeoutlen and undolevels
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :set ttm=-1 ul=-1<CR>:set ttm? ul?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    ttimeoutlen=-1
+    undolevels=-1
+
+=== fileformat must be unix, dos or mac
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :set ff=xx<CR>:set ff?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E474: Invalid argument: ff=xx
+    fileformat=unix
+
+=== fileformat dos
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :set ff=dos<CR>:set ff?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    fileformat=dos
+
+=== messages shows the errors given
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :messages clear<CR>:foo<CR>:set xyz<CR>:messages<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: foo
+  E518: Unknown option: xyz
+  Messages maintainer: The Vim Project
+  E492: Not an editor command: foo
+  E518: Unknown option: xyz
+
+=== messages clear
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :foo<CR>:messages clear<CR>:messages<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: foo
+  Messages maintainer: The Vim Project
+
+=== messages with a count shows the last ones
+text:
+  one two three
+  four five six
+  seven eight nine
+cursor: 1,1
+keys: :messages clear<CR>:foo<CR>:bar<CR>:baz<CR>:2messages<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: foo
+  E492: Not an editor command: bar
+  E492: Not an editor command: baz
+  E492: Not an editor command: bar
+  E492: Not an editor command: baz

@@ -428,3 +428,7 @@ key is typed. A command Vim has and Jasper does not fails with E319.
 | `:omapc[lear]` | remove every Operator-pending mapping |
 | `:imapc[lear]` | remove every Insert-mode mapping |
 | `:cmapc[lear]` | remove every command-line mapping |
+| `:let` | `:let mapleader = ","`, `:let @a = "…"`, `:let &tw = 80`, `:let g:name = …`: a variable, register or option |
+| `:mes[sages]` | the message history: errors, and the vimrc's skipped lines; `:messages clear` |
+| `:sy[ntax]` | accepted and ignored: the Editor highlights by language |
+| `:filet[ype]` | accepted and ignored: the Editor knows each file's language |
