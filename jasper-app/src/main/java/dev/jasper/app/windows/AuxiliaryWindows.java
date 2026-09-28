@@ -49,6 +49,15 @@ public final class AuxiliaryWindows implements AutoCloseable {
         return track(new AuxiliarySurface("", title, AuxiliarySurface.Kind.DIALOG, modal, new Dimension(1, 1), null, owner, shells));
     }
 
+    /**
+     * A modal dialog that remembers its bounds under {@code id}: over the terminal window {@code ownerWindowOrNull}, or
+     * application-modal with no owner when it is null. Showing it blocks until it closes.
+     */
+    public AuxiliarySurface modalDialog(String id, String title, Dimension preferred, UUID ownerWindowOrNull) {
+        if (Objects.requireNonNull(id, "id").isBlank()) throw new IllegalArgumentException("A remembered dialog needs an id");
+        return track(new AuxiliarySurface(id, title, AuxiliarySurface.Kind.DIALOG, true, preferred, ownerWindowOrNull, null, shells));
+    }
+
     /** Reserves one overlay per terminal owner, including surfaces not shown yet. */
     public AuxiliarySurface overlay(String title, UUID ownerWindow) {
         Objects.requireNonNull(ownerWindow);
@@ -77,7 +86,9 @@ public final class AuxiliaryWindows implements AutoCloseable {
             // Dialogs die with their owner, as native dialogs do.
             for (AuxiliarySurface other : List.copyOf(open))
                 if (other.ownerSurface().filter(owner -> owner == surface).isPresent()) other.close();
-            if (surface.kind() == AuxiliarySurface.Kind.WINDOW) surface.lastBounds().ifPresent(bounds -> {
+            boolean remembered = surface.kind() == AuxiliarySurface.Kind.WINDOW
+                || surface.kind() == AuxiliarySurface.Kind.DIALOG && !surface.id().isEmpty();
+            if (remembered) surface.lastBounds().ifPresent(bounds -> {
                 if (bounds.width <= 0 || bounds.height <= 0) return;
                 state.putWindow(surface.id(), new UiState.Bounds(bounds.x, bounds.y, bounds.width, bounds.height));
                 state.save();
