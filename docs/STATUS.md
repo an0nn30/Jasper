@@ -10,10 +10,16 @@
   database. Each package is unpacked and compared byte for byte with the image before it is published. The new
   `linux-packages` workflow builds on `ubuntu-22.04` and `ubuntu-22.04-arm`, then installs every package into
   Debian 12, Ubuntu 24.04, Fedora and openSUSE Tumbleweed containers (`packaging/linux/check-install.sh`). See
-  [Linux packages](packaging.md#linux-packages). Verified on macOS only: `./gradlew check` (3,410 tests, 0
-  failures, 5 skipped), macOS `verifyPackage`, and configuration of the Linux tasks with `-Dos.name=Linux`. **The
-  Linux tasks have not run yet**; the first proof is a `linux-packages` workflow run, which needs a push. Linux
-  desktop acceptance (checklist in `packaging.md`) is the user's. Not pushed; not merged.
+  [Linux packages](packaging.md#linux-packages). Locally: `./gradlew check` (3,410 tests, 0 failures, 5 skipped)
+  and macOS `verifyPackage`. Pushed with the user's approval; the
+  [fifth `linux-packages` run](https://github.com/an0nn30/Jasper/actions/runs/36449030992) passed all ten jobs:
+  both packages on both architectures, and install/library/menu/removal checks on Debian 12, Ubuntu 24.04, Fedora
+  and openSUSE Tumbleweed for x64 and aarch64 (`.deb` ~97 MB, `.rpm` ~119 MB). Earlier runs found and fixed
+  jpackage replacing the menu icon with its generic Java icon (now supplied through `--resource-dir`) and the
+  install-check's container setup. Open: jpackage's install scripts fail on systems without
+  `/usr/share/applications` and `/usr/share/desktop-directories` (documented in `packaging.md`; overriding the
+  scripts would fix it); the regular `ci` workflow is red for unrelated tests already failing on `main`; Linux
+  desktop acceptance (checklist in `packaging.md`) is the user's. Not merged.
 
 - **Editor Vim mode, plan V1b** (branch `claude/vim-v1b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`, written 2026-09-28): Visual mode (charwise,
