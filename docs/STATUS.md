@@ -13,8 +13,9 @@
   (1560 recorded, 5 divergent).
   - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
   - `./gradlew check`: 4,068 tests, 0 failed, 0 errors, 5 skipped.
-  - Not done: GUI checks 51–60 of the [checklist](editor-verification.md) (user-run); plans V2b, V3 and V4; merge;
-    push.
+  - Merged into local `main` on 2026-09-28 after merging main (plugin settings C1) into the branch; `./gradlew check`
+    on the merged tree: 4,099 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+  - Not done: GUI checks 51–60 of the [checklist](editor-verification.md) (user-run); plans V2b, V3 and V4; push.
 - **Plugin settings C1** (`claude/plugin-settings`, 2026-09-28; spec
   `docs/superpowers/specs/2026-09-28-jasper-plugin-settings-design.md`, plan
   `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c1.md`): SDK `dev.jasper.sdk.settings` (declarations,
