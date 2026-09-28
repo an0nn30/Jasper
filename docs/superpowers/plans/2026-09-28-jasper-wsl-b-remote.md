@@ -2,10 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 1-7 done (plan A is implemented on this branch, which satisfies "plan A merged").
+**Status:** Implemented on `worktree-wsl-hosts` (subagent-driven), 2026-09-28; Windows `check` shows only the known
+failures; macOS/Linux check and native acceptance handed to the user. `./gradlew check --continue` on Windows: 3479
+tests, 234 skipped, 8 failed, every one on "Known failed test cases" in `docs/windows-startup-verification.md` (app
+1187/141 skipped/2 failed, terminal 391/19/0, Editor 1172/13/0, Remote 278/54/6, Vault 139/7/0, Buddy 163/0/0,
+History 40/0/0, SDK 27/0/0, SDK testkit 60/0/0, Sample 11/0/0, Snippets 11/0/0). Plan A is implemented on this
+branch, which satisfies "plan A merged".
 Record every deviation from this text here and in `docs/STATUS.md`.
 
-Deviations so far: none in code. Tasks 1-3 applied as written: plan A landed `ShellProfile`, `ShellProfile.Kind`, `ShellProfileCatalog.current()/onChanged(Runnable)`, `OpenSpec.Local(Optional<Path>, Optional<String>)` and the `JasperApplication.shellProfiles` field (created in the constructor, before `startPlugins`) under the names this plan assumed, and every edit anchor still matched. `knownProfile` compares ids exactly (as the fake does), although plan A resolves `wsl:` ids case-insensitively when launching. Plugins match profile ids exactly; they receive canonical ids from profiles(), so plan A's case-insensitive wsl: matching is not needed there. Tasks 4-7 applied as written, with one hygiene fix: the Task 5 and 6 commits left the replaced `HostsPanel.java` and `RemoteScope.java` (and `HostsPanelTest.java`) with raw non-ASCII literals (the dash, ellipsis, stars, dot and middle dot, as the files had before); Task 7's commit rewrites them as Java escapes, as the plan's code intended.
+Deviations so far: none in code. Tasks 1-3 applied as written: plan A landed `ShellProfile`, `ShellProfile.Kind`, `ShellProfileCatalog.current()/onChanged(Runnable)`, `OpenSpec.Local(Optional<Path>, Optional<String>)` and the `JasperApplication.shellProfiles` field (created in the constructor, before `startPlugins`) under the names this plan assumed, and every edit anchor still matched. `knownProfile` compares ids exactly (as the fake does), although plan A resolves `wsl:` ids case-insensitively when launching. Plugins match profile ids exactly; they receive canonical ids from profiles(), so plan A's case-insensitive wsl: matching is not needed there. Tasks 4-7 applied as written, with one hygiene fix: the Task 5 and 6 commits left the replaced `HostsPanel.java` and `RemoteScope.java` (and `HostsPanelTest.java`) with raw non-ASCII literals (the dash, ellipsis, stars, dot and middle dot, as the files had before); Task 7's commit rewrites them as Java escapes, as the plan's code intended. Task 8
+(documentation) additions beyond the text: `docs/remote.md` gains native item 15 (the Sessions dropdown and `>ssh`
+rows, which items 11 to 14 did not exercise), item 13 names the "Detect shells again" button, the WSL-group checks
+are copied into `docs/windows-startup-verification.md`'s native checklist, and the full check ran as `check
+--continue` on Windows, where it is not green only because of the known failures (Step 4 expected BUILD SUCCESSFUL).
 
 **Goal:** Plugins can list the shells Jasper detected (SDK 0.8.6 `Terminals.profiles()`) and open one by id; the
 Remote plugin uses that to show a read-only "WSL" group of distributions first in its panel (renamed "Sessions"),
@@ -2375,7 +2384,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Produces: documentation only.
 - Consumes: Tasks 1 to 7.
 
-- [ ] **Step 1: Remote guide**
+- [x] **Step 1: Remote guide**
 
 In `docs/remote.md`, in the first paragraph replace `The **SSH hosts** panel shows searchable` with
 `The **Sessions** panel shows searchable`. After the paragraph that ends `The list updates when hosts are added, edited, imported or removed.`
@@ -2410,7 +2419,7 @@ For the WSL group (Windows with at least one WSL 1 and one WSL 2 distribution), 
 14. Collapse the WSL group, restart Jasper, and confirm it stays collapsed.
 ```
 
-- [ ] **Step 2: SDK guides**
+- [x] **Step 2: SDK guides**
 
 In `docs/sdk-architecture.md`, append at the end of the file:
 
@@ -2472,7 +2481,7 @@ In `docs/README.md`, replace
 `SSH hosts, import from ~/.ssh/config, host-key trust, shared sessions and the hosts panel.` with
 `SSH hosts, import from ~/.ssh/config, host-key trust, shared sessions, and the Sessions panel with WSL distributions.`.
 
-- [ ] **Step 3: Status**
+- [x] **Step 3: Status**
 
 Add at the top of `## Current state` in `docs/STATUS.md` (fill in the counts from Step 4):
 
@@ -2494,7 +2503,7 @@ Add at the top of `## Current state` in `docs/STATUS.md` (fill in the counts fro
 Update this plan's `**Status:**` line to "Implemented on `worktree-wsl-hosts`" with the date and test count, and list
 every deviation under "Deviations so far".
 
-- [ ] **Step 4: Run the full check and the hygiene scan**
+- [x] **Step 4: Run the full check and the hygiene scan**
 
 Run: `./gradlew check`
 Expected: BUILD SUCCESSFUL. Count results from `*/build/test-results/test/*.xml` and `plugins/*/build/test-results/test/*.xml`
@@ -2505,7 +2514,7 @@ Where Python is unavailable (the Windows worktree), run instead:
 `LC_ALL=C.UTF-8 grep -rnP '[\x{E000}-\x{F8FF}]|[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]' --include=*.java jasper-sdk/src jasper-sdk-testkit/src jasper-app/src plugins`
 Expected: no output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current

@@ -109,8 +109,7 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
   `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.8.0, <0.9"`
-  (Vault `>=0.8.2` for icon meanings; Remote `>=0.8.3` for remote directory hints; Editor
-  `>=0.8.4` for `onCloseCommand`, quit guards and `chooseSaveFile`).
+  (Vault `>=0.8.2` for icon meanings; Editor `>=0.8.5` for hosted document tabs; Remote `>=0.8.6` for shell profiles).
   Jasper supplies IntelliJ New UI artwork; plugins need no artwork. Returned icons are 16px.
   SDK 0.8.2 exposes the complete catalog with `icon(BundledIcon)`, for example
   `context.appearance().icon(BundledIcon.TOOLWINDOWS_PROJECT)`.
@@ -235,7 +234,7 @@ equal. Finding things needs no capability. What a handle may do does:
 | `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()`, and subscribe to `TerminalEvents` |
 | `terminal.selection` | read `PaneHandle.selection()` |
 | `terminal.inject` | `sendText`, `sendBytes`, `paste` |
-| `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()` |
+| `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()` or `localProfile(id)`, and `Terminals.profiles()` and `onProfilesChanged` |
 | `session.provide` | `Terminals.openTab` and `split` with `OpenRequest.session(...)` |
 
 Declare them in `plugin.toml`; the user is shown the list before your plugin loads. A gated call
@@ -286,6 +285,11 @@ private static void installTerminalDemo(PluginContext context) {
 - `PaneInfo.shell` is the launcher's label (`zsh`, `fish`) or a provided session's title.
 - To run a command in a new tab, open one with `OpenRequest.local()` or `localIn(directory)` and
   `sendText` to the pane you get back; the tab runs the user's configured shell.
+- **Shell profiles (SDK 0.8.6).** `context.terminals().profiles()` lists the shells Jasper detected,
+  such as PowerShell or a WSL distribution (`kind()` is `ShellProfileInfo.Kind.WSL` and `detail()`
+  reads `WSL 1` or `WSL 2`). Open one with `OpenRequest.localProfile(profile.id())`; an id Jasper does
+  not list opens nothing and returns empty. On Windows, detection may finish after your plugin starts:
+  subscribe with `onProfilesChanged` and read the list again. Declare `sdk = ">=0.8.6, <0.9"`.
 
 ## Providing a session
 
@@ -475,7 +479,8 @@ that names its own toggle.
 `focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
 `titleChanged`, `cwdChanged`, `sessionExited` and `bell` publish terminal events, delivered by
-`flush()`. `host.remoteCwdChanged(paneId, host, path)` reports a remote directory. Give the
+`flush()`. `host.remoteCwdChanged(paneId, host, path)` reports a remote directory.
+`host.setShellProfiles(list)` scripts the detected shell profiles and runs `onProfilesChanged` listeners; `openRequests()` then ends a line with `|<profile id>` when the request named one. Give the
 `PluginInfo` you start with the capabilities your `plugin.toml` declares.
 A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`, `sessionOutput`,
 `cancelSession` and `reconnectSession`; `flush()` notices exits. The fake runs cancellation handlers

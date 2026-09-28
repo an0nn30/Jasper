@@ -117,3 +117,17 @@ Native acceptance for the user (no GUI was launched):
 - [ ] Choosing a WSL distribution as the Profile and applying: the next New Tab starts it; an uninstalled profile id in
       `config.toml` starts PowerShell and shows a warning in the status bar.
 - [ ] ↻ next to the Profile dropdown detects the profiles again without freezing the dialog.
+
+Remote's WSL group (plan `docs/superpowers/plans/2026-09-28-jasper-wsl-b-remote.md`; the same checks are items 11
+to 15 under "Native acceptance" in `docs/remote.md`). The full `check --continue` after plan B: 3479 tests, 234
+skipped, 8 failed (app 1187/141/2, Remote 278/54/6, the rest 0 failed), exactly the "Failed in that run" list above.
+
+- [ ] The rail panel is titled **Sessions** and starts with a WSL group: each distribution with its WSL 1 or WSL 2
+      badge, `docker-desktop` absent.
+- [ ] Double-click (or Enter, or **Open**) on a distribution opens a tab running it; **Open in split** in the context
+      menu splits the current pane.
+- [ ] The row shows a dot for one open pane and a count for two; exiting or closing them clears it.
+- [ ] The toolbar's **Sessions** dropdown lists the distributions first ("Ubuntu (WSL 2)"); choosing one opens a tab.
+- [ ] `>ssh` in the palette lists distributions as `WSL` rows; Enter opens a tab, Ctrl+Enter splits.
+- [ ] ↻ after installing or removing a distribution updates the group, the dropdown and `>ssh` without a restart;
+      a collapsed WSL group stays collapsed after a restart.

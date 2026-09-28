@@ -2,7 +2,7 @@
 
 Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or type `>ssh` in the
 command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
-split beside the current pane, Shift+Enter edits the host. The **SSH hosts** panel shows searchable
+split beside the current pane, Shift+Enter edits the host. The **Sessions** panel shows searchable
 compact tree-style rows grouped by folder, favorites first, with slightly larger text.
 Choose **View > SSH Hosts** or press **Cmd+Shift+S** (Ctrl+Shift+S elsewhere) to show or hide
 the panel in the current window. Opening the sidebar highlights the first visible host and focuses
@@ -19,6 +19,17 @@ The toolbar’s **Sessions** dropdown lists saved hosts alphabetically with thei
 Choose a host to focus its most recently used running session, or connect in a new tab if none
 is open. **Manage Sessions...** opens the hosts panel, including when no hosts are saved.
 The list updates when hosts are added, edited, imported or removed.
+
+On Windows with WSL installed, the Sessions panel starts with a read-only **WSL** group: the
+distributions Jasper detected for its shell profiles, each with its WSL version (WSL 1 or WSL 2) as a
+badge. Double-click or Enter, **Open** on the card, or **Open in new tab** in the context menu opens
+the distribution in a new local tab; **Open in split** splits the current pane. A dot and count mark
+the panes Remote opened for it whose shell still runs. Distributions are never saved in `hosts.toml`
+and cannot be edited, duplicated, deleted or browsed with SFTP; the group's collapsed state is saved
+as `wsl` in `panel-state.toml`, and search matches distribution names. The Sessions dropdown lists
+them first, titled with their version, and `>ssh` lists them as rows tagged `WSL`. To make a
+distribution the default shell for new panes, choose it under Settings › Terminal › Shell. The status
+bar still counts SSH sessions only. Without WSL, nothing here changes.
 
 Connecting shows a centered overlay inside the owning app window, with an explicit **Cancel**
 button. It stays centered on resize and blocks underlying input; Escape and outside clicks do not
@@ -132,6 +143,21 @@ For the host-list/dialog follow-up, also check:
    running pane is selected. Close both; double-click now starts a new connection.
 10. Connect to Linux/macOS/Windows hosts and search by the learned OS or IP. An SSH server that
     disallows exec requests should still provide its normal terminal.
+
+For the WSL group (Windows with at least one WSL 1 and one WSL 2 distribution), also check:
+
+11. The panel is titled **Sessions** and starts with a WSL group listing each distribution with the
+    right WSL 1 or WSL 2 badge; `docker-desktop` is absent. A Mac or a Windows machine without WSL
+    shows no group.
+12. Double-click a distribution: a tab titled with its name runs that distribution's shell, and the
+    row shows a dot. **Open in split** adds a second pane (count 2). Exit one shell and close the other
+    pane: the dot disappears.
+13. Install or remove a distribution, then click **Detect shells again** (↻) under Settings › Terminal › Shell: the
+    group, the Sessions dropdown and `>ssh` follow without a restart.
+14. Collapse the WSL group, restart Jasper, and confirm it stays collapsed.
+15. The toolbar's **Sessions** dropdown lists the distributions first (for example "Ubuntu (WSL 2)");
+    choosing one opens it in a new tab. In `>ssh`, distributions are rows tagged `WSL`: Enter opens a
+    tab, Cmd/Ctrl+Enter splits the current pane, and Shift+Enter (edit) does nothing.
 
 For native acceptance of the UI changes, resize the app while connecting and confirm the overlay
 stays centered; Escape/outside clicks and underlying menus should not interrupt it. Cancel should

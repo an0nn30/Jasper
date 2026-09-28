@@ -362,3 +362,21 @@ report terminal content only. Plugins must tolerate an empty active pane while e
 
 `Appearance.editorPalette()` provides semantic surface, text, caret, selection, current-line
 and gutter colors. Jasper derives missing theme tokens; plugins retain syntax classification.
+
+### Shell profiles (SDK 0.8.6)
+
+`Terminals.profiles()` lists the shells the application detected (`launch.ShellProfileCatalog`:
+PowerShell, PowerShell 7, Command Prompt and each WSL distribution on Windows, the login shell
+elsewhere, and Custom when `terminal.shell.program` is set) as `ShellProfileInfo(id, name, kind,
+detail)`, and `onProfilesChanged` reports a refresh. Both are binary-compatible default methods (an
+empty list, an inert subscription) and need `terminal.open`. Kinds mirror the application's one to one;
+the SDK does not say which profile the user chose as default, and a plugin cannot
+change that choice.
+
+`LocalSpec.profile` names a profile. `HostedTerminals` checks the id against the catalog: an id it
+does not list logs a warning and makes `openTab` and `split` return empty, rather than starting the
+default shell. An empty profile means what Jasper's own New Tab or Split would start. The catalog
+reaches `dev.jasper.app.plugins` as `PluginRuntime.ShellProfiles`, a supplier and a listener
+registration, so the plugin runtime depends only on the `launch.ShellProfile` value; listener
+registrations close with the plugin. Plugins open only shells the application detected: explicit
+commands in `LocalSpec` remain a separate decision. Remote uses this for its WSL group.

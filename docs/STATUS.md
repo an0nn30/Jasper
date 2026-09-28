@@ -2,6 +2,27 @@
 
 ## Current state — 2026-09-28
 
+- **WSL B: SDK shell profiles and the Remote WSL group** (`worktree-wsl-hosts`, 2026-09-28; spec
+  `docs/superpowers/specs/2026-09-28-jasper-wsl-shell-profiles-design.md`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-wsl-b-remote.md`): SDK 0.8.6 adds `ShellProfileInfo`,
+  `Terminals.profiles()`/`onProfilesChanged` (default methods, `terminal.open`), `LocalSpec.profile` and
+  `OpenRequest.localProfile`; the app feeds plan A's `ShellProfileCatalog` to plugins through
+  `PluginRuntime.ShellProfiles` and refuses unknown ids (empty result, warning); the testkit scripts profiles
+  (`setShellProfiles`) and the contract suite covers known, unknown and default. Remote 0.5.0 (`sdk >=0.8.6`)
+  titles its panel Sessions and shows a read-only WSL group first (badges, session dots, Open in new tab/split,
+  collapsed key `wsl`), lists distributions first in the Sessions dropdown (no separator: the SDK dropdown has
+  none) and as `WSL` rows in `>ssh`. `./gradlew check --continue` on Windows: 3479 tests, 234
+  skipped, 8 failed, all on the known list in `docs/windows-startup-verification.md` (app 1187/141 skipped/2 failed,
+  terminal 391/19/0, Editor 1172/13/0, Remote 278/54/6, Vault 139/7/0, Buddy 163/0/0, History 40/0/0, SDK 27/0/0,
+  SDK testkit 60/0/0, Sample 11/0/0, Snippets 11/0/0); hygiene scan clean. Native WSL acceptance (docs/remote.md items 11 to 15, also in
+  `docs/windows-startup-verification.md`) and the macOS/Linux check pending with the user. Deviations from the
+  plan: none in code. Plan A's names matched the plan's assumptions (`ShellProfile.Kind`, `ShellProfileCatalog`,
+  `OpenSpec.Local(Optional<Path>, Optional<String>)`, `JasperApplication.shellProfiles`); `knownProfile` compares
+  ids exactly although plan A launches `wsl:` ids case-insensitively (plugins receive canonical ids from
+  `profiles()`); Tasks 5 and 6 left raw non-ASCII literals in `HostsPanel`, `RemoteScope` and `HostsPanelTest`,
+  rewritten as Java escapes in Task 7; Task 8 adds native item 15 (Sessions dropdown and `>ssh`) to
+  `docs/remote.md`, names the ↻ "Detect shells again" button in item 13, and copies the WSL-group checks into
+  `docs/windows-startup-verification.md`. Not pushed; not merged.
 - **WSL shell profiles, plan A** (branch `worktree-wsl-hosts`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-wsl-a-profiles.md`, spec
   `docs/superpowers/specs/2026-09-28-jasper-wsl-shell-profiles-design.md`): Windows sessions run on ConPTY, so OSC
@@ -33,7 +54,8 @@
   `JasperApplication.newWindow()`), so a split of a WSL pane in `/mnt/c/Users/NAME` stays there;
   `sessionDefaults` reports no profile warning for SSH panes; the Settings dropdown keeps one "(not detected)"
   entry and ignores re-picking the shown entry; a supplied launcher skips detection; `WslDistributionsTest` runs
-  `java.home`'s java. Plan B (Remote panel WSL group, SDK 0.8.6) not started. Not merged.
+  `java.home`'s java. Plan B (Remote panel WSL group, SDK 0.8.6) is implemented on the same branch (entry above).
+  Not merged.
 - **Settings dialog B2** (`claude/settings-dialog-b2`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b2.md`): Keymap and Plugins are pages of Settings.
   Keymap stages shortcut edits (Set) and saves them in one write on Apply; shortcuts and sections that differ from
