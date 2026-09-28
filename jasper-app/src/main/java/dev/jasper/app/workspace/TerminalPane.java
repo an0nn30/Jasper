@@ -33,6 +33,9 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     static final int PADDING = 4;
     private final UUID id = UUID.randomUUID();
     private final Path launchDirectory;
+    /** The profile this local pane asked for (empty: the user's default), and the one its launch resolved to. */
+    private final Optional<String> requestedProfile;
+    private Optional<String> launchedProfile = Optional.empty();
     private final ShellLauncher launcher;
     private final AtomicBoolean updateQueued = new AtomicBoolean();
     private volatile String shellLabel;
@@ -164,10 +167,14 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     TerminalPane(Path directory, ShellLauncher launcher) { this(directory, launcher, null); }
 
     /** {@code requestOrNull} makes this a pane whose session somebody else provides; it never starts a local shell. */
-    TerminalPane(Path directory, ShellLauncher launcher, SessionRequest requestOrNull) {
+    TerminalPane(Path directory, ShellLauncher launcher, SessionRequest requestOrNull) { this(directory, launcher, requestOrNull, Optional.empty()); }
+
+    /** {@code profile} names the shell profile a local pane starts; empty means the user's default. */
+    TerminalPane(Path directory, ShellLauncher launcher, SessionRequest requestOrNull, Optional<String> profile) {
         super(new BorderLayout());
         this.launchDirectory = directory;
         this.launcher = launcher;
+        this.requestedProfile = java.util.Objects.requireNonNull(profile, "profile");
         this.request = requestOrNull;
         this.shellLabel = requestOrNull == null ? launcher.label() : requestOrNull.title();
         if (requestOrNull != null) reportedTitle = requestOrNull.title();
@@ -201,7 +208,7 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
 
     void start() {
         if (request != null) { connect(); return; }
-        shellLabel = launcher.launch(launchDirectory, (created, failure) -> {
+        ShellLauncher.Launch launched = launcher.launch(launchDirectory, requestedProfile, (created, failure) -> {
             if (closed) { if (created != null) created.close(); return; }
             if (failure != null) {
                 LOG.log(System.Logger.Level.ERROR, "Terminal pane launch failed", failure);
@@ -216,6 +223,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
             }
             adopt(created);
         });
+        shellLabel = launched.label();
+        launchedProfile = launched.profile();
     }
 
     /** Shows a running session here: the local shell, a provider's connection, or a reconnect replacing the last one. */
@@ -446,6 +455,9 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
         return TerminalTitle.singleLine(job.startsWith("-") ? job.substring(1) : job);
     }
     String shellLabel() { return shellLabel; }
+
+    /** The profile this local pane launched, or asked for before launching; empty for provided sessions and plain launchers. */
+    Optional<String> profile() { return request != null ? Optional.empty() : launchedProfile.or(() -> requestedProfile); }
     void focusTerminal() { if (!closed) (view == null ? this : view).requestFocusInWindow(); }
     void setActive(boolean selected) {
         active = selected;

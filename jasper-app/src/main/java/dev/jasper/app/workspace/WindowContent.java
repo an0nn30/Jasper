@@ -551,9 +551,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     TerminalTab openTab(Path directory) { return openTab(directory, null); }
 
     /** {@code requestOrNull} makes the tab's first pane a provided session instead of a local shell. */
-    TerminalTab openTab(Path directory, SessionRequest requestOrNull) {
+    TerminalTab openTab(Path directory, SessionRequest requestOrNull) { return openTab(directory, requestOrNull, Optional.empty()); }
+
+    /** As above; {@code profile} names a local first pane's shell profile, empty for the user's default. */
+    TerminalTab openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile) {
         if (closed) return null;
-        TerminalTab tab = new TerminalTab(directory, launcher, requestOrNull);
+        TerminalTab tab = new TerminalTab(directory, launcher, requestOrNull, profile);
         if (terminals != null) terminals.tabOpened(tab);
         tab.onChanged = () -> {
             for (TerminalPane pane : tab.panes()) if (pane.view() == null) pane.applyTheme(themes.current().palette());

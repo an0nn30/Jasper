@@ -49,7 +49,7 @@ final class WindowTerminals implements AutoCloseable {
             (axis, spec) -> {
                 SplitTree.Axis direction = axis == SplitAxis.RIGHT ? SplitTree.Axis.RIGHT : SplitTree.Axis.DOWN;
                 TerminalPane created = switch (spec) {
-                    case OpenSpec.Local local -> tab.split(pane, direction, local.directory().orElse(null), null);
+                    case OpenSpec.Local local -> tab.split(pane, direction, local.directory().orElse(null), null, local.profile());
                     case OpenSpec.Session session -> tab.split(pane, direction, home(), session.request());
                 };
                 return Optional.ofNullable(created).map(split -> entry(tab, split));
@@ -61,7 +61,7 @@ final class WindowTerminals implements AutoCloseable {
     private Optional<PaneEntry> openTab(OpenSpec spec) {
         if (closed) return Optional.empty();
         TerminalTab tab = switch (spec) {
-            case OpenSpec.Local local -> owner.openTab(local.directory().orElseGet(owner::directory));
+            case OpenSpec.Local local -> owner.openTab(local.directory().orElseGet(owner::directory), null, local.profile());
             case OpenSpec.Session session -> owner.openTab(home(), session.request());
         };
         return tab == null || tab.focusedPane() == null ? Optional.empty() : Optional.of(entry(tab, tab.focusedPane()));

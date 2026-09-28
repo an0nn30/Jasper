@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 0-8 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
+**Status:** In progress: Tasks 0-9 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far: none.
@@ -2688,7 +2688,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Produces: `OpenSpec.Local(Optional<Path> directory, Optional<String> profile)` with `Local(Optional<Path>)` kept; `TerminalPane(Path, ShellLauncher, SessionRequest, Optional<String> profile)` and `TerminalPane.profile()`; `TerminalTab(Path, ShellLauncher, SessionRequest, Optional<String>)`, `TerminalTab.split(TerminalPane, SplitTree.Axis, Path, SessionRequest, Optional<String>)` (the four-argument `split` inherits the target's profile); `WindowContent.openTab(Path, SessionRequest, Optional<String>)`. A registry `OpenSpec.Local` split or tab passes its profile explicitly (empty: the user's default), as plan B's SDK contract requires.
 - Consumes: `ShellLauncher.launch(Path, Optional<String>, BiConsumer)` and `ShellLauncher.Launch` (Task 7).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Cross-platform: the idle session is `cmd.exe /k` on Windows and `/bin/sh` elsewhere.
 
@@ -2783,12 +2783,12 @@ class ShellProfilePaneTest {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.ShellProfilePaneTest'`
 Expected: FAIL: compilation errors (`profile()`, the five-argument `split`, `openTab(Path, SessionRequest, Optional)`, the two-argument `OpenSpec.Local` do not exist).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Replace `OpenSpec.java`'s `Local` record with:
 
@@ -2954,12 +2954,12 @@ with
             case OpenSpec.Local local -> owner.openTab(local.directory().orElseGet(owner::directory), null, local.profile());
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.plugins.*'`
 Expected: PASS on macOS/Linux; on Windows no failure outside the known list (`ShellProfilePaneTest` must pass).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current
