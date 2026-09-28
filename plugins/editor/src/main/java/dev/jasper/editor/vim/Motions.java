@@ -100,10 +100,12 @@ final class Motions {
         Pos p = c.cursor();
         boolean wraps = c.options.has("whichwrap", String.valueOf(which));
         boolean inclusive = false;
+        // In Visual mode l may go onto the end of the line (nv_right's past_line).
+        boolean pastLine = c.inVisual();
         for (int n = c.count; n > 0; n--) {
             String line = c.buffer.line(p.line);
             int next = Text.next(line, p.col);
-            if (p.col < line.length() && next < line.length()) {
+            if (p.col < line.length() && (next < line.length() || pastLine)) {
                 p.col = next;
                 continue;
             }
@@ -159,7 +161,9 @@ final class Motions {
         int down = c.count - 1, last = c.buffer.count() - 1;
         if (down > 0 && p.line >= last) return null;
         int line = Math.min(last, p.line + down);
-        return new Target(new Pos(line, Text.last(c.buffer.line(line))), Target.Kind.INCLUSIVE, Column.END, false, false, true);
+        // In Visual mode the cursor goes onto the end of the line, so the area takes the line break (coladvance).
+        String text = c.buffer.line(line);
+        return new Target(new Pos(line, c.inVisual() ? text.length() : Text.last(text)), Target.Kind.INCLUSIVE, Column.END, false, false, true);
     }
 
     static Target lastNonBlank(Context c) {

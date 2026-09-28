@@ -18,6 +18,12 @@ final class Context {
     String operator;
     /** The forced motion type after the operator: {@code v}, {@code V}, or 0. */
     char forced;
+    /** In Visual mode, the other end of the area (Vim's VIsual); null otherwise. */
+    Pos visual;
+    /** The command line typed for {@code /} and {@code ?}, or null. */
+    String line;
+    /** For an operator, where the cursor was when it started (Vim's oap->cursor_start, for {@code gw}). */
+    Pos cursorStart;
 
     Context(VimEditor editor) {
         this.editor = editor;
@@ -40,6 +46,9 @@ final class Context {
     int argumentChar() { return argument == null ? -1 : argument.plainChar(); }
 
     int tabstop() { return options.number("tabstop"); }
+
+    /** @return whether Visual mode is active, where the cursor may sit on the end of a line (Vim's past_line) */
+    boolean inVisual() { return visual != null; }
 
     static VimFailure fail() { return VimFailure.bell(); }
 }

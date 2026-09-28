@@ -23,6 +23,8 @@ public final class VimEditor {
     private final Options options;
     private final Machine machine;
     private final InsertMode insert;
+    private final CommandLine commandLine = new CommandLine(this);
+    private final Marks marks;
     private final List<Runnable> listeners = new ArrayList<>();
     private final CaretListener caretListener = event -> caretMoved();
     private final CaretStyle originalCaret;
@@ -34,6 +36,28 @@ public final class VimEditor {
     private int bells;
     private boolean busy;
     private EditorDefaults defaults;
+    /** In Visual mode, the other end of the area (Vim's VIsual). */
+    private Pos visualAnchor;
+    private final Highlights highlights;
+    /** While a search pattern is typed with 'incsearch', the match it would find ({start, end} offsets), or null. */
+    private int[] incsearch;
+    /** Bumped by every text change, so the 'hlsearch' matches are found again only when needed. */
+    private int textVersion;
+    private List<Object> highlightedPattern;
+    private int highlightedVersion = -1;
+    private List<int[]> searchMatches = List.of();
+    private boolean highlightPending;
+    private java.util.function.Supplier<String> documentName = () -> "[No Name]";
+    private java.util.function.BooleanSupplier documentModified = () -> false;
+    /** Leaving the tab sets the {@code '"} mark (spec 3.6). */
+    private final java.awt.event.FocusListener leaveListener = new java.awt.event.FocusAdapter() {
+        @Override public void focusLost(java.awt.event.FocusEvent event) { marks.set('"', cursor()); }
+    };
+    private final DocumentListener highlightListener = new DocumentListener() {
+        @Override public void insertUpdate(DocumentEvent event) { textChanged(); }
+        @Override public void removeUpdate(DocumentEvent event) { textChanged(); }
+        @Override public void changedUpdate(DocumentEvent event) { }
+    };
 
     /**
      * Turns Vim on for the area.
@@ -46,9 +70,13 @@ public final class VimEditor {
         this.vim = vim;
         this.area = area;
         this.buffer = new Buffer(area.getDocument());
+        this.marks = new Marks(area.getDocument());
         this.options = vim.options().local();
         this.machine = new Machine(this);
         this.insert = new InsertMode(this);
+        this.highlights = new Highlights(area);
+        area.getDocument().addDocumentListener(highlightListener);
+        area.addFocusListener(leaveListener);
         originalCaret = area.getCaret() instanceof ConfigurableCaret caret ? caret.getStyle() : CaretStyle.VERTICAL_LINE_STYLE;
         editorDefaults(defaults);
         options.onChanged(this::syncArea);
@@ -71,6 +99,11 @@ public final class VimEditor {
         area.attach(null);
         area.setCaretStyle(RTextArea.INSERT_MODE, originalCaret);
         area.enableInputMethods(true);
+        marks.close();
+        area.getDocument().removeDocumentListener(highlightListener);
+        area.removeFocusListener(leaveListener);
+        highlights.clear();
+        vim.forget(this);
         buffer.close();
     }
 
@@ -93,6 +126,8 @@ public final class VimEditor {
         insert.abort();
         machine.abort();
         mode = Mode.NORMAL;
+        visualAnchor = null;
+        marks.clear();
         busy = true;
         try { setCursor(cursor()); }
         finally { busy = false; }
@@ -107,6 +142,12 @@ public final class VimEditor {
      * @return whether Vim took it
      */
     public boolean offer(KeyInput key) {
+        if (commandLine.active()) {
+            // The command line takes every key but the ⌘ ones.
+            if ((key.modifiers() & KeyInput.META) != 0) return false;
+            feed(key);
+            return true;
+        }
         boolean mine = switch (vim.handlers().handler(key, handlerMode())) {
             case VIM -> true;
             case IDE -> false;
@@ -120,6 +161,7 @@ public final class VimEditor {
         return switch (mode()) {
             case INSERT, REPLACE -> 'i';
             case OPERATOR_PENDING -> 'o';
+            case VISUAL, VISUAL_LINE, VISUAL_BLOCK -> 'x';
             default -> 'n';
         };
     }
@@ -133,6 +175,7 @@ public final class VimEditor {
      * also passes on a key bound to one of the Editor's own commands (spec 2.2).
      */
     boolean passesOn(KeyInput key) {
+        if (commandLine.active()) return (key.modifiers() & KeyInput.META) != 0;
         if (mode.inserting() || (key.modifiers() & KeyInput.META) != 0) return true;
         return vim.handlers().handler(key, handlerMode()) == KeyHandlers.Handler.IDE;
     }
@@ -142,6 +185,12 @@ public final class VimEditor {
         bells++;
         fire();
     }
+
+    /** Rings the bell without failing the command (a key the command line has no use for). */
+    void bell() { bells++; }
+
+    /** @return the command line, active while {@code /} or {@code ?} reads a pattern */
+    CommandLine commandLine() { return commandLine; }
 
     /** A failing Insert-mode key: the bell rings and the insert goes on, as Vim's ins_del and ins_bs beep (spec 2.3). */
     void insertKeyFailed(VimFailure failure) {
@@ -179,6 +228,7 @@ public final class VimEditor {
             message("Internal error; the command was cancelled", true);
         } finally {
             busy = false;
+            if (!commandLine.active()) marks.checkpcmark(cursor());
             if (mode == Mode.NORMAL || mode == Mode.OPERATOR_PENDING) setCursor(cursor());
             look();
             fire();
@@ -187,7 +237,8 @@ public final class VimEditor {
 
     /** Runs one key without the failure handling, for {@code .} and a count's repeat. */
     void dispatch(KeyInput key) {
-        if (mode.inserting()) insert.key(key);
+        if (commandLine.active()) commandLine.key(key);
+        else if (mode.inserting()) insert.key(key);
         else machine.key(key);
     }
 
@@ -195,10 +246,41 @@ public final class VimEditor {
     void typedByInputMethod(String text) { insert.typedByInputMethod(text); }
 
     /** @return the mode */
-    public Mode mode() { return mode == Mode.NORMAL && machine.operatorPending() ? Mode.OPERATOR_PENDING : mode; }
+    public Mode mode() {
+        if (commandLine.active()) return Mode.COMMAND_LINE;
+        return mode == Mode.NORMAL && machine.operatorPending() ? Mode.OPERATOR_PENDING : mode;
+    }
 
     /** @return the partly typed command ('showcmd') */
-    public String showcmd() { return options.flag("showcmd") ? machine.showcmd() : ""; }
+    public String showcmd() {
+        if (!options.flag("showcmd")) return "";
+        String pending = machine.showcmd();
+        return pending.isEmpty() && mode.visual() && visualAnchor != null ? visualSize() : pending;
+    }
+
+    /**
+     * The Visual area's size as Vim's showcmd shows it: {@code 3x5} (lines by display columns) for a block, the line
+     * count for a linewise or multi-line area, else the character count, with the UTF-8 byte count after it when it
+     * differs ({@code 3-4}).
+     */
+    private String visualSize() {
+        Pos cursor = cursor();
+        int lines = Math.abs(cursor.line - visualAnchor.line) + 1;
+        if (mode == Mode.VISUAL_BLOCK) {
+            int ts = options.number("tabstop");
+            int left = Math.min(Visual.startVcol(buffer, visualAnchor, ts), Visual.startVcol(buffer, cursor, ts));
+            int right = Math.max(Visual.endVcol(buffer, visualAnchor, ts), Visual.endVcol(buffer, cursor, ts));
+            return lines + "x" + (right - left + 1);
+        }
+        if (mode == Mode.VISUAL_LINE || lines > 1) return String.valueOf(lines);
+        String line = buffer.line(cursor.line);
+        int from = Math.min(cursor.col, visualAnchor.col), to = Math.max(cursor.col, visualAnchor.col);
+        to = to < line.length() ? Text.next(line, to) : line.length();
+        String part = line.substring(Math.min(from, line.length()), to);
+        int chars = part.codePointCount(0, part.length()), bytes = part.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        if (from >= line.length()) chars = bytes = 1;
+        return bytes == chars ? String.valueOf(chars) : chars + "-" + bytes;
+    }
 
     /** @return the last message, or empty */
     public String message() { return message; }
@@ -228,6 +310,18 @@ public final class VimEditor {
     Buffer buffer() { return buffer; }
 
     Machine machine() { return machine; }
+
+    Marks marks() { return marks; }
+
+    /** @return in Visual mode, the other end of the area; null otherwise */
+    Pos visualAnchor() { return visualAnchor == null ? null : visualAnchor.copy(); }
+
+    void visualAnchor(Pos anchor) { visualAnchor = anchor == null ? null : anchor.copy(); }
+
+    /** @return the remembered display column; {@link Integer#MAX_VALUE} after {@code $}, -1 when forgotten */
+    int curswant() { return curswant; }
+
+    void curswant(int value) { curswant = value; }
 
     InsertMode insert() { return insert; }
 
@@ -274,12 +368,16 @@ public final class VimEditor {
         }
     }
 
-    /** @return the column a vertical motion lands on in {@code line}, from the remembered column */
+    /**
+     * @return the column a vertical motion lands on in {@code line}, from the remembered column; in Visual mode it
+     *     may be the end of the line (coladvance's one_more)
+     */
     int wantedColumn(int line) {
         String text = buffer.line(line);
-        if (curswant == Integer.MAX_VALUE) return Text.last(text);
+        boolean visual = mode.visual();
+        if (curswant == Integer.MAX_VALUE) return visual ? text.length() : Text.last(text);
         int col = Text.columnAt(text, want(false), options.number("tabstop"));
-        return col >= text.length() && !text.isEmpty() ? Text.last(text) : col;
+        return col >= text.length() && !text.isEmpty() && !visual ? Text.last(text) : col;
     }
 
     /** @return the column Insert mode's Up and Down land on: the remembered column, or the end of a shorter line */
@@ -312,6 +410,7 @@ public final class VimEditor {
     }
 
     void beginUndoStep() {
+        marks.newChange();
         Pos p = cursor();
         area.vimUndo().beginStep(p.line, p.col);
     }
@@ -364,6 +463,11 @@ public final class VimEditor {
     /** The caret moved by the mouse or the Editor: in Normal mode it is kept off the end of the line. */
     private void caretMoved() {
         if (busy || mode != Mode.NORMAL || machine.pending()) return;
+        // An outside selection (a mouse drag, the Find bar, Select All) becomes a Visual area (spec 3.1).
+        if (area.getSelectionStart() != area.getSelectionEnd()) {
+            javax.swing.SwingUtilities.invokeLater(this::selectionToVisual);
+            return;
+        }
         if (area.getSelectionStart() != area.getSelectionEnd()) return;
         Pos p = cursor();
         String text = buffer.line(p.line);
@@ -378,6 +482,37 @@ public final class VimEditor {
             });
         }
         curswant = -1;
+    }
+
+    /** The text area's own selection becomes a charwise Visual area, which Vim then draws. */
+    private void selectionToVisual() {
+        if (area.vim().orElse(null) != this || busy || mode != Mode.NORMAL) return;
+        int start = area.getSelectionStart(), end = area.getSelectionEnd();
+        if (start == end) return;
+        int dot = area.getCaretPosition();
+        int mark = dot == start ? end : start;
+        busy = true;
+        try {
+            // Vim's area includes the character at each end; the text area's selection excludes the one at its end, so
+            // that end moves back one character (onto the line's end when it was the line break).
+            Pos anchor = selectionEnd(mark, dot);
+            Pos head = selectionEnd(dot, mark);
+            area.select(dot, dot);
+            visualAnchor = anchor;
+            mode = Mode.VISUAL;
+            setCursor(head, true);
+        } finally { busy = false; }
+        look();
+        fire();
+    }
+
+    /** @return one end of a selection as a Visual position: the end that is further in the text steps back a character */
+    private Pos selectionEnd(int offset, int other) {
+        if (offset <= other) return buffer.pos(offset);
+        Pos p = buffer.pos(offset - 1);
+        String line = buffer.line(p.line);
+        if (p.col < line.length() && Character.isLowSurrogate(line.charAt(p.col)) && p.col > 0) p = new Pos(p.line, p.col - 1);
+        return p;
     }
 
     /** The caret shape and input methods for the mode (spec 5.1 and 2.1). */
@@ -396,5 +531,96 @@ public final class VimEditor {
         area.setTabsEmulated(options.flag("expandtab"));
     }
 
-    private void fire() { for (Runnable listener : List.copyOf(listeners)) listener.run(); }
+    private void fire() {
+        refreshHighlights();
+        for (Runnable listener : List.copyOf(listeners)) listener.run();
+    }
+
+    private void textChanged() {
+        textVersion++;
+        if (highlightPending) return;
+        highlightPending = true;
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            highlightPending = false;
+            if (area.vim().orElse(null) == this) refreshHighlights();
+        });
+    }
+
+    /** Draws the Visual area, the 'hlsearch' matches and the incremental-search match. */
+    void refreshHighlights() {
+        List<int[]> ranges = new ArrayList<>();
+        Search search = vim.search();
+        if (options.flag("hlsearch") && search.pattern() != null && !search.highlightHidden()) {
+            List<Object> key = List.of(search.pattern(), options.flag("ignorecase"), options.flag("smartcase"), options.string("iskeyword"));
+            if (!key.equals(highlightedPattern) || highlightedVersion != textVersion) {
+                List<int[]> found = new ArrayList<>();
+                for (Search.Match match : search.all(this)) {
+                    int start = buffer.offset(match.start()), end = buffer.offset(match.end());
+                    // An empty match is drawn one character wide, as Vim does.
+                    found.add(new int[] { 1, start, end > start ? end : start + 1 });
+                }
+                searchMatches = found;
+                highlightedPattern = key;
+                highlightedVersion = textVersion;
+            }
+            ranges.addAll(searchMatches);
+        }
+        ranges.addAll(Highlights.visual(this));
+        if (incsearch != null) ranges.add(new int[] { 0, incsearch[0], incsearch[1] });
+        highlights.show(ranges);
+    }
+
+    /** @return the drawn highlights as {kind, start, end}, for tests */
+    List<int[]> highlights() { return highlights.shown(); }
+
+    /**
+     * 'incsearch': while {@code /} or {@code ?} reads a pattern, the match it would find is drawn and scrolled to;
+     * the cursor stays where it is.
+     */
+    void incsearch(char type, String line) {
+        incsearch = null;
+        if (options.flag("incsearch") && !line.isEmpty()) {
+            Search.Match match = vim.search().preview(this, type, line);
+            if (match != null) {
+                int start = buffer.offset(match.start()), end = buffer.offset(match.end());
+                incsearch = new int[] { start, Math.max(end, start + 1) };
+                try {
+                    var rect = area.modelToView2D(start);
+                    if (rect != null) area.scrollRectToVisible(rect.getBounds());
+                } catch (javax.swing.text.BadLocationException ignored) { }
+            }
+        }
+        refreshHighlights();
+    }
+
+    /** The command line closed: the incremental-search match goes. */
+    void incsearchDone() {
+        incsearch = null;
+        Pos p = cursor();
+        try {
+            var rect = area.modelToView2D(buffer.offset(p));
+            if (rect != null) area.scrollRectToVisible(rect.getBounds());
+        } catch (javax.swing.text.BadLocationException ignored) { }
+    }
+
+    /** @return while a command line is typed, its text with the {@code /} or {@code ?} in front; else empty */
+    public java.util.Optional<String> commandLineText() {
+        return commandLine.active() ? java.util.Optional.of(commandLine.type() + commandLine.text()) : java.util.Optional.empty();
+    }
+
+    /** @return the command line's cursor, as an index into {@link #commandLineText()} */
+    public int commandLineCursor() { return commandLine.cursor() + 1; }
+
+    /**
+     * @param name the document's name for {@code <C-g>}
+     * @param modified whether the document has unsaved changes
+     */
+    public void documentInfo(java.util.function.Supplier<String> name, java.util.function.BooleanSupplier modified) {
+        documentName = name;
+        documentModified = modified;
+    }
+
+    String documentName() { return documentName.get(); }
+
+    boolean documentModified() { return documentModified.getAsBoolean(); }
 }

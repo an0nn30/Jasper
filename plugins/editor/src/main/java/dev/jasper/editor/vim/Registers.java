@@ -11,21 +11,28 @@ import java.util.Optional;
  * op_delete) and what the unnamed register points at. {@code "+} and {@code "*} are the host's clipboard.
  */
 public final class Registers {
-    /** How a register's text is put: within a line, as whole lines (or, from plan V1b, as a block). */
-    public enum Type { CHAR, LINE }
+    /** How a register's text is put: within a line, as whole lines, or as a block of columns. */
+    public enum Type { CHAR, LINE, BLOCK }
 
     /**
      * A register's text as Vim holds it: lines, and how they are put.
      *
      * @param lines at least one line; a character register's lines are joined by line breaks
-     * @param type charwise or linewise
+     * @param type charwise, linewise or blockwise
+     * @param width for a block, its width in display columns minus one (Vim's y_width); 0 otherwise
      */
-    public record Content(List<String> lines, Type type) {
+    public record Content(List<String> lines, Type type, int width) {
         /** Copies the lines. */
         public Content {
             lines = List.copyOf(lines);
             if (lines.isEmpty()) throw new IllegalArgumentException("A register holds at least one line");
         }
+
+        /**
+         * @param lines at least one line
+         * @param type charwise or linewise
+         */
+        public Content(List<String> lines, Type type) { this(lines, type, 0); }
 
         /**
          * @param text register text; a linewise register's text ends with a line break, which is dropped
@@ -37,7 +44,7 @@ public final class Registers {
             return new Content(List.of(body.split("\n", -1)), type);
         }
 
-        /** @return the text as {@code getreg()} gives it: linewise text ends with a line break */
+        /** @return the text as {@code getreg()} gives it: linewise text ends with a line break, a block's lines are joined */
         public String text() {
             String joined = String.join("\n", lines);
             return type == Type.LINE ? joined + "\n" : joined;
@@ -68,10 +75,32 @@ public final class Registers {
         };
     }
 
-    /** Sets a register directly, as {@code setreg()} or {@code :let @a = …}; the unnamed register then points at it. */
+    /**
+     * Sets a register directly, as {@code setreg()} or {@code :let @a = …}: the unnamed register keeps pointing where
+     * it did, unless the register set is the unnamed one ({@code "0} then holds the text).
+     */
     public void set(char name, Content content) {
         write(name, content);
-        previous = Character.toLowerCase(name) == '"' ? '0' : Character.toLowerCase(name);
+        if (name == '"') previous = '0';
+    }
+
+    /** @return the register a name reads: the unnamed register's target for {@code "}, else the name in lower case */
+    char resolve(char name) {
+        char register = Character.toLowerCase(name);
+        return register == '"' ? (previous == 0 ? '0' : previous) : register;
+    }
+
+    /**
+     * Puts a register's earlier content back without moving the unnamed register (Visual {@code p}, which must not
+     * put the text it just deleted). A null content empties the register.
+     */
+    void restore(char name, Content content) {
+        char register = Character.toLowerCase(name);
+        if (content == null) values.remove(register);
+        else if (register == '*' || register == '+') {
+            clipboardWritten = content;
+            host.writeClipboard().accept(register, content.text());
+        } else values.put(register, content);
     }
 
     /** @return whether the name is a register a command may name */
@@ -165,14 +194,15 @@ public final class Registers {
             values.put(register, content);
             return;
         }
-        // Appending (ops.c): linewise wins; two charwise texts join their touching lines.
-        Type type = content.type() == Type.LINE || old.type() == Type.LINE ? Type.LINE : Type.CHAR;
+        // Appending (op_yank): linewise text makes the register linewise; otherwise it keeps its type, and a
+        // charwise register joins its last line with the first appended one.
+        Type type = content.type() == Type.LINE ? Type.LINE : old.type();
         List<String> lines = new ArrayList<>(old.lines());
         if (type == Type.CHAR) {
             lines.set(lines.size() - 1, lines.getLast() + content.lines().getFirst());
             lines.addAll(content.lines().subList(1, content.lines().size()));
         } else lines.addAll(content.lines());
-        values.put(register, new Content(lines, type));
+        values.put(register, new Content(lines, type, old.width()));
     }
 
     private Optional<Content> clipboard(char register) {

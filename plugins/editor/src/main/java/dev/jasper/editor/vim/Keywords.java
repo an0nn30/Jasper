@@ -46,6 +46,20 @@ final class Keywords {
         return keywords;
     }
 
+    /** @return a Java character-class body matching the same characters, for patterns ({@code \k}, {@code \<}) */
+    String javaClass() {
+        StringBuilder out = new StringBuilder();
+        for (int c = 0; c < 256; c++) {
+            if (!table[c]) continue;
+            int end = c;
+            while (end + 1 < 256 && table[end + 1]) end++;
+            out.append(String.format("\\x{%x}", c));
+            if (end > c) out.append(String.format("-\\x{%x}", end));
+            c = end;
+        }
+        return out + dev.jasper.editor.vim.regex.VimRegex.WIDE;
+    }
+
     /** @return whether Vim treats the character as a keyword character */
     boolean isWord(int c) { return c < 256 ? table[c] : charClass(c) >= 2; }
 
