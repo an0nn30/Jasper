@@ -1,0 +1,4378 @@
+# Ex listings and settings: :print :number :list := :k :mark :delmarks :marks :jumps :changes :registers :nohlsearch :set (V2a).
+
+=== p prints the line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :p<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  two
+
+=== capital P prints the line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :P<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  two
+
+=== p prints a range
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :2,3p<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+  two
+  three
+
+=== p cursor goes to the last line
+text:
+  alpha
+    beta
+      gamma
+  delta
+cursor: 1,1
+keys: :1,3p<CR>
+--- vim 9.1
+expect-text:
+  alpha
+    beta
+      gamma
+  delta
+expect-cursor: 3,5
+expect-mode: normal
+
+=== p shows tabs as spaces
+text:
+  a	b
+  	x
+cursor: 1,1
+keys: :%p<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a	b
+  	x
+expect-cursor: 2,2
+expect-mode: normal
+expect-output:
+  a       b
+          x
+
+=== l lists tabs and ends
+text:
+  a	b
+   x $
+cursor: 1,1
+keys: :%l<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a	b
+   x $
+expect-cursor: 2,2
+expect-mode: normal
+expect-output:
+  a^Ib$$
+   x $$
+
+=== number prints numbers
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :2,3nu<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+    2 two
+    3 three
+
+=== hash prints numbers
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :#<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    1 one
+
+=== number width grows
+text:
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+cursor: 998,1
+keys: :.,$#<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+expect-cursor: 1000,1
+expect-mode: normal
+expect-output:
+   998 x
+   999 x
+  1000 x
+
+=== p with l flag
+text:
+  a	b
+cursor: 1,1
+keys: :p l<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a	b
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  a^Ib$$
+
+=== p with a count
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :p 2<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  one
+  two
+
+=== equals shows the last line number
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,1
+keys: :=<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+  10
+
+=== equals with a range
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,1
+keys: :.=<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+  3
+
+=== equals with a mark
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 4Gma:'a=<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 4,1
+expect-mode: normal
+expect-output:
+  4
+
+=== k sets a mark
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :3k a<CR>gg'a
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 3,5
+expect-mode: normal
+
+=== k without space
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :3ka<CR>gg`a
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 3,5
+expect-mode: normal
+
+=== mark sets a mark at the first non-blank
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :3mark b<CR>gg`b
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 3,5
+expect-mode: normal
+
+=== mark uppercase
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :2mark Q<CR>gg'Q
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 2,1
+expect-mode: normal
+
+=== mark needs an argument
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :mark<CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E471: Argument required
+
+=== mark with two letters
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :mark ab<CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E488: Trailing characters: ab
+
+=== mark bad name
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :mark %<CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E191: Argument must be a letter or forward/backward quote
+
+=== mark previous context
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :3mark '<CR>G''
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,3
+expect-mode: normal
+
+=== delmarks one
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: 3Gmagg:delm a<CR>'a
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,3
+expect-mode: normal
+expect-output:
+  E20: Mark not set
+
+=== delmarks a range
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: 3Gma2Gmbgg:delm a-c<CR>'b
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,3
+expect-mode: normal
+expect-output:
+  E20: Mark not set
+
+=== delmarks bang clears
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: 3Gmagg:delm!<CR>'a
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,3
+expect-mode: normal
+expect-output:
+  E20: Mark not set
+
+=== delmarks bang with argument
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :delm! a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E474: Invalid argument
+
+=== delmarks without argument
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :delm<CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E471: Argument required
+
+=== delmarks bad range
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :delm c-a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E475: Invalid argument: c-a
+
+=== delmarks special
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: ix<Esc>:delm .<CR>`.
+output: yes
+--- vim 9.1
+expect-text:
+  x  first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E20: Mark not set
+
+=== marks lists marks
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: 3Gma4Gmb:marks ab<CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 4,1
+expect-mode: normal
+expect-output:
+  mark line  col file/text
+   a      3    4 third indented
+   b      4    0 fourth
+
+=== marks with the context mark
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: 3GG:marks '<CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 4,1
+expect-mode: normal
+expect-output:
+  mark line  col file/text
+   '      3    4 third indented
+
+=== marks no match
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: :marks x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E283: No marks matching "x"
+
+=== marks bytes in columns
+text:
+  é é x
+cursor: 1,1
+keys: $mc:marks c<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  é é x
+expect-cursor: 1,5
+expect-mode: normal
+expect-output:
+  mark line  col file/text
+   c      1    6 é é x
+
+=== marks shows special marks
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: 2Gix<Esc>:marks .^[]<CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  xsecond
+      third indented
+  fourth
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  mark line  col file/text
+   [      2    0 xsecond
+   ]      2    1 xsecond
+   ^      2    1 xsecond
+   .      2    0 xsecond
+
+=== marks shows visual marks
+text:
+    first line
+  second
+      third indented
+  fourth
+cursor: 1,1
+keys: 2GVj<Esc>:marks <lt>><CR>
+output: yes
+--- vim 9.1
+expect-text:
+    first line
+  second
+      third indented
+  fourth
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+  mark line  col file/text
+   <      2    0 second
+   >      3    0 third indented
+
+=== marks cuts long lines
+text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+cursor: 1,1
+keys: $ma:marks a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+expect-cursor: 1,100
+expect-mode: normal
+expect-output:
+  mark line  col file/text
+   a      1   99 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+=== jumps lists the jumplist
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 5GG3G:jumps<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+   jump line  col file/text
+     3     1    0 one
+     2     5    0 five
+     1    10    0 ten
+  >
+
+=== jumps after moving back
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 5GG3G<C-o><C-o>:jumps<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,1
+expect-mode: normal
+expect-output:
+   jump line  col file/text
+     1     1    0 one
+  >  0     5    0 five
+     1    10    0 ten
+     2     3    0 three
+
+=== changes lists the change list
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: xjjxGx:changes<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  ne
+  two
+  hree
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  en
+expect-cursor: 10,1
+expect-mode: normal
+expect-output:
+  change line  col text
+      3     1    0 ne
+      2     3    0 hree
+      1    10    0 en
+  >
+
+=== changes after g semicolon
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: xjjxGxg;g;:changes<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  ne
+  two
+  hree
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  en
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+  change line  col text
+      1     1    0 ne
+  >   0     3    0 hree
+      1    10    0 en
+
+=== registers lists registers
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: "ayy"byw:reg ab<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Type Name Content
+    l  "a   one^J
+    c  "b   one
+
+=== registers with display
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: "ayy:di a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Type Name Content
+    l  "a   one^J
+
+=== registers shows the unnamed and numbered
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: dd:reg "01<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Type Name Content
+    l  ""   one^J
+    l  "1   one^J
+
+=== registers shows control characters
+text:
+  a	b
+cursor: 1,1
+keys: "ay$:reg a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a	b
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Type Name Content
+    c  "a   a^Ib
+
+=== registers shows the last insert and command
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: ihi<Esc>:2<CR>:reg .:<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  hione
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  Type Name Content
+    c  ".   hi
+    c  ":   2
+
+=== registers shows the search pattern
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: /tw<CR>:reg /<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  /tw $
+  Type Name Content
+    c  "/   tw
+
+=== registers with a block
+text:
+  abc
+  def
+cursor: 1,1
+keys: <C-v>jl"ay:reg a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  abc
+  def
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Type Name Content
+    b  "a   ab^Jde
+
+=== registers cuts long text
+text:
+  yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+cursor: 1,1
+keys: "ayy:reg a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Type Name Content
+    l  "a   yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+
+=== nohlsearch keeps the pattern
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: /tw<CR>:noh<CR>n
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+
+=== set shows a number
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=8
+
+=== set shows a boolean
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set et?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  noexpandtab
+
+=== set shows several
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw? ts?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=8
+    tabstop=8
+
+=== set number without value shows it
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set ts<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    tabstop=8
+
+=== set string without value shows it
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set fo<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    formatoptions=tcq
+
+=== set sets and shows
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw=4 sw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=4
+
+=== set unknown option
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set foo<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E518: Unknown option: foo
+
+=== set unknown after a good one
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw=3 foo sw=5<CR>:set sw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E518: Unknown option: foo $
+    shiftwidth=3
+
+=== set number required
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw=x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E521: Number required after =: sw=x
+
+=== set invalid boolean value
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set et=1<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E474: Invalid argument: et=1
+
+=== set bang on a number
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw!<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=8
+  E488: Trailing characters: sw!
+
+=== set no on a number
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set nosw<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E474: Invalid argument: nosw
+
+=== set trailing after question
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set et?x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E488: Trailing characters: et?x
+
+=== set negative
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw=-1<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E487: Argument must be positive: sw=-1
+
+=== set tabstop zero
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set ts=0<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E487: Argument must be positive: ts=0
+
+=== set octal and hex
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw=010<CR>:set sw?<CR>:set ts=0x10<CR>:set ts?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=8
+    tabstop=16
+
+=== set add and remove
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set nf+=alpha<CR>:set nf?<CR>:set nf-=octal<CR>:set nf?<CR>:set nf^=octal<CR>:set nf?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    nrformats=bin,octal,hex,alpha
+    nrformats=bin,hex,alpha
+    nrformats=octal,bin,hex,alpha
+
+=== set add a duplicate
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set nf+=hex<CR>:set nf?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    nrformats=bin,octal,hex
+
+=== set flags add and remove
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set fo+=ct<CR>:set fo?<CR>:set fo-=q<CR>:set fo?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    formatoptions=qct
+    formatoptions=ct
+
+=== set bad flag
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set fo=tcqz<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E539: Illegal character <z>: fo=tcqz
+
+=== set whichwrap flags
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set ww+=h,l<CR>:set ww?<CR>:set ww-=b<CR>:set ww?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    whichwrap=b,s,h,l
+    whichwrap=s,h,l
+
+=== set bad whichwrap
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set ww=b,x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E539: Illegal character <x>: ww=b,x
+
+=== set bad backspace
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set bs=foo<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E474: Invalid argument: bs=foo
+
+=== set bad matchpairs
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set mps=ab<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E474: Invalid argument: mps=ab
+
+=== set bad clipboard
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set cb=bad<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E474: Invalid argument: cb=bad
+
+=== set number add multiply subtract
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw+=2<CR>:set sw?<CR>:set sw^=3<CR>:set sw?<CR>:set sw-=4<CR>:set sw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=10
+    shiftwidth=30
+    shiftwidth=26
+
+=== set default with ampersand
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw=3<CR>:set sw&<CR>:set sw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=8
+
+=== set invert and bang
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set invet<CR>:set et?<CR>:set et!<CR>:set et?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    expandtab
+  noexpandtab
+
+=== set no with bang inverts
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set noet!<CR>:set et?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    expandtab
+
+=== set with colon
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw:5<CR>:set sw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=5
+
+=== setlocal and setglobal
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw=4<CR>:setlocal sw=3<CR>:setglobal sw?<CR>:setlocal sw?<CR>:set sw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=4
+    shiftwidth=3
+    shiftwidth=3
+
+=== setglobal leaves the local value
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :setglobal sw=6<CR>:set sw?<CR>:setglobal sw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=8
+    shiftwidth=6
+
+=== setlocal global option
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :setlocal ws!<CR>:setglobal ws?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  nowrapscan
+
+=== set takes effect
+text:
+  	x
+cursor: 1,1
+keys: :set ts=4<CR>:p<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  	x
+expect-cursor: 1,2
+expect-mode: normal
+expect-output:
+      x
+
+=== set with space before question
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw ?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=8
+
+=== set changes the behaviour
+text:
+  abc abc
+cursor: 1,1
+keys: :set nows<CR>/abc<CR>n
+output: yes
+--- vim 9.1
+expect-text:
+  abc abc
+expect-cursor: 1,5
+expect-mode: normal
+expect-output:
+  /abc $
+  /abc $
+  E385: Search hit BOTTOM without match for: abc
+
+=== set then bar
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw=2|set sw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=2
+
+=== set with a trailing comment
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :set sw=2 "hi<CR>:set sw?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    shiftwidth=2

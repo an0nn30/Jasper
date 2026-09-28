@@ -34,6 +34,7 @@ final class CorpusFile {
             if (!line.startsWith("=== ")) throw error(file, i, "expected \"=== name\"");
             String name = line.substring(4).trim();
             String divergent = null, set = "", keys = null, window = null, folds = null;
+            boolean output = false;
             Map<Character, CorpusCase.Register> given = new LinkedHashMap<>();
             List<String> text = null;
             int cursorLine = 1, cursorCol = 1;
@@ -67,6 +68,7 @@ final class CorpusFile {
                     case "set" -> set = value;
                     case "window" -> window = value;
                     case "folds" -> folds = value;
+                    case "output" -> output = value.equals("yes");
                     case "cursor" -> {
                         String[] parts = value.split(",");
                         cursorLine = Integer.parseInt(parts[0].trim());
@@ -84,7 +86,7 @@ final class CorpusFile {
                 i++;
             }
             if (text == null || keys == null) throw error(file, i, "case \"" + name + "\" needs text: and keys:");
-            cases.add(new CorpusCase(file, name, divergent, set, given, text, cursorLine, cursorCol, keys, registers, window, folds, expected));
+            cases.add(new CorpusCase(file, name, divergent, set, given, text, cursorLine, cursorCol, keys, registers, window, folds, output, expected));
         }
         return cases;
     }
@@ -95,6 +97,7 @@ final class CorpusFile {
         List<String> text = List.of();
         int line = 1, col = 1;
         String mode = "normal", visual = null, view = null, closedFolds = null;
+        List<String> output = null;
         Map<Character, CorpusCase.Register> registers = new LinkedHashMap<>();
         while (i < lines.size() && !lines.get(i).startsWith("=== ")) {
             String field = lines.get(i);
@@ -106,6 +109,12 @@ final class CorpusFile {
                 List<String> block = new ArrayList<>();
                 i = block(lines, i + 1, block);
                 text = block;
+                continue;
+            }
+            if (field.equals("expect-output:")) {
+                List<String> block = new ArrayList<>();
+                i = block(lines, i + 1, block);
+                output = block;
                 continue;
             }
             int colon = field.indexOf(':', field.startsWith("expect-register ") ? 17 : 0);
@@ -127,7 +136,7 @@ final class CorpusFile {
             }
             i++;
         }
-        return new Parsed(new CorpusCase.Expected(by, text, line, col, mode, visual, registers, view, closedFolds), i);
+        return new Parsed(new CorpusCase.Expected(by, text, line, col, mode, visual, registers, view, closedFolds, output), i);
     }
 
     private static CorpusCase.Register register(String value) {
@@ -189,6 +198,10 @@ final class CorpusFile {
         if (expected.visual() != null) out.add("expect-visual: " + expected.visual());
         if (expected.view() != null) out.add("expect-view: " + expected.view());
         if (expected.folds() != null) out.add("expect-folds: " + expected.folds());
+        if (expected.output() != null) {
+            out.add("expect-output:");
+            for (String line : expected.output()) out.add(textLine(line));
+        }
         for (char name : c.registers()) {
             CorpusCase.Register register = expected.registers().get(name);
             out.add("expect-register " + name + ": " + (register == null ? "none" : register.type() + " " + Json.quote(register.text())));

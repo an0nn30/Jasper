@@ -24,6 +24,16 @@ public final class VimEditor {
     private final Machine machine;
     private final InsertMode insert;
     private final CommandLine commandLine = new CommandLine(this);
+    private final Ex ex = new Ex(this);
+    /** A question waiting for its answer key (Vim's ask_yesno and the {@code :s} confirmation): its text and what takes the key. */
+    private String promptText;
+    private java.util.function.Consumer<KeyInput> promptHandler;
+    /** The output panel: what a command line said, shown until a key is typed (Vim's hit-enter prompt). */
+    private List<OutputLine> output = List.of();
+    /** While a command line runs, what it says, gathered for the output panel; null otherwise. */
+    private List<OutputLine> collecting;
+    /** Every message given, for the corpus's output comparison. */
+    private final List<String> messageLog = new ArrayList<>();
     private final Marks marks;
     private final List<Runnable> listeners = new ArrayList<>();
     private final CaretListener caretListener = event -> caretMoved();
@@ -48,6 +58,8 @@ public final class VimEditor {
     private final javax.swing.text.NavigationFilter originalNavigation;
     /** While a search pattern is typed with 'incsearch', the match it would find ({start, end} offsets), or null. */
     private int[] incsearch;
+    /** While {@code :s} asks for confirmation, the match it asks about ({start, end} offsets), or null. */
+    private int[] confirmMatch;
     /** While 'incsearch' previews a match, the view as it was when the command line opened (Vim's old_viewstate). */
     private int[] incsearchView;
     /** While the view scrolls to an 'incsearch' match, the match's start stands in for the cursor, which stays put. */
@@ -110,6 +122,9 @@ public final class VimEditor {
 
     /** Turns Vim off: the caret and input methods return to the Editor's; the text is untouched. */
     public void close() {
+        ex.abort();
+        promptHandler = null;
+        output = List.of();
         insert.abort();
         machine.abort();
         area.removeCaretListener(caretListener);
@@ -144,6 +159,9 @@ public final class VimEditor {
 
     /** The text was replaced (a reload): any command or insert in progress is dropped. */
     public void textReplaced() {
+        ex.abort();
+        promptHandler = null;
+        output = List.of();
         insert.abort();
         machine.abort();
         mode = Mode.NORMAL;
@@ -163,7 +181,7 @@ public final class VimEditor {
      * @return whether Vim took it
      */
     public boolean offer(KeyInput key) {
-        if (commandLine.active()) {
+        if (commandLine.active() || promptHandler != null || !output.isEmpty()) {
             // The command line takes every key but the ⌘ ones.
             if ((key.modifiers() & KeyInput.META) != 0) return false;
             feed(key);
@@ -196,7 +214,7 @@ public final class VimEditor {
      * also passes on a key bound to one of the Editor's own commands (spec 2.2).
      */
     boolean passesOn(KeyInput key) {
-        if (commandLine.active()) return (key.modifiers() & KeyInput.META) != 0;
+        if (commandLine.active() || promptHandler != null || !output.isEmpty()) return (key.modifiers() & KeyInput.META) != 0;
         if (mode.inserting() || (key.modifiers() & KeyInput.META) != 0) return true;
         return vim.handlers().handler(key, handlerMode()) == KeyHandlers.Handler.IDE;
     }
@@ -251,7 +269,7 @@ public final class VimEditor {
     /** Rings the bell without failing the command (a key the command line has no use for). */
     void bell() { bells++; }
 
-    /** @return the command line, active while {@code /} or {@code ?} reads a pattern */
+    /** @return the command line, active while {@code :}, {@code /} or {@code ?} reads a line */
     CommandLine commandLine() { return commandLine; }
 
     /** A failing Insert-mode key: the bell rings and the insert goes on, as Vim's ins_del and ins_bs beep (spec 2.3). */
@@ -276,7 +294,7 @@ public final class VimEditor {
         try {
             dispatch(key);
         } catch (VimFailure failure) {
-            bells++;
+            if (!failure.quiet) bells++;
             if (!failure.getMessage().isEmpty()) message(failure.getMessage(), true);
             if (!mode.inserting()) {
                 machine.reset();
@@ -284,6 +302,8 @@ public final class VimEditor {
             }
         } catch (RuntimeException bug) {
             LOG.log(System.Logger.Level.ERROR, "Vim command failed", bug);
+            ex.abort();
+            promptHandler = null;
             insert.abort();
             machine.abort();
             mode = Mode.NORMAL;
@@ -303,8 +323,17 @@ public final class VimEditor {
         }
     }
 
-    /** Runs one key without the failure handling, for {@code .} and a count's repeat. */
+    /** Runs one key without the failure handling, for {@code .}, a count's repeat and {@code :normal}. */
     void dispatch(KeyInput key) {
+        if (promptHandler != null) {
+            answer(key);
+            return;
+        }
+        if (!output.isEmpty()) {
+            // The hit-enter prompt: these keys only take the output away; any other key then runs as typed.
+            output = List.of();
+            if (key.is("<CR>") || key.is(" ") || key.is("<Esc>") || key.is("<C-j>") || key.is("<kEnter>")) return;
+        }
         if (commandLine.active()) commandLine.key(key);
         else if (mode.inserting()) insert.key(key);
         else machine.key(key);
@@ -315,7 +344,7 @@ public final class VimEditor {
 
     /** @return the mode */
     public Mode mode() {
-        if (commandLine.active()) return Mode.COMMAND_LINE;
+        if (commandLine.active() || promptHandler != null) return Mode.COMMAND_LINE;
         return mode == Mode.NORMAL && machine.operatorPending() ? Mode.OPERATOR_PENDING : mode;
     }
 
@@ -396,8 +425,105 @@ public final class VimEditor {
     void mode(Mode value) { mode = value; }
 
     void message(String text, boolean error) {
+        messageLog.add(text);
+        if (collecting != null) {
+            collecting.add(new OutputLine(text, error));
+            return;
+        }
         message = text;
         messageError = error;
+    }
+
+    /** An informational line, such as one line of a listing; while a command line runs it goes to the output. */
+    void say(String text) { message(text, false); }
+
+    /**
+     * msgmore: after lines were added or deleted, "3 more lines" or "3 fewer lines" when more than 'report' lines
+     * changed; not while {@code :global} runs, which reports once at its end.
+     */
+    void msgmore(int n) {
+        if (ex.globalBusy()) return;
+        int pn = Math.abs(n);
+        if (pn <= options.number("report")) return;
+        say(n > 0 ? pn + (pn == 1 ? " more line" : " more lines") : pn + (pn == 1 ? " line less" : " fewer lines"));
+    }
+
+    /** @return every message given so far, for tests */
+    List<String> messageLog() { return messageLog; }
+
+    /** @return the Ex command line */
+    Ex ex() { return ex; }
+
+    /**
+     * Starts gathering what is said for the output panel; returns the list gathered before, for {@link #stopCollecting}.
+     * A command line run from inside another one ({@code :normal :s…}) adds to the outer one's output.
+     */
+    List<OutputLine> startCollecting() {
+        List<OutputLine> before = collecting;
+        if (collecting == null) collecting = new ArrayList<>();
+        return before;
+    }
+
+    /**
+     * Stops gathering: at the outermost level one line becomes the message and more lines the output panel, which
+     * waits for a key (Vim's hit-enter prompt). After a failed command line only the last line is kept, as Vim
+     * does not wait then.
+     */
+    void stopCollecting(List<OutputLine> before, boolean failed) {
+        if (before != null) return;
+        List<OutputLine> said = collecting;
+        collecting = null;
+        // After an error Vim does not wait for a key: the last line stays as the message.
+        if (failed && !said.isEmpty()) said = List.of(said.getLast());
+        if (said.size() == 1) {
+            message = said.getFirst().text();
+            messageError = said.getFirst().error();
+        } else if (said.size() > 1) {
+            output = List.copyOf(said);
+            message = "";
+            messageError = false;
+        }
+    }
+
+    /**
+     * A line of the output panel.
+     *
+     * @param text the line
+     * @param error whether it is an error message
+     */
+    public record OutputLine(String text, boolean error) { }
+
+    /** @return the output panel's lines, empty when it is not shown */
+    public List<OutputLine> output() { return output; }
+
+    /**
+     * Asks a question that one key answers; {@code handler} gets the key. It may ask again. When no question is left
+     * open, the command line goes on with what waited for the answer.
+     */
+    void ask(String question, java.util.function.Consumer<KeyInput> handler) {
+        messageLog.add(question);
+        promptText = question;
+        promptHandler = handler;
+    }
+
+    /** @return whether a question waits for its answer */
+    boolean prompting() { return promptHandler != null; }
+
+    private void answer(KeyInput key) {
+        var handler = promptHandler;
+        promptHandler = null;
+        promptText = null;
+        ex.answered(handler, key);
+    }
+
+    /**
+     * @return the question waiting for a key, or "Press ENTER or type command to continue" under the output panel;
+     *     empty when neither is shown
+     */
+    public java.util.Optional<String> prompt() {
+        if (promptText != null) return java.util.Optional.of(promptText);
+        if (!output.isEmpty()) return java.util.Optional.of("Press ENTER or type command to continue");
+        return java.util.Optional.empty();
     }
 
     /** @return the cursor as a position */
@@ -490,6 +616,26 @@ public final class VimEditor {
 
     /** {@code CTRL-R}. */
     void redo(int count) { undoRedo(count, false); }
+
+    /**
+     * {@code :undo N}: undoes or redoes to the text after change N (0: before the first). Jasper keeps one line of
+     * history, so only the changes on it can be reached.
+     */
+    void undoTo(int target) {
+        VimUndoManager manager = area.vimUndo();
+        List<Integer> done = manager.doneSeqs(), undone = manager.undoneSeqs();
+        int current = done.isEmpty() ? 0 : done.getLast();
+        if (target == current) return;
+        if (target < current) {
+            if (target != 0 && !done.contains(target)) throw new VimFailure("E830: Undo number " + target + " not found");
+            int count = 0;
+            for (int i = done.size() - 1; i >= 0 && done.get(i) > target; i--) count++;
+            undo(count);
+        } else {
+            if (!undone.contains(target)) throw new VimFailure("E830: Undo number " + target + " not found");
+            redo(undone.indexOf(target) + 1);
+        }
+    }
 
     private void undoRedo(int count, boolean undo) {
         VimUndoManager manager = area.vimUndo();
@@ -635,7 +781,14 @@ public final class VimEditor {
         }
         ranges.addAll(Highlights.visual(this));
         if (incsearch != null) ranges.add(new int[] { 0, incsearch[0], incsearch[1] });
+        if (confirmMatch != null) ranges.add(new int[] { 0, confirmMatch[0], confirmMatch[1] });
         highlights.show(ranges);
+    }
+
+    /** Shows the match {@code :s} asks about ({start, end} offsets), or none. */
+    void confirmMatch(int[] match) {
+        confirmMatch = match;
+        refreshHighlights();
     }
 
     /** @return the drawn highlights as {kind, start, end}, for tests */
@@ -679,7 +832,7 @@ public final class VimEditor {
         }
     }
 
-    /** @return while a command line is typed, its text with the {@code /} or {@code ?} in front; else empty */
+    /** @return while a command line is typed, its text with the {@code :}, {@code /} or {@code ?} in front; else empty */
     public java.util.Optional<String> commandLineText() {
         return commandLine.active() ? java.util.Optional.of(commandLine.type() + commandLine.text()) : java.util.Optional.empty();
     }

@@ -14,6 +14,7 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 | operators-other.case | equals reindents a block | = uses previous-line indent and bracket depth, not Vim's C-indenting |
 | operators-other.case | equals equals on a blank line | = uses previous-line indent and bracket depth, not Vim's C-indenting |
 | marks.case | backtick dot after o | '. takes each typed character's column, as when typing; Vim fed a whole string at once records where it started |
+| ex-range.case | a Vim command Jasper lacks | Jasper has no abbreviations; a command it lacks fails with E319 (docs/vim-divergences.md) |
 
 ## Other differences
 

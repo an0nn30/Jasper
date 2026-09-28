@@ -1,0 +1,2567 @@
+# Ex command line: addresses, ranges, counts and errors (V2a).
+
+=== colon number goes to the line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :5<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,1
+expect-mode: normal
+
+=== colon number keeps the first non-blank
+text:
+  alpha
+    beta
+      gamma
+  delta
+cursor: 1,1
+keys: :3<CR>
+--- vim 9.1
+expect-text:
+  alpha
+    beta
+      gamma
+  delta
+expect-cursor: 3,5
+expect-mode: normal
+
+=== colon number past the end goes to the last line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :99<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 10,1
+expect-mode: normal
+
+=== colon zero goes to the first line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 5,1
+keys: :0<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== colon dollar
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :$<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 10,1
+expect-mode: normal
+
+=== colon dot plus
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :.+3<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,1
+expect-mode: normal
+
+=== colon plus alone
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :+<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== colon plus plus
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :++<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 4,1
+expect-mode: normal
+
+=== colon minus
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 6,1
+keys: :-2<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 4,1
+expect-mode: normal
+
+=== colon number is a plus offset
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :. 3<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,1
+expect-mode: normal
+
+=== colon dollar minus
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :$-2<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 8,1
+expect-mode: normal
+
+=== colon with spaces and colons
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: : : 4<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 4,1
+expect-mode: normal
+
+=== colon mark
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 5Gmx1G:'x<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,1
+expect-mode: normal
+
+=== colon mark plus
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 5Gmx1G:'x+1<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 6,1
+expect-mode: normal
+
+=== colon unset mark
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :'q<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E20: Mark not set
+
+=== colon search forward
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :/six/<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 6,1
+expect-mode: normal
+
+=== colon search without the closing slash
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :/six<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 6,1
+expect-mode: normal
+
+=== colon search skips the cursor line
+text:
+  ab
+  x
+  ab
+  ab
+cursor: 1,1
+keys: :/ab/<CR>
+--- vim 9.1
+expect-text:
+  ab
+  x
+  ab
+  ab
+expect-cursor: 3,1
+expect-mode: normal
+
+=== colon search backward
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 8,1
+keys: :?three?<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== colon search then offset
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :/four/+2<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 6,1
+expect-mode: normal
+
+=== colon search sets the last pattern for n
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :/f/<CR>n
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,1
+expect-mode: normal
+
+=== colon search backward sets the direction for n
+text:
+  ab
+  x
+  ab
+  x
+  ab
+cursor: 5,1
+keys: :?ab?<CR>n
+--- vim 9.1
+expect-text:
+  ab
+  x
+  ab
+  x
+  ab
+expect-cursor: 1,1
+expect-mode: normal
+
+=== colon search then another
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :/t/;/t/<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== colon two searches in a row
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :/two//e/<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== colon search not found
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :/zzz/<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  search hit BOTTOM, continuing at TOP
+  E486: Pattern not found: zzz
+
+=== colon backslash slash repeats the search
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: /e<CR>:1<CR>:\/<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== colon backslash question
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 9,1
+keys: /e<CR>:9<CR>:\?<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 8,1
+expect-mode: normal
+
+=== colon bad backslash
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :\x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E10: \ should be followed by /, ? or &
+
+=== colon bar prints the line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,1
+keys: :|<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+  three
+
+=== colon number bar prints it
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :4|<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 4,1
+expect-mode: normal
+expect-output:
+  four
+
+=== colon comment does nothing
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,1
+keys: :"hello<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== colon range with a comment goes to it
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :6"x<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 6,1
+expect-mode: normal
+
+=== percent range prints all
+text:
+  a
+  b
+  c
+cursor: 1,1
+keys: :%p<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a
+  b
+  c
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+  a
+  b
+  c
+
+=== comma range
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :2,4d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\nthree\nfour\n"
+expect-register 0: none
+expect-register 1: l "two\nthree\nfour\n"
+expect-register a: none
+expect-register -: none
+
+=== semicolon range counts from the first
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :3;+2d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "three\nfour\nfive\n"
+expect-register 0: none
+expect-register 1: l "three\nfour\nfive\n"
+expect-register a: none
+expect-register -: none
+
+=== comma range counts from the cursor
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :3,+2d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "three\n"
+expect-register 0: none
+expect-register 1: l "three\n"
+expect-register a: none
+expect-register -: none
+
+=== semicolon moves the cursor even if the command fails
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :4;foo<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 4,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: 4;foo
+
+=== semicolon zero then search finds the first line
+text:
+  abc
+  x
+  abc
+cursor: 2,1
+keys: :0;/abc/d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  x
+  abc
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "abc\n"
+expect-register 0: none
+expect-register 1: l "abc\n"
+expect-register a: none
+expect-register -: none
+
+=== one address with comma
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 5,1
+keys: :,d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,1
+expect-mode: normal
+expect-register ": l "five\n"
+expect-register 0: none
+expect-register 1: l "five\n"
+expect-register a: none
+expect-register -: none
+
+=== range dot comma dollar
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 8,1
+keys: :.,$d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+expect-cursor: 7,1
+expect-mode: normal
+expect-register ": l "eight\nnine\nten\n"
+expect-register 0: none
+expect-register 1: l "eight\nnine\nten\n"
+expect-register a: none
+expect-register -: none
+
+=== backwards range asks and y swaps
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :5,2d<CR>y
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\nthree\nfour\nfive\n"
+expect-register 0: none
+expect-register 1: l "two\nthree\nfour\nfive\n"
+expect-register a: none
+expect-register -: none
+
+=== backwards range asks and n cancels
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :5,2d<CR>n
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== backwards range asks and Esc cancels
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :5,2d<CR><Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== backwards range ignores other keys
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :5,2d<CR>xy
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\nthree\nfour\nfive\n"
+expect-register 0: none
+expect-register 1: l "two\nthree\nfour\nfive\n"
+expect-register a: none
+expect-register -: none
+
+=== invalid range past the end
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :8,12d<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E16: Invalid range
+
+=== negative address is invalid
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :-5d<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  E16: Invalid range
+
+=== zero range for delete means line one
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,1
+keys: :0d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "one\n"
+expect-register 0: none
+expect-register 1: l "one\n"
+expect-register a: none
+expect-register -: none
+
+=== unknown command
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :foo<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: foo
+
+=== unknown command with a range
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :3foo bar<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: 3foo bar
+
+=== a Vim command Jasper lacks
+divergent: Jasper has no abbreviations; a command it lacks fails with E319 (docs/vim-divergences.md)
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :ab x y<CR>
+output: yes
+--- expected
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E319: Sorry, the command is not available in this version
+
+=== no range allowed
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :3marks<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E481: No range allowed
+
+=== no range allowed with a dot
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :.marks<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E481: No range allowed
+
+=== no bang allowed
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :delete!<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E477: No ! allowed
+
+=== trailing characters
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :marks!<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E477: No ! allowed
+
+=== trailing characters after a command
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :noh x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E488: Trailing characters: x
+
+=== count after the command
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :d 3<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\nthree\nfour\n"
+expect-register 0: none
+expect-register 1: l "two\nthree\nfour\n"
+expect-register a: none
+expect-register -: none
+
+=== count after a range starts at its end
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :2,3d 2<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "three\nfour\n"
+expect-register 0: none
+expect-register 1: l "three\nfour\n"
+expect-register a: none
+expect-register -: none
+
+=== count past the end is cut
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 8,1
+keys: :d 9<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+expect-cursor: 7,1
+expect-mode: normal
+expect-register ": l "eight\nnine\nten\n"
+expect-register 0: none
+expect-register 1: l "eight\nnine\nten\n"
+expect-register a: none
+expect-register -: none
+
+=== zero count is an error
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :d 0<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  E939: Positive count required
+
+=== register and count
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :d a 2<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\nthree\n"
+expect-register 0: none
+expect-register 1: l "two\nthree\n"
+expect-register a: l "two\nthree\n"
+expect-register -: none
+
+=== star register takes the clipboard
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :d * <CR>
+--- vim 9.1
+expect-text:
+  one
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+
+=== bar separates commands
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :2d|3d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  three
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "four\n"
+expect-register 0: none
+expect-register 1: l "four\n"
+expect-register a: none
+expect-register -: none
+
+=== error stops the rest of the line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :foo|2d<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: foo|2d
+
+=== count before colon
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: 3:d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\nthree\nfour\n"
+expect-register 0: none
+expect-register 1: l "two\nthree\nfour\n"
+expect-register a: none
+expect-register -: none
+
+=== count one before colon
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: 1:d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\n"
+expect-register 0: none
+expect-register 1: l "two\n"
+expect-register a: none
+expect-register -: none
+
+=== count before colon then backspace edits the range
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: 3:<BS><BS>5d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\nthree\nfour\nfive\nsix\nseven\n"
+expect-register 0: none
+expect-register 1: l "two\nthree\nfour\nfive\nsix\nseven\n"
+expect-register a: none
+expect-register -: none
+
+=== visual colon uses the visual lines
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,2
+keys: Vjj:d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\nthree\nfour\n"
+expect-register 0: none
+expect-register 1: l "two\nthree\nfour\n"
+expect-register a: none
+expect-register -: none
+
+=== visual colon then escape ends visual mode
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,2
+keys: vjj:<Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,2
+expect-mode: normal
+
+=== visual colon backwards then escape
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 4,3
+keys: vkk:<Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,3
+expect-mode: normal
+
+=== linewise visual colon then escape
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,3
+keys: Vjj:<Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+
+=== linewise visual colon backwards then escape
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 4,3
+keys: Vkk:<Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,3
+expect-mode: normal
+
+=== block visual colon then escape
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,3
+keys: <C-v>jjh:<Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,2
+expect-mode: normal
+
+=== block visual colon from the top right
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 4,2
+keys: <C-v>kkl:<Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,2
+expect-mode: normal
+
+=== block visual colon from the bottom right
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,2
+keys: <C-v>jjl:<Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,2
+expect-mode: normal
+
+=== visual colon then a command keeps the cursor from the start
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,3
+keys: vj:p<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== star range is the visual area
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 2GVj<Esc>G:*d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\nthree\n"
+expect-register 0: none
+expect-register 1: l "two\nthree\n"
+expect-register a: none
+expect-register -: none
+
+=== apostrophe angle range
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 3GVj<Esc>1G:'<lt>,'>d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "three\nfour\n"
+expect-register 0: none
+expect-register 1: l "three\nfour\n"
+expect-register a: none
+expect-register -: none
+
+=== colon escape cancels
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :3d<Esc>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+
+=== colon backspace on empty cancels
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :<BS>x
+--- vim 9.1
+expect-text:
+  one
+  wo
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+
+=== colon history recalls
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :2d<CR>:<Up><CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "three\n"
+expect-register 0: none
+expect-register 1: l "three\n"
+expect-register a: none
+expect-register -: none
+
+=== colon register holds the last line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :3<CR>":p
+registers: : "
+--- vim 9.1
+expect-text:
+  one
+  two
+  t3hree
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,2
+expect-mode: normal
+expect-register :: c "3"
+expect-register ": none
+
+=== closed fold counts as one line in a range
+text:
+  class A {
+    void f() {
+      x();
+    }
+    int y;
+  }
+cursor: 1,1
+folds: java 2
+keys: :2d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  class A {
+    int y;
+  }
+expect-cursor: 2,3
+expect-mode: normal
+expect-folds: none
+expect-register ": l "  void f() {\n    x();\n  }\n"
+expect-register 0: none
+expect-register 1: l "  void f() {\n    x();\n  }\n"
+expect-register a: none
+expect-register -: none
+
+=== a range ending in a closed fold takes all of it
+text:
+  class A {
+    void f() {
+      x();
+    }
+    int y;
+  }
+cursor: 1,1
+folds: java 2
+keys: :1,2d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+    int y;
+  }
+expect-cursor: 1,3
+expect-mode: normal
+expect-folds: none
+expect-register ": l "class A {\n  void f() {\n    x();\n  }\n"
+expect-register 0: none
+expect-register 1: l "class A {\n  void f() {\n    x();\n  }\n"
+expect-register a: none
+expect-register -: none
+
+=== relative address skips a closed fold
+text:
+  class A {
+    void f() {
+      x();
+    }
+    int y;
+  }
+cursor: 2,1
+folds: java 2
+keys: :.,+1d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  class A {
+  }
+expect-cursor: 2,1
+expect-mode: normal
+expect-folds: none
+expect-register ": l "  void f() {\n    x();\n  }\n  int y;\n"
+expect-register 0: none
+expect-register 1: l "  void f() {\n    x();\n  }\n  int y;\n"
+expect-register a: none
+expect-register -: none
+
+=== multiple colons and spaces before the command
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :: 3 : d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "three\n"
+expect-register 0: none
+expect-register 1: l "three\n"
+expect-register a: none
+expect-register -: none
+
+=== apostrophe after a number is not a mark
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 5Gma1G:3'a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: 3'a

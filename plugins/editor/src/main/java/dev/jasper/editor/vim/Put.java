@@ -21,6 +21,8 @@ final class Put {
     static final int LINE_SPLIT = 8;
     /** Put lines below the Visual block (p over a block). */
     static final int LINE_FORWARD = 16;
+    /** {@code :put}: the cursor goes to the first non-blank of the last new line. */
+    static final int CURSLINE = 32;
 
     private Put() { }
 
@@ -32,6 +34,13 @@ final class Put {
      * @param visualEnd for {@code p} in Visual mode: the last line of the deleted Visual area, or -1
      */
     static void put(Context c, boolean forward, int count, int flags, int visualEnd) {
+        int before = c.buffer.count();
+        putText(c, forward, count, flags, visualEnd);
+        // do_put's msgmore: more than 'report' new lines give a message.
+        c.editor.msgmore(c.buffer.count() - before);
+    }
+
+    private static void putText(Context c, boolean forward, int count, int flags, int visualEnd) {
         Buffer b = c.buffer;
         Marks marks = c.editor.marks();
         char requested = Registers.effective(c.register, c.options.string("clipboard"));
@@ -130,7 +139,8 @@ final class Put {
         }
         int lastLen = Math.max(0, y.getLast().length() - lenDiff);
         marks.set(']', new Pos(newLine, lastLen > 1 ? Text.previous(y.getLast(), lastLen) : 0));
-        if ((flags & CURSEND) != 0) {
+        if ((flags & CURSLINE) != 0) c.editor.setCursor(new Pos(lnum, Text.firstNonBlank(b.line(lnum))));
+        else if ((flags & CURSEND) != 0) {
             if (type == Type.LINE) c.editor.setCursor(new Pos(Math.min(lnum + 1, b.count() - 1), 0), true);
             else c.editor.setCursor(new Pos(newLine, lastLen), true);
         } else if (type == Type.LINE) {

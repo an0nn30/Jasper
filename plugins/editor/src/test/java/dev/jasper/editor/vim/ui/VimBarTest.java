@@ -84,4 +84,28 @@ class VimBarTest {
             assertThat(bar.commandText()).as("a pending key replaces the size").isEqualTo("\"");
         });
     }
+
+    @Test void showsTheOutputPanelAndQuestions() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var area = new VimTextArea();
+            area.setText("one\ntwo\n");
+            area.setCaretPosition(0);
+            var editor = new VimEditor(new Vim(VimHost.detached()), area, EditorDefaults.VIM);
+            var bar = new VimBar();
+            bar.attach(editor);
+            type(editor, ":%p");
+            assertThat(bar.statusText()).isEqualTo(":%p");
+            type(editor, "<CR>");
+            assertThat(bar.outputLines()).containsExactly("one", "two");
+            assertThat(bar.statusText()).isEqualTo("Press ENTER or type command to continue");
+            type(editor, "<CR>");
+            assertThat(bar.outputLines()).isEmpty();
+            type(editor, ":2,1p<CR>");
+            assertThat(bar.statusText()).isEqualTo("Backwards range given, OK to swap (y/n)?");
+            type(editor, "n");
+            assertThat(bar.statusText()).isEmpty();
+            type(editor, ":foo<CR>");
+            assertThat(bar.statusText()).isEqualTo("E492: Not an editor command: foo");
+        });
+    }
 }
