@@ -2,8 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/settings-foundation`, worktree `.worktrees/settings-foundation`.
+**Status:** In progress (inline execution). Branch `claude/settings-foundation`, worktree `.worktrees/settings-foundation`.
 Record every deviation from this text here and in `docs/STATUS.md`.
+
+Deviations so far:
+- Task 3: tests and implementation were written before the first run, so the failing run was not observed.
+- Task 6: `ConfigLoader.Result` keeps a three-argument constructor (defaults, nothing to migrate), because
+  `ConfigLoaderTest` builds one directly; this mirrors Task 9's `State` constructor.
+- Task 6: three fixtures the rename script could not reach were converted by hand:
+  `ExpandedConfigTest`'s inline-table variant (the inline `font = {...}` table moved inside `terminal = {...}`),
+  and `ConfigLoaderTest.unknownKeysAndEmptyTablesWarnWhileSupportedSettingsApply` (key `terminal.font.future_font`).
+- Task 12's plugin-authoring instruction no longer spells out a Markdown link in this plan, because
+  `AppDocumentationTest` resolves every link in `docs/`, plans included.
 
 **Goal:** Give `config.toml` one declarative schema, the version 2 key layout, a comment-preserving writer
 with a single save transaction, an opt-in migration with a backup, and plugin diagnostics attributed to
@@ -4269,7 +4279,7 @@ formatting and refuse, rather than guess, when a change cannot be made exactly.
 
 - [ ] **Step 3: Fix stale and contributor documentation**
 
-- `docs/plugin-authoring.md`: replace `Users write \`[plugins."<id>"]\` in \`config.toml\`. It is read-only to` with `Users edit \`plugins/<id>/<id>.toml\`; see [plugin settings](configuration.md#plugins). It is read-only to` (keep the rest of the bullet). Problems a plugin reports with `report(key, message)` now appear against that file with the key's line: add the sentence `Problems you report with \`config().report(key, message)\` are shown against that file, at the key's line, until the file is next reloaded.` to the same bullet.
+- `docs/plugin-authoring.md`: replace `Users write \`[plugins."<id>"]\` in \`config.toml\`. It is read-only to` with `Users edit \`plugins/<id>/<id>.toml\`; see plugin settings (a Markdown link to the Plugins section of configuration.md). It is read-only to` (keep the rest of the bullet). Problems a plugin reports with `report(key, message)` now appear against that file with the key's line: add the sentence `Problems you report with \`config().report(key, message)\` are shown against that file, at the key's line, until the file is next reloaded.` to the same bullet.
 - `docs/app-architecture.md`:
   - replace `separately preserves a temporary theme choice until the saved appearance changes.` with `separately preserves a temporary terminal-colours choice until the saved \`terminal.colors\` changes.`
   - in the package table, add after the `config` row: `| \`settings\` | Pure declarative settings machinery: setting kinds, descriptors, the schema, loaded values and the comment-preserving TomlDocument editor. No Jasper dependencies; caller chooses thread. |`

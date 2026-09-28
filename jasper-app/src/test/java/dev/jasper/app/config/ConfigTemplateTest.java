@@ -44,22 +44,26 @@ class ConfigTemplateTest {
         String text = Files.readString(example, StandardCharsets.UTF_8);
         var toml = Toml.parse(text);
         assertThat(toml.errors()).isEmpty();
+        assertThat(toml.getLong("version")).isEqualTo(2L);
         assertThat(toml.getTable("buddy").keySet()).containsExactly("enabled");
         assertThat(toml.getTable("notifications").keySet()).containsExactly("long_command_seconds");
+        assertThat(toml.getTable("system").keySet()).containsExactly("run_in_background");
         assertThat(toml.getTable("palette").keySet()).containsExactly("max_results");
         assertThat(toml.getTable("window").keySet())
             .containsExactlyInAnyOrder("tab_height", "rail_width", "toolbar", "toolbar_height", "status_bar",
                 "status_bar_height", "columns", "lines");
-        assertThat(toml.getTable("font").keySet())
+        assertThat(toml.getTable("terminal.font").keySet())
             .containsExactlyInAnyOrder("family", "size", "fallback", "ligatures", "line_height");
         assertThat(toml.getTable("terminal").keySet())
             .containsExactlyInAnyOrder("scrollback", "option_as_meta", "dim_inactive_panes", "copy_on_select",
-                "bell", "on_exit", "shell_integration", "shell", "cursor", "env");
+                "bell", "on_exit", "shell_integration", "colors", "font", "shell", "cursor", "env");
         assertThat(toml.getTable("terminal.shell").keySet()).containsExactlyInAnyOrder("program", "args");
         assertThat(toml.getTable("terminal.cursor").keySet()).containsExactlyInAnyOrder("shape", "blink");
         assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
         assertThat(toml.getTable("ui.font").keySet()).containsExactly("family");
-        assertThat(toml.getTable("ui.theme").keySet()).containsExactlyInAnyOrder("name", "terminal");
+        assertThat(toml.getTable("ui.theme").keySet()).containsExactly("name");
+        assertThat(toml.contains("font")).isFalse();
+        assertThat(toml.contains("background")).isFalse();
         assertThat(toml.getTable("keybindings").keySet()).isEmpty();
 
         for (boolean macOs : new boolean[]{true, false}) {

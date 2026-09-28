@@ -72,7 +72,7 @@ public final class ApplicationBootstrap {
             if (!standalone && options.background() && !resident) {
                 reconcileLoginItem(false, appPath, home);
                 LOG.log(System.Logger.Level.INFO,
-                    "Started with --background while background.enabled is off; exiting");
+                    "Started with --background while system.run_in_background is off; exiting");
                 service.close(); System.exit(0); return;
             }
             compose(service, () -> new CommandHistory(dirs.commandHistory()),
@@ -285,7 +285,7 @@ public final class ApplicationBootstrap {
     /**
      * Wraps a login-item reconcile action so a run of equal values collapses to one call, and so
      * the call itself never runs on the EDT. {@code ConfigurationController.accept} publishes on
-     * every saved config, not only when {@code background.enabled} changed, and on a packaged
+     * every saved config, not only when {@code system.run_in_background} changed, and on a packaged
      * Windows install the wrapped action can shell out to {@code reg add} with a ten-second
      * timeout -- long enough to freeze the UI if it ran inline.
      */

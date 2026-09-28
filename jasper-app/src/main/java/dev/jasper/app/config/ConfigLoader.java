@@ -1,12 +1,11 @@
 package dev.jasper.app.config;
 
 import dev.jasper.app.commands.ActionId;
-import dev.jasper.app.config.PaletteSettings;
-import dev.jasper.app.config.ToolbarMode;
-
-import dev.jasper.terminal.config.BellMode;
-import dev.jasper.terminal.config.CursorStyle;
-import dev.jasper.terminal.config.OptionAsMeta;
+import dev.jasper.app.settings.LegacyKey;
+import dev.jasper.app.settings.Reading;
+import dev.jasper.app.settings.Setting;
+import dev.jasper.app.settings.SettingValues;
+import dev.jasper.app.settings.SettingsSchema;
 import org.tomlj.Toml;
 import org.tomlj.TomlArray;
 import org.tomlj.TomlParseResult;
@@ -18,84 +17,60 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.function.Predicate;
 
-/** Pure TOML parsing and validation, with no file or Swing operations. */
+/** Pure TOML parsing and validation, with no file or Swing operations; the schema is {@link CoreSettings#SCHEMA}. */
 public final class ConfigLoader {
-    public record Result(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, boolean rejected) {
+    /**
+     * A parsed file.
+     *
+     * @param snapshot the settings to use (meaningless when {@code rejected})
+     * @param diagnostics problems, by position
+     * @param rejected whether a syntax or type error means the file must not be applied
+     * @param values each setting's loaded value and where it came from
+     * @param legacyKeys old keys found, in file order, with the keys they moved to
+     * @param deadTables old {@code palette.scopes} and {@code plugins."<id>"} tables Migrate Config may remove
+     */
+    public record Result(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, boolean rejected,
+                         SettingValues values, List<LegacyKey> legacyKeys, List<List<String>> deadTables) {
         public Result {
             Objects.requireNonNull(snapshot, "snapshot");
+            Objects.requireNonNull(values, "values");
             diagnostics = List.copyOf(diagnostics);
+            legacyKeys = List.copyOf(legacyKeys);
+            deadTables = deadTables.stream().map(List::copyOf).toList();
+        }
+
+        /** A result with default values and nothing to migrate. */
+        public Result(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, boolean rejected) {
+            this(snapshot, diagnostics, rejected, SettingValues.defaults(CoreSettings.SCHEMA), List.of(), List.of());
         }
     }
 
-    private static final Map<List<String>, Set<String>> FIELDS = Map.ofEntries(
-        Map.entry(List.of(), Set.of("window", "font", "ui", "keybindings", "terminal", "buddy", "palette",
-            "notifications", "background", "plugins")),
-        Map.entry(List.of("background"), Set.of("enabled")),
-        Map.entry(List.of("buddy"), Set.of("enabled")),
-        Map.entry(List.of("notifications"), Set.of("long_command_seconds")),
-        Map.entry(List.of("palette"), Set.of("max_results", "scopes")),
-        // palette.scopes once held the History scope's settings; the table is kept known so the
-        // moved-to-a-plugin report below replaces the generic unknown-key warning.
-        Map.entry(List.of("palette", "scopes"), Set.of()),
-        Map.entry(List.of("window"), Set.of("tab_height", "rail_width", "toolbar", "toolbar_height", "status_bar",
-            "status_bar_height", "columns", "lines")),
-        Map.entry(List.of("font"), Set.of("family", "size", "fallback", "ligatures", "line_height")),
-        Map.entry(List.of("ui"), Set.of("theme", "font")),
-        Map.entry(List.of("ui", "font"), Set.of("family", "size")),
-        Map.entry(List.of("ui", "theme"), Set.of("name", "terminal")),
-        Map.entry(List.of("terminal"), Set.of("shell", "env", "scrollback", "option_as_meta", "cursor",
-            "dim_inactive_panes", "copy_on_select", "bell", "on_exit", "shell_integration")),
-        Map.entry(List.of("terminal", "shell"), Set.of("program", "args")),
-        Map.entry(List.of("terminal", "cursor"), Set.of("shape", "blink")));
+    /** The layout this build writes; a file without {@code version} is version 1. */
+    public static final int VERSION = 2;
 
+    private static final List<String> KEYBINDINGS = List.of("keybindings");
+    private static final List<String> PLUGINS = List.of("plugins");
+    private static final List<String> PALETTE_SCOPES = List.of("palette", "scopes");
+    private static final List<String> VERSION_KEY = List.of("version");
+    private static final java.util.regex.Pattern PLUGIN_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
+
+    private record AliasHit(Setting<?> setting, List<String> path, Object value) { }
+
+    private final SettingsSchema schema = CoreSettings.SCHEMA;
     private final Path file;
     private final TomlParseResult toml;
     private final boolean macOs;
     private final List<ConfigDiagnostic> diagnostics = new ArrayList<>();
+    private final SettingValues.Builder values = SettingValues.builder(CoreSettings.SCHEMA);
+    private final List<AliasHit> aliasHits = new ArrayList<>();
+    private final List<List<String>> deadTables = new ArrayList<>();
     private boolean rejected;
-    private int tabHeight = 30;
-    private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
-    private int toolbarHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
-    private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
-    private ToolbarMode toolbar = ToolbarMode.ICONS_AND_LABELS;
-    private boolean statusBar = true;
-    private boolean buddyEnabled = false;
-    private boolean backgroundEnabled;
-    private int longCommandSeconds = 10;
-    private int maxResults = PaletteSettings.DEFAULT_MAX_RESULTS;
-    private int columns = 100;
-    private int lines = 35;
-    private String fontFamily = FontConfig.defaults().family();
-    private float fontSize = 16f;
-    private String uiFontFamily = UiFontConfig.defaults().family();
-    private float uiFontSize;
-    private List<String> fallback = FontConfig.defaults().fallback();
-    private boolean ligatures = true;
-    private float lineHeight = 1f;
-    private String program = "";
-    private List<String> args = List.of();
-    private Map<String, String> env = Map.of();
-    private int scrollback = 10_000;
-    private OptionAsMeta optionAsMeta = OptionAsMeta.LEFT;
-    private CursorStyle cursorShape = CursorStyle.BLOCK;
-    private boolean cursorBlink = true;
-    private float dimInactivePanes = .3f;
-    private boolean copyOnSelect;
-    private BellMode bell = BellMode.VISUAL;
-    private ShellExitBehavior onExit = ShellExitBehavior.KEEP_OPEN;
-    private ShellIntegrationMode shellIntegration = ShellIntegrationMode.AUTO;
-    private String theme = ConfigSnapshot.DEFAULT_THEME;
-    private TerminalColors terminalColors = TerminalColors.MATCH;
     private Map<String, String> keybindings = Map.of();
     private Map<String, Map<String, Object>> plugins = Map.of();
-    private static final java.util.regex.Pattern PLUGIN_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
 
     private ConfigLoader(Path file, String text, boolean macOs) {
         this.file = Objects.requireNonNull(file, "file");
@@ -112,45 +87,76 @@ public final class ConfigLoader {
             toml.errors().forEach(error -> diagnostics.add(new ConfigDiagnostic(
                 ConfigDiagnostic.Severity.ERROR, file, error.position().line(), error.position().column(), "",
                 "Invalid TOML syntax or duplicate definition; check this location.")));
-            return new Result(ConfigSnapshot.defaults(), diagnostics, true);
+            return new Result(ConfigSnapshot.defaults(), diagnostics, true, SettingValues.defaults(schema), List.of(), List.of());
         }
         readTable(List.of(), toml);
+        List<LegacyKey> legacyKeys = resolveAliases();
         diagnostics.sort(Comparator.comparingInt(ConfigDiagnostic::line).thenComparingInt(ConfigDiagnostic::column));
-        var snapshot = new ConfigSnapshot(tabHeight, toolbar, statusBar,
-            new FontConfig(fontFamily, fontSize, fallback, ligatures, lineHeight), theme, keybindings, columns, lines,
-            new TerminalConfig(new TerminalConfig.Shell(program, args), env, scrollback, optionAsMeta,
-                cursorShape, cursorBlink, dimInactivePanes, copyOnSelect, bell, onExit, shellIntegration),
-                buddyEnabled, maxResults, longCommandSeconds, backgroundEnabled, plugins, new UiFontConfig(uiFontFamily, uiFontSize), terminalColors, railWidth,
-                toolbarHeight, statusBarHeight);
-        return new Result(snapshot, diagnostics, rejected);
+        SettingValues loaded = values.build();
+        return new Result(ConfigSnapshot.from(loaded, keybindings, plugins), diagnostics, rejected, loaded, legacyKeys, deadTables);
     }
 
     private void readTable(List<String> parent, TomlTable table) {
         for (String key : table.keySet()) {
-            var path = new ArrayList<>(parent);
-            path.add(key);
-            if (!FIELDS.get(parent).contains(key)) {
-                if (parent.equals(List.of("palette", "scopes")) && key.equals("history"))
-                    warning(path, "History moved to the Shell History plugin: use [plugins.\"dev.jasper.history\"] with "
-                        + "trivial_commands and deprioritize_trivial, or disable the plugin in Manage Plugins.");
-                else warning(path, "Unknown setting or table; ignored.");
-                continue;
-            }
+            List<String> path = append(parent, key);
             Object value = table.get(List.of(key));
-            boolean bindings = path.equals(List.of("keybindings"));
-            boolean environment = path.equals(List.of("terminal", "env"));
-            boolean pluginTables = path.equals(List.of("plugins"));
-            if (FIELDS.containsKey(path) || bindings || environment || pluginTables) {
-                if (!(value instanceof TomlTable nested)) typeError(path, "a table");
-                else if (bindings) readBindings(nested);
-                else if (environment) readEnvironment(nested);
-                else if (pluginTables) readPlugins(nested);
-                else readTable(path, nested);
-            } else {
-                // Only schema-validated components reach this dispatch. Quoted dotted
-                // keys stay single components throughout traversal and positioning.
-                readField(String.join(".", path), path, value);
+            if (path.equals(VERSION_KEY)) { readVersion(path, value); continue; }
+            var current = schema.find(path);
+            if (current.isPresent()) { read(current.get(), path, value); continue; }
+            var aliased = schema.aliasOf(path);
+            if (aliased.isPresent()) { aliasHits.add(new AliasHit(aliased.get(), path, value)); continue; }
+            if (!schema.reserved(path) && !schema.knownTable(path)) { warning(path, "Unknown setting or table; ignored."); continue; }
+            if (!(value instanceof TomlTable nested)) typeError(path, "a table");
+            else if (path.equals(KEYBINDINGS)) readBindings(nested);
+            else if (path.equals(PLUGINS)) readPlugins(nested);
+            else if (path.equals(PALETTE_SCOPES)) readOldScopes(nested);
+            else readTable(path, nested);
+        }
+    }
+
+    private <T> void read(Setting<T> setting, List<String> path, Object value) {
+        Reading<T> reading = setting.kind().read(value, setting.defaultValue());
+        for (Reading.Issue issue : reading.issues()) {
+            if (issue.rejectsFile()) rejected = true;
+            var at = new ArrayList<>(path);
+            at.addAll(issue.subPath());
+            diagnostic(issue.severity() == Reading.Severity.WARNING ? ConfigDiagnostic.Severity.WARNING : ConfigDiagnostic.Severity.ERROR,
+                at, issue.message());
+        }
+        values.put(setting, reading.value(), path);
+    }
+
+    /** Old keys are read after the walk, so a current key wins wherever it appears in the file. */
+    private List<LegacyKey> resolveAliases() {
+        aliasHits.sort(Comparator.comparingInt((AliasHit hit) -> line(hit.path())).thenComparingInt(hit -> column(hit.path())));
+        var legacy = new ArrayList<LegacyKey>();
+        for (AliasHit hit : aliasHits) {
+            Setting<?> setting = hit.setting();
+            legacy.add(new LegacyKey(hit.path(), setting.key()));
+            if (values.present(setting)) warning(hit.path(), "Superseded by " + setting.name() + "; ignored.");
+            else {
+                read(setting, hit.path(), hit.value());
+                warning(hit.path(), "Moved to " + setting.name() + ". Use Migrate Config to update the file.");
             }
+        }
+        return legacy;
+    }
+
+    private void readVersion(List<String> path, Object value) {
+        if (!(value instanceof Long number)) typeError(path, "an integer");
+        else if (number < 1) valueError(path, "Use a version from 1–" + VERSION + "; treating this file as version 1.");
+        else if (number > VERSION) warning(path, "Written by a newer Jasper; unknown settings are ignored.");
+    }
+
+    /** palette.scopes once held the History scope's settings; it is kept known so the move is explained. */
+    private void readOldScopes(TomlTable table) {
+        deadTables.add(PALETTE_SCOPES);
+        for (String key : table.keySet()) {
+            List<String> path = append(PALETTE_SCOPES, key);
+            if (key.equals("history"))
+                warning(path, "History moved to the Shell History plugin: its settings (trivial_commands, deprioritize_trivial) "
+                    + "now live in plugins/dev.jasper.history/dev.jasper.history.toml; disable the plugin in Manage Plugins to turn it off.");
+            else warning(path, "Unknown setting or table; ignored.");
         }
     }
 
@@ -163,6 +169,7 @@ public final class ConfigLoader {
             if (!PLUGIN_ID.matcher(id).matches()) { warning(path, "Not a plugin id; ignored."); continue; }
             if (!(value instanceof TomlTable nested)) { typeError(path, "a table"); continue; }
             staged.put(id, freeze(path, nested));
+            deadTables.add(path);
             warning(path, "Plugin settings moved to plugins/" + id + "/" + id + ".toml; this table only seeds that file when it is missing.");
         }
         plugins = Map.copyOf(staged);
@@ -201,161 +208,6 @@ public final class ConfigLoader {
             }
         }
         return Collections.unmodifiableMap(result);
-    }
-
-    private void readField(String name, List<String> path, Object value) {
-        switch (name) {
-            case "window.tab_height" -> tabHeight = clampedInteger(path, value, 20, 72, tabHeight);
-            case "window.rail_width" -> railWidth = clampedInteger(path, value,
-                ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH, railWidth);
-            case "window.toolbar_height" -> toolbarHeight = clampedInteger(path, value,
-                ConfigSnapshot.MIN_TOOLBAR_HEIGHT, ConfigSnapshot.MAX_TOOLBAR_HEIGHT, toolbarHeight);
-            case "window.status_bar_height" -> statusBarHeight = clampedInteger(path, value,
-                ConfigSnapshot.MIN_STATUS_BAR_HEIGHT, ConfigSnapshot.MAX_STATUS_BAR_HEIGHT, statusBarHeight);
-            case "window.columns" -> columns = integer(path, value, 5, 500, columns);
-            case "window.lines" -> lines = integer(path, value, 2, 200, lines);
-            case "window.toolbar" -> toolbar = choice(path, value, Map.of(
-                "icons_and_labels", ToolbarMode.ICONS_AND_LABELS,
-                "icons", ToolbarMode.ICONS, "hidden", ToolbarMode.HIDDEN), toolbar);
-            case "window.status_bar" -> statusBar = bool(path, value, statusBar);
-            case "buddy.enabled" -> buddyEnabled = bool(path, value, buddyEnabled);
-            case "background.enabled" -> backgroundEnabled = bool(path, value, backgroundEnabled);
-            case "notifications.long_command_seconds" ->
-                longCommandSeconds = integer(path, value, 0, 3600, longCommandSeconds);
-            case "palette.max_results" -> maxResults = integer(path, value, PaletteSettings.MIN_MAX_RESULTS, PaletteSettings.MAX_MAX_RESULTS, maxResults);
-            case "ui.font.family" -> uiFontFamily = string(path, value, ConfigLoader::fontName,
-                "Use a nonblank font name without NUL; using the default.", uiFontFamily);
-            case "ui.font.size" -> uiFontSize = number(path, value, 8, 32, uiFontSize);
-            case "font.family" -> fontFamily = string(path, value, ConfigLoader::fontName,
-                "Use a nonblank font name without NUL; using the default.", fontFamily);
-            case "font.size" -> fontSize = number(path, value, 6, 72, fontSize);
-            case "font.fallback" -> fallback = strings(path, value, ConfigLoader::fontName, fallback);
-            case "font.ligatures" -> ligatures = bool(path, value, ligatures);
-            case "font.line_height" -> lineHeight = number(path, value, .5, 3, lineHeight);
-            // Any name: whether a theme has it is known only to the theme catalog.
-            case "ui.theme.name" -> theme = string(path, value, ignored -> true, "", theme).strip();
-            case "ui.theme.terminal" -> terminalColors = choice(path, value, Map.of(
-                "match", TerminalColors.MATCH, "light", TerminalColors.LIGHT, "dark", TerminalColors.DARK), terminalColors);
-            case "terminal.shell.program" -> program = string(path, value,
-                text -> (text.isEmpty() || !text.isBlank()) && noNul(text),
-                "Use an empty or nonblank executable name without NUL; using the default.", program);
-            case "terminal.shell.args" -> args = strings(path, value, ConfigLoader::noNul, args);
-            case "terminal.scrollback" -> scrollback = integer(path, value, 0, 1_000_000, scrollback);
-            case "terminal.option_as_meta" -> optionAsMeta = choice(path, value, Map.of(
-                "left", OptionAsMeta.LEFT, "right", OptionAsMeta.RIGHT, "both", OptionAsMeta.BOTH, "none", OptionAsMeta.NONE), optionAsMeta);
-            case "terminal.cursor.shape" -> cursorShape = choice(path, value, Map.of(
-                "block", CursorStyle.BLOCK, "beam", CursorStyle.BEAM, "underline", CursorStyle.UNDERLINE), cursorShape);
-            case "terminal.cursor.blink" -> cursorBlink = bool(path, value, cursorBlink);
-            case "terminal.dim_inactive_panes" -> dimInactivePanes = number(path, value, 0, 1, dimInactivePanes);
-            case "terminal.copy_on_select" -> copyOnSelect = bool(path, value, copyOnSelect);
-            case "terminal.bell" -> bell = choice(path, value,
-                Map.of("visual", BellMode.VISUAL, "sound", BellMode.SOUND, "none", BellMode.NONE), bell);
-            case "terminal.on_exit" -> onExit = choice(path, value, Map.of(
-                "keep_open", ShellExitBehavior.KEEP_OPEN, "close_on_success", ShellExitBehavior.CLOSE_ON_SUCCESS,
-                "close", ShellExitBehavior.CLOSE), onExit);
-            case "terminal.shell_integration" -> shellIntegration = choice(path, value, Map.of(
-                "auto", ShellIntegrationMode.AUTO, "manual", ShellIntegrationMode.MANUAL, "off", ShellIntegrationMode.OFF),
-                shellIntegration);
-            default -> throw new IllegalStateException("Unrecognized validated field.");
-        }
-    }
-
-    private int integer(List<String> path, Object value, int min, int max, int defaultValue) {
-        if (!(value instanceof Long number)) typeError(path, "an integer");
-        else if (number < min || number > max) valueError(path, "Use an integer from " + min + "–" + max + "; using the default.");
-        else return number.intValue();
-        return defaultValue;
-    }
-
-    /** An out-of-range integer uses the nearest bound, with a warning, so a smaller value never yields a larger one. */
-    private int clampedInteger(List<String> path, Object value, int min, int max, int defaultValue) {
-        if (!(value instanceof Long number)) { typeError(path, "an integer"); return defaultValue; }
-        if (number < min || number > max) {
-            int bound = number < min ? min : max;
-            diagnostic(ConfigDiagnostic.Severity.WARNING, path, "Use an integer from " + min + "–" + max + "; using " + bound + ".");
-            return bound;
-        }
-        return number.intValue();
-    }
-
-    private float number(List<String> path, Object value, double min, double max, float defaultValue) {
-        if (!(value instanceof Long) && !(value instanceof Double)) typeError(path, "a number");
-        else {
-            double number = ((Number) value).doubleValue();
-            if (!Double.isFinite(number) || number < min || number > max) {
-                valueError(path, "Use a finite number from " + bound(min) + "–" + bound(max) + "; using the default.");
-            } else return (float) number;
-        }
-        return defaultValue;
-    }
-
-    /** Whole bounds print without a fraction, so existing messages read "6–72". */
-    private static String bound(double value) {
-        return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
-    }
-
-    private boolean bool(List<String> path, Object value, boolean defaultValue) {
-        if (value instanceof Boolean result) return result;
-        typeError(path, "a boolean");
-        return defaultValue;
-    }
-
-    private String string(List<String> path, Object value, Predicate<String> valid, String message, String defaultValue) {
-        if (!(value instanceof String text)) typeError(path, "a string");
-        else if (!valid.test(text)) valueError(path, message);
-        else return text;
-        return defaultValue;
-    }
-
-    private <T> T choice(List<String> path, Object value, Map<String, T> choices, T defaultValue) {
-        if (!(value instanceof String text)) typeError(path, "a string");
-        else if (!choices.containsKey(text)) {
-            valueError(path, "Use " + String.join(", ", choices.keySet().stream().sorted().toList()) + "; using the default.");
-        } else return choices.get(text);
-        return defaultValue;
-    }
-
-    private List<String> strings(List<String> path, Object value, Predicate<String> valid, List<String> defaultValue) {
-        if (!(value instanceof TomlArray array)) {
-            typeError(path, "an array of strings");
-            return defaultValue;
-        }
-        var values = new ArrayList<String>();
-        boolean invalid = false;
-        for (int index = 0; index < array.size(); index++) {
-            Object element = array.get(index);
-            if (!(element instanceof String text)) {
-                typeError(path, "an array of strings");
-                invalid = true;
-            } else if (!valid.test(text)) {
-                valueError(path, "Invalid string array element; using the default list.");
-                invalid = true;
-            } else values.add(text);
-        }
-        return invalid ? defaultValue : List.copyOf(values);
-    }
-
-    private void readEnvironment(TomlTable table) {
-        var values = new LinkedHashMap<String, String>();
-        for (String name : table.keySet()) {
-            List<String> path = List.of("terminal", "env", name);
-            Object value = table.get(List.of(name));
-            if (!(value instanceof String text)) typeError(path, "a string environment value");
-            else if (!TerminalConfig.validEnvName(name)) valueError(path, "Use a portable environment name; entry omitted.");
-            else if (TerminalConfig.reservedEnvName(name)) warning(path, "Jasper sets this environment variable; entry omitted.");
-            else if (!noNul(text)) valueError(path, "Environment values must contain no NUL; entry omitted.");
-            else values.put(name, text);
-        }
-        env = Map.copyOf(values);
-    }
-
-    /** Only a command's first word is ever compared, so an entry with whitespace could never match. */
-    private static boolean noNul(String text) {
-        return text.indexOf('\0') < 0;
-    }
-
-    private static boolean fontName(String text) {
-        return !text.isBlank() && noNul(text);
     }
 
     private void readBindings(TomlTable table) {
@@ -404,6 +256,22 @@ public final class ConfigLoader {
     private static boolean knownAction(String id) {
         for (ActionId action : ActionId.values()) if (action.id().equals(id)) return true;
         return false;
+    }
+
+    private static List<String> append(List<String> parent, String key) {
+        var path = new ArrayList<>(parent);
+        path.add(key);
+        return List.copyOf(path);
+    }
+
+    private int line(List<String> path) {
+        TomlPosition position = toml.inputPositionOf(path);
+        return position == null ? 0 : position.line();
+    }
+
+    private int column(List<String> path) {
+        TomlPosition position = toml.inputPositionOf(path);
+        return position == null ? 0 : position.column();
     }
 
     private void typeError(List<String> path, String expected) {

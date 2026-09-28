@@ -59,7 +59,7 @@ class ExpandedConfigTest {
             [window]
             columns=100
             lines=30
-            [font]
+            [terminal.font]
             family='Missing Example Font'
             size=19.5
             fallback=['Fallback One', 'Fallback Two']
@@ -81,8 +81,7 @@ class ExpandedConfigTest {
             EXAMPLE='one value'
             """, """
             window={columns=100, lines=30}
-            font={family='Missing Example Font', size=19.5, fallback=['Fallback One', 'Fallback Two'], ligatures=false, line_height=1.5}
-            terminal={scrollback=321, option_as_meta='both', dim_inactive_panes=0.6, copy_on_select=true, bell='sound', shell={program='example-shell', args=['--login', 'one argument', '']}, cursor={shape='beam', blink=false}, env={EXAMPLE='one value'}}
+            terminal={font={family='Missing Example Font', size=19.5, fallback=['Fallback One', 'Fallback Two'], ligatures=false, line_height=1.5}, scrollback=321, option_as_meta='both', dim_inactive_panes=0.6, copy_on_select=true, bell='sound', shell={program='example-shell', args=['--login', 'one argument', '']}, cursor={shape='beam', blink=false}, env={EXAMPLE='one value'}}
             """)) {
             var result = parse(text);
             assertThat(result.rejected()).isFalse();
@@ -112,8 +111,8 @@ class ExpandedConfigTest {
     }
 
     @Test void expandedKnownTypesRejectWholeCandidateWithoutEchoingSecrets() {
-        for (String assignment : List.of("window.columns=5.0", "window.lines='secret'", "font.family=7",
-                "font.fallback='secret'", "font.fallback=['ok', 7]", "font.ligatures='secret'", "font.line_height=true",
+        for (String assignment : List.of("window.columns=5.0", "window.lines='secret'", "terminal.font.family=7",
+                "terminal.font.fallback='secret'", "terminal.font.fallback=['ok', 7]", "terminal.font.ligatures='secret'", "terminal.font.line_height=true",
                 "terminal=7", "terminal.shell=[]", "terminal.cursor='secret'", "terminal.env=[]",
                 "terminal.shell.program=[]", "terminal.shell.args=7", "terminal.shell.args=['secret', true]",
                 "terminal.env.EXAMPLE=7", "terminal.scrollback=10.0", "terminal.option_as_meta=[]",
@@ -131,9 +130,9 @@ class ExpandedConfigTest {
 
     @Test void invalidExpandedValuesDefaultOnlyTheirField() {
         for (String assignment : List.of("window.columns=4", "window.columns=501", "window.lines=1", "window.lines=201",
-                "font.family=''", "font.family='  '", "font.family=\"bad\\u0000name\"", "font.fallback=['ok', '  ']",
-                "font.fallback=[\"bad\\u0000name\"]", "font.line_height=0.4", "font.line_height=3.1", "font.line_height=nan",
-                "font.line_height=inf", "terminal.shell.program='  '", "terminal.shell.program=\"bad\\u0000program\"",
+                "terminal.font.family=''", "terminal.font.family='  '", "terminal.font.family=\"bad\\u0000name\"", "terminal.font.fallback=['ok', '  ']",
+                "terminal.font.fallback=[\"bad\\u0000name\"]", "terminal.font.line_height=0.4", "terminal.font.line_height=3.1", "terminal.font.line_height=nan",
+                "terminal.font.line_height=inf", "terminal.shell.program='  '", "terminal.shell.program=\"bad\\u0000program\"",
                 "terminal.shell.args=['secret', \"bad\\u0000arg\"]", "terminal.scrollback=-1", "terminal.scrollback=1000001",
                 "terminal.option_as_meta='secret'", "terminal.cursor.shape='secret'", "terminal.dim_inactive_panes=-0.1",
                 "terminal.dim_inactive_panes=1.1", "terminal.dim_inactive_panes=nan", "terminal.dim_inactive_panes=inf",
@@ -192,7 +191,7 @@ class ExpandedConfigTest {
         assertPosition(parse("[terminal]\n  cursor=[]"), "terminal.cursor", 2, 3, ConfigDiagnostic.Severity.ERROR);
         assertPosition(parse("[terminal]\n  env=false"), "terminal.env", 2, 3, ConfigDiagnostic.Severity.ERROR);
         assertPosition(parse("[terminal.shell]\nargs=[\n 'secret',\n  7\n]"), "terminal.shell.args", 2, 1, ConfigDiagnostic.Severity.ERROR);
-        assertPosition(parse("[font]\nfallback=[\n 'ok',\n  false\n]"), "font.fallback", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        assertPosition(parse("[terminal.font]\nfallback=[\n 'ok',\n  false\n]"), "terminal.font.fallback", 2, 1, ConfigDiagnostic.Severity.ERROR);
     }
 
     @Test void templateUncommentsToEverySupportedSetting() {
@@ -202,8 +201,8 @@ class ExpandedConfigTest {
             .collect(java.util.stream.Collectors.joining("\n"));
         var toml = Toml.parse(uncommented);
         assertThat(toml.errors()).isEmpty();
-        for (String key : List.of("window.columns", "window.lines", "font.family", "font.fallback", "font.ligatures",
-                "font.line_height", "terminal.shell.program", "terminal.shell.args", "terminal.env", "terminal.scrollback",
+        for (String key : List.of("window.columns", "window.lines", "terminal.font.family", "terminal.font.fallback", "terminal.font.ligatures",
+                "terminal.font.line_height", "terminal.shell.program", "terminal.shell.args", "terminal.env", "terminal.scrollback",
                 "terminal.option_as_meta", "terminal.cursor.shape", "terminal.cursor.blink", "terminal.dim_inactive_panes",
                 "terminal.copy_on_select", "terminal.bell", "terminal.on_exit")) {
             assertThat(toml.contains(key)).as(key).isTrue();
@@ -230,7 +229,7 @@ class ExpandedConfigTest {
         for (int columns : new int[]{5, 500}) assertThat(parse("window.columns=" + columns).snapshot().columns()).isEqualTo(columns);
         for (int lines : new int[]{2, 200}) assertThat(parse("window.lines=" + lines).snapshot().lines()).isEqualTo(lines);
         for (int scrollback : new int[]{0, 1000000}) assertThat(parse("terminal.scrollback=" + scrollback).snapshot().terminal().scrollback()).isEqualTo(scrollback);
-        for (float height : new float[]{.5f, .6f, .7f, .8f, .9f, 1, 3}) assertThat(parse("font.line_height=" + height).snapshot().font().lineHeight()).isEqualTo(height);
+        for (float height : new float[]{.5f, .6f, .7f, .8f, .9f, 1, 3}) assertThat(parse("terminal.font.line_height=" + height).snapshot().font().lineHeight()).isEqualTo(height);
         for (float dim : new float[]{0, 1}) assertThat(parse("terminal.dim_inactive_panes=" + dim).snapshot().terminal().dimInactivePanes()).isEqualTo(dim);
         for (var entry : Map.of("left", OptionAsMeta.LEFT, "right", OptionAsMeta.RIGHT, "both", OptionAsMeta.BOTH, "none", OptionAsMeta.NONE).entrySet()) {
             assertThat(parse("terminal.option_as_meta='" + entry.getKey() + "'").snapshot().terminal().optionAsMeta()).isEqualTo(entry.getValue());
@@ -241,7 +240,7 @@ class ExpandedConfigTest {
         for (var entry : Map.of("visual", BellMode.VISUAL, "sound", BellMode.SOUND, "none", BellMode.NONE).entrySet()) {
             assertThat(parse("terminal.bell='" + entry.getKey() + "'").snapshot().terminal().bell()).isEqualTo(entry.getValue());
         }
-        var empty = parse("font.fallback=[]\nterminal.shell={program='', args=[]}\nterminal.env={}");
+        var empty = parse("terminal.font.fallback=[]\nterminal.shell={program='', args=[]}\nterminal.env={}");
         assertThat(empty.diagnostics()).isEmpty();
         assertThat(empty.snapshot().font().fallback()).isEmpty();
     }
@@ -269,7 +268,7 @@ class ExpandedConfigTest {
     }
 
     @Test void listsDefaultAsUnitsWhileUnrelatedValidFieldsSurvive() {
-        var result = parse("font.family='Example'\nfont.fallback=['ok', ' ']\nterminal.shell={program='custom', args=['ok', \"bad\\u0000arg\"]}");
+        var result = parse("terminal.font.family='Example'\nterminal.font.fallback=['ok', ' ']\nterminal.shell={program='custom', args=['ok', \"bad\\u0000arg\"]}");
         assertThat(result.rejected()).isFalse();
         assertThat(result.snapshot().font().family()).isEqualTo("Example");
         assertThat(result.snapshot().font().fallback()).containsExactly("Symbols Nerd Font Mono", "Apple Color Emoji");

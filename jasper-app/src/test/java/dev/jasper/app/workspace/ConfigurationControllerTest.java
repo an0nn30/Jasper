@@ -67,7 +67,7 @@ class ConfigurationControllerTest {
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void savedFieldsApplyAcrossOwnersAndPendingHiddenViewsWithoutReplacingSessions() throws Exception {
-        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=19\n[ui.theme]\nname='IntelliJ Light'\n");
+        start("[window]\ntab_height=44\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=19\n[ui.theme]\nname='IntelliJ Light'\n");
         edt(() -> { owner(); owner(); }); launchAll();
         var first = owners.getFirst(); var second = owners.get(1);
         var retained = first.currentPane(); var session = retained.session();
@@ -80,7 +80,7 @@ class ConfigurationControllerTest {
             retained.findBar().open(); retained.findBar().queryField().setText("alpha");
             first.newTab(HOME); // pending and hides the retained terminal
         });
-        reload("[window]\ntab_height=50\ntoolbar='hidden'\n[font]\nsize=21\n");
+        reload("[window]\ntab_height=50\ntoolbar='hidden'\n[terminal.font]\nsize=21\n");
         launchAll();
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(50); assertThat(second.tabHeight()).isEqualTo(50);
@@ -98,13 +98,13 @@ class ConfigurationControllerTest {
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void unrelatedChangesPreserveTemporaryChoicesAndNewOwnersUseSavedDefaults() throws Exception {
-        start("[font]\nsize=19\n"); edt(this::owner); launchAll();
+        start("[terminal.font]\nsize=19\n"); edt(this::owner); launchAll();
         var first = owners.getFirst();
         edt(() -> {
             first.setTabHeight(60); first.setToolbarMode(ToolbarMode.HIDDEN);
             first.setStatusVisible(false); first.currentPane().view().setFontSize(28);
         });
-        reload("# comment\n[font]\nsize=19\nunknown=1\n");
+        reload("# comment\n[terminal.font]\nsize=19\nunknown=1\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(60); assertThat(first.toolbar().isVisible()).isFalse();
             assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(Theme.DARK);
@@ -114,7 +114,7 @@ class ConfigurationControllerTest {
             assertThat(next.theme().chrome()).isEqualTo(Theme.DARK);
         }); launchAll();
         edt(() -> assertThat(owners.get(1).currentPane().view().fontSize()).isEqualTo(19));
-        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[font]\nsize=20\n[ui.theme]\nname='IntelliJ Light'\n");
+        reload("[window]\ntab_height=45\ntoolbar='icons'\nstatus_bar=false\n[terminal.font]\nsize=20\n[ui.theme]\nname='IntelliJ Light'\n");
         edt(() -> {
             assertThat(first.tabHeight()).isEqualTo(45); assertThat(first.toolbar().isVisible()).isTrue();
             assertThat(first.currentPane().view().fontSize()).isEqualTo(20);
@@ -273,7 +273,7 @@ class ConfigurationControllerTest {
         }); launchAll();
         var sibling = owner.currentPane();
         edt(() -> { tab.toggleZoom(); owner.newTab(HOME); });
-        reload("[font]\nsize=20\n[keybindings]\nnew_tab='Ctrl+F12'\n"); launchAll();
+        reload("[terminal.font]\nsize=20\n[keybindings]\nnew_tab='Ctrl+F12'\n"); launchAll();
         edt(() -> {
             assertThat(tab.tree().zoomed()).isTrue();
             assertThat(retained.view().selectedText()).contains("alpha");
@@ -331,7 +331,7 @@ class ConfigurationControllerTest {
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void typographyAndBehaviorChangesPreserveManualSizeAndThemeUntilSavedSizeChanges() throws Exception {
-        start("[font]\nsize=18\n"); edt(this::owner); launchAll();
+        start("[terminal.font]\nsize=18\n"); edt(this::owner); launchAll();
         var owner = owners.getFirst(); var pane = owner.currentPane();
         edt(() -> { pane.view().setFontSize(27); owner.selectTheme(Theme.LIGHT); });
         reload(liveSettings(18));
@@ -555,7 +555,7 @@ class ConfigurationControllerTest {
 
     private static String liveSettings(int size) {
         return """
-            [font]
+            [terminal.font]
             family='Monospaced'
             size=%d
             fallback=['Dialog']
@@ -626,9 +626,9 @@ class ConfigurationControllerTest {
     }
 
     @Test void savedTerminalColorsApplyLiveOnStartAndReloadWithoutARestartNotice() throws Exception {
-        start("[ui.theme]\nname='IntelliJ Light'\nterminal='dark'\n");
+        start("[ui.theme]\nname='IntelliJ Light'\n[terminal]\ncolors='dark'\n");
         edt(() -> assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperDark())));
-        reload("[ui.theme]\nname='IntelliJ Light'\nterminal='match'\n");
+        reload("[ui.theme]\nname='IntelliJ Light'\n[terminal]\ncolors='match'\n");
         edt(() -> {
             assertThat(themes.current()).isEqualTo(new ResolvedTheme(Theme.LIGHT, Palette.jasperLight()));
             assertThat(controller.shown().diagnostics()).noneMatch(d -> d.key().startsWith("ui.theme"));

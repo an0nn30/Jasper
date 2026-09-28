@@ -52,18 +52,18 @@ public final class ConfigTemplate {
             # Zero disables notifications. Range 0-3600.
             # long_command_seconds = 10
 
-            [background]
+            [system]
             # Keep Jasper running with no windows after the last one closes to reduce next-launch startup
             # work, and start it in the background at login. Quit still exits completely.
             # Residency applies from the next start; the login item updates as soon as you save.
             # Autostart needs an installed Jasper, not a development run.
-            # enabled = false
+            # run_in_background = false
 
             [palette]
             # Rows each palette scope shows, and the All tab shows per scope, 1-20; updates live.
             # max_results = 5
 
-            [font]
+            [terminal.font]
             # Font family and ordered fallbacks update live. Missing fonts use JBR/system fallback.
             # family = "JetBrains Mono"
             # fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
@@ -94,6 +94,9 @@ public final class ConfigTemplate {
             # Shell integration: "auto" loads Jasper's zsh/bash/fish script after your own startup files (new panes only),
             # "manual" only exports JASPER_SHELL_INTEGRATION so you can source it yourself, "off" does neither.
             # shell_integration = "auto"
+            # Terminal colors: "match" uses the theme's console colours (Jasper's palette when it has
+            # none); "light" or "dark" keeps Jasper's palette. Switches live.
+            # colors = "match"
 
             [terminal.shell]
             # New panes only. Empty program resolves the default shell and appends configured args.
@@ -132,9 +135,6 @@ public final class ConfigTemplate {
             # The UI theme by name: "Jasper Dark" (the default), "IntelliJ Light", or a theme plugin
             # installed in the themes folder beside this file. Switches live across windows.
             # name = "Jasper Dark"
-            # Terminal colors: "match" uses the theme's console colours (Jasper's palette when it has
-            # none); "light" or "dark" keeps Jasper's palette. Switches live.
-            # terminal = "match"
 
             [keybindings]
             # Shortcuts update live. Use "none" to disable an action; shortcuts must be unique.
