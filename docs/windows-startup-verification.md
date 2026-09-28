@@ -76,6 +76,16 @@ Timing-sensitive under full-check load (passed in that run and alone; failed onc
 - `TerminalAppIntegrationTest > rowResetRejectsACompletedSearchAlreadyQueuedAheadOfReconciliation(String) [3] "reflow"`:
   uses `FakeConnector`, no PTY; tripped its 5 s wait while the whole build was running.
 
+Arrived with the merge of `main` (plugin settings C1-C3, Vim V1c-V3a) on 2026-09-28; each also fails on `main`
+itself (c974ec4d) on this machine:
+
+- `EditorsTest > aPathEditorBrowsesForAFile()`: the Unix `"/bin/zsh"` fixture becomes `"\bin\zsh"`.
+- Editor `CompletionTest > bufferNamesThatHoldTheText()`: a Windows temp path in the buffer names.
+- Editor `ExFilesTest > editOpensAFileOrReadsTheTabsFileAgain()`: `sub\other.txt` where `sub/other.txt` is expected.
+- Editor `ViewportSyncTest > wrappedScreenLinesAreTheSameInTheViewAndOnTheScreen()`: `g$` lands on the wrong
+  screen line (font metrics).
+- `TerminalAppIntegrationTest` `"reflow"` above failed again in the merged tree's full check.
+
 ## ConPTY and WSL shell profiles — 2026-09-28
 
 Branch: `worktree-wsl-hosts` (plan `docs/superpowers/plans/2026-09-28-jasper-wsl-a-profiles.md`).

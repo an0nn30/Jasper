@@ -2,13 +2,22 @@
 
 ## Current state — 2026-09-28
 
+- **Merged main (plugin settings C1-C3, Vim V1c-V3a) into `worktree-wsl-hosts`** (2026-09-28). Main's SDK 0.9.0
+  plus this branch's additive profile API ship as SDK 0.9.1 (`JasperSdk.VERSION`, `@since 0.9.1`, version tests);
+  Remote is 0.6.0 with `sdk = ">=0.9.1, <0.10"` (main's declared settings and the WSL group); the other bundled
+  plugins keep main's `>=0.9.0, <0.10`. `PluginHost.Environment` takes main's settings files and report clearing plus
+  `PluginRuntime.ShellProfiles`; `CorePages.pages` gains an overload with both the detected shells and the plugin
+  pages under Tools, which `JasperApplication` uses. `./gradlew check --continue` on Windows: 4367 tests, 234 skipped,
+  13 failed (app 1221/141/3, terminal 391/19/1, Editor 2005/13/3, Remote 284/54/6, Vault 139/7/0, Buddy 163/0/0,
+  History 41/0/0, SDK 31/0/0, SDK testkit 69/0/0, Sample 12/0/0, Snippets 11/0/0): the known list plus four that
+  also fail on `main` on Windows (listed in `docs/windows-startup-verification.md`). Not pushed.
 - **WSL B: SDK shell profiles and the Remote WSL group** (`worktree-wsl-hosts`, 2026-09-28; spec
   `docs/superpowers/specs/2026-09-28-jasper-wsl-shell-profiles-design.md`, plan
-  `docs/superpowers/plans/2026-09-28-jasper-wsl-b-remote.md`): SDK 0.8.6 adds `ShellProfileInfo`,
+  `docs/superpowers/plans/2026-09-28-jasper-wsl-b-remote.md`): SDK 0.9.1 (written as 0.8.6; renumbered when main's SDK 0.9.0 was merged) adds `ShellProfileInfo`,
   `Terminals.profiles()`/`onProfilesChanged` (default methods, `terminal.open`), `LocalSpec.profile` and
   `OpenRequest.localProfile`; the app feeds plan A's `ShellProfileCatalog` to plugins through
   `PluginRuntime.ShellProfiles` and refuses unknown ids (empty result, warning); the testkit scripts profiles
-  (`setShellProfiles`) and the contract suite covers known, unknown and default. Remote 0.5.0 (`sdk >=0.8.6`)
+  (`setShellProfiles`) and the contract suite covers known, unknown and default. Remote 0.6.0 (`sdk >=0.9.1, <0.10`; 0.5.0 before the merge)
   titles its panel Sessions and shows a read-only WSL group first (badges, session dots, Open in new tab/split,
   its own `wsl_collapsed` flag), lists distributions first in the Sessions dropdown (no separator: the SDK dropdown has
   none) and as `WSL` rows in `>ssh`. `./gradlew check --continue` on Windows: 3479 tests, 234
@@ -27,7 +36,7 @@
   matches distributions on names only and keeps up to half the result limit for hosts; `onProfilesChanged`'s
   Javadoc and docs say when it fires (first detection, then changed results; Custom edits may not be reported); the
   panel reads "Search sessions…" and, beside a WSL group with no hosts, "No SSH hosts yet — …". Remote tests
-  283/54/6 (known six). Not pushed; not merged.
+  283/54/6 (known six). Merged with main afterwards (entry above: SDK 0.9.1, Remote 0.6.0). Not pushed; not merged into main.
 - **WSL shell profiles, plan A** (branch `worktree-wsl-hosts`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-wsl-a-profiles.md`, spec
   `docs/superpowers/specs/2026-09-28-jasper-wsl-shell-profiles-design.md`): Windows sessions run on ConPTY, so OSC
@@ -59,8 +68,123 @@
   `JasperApplication.newWindow()`), so a split of a WSL pane in `/mnt/c/Users/NAME` stays there;
   `sessionDefaults` reports no profile warning for SSH panes; the Settings dropdown keeps one "(not detected)"
   entry and ignores re-picking the shown entry; a supplied launcher skips detection; `WslDistributionsTest` runs
-  `java.home`'s java. Plan B (Remote panel WSL group, SDK 0.8.6) is implemented on the same branch (entry above).
+  `java.home`'s java. Plan B (Remote panel WSL group, SDK 0.9.1) is implemented on the same branch (entry above).
   Not merged.
+- **Editor Vim mode, plan V3a** (branch `claude/vim-v3a`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v3a.md`, written 2026-09-28): macros (`q`, `@`, `@@`, `{n}@`, `@:`, `@.`,
+  `recording @q` in the Vim bar) and the mapping commands typed on the command line (`:map :nmap :vmap :xmap :omap
+  :imap :cmap :map!`, their `noremap`, `unmap` and `mapclear` forms, and the listings), through a per-tab typeahead
+  ported from Vim's getchar.c: recursion and E223 ('maxmapdepth'), 'timeout' and 'timeoutlen' on a Swing timer,
+  `<nowait>`, `<unique>`, `<Plug>`, `<Nop>`, `<Leader>`; a failing command ends a mapping or macro, a mapping's changes
+  undo as one step, and Ctrl+C stops one that runs on. Every file in the plan was compiled and run against Vim 9.1
+  before the plan was written: 1714 corpus cases (133 new in `macros.case` and `mappings.case`, 2 divergent).
+  - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
+  - `./gradlew check`: 4,311 tests, 0 failed, 0 errors, 5 skipped.
+  - Merged into local `main` on 2026-09-28 after merging main (plugin settings C3) into the branch; `./gradlew check`
+    on the merged tree: 4,311 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+  - Not done: GUI checks 71–79 of the [checklist](editor-verification.md) (user-run); plan V3b
+    (the vimrc, `sethandler` lines, `let mapleader`, `<Action>`); V4; push.
+- **Plugin settings C3** (`claude/plugin-settings-c3`, 2026-09-28; plan
+  `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c3.md`): SDK 0.9.0. Editor, Shell History, Remote and
+  Credential Vault declare their settings and get generated pages under Settings › Tools; Snippets declares none.
+  `PluginConfig`, `PluginContext.config()`, the testkit's `setConfig` and `reports()`, and the application's
+  `PluginSettings` view are gone; every bundled plugin requires `>=0.9.0, <0.10`. Remote's `[shortcuts]` table is
+  gone: its actions keep Cmd+Shift+S and Cmd+Shift+H as default bindings, rebindable in Keymap, and old lines warn
+  as unknown keys. The Editor's Vim toggle saves through its setting. History's empty list means no trivial
+  commands. Values the plugins used to clamp now fall back to their defaults with a report. `./gradlew check`: 4,117 tests,
+  0 failures, 5 skipped. GUI checks pending with the user: each plugin's page under Tools; the Editor's Vim toggle
+  and its page's Vim mode; a Remote file with an old `[shortcuts]` table; Keymap rebinding Toggle SSH Hosts.
+  Still deferred from C2:
+  - a pending-changed callback for plugin controls
+  - per-page dedupe of warnings from a throwing `modified()`/`keywords()`
+  - the stub's Open in Editor failure going to a notice while Settings is modal
+  - section-heading carry-over for unsectioned settings
+  - the discard count per plugin page
+
+  Deviations: see the plan's status banner. Merged into local `main` on 2026-09-28 after merging main (Vim V2b)
+  into the branch, which needed `EditorWindow`'s `IOException` import back for V2b's new catch; `./gradlew check` on the
+  merged tree: 4,153 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+- **Editor Vim mode, plan V2b** (branch `claude/vim-v2b`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2b.md`, written 2026-09-28): the Editor's tabs as Vim's buffers — `:w :wq :x :exi :sav :wa :xa :wqa :q :qa
+  :quita :e :ene :r :ls :buffers :files :b :bn :bN :bp :tabn :tabN :tabp :tabnew :tabe`, `ZZ`, `ZQ`, `gt`, `gT`,
+  through the Editor's save, conflict and close paths (`VimHost.Documents`, implemented by `EditorWindow`); `<Tab>`
+  completion of commands, options, paths and tab names; 'number' and 'relativenumber' on the gutter; uppercase marks
+  that select their tab. Every file in the plan was compiled and run before the plan was written: 1582 corpus
+  cases against Vim 9.1 (17 new), and the tab commands in `ExFilesTest` and `EditorWindowTest`.
+  - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
+  - `./gradlew check`: 4,135 tests, 0 failed, 0 errors, 5 skipped.
+  - Merged into local `main` on 2026-09-28 after merging main (plugin settings C2) into the branch; `./gradlew check`
+    on the merged tree: 4,153 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+  - Not done: GUI checks 61–70 of the [checklist](editor-verification.md) (user-run); plans V3 and V4; push.
+- **Plugin settings C2** (`claude/plugin-settings-c2`, 2026-09-28; plan
+  `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c2.md`): Settings has a page under Tools for each running
+  plugin with settings, generated from its declarations (`PluginSettingsPage`) or built by the plugin through the new
+  SDK `SettingsPanel` and `SettingsPanelHost` (`PluginPanelPage`); plugins that are enabled but not running get a stub
+  with Open in Editor. Apply writes the plugin's own file. The Plugins page's Open Settings goes to a running plugin's
+  page. The Sample plugin declares its settings and has its own page. Previews: `settingsPreview` renders 44 images.
+  The preview did not render correctly on the first run: the final review found plugin-built pages stretched (the
+  Sample page's slider about 430 px below its checkbox), fixed in the final fix wave and checked in the re-rendered
+  preview. Final review fixes: F1 one page per plugin id (no stub for a superseded copy or a running plugin, no
+  duplicate stubs); F2 a rejected plugin file blocks only its own page's edits, and plugin-built pages show the
+  rejection message too; F3 plugin-built pages stay at the top and their standard rows keep their height; F4 closing a
+  plugin-built page without a successful Apply calls `SettingsPanel.reset()` before `dispose()`; minors: staging the
+  default of an unset key stages "unset", a failure without a message shows its type, `SettingsPanelHost.changed()`
+  Javadoc, and docs. `./gradlew check`: 3,666 tests, 0 failures, 5 skipped. GUI checks pending with the user: change
+  a plugin setting and Apply; the Sample page's slider; Open Settings from the Plugins page; a plugin in safe mode
+  (stub page). Deferred to C3: a pending-changed callback for plugin controls; per-page dedupe of warnings from a
+  throwing `modified()`/`keywords()`; contract cases for `page()`; the stub's Open in Editor failure going to a notice
+  while Settings is modal; section-heading carry-over for unsectioned settings; the discard count per plugin page; the
+  Sample `settings.toml` "reads this file live" wording. Deviations: see the plan's status banner. Merged into local `main` on 2026-09-28
+  after merging main (Vim V2a) into the branch; `./gradlew check` on the merged tree: 4,117 tests, 0 failures,
+  0 errors, 5 skipped. Not pushed.
+- **Editor Vim mode, plan V2a** (branch `claude/vim-v2a`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2a.md`, written 2026-09-28): the Ex command line — ranges (`;`, searches, marks, folds, `*`), `|`, Vim's 600
+  command names for abbreviations (E319 for those Jasper lacks), `:s` with every flag including confirmation, `:&`,
+  `:&&`, `:~`, `&`, `g&`, `:g`/`:g!`/`:v`, `:d :y :> :< :pu :j :m :t :co :norm :sort :left :right :center`,
+  `:p :P :l :nu :# :=`, `:k :mark :delm :marks :jumps :changes :reg :di`, `:u :red :noh`, `:set`/`:setlocal`/
+  `:setglobal` with do_set's syntax, the output panel (Vim's hit-enter prompt), questions that pause a command,
+  'report' messages, 'hlsearch' on and 'gdefault'. The corpus compares output (`output: yes`). Every file in the plan
+  was compiled and run against Vim 9.1 before the plan was written: 1565 corpus cases
+  (1560 recorded, 5 divergent).
+  - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
+  - `./gradlew check`: 4,068 tests, 0 failed, 0 errors, 5 skipped.
+  - Merged into local `main` on 2026-09-28 after merging main (plugin settings C1) into the branch; `./gradlew check`
+    on the merged tree: 4,099 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+  - Not done: GUI checks 51–60 of the [checklist](editor-verification.md) (user-run); plans V2b, V3 and V4; push.
+- **Plugin settings C1** (`claude/plugin-settings`, 2026-09-28; spec
+  `docs/superpowers/specs/2026-09-28-jasper-plugin-settings-design.md`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c1.md`): SDK `dev.jasper.sdk.settings` (declarations,
+  kinds, typed handles) and `PluginContext.settings()`; the application reads each plugin's declared settings with its
+  own schema (`SchemaReader`, moved out of `ConfigLoader`), reports bad values and unknown keys against the file,
+  runs listeners on the UI thread and saves through a comment-preserving atomic write; the testkit fake and the
+  contract suite cover the same behaviour. `PluginConfig` stays until C3; Settings pages come in C2.
+  `./gradlew check`: 3,450 tests, 0 failures, 0 errors, 5 skipped. Executed inline with checkpoints after Tasks 3 and 5. Deviations: see the plan's status banner.
+  Merged into local `main` on 2026-09-28 after merging main (Linux packages, Vim V1c) into the branch; `./gradlew check`
+  on the merged tree: 3,648 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+
+- **Editor Vim mode, plan V1c** (branch `claude/vim-v1c`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1c.md`, written 2026-09-28): the view — scrolling
+  (`<C-e> <C-y> <C-d> <C-u> <C-f> <C-b>`, page keys, `zt z<CR> zz z. zb z- z+ z^`), `H M L`, the screen-line motions
+  (`gj gk g0 g^ gm g$`), 'scrolloff', 'sidescroll' and 'sidescrolloff', and the fold commands on the Editor's code
+  folds (`zo zO zc zC za zA zv zR zM zj zk [z ]z`) with closed folds counted as one line and 'foldopen'. A port of
+  Vim's move.c (`View`) kept in step with the text area's viewport (`ViewportSync`). Every file in the plan was
+  compiled and run against Vim 9.1 before the plan was written: 1,125 corpus cases (1,122 recorded, 3 divergent).
+  - Executed 2026-09-28 (subagent-driven: three task commits plus the final review's fix commit).
+  - Final review fixes: (1) while the command line reads a pattern, the view is not updated after each key;
+    'incsearch' scrolls the view to the match from the view as it was when the line opened (the caret stays), and
+    `<Esc>` or `<CR>` puts that view back before the usual update, as Vim's old_viewstate does; (2) `EditorTab.refresh`
+    no longer turns word wrapping back on while Vim is on, and because RSyntaxTextArea always wraps at words,
+    `VimTextArea` installs a wrapped view that honours `setWrapStyleWord(false)` and breaks at any character, so the
+    screen lines are Vim's; `ViewportSync` counts the view's columns without the text area's side insets; (3) with Vim
+    on, the text area is taller by the viewport's height less one line, so the view may scroll past the end of the
+    text (`G` `zt`, `<C-f>` at the end, `<C-e>`) and the screen shows the view's first line; (4) `viewScrolled` keeps
+    an enclosing command's busy flag and does not notify mid-command; (5) a viewport resize that changes the view's
+    size scrolls the view to the cursor at once; (6) an unused local in `View.scrollCursorTop` went. Six
+    `ViewportSyncTest` cases and one `EditorTabTest` case cover them.
+  - `./gradlew check`: 3,599 tests, 0 failed, 0 errors, 5 skipped.
+  - Merged into local `main` on 2026-09-28 after merging main (settings dialog B2) into the branch; not pushed.
+  - Not done: GUI checks 41–50 of the [checklist](editor-verification.md) (user-run); plans V2, V3 and V4; push.
+
 - **Settings dialog B2** (`claude/settings-dialog-b2`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b2.md`): Keymap and Plugins are pages of Settings.
   Keymap stages shortcut edits (Set) and saves them in one write on Apply; shortcuts and sections that differ from

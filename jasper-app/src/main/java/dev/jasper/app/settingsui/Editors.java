@@ -94,7 +94,12 @@ public final class Editors {
 
     /** A text field with Browse…, for a program path. */
     public static Factory<String> executable() {
-        return new Factory<>((setting, context) -> new Executable(context), List.of());
+        return new Factory<>((setting, context) -> new Browse(context, "Choose a shell program"), List.of());
+    }
+
+    /** A text field with Browse…, for a file path. */
+    public static Factory<String> path(String title) {
+        return new Factory<>((setting, context) -> new Browse(context, title), List.of());
     }
 
     /** An ordered list of strings; + asks for text. */
@@ -235,19 +240,21 @@ public final class Editors {
         @Override public void onEdit(Runnable listener) { onText(editor(), () -> { if (!showing) listener.run(); }); }
     }
 
-    static final class Executable implements ValueEditor<String> {
+    static final class Browse implements ValueEditor<String> {
         private final Line line = new Line();
         private final JComponent component;
         private final PageContext context;
-        Executable(PageContext context) {
+        private final String title;
+        Browse(PageContext context, String title) {
             this.context = context;
+            this.title = title;
             var browse = new JButton("Browse…");
             browse.addActionListener(event -> browse());
             component = line(line.field, browse);
         }
         void browse() {
             String current = line.value();
-            context.chooseFile().apply("Choose a shell program", current.isBlank() ? Optional.empty() : Optional.of(java.nio.file.Path.of(current)))
+            context.chooseFile().apply(title, current.isBlank() ? Optional.empty() : Optional.of(java.nio.file.Path.of(current)))
                 .ifPresent(path -> line.field.setText(path.toString()));
         }
         @Override public JComponent component() { return component; }

@@ -11,7 +11,6 @@ import dev.jasper.sdk.events.AppEvents;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.events.Topic;
 import dev.jasper.sdk.plugin.Plugin;
-import dev.jasper.sdk.plugin.PluginConfig;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.services.ServiceUnavailableException;
 import dev.jasper.sdk.services.Services;
@@ -49,19 +48,19 @@ public final class FakePluginContext implements PluginContext {
     final Set<String> requires;
     final Plugin plugin;
     volatile State state = State.STARTING;
-    volatile Map<String, Object> table = Map.of();
-    final CopyOnWriteArrayList<Runnable> configListeners = new CopyOnWriteArrayList<>();
     final Map<Class<?>, Object> services = new ConcurrentHashMap<>();
     private final List<Subscription> owned = new ArrayList<>();
     final FakeTerminals terminals;
     final FakeUi ui;
     final FakePalette palette;
+    final FakePluginSettings settings;
 
     FakePluginContext(FakePluginHost host, PluginInfo info, Set<String> requires, Plugin plugin) {
         this.host = host; this.info = info; this.requires = requires; this.plugin = plugin;
         this.terminals = new FakeTerminals(this, host.workspace);
         this.ui = new FakeUi(host, this);
         this.palette = new FakePalette(host, this);
+        this.settings = new FakePluginSettings(host, info.id(), host.dataRoot().resolve(info.id()).resolve(info.id() + ".toml"));
     }
 
     void requireOpen() {
@@ -88,11 +87,7 @@ public final class FakePluginContext implements PluginContext {
         catch (IOException failure) { throw new UncheckedIOException(failure); }
     }
 
-    @Override public PluginConfig config() {
-        return new FakePluginConfig(() -> table, "", configListeners,
-            (key, message) -> host.reports.add(info.id() + ": " + key + ": " + message),
-            host.dataRoot().resolve(info.id()).resolve(info.id() + ".toml"));
-    }
+    @Override public dev.jasper.sdk.settings.PluginSettings settings() { return settings; }
 
     @Override public Executor background() {
         return task -> {

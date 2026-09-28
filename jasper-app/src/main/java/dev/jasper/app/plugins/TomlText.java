@@ -3,7 +3,7 @@ package dev.jasper.app.plugins;
 import java.util.List;
 import java.util.Map;
 
-/** Writes the value kinds {@code PluginConfig} reads as TOML: scalars and string lists first, then one table per nested map. */
+/** Writes an old {@code [plugins."<id>"]} table as TOML: scalars and string lists first, then one table per nested map. */
 final class TomlText {
     private TomlText() { }
 

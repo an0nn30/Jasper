@@ -126,19 +126,25 @@ final class Motions {
         return inclusive ? Target.inclusive(p) : Target.exclusive(p);
     }
 
-    /** cursor_down: fails only on the last line; a count past the end stops on the last line. */
+    /**
+     * cursor_down: fails only on the last line (or in a closed fold that ends there); a count past the end stops on
+     * the last line; a closed fold counts as one line.
+     */
     static Target down(Context c, int n) {
-        Pos p = c.cursor();
-        int last = c.buffer.count() - 1;
-        if (n > 0 && p.line >= last) return null;
-        int line = Math.min(last, p.line + n);
+        int lnum = c.cursor().line + 1;
+        if (n > 0) {
+            int[] fold = c.editor.folds().closed(lnum);
+            if ((fold != null ? fold[1] : lnum) >= c.buffer.count()) return null;
+        }
+        int line = c.editor.view().downFrom(lnum, n) - 1;
         return Target.linewise(new Pos(line, c.editor.wantedColumn(line)), Column.KEEP);
     }
 
+    /** cursor_up: fails on the first line; a closed fold counts as one line. */
     static Target up(Context c, int n) {
-        Pos p = c.cursor();
-        if (n > 0 && p.line == 0) return null;
-        int line = Math.max(0, p.line - n);
+        int lnum = c.cursor().line + 1;
+        if (n > 0 && lnum <= 1) return null;
+        int line = c.editor.view().upFrom(lnum, n, c.editor.mode().inserting()) - 1;
         return Target.linewise(new Pos(line, c.editor.wantedColumn(line)), Column.KEEP);
     }
 
@@ -269,7 +275,7 @@ final class Motions {
 
     /** nv_findpar: { and }. */
     static Target paragraph(Context c, boolean forward, int what, boolean both) {
-        Pos p = findParagraph(c.buffer, c.cursor().line, forward, c.count, what, both);
+        Pos p = findParagraph(c.buffer, c.cursor().line, forward, c.count, what, both, c.editor.folds().any() ? c.editor.folds()::closed : null);
         if (p == null) return null;
         boolean inclusive = p.line == c.buffer.count() - 1 && what != '}' && forward && !c.buffer.line(p.line).isEmpty();
         return (inclusive ? Target.inclusive(p) : Target.exclusive(p)).usingRegisterOne().asJump();
@@ -278,7 +284,7 @@ final class Motions {
     /** nv_brackets: [[, ]], [] and ][. */
     static Target section(Context c, boolean forward, char what) {
         boolean both = c.operator != null && forward && what == '{';
-        Pos p = findParagraph(c.buffer, c.cursor().line, forward, c.count, what, both);
+        Pos p = findParagraph(c.buffer, c.cursor().line, forward, c.count, what, both, c.editor.folds().any() ? c.editor.folds()::closed : null);
         if (p == null) return null;
         boolean inclusive = p.line == c.buffer.count() - 1 && what != '}' && forward && !c.buffer.line(p.line).isEmpty();
         if (!inclusive && c.operator == null) p.col = Text.firstNonBlank(c.buffer.line(p.line));
@@ -308,13 +314,22 @@ final class Motions {
     }
 
     /** findpar (textobject.c): the {@code count}-th paragraph or section boundary; null when there are too few. */
-    static Pos findParagraph(Buffer buffer, int start, boolean forward, int count, int what, boolean both) {
+    static Pos findParagraph(Buffer buffer, int start, boolean forward, int count, int what, boolean both,
+                             java.util.function.IntFunction<int[]> folds) {
         int curr = start, dir = forward ? 1 : -1, last = buffer.count() - 1;
         while (count-- > 0) {
             boolean didSkip = false;
             for (boolean first = true; ; first = false) {
                 if (!buffer.line(curr).isEmpty()) didSkip = true;
+                // A closed fold the search starts in is skipped whole.
+                boolean foldSkipped = false;
+                int[] fold = first && folds != null ? folds.apply(curr + 1) : null;
+                if (fold != null) {
+                    curr = (dir > 0 ? fold[1] : fold[0]) - 1 + dir;
+                    foldSkipped = true;
+                }
                 if (!first && didSkip && startPS(buffer, curr, what, both)) break;
+                if (foldSkipped) curr -= dir;
                 curr += dir;
                 if (curr < 0 || curr > last) {
                     if (count > 0) return null;

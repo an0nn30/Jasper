@@ -34,6 +34,8 @@ class EditorWindowTest {
     private Runnable duringWait = () -> { };
     private Runnable duringAsk = () -> { };
     private boolean cancelWait;
+    private final List<Boolean> savedVim = new ArrayList<>();
+    private java.util.concurrent.CompletableFuture<Void> vimSave = java.util.concurrent.CompletableFuture.completedFuture(null);
 
     @BeforeEach void open() {
         Languages.register();
@@ -54,7 +56,7 @@ class EditorWindowTest {
                 drain();
                 return saves.getNow(false);
             },
-            settings::get, false);
+            settings::get, on -> { savedVim.add(on); return vimSave; }, false);
         window = new EditorWindow(environment, () -> windowClosed = true);
     }
 
@@ -355,7 +357,7 @@ class EditorWindowTest {
         window.toggleVim();
         assertThat(first.vimEditor()).isPresent();
         assertThat(second.vimEditor()).isPresent();
-        assertThat(Files.readString(context.config().file())).contains("vim = true");
+        assertThat(savedVim).containsExactly(true);
         var item = host.contentStatus(host.contentTabs().getLast()).stream().filter(status -> status.text().startsWith("Vim:")).findFirst().orElseThrow();
         assertThat(item.text()).isEqualTo("Vim: On");
         assertThat(opened(file("three.txt", "three\n")).vimEditor()).as("a new tab follows").isPresent();
@@ -364,7 +366,16 @@ class EditorWindowTest {
         assertThat(window.vimOn()).isTrue();
         item.run().run();
         assertThat(first.vimEditor()).isEmpty();
-        assertThat(Files.readString(context.config().file())).contains("vim = false");
+        assertThat(savedVim).containsExactly(true, false);
+    }
+
+    @Test void aVimModeThatCannotBeSavedLastsForTheSessionAndSaysSo() throws Exception {
+        opened(file("one.txt", "one\n"));
+        vimSave = java.util.concurrent.CompletableFuture.failedFuture(new java.io.IOException("disk full"));
+        window.toggleVim();
+        assertThat(window.vimOn()).isTrue();
+        assertThat(asked).extracting(Question::message)
+            .contains("Vim mode is on until the Editor closes: the setting could not be saved (disk full).");
     }
 
     @Test void vimKeysEditTheDocumentAndUndoItsChange() throws Exception {
@@ -399,5 +410,80 @@ class EditorWindowTest {
         wrap.run().run();
         assertThat(first.session().wrap()).isEqualTo(!original);
         assertThat(second.session().wrap()).isEqualTo(other);
+    }
+
+    /** Types Vim keys on the event thread, where the caret follows the text as in the app. */
+    private static void vimKeys(EditorTab tab, String keys) throws Exception {
+        var vim = tab.vimEditor().orElseThrow();
+        javax.swing.SwingUtilities.invokeAndWait(() -> { for (var key : dev.jasper.editor.vim.KeyInput.parse(keys)) vim.feed(key); });
+    }
+
+    @Test void vimWritesOpensListsSelectsAndClosesTabs() throws Exception {
+        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        Path one = file("one.txt", "one\n");
+        file("two.txt", "two\n");
+        EditorTab first = opened(one);
+        vimKeys(first, "Aa<Esc>:w<CR>");
+        drain();
+        assertThat(Files.readString(one)).isEqualTo("onea\n");
+        assertThat(first.vimEditor().orElseThrow().message()).isEqualTo("\"" + one + "\" 1L, 5B written");
+        vimKeys(first, ":e two.txt<CR>");
+        drain();
+        EditorTab second = window.selected().orElseThrow();
+        assertThat(second).isNotSameAs(first);
+        assertThat(second.area().getText()).isEqualTo("two\n");
+        vimKeys(second, ":ls<CR>");
+        assertThat(second.vimEditor().orElseThrow().output()).extracting(dev.jasper.editor.vim.VimEditor.OutputLine::text)
+            .containsExactly(String.format("  1 #a   \"%s\"", one) + " ".repeat(Math.max(1, 30 - one.toString().length())) + "line 1",
+                String.format("  2 %%a   \"%s\"", home.resolve("two.txt")) + " ".repeat(Math.max(1, 30 - home.resolve("two.txt").toString().length())) + "line 1");
+        vimKeys(second, "<CR>:b 1<CR>");
+        assertThat(window.selected()).contains(first);
+        vimKeys(first, "gt");
+        assertThat(window.selected()).contains(second);
+        vimKeys(second, "x:q<CR>");
+        assertThat(second.vimEditor().orElseThrow().message()).isEqualTo("E37: No write since last change (add ! to override)");
+        assertThat(window.sessions()).hasSize(2);
+        vimKeys(second, ":q!<CR>");
+        assertThat(asked).as("no question").isEmpty();
+        assertThat(window.sessions()).hasSize(1);
+        assertThat(Files.readString(home.resolve("two.txt"))).isEqualTo("two\n");
+        assertThat(window.selected()).contains(first);
+    }
+
+    @Test void vimOpensANewFileThatItsFirstWriteCreates() throws Exception {
+        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        EditorTab first = opened(file("one.txt", "one\n"));
+        vimKeys(first, ":e new.txt<CR>");
+        EditorTab created = window.selected().orElseThrow();
+        assertThat(created.session().name()).isEqualTo("new.txt");
+        vimKeys(created, "ihello<Esc>:wq<CR>");
+        drain();
+        assertThat(Files.readString(home.resolve("new.txt"))).isEqualTo("hello");
+        assertThat(window.sessions()).as(":wq closed it once saved").hasSize(1);
+        vimKeys(first, ":r new.txt<CR>");
+        assertThat(first.area().getText()).isEqualTo("one\nhello\n");
+        vimKeys(first, ":enew<CR>");
+        assertThat(window.sessions()).hasSize(2);
+        assertThat(window.selected().orElseThrow().session().untitled()).isTrue();
+    }
+
+    @Test void anUppercaseMarkSelectsItsTab() throws Exception {
+        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        EditorTab first = opened(file("one.txt", "one\n"));
+        EditorTab second = opened(file("two.txt", "a\n  b\nc\n"));
+        vimKeys(second, "jlmAgg");
+        vimKeys(second, ":b 1<CR>");
+        assertThat(window.selected()).contains(first);
+        vimKeys(first, "'A");
+        assertThat(window.selected()).contains(second);
+        assertThat(second.area().getCaretLineNumber()).isEqualTo(1);
+        assertThat(second.vimEditor().orElseThrow().message()).isEmpty();
+        vimKeys(second, "gg:b 1<CR>");
+        vimKeys(first, "`A");
+        assertThat(window.selected()).contains(second);
+        assertThat(second.area().getCaretPosition()).isEqualTo(3);
+        vimKeys(second, ":b 1<CR>");
+        vimKeys(first, "d'A");
+        assertThat(first.area().getText()).as("an operator cannot reach another tab").isEqualTo("one\n");
     }
 }

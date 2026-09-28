@@ -24,6 +24,19 @@ public final class VimEditor {
     private final Machine machine;
     private final InsertMode insert;
     private final CommandLine commandLine = new CommandLine(this);
+    private final Ex ex = new Ex(this);
+    private final Typeahead typeahead = new Typeahead(this);
+    /** How many keys have run, so {@link #feed} knows whether one did. */
+    private long steps;
+    /** A question waiting for its answer key (Vim's ask_yesno and the {@code :s} confirmation): its text and what takes the key. */
+    private String promptText;
+    private java.util.function.Consumer<KeyInput> promptHandler;
+    /** The output panel: what a command line said, shown until a key is typed (Vim's hit-enter prompt). */
+    private List<OutputLine> output = List.of();
+    /** While a command line runs, what it says, gathered for the output panel; null otherwise. */
+    private List<OutputLine> collecting;
+    /** Every message given, for the corpus's output comparison. */
+    private final List<String> messageLog = new ArrayList<>();
     private final Marks marks;
     private final List<Runnable> listeners = new ArrayList<>();
     private final CaretListener caretListener = event -> caretMoved();
@@ -39,8 +52,22 @@ public final class VimEditor {
     /** In Visual mode, the other end of the area (Vim's VIsual). */
     private Pos visualAnchor;
     private final Highlights highlights;
+    private final View view = new View(this);
+    private final ViewportSync viewport;
+    private final Folds folds;
+    private final LineNumbers lineNumbers;
+    /** The text area's word-wrapping, put back when Vim turns off (Vim wraps at any character). */
+    private final boolean originalWrapStyleWord;
+    /** The text area's fold-aware navigation, put back when Vim turns off (Vim's cursor may be inside a closed fold). */
+    private final javax.swing.text.NavigationFilter originalNavigation;
     /** While a search pattern is typed with 'incsearch', the match it would find ({start, end} offsets), or null. */
     private int[] incsearch;
+    /** While {@code :s} asks for confirmation, the match it asks about ({start, end} offsets), or null. */
+    private int[] confirmMatch;
+    /** While 'incsearch' previews a match, the view as it was when the command line opened (Vim's old_viewstate). */
+    private int[] incsearchView;
+    /** While the view scrolls to an 'incsearch' match, the match's start stands in for the cursor, which stays put. */
+    private Pos previewCursor;
     /** Bumped by every text change, so the 'hlsearch' matches are found again only when needed. */
     private int textVersion;
     private List<Object> highlightedPattern;
@@ -75,6 +102,13 @@ public final class VimEditor {
         this.machine = new Machine(this);
         this.insert = new InsertMode(this);
         this.highlights = new Highlights(area);
+        this.folds = new Folds(area);
+        this.viewport = new ViewportSync(this, area);
+        this.lineNumbers = new LineNumbers(this, area);
+        this.originalWrapStyleWord = area.getWrapStyleWord();
+        area.setWrapStyleWord(false);
+        this.originalNavigation = area.getNavigationFilter();
+        area.setNavigationFilter(null);
         area.getDocument().addDocumentListener(highlightListener);
         area.addFocusListener(leaveListener);
         originalCaret = area.getCaret() instanceof ConfigurableCaret caret ? caret.getStyle() : CaretStyle.VERTICAL_LINE_STYLE;
@@ -93,6 +127,10 @@ public final class VimEditor {
 
     /** Turns Vim off: the caret and input methods return to the Editor's; the text is untouched. */
     public void close() {
+        typeahead.clear();
+        ex.abort();
+        promptHandler = null;
+        output = List.of();
         insert.abort();
         machine.abort();
         area.removeCaretListener(caretListener);
@@ -102,6 +140,10 @@ public final class VimEditor {
         marks.close();
         area.getDocument().removeDocumentListener(highlightListener);
         area.removeFocusListener(leaveListener);
+        area.setWrapStyleWord(originalWrapStyleWord);
+        area.setNavigationFilter(originalNavigation);
+        viewport.close();
+        lineNumbers.close();
         highlights.clear();
         vim.forget(this);
         buffer.close();
@@ -119,10 +161,15 @@ public final class VimEditor {
         options.setLocal("shiftwidth", changed.tabstop());
         options.setLocal("expandtab", changed.expandtab());
         options.setLocal("autoindent", changed.autoindent());
+        options.setLocal("wrap", changed.wrap());
     }
 
     /** The text was replaced (a reload): any command or insert in progress is dropped. */
     public void textReplaced() {
+        typeahead.clear();
+        ex.abort();
+        promptHandler = null;
+        output = List.of();
         insert.abort();
         machine.abort();
         mode = Mode.NORMAL;
@@ -142,7 +189,7 @@ public final class VimEditor {
      * @return whether Vim took it
      */
     public boolean offer(KeyInput key) {
-        if (commandLine.active()) {
+        if (commandLine.active() || promptHandler != null || !output.isEmpty()) {
             // The command line takes every key but the ⌘ ones.
             if ((key.modifiers() & KeyInput.META) != 0) return false;
             feed(key);
@@ -151,10 +198,18 @@ public final class VimEditor {
         boolean mine = switch (vim.handlers().handler(key, handlerMode())) {
             case VIM -> true;
             case IDE -> false;
-            case DEFAULT -> (key.modifiers() & KeyInput.META) == 0 && (mode.inserting() ? insert.wants(key) : machine.wants(key));
+            // Keys that wait for the rest of a mapping, and a key that starts one (even a ⌘ key), are Vim's.
+            case DEFAULT -> typeahead.waiting() || startsMapping(key)
+                || (key.modifiers() & KeyInput.META) == 0 && (mode.inserting() ? insert.wants(key) : machine.wants(key));
         };
         if (mine) feed(key);
         return mine;
+    }
+
+    /** @return whether a mapping for the mode Vim is in starts with the key */
+    private boolean startsMapping(KeyInput key) {
+        int state = mapState(key);
+        return state != 0 && !vim.mappings().starting(state, key).isEmpty();
     }
 
     private char handlerMode() {
@@ -175,7 +230,7 @@ public final class VimEditor {
      * also passes on a key bound to one of the Editor's own commands (spec 2.2).
      */
     boolean passesOn(KeyInput key) {
-        if (commandLine.active()) return (key.modifiers() & KeyInput.META) != 0;
+        if (commandLine.active() || promptHandler != null || !output.isEmpty()) return (key.modifiers() & KeyInput.META) != 0;
         if (mode.inserting() || (key.modifiers() & KeyInput.META) != 0) return true;
         return vim.handlers().handler(key, handlerMode()) == KeyHandlers.Handler.IDE;
     }
@@ -186,10 +241,51 @@ public final class VimEditor {
         fire();
     }
 
+    /** @return the window onto the text (topline, size, 'wrap') */
+    View view() { return view; }
+
+    /**
+     * The user scrolled the text area to show {@code topline} first: the view follows, and the cursor moves inside
+     * the window when it was scrolled out, keeping its column, as with Vim's scroll wheel.
+     */
+    void viewScrolled(int topline) {
+        if (mode.inserting() || commandLine.active()) {
+            view.topline(topline);
+            view.compBotline();
+            return;
+        }
+        view.topline(topline);
+        view.compBotline();
+        int lnum = cursor().line + 1;
+        int target = lnum < view.topline ? view.topline : lnum >= view.botline && view.botline <= buffer.count() ? view.botline - 1 : lnum;
+        boolean was = busy;
+        if (target != lnum) {
+            busy = true;
+            try { setCursor(new Pos(target - 1, wantedColumn(target - 1)), mode.visual()); }
+            finally { busy = was; }
+        }
+        if (!was) fire();
+    }
+
+    /** The viewport's size changed the view's: outside a command, the view scrolls to keep the cursor shown. */
+    void viewResized() {
+        // The constructor sizes the view before it has its viewport sync.
+        if (viewport == null || busy || commandLine.active()) return;
+        view.updateTopline();
+        view.cursColumns();
+        viewport.show();
+    }
+
+    /** @return the tab's code folds */
+    Folds folds() { return folds; }
+
+    /** @return the remembered display column, computed from the cursor when it was forgotten (Vim's w_curswant) */
+    int columnWanted() { return want(false); }
+
     /** Rings the bell without failing the command (a key the command line has no use for). */
     void bell() { bells++; }
 
-    /** @return the command line, active while {@code /} or {@code ?} reads a pattern */
+    /** @return the command line, active while {@code :}, {@code /} or {@code ?} reads a line */
     CommandLine commandLine() { return commandLine; }
 
     /** A failing Insert-mode key: the bell rings and the insert goes on, as Vim's ins_del and ins_bs beep (spec 2.3). */
@@ -200,12 +296,57 @@ public final class VimEditor {
     }
 
     /**
-     * Runs one key, as typed. A failing command rings the bell; an unexpected exception cancels the command, closes
-     * its undo step and returns to Normal mode (spec 10).
+     * A key typed: it goes through the typeahead, where mappings apply (spec 7.2), and then runs, unless it starts a
+     * mapping and waits for the keys after it.
      *
      * @param key the key
      */
     public void feed(KeyInput key) {
+        long before = steps;
+        typeahead.typed(key);
+        // Nothing ran (keys wait for the rest of a mapping, or a mapping did nothing): the Vim bar shows what waits.
+        if (steps == before || typeahead.waiting()) fire();
+    }
+
+    /** The keys waiting for the rest of a mapping resolve now, as when 'timeoutlen' runs out. */
+    void timeoutNow() {
+        typeahead.timeout();
+        fire();
+    }
+
+    /** @return the typeahead, where keys wait and mappings and macros insert theirs */
+    Typeahead typeahead() { return typeahead; }
+
+    /**
+     * The mapping mode for the next key, as Vim's get_real_state, or 0 when the key is not mapped (no_mapping): a
+     * question's answer, the key after one that reads an argument ({@code f}, {@code "}, {@code i_CTRL-V}), the second
+     * key of a two-key command ({@code gx}), and {@code 0} after count digits. At the output panel's hit-enter
+     * prompt Normal-mode mappings apply to any key but {@code <CR>} and {@code <Space>}.
+     */
+    int mapState(KeyInput next) {
+        if (promptHandler != null) return 0;
+        if (!output.isEmpty()) return next.is("<CR>") || next.is(" ") ? 0 : Mappings.NORMAL;
+        if (commandLine.active()) return commandLine.readingArgument() ? 0 : Mappings.CMDLINE;
+        if (mode.inserting()) return insert.readingArgument() ? 0 : Mappings.INSERT;
+        if (!machine.mappable() || next.plainChar() == '0' && machine.counting()) return 0;
+        if (mode.visual()) return Mappings.VISUAL;
+        return machine.operatorPending() ? Mappings.OP_PENDING : Mappings.NORMAL;
+    }
+
+    /** Mapped keys failed (E223) or were interrupted: the bell, and the message if there is one, as for a failing command. */
+    void mappingFailed(VimFailure failure) {
+        bells++;
+        if (!failure.getMessage().isEmpty()) message(failure.getMessage(), true);
+        fire();
+    }
+
+    /**
+     * Runs one key from the typeahead. A failing command rings the bell and drops the keys of the mapping or macro
+     * running (spec 2.3); an unexpected exception cancels the command, closes its undo step and returns to Normal
+     * mode (spec 10).
+     */
+    void step(KeyInput key) {
+        steps++;
         busy = true;
         message = "";
         messageError = false;
@@ -214,14 +355,19 @@ public final class VimEditor {
         try {
             dispatch(key);
         } catch (VimFailure failure) {
-            bells++;
+            if (!failure.quiet) bells++;
             if (!failure.getMessage().isEmpty()) message(failure.getMessage(), true);
+            // beep_flush and emsg drop the keys of a running mapping or macro; a beep in Insert mode does not.
+            if (!mode.inserting() || !failure.getMessage().isEmpty()) typeahead.flush();
             if (!mode.inserting()) {
                 machine.reset();
                 machine.resumeIfInsertNormal();
             }
         } catch (RuntimeException bug) {
             LOG.log(System.Logger.Level.ERROR, "Vim command failed", bug);
+            typeahead.clear();
+            ex.abort();
+            promptHandler = null;
             insert.abort();
             machine.abort();
             mode = Mode.NORMAL;
@@ -230,24 +376,45 @@ public final class VimEditor {
             busy = false;
             if (!commandLine.active()) marks.checkpcmark(cursor());
             if (mode == Mode.NORMAL || mode == Mode.OPERATOR_PENDING) setCursor(cursor());
+            // While the command line reads a pattern the cursor stays and the view shows 'incsearch''s match.
+            if (!commandLine.active()) {
+                view.updateTopline();
+                view.cursColumns();
+                viewport.show();
+            }
             look();
             fire();
+            List<Runnable> after = List.copyOf(afterKey);
+            afterKey.clear();
+            for (Runnable work : after) work.run();
         }
     }
 
-    /** Runs one key without the failure handling, for {@code .} and a count's repeat. */
+    /** Runs one key without the failure handling, for {@code .}, a count's repeat and {@code :normal}. */
     void dispatch(KeyInput key) {
+        if (promptHandler != null) {
+            answer(key);
+            return;
+        }
+        if (!output.isEmpty()) {
+            // The hit-enter prompt: these keys only take the output away; any other key then runs as typed.
+            output = List.of();
+            if (key.is("<CR>") || key.is(" ") || key.is("<Esc>") || key.is("<C-j>") || key.is("<kEnter>")) return;
+        }
         if (commandLine.active()) commandLine.key(key);
         else if (mode.inserting()) insert.key(key);
         else machine.key(key);
     }
 
     /** Text an input method committed in Insert mode, recorded for {@code .}. */
-    void typedByInputMethod(String text) { insert.typedByInputMethod(text); }
+    void typedByInputMethod(String text) {
+        text.codePoints().forEach(cp -> vim.macros().typed(KeyInput.of(cp)));
+        insert.typedByInputMethod(text);
+    }
 
     /** @return the mode */
     public Mode mode() {
-        if (commandLine.active()) return Mode.COMMAND_LINE;
+        if (commandLine.active() || promptHandler != null) return Mode.COMMAND_LINE;
         return mode == Mode.NORMAL && machine.operatorPending() ? Mode.OPERATOR_PENDING : mode;
     }
 
@@ -255,6 +422,8 @@ public final class VimEditor {
     public String showcmd() {
         if (!options.flag("showcmd")) return "";
         String pending = machine.showcmd();
+        // Keys waiting for the rest of a mapping show after the partly typed command.
+        if (typeahead.waiting()) return pending + KeyInput.format(typeahead.waitingKeys());
         return pending.isEmpty() && mode.visual() && visualAnchor != null ? visualSize() : pending;
     }
 
@@ -297,6 +466,16 @@ public final class VimEditor {
     /** @param listener no longer runs */
     public void removeListener(Runnable listener) { listeners.remove(listener); }
 
+    /**
+     * @return what the Vim bar shows when there is no message: the mode with 'showmode', then {@code recording @q}
+     *     while a macro is recorded (showmode)
+     */
+    public String modeText() {
+        String label = showmode() ? mode().label() : "";
+        char recording = vim.macros().recording();
+        return recording == 0 ? label : label + "recording @" + recording;
+    }
+
     /** @return whether the Vim bar shows the mode ('showmode') */
     public boolean showmode() { return options.flag("showmode"); }
 
@@ -328,12 +507,109 @@ public final class VimEditor {
     void mode(Mode value) { mode = value; }
 
     void message(String text, boolean error) {
+        messageLog.add(text);
+        if (collecting != null) {
+            collecting.add(new OutputLine(text, error));
+            return;
+        }
         message = text;
         messageError = error;
     }
 
+    /** An informational line, such as one line of a listing; while a command line runs it goes to the output. */
+    void say(String text) { message(text, false); }
+
+    /**
+     * msgmore: after lines were added or deleted, "3 more lines" or "3 fewer lines" when more than 'report' lines
+     * changed; not while {@code :global} runs, which reports once at its end.
+     */
+    void msgmore(int n) {
+        if (ex.globalBusy()) return;
+        int pn = Math.abs(n);
+        if (pn <= options.number("report")) return;
+        say(n > 0 ? pn + (pn == 1 ? " more line" : " more lines") : pn + (pn == 1 ? " line less" : " fewer lines"));
+    }
+
+    /** @return every message given so far, for tests */
+    List<String> messageLog() { return messageLog; }
+
+    /** @return the Ex command line */
+    Ex ex() { return ex; }
+
+    /**
+     * Starts gathering what is said for the output panel; returns the list gathered before, for {@link #stopCollecting}.
+     * A command line run from inside another one ({@code :normal :s…}) adds to the outer one's output.
+     */
+    List<OutputLine> startCollecting() {
+        List<OutputLine> before = collecting;
+        if (collecting == null) collecting = new ArrayList<>();
+        return before;
+    }
+
+    /**
+     * Stops gathering: at the outermost level one line becomes the message and more lines the output panel, which
+     * waits for a key (Vim's hit-enter prompt). After a failed command line only the last line is kept, as Vim
+     * does not wait then.
+     */
+    void stopCollecting(List<OutputLine> before, boolean failed) {
+        if (before != null) return;
+        List<OutputLine> said = collecting;
+        collecting = null;
+        // After an error Vim does not wait for a key: the last line stays as the message.
+        if (failed && !said.isEmpty()) said = List.of(said.getLast());
+        if (said.size() == 1) {
+            message = said.getFirst().text();
+            messageError = said.getFirst().error();
+        } else if (said.size() > 1) {
+            output = List.copyOf(said);
+            message = "";
+            messageError = false;
+        }
+    }
+
+    /**
+     * A line of the output panel.
+     *
+     * @param text the line
+     * @param error whether it is an error message
+     */
+    public record OutputLine(String text, boolean error) { }
+
+    /** @return the output panel's lines, empty when it is not shown */
+    public List<OutputLine> output() { return output; }
+
+    /**
+     * Asks a question that one key answers; {@code handler} gets the key. It may ask again. When no question is left
+     * open, the command line goes on with what waited for the answer.
+     */
+    void ask(String question, java.util.function.Consumer<KeyInput> handler) {
+        messageLog.add(question);
+        promptText = question;
+        promptHandler = handler;
+    }
+
+    /** @return whether a question waits for its answer */
+    boolean prompting() { return promptHandler != null; }
+
+    private void answer(KeyInput key) {
+        var handler = promptHandler;
+        promptHandler = null;
+        promptText = null;
+        ex.answered(handler, key);
+    }
+
+    /**
+     * @return the question waiting for a key, or "Press ENTER or type command to continue" under the output panel;
+     *     empty when neither is shown
+     */
+    public java.util.Optional<String> prompt() {
+        if (promptText != null) return java.util.Optional.of(promptText);
+        if (!output.isEmpty()) return java.util.Optional.of("Press ENTER or type command to continue");
+        return java.util.Optional.empty();
+    }
+
     /** @return the cursor as a position */
-    Pos cursor() { return buffer.pos(area.getCaretPosition()); }
+    Pos cursor() { return previewCursor != null ? previewCursor.copy() : buffer.pos(area.getCaretPosition()); }
 
     /** Moves the cursor, clamping it to the text; in Normal mode never past the last character. */
     void setCursor(Pos pos) { setCursor(pos, false); }
@@ -417,11 +693,37 @@ public final class VimEditor {
 
     void endUndoStep() { area.vimUndo().endStep(); }
 
+    /** Opens an undo step that the commands run from a mapping or macro share ({@link #endUndoStep} closes it). */
+    void beginUndoGroup() {
+        Pos p = cursor();
+        area.vimUndo().beginStep(p.line, p.col);
+    }
+
     /** {@code u}: undoes {@code count} steps, placing the cursor as Vim's u_undoredo does. */
     void undo(int count) { undoRedo(count, true); }
 
     /** {@code CTRL-R}. */
     void redo(int count) { undoRedo(count, false); }
+
+    /**
+     * {@code :undo N}: undoes or redoes to the text after change N (0: before the first). Jasper keeps one line of
+     * history, so only the changes on it can be reached.
+     */
+    void undoTo(int target) {
+        VimUndoManager manager = area.vimUndo();
+        List<Integer> done = manager.doneSeqs(), undone = manager.undoneSeqs();
+        int current = done.isEmpty() ? 0 : done.getLast();
+        if (target == current) return;
+        if (target < current) {
+            if (target != 0 && !done.contains(target)) throw new VimFailure("E830: Undo number " + target + " not found");
+            int count = 0;
+            for (int i = done.size() - 1; i >= 0 && done.get(i) > target; i--) count++;
+            undo(count);
+        } else {
+            if (!undone.contains(target)) throw new VimFailure("E830: Undo number " + target + " not found");
+            redo(undone.indexOf(target) + 1);
+        }
+    }
 
     private void undoRedo(int count, boolean undo) {
         VimUndoManager manager = area.vimUndo();
@@ -567,43 +869,58 @@ public final class VimEditor {
         }
         ranges.addAll(Highlights.visual(this));
         if (incsearch != null) ranges.add(new int[] { 0, incsearch[0], incsearch[1] });
+        if (confirmMatch != null) ranges.add(new int[] { 0, confirmMatch[0], confirmMatch[1] });
         highlights.show(ranges);
+    }
+
+    /** Shows the match {@code :s} asks about ({start, end} offsets), or none. */
+    void confirmMatch(int[] match) {
+        confirmMatch = match;
+        refreshHighlights();
     }
 
     /** @return the drawn highlights as {kind, start, end}, for tests */
     List<int[]> highlights() { return highlights.shown(); }
 
     /**
-     * 'incsearch': while {@code /} or {@code ?} reads a pattern, the match it would find is drawn and scrolled to;
-     * the cursor stays where it is.
+     * 'incsearch': while {@code /} or {@code ?} reads a pattern, the match it would find is drawn and the view scrolls
+     * to it from where it was when the command line opened (ex_getln.c's may_do_incsearch_highlighting); the cursor
+     * stays where it is.
      */
     void incsearch(char type, String line) {
         incsearch = null;
+        if (incsearchView == null) incsearchView = view.viewstate();
+        view.viewstate(incsearchView);
         if (options.flag("incsearch") && !line.isEmpty()) {
             Search.Match match = vim.search().preview(this, type, line);
             if (match != null) {
                 int start = buffer.offset(match.start()), end = buffer.offset(match.end());
                 incsearch = new int[] { start, Math.max(end, start + 1) };
+                // The caret itself does not move: a moved caret would scroll back to itself once the key is done.
+                previewCursor = match.start().copy();
                 try {
-                    var rect = area.modelToView2D(start);
-                    if (rect != null) area.scrollRectToVisible(rect.getBounds());
-                } catch (javax.swing.text.BadLocationException ignored) { }
+                    view.updateTopline();
+                    view.cursColumns();
+                } finally { previewCursor = null; }
             }
         }
+        viewport.show();
         refreshHighlights();
     }
 
-    /** The command line closed: the incremental-search match goes. */
+    /**
+     * The command line closed: the incremental-search match goes and the view is put back as it was when the line
+     * opened (finish_incsearch_highlighting); after the key the view scrolls to the cursor as after any command.
+     */
     void incsearchDone() {
         incsearch = null;
-        Pos p = cursor();
-        try {
-            var rect = area.modelToView2D(buffer.offset(p));
-            if (rect != null) area.scrollRectToVisible(rect.getBounds());
-        } catch (javax.swing.text.BadLocationException ignored) { }
+        if (incsearchView != null) {
+            view.viewstate(incsearchView);
+            incsearchView = null;
+        }
     }
 
-    /** @return while a command line is typed, its text with the {@code /} or {@code ?} in front; else empty */
+    /** @return while a command line is typed, its text with the {@code :}, {@code /} or {@code ?} in front; else empty */
     public java.util.Optional<String> commandLineText() {
         return commandLine.active() ? java.util.Optional.of(commandLine.type() + commandLine.text()) : java.util.Optional.empty();
     }
@@ -621,6 +938,23 @@ public final class VimEditor {
     }
 
     String documentName() { return documentName.get(); }
+
+    /** @return the cursor's line, 1-based */
+    int cursorLine() { return cursor().line + 1; }
+
+    /** Work for after the key being handled ({@code :q} closes the tab once the key is done); at once outside a key. */
+    void afterKey(Runnable work) {
+        if (busy) afterKey.add(work);
+        else work.run();
+    }
+
+    private final List<Runnable> afterKey = new ArrayList<>();
+
+    /** A message given outside a key (a save that completed later): shown at once. */
+    void announce(String text) {
+        message(text, false);
+        if (!busy) fire();
+    }
 
     boolean documentModified() { return documentModified.getAsBoolean(); }
 }

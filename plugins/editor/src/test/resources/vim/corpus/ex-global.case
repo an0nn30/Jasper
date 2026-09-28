@@ -1,0 +1,814 @@
+# Ex :global and :vglobal (V2a).
+
+=== g deletes matching lines
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/d<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  b2
+  b4
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  3 fewer lines
+
+=== g bang keeps matching lines
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g!/a/d<CR>
+--- vim 9.1
+expect-text:
+  a1
+  a3
+  a5
+expect-cursor: 3,1
+expect-mode: normal
+
+=== v deletes other lines
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :v/a/d<CR>
+--- vim 9.1
+expect-text:
+  a1
+  a3
+  a5
+expect-cursor: 3,1
+expect-mode: normal
+
+=== g with a range
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :2,4g/a/d<CR>
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  b4
+  a5
+expect-cursor: 3,1
+expect-mode: normal
+
+=== g prints by default
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/b<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 4,1
+expect-mode: normal
+expect-output:
+  b2
+  b4
+
+=== g with p
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/p<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 5,1
+expect-mode: normal
+expect-output:
+  a1
+  a3
+  a5
+
+=== g with number
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/#<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 5,1
+expect-mode: normal
+expect-output:
+    1 a1
+    3 a3
+    5 a5
+
+=== g not found
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/z/d<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Pattern not found: z
+
+=== v found everywhere
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :v/./d<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Pattern found in every line: .
+
+=== g missing pattern
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E148: Regular expression missing from :global
+
+=== g letter delimiter
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :gxaxd<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: gxaxd
+
+=== g other delimiter
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g#a#d<CR>
+--- vim 9.1
+expect-text:
+  b2
+  b4
+expect-cursor: 2,1
+expect-mode: normal
+
+=== g empty pattern uses the last search
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: /b<CR>:g//d<CR>
+--- vim 9.1
+expect-text:
+  a1
+  a3
+  a5
+expect-cursor: 3,1
+expect-mode: normal
+
+=== g sets the search pattern
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/b/s/b/B/<CR>n
+--- vim 9.1
+expect-text:
+  a1
+  B2
+  a3
+  B4
+  a5
+expect-cursor: 4,1
+expect-mode: normal
+
+=== g with s
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/s/a/X/<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  X1
+  b2
+  X3
+  b4
+  X5
+expect-cursor: 5,1
+expect-mode: normal
+expect-output:
+  3 substitutions on 3 lines
+
+=== g with s reports the total
+text:
+  a a
+  b
+  a a a
+cursor: 1,1
+keys: :g/a/s/a/X/g<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  X X
+  b
+  X X X
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+  5 substitutions on 2 lines
+
+=== g with s and an empty pattern
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/s//X/<CR>
+--- vim 9.1
+expect-text:
+  X1
+  b2
+  X3
+  b4
+  X5
+expect-cursor: 5,1
+expect-mode: normal
+
+=== g with normal
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/norm Ax<CR>
+--- vim 9.1
+expect-text:
+  a1x
+  b2
+  a3x
+  b4
+  a5x
+expect-cursor: 5,3
+expect-mode: normal
+
+=== g with normal then undo
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/norm Ax<CR>u
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 1,2
+expect-mode: normal
+
+=== g move reverses the lines
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/^/m0<CR>
+--- vim 9.1
+expect-text:
+  a5
+  b4
+  a3
+  b2
+  a1
+expect-cursor: 1,1
+expect-mode: normal
+
+=== g copy duplicates
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/b/t.<CR>
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  b2
+  a3
+  b4
+  b4
+  a5
+expect-cursor: 6,1
+expect-mode: normal
+
+=== g join
+text:
+  a
+  1
+  a
+  2
+cursor: 1,1
+keys: :g/a/j<CR>
+--- vim 9.1
+expect-text:
+  a 1
+  a 2
+expect-cursor: 2,1
+expect-mode: normal
+
+=== g delete next line
+text:
+  x
+  y
+  x
+  y
+cursor: 1,1
+keys: :g/x/+1d<CR>
+--- vim 9.1
+expect-text:
+  x
+  x
+expect-cursor: 2,1
+expect-mode: normal
+
+=== g delete that removes marked lines
+text:
+  x
+  x
+  x
+  y
+cursor: 1,1
+keys: :g/x/.,+1d<CR>
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+
+=== g with a bar in the command
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/s/a/X/|s/X/Y/<CR>
+--- vim 9.1
+expect-text:
+  Y1
+  b2
+  Y3
+  b4
+  Y5
+expect-cursor: 5,1
+expect-mode: normal
+
+=== g cursor ends on the last line it ran on
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/b/<CR>
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 4,1
+expect-mode: normal
+
+=== g with s puts the cursor on the first non-blank
+text:
+    a
+    b
+    a
+cursor: 1,1
+keys: :g/a/s/a/X/<CR>
+--- vim 9.1
+expect-text:
+    X
+    b
+    X
+expect-cursor: 3,3
+expect-mode: normal
+
+=== g sets the jumplist
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 5,1
+keys: :g/a/s/a/X/<CR><C-o>
+--- vim 9.1
+expect-text:
+  X1
+  b2
+  X3
+  b4
+  X5
+expect-cursor: 5,1
+expect-mode: normal
+
+=== g reports fewer lines
+text:
+  a
+  a
+  a
+  b
+cursor: 1,1
+keys: :g/a/d<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  b
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  3 fewer lines
+
+=== g nested
+text:
+  ab
+  a
+  b
+  abc
+cursor: 1,1
+keys: :g/a/v/b/d<CR>
+--- vim 9.1
+expect-text:
+  ab
+  b
+  abc
+expect-cursor: 3,1
+expect-mode: normal
+
+=== g nested with a range fails
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/2,3g/b/d<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E147: Cannot do :global recursive with a range
+
+=== g backslash slash
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: /b<CR>:g\/d<CR>
+--- vim 9.1
+expect-text:
+  a1
+  a3
+  a5
+expect-cursor: 3,1
+expect-mode: normal
+
+=== g backslash ampersand
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :s/a/a/<CR>:g\&d<CR>
+--- vim 9.1
+expect-text:
+  b2
+  b4
+expect-cursor: 2,1
+expect-mode: normal
+
+=== g error stops it
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/foo<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: foo
+
+=== g with a failing normal goes on
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/norm 3lx<CR>
+--- vim 9.1
+expect-text:
+  a
+  b2
+  a
+  b4
+  a
+expect-cursor: 5,1
+expect-mode: normal
+
+=== g with confirm
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/s/a/X/c<CR>yny
+--- vim 9.1
+expect-text:
+  X1
+  b2
+  a3
+  b4
+  X5
+expect-cursor: 5,1
+expect-mode: normal
+
+=== g with confirm then quit
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/s/a/X/c<CR>yqq
+--- vim 9.1
+expect-text:
+  X1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 5,1
+expect-mode: normal
+
+=== g with confirm stops on q and goes on
+text:
+  a
+  a
+  a
+cursor: 1,1
+keys: :g/a/s/a/X/c<CR>ynq
+output: yes
+--- vim 9.1
+expect-text:
+  X
+  a
+  a
+expect-cursor: 3,1
+expect-mode: normal
+expect-output:
+  replace with X (y/n/a/q/l/^E/^Y)?
+  replace with X (y/n/a/q/l/^E/^Y)?
+  replace with X (y/n/a/q/l/^E/^Y)?
+
+=== g on the visual lines
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: Vjj:g/a/d<CR>
+--- vim 9.1
+expect-text:
+  b2
+  b4
+  a5
+expect-cursor: 2,1
+expect-mode: normal
+
+=== g dot
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 3,1
+keys: :.g/a/d<CR>
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  b4
+  a5
+expect-cursor: 3,1
+expect-mode: normal
+
+=== g with k marks
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/b/k x<CR>'x
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 4,1
+expect-mode: normal
+
+=== g then undo is one step
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/d<CR>u
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  a3
+  b4
+  a5
+expect-cursor: 1,1
+expect-mode: normal
+
+=== g with d into a register appends
+text:
+  a1
+  b2
+  a3
+  b4
+  a5
+cursor: 1,1
+keys: :g/a/d A<CR>
+registers: a
+--- vim 9.1
+expect-text:
+  b2
+  b4
+expect-cursor: 2,1
+expect-mode: normal
+expect-register a: l "a1\na3\na5\n"

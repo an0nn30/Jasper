@@ -115,11 +115,37 @@ recorded corpus.
   mode, `<C-w>` deletes a word in Insert mode, and Tab (`<C-i>`) goes forward in the jumplist.
 - `"+` is the clipboard and `"*` the selection (the clipboard where there is none).
 - 'tabstop' and 'shiftwidth' start at `tab_size`, 'expandtab' follows the tab's Spaces or Tab setting, and
-  'autoindent' is on. 'incsearch' is on; 'hlsearch' is off until the `:` command line (with `:noh`) arrives.
+  'autoindent' is on. 'incsearch' and 'hlsearch' are on; `:noh` hides the highlight until the next search.
+- `:` opens the command line in the strip, with the same keys as `/` and its own history. It runs Vim's Ex commands
+  for editing, with Vim's ranges (`:3,5`, `:%`, `:'<,'>` after Visual mode, `:/pat/`, `:.,+3`): `:s` with every flag,
+  including `c`, which asks in the strip; `:g` and `:v`; `:d`, `:y`, `:m`, `:t`, `:j`, `:>`, `:pu`, `:norm`, `:sort`,
+  `:left`, `:right` and `:center`; `:marks`, `:reg`, `:jumps` and `:changes`; `:u`, `:noh` and `:set`. The
+  [reference](editor-vim-reference.md#ex-commands) lists them. When a command line says several lines (`:reg`,
+  `:g/pat/`) they stay above the strip until you type a key; `:` goes straight on to the next command line.
+- The tabs are Vim's buffers. `:w` saves through the Editor's Save (`:w file` saves as the file), `:q` closes the tab
+  (`:q!` without asking about changes), `:wq`, `:x` and `ZZ` save and close, `:e file` opens a file in a tab (a
+  relative name starts from the current file's folder), `:r file` puts a file's lines below the cursor, `:ls` lists
+  the tabs with their buffer numbers, and `:b N`, `:bn`, `:tabn`, `gt` and `gT` move between them. `<Tab>` completes
+  command names, options after `:set`, file names and tab names. 'relativenumber' shows each line's distance from the
+  cursor in the gutter.
 - `<C-g>` shows the file, its line count and the cursor's position; `ga` the character's code.
-- Not yet: scrolling commands (`<C-d>`, `zz`), `H`, `M`, `L` and the other screen-line motions, folds, the `:`
-  command line, macros, a vimrc, and emulated plugins such as surround and commentary. They follow in later releases.
-  An uppercase mark (`mA`) works within its own tab.
+- Scrolling (`<C-e>`, `<C-d>`, `<C-f>`, `zt`, `zz`), `H`, `M`, `L` and the screen-line motions (`gj`, `g0`, `g$`)
+  work on a window as many lines high and characters wide as the text area shows. Scrolling with the mouse or the
+  scroll bar keeps the cursor inside it, as in Vim. With Vim on, long lines wrap at any character, as Vim wraps them.
+- The fold commands (`zo`, `zc`, `za`, `zR`, `zM`, `zj`, `[z`) work on the Editor's code folds. A closed fold counts as
+  one line for `j`, `k` and scrolling, an operator takes it whole, and the motions Vim's 'foldopen' names (`l`, `w`,
+  searches, marks, `%`, `{`, `u`) open the fold they land in.
+- Macros: `qa` … `q` records the keys you type into register `a` (the strip shows `recording @a`), `@a` runs them,
+  `5@a` five times, `@@` the last register again and `@:` the last command line; `qA` appends to `a`. A macro stops
+  at the first command that fails, so one that ends with `@a` runs to the end of the file; `u` undoes everything a
+  macro or mapping changed at once. Ctrl+C stops a macro or mapping that runs on.
+- Mappings: `:nmap`, `:vmap`, `:xmap`, `:omap`, `:imap`, `:cmap`, `:map` and `:map!`, their `noremap` forms, and the
+  `unmap` and `mapclear` forms, as in Vim (`:nnoremap <Space>w :w<CR>`); without a right-hand side they list the
+  mappings. Keys that start a longer mapping wait 'timeoutlen' (1000 ms) for the rest, and the strip shows them.
+  `<nowait>`, `<unique>`, `<Plug>`, `<Nop>` and `<Leader>` (a backslash for now) work as in Vim. A key that starts a
+  mapping is Vim's, even a ⌘ key.
+- Not yet: a vimrc, `sethandler` lines and emulated plugins such as surround and commentary. They follow in later
+  releases. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
 
 ## For other plugins
 

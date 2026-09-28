@@ -37,21 +37,26 @@ class VimCorpusTest {
     @Test void everyCommandHasACase() {
         Set<String> used = new TreeSet<>();
         for (CorpusCase c : cases()) CorpusRunner.run(c, used::add);
-        List<String> missing = VimCommands.standard().entries().stream().map(VimCommands.Entry::id).filter(id -> !used.contains(id)).toList();
+        List<String> ids = new java.util.ArrayList<>(VimCommands.standard().entries().stream().map(VimCommands.Entry::id).toList());
+        for (Ex.Def def : Ex.implemented()) ids.add("ex " + def.name());
+        // The file, buffer and tab commands need the Editor's tabs behind Vim; ExFilesTest checks them.
+        List<String> missing = ids.stream().filter(id -> !used.contains(id) && !ExFilesTest.NEEDS_TABS.contains(id)).toList();
         assertThat(missing).as("commands with no corpus case").isEmpty();
     }
 
     @Test void theCorpusFormatReadsBackWhatItWrites() {
         var lines = List.of("=== trailing blanks", "set: sw=4", "register a: l \"x\\n\"", "text:", "  ends in space $", "  $", "  cost $$",
-            "cursor: 1,2", "keys: d<Esc>", "registers: \" a", "--- vim 9.1", "expect-text:", "  done", "expect-cursor: 1,1",
-            "expect-mode: insert", "expect-register \": c \"one\\ttwo\"", "expect-register a: none");
+            "cursor: 1,2", "keys: d<Esc>", "registers: \" a", "output: yes", "--- vim 9.1", "expect-text:", "  done", "expect-cursor: 1,1",
+            "expect-mode: insert", "expect-output:", "  said $", "expect-register \": c \"one\\ttwo\"", "expect-register a: none");
         CorpusCase c = CorpusFile.parse("inline", lines).getFirst();
         assertThat(c.text()).containsExactly("ends in space ", "", "cost $");
         assertThat(c.given().get('a')).isEqualTo(new CorpusCase.Register("l", "x\n"));
         assertThat(c.expected().registers()).containsOnlyKeys('"');
         assertThat(c.expected().registers().get('"').text()).isEqualTo("one\ttwo");
+        assertThat(c.output()).isTrue();
+        assertThat(c.expected().output()).containsExactly("said ");
         assertThat(CorpusFile.format(c, c.expected())).containsExactly("--- vim 9.1", "expect-text:", "  done", "expect-cursor: 1,1",
-            "expect-mode: insert", "expect-register \": c \"one\\ttwo\"", "expect-register a: none");
+            "expect-mode: insert", "expect-output:", "  said $", "expect-register \": c \"one\\ttwo\"", "expect-register a: none");
         assertThat(RecordCorpus.vimKeys("a\"b\\<Esc><C-w>")).isEqualTo("a\\\"b\\\\\\<Esc>\\<C-w>");
         assertThat(RecordCorpus.mode("no")).isEqualTo("operator-pending");
     }

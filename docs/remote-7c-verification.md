@@ -66,7 +66,7 @@ you control for the following acceptance steps:
    ancestor without recursive traversal. Delete only disposable selections, cancelling partway.
 7. Deny destination cleanup or metadata permissions. Confirm a visible issue/warning, preserved
    copied content and explicit cleanup retry/acknowledgement before forgetting cleanup history.
-8. Set `toggle_sftp` in Remote's TOML; verify live changes and app override precedence. Set copy
+8. Bind Toggle SFTP in Settings › Keymap and check it in every window. Set copy
    concurrency and a short request timeout for a deliberately stalled host.
 9. Directory follow without shell integration (2026-09-24 amendment): on the Mac host and a stock
    Linux bash host, open two panes each and `cd` in each; the sidebar follows the focused pane

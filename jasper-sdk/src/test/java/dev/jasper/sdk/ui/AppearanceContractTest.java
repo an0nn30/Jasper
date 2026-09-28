@@ -18,7 +18,7 @@ class AppearanceContractTest {
     }
 
     @Test void appearanceOffersOneIconFamilyInSdkZeroEight() {
-        assertThat(JasperSdk.VERSION).isEqualTo("0.8.6");
+        assertThat(JasperSdk.VERSION).isEqualTo("0.9.1");
         assertThat(Arrays.stream(Appearance.class.getMethods()).filter(method -> method.getName().equals("icon"))
             .map(method -> method.getParameterCount())).containsOnly(1);
     }

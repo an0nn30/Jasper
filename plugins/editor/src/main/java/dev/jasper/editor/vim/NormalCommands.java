@@ -40,8 +40,16 @@ final class NormalCommands {
         commands.action("o", "open a line below", true, c -> open(c, true));
         commands.action("O", "open a line above", true, c -> open(c, false));
         commands.action("R", "Replace mode", true, c -> c.editor.insert().begin("R", c.count, true, -1));
-        commands.action("u", "undo {count} changes", false, c -> c.editor.undo(c.count));
-        commands.action("<C-r>", "redo {count} changes", false, c -> c.editor.redo(c.count));
+        commands.action("u", "undo {count} changes", false, c -> {
+            Pos before = c.cursor();
+            c.editor.undo(c.count);
+            c.editor.machine().foldOpenAfter("undo", before);
+        });
+        commands.action("<C-r>", "redo {count} changes", false, c -> {
+            Pos before = c.cursor();
+            c.editor.redo(c.count);
+            c.editor.machine().foldOpenAfter("undo", before);
+        });
         commands.action(".", "repeat the last change, with {count} replacing its count", false, c -> c.editor.machine().repeat(c));
         commands.action("<C-l>", "redraw (does nothing)", false, c -> { });
     }

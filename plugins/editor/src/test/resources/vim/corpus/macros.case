@@ -1,0 +1,825 @@
+# Macros: q records typed keys into a register, @ runs a register's keys.
+
+=== q records keys and @ runs them
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qadwjq@a
+registers: a
+--- vim 9.1
+expect-text:
+  two three
+  five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 3,1
+expect-mode: normal
+expect-register a: c "dwj"
+
+=== @ with a count runs the register that many times
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qaxq3@a
+registers: a
+--- vim 9.1
+expect-text:
+  two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register a: c "x"
+
+=== @@ runs the last register again
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qaxjq@a@@
+registers: a
+--- vim 9.1
+expect-text:
+  ne two three
+  our five six
+  even eight nine
+  ten eleven twelve
+expect-cursor: 4,1
+expect-mode: normal
+expect-register a: c "xj"
+
+=== q with an upper-case name appends
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qaxqqAjq@a
+registers: a
+--- vim 9.1
+expect-text:
+  ne two three
+  our five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 3,1
+expect-mode: normal
+expect-register a: c "xj"
+
+=== q with an upper-case name appends to a linewise register
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+register a: l "yy\n"
+keys: qAxq
+registers: a
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register a: l "yyx\n"
+
+=== q with an upper-case name on an empty register
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qAxq
+registers: a
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register a: c "x"
+
+=== q with a double quote records into register 0
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: yiwq"xq
+registers: " 0 -
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "o"
+expect-register 0: c "x"
+expect-register -: c "o"
+
+=== q records into a digit register
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: q5xq@5
+registers: 5
+--- vim 9.1
+expect-text:
+  e two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register 5: c "x"
+
+=== recording keeps the unnamed register
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: yiwqaxq
+registers: " a 0
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "o"
+expect-register a: c "x"
+expect-register 0: c "one"
+
+=== special keys are recorded as Vim codes
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qai1<BS>2<Left><Esc><C-Left><End>q:registers a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  2one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,14
+expect-mode: normal
+expect-output:
+  Type Name Content
+    c  "a   i1<80>kb2<80>kl^[<80><fd>U<80>@7
+
+=== shifted and function keys are recorded as Vim codes
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qa<S-Tab><S-Up><F10><F11><Home><PageUp><Esc>q:registers a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Type Name Content
+    c  "a   <80>kB<80><fd>^D<80>k;<80>F1<80>kh<80>kP^[
+
+=== a recursive macro runs until a command fails
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: qaqqajx@aq@a
+registers: a
+--- vim 9.1
+expect-text:
+  a1
+  2
+  3
+  4
+  5
+  6
+expect-cursor: 6,1
+expect-mode: normal
+expect-register a: c "jx@a"
+
+=== a failing command ends the macro
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: qafzxjq@a
+--- vim 9.1
+expect-text:
+  1
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 2,1
+expect-mode: normal
+
+=== @ with a count stops at the first failure
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: qajxq9@a
+--- vim 9.1
+expect-text:
+  a1
+  2
+  3
+  4
+  5
+  6
+expect-cursor: 6,1
+expect-mode: normal
+
+=== @: runs the last command line again
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :s/$/!/<CR>j@:
+registers: :
+--- vim 9.1
+expect-text:
+  a1!
+  b2!
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 2,1
+expect-mode: normal
+expect-register :: c "s/$/!/"
+
+=== @@ after @: runs the command line again
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :s/$/!/<CR>j@:j@@
+--- vim 9.1
+expect-text:
+  a1!
+  b2!
+  c3!
+  d4
+  e5
+  f6
+expect-cursor: 3,1
+expect-mode: normal
+
+=== @: with a count
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :s/$/!/<CR>j3@:
+--- vim 9.1
+expect-text:
+  a1!
+  b2!!!
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 2,1
+expect-mode: normal
+
+=== @: in Visual mode drops the range it would add again
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: Vj:s/$/!/<CR>jjVj@:
+--- vim 9.1
+expect-text:
+  a1!
+  b2!
+  c3
+  d4!
+  e5!
+  f6
+expect-cursor: 5,1
+expect-mode: normal
+
+=== @: with no command line fails
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: @:
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E30: No previous command line
+
+=== @@ with no register run fails
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: @@
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E748: No previously used register
+
+=== @ with an invalid register fails
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: @%
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E354: Invalid register name: '%'
+
+=== @ with an empty register fails
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: @bx
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== @ of the black hole register does nothing
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: @_x
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a yanked line runs as keys with a line break
+text:
+  x
+  abc
+  def
+cursor: 1,1
+keys: "ayyj@a
+registers: a
+--- vim 9.1
+expect-text:
+  x
+  bc
+  def
+expect-cursor: 3,1
+expect-mode: normal
+expect-register a: l "x\n"
+
+=== a register of several lines runs with line breaks
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+register a: c "x\nx"
+keys: @a
+--- vim 9.1
+expect-text:
+  ne two three
+  our five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 2,1
+expect-mode: normal
+
+=== @. runs the last inserted text
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: ix<Esc>w@.
+--- vim 9.1
+expect-text:
+  xone wo three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,6
+expect-mode: normal
+
+=== q in a macro does nothing
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+register a: c "xqx"
+keys: @a
+--- vim 9.1
+expect-text:
+  e two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a macro's keys are mapped
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+register a: c "x"
+keys: :nmap x dd<CR>@a
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== CTRL-O @ runs the register in Normal mode then inserts
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+register a: c "wdw"
+keys: i<C-o>@aZ<Esc>
+--- vim 9.1
+expect-text:
+  one Zthree
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,5
+expect-mode: normal
+
+=== CTRL-O q stops recording without the CTRL-O
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qaiab<C-o>qcd<Esc>
+registers: a
+--- vim 9.1
+expect-text:
+  abcdone two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,4
+expect-mode: normal
+expect-register a: c "iab"
+
+=== CTRL-O q starts recording in Insert mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: iab<C-o>qacd<Esc>q
+registers: a
+--- vim 9.1
+expect-text:
+  abcdone two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,4
+expect-mode: normal
+expect-register a: c "cd\u001b"
+
+=== q colon is not a register
+divergent: Jasper has no command-line window; q: fails (docs/vim-divergences.md)
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: q:x
+--- expected
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== q with an invalid register fails
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: q%x
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== q in Visual mode stops recording
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qavlqd
+registers: a
+--- vim 9.1
+expect-text:
+  e two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register a: c "vl"
+
+=== q in Visual mode starts recording
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: vqalqd
+registers: a
+--- vim 9.1
+expect-text:
+  e two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register a: c "l"
+
+=== a macro that inserts text
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qaA!<Esc>jq@a@@
+--- vim 9.1
+expect-text:
+  one two three!
+  four five six!
+  seven eight nine!
+  ten eleven twelve
+expect-cursor: 4,17
+expect-mode: normal
+
+=== u undoes all of a macro's changes
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qaxxq@au
+--- vim 9.1
+expect-text:
+  e two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== u undoes all of a macro's changes over lines
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: qaxjxq@au
+--- vim 9.1
+expect-text:
+  1
+  2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 2,1
+expect-mode: normal
+
+=== dot after a macro repeats its last change
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: qaxwq@a.
+--- vim 9.1
+expect-text:
+  ne wo hree
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,7
+expect-mode: normal
+
+=== gqq still formats while q records
+text:
+  a b
+  c
+cursor: 1,1
+keys: qagqqq
+registers: a
+--- vim 9.1
+expect-text:
+  a b
+  c
+expect-cursor: 1,1
+expect-mode: normal
+expect-register a: c "gqq"
+
+=== q after an operator fails
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: dqx
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a macro running a command line
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+register a: c ":s/$/!/\r"
+keys: @a
+--- vim 9.1
+expect-text:
+  a1!
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a macro run from a macro
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+register a: c "x@b"
+register b: c "w"
+keys: @a
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,4
+expect-mode: normal

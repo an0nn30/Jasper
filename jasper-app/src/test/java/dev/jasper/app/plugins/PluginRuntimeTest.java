@@ -27,6 +27,9 @@ class PluginRuntimeTest {
         import dev.jasper.sdk.events.AppEvents;
         import dev.jasper.sdk.plugin.Plugin;
         import dev.jasper.sdk.plugin.PluginContext;
+        import dev.jasper.sdk.settings.Setting;
+        import dev.jasper.sdk.settings.SettingKind;
+        import dev.jasper.sdk.settings.SettingSpec;
         import java.nio.file.Files;
         public final class Main implements Plugin {
             private PluginContext context;
@@ -36,8 +39,9 @@ class PluginRuntimeTest {
             }
             @Override public void start(PluginContext context) {
                 this.context = context;
-                note(context, "started", context.config().string("greeting").orElse("none"));
-                context.config().onChanged(() -> note(context, "changed", context.config().string("greeting").orElse("none")));
+                Setting<String> greeting = context.settings().declare(SettingSpec.of("greeting", SettingKind.text(), "none").label("Greeting"));
+                note(context, "started", greeting.get());
+                greeting.onChanged(value -> note(context, "changed", value));
                 context.events().subscribe(AppEvents.THEME_CHANGED, event -> note(context, "theme", event.variant().name()));
                 context.events().subscribe(AppEvents.CONFIG_RELOADED, event -> note(context, "reloaded", "yes"));
                 context.activities().begin(ActivitySpec.of("Probe work")).progress(0.5, "half way");
@@ -178,8 +182,7 @@ class PluginRuntimeTest {
     }
 
         @Test void aChangedSettingsFileReachesThePluginWithoutAConfigReload() throws Exception {
-            // Reuse the probe fixture of the test above: it writes context.config().string("greeting") to data/started at start
-            // and, on config change, to data/changed. Read that fixture's source before writing this test and adapt the file names.
+            // The probe fixture above writes its declared greeting to data/started at start and, when it changes, to data/changed.
             Path dev = root.resolve("dev-plugin");
             PluginJars.build(dev, "probe.jar", PluginJars.descriptor("dev.example.probe", "1.0.0", "fix.probe.Main"), Map.of("fix.probe.Main", FIXTURE), List.of());
             List<String> reports = new ArrayList<>();

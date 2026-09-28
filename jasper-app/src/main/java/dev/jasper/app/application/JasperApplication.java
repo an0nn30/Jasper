@@ -441,7 +441,8 @@ public final class JasperApplication {
                 shellProfiles::refresh, shellProfiles::onChanged);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(), system, shells,
-                    context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context)),
+                    context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context),
+                    context -> plugins.settingsPages(context)),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
                     this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));
             configuration.settingsOpener((owner, page) -> openSettings(owner.id(), page));

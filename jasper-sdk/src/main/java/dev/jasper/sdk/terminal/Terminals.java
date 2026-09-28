@@ -77,7 +77,7 @@ public interface Terminals {
      * command when one is configured. Needs {@code terminal.open}. UI thread only.
      *
      * @return the profiles; empty when the host lists none, or has not finished detecting them
-     * @since 0.8.6
+     * @since 0.9.1
      */
     default List<ShellProfileInfo> profiles() { return List.of(); }
 
@@ -90,7 +90,7 @@ public interface Terminals {
      *
      * @param listener called with nothing; read {@link #profiles()} again
      * @return the registration
-     * @since 0.8.6
+     * @since 0.9.1
      */
     default Subscription onProfilesChanged(Runnable listener) {
         java.util.Objects.requireNonNull(listener, "listener");

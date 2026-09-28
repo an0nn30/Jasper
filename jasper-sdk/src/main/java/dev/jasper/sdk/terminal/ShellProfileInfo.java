@@ -11,7 +11,7 @@ import java.util.Optional;
  * @param name the display name, such as {@code Ubuntu}
  * @param kind what sort of shell it is
  * @param detail a short qualifier to show beside the name; for a WSL distribution {@code WSL 1} or {@code WSL 2}
- * @since 0.8.6
+ * @since 0.9.1
  */
 public record ShellProfileInfo(String id, String name, Kind kind, Optional<String> detail) {
     /** What sort of shell a profile starts. */

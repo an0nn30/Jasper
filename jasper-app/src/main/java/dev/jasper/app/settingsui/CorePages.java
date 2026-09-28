@@ -123,6 +123,22 @@ public final class CorePages {
     public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells,
                                                                    Function<PageContext, SettingsPage> keymap,
                                                                    Function<PageContext, SettingsPage> plugins) {
+        return pages(themeNames, system, shells, keymap, plugins, context -> List.of());
+    }
+
+    /** The whole tree with no detected shells, followed by {@code tools}. */
+    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system,
+                                                                   Function<PageContext, SettingsPage> keymap,
+                                                                   Function<PageContext, SettingsPage> plugins,
+                                                                   Function<PageContext, List<SettingsPage>> tools) {
+        return pages(themeNames, system, ShellChoices.NONE, keymap, plugins, tools);
+    }
+
+    /** As above with {@code shells}, followed by {@code tools}: pages under Tools, such as plugins' settings pages. */
+    public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system, ShellChoices shells,
+                                                                   Function<PageContext, SettingsPage> keymap,
+                                                                   Function<PageContext, SettingsPage> plugins,
+                                                                   Function<PageContext, List<SettingsPage>> tools) {
         return context -> {
             var specs = specs(themeNames, system, shells);
             var all = new ArrayList<SettingsPage>();
@@ -135,6 +151,7 @@ public final class CorePages {
             for (var spec : specs.subList(6, specs.size())) all.add(spec.build(context));
             all.add(plugins.apply(context));
             all.add(new GroupPage("tools", "Tools", Optional.empty(), true, childrenOf.apply("tools"), context));
+            all.addAll(tools.apply(context));
             return List.copyOf(all);
         };
     }

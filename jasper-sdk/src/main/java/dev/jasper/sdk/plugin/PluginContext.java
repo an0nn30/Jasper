@@ -4,6 +4,7 @@ import dev.jasper.sdk.PluginInfo;
 import dev.jasper.sdk.activity.Activities;
 import dev.jasper.sdk.events.Events;
 import dev.jasper.sdk.services.Services;
+import dev.jasper.sdk.settings.PluginSettings;
 import dev.jasper.sdk.ui.Actions;
 import dev.jasper.sdk.ui.Appearance;
 import dev.jasper.sdk.ui.Menus;
@@ -48,11 +49,11 @@ public interface PluginContext {
     Path dataDirectory();
 
     /**
-     * The plugin's configuration table.
+     * The plugin's declared settings.
      *
-     * @return the read-only view
+     * @return this plugin's settings
      */
-    PluginConfig config();
+    PluginSettings settings();
 
     /**
      * A plugin-scoped executor for slow work. It stops admitting tasks at shutdown; tasks already

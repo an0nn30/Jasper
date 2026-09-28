@@ -41,6 +41,7 @@ class PluginManagerTest {
     private final List<String> quits = new CopyOnWriteArrayList<>();
     private final List<Path> edited = new CopyOnWriteArrayList<>();
     private final List<Path> revealed = new CopyOnWriteArrayList<>();
+    private final List<String> navigated = new CopyOnWriteArrayList<>();
     private PluginRuntime runtime;
     private AuxiliaryWindows windows;
     private PluginManager manager;
@@ -90,7 +91,7 @@ class PluginManagerTest {
     private void open() throws Exception {
         edt(() -> {
             host = windows.window("app.settings", "Settings", new java.awt.Dimension(1000, 700), true);
-            page = manager.page(new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { },
+            page = manager.page(new PageContext(null, navigated::add, Runnable::run, (title, initial) -> Optional.empty(), () -> { },
                 () -> host));
             page.component();
             page.selected();
@@ -231,6 +232,31 @@ class PluginManagerTest {
             assertThat(revealed).containsExactly(user().resolve("dev.example.gone"), user().resolve("dev.example.gone/data"));
             assertThat(user().resolve("dev.example.gone/data")).isDirectory();
         }
+
+    @Test void openSettingsGoesToARunningPluginsPageInSettings() throws Exception {
+        String source = """
+            package fix.declared;
+            public final class Main implements dev.jasper.sdk.plugin.Plugin {
+                @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                    context.settings().declare(dev.jasper.sdk.settings.SettingSpec.of("size",
+                        dev.jasper.sdk.settings.SettingKind.integer(1, 9), 3).label("Size"));
+                }
+            }
+            """;
+        PluginJars.build(user().resolve("dev.example.declares/jars"), "main.jar",
+            PluginJars.descriptor("dev.example.declares", "1.0.0", "fix.declared.Main"), Map.of("fix.declared.Main", source), List.of());
+        Files.writeString(root.resolve("plugins.toml"), "version = 1\n[plugins.\"dev.example.declares\"]\nenabled = true\nconsented = []\n");
+        start(false, false);
+        open();
+        until(() -> manager.panel().listed().stream().anyMatch(line -> line.contains("dev.example.declares")));
+        edt(() -> {
+            assertThat(runtime.hasSettingsPage("dev.example.declares")).isTrue();
+            manager.panel().select("dev.example.declares");
+            manager.panel().clickMenu("Open Settings");
+        });
+        assertThat(navigated).containsExactly("plugin.dev.example.declares");
+        assertThat(edited).as("a running plugin's page, not its file").isEmpty();
+    }
 
     @Test void thePageSearchesPluginNamesSelectsAMatchAndLetsGoWhenDisposed() throws Exception {
         PluginJars.build(user().resolve("dev.example.found/jars"), "main.jar",

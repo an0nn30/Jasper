@@ -24,22 +24,34 @@ public final class Vim {
     }
 
     private final Options options = new Options();
+    private final VimHost host;
     private final Registers registers;
     private final KeyHandlers handlers = new KeyHandlers();
+    private final Mappings mappings = new Mappings();
+    private final Macros macros = new Macros();
     private final VimCommands commands = VimCommands.standard();
     private Consumer<String> coverage = id -> { };
     private Find lastFind;
     private Change lastChange;
     private final Search search = new Search();
+    /** The command-line history ({@code :}), oldest first. */
+    private final java.util.List<String> commandHistory = new java.util.ArrayList<>();
     /** Whether the last hex number CTRL-A changed had upper-case letters (do_addsub's static hexupper). */
     private boolean hexUpper;
     /** The uppercase marks: each remembers its editor (Vim's namedfm). */
     private final java.util.Map<Character, GlobalMark> globalMarks = new java.util.HashMap<>();
 
-    private record GlobalMark(VimEditor editor, Pos pos) { }
+    /** An uppercase mark: its editor and where it is. */
+    record GlobalMark(VimEditor editor, Pos pos) { }
 
     /** @param host what the engine needs from the Editor */
-    public Vim(VimHost host) { registers = new Registers(host); }
+    public Vim(VimHost host) {
+        this.host = host;
+        registers = new Registers(host);
+    }
+
+    /** @return what the engine needs from the Editor */
+    VimHost host() { return host; }
 
     /** @return the global options */
     public Options options() { return options; }
@@ -49,6 +61,12 @@ public final class Vim {
 
     /** @return the handler table */
     public KeyHandlers handlers() { return handlers; }
+
+    /** @return macro recording and execution */
+    Macros macros() { return macros; }
+
+    /** @return the key mappings */
+    Mappings mappings() { return mappings; }
 
     /** @return the command table */
     public VimCommands commands() { return commands; }
@@ -83,6 +101,15 @@ public final class Vim {
         return mark == null || mark.editor() != editor ? null : mark.pos().copy();
     }
 
+    /** {@code :delmarks}: an uppercase mark goes. */
+    void clearGlobalMark(char name) {
+        GlobalMark old = globalMarks.remove(name);
+        if (old != null) old.editor().marks().untrack(old.pos());
+    }
+
+    /** @return the uppercase and digit marks, by name, for {@code :marks} */
+    java.util.SortedMap<Character, GlobalMark> globalMarks() { return new java.util.TreeMap<>(globalMarks); }
+
     /** An editor closed: its uppercase marks go. */
     void forget(VimEditor editor) { globalMarks.values().removeIf(mark -> mark.editor() == editor); }
 
@@ -90,4 +117,15 @@ public final class Vim {
     Search search() { return search; }
 
     void lastChange(Change change) { lastChange = change; }
+
+    /** @return the {@code :} history, oldest first */
+    java.util.List<String> commandHistory() { return commandHistory; }
+
+    /** A typed command line joins the history (at its end, once), as Vim's add_to_history. */
+    void rememberCommand(String line) {
+        if (line.isEmpty()) return;
+        commandHistory.remove(line);
+        commandHistory.add(line);
+        if (commandHistory.size() > 50) commandHistory.removeFirst();
+    }
 }

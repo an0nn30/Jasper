@@ -78,6 +78,7 @@ public final class RecordCorpus {
             if (!Files.exists(out)) throw new IllegalStateException(c + ": Vim wrote no result; check the keys");
             @SuppressWarnings("unchecked")
             Map<String, Object> result = (Map<String, Object>) Json.parse(Files.readString(out, StandardCharsets.UTF_8).trim());
+            if (!result.containsKey("text")) throw new IllegalStateException(c + ": the keys left Vim waiting for more (a prompt?)");
             @SuppressWarnings("unchecked")
             List<String> text = (List<String>) result.get("text");
             Map<Character, CorpusCase.Register> registers = new LinkedHashMap<>();
@@ -94,8 +95,26 @@ public final class RecordCorpus {
             }
             @SuppressWarnings("unchecked")
             List<Long> visual = (List<Long>) result.get("visual");
+            @SuppressWarnings("unchecked")
+            List<Long> view = (List<Long>) result.get("view");
+            @SuppressWarnings("unchecked")
+            List<String> closed = (List<String>) result.get("folds");
+            List<String> output = null;
+            if (c.output()) {
+                output = new ArrayList<>();
+                @SuppressWarnings("unchecked")
+                List<String> said = (List<String>) result.get("out");
+                // The recorder's Vim runs the keys while sourcing its script, so each error message comes with a
+                // header naming the script and line; a typed command line has none.
+                for (String line : said) {
+                    if (line.isEmpty() || line.startsWith("Error detected while processing ") || line.matches("line +\\d+:")) continue;
+                    output.add(line);
+                }
+            }
             return new CorpusCase.Expected(version, text, ((Long) result.get("line")).intValue(), ((Long) result.get("col")).intValue(),
-                mode((String) result.get("mode")), visual.isEmpty() ? null : visual.get(0) + "," + visual.get(1), registers);
+                mode((String) result.get("mode")), visual.isEmpty() ? null : visual.get(0) + "," + visual.get(1), registers,
+                c.window() == null ? null : view.get(0) + "," + view.get(1),
+                c.folds() == null ? null : closed.isEmpty() ? "none" : String.join(" ", closed), output);
         } finally {
             try (Stream<Path> files = Files.list(folder)) { for (Path p : files.toList()) Files.deleteIfExists(p); }
             Files.deleteIfExists(folder);
@@ -121,8 +140,20 @@ public final class RecordCorpus {
         lines.add("set encoding=utf-8");
         lines.add("scriptencoding utf-8");
         lines.add("set nocompatible");
+        // Vim on macOS maps <D-v> and Visual <BS> even with -u NONE; Jasper starts with no mappings.
+        lines.add("mapclear | mapclear!");
         lines.add("function! JasperRecord()");
         lines.add("  let g:jasper = {'text': getline(1, '$'), 'line': line('.'), 'col': charcol('.'), 'mode': mode(1), 'regs': {}, 'visual': []}");
+        lines.add("  let g:jasper.view = [winsaveview().topline, winsaveview().leftcol]");
+        lines.add("  let g:jasper.folds = []");
+        lines.add("  let l = 1");
+        lines.add("  while l <= line('$')");
+        lines.add("    if foldclosed(l) == l");
+        lines.add("      call add(g:jasper.folds, l . '-' . foldclosedend(l))");
+        lines.add("      let l = foldclosedend(l)");
+        lines.add("    endif");
+        lines.add("    let l += 1");
+        lines.add("  endwhile");
         lines.add("  if mode() =~# '^[vV\\x16]'");
         lines.add("    let g:jasper.visual = [line('v'), charcol('v')]");
         lines.add("  endif");
@@ -133,6 +164,10 @@ public final class RecordCorpus {
         lines.add("for r in split('\"0123456789abcdefghijklmnopqrstuvwxyz-', '\\zs')");
         lines.add("  call setreg(r, [], 'c')");
         lines.add("endfor");
+        if (c.window() != null) {
+            int[] size = c.windowSize();
+            lines.add("set columns=" + size[0] + " lines=" + (size[1] + 1));
+        }
         if (!c.set().isBlank()) lines.add("set " + c.set());
         for (var entry : c.given().entrySet()) {
             CorpusCase.Register register = entry.getValue();
@@ -142,12 +177,40 @@ public final class RecordCorpus {
         // Editing a file, rather than setline(), leaves no undo history for u to reach.
         lines.add("call writefile(" + vimList(c.text()) + ", " + Json.quote(file.toString()) + ")");
         lines.add("silent execute 'edit!' fnameescape(" + Json.quote(file.toString()) + ")");
+        if (c.folds() != null) lines.addAll(foldCommands(c));
         lines.add("call setcursorcharpos(" + c.line() + ", " + c.col() + ")");
         lines.add("let g:jasper = {}");
+        // What the keys say is captured; 'nomore' keeps a long listing from waiting for a key.
+        lines.add("set nomore");
+        lines.add("let g:jasper_out = ''");
+        lines.add("redir => g:jasper_out");
         lines.add("call feedkeys(\"" + vimKeys(c.keys()) + "\\<Cmd>call JasperRecord()\\<CR>\", 'xt')");
+        lines.add("redir END");
+        lines.add("let g:jasper.out = split(g:jasper_out, \"\\n\", 1)");
         lines.add("call writefile([json_encode(g:jasper)], " + Json.quote(out.toString()) + ")");
         lines.add("qa!");
         return String.join("\n", lines) + "\n";
+    }
+
+    /**
+     * The case's code folds as Vim manual folds: RSyntaxTextArea's Java fold parser finds them in the text, inner
+     * folds are made first (a fold made over a closed one would take it whole), all are opened, and then the ones the
+     * case lists are closed, innermost (last-starting) first.
+     */
+    static List<String> foldCommands(CorpusCase c) {
+        List<String> out = new ArrayList<>();
+        var area = new VimTextArea();
+        area.setText(String.join("\n", c.text()) + "\n");
+        CorpusRunner.javaFolds(area, List.of());
+        List<org.fife.ui.rsyntaxtextarea.folding.Fold> folds = new ArrayList<>(CorpusRunner.folds(area.getFoldManager()));
+        java.util.Collections.reverse(folds);
+        for (var fold : folds) out.add((fold.getStartLine() + 1) + "," + (fold.getEndLine() + 1) + "fold");
+        out.add("normal! zR");
+        // Innermost first: closing a line's fold when an outer one is already closed would close nothing.
+        List<Integer> closed = new ArrayList<>(c.closedAtStart());
+        closed.sort(java.util.Comparator.reverseOrder());
+        for (int line : closed) out.add(line + "foldclose");
+        return out;
     }
 
     private static String vimList(List<String> items) {

@@ -1,0 +1,9 @@
+package dev.jasper.sdk.settings;
+
+/** When a saved change to a setting takes effect. */
+public enum Applies {
+    /** At once: the plugin reads the new value when it changes. */
+    LIVE,
+    /** When the plugin next starts. */
+    RESTART
+}

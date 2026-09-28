@@ -1,6 +1,6 @@
 # Editor Vim mode
 
-**Status:** Approved by the user on 2026-09-27. Plan V1a (`docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`) amends sections 3.8, 4.1 and 13, as marked **Amended (V1a)**. Plan V1b (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`) amends sections 3.5, 3.6, 3.8, 5.2, 5.3, 11.1 and 13, as marked **Amended (V1b)**. Amends the [Editor plugin](2026-09-27-jasper-editor-plugin-design.md) spec (settings, key handling, package layout) as hosted by [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md). Branch `claude/vim-mode`.
+**Status:** Approved by the user on 2026-09-27. Plan V1a (`docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`) amends sections 3.8, 4.1 and 13, as marked **Amended (V1a)**. Plan V1b (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`) amends sections 3.5, 3.6, 3.8, 5.2, 5.3, 11.1 and 13, as marked **Amended (V1b)**. Plan V1c (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1c.md`) amends sections 3.1, 4.1 and 11.1, as marked **Amended (V1c)**. Plan V2a (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2a.md`) amends sections 3.8, 5.2, 6.1, 6.2, 6.3, 11.1, 12 and 13, as marked **Amended (V2a)**. Plan V2b (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2b.md`) amends sections 3.6, 5.4, 6.1, 6.2 and 12, as marked **Amended (V2b)**. Plan V3a (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v3a.md`) amends sections 2.3, 4.3, 6.3, 7.2, 12 and 13, as marked **Amended (V3a)**. Amends the [Editor plugin](2026-09-27-jasper-editor-plugin-design.md) spec (settings, key handling, package layout) as hosted by [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md). Branch `claude/vim-mode`.
 
 ## Purpose and scope
 
@@ -79,6 +79,8 @@ For each normalized key, in order:
 - A key sequence that is a proper prefix of a mapping waits up to `timeoutlen` ms (default 1000, `timeout` on) on a Swing timer, then resolves as unmapped keys. `<nowait>` mappings resolve at once.
 - A command that fails in Vim (motion past the buffer end, `f` with no match, a search with no match, an unknown register) **fails** here: it rings the visual bell (a short flash of the Vim bar; Jasper never beeps), discards the pending command, and aborts the rest of the macro, mapping or `:normal` being executed, as Vim does.
 
+**Amended (V3a):** keys wait in a typeahead, one per tab, ported from Vim's getchar.c: a failing command drops the keys that were not typed (a mapping's, a macro's), typed keys stay. The keys of one mapping or macro change the text as one undo step, as Vim closes an undo step only when it takes a typed key. Ctrl+C typed while a mapping or macro runs stops it, as in Vim; Jasper looks for it among the window's pending key events every 1000 keys. At the end of a `:normal` argument keys waiting for a mapping resolve at once.
+
 ## 3. The editing model
 
 ### 3.1 Cursor
@@ -86,7 +88,7 @@ For each normalized key, in order:
 - The cursor is a buffer offset in the text area's `\n`-separated document. Positions are reported to the user 1-based (line, column in characters).
 - A "character" is a grapheme: `BreakIterator.getCharacterInstance` decides boundaries, so surrogate pairs and a base letter with combining marks move and delete as one.
 - In Normal and Visual modes the cursor never sits after the last character of a non-empty line. `curswant`: vertical motions keep the desired **display** column (tabs expanded with `tabstop`); `$` sets it to end-of-line.
-- `j`/`k` move by buffer lines; `gj`/`gk`, `g0`, `g^`, `g$`, `gm` use screen lines when wrap is on.
+- `j`/`k` move by buffer lines; `gj`/`gk`, `g0`, `g^`, `g$`, `gm` use screen lines when wrap is on. **Amended (V1c):** the window is Vim's model of the text area (its height and width in lines and characters of the Editor font), kept in step with the scroll pane; while Vim is on the text area wraps at any character, as Vim does, and the cursor may be inside a closed fold.
 - Mouse: a click in Normal mode places the cursor and clamps it; a drag, a Find-bar match, or the Editor's Select All enters charwise Visual mode; clearing the selection returns to Normal.
 
 ### 3.2 Modes
@@ -122,7 +124,7 @@ Each register holds text and a type: charwise, linewise or blockwise (with width
 
 ### 3.6 Marks, jumplist and change list
 
-- `a`–`z` per tab; `A`–`Z` global, remembering the document key, so `'A` selects (or opens) that document's tab. **Amended (V1b):** until plan V2's buffer commands, an uppercase mark works within its own tab.
+- `a`–`z` per tab; `A`–`Z` global, remembering the document key, so `'A` selects (or opens) that document's tab. **Amended (V1b):** until plan V2's buffer commands, an uppercase mark works within its own tab. **Amended (V2b):** `'A` and `` `A `` in another tab select the mark's tab and go to it; after an operator or in Visual mode they fail.
 - Special marks: `` ` `` / `'` (previous context), `[` `]` (last change or yank), `<` `>` (last visual), `.` (last change), `^` (last insert exit), `"` (position when the tab was last left).
 - Marks move with edits: an insertion or deletion before a mark shifts it; deleting the mark's line removes a lowercase mark (as Vim does for `:d`, and keeps it for character deletes).
 - Jumplist: up to 100 entries per tab, filled by the motions Vim calls jumps (`G`, `gg`, `/`, `?`, `n`, `N`, `%`, `(`, `)`, `{`, `}`, `[[`, `]]`, `H`, `M`, `L`, `'x`, `` `x ``, `*`, `#`, `:{N}`), walked by `<C-o>`/`<C-i>` (with `<Tab>` = `<C-i>`). Change list: `g;`/`g,`.
@@ -144,7 +146,7 @@ Each register holds text and a type: charwise, linewise or blockwise (with width
 
 Options have global and, where Vim has them, buffer-local values (`tabstop`, `shiftwidth`, `softtabstop`, `expandtab`, `autoindent`, `textwidth`, `iskeyword`, `nrformats`, `matchpairs`) and window-local ones (`number`, `relativenumber`, `wrap`, `scrolloff`, `sidescrolloff`), which live on the tab. The full list is in section 6.3.
 
-Defaults where the Editor has its own setting: `tabstop` and `shiftwidth` = the Editor's `tab_size`; `expandtab` = the tab's Spaces state; `autoindent` on, like the Editor's own auto-indent (**Amended (V1a)**); `wrap` = the tab's Wrap state; `number` on. Setting one of these through `:set` also changes the Editor's matching per-tab state, so the status line stays true. Other options default to Vim's (`-u NONE`) values, except `incsearch`, `hlsearch`, `showcmd` and `showmode`, which are on, as in IdeaVim. **Amended (V1b):** `hlsearch` starts off until plan V2 adds `:noh` and `:set` to turn the highlight off.
+Defaults where the Editor has its own setting: `tabstop` and `shiftwidth` = the Editor's `tab_size`; `expandtab` = the tab's Spaces state; `autoindent` on, like the Editor's own auto-indent (**Amended (V1a)**); `wrap` = the tab's Wrap state; `number` on. Setting one of these through `:set` also changes the Editor's matching per-tab state, so the status line stays true. Other options default to Vim's (`-u NONE`) values, except `incsearch`, `hlsearch`, `showcmd` and `showmode`, which are on, as in IdeaVim. **Amended (V1b):** `hlsearch` starts off until plan V2 adds `:noh` and `:set` to turn the highlight off. **Amended (V2a):** `hlsearch` is on, as this paragraph says; `:noh` hides the highlight until the next search.
 
 ### 3.9 Indentation
 
@@ -174,8 +176,8 @@ Defaults where the Editor has its own setting: `tabstop` and `shiftwidth` = the 
 - Entering Insert or Visual: `i a I A o O gi gI v V <C-v> gv`.
 - Undo and repeat: `u <C-r> .`, `&` (in V2).
 - Numbers: `<C-a> <C-x>` with `nrformats` (default `bin,octal,hex`, Vim's value with `-u NONE`; **Amended (V1a)**), on the number under or after the cursor.
-- Scrolling: `<C-e> <C-y> <C-d> <C-u> <C-f> <C-b> zt zz zb z<CR> z. z-`, `scrolloff` respected.
-- Folds: `zo zc za zO zC zA zR zM zv zj zk [z ]z` on the tab's code folds.
+- Scrolling: `<C-e> <C-y> <C-d> <C-u> <C-f> <C-b> zt zz zb z<CR> z. z-`, `scrolloff` respected. **Amended (V1c):** also `z+ z^ <PageUp> <PageDown> <S-Up> <S-Down>`, the scroll keys in Visual mode, `g<Down> g<Up> g<Home> g<End>`; 'scrolljump', 'sidescroll' and 'sidescrolloff' are respected.
+- Folds: `zo zc za zO zC zA zR zM zv zj zk [z ]z` on the tab's code folds. **Amended (V1c):** a code fold covers its first to last line; a closed fold counts as one line for vertical motions and scrolling, an operator takes it whole, word motions, `{`, `}` and searches start past it, and the motions Vim's default 'foldopen' names open it.
 - Other: `<C-g>` (file name, line count, position in the Vim bar), `ga` (character code), `ZZ` (`:x`), `ZQ` (`:q!`), `m{mark}`. The command-line window (`q:`, `q/`) is not supported.
 
 **Visual mode:** every operator; `o`, `O` (block corners), `$` in block mode, `r J gJ u U ~ > < p P y d c s x X D C S R Y`; block `I` and `A` (replayed on each line on `<Esc>`), block `c`; `gv`; `g<C-a>`/`g<C-x>` (progressive); text objects and motions extend the selection; `:` starts with `'<,'>`; `*`/`#` are Normal-mode only, as in Vim.
@@ -190,6 +192,8 @@ Section 6.
 
 - `q{reg}` … `q` records typed keys (before mapping) into the register as text; `q{A-Z}` appends. `@{reg}`, `@@`, `{n}@{reg}`, `@:`. `"ap`, edit, `"ayy` redefines a macro. Recursive macros run until a command fails. The Vim bar shows `recording @q`.
 - Mappings and the vimrc: section 7.
+
+**Amended (V3a):** plan V3a delivers this section. `@` also works in Visual mode, `@.` runs the last inserted text and `@_` nothing, as in Vim; `q:`, `q/` and `q?` fail (there is no command-line window); a register's text keeps named keys in Vim's codes (`<80>kb` for `<BS>`); `recording @q` follows the mode in the Vim bar, with or without 'showmode'.
 
 ### 4.4 Extensions (plan V4)
 
@@ -207,7 +211,7 @@ A one-line strip at the bottom of each `EditorTab`, shown only while Vim mode is
 - left: the mode (`-- INSERT --`, `-- REPLACE --`, `-- VISUAL --`, `-- VISUAL LINE --`, `-- VISUAL BLOCK --`, `-- (insert) --`, plus `recording @q`) when `showmode` is on; messages (`3 lines yanked`, `search hit BOTTOM…`, errors as `E486: Pattern not found: foo` in the theme's error colour) replace it until the next key;
 - right: pending keys (`showcmd`, such as `2d` or `"a`) and, for a Visual selection, its size (`3`, `2x5`);
 - the command line: `:`, `/` and `?` turn the left part into an editable field with the prompt character. It has its own key handling (section 6.1) and returns focus to the text area when it closes. **Amended (V1b):** the bar draws the command line and its cursor while keys keep going through the text area, which gives every key to the command line; `/` and `?` arrive in V1b, `:` in V2.
-- Multi-line output (`:reg`, `:marks`, `:ls`, `:jumps`, `:changes`, `:set all`) expands the bar upward into a scrollable read-only panel dismissed by any key, like Vim's more-prompt.
+- Multi-line output (`:reg`, `:marks`, `:ls`, `:jumps`, `:changes`, `:set all`) expands the bar upward into a scrollable read-only panel dismissed by any key, like Vim's more-prompt. **Amended (V2a):** the panel shows any command line's output of more than one line, errors in the error colour, and behaves as Vim's hit-enter prompt: `<CR>`, `<Space>` and `<Esc>` only close it, and any other key closes it and runs (`:` starts the next command line). After a failed command line only the error stays in the strip, as Vim does not wait then. The strip shows questions (`replace with X (y/n/a/q/l/^E/^Y)?`) and "Press ENTER or type command to continue". `:ls` comes with plan V2b.
 
 ### 5.3 Highlights
 
@@ -217,7 +221,7 @@ A one-line strip at the bottom of each `EditorTab`, shown only while Vim mode is
 
 ### 5.4 Line numbers
 
-`number` maps to the gutter's line numbers. `relativenumber` replaces RSyntaxTextArea's line number list with a Vim-owned gutter component showing distances, with the current line absolute when `number` is also on. It follows folds, wrap and the theme's gutter colours.
+`number` maps to the gutter's line numbers. `relativenumber` replaces RSyntaxTextArea's line number list with a Vim-owned gutter component showing distances, with the current line absolute when `number` is also on. It follows folds, wrap and the theme's gutter colours. **Amended (V2b):** 'relativenumber' is RSyntaxTextArea's own gutter with a line-number formatter, not a component of its own; the cursor line's number is right-aligned like the others; 'number' starts on, as the Editor shows line numbers.
 
 ### 5.5 Status and commands
 
@@ -228,7 +232,7 @@ A one-line strip at the bottom of each `EditorTab`, shown only while Vim mode is
 
 ### 6.1 Editing the command line
 
-`<Left> <Right> <S-Left> <S-Right> <Home> <End> <BS> <Del> <C-w> <C-u> <C-b> <C-e>`; `<C-r>{reg}`, `<C-r><C-w>` (word under the cursor), `<C-r><C-a>`; `<Up>`/`<Down>` walk history filtered by the typed prefix (separate histories for `:` and search, 50 entries each, kept for the plugin's lifetime); `<Tab>`/`<S-Tab>` complete command names, option names after `:set`, and paths after `:e`, `:w`, `:r`, `:source`; `<Esc>` and `<C-c>` cancel; `<BS>` on an empty line cancels.
+`<Left> <Right> <S-Left> <S-Right> <Home> <End> <BS> <Del> <C-w> <C-u> <C-b> <C-e>`; `<C-r>{reg}`, `<C-r><C-w>` (word under the cursor), `<C-r><C-a>`; `<Up>`/`<Down>` walk history filtered by the typed prefix (separate histories for `:` and search, 50 entries each, kept for the plugin's lifetime); `<Tab>`/`<S-Tab>` complete command names, option names after `:set`, and paths after `:e`, `:w`, `:r`, `:source` (**Amended (V2a):** completion comes with plan V2b; until then `<Tab>` types a tab. **Amended (V2b):** Jasper completes the commands and options it has (with `no` and `inv`, and an option's value after `=`), paths after the file commands and tab names after `:b`, cycling as Vim's 'wildmode' "full" without 'wildmenu'; where nothing completes, and in `/` and `?`, `<Tab>` types a tab; `:source`'s paths come with V3); `<Esc>` and `<C-c>` cancel; `<BS>` on an empty line cancels.
 
 ### 6.2 Ranges and commands
 
@@ -247,13 +251,15 @@ A one-line strip at the bottom of each `EditorTab`, shown only while Vim mode is
 | Options | `:set`, `:setlocal`, `:setglobal` (section 6.3) |
 | Vimrc | the vimrc commands of section 7, typed interactively |
 
-`:w` and friends call `VimHost`, so they use the Editor's save path, conflict checks, remote write contract and dialogs unchanged. `:q` on an unsaved tab fails with `E37: No write since last change (add ! to override)`; `:q!` discards through the Editor's close path without asking.
+`:w` and friends call `VimHost`, so they use the Editor's save path, conflict checks, remote write contract and dialogs unchanged. `:q` on an unsaved tab fails with `E37: No write since last change (add ! to override)`; `:q!` discards through the Editor's close path without asking. **Amended (V2b):** each Editor tab is a buffer and a tab page, numbered while it is open; `:e file` opens the file in a tab or selects its tab (a missing file gets an empty tab its first save creates), `:w file` saves the tab as the file, `:q` closes the tab and never quits Jasper, and no command needs `!` to leave a tab with changes. Relative names start from the current file's folder (the home folder for an untitled tab); `%`, `#` and `~` work in them. Also `:sav[eas]`, `:exi[t]`, `:quita[ll]`, `:files`, `:bN[ext]`, `:tabN[ext]`, `:tabe[dit]`, `gt` and `gT`; `:2,5w file`, `:w >>`, `:w !cmd` and `:r !cmd` fail with E319. The corpus cannot record these commands; `ExFilesTest` runs them against a fake set of tabs and `EditorWindowTest` through the Editor.
 
 The `c` flag asks in the Vim bar with the current match highlighted: `replace with X (y/n/a/q/l/^E/^Y)?`.
 
+**Amended (V2a):** files and tabs, `ZZ` and `ZQ` move to plan V2b. Every other Ex command name Vim knows and Jasper does not run fails with `E319: Sorry, the command is not available in this version`, as does `\=` in a substitute string (there is no Vim script); a name Vim does not know fails with `E492`. `:undo N` reaches the changes on Jasper's linear history (`E830` otherwise). The 'report' messages ("3 fewer lines", "4 lines yanked", "3 lines >ed 1 time", "3 substitutions on 2 lines") are given, also after Normal-mode commands. The `c` flag's question highlights the match in the line as it stood; the line changes when it is done, as in Vim. A command that asks pauses and continues from the answer, with the rest of its line and `:g`'s remaining lines; `:normal` answers from its keys, or with `<Esc>` when they run out.
+
 ### 6.3 `:set`
 
-Forms: `opt`, `noopt`, `opt!`, `invopt`, `opt?`, `opt&`, `opt=val`, `opt:val`, `opt+=val`, `opt-=val`, `opt^=val`, several per line, `:set` (changed options) and `:set all`. Unknown options fail with `E518: Unknown option`.
+Forms: `opt`, `noopt`, `opt!`, `invopt`, `opt?`, `opt&`, `opt=val`, `opt:val`, `opt+=val`, `opt-=val`, `opt^=val`, several per line, `:set` (changed options) and `:set all`. Unknown options fail with `E518: Unknown option`. **Amended (V2a):** V2a adds `gdefault`; `number` and `relativenumber` come with the gutter in V2b; `timeout`, `timeoutlen`, `undolevels`, `visualbell` and the accepted-and-ignored vimrc options come with the vimrc in V3. **Amended (V3a):** `timeout`, `timeoutlen` and `maxmapdepth` (`mmd`, Vim's, default 1000) come with the mappings in V3a; the rest with the vimrc in V3b. `:set` and `:set all` list only the options Jasper has, in Vim's layout; `:setlocal` and `:setglobal` read and write the local and global values.
 
 Options: `autoindent (ai)`, `backspace (bs)`, `clipboard (cb)`, `expandtab (et)`, `gdefault (gd)`, `hlsearch (hls)`, `ignorecase (ic)`, `incsearch (is)`, `iskeyword (isk)`, `joinspaces (js)`, `matchpairs (mps)`, `nrformats (nf)`, `number (nu)`, `relativenumber (rnu)`, `scrolljump (sj)`, `scrolloff (so)`, `shiftround (sr)`, `shiftwidth (sw)`, `showcmd (sc)`, `showmode (smd)`, `sidescroll (ss)`, `sidescrolloff (siso)`, `smartcase (scs)`, `softtabstop (sts)`, `startofline (sol)`, `tabstop (ts)`, `textwidth (tw)`, `tildeop (top)`, `timeout (to)`, `timeoutlen (tm)`, `undolevels (ul)` (accepted, capped by the Editor's undo limit), `visualbell (vb)`, `whichwrap (ww)`, `wrap`, `wrapscan (ws)`; extension switches (section 8); and accepted-and-ignored options common in vimrcs (`nocompatible`, `encoding`, `fileformat`, `ruler`, `laststatus`, `mouse`, `belloff`, `ttimeout`, `ttimeoutlen`, `syntax`), which are listed so they do not report errors.
 
@@ -273,6 +279,8 @@ Options: `autoindent (ai)`, `backspace (bs)`, `clipboard (cb)`, `expandtab (et)`
 - Arguments `<silent>` (no command-line echo for the right-hand side), `<nowait>`, `<unique>`; `<buffer>`, `<expr>` and `<script>` are refused with a message.
 - Semantics follow `:help map`: recursive mappings remap their right-hand side; `noremap` does not; a right-hand side starting with its own left-hand side is not remapped for that prefix; recursion is limited by `maxmapdepth` 1000 (then `E223: recursive mapping`); `<Plug>` names are unique left-hand sides; `<Nop>` does nothing; counts and registers typed before a mapped key apply to its first command.
 - `<Action>(id)` in a right-hand side runs an Editor command by id through `VimHost` (as IdeaVim's `<Action>(…)`); `:action {id}` does the same from the command line; `:actionlist [pattern]` lists ids in the output panel.
+
+**Amended (V3a):** plan V3a delivers the mapping commands typed on the command line; `<Action>(id)`, `:action` and `:actionlist` move to V3b with the vimrc. `<Leader>` and `<LocalLeader>` are a backslash until V3b reads `let mapleader`. `<silent>` and `<special>` are accepted; `<silent>` changes nothing, since Jasper never echoes the command line a mapping types. `:smap`, `:lmap`, `:tmap` and their forms fail with E319 (no Select, Lang-Arg or terminal mode); `:vmap` and `:map` still include Select mode for their listings. Listings follow Vim's layout and order (`n  x           * dd`). The recorder clears Vim's own mappings (`<D-v>` on macOS) before each case.
 
 ## 8. Extensions (plan V4)
 
@@ -339,7 +347,7 @@ Everything else about Vim is configured in the vimrc, as with IdeaVim.
   expect-register 1: (empty)
   ```
 
-  Keys use the notation of section 2.1. Text lines are indented two spaces; trailing spaces are shown with a `$` end marker option (`text$:`) when significant. Optional fields: `set:` (options), `marks:` (initial marks), `clipboard:`, `vimrc:` (lines for mapping and extension cases), `ext:` (extensions to enable), `expect-marks:`, `expect-search:`, `expect-message:`. **Amended (V1b):** `expect-visual:` gives a Visual area's other end; a blockwise register's type is `b` and its width (`b3`, `getregtype()` in letters); the mode `command-line` is Vim's `c`.
+  Keys use the notation of section 2.1. Text lines are indented two spaces; trailing spaces are shown with a `$` end marker option (`text$:`) when significant. Optional fields: `set:` (options), `marks:` (initial marks), `clipboard:`, `vimrc:` (lines for mapping and extension cases), `ext:` (extensions to enable), `expect-marks:`, `expect-search:`, `expect-message:`. **Amended (V1b):** `expect-visual:` gives a Visual area's other end; a blockwise register's type is `b` and its width (`b3`, `getregtype()` in letters); the mode `command-line` is Vim's `c`. **Amended (V1c):** `window:` sets the window's size (`20x5`, columns by rows); `folds: java 2 7` makes the text's code folds with RSyntaxTextArea's Java fold parser and closes those starting on the listed lines (the recorder makes the same folds in Vim as manual folds); `expect-view:` (`topline,leftcol`) and `expect-folds:` (the closed folds) are then compared. **Amended (V2a):** `output: yes` makes a case compare what its keys said: the recorder captures Vim's messages with `:redir`, dropping empty lines and the script-error headers of a sourced script, into `expect-output:`. The recorder types keys with `feedkeys()`, where Vim never waits at the hit-enter prompt, so unit tests cover the output panel.
 - **Recording:** `./gradlew :jasper-plugin-editor:recordVimCorpus` (not part of `check`; needs `vim` on `PATH`, or `-PvimBinary=…`). For each case it runs `vim -u NONE -i NONE -N -Es` with a generated script that sets options and the buffer, places the cursor, runs the vimrc lines, feeds the keys with `feedkeys(keys, 'xt')`, and writes text, cursor, mode, registers, marks and messages as JSON; the task rewrites everything below each case's `---` line. For `ext:` cases it first clones each extension's upstream repository at the commit pinned in `plugins/editor/vim-oracle.properties` into `build/vim-oracle/` and adds it to `runtimepath`. `-Pcase=<pattern>` records a subset.
 - **Replay:** a JUnit dynamic test per case builds a headless `VimTextArea` with a recording `VimHost`, applies the fields, feeds the keys through the same entry point real key events reach after normalization, and compares every recorded field. A case with no `---` block fails with "not recorded". `check` never runs Vim.
 - **Divergences:** a case with `divergent: <reason>` keeps a hand-written expected block and is exempt from recording. Every divergent case is listed with its reason in `docs/vim-divergences.md`; a test fails if the document and the corpus disagree.
@@ -369,6 +377,8 @@ GUI checks are the user's: a new section in `docs/editor-verification.md` (typin
 | `dev.jasper.editor.vim.ui` | `VimBar`, `BlockHighlighter`, `RelativeGutter`, caret styles | `vim`, `vim.ex`, RSyntaxTextArea, Swing |
 | `dev.jasper.editor.ui` (existing) | `EditorTab` uses `VimTextArea` and `VimBar`; `EditorWindow` builds `VimHost` | adds `vim`, `vim.ui` |
 
+**Amended (V2a):** the Ex classes (`Ex`, `ExTable`, `ExCommand`, `ExInfo`, `ExLines`, `ExSubstitute`, `ExGlobal`) live in `dev.jasper.editor.vim`, not `vim.ex`: they use the engine's package-private API, and a separate package would need a public API or a dependency cycle. `vim.ui` depends on `vim` only. **Amended (V2b):** `VimHost.Documents` (a record of callbacks) is how the engine reaches the Editor's tabs; `ExFiles`, `Completion` and `LineNumbers` join `dev.jasper.editor.vim`, and there is no `RelativeGutter`. **Amended (V3a):** `Typeahead`, `Mappings`, `ExMaps`, `Macros` and `KeyCodes` join `dev.jasper.editor.vim`; there is no `KeyNotation` (`KeyInput` reads the notation).
+
 No SDK change is needed.
 
 ## 13. Delivery
@@ -378,8 +388,8 @@ One plan per runnable deliverable, each written with `superpowers:writing-plans`
 - **Plan V1a: engine foundation.** `VimTextArea`, key normalization, the handler rule, the `Machine`, Normal/Insert/Replace modes, counts, motions other than search and marks, text objects, operators, registers (including the clipboard), undo grouping, insert sessions and `.`, caret styles, the Vim bar without the command line, the setting, toggle and status item, the corpus format, recorder, replay test and coverage guard. Runnable: Vim-mode editing without Visual mode or search. **Amended (V1a):** the screen-line motions `H M L gj gk g0 g^ g$ gm`, `gi`, `<C-g>`, `ga` and blockwise forced motions (`d<C-v>j`) move to V1b; `ZZ` and `ZQ` to V2; `timeoutlen` and reading `sethandler` from the vimrc to V3.
 - **Plan V1b: Visual mode, search and navigation.** Visual char/line/block with the block highlighter, `VimRegex`, `/ ? n N * #` with offsets, `hlsearch`/`incsearch`, marks, jumplist and change list, scrolling, folds, `<C-a>`/`<C-x>`, `gq`/`gw`; and, moved from V1a, the screen-line motions, `gi`, `<C-g>`, `ga` and blockwise forced motions. **Amended (V1b):** split in two by the user on 2026-09-28; scrolling, the screen-line motions (`H M L gj gk g0 g^ g$ gm`) and folds move to plan V1c.
 - **Plan V1c: the view.** Scrolling (`<C-d> <C-u> <C-f> <C-b> <C-e> <C-y> zz zt zb`), `H M L` and the other screen-line motions, and folds.
-- **Plan V2: ex command line.** Section 6, the output panel and the relative-number gutter; `ZZ` and `ZQ`.
-- **Plan V3: macros and mappings.** Section 4.3 and section 7, with `timeoutlen` (section 2.3) and `sethandler` lines.
+- **Plan V2: ex command line.** Section 6, the output panel and the relative-number gutter; `ZZ` and `ZQ`. **Amended (V2a):** split in two by the user on 2026-09-28. Plan V2a: the command line, ranges, the line, substitute, global, mark, register and option commands, `:u`, `:red`, `:noh`, the output panel and 'hlsearch' on. Plan V2b: files, buffers and tabs through the Editor (`:w :q :e :b :ls :tab…`, `ZZ`, `ZQ`), Tab completion, and the relative-number gutter.
+- **Plan V3: macros and mappings.** Section 4.3 and section 7, with `timeoutlen` (section 2.3) and `sethandler` lines. **Amended (V3a):** split in two by the user on 2026-09-28. Plan V3a: macros, the typeahead and the mapping commands typed on the command line, with 'timeout', 'timeoutlen' and 'maxmapdepth'. Plan V3b: the vimrc (section 7.1), `sethandler` lines, `let mapleader`, `<Action>(id)`, `:action`, `:actionlist` and the vimrc options.
 - **Plan V4: extensions.** Section 8, with the pinned-upstream oracle.
 
 Documentation lands with each plan: a Vim section in the Editor README (enabling, the vimrc location, `sethandler`, `<Action>`), `docs/vim-divergences.md`, the supported-command reference generated from `VimCommands` into `docs/editor-vim-reference.md` by a test that fails when it is stale, and `docs/STATUS.md` entries.

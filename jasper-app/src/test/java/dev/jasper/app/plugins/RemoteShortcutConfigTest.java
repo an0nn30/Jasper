@@ -22,7 +22,8 @@ import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Exercises the staged Remote jar through real TOML reload and the app's keybinding resolver. */
+/** Exercises the staged Remote jar through real TOML reload and the app's keybinding resolver: Remote's shortcuts are
+ * its actions' default bindings, and only the Keymap (app overrides) changes them. */
 class RemoteShortcutConfigTest {
     private static final String HOSTS = "dev.jasper.remote.hosts", CONNECT = "dev.jasper.remote.connect",
         SFTP_TOGGLE = "dev.jasper.remote.sftp.toggle";
@@ -59,15 +60,12 @@ class RemoteShortcutConfigTest {
         }
     }
 
-    @Test void defaultsReloadDisableAndAppOverridesPreserveMenuPlacements() throws Exception {
+    @Test void defaultsHoldAcrossReloadsAndAppOverridesRebindWithoutMovingMenuPlacements() throws Exception {
         start();
         onEdt(() -> {
             assertThat(contributions.action(HOSTS).orElseThrow().defaultBinding()).contains("cmd+shift+s");
             assertThat(contributions.action(CONNECT).orElseThrow().defaultBinding()).contains("cmd+shift+h");
-        });
-        reload("[shortcuts]\ntoggle_panel = 'ctrl+alt+s'\nopen_palette = 'ctrl+alt+h'\n");
-        onEdt(() -> {
-            var bindings = resolve(Map.of()).bindings();
+            var bindings = resolve(Map.of(HOSTS, "ctrl+alt+s", CONNECT, "ctrl+alt+h")).bindings();
             assertThat(bindings.strokeFor(HOSTS)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
             assertThat(bindings.strokeFor(CONNECT)).contains(KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
             assertThat(bindings.idFor(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).isEmpty();
@@ -81,19 +79,14 @@ class RemoteShortcutConfigTest {
         });
         var hostsBefore = onEdtValue(() -> contributions.action(HOSTS).orElseThrow());
         reload("keepalive_seconds = 9\n[shortcuts]\ntoggle_panel = 'ctrl+alt+s'\nopen_palette = 'ctrl+alt+h'\n");
-        onEdt(() -> assertThat(contributions.action(HOSTS)).containsSame(hostsBefore));
-        reload("[shortcuts]\ntoggle_panel = ''\nopen_palette = '  '\n");
         onEdt(() -> {
-            assertThat(resolve(Map.of()).bindings().strokeFor(HOSTS)).isEmpty();
-            assertThat(resolve(Map.of()).bindings().strokeFor(CONNECT)).isEmpty();
-            assertThat(resolve(Map.of(HOSTS, "ctrl+alt+s")).bindings().strokeFor(HOSTS))
-                .contains(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
+            assertThat(contributions.action(HOSTS)).as("an old [shortcuts] table replaces nothing").containsSame(hostsBefore);
+            assertThat(contributions.action(HOSTS).orElseThrow().defaultBinding()).contains("cmd+shift+s");
+            assertThat(contributions.action(CONNECT).orElseThrow().defaultBinding()).contains("cmd+shift+h");
         });
-        reload("# Reset to defaults\n");
-        onEdt(() -> assertThat(contributions.action(HOSTS).orElseThrow().defaultBinding()).contains("cmd+shift+s"));
     }
 
-    @Test void eachRemotePanelHasOneToggleThatToolsListsWithItsShortcutAcrossReloads() throws Exception {
+    @Test void eachRemotePanelHasOneToggleThatToolsLists() throws Exception {
         start();
         onEdt(() -> {
             assertThat(contributions.action("dev.jasper.remote.panel.toggle")).as("no app toggle beside Remote's").isEmpty();
@@ -102,11 +95,6 @@ class RemoteShortcutConfigTest {
                 .extracting(action -> action.id() + "|" + action.title())
                 .containsExactlyInAnyOrder(HOSTS + "|Toggle SSH hosts", SFTP_TOGGLE + "|Toggle SFTP");
             assertThat(tools()).contains(new MenuEntry.Item(HOSTS), new MenuEntry.Item(SFTP_TOGGLE));
-        });
-        reload("[shortcuts]\ntoggle_panel = 'ctrl+alt+s'\n");
-        onEdt(() -> {
-            assertThat(contributions.action(HOSTS).orElseThrow().defaultBinding()).contains("ctrl+alt+s");
-            assertThat(tools()).as("the replaced action keeps its Tools entry").contains(new MenuEntry.Item(HOSTS));
         });
     }
 
@@ -118,22 +106,11 @@ class RemoteShortcutConfigTest {
             .flatMap(entry -> ((MenuEntry.Submenu) entry).entries().stream()).toList();
     }
 
-    @Test void badOrConflictingShortcutsDoNotDisplaceBuiltInKeys() throws Exception {
+    @Test void sftpBindingIsBlankByDefaultAndAnOverrideBindsIt() throws Exception {
         start();
-        reload("[shortcuts]\ntoggle_panel = 'no-such-key'\nopen_palette = 'cmd+t'\n");
         onEdt(() -> {
-            var resolved = resolve(Map.of());
-            assertThat(resolved.bindings().strokeFor(HOSTS)).isEmpty();
-            assertThat(resolved.bindings().strokeFor(CONNECT)).isEmpty();
-            assertThat(resolved.bindings().idFor(KeyStroke.getKeyStroke(KeyEvent.VK_T, InputEvent.META_DOWN_MASK))).contains("new_tab");
-            assertThat(resolved.problems()).extracting(KeyBindings.Problem::actionId).contains(HOSTS, CONNECT);
+            assertThat(resolve(Map.of()).bindings().strokeFor(SFTP_TOGGLE)).isEmpty();
+            assertThat(resolve(Map.of(SFTP_TOGGLE, "cmd+alt+f")).bindings().strokeFor(SFTP_TOGGLE)).isPresent();
         });
     }
-    @Test void sftpBindingIsBlankByDefaultAndReloadsThroughTheRemoteFile() throws Exception {
-        start();
-        onEdt(()-> { var initial=resolve(Map.of());assertThat(initial.bindings().strokeFor("dev.jasper.remote.sftp.toggle")).isEmpty(); });
-        reload("[shortcuts]\ntoggle_sftp = 'cmd+alt+f'\n");
-        onEdt(()-> { var changed=resolve(Map.of());assertThat(changed.bindings().strokeFor("dev.jasper.remote.sftp.toggle")).isPresent(); });
-    }
-
 }

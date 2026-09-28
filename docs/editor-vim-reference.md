@@ -75,6 +75,23 @@ In Normal and Visual mode and after an operator. A count repeats or scales them.
 | `g#` | search backward for the keyword under the cursor, also inside words |
 | `'{char}` | to the first non-blank of mark {char}'s line |
 | `` `{char} `` | to mark {char} |
+| `H` | to line {count} from the top of the window |
+| `M` | to the middle line of the window |
+| `L` | to line {count} from the bottom of the window |
+| `gj` | down {count} screen lines |
+| `gk` | up {count} screen lines |
+| `g<Down>` | down {count} screen lines |
+| `g<Up>` | up {count} screen lines |
+| `g0` | to the first character of the screen line |
+| `g<Home>` | to the first character of the screen line |
+| `g^` | to the first non-blank of the screen line |
+| `gm` | to the middle of the screen line |
+| `g$` | to the last character of the screen line |
+| `g<End>` | to the last non-blank of the screen line |
+| `zj` | to the start of the next fold |
+| `zk` | to the end of the previous fold |
+| `[z` | to the start of the open fold |
+| `]z` | to the end of the open fold |
 
 ## Operators
 
@@ -189,6 +206,42 @@ After an operator, and in Visual mode, where they extend the area.
 | `gi` | Insert mode where it was last left (the '^ mark) |
 | `<C-a>` | add {count} to the number at or after the cursor |
 | `<C-x>` | subtract {count} from the number at or after the cursor |
+| `<C-e>` | scroll the text up {count} lines |
+| `<C-y>` | scroll the text down {count} lines |
+| `<C-d>` | scroll down half a window ({count} sets 'scroll'), the cursor too |
+| `<C-u>` | scroll up half a window ({count} sets 'scroll'), the cursor too |
+| `<C-f>` | scroll down {count} pages |
+| `<PageDown>` | scroll down {count} pages |
+| `<S-Down>` | scroll down {count} pages |
+| `<C-b>` | scroll up {count} pages |
+| `<PageUp>` | scroll up {count} pages |
+| `<S-Up>` | scroll up {count} pages |
+| `zt` | line {count} (default the cursor line) to the top of the window |
+| `z<CR>` | as zt, the cursor on the first non-blank |
+| `zz` | line {count} to the middle of the window |
+| `z.` | as zz, the cursor on the first non-blank |
+| `zb` | line {count} to the bottom of the window |
+| `z-` | as zb, the cursor on the first non-blank |
+| `z+` | the line below the window to the top (line {count} with a count) |
+| `z^` | the line above the window to the bottom (line {count} with a count) |
+| `zo` | open {count} levels of folds at the cursor |
+| `zO` | open every fold at the cursor |
+| `zc` | close {count} levels of folds at the cursor |
+| `zC` | close every fold at the cursor |
+| `za` | open a closed fold, or close an open one |
+| `zA` | open or close every fold at the cursor |
+| `zv` | open the folds that hide the cursor line |
+| `zR` | open every fold |
+| `zM` | close every fold |
+| `:` | a command line; with a count, for that many lines (`:.,.+N`) |
+| `ZZ` | save the tab if it has changes and close it (`:x`) |
+| `ZQ` | close the tab, discarding its changes (`:q!`) |
+| `gt` | the next tab, or tab {count} |
+| `gT` | {count} tabs back |
+| `&` | repeat the last `:s` on the line, without its flags |
+| `g&` | repeat the last `:s` on every line, with its flags (`:%s//~/&`) |
+| `q{char}` | `q{reg}` records typed keys into a register; `q` again stops (`{A-Z}` appends) |
+| `@{char}` | run a register's keys, [count] times; `@@` the last one run, `@:` the last command line |
 
 ## Visual-mode commands
 
@@ -226,6 +279,19 @@ In Visual mode, besides the motions, operators and text objects above. A change 
 | `<C-x>` | subtract {count} from the first number in each line |
 | `g<C-a>` | add {count}, 2 × {count}, … to the numbers of successive lines |
 | `g<C-x>` | subtract {count}, 2 × {count}, … from the numbers of successive lines |
+| `<C-e>` | scroll the text up {count} lines |
+| `<C-y>` | scroll the text down {count} lines |
+| `<C-d>` | scroll down half a window ({count} sets 'scroll'), the cursor too |
+| `<C-u>` | scroll up half a window ({count} sets 'scroll'), the cursor too |
+| `<C-f>` | scroll down {count} pages |
+| `<PageDown>` | scroll down {count} pages |
+| `<S-Down>` | scroll down {count} pages |
+| `<C-b>` | scroll up {count} pages |
+| `<PageUp>` | scroll up {count} pages |
+| `<S-Up>` | scroll up {count} pages |
+| `:` | a command line for the Visual lines (`:'<,'>`) |
+| `q{char}` | record into a register, or stop recording, as `q` |
+| `@{char}` | run a register's keys in Visual mode, as `@` |
 
 ## Insert-mode keys
 
@@ -259,3 +325,106 @@ Printable keys type text; these keys do more.
 | `<Down>` | move the cursor, starting a new insert for undo and . |
 | `<Home>` | move the cursor, starting a new insert for undo and . |
 | `<End>` | move the cursor, starting a new insert for undo and . |
+
+## Ex commands
+
+Typed after `:` and ended by `<CR>`. A range goes before the name: `3`, `.`, `$`, `%`, `'x`, `/pattern/`, `?pattern?`,
+`\/`, `\?` and `\&`, each with `+N` or `-N` offsets, separated by `,` or `;`; `'<,'>` and `*` are the last Visual lines.
+`|` separates commands. When a command line says more than one line, the output stays above the Vim bar until a
+key is typed. A command Vim has and Jasper does not fails with E319.
+
+| Command | What it does |
+|---|---|
+| `:p[rint]` | print the lines ([range], default the cursor line); `P` too |
+| `:P[rint]` | print the lines, as `:print` |
+| `:l[ist]` | print the lines with tabs as `^I` and `$` at the end |
+| `:nu[mber]` | print the lines with their numbers |
+| `:#` | print the lines with their numbers, as `:number` |
+| `:=` | show the last line's number, or the range's last |
+| `:d[elete]` | delete the lines [into a register] [count] |
+| `:y[ank]` | yank the lines [into a register] [count] |
+| `:>` | shift the lines right; `>>` twice, and so on |
+| `:<` | shift the lines left; `<<` twice, and so on |
+| `:pu[t]` | put a register as lines below the line; `!` above; `:0put` above the first |
+| `:j[oin]` | join the lines (at least two); `!` without spaces |
+| `:co[py]` | copy the lines below {address} |
+| `:t` | copy the lines below {address}, as `:copy` |
+| `:m[ove]` | move the lines below {address} |
+| `:norm[al]` | run {keys} as Normal-mode keys, on each line of the range |
+| `:sor[t]` | sort the lines (all by default); `!` reverses; `i`, `n`, `x`, `o`, `b`, `f`, `u`, `r` and a `/pattern/` |
+| `:le[ft]` | align the lines left, with [indent] |
+| `:ri[ght]` | align the lines right at [width] ('textwidth', or 80) |
+| `:ce[nter]` | center the lines in [width] ('textwidth', or 80) |
+| `:s[ubstitute]` | `:s/pattern/string/flags [count]`: replace matches; flags `& c e g i I n p # l r` |
+| `:&` | repeat the last `:s` with the same pattern and string; `:&&` keeps its flags |
+| `:~` | repeat the last `:s` with the last used pattern |
+| `:g[lobal]` | `:g/pattern/cmd`: run cmd (default `:p`) on the matching lines; `!` on the others |
+| `:v[global]` | `:v/pattern/cmd`: run cmd on the lines that do not match |
+| `:k` | set a mark at the line (`:ka`, `:k a`) |
+| `:ma[rk]` | set a mark at the line |
+| `:delm[arks]` | delete marks (`a b-d`); `!` all lowercase ones |
+| `:marks` | list the marks, or those named |
+| `:ju[mps]` | list the jumplist |
+| `:changes` | list the change list |
+| `:reg[isters]` | list the registers, or those named |
+| `:di[splay]` | list the registers, as `:registers` |
+| `:u[ndo]` | undo one change; `:undo N` goes to the text after change N |
+| `:red[o]` | redo one change |
+| `:noh[lsearch]` | hide the 'hlsearch' matches until the next search |
+| `:se[t]` | show or set options: `opt`, `noopt`, `invopt`, `opt!`, `opt&`, `opt?`, `opt=val`, `+=`, `-=`, `^=`, `all` |
+| `:setl[ocal]` | `:set` for this tab's local values only |
+| `:setg[lobal]` | `:set` for the global values only |
+| `:w[rite]` | save the tab (`:w file` saves it as the file; `!` replaces a file that exists) |
+| `:wq` | save the tab, then close it |
+| `:x[it]` | save the tab if it has changes, then close it |
+| `:exi[t]` | as `:x` |
+| `:sav[eas]` | save the tab as {file} |
+| `:wa[ll]` | save every tab with changes |
+| `:xa[ll]` | save every tab with changes, then close them all |
+| `:wqa[ll]` | as `:xa` |
+| `:q[uit]` | close the tab; `!` discards its changes |
+| `:qa[ll]` | close every tab; `!` discards their changes |
+| `:quita[ll]` | as `:qa` |
+| `:e[dit]` | open {file} in a tab, or read the tab's file again (`!` discards changes) |
+| `:ene[w]` | a new untitled tab |
+| `:r[ead]` | put {file}'s lines below the line (`:0r` above the first) |
+| `:ls` | list the tabs as buffers |
+| `:buffers` | as `:ls` |
+| `:files` | as `:ls` |
+| `:b[uffer]` | select the tab with buffer number N, or whose name holds {name} |
+| `:bn[ext]` | the next tab, [N] times |
+| `:bN[ext]` | the previous tab, [N] times |
+| `:bp[revious]` | the previous tab, [N] times |
+| `:tabn[ext]` | the next tab, or tab [N] |
+| `:tabN[ext]` | [N] tabs back |
+| `:tabp[revious]` | [N] tabs back |
+| `:tabnew` | a new untitled tab, or {file} in a tab |
+| `:tabe[dit]` | as `:tabnew` |
+| `:map` | map {lhs} to {rhs} in Normal, Visual and Operator-pending mode (`!`: Insert and Command-line); list mappings |
+| `:nm[ap]` | map {lhs} to {rhs} in Normal mode; list the mappings |
+| `:vm[ap]` | map {lhs} to {rhs} in Visual mode; list the mappings |
+| `:xm[ap]` | map {lhs} to {rhs} in Visual mode, as `:vmap`; list the mappings |
+| `:om[ap]` | map {lhs} to {rhs} in Operator-pending mode; list the mappings |
+| `:im[ap]` | map {lhs} to {rhs} in Insert mode; list the mappings |
+| `:cm[ap]` | map {lhs} to {rhs} on the command line; list the mappings |
+| `:no[remap]` | as `:map`, but {rhs} is not mapped again |
+| `:nn[oremap]` | as `:nmap`, but {rhs} is not mapped again |
+| `:vn[oremap]` | as `:vmap`, but {rhs} is not mapped again |
+| `:xn[oremap]` | as `:xmap`, but {rhs} is not mapped again |
+| `:ono[remap]` | as `:omap`, but {rhs} is not mapped again |
+| `:ino[remap]` | as `:imap`, but {rhs} is not mapped again |
+| `:cno[remap]` | as `:cmap`, but {rhs} is not mapped again |
+| `:unm[ap]` | remove the mapping of {lhs} in Normal, Visual and Operator-pending mode (`!`: Insert and Command-line) |
+| `:nun[map]` | remove the Normal-mode mapping of {lhs} |
+| `:vu[nmap]` | remove the Visual-mode mapping of {lhs} |
+| `:xu[nmap]` | remove the Visual-mode mapping of {lhs}, as `:vunmap` |
+| `:ou[nmap]` | remove the Operator-pending mapping of {lhs} |
+| `:iu[nmap]` | remove the Insert-mode mapping of {lhs} |
+| `:cu[nmap]` | remove the command-line mapping of {lhs} |
+| `:mapc[lear]` | remove every mapping of `:map` (`!`: of `:map!`) |
+| `:nmapc[lear]` | remove every Normal-mode mapping |
+| `:vmapc[lear]` | remove every Visual-mode mapping |
+| `:xmapc[lear]` | remove every Visual-mode mapping, as `:vmapclear` |
+| `:omapc[lear]` | remove every Operator-pending mapping |
+| `:imapc[lear]` | remove every Insert-mode mapping |
+| `:cmapc[lear]` | remove every command-line mapping |

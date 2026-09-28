@@ -19,6 +19,14 @@ class KeyInputTest {
             KeyInput.named("Del"), KeyInput.of(' '), KeyInput.of('<'), KeyInput.of('|'), KeyInput.of('\\'), KeyInput.named("F12"));
     }
 
+    @Test void readsTheNotationMappingsUse() {
+        assertThat(KeyInput.parse("<NL><nul><Char-65><char-0x42><Char-0103><Plug>")).containsExactly(
+            new KeyInput("j", KeyInput.CTRL), new KeyInput("@", KeyInput.CTRL), KeyInput.of('A'), KeyInput.of('B'), KeyInput.of('C'),
+            KeyInput.named("Plug"));
+        assertThat(KeyInput.parse("<Char-x>")).as("not a number").hasSize(8);
+        assertThat(KeyInput.named("Plug").notation()).isEqualTo("<Plug>");
+    }
+
     @Test void normalizesCtrlAndShiftAsVimDoes() {
         assertThat(KeyInput.parse("<C-W>")).containsExactly(new KeyInput("w", KeyInput.CTRL));
         assertThat(KeyInput.parse("<C-[>")).containsExactly(KeyInput.named("Esc"));

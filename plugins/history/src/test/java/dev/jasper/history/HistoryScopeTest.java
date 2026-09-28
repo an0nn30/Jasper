@@ -80,19 +80,36 @@ class HistoryScopeTest {
             host.start(INFO, Set.of(), Set.of(), new HistoryPlugin(context -> fourCommands()));
             UUID window = host.addTerminalWindow();
             assertThat(host.searchScope(SCOPE, "", window, null)).extracting(line -> line.split("\\|")[1]).as("defaults").containsExactly("make", "clear", "ls", "cd /x");
+            assertThat(host.declared("dev.jasper.history")).containsExactly("trivial_commands", "deprioritize_trivial");
         }
         try (var host = new FakePluginHost()) {
-            host.setConfig("dev.jasper.history", Map.of("deprioritize_trivial", false));
+            host.setSetting("dev.jasper.history", "deprioritize_trivial", false);
             host.start(INFO, Set.of(), Set.of(), new HistoryPlugin(context -> fourCommands()));
             UUID window = host.addTerminalWindow();
             assertThat(host.searchScope(SCOPE, "", window, null)).extracting(line -> line.split("\\|")[1]).as("off").containsExactly("clear", "ls", "make", "cd /x");
         }
         try (var host = new FakePluginHost()) {
-            host.setConfig("dev.jasper.history", Map.of("trivial_commands", List.of("make")));
+            host.setSetting("dev.jasper.history", "trivial_commands", List.of("make"));
             host.start(INFO, Set.of(), Set.of(), new HistoryPlugin(context -> fourCommands()));
             UUID window = host.addTerminalWindow();
             assertThat(host.searchScope(SCOPE, "", window, null)).extracting(line -> line.split("\\|")[1]).as("replaced").containsExactly("clear", "ls", "cd /x", "make");
             assertThat(host.searchScope(SCOPE, "make", window, null)).as("still found when searched for").hasSize(1);
+        }
+    }
+
+    @Test void anEmptyListMeansNoTrivialCommandsAndAWordWithSpacesIsRejected() {
+        try (var host = new FakePluginHost()) {
+            host.setSetting("dev.jasper.history", "trivial_commands", List.of());
+            host.start(INFO, Set.of(), Set.of(), new HistoryPlugin(context -> fourCommands()));
+            UUID window = host.addTerminalWindow();
+            assertThat(host.searchScope(SCOPE, "", window, null)).extracting(line -> line.split("\\|")[1]).as("empty list").containsExactly("clear", "ls", "make", "cd /x");
+        }
+        try (var host = new FakePluginHost()) {
+            host.setSetting("dev.jasper.history", "trivial_commands", List.of("git status"));
+            host.start(INFO, Set.of(), Set.of(), new HistoryPlugin(context -> fourCommands()));
+            UUID window = host.addTerminalWindow();
+            assertThat(host.searchScope(SCOPE, "", window, null)).extracting(line -> line.split("\\|")[1]).as("the default list").containsExactly("make", "clear", "ls", "cd /x");
+            assertThat(host.settingsReports("dev.jasper.history")).singleElement().asString().startsWith("trivial_commands: ");
         }
     }
 

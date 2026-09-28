@@ -28,6 +28,9 @@ changed result, and that Custom shell edits may not be reported; mirrored in `pl
 group shown and no hosts the hint under it reads "No SSH hosts yet — Add or Import from ~/.ssh/config" and an empty
 search "No sessions match" (unchanged copy without WSL). Spec section 7 and `docs/remote.md` (item 14 gains the
 host-group-named-`wsl` check) follow. Remote tests 283/54 skipped/6 failed (the known Windows six).
+Merged after main's SDK 0.9.0; the profile API shipped as 0.9.1: `JasperSdk.VERSION` is 0.9.1, every `@since 0.8.6`
+reads `@since 0.9.1`, and Remote is 0.6.0 with `sdk = ">=0.9.1, <0.10"` (main's Remote 0.5.0 declared settings; this
+branch's 0.5.0 had the WSL group). The text below keeps the original 0.8.6 wording.
 
 **Goal:** Plugins can list the shells Jasper detected (SDK 0.8.6 `Terminals.profiles()`) and open one by id; the
 Remote plugin uses that to show a read-only "WSL" group of distributions first in its panel (renamed "Sessions"),

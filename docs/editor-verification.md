@@ -55,3 +55,54 @@ unverified.
 - [ ] 38. `<C-g>` shows the file's path, line count and position (`[Modified]` after an edit); `ga` shows the code of the character under the cursor.
 - [ ] 39. `<C-a>` on `0x0f` gives `0x10`; `V` over three lines of `0` then `g<C-a>` numbers them 1, 2, 3.
 - [ ] 40. After edits in two places, `g;` returns to each in turn and `` `. `` to the last; `ma`, then `'a` elsewhere, returns to it.
+
+## Vim mode (plan V1c)
+
+- [ ] 41. `<C-d>`, `<C-u>`, `<C-f>` and `<C-b>` scroll by half or whole windows and the cursor follows; `<C-e>` and `<C-y>` scroll one line, the cursor staying put until it would leave the window.
+- [ ] 42. `zt`, `zz` and `zb` put the cursor line at the top, middle and bottom of the window; after resizing the window, `zz` still centres.
+- [ ] 43. `H`, `M` and `L` go to the top, middle and bottom lines on screen; `3H` to the third.
+- [ ] 44. With Wrap on, a long line wraps at any character; `gj`/`gk` move by screen line and `g0`/`g$` go to the start and end of the screen line.
+- [ ] 45. Scrolling with the mouse wheel or the scroll bar moves the view; the caret moves into the window when it was scrolled out, and the next `j` does not jump back.
+- [ ] 46. In a Java file, `zc` inside a method folds it (the fold marker in the gutter shows it), `j` steps over the closed fold, `zo` opens it; `zM` folds everything and `zR` opens everything; clicking the gutter's fold markers still works.
+- [ ] 47. With a method folded, `dd` on it deletes the whole method, `u` brings it back, and `/` for text inside it opens the fold.
+- [ ] 48. With 'incsearch' (on by default), typing `/` and text that matches off screen shows the match while typing, and `<Esc>` returns the view to where it was.
+- [ ] 49. `G` `zt` and `<C-f>` at the end show blank rows below the last line, and `H` goes to the top line shown.
+- [ ] 50. The caret is visible on a closed fold's line when the cursor is inside the fold.
+
+## Vim mode (plan V2a)
+
+- [ ] 51. `:` opens the command line in the Vim bar with a thin-bar cursor; `<Up>` recalls earlier command lines; `<Esc>` cancels.
+- [ ] 52. `:%s/foo/bar/g` changes every line and the bar says how many substitutions on how many lines; `u` undoes it in one step.
+- [ ] 53. `:%s/foo/bar/gc` highlights each match and asks `replace with bar (y/n/a/q/l/^E/^Y)?` in the bar; `y`, `n`, `a`, `q` and `l` answer as in Vim, and `<C-e>`/`<C-y>` scroll while it asks.
+- [ ] 54. `:reg`, `:marks`, `:jumps` and `:g/pattern/` show their lines above the Vim bar in the Editor font, scrollable with the mouse when long, and the bar says "Press ENTER or type command to continue"; `<CR>` takes them away and `:` starts the next command line at once.
+- [ ] 55. An error (`:foo`) shows in red in the bar, with no panel; `:%p|foo` shows only the error.
+- [ ] 56. `V`, `jj`, `:` shows `:'<,'>` in the bar; `s/x/y/` then changes only those lines.
+- [ ] 57. `:set sw?` shows the Editor's tab size; `:set sw=2` then `>>` indents by 2; `:set` lists the options that differ from their defaults.
+- [ ] 58. After `/pattern`, every match is highlighted in the theme's mark-all colour; `:noh` hides them until the next `n`.
+- [ ] 59. `:g/TODO/d` deletes matching lines, `:v/./d` deletes blank lines, `:%norm A;` appends to every line and `:sort u` sorts and removes duplicates.
+- [ ] 60. `:5,1d` asks `Backwards range given, OK to swap (y/n)?` in the bar; `y` deletes lines 1 to 5.
+
+## Vim mode (plan V2b)
+
+- [ ] 61. In a changed file, `:w` saves it (the tab's dot goes) and the Vim bar says `"…" NL, NB written`; `:w` in an untitled tab opens the Save As dialog.
+- [ ] 62. `:e other.txt` (next to the current file) opens it in a new tab next to the current one; `:e` of a file already open selects its tab; `:e new.txt` opens an empty tab that `:w` creates on disk.
+- [ ] 63. `:q` in a changed tab says `E37: No write since last change (add ! to override)`; `:q!` closes it without asking and without saving; `:wq` and `ZZ` save and close.
+- [ ] 64. With three tabs, `:ls` lists them with numbers, `%a` on the current one and `#` on the one before; `:b 2`, `:bn`, `:bp`, `:tabn`, `gt`, `3gt` and `gT` select the tabs, including tabs moved to another workspace.
+- [ ] 65. `:qa` with a changed tab says `E162`; `:qa!` closes every Editor tab without asking; the terminal tabs stay.
+- [ ] 66. `:e ` then `<Tab>` completes file names from the current file's folder (folders end with `/`), `<Tab>` again cycles, `<S-Tab>` goes back; `:set sh<Tab>` cycles through the options; `:tabn<Tab>` completes `tabnew`, then `tabnext`.
+- [ ] 67. `:set rnu` shows distances from the cursor line in the gutter, updating as the cursor moves; `:set nonu` shows 0 on the cursor line; `:set nonu nornu` hides the numbers; turning Vim off brings the Editor's numbers back.
+- [ ] 68. `mA` in one tab, then `'A` in another tab, selects the first tab with the cursor on the mark.
+- [ ] 69. `:r other.txt` puts the other file's lines below the cursor; `u` takes them away.
+- [ ] 70. A remote file saved with `:w` goes through the Editor's remote save (conflict check and all).
+
+## Vim mode (plan V3a)
+
+- [ ] 71. `qa`, `dwj`, `q`: the Vim bar shows `recording @a` while recording (`-- INSERT --recording @a` in Insert mode); `@a` repeats it, `3@a` three times, `@@` once more.
+- [ ] 72. `qaq`, then `qa0xj@aq`, then `@a`: the macro runs down to the last line and stops; `u` undoes everything it changed in one step.
+- [ ] 73. `:nnoremap <Space>w :w<CR>`, then Space and `w` saves the tab; `:nmap` lists the mapping above the Vim bar.
+- [ ] 74. `:imap jk <Esc>`: typing `jk` quickly leaves Insert mode; typing `j` and waiting a second inserts the `j`, and while it waits the right of the Vim bar shows `j`.
+- [ ] 75. `:nmap ab dd`, then `a`: after a second Insert mode starts; after `:set tm=3000` it takes three seconds; after `:set notimeout` it waits for the next key.
+- [ ] 76. `:nmap <F2> dd` makes F2 delete a line; `:nmap <D-k> dd` makes ⌘K delete a line in Normal mode, and ⌘K in Insert mode still does what the Editor does.
+- [ ] 77. `:nmap x ggx` and then `x` runs on; Ctrl+C stops it, the Vim bar flashes, and the Editor answers again.
+- [ ] 78. `:s/a/b/`, `j`, `@:` repeats the substitution on the next line.
+- [ ] 79. `qai`, typing 日本 with the Japanese input method, `<Esc>q`, then `@a` on another line inserts 日本 again.

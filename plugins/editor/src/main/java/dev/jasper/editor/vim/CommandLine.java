@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The command line that {@code /} and {@code ?} read (spec 5.3), with Vim's editing keys (ex_getln.c): moving and
+ * The command line that {@code :}, {@code /} and {@code ?} read (spec 5.3), with Vim's editing keys (ex_getln.c): moving and
  * deleting, {@code <C-r>} for registers and the word under the cursor, {@code <C-v>} for a literal key, and history
  * walked by {@code <Up>}/{@code <Down>} filtered by the typed prefix. The Vim bar draws it; the editor feeds it keys
  * while it is active.
@@ -22,6 +22,12 @@ final class CommandLine {
     private Consumer<KeyInput> argument;
     private Consumer<String> changed, done;
     private Runnable cancelled;
+    /** For {@code :}, what {@code <Tab>} completes; null for {@code /} and {@code ?}, where it types a tab. */
+    private java.util.function.Function<String, Completion.Result> completer;
+    /** While {@code <Tab>} cycles: the matches, the one shown (-1 for the typed word), where the word starts, the typed word. */
+    private List<String> matches;
+    private int matchIndex, matchStart;
+    private String typedWord;
 
     CommandLine(VimEditor editor) { this.editor = editor; }
 
@@ -35,20 +41,34 @@ final class CommandLine {
      * @param cancelled runs on {@code <Esc>}, {@code <C-c>}, or {@code <BS>} on an empty line
      */
     void start(char type, List<String> history, Consumer<String> changed, Consumer<String> done, Runnable cancelled) {
+        start(type, history, "", changed, done, cancelled);
+    }
+
+    /** Opens the command line with {@code initial} typed on it ({@code '<,'>} after Visual {@code :}). */
+    void start(char type, List<String> history, String initial, Consumer<String> changed, Consumer<String> done, Runnable cancelled) {
+        if (type != ':') completer = null;
+        matches = null;
         this.type = type;
         this.history = history;
         this.changed = changed;
         this.done = done;
         this.cancelled = cancelled;
         text.setLength(0);
-        cursor = 0;
+        text.append(initial);
+        cursor = text.length();
         typed.clear();
         historyIndex = history.size();
         historyPrefix = null;
         argument = null;
     }
 
+    /** @return whether the next key is an argument ({@code <C-r>}'s register, {@code <C-v>}'s character), which is not mapped */
+    boolean readingArgument() { return argument != null; }
+
     boolean active() { return done != null; }
+
+    /** @param completer what {@code <Tab>} completes on the next {@code :} line: the matches for the text before the cursor */
+    void completer(java.util.function.Function<String, Completion.Result> completer) { this.completer = completer; }
 
     /** @return {@code /}, {@code ?} or {@code :} */
     char type() { return type; }
@@ -64,6 +84,7 @@ final class CommandLine {
     /** The keys that end the line, and whether each executes it. */
     void key(KeyInput key) {
         typed.add(key);
+        if (!key.is("<Tab>") && !key.is("<S-Tab>")) matches = null;
         if (argument != null) {
             Consumer<KeyInput> handler = argument;
             argument = null;
@@ -122,11 +143,53 @@ final class CommandLine {
                 insertQuietly(c >= 0 ? new String(Character.toChars(c)) : literal(k));
             };
             case "<C-r>" -> argument = this::register;
-            case "<Tab>" -> insert("\t");
+            case "<Tab>" -> {
+                if (completer == null) insert("\t");
+                else complete(1);
+            }
+            case "<S-Tab>" -> {
+                if (completer == null) editor.bell();
+                else complete(-1);
+            }
             case "<Up>", "<S-Up>", "<PageUp>" -> recall(-1, key.is("<Up>"));
             case "<Down>", "<S-Down>", "<PageDown>" -> recall(1, key.is("<Down>"));
             default -> editor.bell();
         }
+    }
+
+    /**
+     * {@code <Tab>} (step 1) and {@code <S-Tab>} (-1), as Vim's 'wildmode' "full" without 'wildmenu': the first match
+     * replaces the word before the cursor, each further key the next match, and after the last the typed word comes
+     * back; a single match stays. Where nothing completes ({@code :s/a/b}) {@code <Tab>} types a tab; where nothing
+     * matches the bell rings.
+     */
+    private void complete(int step) {
+        if (matches == null) {
+            String before = text.substring(0, cursor);
+            Completion.Result result = completer.apply(before);
+            if (!result.completes()) {
+                if (step > 0) insert("\t");
+                else editor.bell();
+                return;
+            }
+            if (result.matches().isEmpty()) {
+                editor.bell();
+                return;
+            }
+            matches = result.matches();
+            matchStart = result.start();
+            typedWord = before.substring(matchStart);
+            matchIndex = step > 0 ? 0 : matches.size() - 1;
+        } else if (matches.size() > 1) {
+            matchIndex += step;
+            if (matchIndex >= matches.size()) matchIndex = -1;
+            else if (matchIndex < -1) matchIndex = matches.size() - 1;
+        }
+        String word = matchIndex < 0 ? typedWord : matches.get(matchIndex);
+        text.replace(matchStart, cursor, word);
+        cursor = matchStart + word.length();
+        historyIndex = history.size();
+        if (changed != null) changed.accept(text.toString());
     }
 
     private static String literal(KeyInput key) {

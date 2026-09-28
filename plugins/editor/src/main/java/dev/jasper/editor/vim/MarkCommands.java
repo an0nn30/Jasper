@@ -20,23 +20,27 @@ final class MarkCommands {
         commands.visual("m", "set mark {char} at the cursor", true, false, MarkCommands::set);
     }
 
-    /** nv_mark and setmark_pos. */
+    /** nv_mark. */
     static void set(Context c) {
         int name = c.argumentChar();
-        Marks marks = c.editor.marks();
-        Pos cursor = c.cursor();
-        if (name == '\'' || name == '`') marks.setpcmarkKeep(cursor);
-        else if (name >= 'a' && name <= 'z' || name == '[' || name == ']' || name == '"') marks.set((char) name, cursor);
-        else if (name == '<') setVisual(c, Visual.START, cursor);
-        else if (name == '>') setVisual(c, Visual.END, cursor);
-        else if (name >= 'A' && name <= 'Z') c.vim.globalMark((char) name, c.editor, cursor);
-        else throw Context.fail();
+        if (name < 0 || !setmark(c.editor, (char) name, c.cursor())) throw Context.fail();
     }
 
-    private static void setVisual(Context c, char which, Pos cursor) {
-        Marks marks = c.editor.marks();
-        marks.set(which, cursor);
-        if (marks.visualMode == null) marks.visualMode = Mode.VISUAL;
+    /**
+     * setmark_pos with the cursor at {@code pos}, for {@code m} and {@code :mark}.
+     *
+     * @return false for a name that is not a mark
+     */
+    static boolean setmark(VimEditor editor, char name, Pos pos) {
+        Marks marks = editor.marks();
+        if (name == '\'' || name == '`') marks.setpcmarkKeep(pos);
+        else if (name >= 'a' && name <= 'z' || name == '[' || name == ']' || name == '"') marks.set(name, pos);
+        else if (name == '<' || name == '>') {
+            marks.set(name == '<' ? Visual.START : Visual.END, pos);
+            if (marks.visualMode == null) marks.visualMode = Mode.VISUAL;
+        } else if (name >= 'A' && name <= 'Z' || name >= '0' && name <= '9') editor.vim().globalMark(name, editor, pos);
+        else return false;
+        return true;
     }
 
     /**
@@ -57,7 +61,7 @@ final class MarkCommands {
                 yield pos;
             }
             default -> {
-                if (name >= 'A' && name <= 'Z') yield editor.vim().globalMark(name, editor);
+                if (name >= 'A' && name <= 'Z' || name >= '0' && name <= '9') yield editor.vim().globalMark(name, editor);
                 yield marks.get(name);
             }
         };
@@ -67,6 +71,13 @@ final class MarkCommands {
     static Target go(Context c, boolean linewise) {
         int name = c.argumentChar();
         if (name < 0) throw Context.fail();
+        if (name >= 'A' && name <= 'Z' || name >= '0' && name <= '9') {
+            Vim.GlobalMark mark = c.vim.globalMarks().get((char) name);
+            if (mark != null && mark.editor() != c.editor) {
+                elsewhere(c, mark, linewise);
+                throw VimFailure.quiet();
+            }
+        }
         Pos pos = get(c.editor, (char) name);
         pos = check(c.buffer, pos);
         if (linewise) {
@@ -77,6 +88,25 @@ final class MarkCommands {
         int col = Math.min(pos.col, line.length());
         if (!c.inVisual() && col >= line.length() && !line.isEmpty()) col = Text.last(line);
         return Target.exclusive(new Pos(pos.line, col)).asJump().usingRegisterOne().withoutAdjust();
+    }
+
+    /**
+     * An uppercase mark in another tab (spec 3.6): its tab is selected and its cursor goes to the mark. An operator
+     * or Visual mode cannot reach into another tab, so there the command fails.
+     */
+    private static void elsewhere(Context c, Vim.GlobalMark mark, boolean linewise) {
+        if (c.operator != null || c.inVisual()) throw Context.fail();
+        VimEditor other = mark.editor();
+        var buffers = c.vim.host().documents().buffers().apply(other);
+        var buffer = buffers.stream().filter(VimHost.Buffer::current).findFirst().orElseThrow(() -> new VimFailure("E20: Mark not set"));
+        Pos pos = check(other.buffer(), mark.pos());
+        String line = other.buffer().line(pos.line);
+        int col = linewise ? Text.firstNonBlank(line) : Math.min(pos.col, line.length());
+        if (col >= line.length() && !line.isEmpty()) col = Text.last(line);
+        other.marks().setpcmark(other.cursor());
+        other.setCursor(new Pos(pos.line, col));
+        other.forgetColumn();
+        c.vim.host().documents().select().accept(buffer.number());
     }
 
     /** check_mark: E20 for a mark that is not set, E19 for one past the last line. */
@@ -107,11 +137,13 @@ final class MarkCommands {
     }
 
     private static void moveTo(Context c, Pos pos) {
+        Pos before = c.cursor();
         String line = c.buffer.line(pos.line);
         int col = Math.min(pos.col, line.length());
         if (col >= line.length() && !line.isEmpty()) col = Text.last(line);
         c.editor.setCursor(new Pos(pos.line, col));
         c.editor.forgetColumn();
+        c.editor.machine().foldOpenAfter("mark", before);
     }
 
     /** gi: Insert mode at the {@code '^} mark, or at the cursor when it is not set. */

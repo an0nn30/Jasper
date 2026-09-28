@@ -138,6 +138,18 @@ public interface ContractHarness extends AutoCloseable {
     /** Stops every active plugin in reverse start order. */
     void stopAll();
 
+    /**
+     * Sets a raw value in a plugin's settings file as a user editing it would, then returns once the plugin has seen
+     * the file again. Raw values are what TOML reads: String, Long, Double, Boolean or List of String.
+     */
+    void setSetting(String pluginId, String key, Object rawValue);
+
+    /** The raw value a plugin's settings file holds for a dotted key. */
+    java.util.Optional<Object> savedSetting(String pluginId, String key);
+
+    /** The problems reported for a plugin's settings file and not yet cleared, as {@code key: message}. */
+    List<String> settingsReports(String pluginId);
+
     @Override void close();
 
         /** Contributed scopes as {@code id|label|verbIds}, in registration order. */

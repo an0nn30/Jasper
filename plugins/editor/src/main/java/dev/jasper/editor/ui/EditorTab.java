@@ -252,7 +252,7 @@ public final class EditorTab extends JPanel {
     }
 
     /** Vim's tab options start from the Editor's tab size and the tab's Tabs or Spaces (Vim spec 3.8). */
-    private EditorDefaults defaults() { return new EditorDefaults(tabSize, !session.tabs(), true); }
+    private EditorDefaults defaults() { return new EditorDefaults(tabSize, !session.tabs(), true, session.wrap()); }
 
     private void refresh() {
         switch (session.state()) {
@@ -272,7 +272,8 @@ public final class EditorTab extends JPanel {
         }
         if (!area.getSyntaxEditingStyle().equals(session.style())) area.setSyntaxEditingStyle(session.style());
         area.setLineWrap(session.wrap());
-        area.setWrapStyleWord(true);
+        // Vim wraps at any character (VimEditor turns word wrapping off while it is on).
+        area.setWrapStyleWord(vim == null);
         area.setTabsEmulated(!session.tabs());
         if (vim != null) vim.editorDefaults(defaults());
         switch (session.banner()) {

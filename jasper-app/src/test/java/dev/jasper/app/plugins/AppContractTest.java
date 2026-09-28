@@ -41,8 +41,8 @@ class AppContractTest extends PluginContractTest {
         }
     }
 
-    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace) {
-        return host(data, tables, drainGrace, onEdtValue(Contributions::new), new java.util.concurrent.atomic.AtomicBoolean(true));
+    static PluginHost host(Path data, Duration drainGrace) {
+        return host(data, drainGrace, onEdtValue(Contributions::new), new java.util.concurrent.atomic.AtomicBoolean(true));
     }
 
     static <T> T onEdtValue(java.util.function.Supplier<T> supplier) {
@@ -51,25 +51,35 @@ class AppContractTest extends PluginContractTest {
         return value.get();
     }
 
-    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
+    static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark) {
-        return host(data, tables, drainGrace, contributions, dark, onEdtValue(AppContractTest::headlessWindows), onEdtValue(TerminalRegistry::new),
+        return host(data, drainGrace, contributions, dark, onEdtValue(AppContractTest::headlessWindows), onEdtValue(TerminalRegistry::new),
             new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>());
     }
 
-    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
+    static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
                            TerminalRegistry terminals, List<String> notices, List<Path> edited) {
-        return host(data, tables, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, PluginRuntime.ShellProfiles.NONE);
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, new CopyOnWriteArrayList<>());
     }
 
-    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
+    /** As above; configuration problems land in {@code diagnostics}, and a file's reload or save clears that file's. */
+    static PluginHost host(Path data, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
-                           TerminalRegistry terminals, List<String> notices, List<Path> edited, PluginRuntime.ShellProfiles profiles) {
+                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           List<dev.jasper.app.config.ConfigDiagnostic> diagnostics) {
+        return host(data, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, diagnostics, PluginRuntime.ShellProfiles.NONE);
+    }
+
+    /** As above, with the shell profiles plugins list and open. */
+    static PluginHost host(Path data, Duration drainGrace,
+                           Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
+                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           List<dev.jasper.app.config.ConfigDiagnostic> diagnostics, PluginRuntime.ShellProfiles profiles) {
+        var files = new PluginSettingsFiles(data, diagnostics::add);
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
-            SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()), id -> data.resolve(id + ".toml"),
-            (id, path) -> java.util.Optional.empty(), diagnostic -> { }, drainGrace, contributions, dark::get, auxiliary, terminals, notices::add, edited::add,
-            profiles)));
+            SwingUtilities::isEventDispatchThread, data::resolve, diagnostics::add, drainGrace, contributions, dark::get, auxiliary, terminals,
+            notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)), profiles)));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
@@ -111,7 +121,10 @@ class AppContractTest extends PluginContractTest {
         List<String> notices = new CopyOnWriteArrayList<>();
         List<Path> edited = new CopyOnWriteArrayList<>();
         TestShellProfiles shells = new TestShellProfiles();
-        PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited, shells.source());
+        List<dev.jasper.app.config.ConfigDiagnostic> diagnostics = new CopyOnWriteArrayList<>();
+        PluginHost host = host(data, Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited,
+            diagnostics, shells.source());
+        PluginSettingsFiles files = host.environment.settingsFiles();
         List<ActivityEvent> log = new CopyOnWriteArrayList<>();
         onEdt(() -> host.bus.subscribe(EventBus.APP, Activities.TOPIC, log::add));
         List<String> opens = new CopyOnWriteArrayList<>();
@@ -119,6 +132,32 @@ class AppContractTest extends PluginContractTest {
             + request.query().orElse("-") + " " + request.rowId().orElse("-"))));
         Map<String, Map<String, dev.jasper.app.palette.PaletteRow>> lastRows = new java.util.HashMap<>();
         return new ContractHarness() {
+            @Override public void setSetting(String pluginId, String key, Object rawValue) {
+                Path file = files.file(pluginId);
+                try {
+                    String text = Files.exists(file) ? Files.readString(file) : "";
+                    var document = dev.jasper.app.settings.TomlDocument.parse(text).set(org.tomlj.Toml.parseDottedKey(key), literal(rawValue));
+                    Files.createDirectories(file.getParent());
+                    Files.writeString(file, document.text());
+                } catch (IOException failure) { throw new UncheckedIOException(failure); }
+                onEdt(() -> {
+                    var changed = files.refresh(true);
+                    for (String id : changed) diagnostics.removeIf(diagnostic -> diagnostic.file().equals(files.file(id)));
+                    host.settingsChanged(changed);
+                });
+            }
+            @Override public java.util.Optional<Object> savedSetting(String pluginId, String key) {
+                Path file = files.file(pluginId);
+                try {
+                    if (!Files.exists(file)) return java.util.Optional.empty();
+                    return java.util.Optional.ofNullable(dev.jasper.app.settings.TomlDocument.leaves(Files.readString(file))
+                        .get(org.tomlj.Toml.parseDottedKey(key)));
+                } catch (IOException failure) { throw new UncheckedIOException(failure); }
+            }
+            @Override public List<String> settingsReports(String pluginId) {
+                return diagnostics.stream().filter(diagnostic -> diagnostic.file().equals(files.file(pluginId)))
+                    .map(diagnostic -> diagnostic.key() + ": " + diagnostic.message()).toList();
+            }
             @Override public void start(PluginInfo info, Set<String> requires, Set<String> optional, Plugin plugin) {
                 onEdt(() -> host.start(new HostedPlugin(info, requires, optional,
                     Set.of(PluginContractTest.class.getPackageName()), PluginContractTest.class.getClassLoader(), () -> plugin)));
@@ -316,5 +355,13 @@ class AppContractTest extends PluginContractTest {
                 }
             }
         }
+    }
+
+    /** A raw TOML value as source text. */
+    private static String literal(Object raw) {
+        if (raw instanceof List<?> items)
+            return items.stream().map(item -> dev.jasper.app.settings.TomlLiterals.string((String) item))
+                .collect(java.util.stream.Collectors.joining(", ", "[", "]"));
+        return dev.jasper.app.settings.TomlLiterals.format(raw);
     }
 }

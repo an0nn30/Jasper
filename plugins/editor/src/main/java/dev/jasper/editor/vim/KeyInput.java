@@ -24,7 +24,7 @@ public record KeyInput(String key, int modifiers) {
     public static final int META = 8;
     /** The named keys, in their canonical spelling. */
     public static final List<String> NAMES = List.of("Esc", "CR", "Tab", "BS", "Del", "Insert", "Home", "End", "PageUp", "PageDown",
-        "Up", "Down", "Left", "Right", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12");
+        "Up", "Down", "Left", "Right", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "Plug");
 
     /** Checks the key is one code point or a known name. */
     public KeyInput {
@@ -139,6 +139,14 @@ public record KeyInput(String key, int modifiers) {
             rest = rest.substring(2);
         }
         String name = rest.toLowerCase(Locale.ROOT);
+        if (modifiers == 0) {
+            switch (name) {
+                case "nl", "newline", "linefeed", "lf" -> { return new KeyInput("j", CTRL); }
+                case "nul" -> { return new KeyInput("@", CTRL); }
+                default -> { }
+            }
+            if (name.startsWith("char-")) return character(name.substring(5));
+        }
         String key = switch (name) {
             case "esc", "escape" -> "Esc";
             case "cr", "return", "enter" -> "CR";
@@ -158,12 +166,24 @@ public record KeyInput(String key, int modifiers) {
             case "lt" -> "<";
             case "bar" -> "|";
             case "bslash" -> "\\";
+            case "plug" -> "Plug";
             default -> {
                 if (name.matches("f([1-9]|1[0-2])")) yield "F" + name.substring(1);
                 yield modifiers != 0 && rest.codePointCount(0, rest.length()) == 1 ? rest : null;
             }
         };
         return key == null ? null : normalize(key, modifiers);
+    }
+
+    /** {@code <Char-65>}, {@code <Char-0x41>}, {@code <Char-0101>}: a character by its code, or null. */
+    private static KeyInput character(String number) {
+        try {
+            int code = number.startsWith("0x") ? Integer.parseInt(number.substring(2), 16)
+                : number.length() > 1 && number.startsWith("0") ? Integer.parseInt(number.substring(1), 8) : Integer.parseInt(number);
+            return code > 0 && Character.isValidCodePoint(code) ? of(code) : null;
+        } catch (NumberFormatException notANumber) {
+            return null;
+        }
     }
 
     /**

@@ -189,7 +189,7 @@ done stays pending. An entry in `plugins.toml` means the user reviewed the plugi
 `PluginSettingsFiles` owns each plugin's `plugins/<id>/<id>.toml`: `PluginRuntime.start` prepares
 every discovered plugin's folder, data directory and settings file (seeded from an old
 `[plugins."<id>"]` table, else the jar's `settings.toml`, else a header) before loading, and a
-one-second poller re-reads changed files into `PluginSettings`, which fires `PluginConfig.onChanged`;
+one-second poller re-reads changed files, and each plugin's `DeclaredSettings` updates its handles and runs their listeners;
 a broken file keeps its last good values and is reported under `plugins.<id>`. `PluginRuntime.Row`
 carries the folder, settings file and data directory, which the manager's context menu opens
 through `ConfigEditor`.
@@ -363,7 +363,28 @@ report terminal content only. Plugins must tolerate an empty active pane while e
 `Appearance.editorPalette()` provides semantic surface, text, caret, selection, current-line
 and gutter colors. Jasper derives missing theme tokens; plugins retain syntax classification.
 
-### Shell profiles (SDK 0.8.6)
+### Declared settings (plan C1; SDK 0.9 completes them)
+
+`PluginContext.settings()` returns `PluginSettings`. A plugin declares each setting during `start` with a
+`SettingSpec` (dotted key, `SettingKind`, default, label, description, keywords, section, applies-when, editor hint)
+and gets a typed `Setting` handle: `get()` is the file's value when its kind allows it, else the default; `set(value)`
+saves through the same comment-preserving, atomic write as `config.toml`; `onChanged` runs on the UI thread. The
+application translates declarations into its own settings schema inside `dev.jasper.app.plugins`, reads the plugin's
+file with `dev.jasper.app.settings.SchemaReader`, and reports rejected values and undeclared keys against the file.
+The testkit's `FakePluginHost` offers `setSetting`, `savedSettings`, `settingsReports` and `declared`, and the contract
+suite holds the fake and the application to the same behaviour. SDK 0.9.0 removed `PluginConfig`; every bundled plugin declares its settings.
+Settings shows the declarations as a page per plugin, described next.
+
+### Plugin pages in Settings (plan C2)
+
+`PluginSettings.page(SettingsPanel)` lets a plugin build its own page; `SettingsPanelHost` gives it standard rows
+and the page's unsaved values. The application's `PluginRuntime.settingsPages` returns a generated page
+(`PluginSettingsPage`, a `SchemaPage` over the plugin's own draft) or the plugin's own (`PluginPanelPage`, every call
+contained) for each running plugin with settings, and a `PluginStubPage` for each plugin that is enabled but not
+running, at most one page per plugin id (a copy superseded by another copy of the same plugin gets none);
+`CorePages` places them under Tools. Apply writes the plugin's file through `DeclaredSettings.save`.
+
+### Shell profiles (SDK 0.9.1)
 
 `Terminals.profiles()` lists the shells the application detected (`launch.ShellProfileCatalog`:
 PowerShell, PowerShell 7, Command Prompt and each WSL distribution on Windows, the login shell

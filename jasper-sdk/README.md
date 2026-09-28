@@ -6,7 +6,8 @@ enforces that from bytecode, and `check` runs Javadoc with doclint.
 | Package | Contents |
 | --- | --- |
 | `dev.jasper.sdk` | `JasperSdk.VERSION`, `PluginInfo`, `Variant`, `Subscription`, `WindowOwner`, `Capabilities`, `MissingCapabilityException` |
-| `dev.jasper.sdk.plugin` | `Plugin` (the entry point), `PluginContext`, `PluginConfig` |
+| `dev.jasper.sdk.plugin` | `Plugin` (the entry point), `PluginContext` |
+| `dev.jasper.sdk.settings` | `PluginSettings`, `Setting`, `SettingSpec`, `SettingKind`, `Choice`, `EditorHint`, `Applies`, `SettingsPanel`, `SettingsPanelHost` |
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
@@ -32,8 +33,7 @@ var unlock = context.appearance().icon(IconName.UNLOCK);
 Import `dev.jasper.sdk.ui.IconName`. Plugins request only the meaning, without image paths.
 Icons use IntelliJ New UI artwork, selected centrally and fitted into a 16px square.
 SDK 0.8.2 also exposes all 885 catalog choices through `Appearance.icon(BundledIcon)`.
-Vault requires `sdk = ">=0.8.2, <0.9"`; Editor requires `sdk = ">=0.8.5, <0.9"` for app-hosted document tabs and theme palettes; Remote requires `sdk = ">=0.8.6, <0.9"` for shell profiles.
-Other bundled plugins retain their 0.8.0 floor.
+Bundled plugins require `sdk = ">=0.9.0, <0.10"` (SDK 0.9.0 removed `PluginConfig`); Remote requires `sdk = ">=0.9.1, <0.10"` for shell profiles. Before 0.9, Vault required `>=0.8.2` and Editor `>=0.8.5` for app-hosted document tabs and theme palettes.
 Older custom hosts inherit UnsupportedOperationException until they implement each catalog.
 See the [catalog, size rules and testkit example](../docs/sdk-icons.md).
 
@@ -57,7 +57,7 @@ updates display and `PaneInfo.remoteDirectory()` only; shell OSC 7 reports take 
 Reports before attachment, after exit/close, or from an old reconnect attempt are ignored.
 The hint never becomes a local `Path`, changes command history, or emits `CWD_CHANGED`.
 
-SDK 0.8.6 adds shell profiles: `Terminals.profiles()` lists the shells Jasper detected as
+SDK 0.9.1 adds shell profiles: `Terminals.profiles()` lists the shells Jasper detected as
 `ShellProfileInfo` (PowerShell, Command Prompt and WSL distributions on Windows, the login shell
 elsewhere), `onProfilesChanged` fires after a shell detection completes with a changed list (Custom
 shell edits may not be reported), and `OpenRequest.localProfile(id)` opens one. An

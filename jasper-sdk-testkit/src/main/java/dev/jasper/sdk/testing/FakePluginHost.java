@@ -63,14 +63,15 @@ public final class FakePluginHost implements AutoCloseable {
     private final Map<String, Map<Class<?>, Provider>> staged = new HashMap<>();
     final FakeWorkspace workspace = new FakeWorkspace(this);
     private final Map<String, FakePluginContext> contexts = new LinkedHashMap<>();
+    final Map<String, FakeSettingsPanelHost> panelHosts = new java.util.concurrent.ConcurrentHashMap<>();
         final Map<String, FakePalette.Registered> scopes = new LinkedHashMap<>();
         final List<String> paletteOpens = new ArrayList<>();
         final List<String> notices = new ArrayList<>();
         final List<Path> openedInEditor = new ArrayList<>();
         private final Map<String, Map<String, PaletteRow>> lastRows = new HashMap<>();
-    private final Map<String, Map<String, Object>> presets = new HashMap<>();
     private final List<String> failures = new CopyOnWriteArrayList<>();
-    final List<String> reports = new CopyOnWriteArrayList<>();
+    final Map<String, Map<String, Object>> settingFiles = new java.util.concurrent.ConcurrentHashMap<>();
+    final Map<String, List<String>> settingsReports = new java.util.concurrent.ConcurrentHashMap<>();
     final Map<UUID, FakeUi.FakeWindow> overlays = new HashMap<>();
     private Path dataRoot;
     private final boolean ownsRoot;
@@ -102,7 +103,6 @@ public final class FakePluginHost implements AutoCloseable {
         var all = new java.util.HashSet<>(requires);
         all.addAll(optional);
         var context = new FakePluginContext(this, info, Set.copyOf(all), Objects.requireNonNull(plugin));
-        context.table = presets.getOrDefault(info.id(), Map.of());
         contexts.put(info.id(), context);
         for (String required : requires) {
             if (!active(required)) {
@@ -120,6 +120,7 @@ public final class FakePluginHost implements AutoCloseable {
             plugin.start(context);
             committed.putAll(staged.getOrDefault(info.id(), Map.of()));
             context.state = FakePluginContext.State.ACTIVE;
+            context.settings.complete();
         } catch (Exception | LinkageError failure) {
             failures.add(info.id() + " start: " + failure);
             teardown(context, "Plugin failed to start");
@@ -171,19 +172,87 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public <T> void publishApp(Topic<T> topic, T payload) { publish(APP, topic, payload); }
 
+    Map<String, Object> settingFile(String pluginId) {
+        return settingFiles.computeIfAbsent(pluginId, id -> new java.util.LinkedHashMap<>());
+    }
+
     /**
-     * Replaces a plugin's configuration table. Before the plugin starts this is its initial table;
-     * afterwards its change listeners run.
+     * Sets a raw value in a plugin's settings file, as a user editing the file would. Before the plugin starts this
+     * is part of the file it starts with; afterwards its declared settings reload and their listeners run.
      *
      * @param pluginId the plugin
-     * @param table values of type String, Long, Boolean, List of String, or nested Map
+     * @param key the dotted key
+     * @param rawValue a String, Long, Double, Boolean or List of String, as TOML reads them
      */
-    public void setConfig(String pluginId, Map<String, Object> table) {
-        presets.put(pluginId, Map.copyOf(table));
+    public void setSetting(String pluginId, String key, Object rawValue) {
+        settingFile(pluginId).put(Objects.requireNonNull(key, "key"), Objects.requireNonNull(rawValue, "rawValue"));
         FakePluginContext context = contexts.get(pluginId);
-        if (context == null) return;
-        context.table = Map.copyOf(table);
-        for (Runnable listener : context.configListeners) listener.run();
+        if (context != null && context.state == FakePluginContext.State.ACTIVE) context.settings.reload();
+    }
+
+    /**
+     * The raw values in a plugin's settings file, including what the plugin saved.
+     *
+     * @param pluginId the plugin
+     * @return the values by dotted key
+     */
+    public Map<String, Object> savedSettings(String pluginId) { return Map.copyOf(settingFile(pluginId)); }
+
+    /**
+     * The problems the last read of a plugin's settings found.
+     *
+     * @param pluginId the plugin
+     * @return lines of the form {@code key: message}
+     */
+    public List<String> settingsReports(String pluginId) { return settingsReports.getOrDefault(pluginId, List.of()); }
+
+    /**
+     * The keys a plugin declared.
+     *
+     * @param pluginId the plugin
+     * @return the keys in declaration order
+     */
+    public List<String> declared(String pluginId) {
+        FakePluginContext context = contexts.get(pluginId);
+        return context == null ? List.of() : context.settings.keys();
+    }
+
+    /**
+     * Builds a plugin's own settings page as Settings would, over a host whose rows are labelled placeholders.
+     *
+     * @param pluginId the plugin
+     * @return the page's component; empty when the plugin gave no page or is not running
+     */
+    public java.util.Optional<javax.swing.JComponent> settingsPanel(String pluginId) {
+        FakePluginContext context = contexts.get(pluginId);
+        if (context == null) return java.util.Optional.empty();
+        return context.settings.panel().map(panel -> {
+            var rows = new FakeSettingsPanelHost(context.settings);
+            panelHosts.put(pluginId, rows);
+            return panel.create(rows);
+        });
+    }
+
+    /**
+     * The values a plugin's own settings page staged since {@link #settingsPanel} built it.
+     *
+     * @param pluginId the plugin
+     * @return the values by dotted key
+     */
+    public Map<String, Object> pendingSettings(String pluginId) {
+        FakeSettingsPanelHost rows = panelHosts.get(pluginId);
+        return rows == null ? Map.of() : Map.copyOf(rows.pending);
+    }
+
+    /**
+     * How often a plugin's own settings page said its state changed.
+     *
+     * @param pluginId the plugin
+     * @return the count since {@link #settingsPanel} built it
+     */
+    public int settingsPanelChanges(String pluginId) {
+        FakeSettingsPanelHost rows = panelHosts.get(pluginId);
+        return rows == null ? 0 : rows.changes;
     }
 
     /**
@@ -199,13 +268,6 @@ public final class FakePluginHost implements AutoCloseable {
      * @return one line per failure
      */
     public List<String> failures() { return List.copyOf(failures); }
-
-    /**
-     * Configuration problems plugins reported.
-     *
-     * @return lines of the form {@code pluginId: key: message}
-     */
-    public List<String> reports() { return List.copyOf(reports); }
 
     /** Stops every active plugin in reverse start order. */
     public void stopAll() {
@@ -358,6 +420,7 @@ public final class FakePluginHost implements AutoCloseable {
         context.state = FakePluginContext.State.CLOSED;
         workspace.sessions.stopping(context);
         context.closeOwned();
+        context.settings.close();
         context.ui.closeAll();
         context.palette.closeAll();
         String id = context.plugin().id();

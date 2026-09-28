@@ -1,5 +1,6 @@
 package dev.jasper.editor.vim;
 
+import java.awt.Dimension;
 import java.awt.event.InputEvent;
 import java.awt.event.InputMethodEvent;
 import java.awt.event.KeyEvent;
@@ -8,8 +9,14 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import javax.swing.JViewport;
 import javax.swing.KeyStroke;
+import javax.swing.text.Element;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
+import org.fife.ui.rsyntaxtextarea.RSyntaxTextAreaUI;
+import org.fife.ui.rsyntaxtextarea.Token;
+import org.fife.ui.rsyntaxtextarea.WrappedSyntaxView;
+import org.fife.ui.rtextarea.RTextAreaUI;
 import org.fife.ui.rtextarea.RUndoManager;
 
 /**
@@ -52,6 +59,61 @@ public class VimTextArea extends RSyntaxTextArea {
     void attach(VimEditor editor) {
         vim = editor;
         undo.vim(editor != null);
+        revalidate();
+    }
+
+    /**
+     * With Vim on in a scroll pane, the text area is taller by the viewport's height less one line, so the view may
+     * scroll past the end of the text as Vim's window does (the rows below the last line stay empty, Vim's {@code ~}
+     * rows) and any line can be the first one shown.
+     */
+    @Override public Dimension getPreferredSize() {
+        Dimension size = super.getPreferredSize();
+        if (vim != null && getParent() instanceof JViewport port) {
+            int extra = port.getExtentSize().height - getLineHeight();
+            if (extra > 0) return new Dimension(size.width, size.height + extra);
+        }
+        return size;
+    }
+
+    /** Wrapped lines honour {@link #setWrapStyleWord}, which RSyntaxTextArea ignores (it always wraps at words). */
+    @Override protected RTextAreaUI createRTextAreaUI() {
+        return new RSyntaxTextAreaUI(this) {
+            @Override public javax.swing.text.View create(Element element) {
+                return getLineWrap() ? new CharacterWrappedView(element) : super.create(element);
+            }
+        };
+    }
+
+    /**
+     * Without word wrapping (Vim's 'nolinebreak', set while Vim is on), a line breaks at the last character that fits,
+     * inside a word or not, so the screen lines are Vim's.
+     */
+    private static final class CharacterWrappedView extends WrappedSyntaxView {
+        CharacterWrappedView(Element element) { super(element); }
+
+        @Override protected int calculateBreakPosition(int p0, Token tokenList, float x0) {
+            RSyntaxTextArea area = (RSyntaxTextArea) getContainer();
+            if (area.getWrapStyleWord()) return super.calculateBreakPosition(p0, tokenList, x0);
+            float room = getWidth();
+            if (room == Integer.MAX_VALUE) room = getPreferredSpan(X_AXIS);
+            room = Math.max(room, 1);
+            int p = p0;
+            float x = x0;
+            for (Token t = tokenList; t != null && t.isPaintable(); t = t.getNextToken()) {
+                float width = t.getWidth(area, this, x);
+                if (width > room) {
+                    // The first character that does not fit starts the next screen line; a screen line holds at
+                    // least one character.
+                    if (p != p0 && t.getWidthUpTo(1, area, this, x) > room) return p;
+                    return t.getOffsetBeforeX(area, this, x, x + room);
+                }
+                room -= width;
+                x += width;
+                p += t.length();
+            }
+            return p + 1;
+        }
     }
 
     @Override protected void processKeyEvent(KeyEvent event) {

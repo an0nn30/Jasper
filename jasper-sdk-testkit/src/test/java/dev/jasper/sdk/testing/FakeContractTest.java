@@ -14,6 +14,11 @@ class FakeContractTest extends PluginContractTest {
     @Override protected ContractHarness newHarness() {
         var host = new FakePluginHost();
         return new ContractHarness() {
+            @Override public void setSetting(String pluginId, String key, Object rawValue) { host.setSetting(pluginId, key, rawValue); }
+            @Override public java.util.Optional<Object> savedSetting(String pluginId, String key) {
+                return java.util.Optional.ofNullable(host.savedSettings(pluginId).get(key));
+            }
+            @Override public List<String> settingsReports(String pluginId) { return host.settingsReports(pluginId); }
             @Override public void start(PluginInfo info, Set<String> requires, Set<String> optional, Plugin plugin) {
                 host.start(info, requires, optional, plugin);
             }

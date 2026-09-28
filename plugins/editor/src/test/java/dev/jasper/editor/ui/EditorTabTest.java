@@ -68,6 +68,19 @@ class EditorTabTest {
         assertThat(tab.area().getText()).isEqualTo("one\n");
     }
 
+    @Test void vimWrapsAtAnyCharacterThroughEditsAndGivesWordWrappingBack() throws Exception {
+        var tab = open(Files.writeString(folder.resolve("w.txt"), "one\n"));
+        drain();
+        assertThat(tab.area().getWrapStyleWord()).isTrue();
+        tab.vim(Optional.of(new dev.jasper.editor.vim.Vim(dev.jasper.editor.vim.VimHost.detached())));
+        assertThat(tab.area().getWrapStyleWord()).isFalse();
+        tab.area().append("two\n");
+        assertThat(tab.session().dirty()).as("the edit refreshed the tab").isTrue();
+        assertThat(tab.area().getWrapStyleWord()).as("Vim wraps at any character").isFalse();
+        tab.vim(Optional.empty());
+        assertThat(tab.area().getWrapStyleWord()).isTrue();
+    }
+
     @Test void aFailureShowsRetryAndCloseAndABinaryFileHasNoRetry() throws Exception {
         var missing = open(folder.resolve("gone.txt"));
         drain();

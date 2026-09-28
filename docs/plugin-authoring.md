@@ -16,7 +16,7 @@ id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasp
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
-sdk = ">=0.6, <0.7"
+sdk = ">=0.9, <0.10"
 capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute
 exports = []                       # packages other plugins may use
 
@@ -28,7 +28,7 @@ optional = false
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with
-their meaning; `context.config()` reads that file live and `config().file()` names it.
+their meaning; declare each key with `context.settings()` (see "Declared settings" below), and `settings().file()` names the file.
 Compile against `jasper-sdk` as `compileOnly`; ship any other library as a jar in the same
 directory. A plugin cannot see the application's classes or libraries, and may not define
 classes in `dev.jasper.*` platform packages or in a package a dependency exports.
@@ -41,18 +41,14 @@ classes in `dev.jasper.*` platform packages or in a package a dependency exports
     context.log().log(System.Logger.Level.INFO, "Sample plugin " + context.plugin().version() + " started");
     context.events().subscribe(AppEvents.THEME_CHANGED,
         event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
-    long delay = context.config().integer("demo_step_millis").orElse(300);
-    if (delay < 0 || delay > 5000) {
-        context.config().report("demo_step_millis", "Use 0 to 5000; using 300.");
-        delay = 300;
-    }
-    long stepMillis = delay;
-    if (context.config().bool("demo_ui").orElse(false)) installUi(context, stepMillis);
-    if (context.config().bool("demo_terminal").orElse(false)) installTerminalDemo(context);
-    if (context.config().bool("demo_session").orElse(false)) installSessionDemo(context, stepMillis);
-            if (context.config().bool("demo_scope").orElse(false)) installPaletteDemo(context);
-    if (context.config().bool("demo_activity").orElse(false))
-        context.background().execute(() -> demo(context, stepMillis));
+    var settings = new SampleSettings(context.settings());
+    context.settings().page(new SampleSettingsPanel(settings));
+    long stepMillis = settings.stepMillis.get();
+    if (settings.ui.get()) installUi(context, stepMillis);
+    if (settings.terminal.get()) installTerminalDemo(context);
+    if (settings.session.get()) installSessionDemo(context, stepMillis);
+    if (settings.scope.get()) installPaletteDemo(context);
+    if (settings.activity.get()) context.background().execute(() -> demo(context, stepMillis));
 }
 ```
 
@@ -108,8 +104,10 @@ private static void installUi(PluginContext context, long stepMillis) {
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Prefer semantic names: `context.appearance().icon(IconName.LOCK)`. SDK 0.7.6 added
-  `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.8.0, <0.9"`
-  (Vault `>=0.8.2` for icon meanings; Editor `>=0.8.5` for hosted document tabs; Remote `>=0.8.6` for shell profiles).
+  `SPLIT`, `ZOOM`, `TERMINAL` and `SERVER`; bundled plugins declare `sdk = ">=0.9.0, <0.10"`
+  (Remote `>=0.9.1, <0.10` for shell profiles; before 0.9, Vault needed `>=0.8.2` for icon meanings,
+  Remote `>=0.8.3` for remote directory hints and Editor `>=0.8.4` for `onCloseCommand`, quit guards
+  and `chooseSaveFile`).
   Jasper supplies IntelliJ New UI artwork; plugins need no artwork. Returned icons are 16px.
   SDK 0.8.2 exposes the complete catalog with `icon(BundledIcon)`, for example
   `context.appearance().icon(BundledIcon.TOOLWINDOWS_PROJECT)`.
@@ -285,14 +283,14 @@ private static void installTerminalDemo(PluginContext context) {
 - `PaneInfo.shell` is the launcher's label (`zsh`, `fish`) or a provided session's title.
 - To run a command in a new tab, open one with `OpenRequest.local()` or `localIn(directory)` and
   `sendText` to the pane you get back; the tab runs the user's configured shell.
-- **Shell profiles (SDK 0.8.6).** `context.terminals().profiles()` lists the shells Jasper detected,
+- **Shell profiles (SDK 0.9.1).** `context.terminals().profiles()` lists the shells Jasper detected,
   such as PowerShell or a WSL distribution (`kind()` is `ShellProfileInfo.Kind.WSL` and `detail()`
   reads `WSL 1` or `WSL 2`). Open one with `OpenRequest.localProfile(profile.id())`; an id Jasper does
   not list opens nothing and returns empty. On Windows, detection may finish after your plugin starts:
   subscribe with `onProfilesChanged` and read the list again. It fires after a detection completes:
   the first one, and each later one whose result differs (a WSL distribution or PowerShell 7
   appearing or disappearing). Edits to the Custom shell settings may not be reported, so read
-  `profiles()` again when the current list matters. Declare `sdk = ">=0.8.6, <0.9"`.
+  `profiles()` again when the current list matters. Declare `sdk = ">=0.9.1, <0.10"`.
 
 ## Providing a session
 
@@ -455,22 +453,53 @@ is reported as a notice.
   `publish` or, to learn who is calling, `publishPerConsumer`. Consumers must declare
   `requires` on the provider. Put the interfaces in a separate API jar that consumers compile
   against.
-- **Configuration.** Users edit `plugins/<id>/<id>.toml`; see [plugin settings](configuration.md#plugins). It is read-only to
-  the plugin; keep your own state under `context.dataDirectory()`. Problems you report with
-  `config().report(key, message)` are shown against that file, at the key's line, until the file is next reloaded.
+- **Settings.** Declare them while starting (see "Declared settings" below); users edit them in Settings › Tools or in
+  `plugins/<id>/<id>.toml` (see [plugin settings](configuration.md#plugins)). Jasper checks and reports the values;
+  keep your own state under `context.dataDirectory()`.
 - **Your own threads and sockets** are yours to release, including before `start` throws.
+
+## Declared settings
+
+Declare each setting while the plugin starts; the handle reads the file's value, reports bad values for you and
+saves new ones:
+
+```java
+Setting<Integer> size = context.settings().declare(
+    SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size")
+        .description("Font size in points.").section("Editor"));
+size.onChanged(points -> window.setFontSize(points));
+size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
+```
+
+Kinds are `bool`, `integer`, `number`, `text` (optionally with a rule and message), `choice` and `stringList`. A value
+the kind rejects falls back to the default and is reported against the file with its line; keys nothing declares are
+reported as unknown. Declaring after `start` returns throws. SDK 0.9 removed `PluginConfig` and `context.config()`.
+
+Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
+heading wherever `section` changes, the description under each control, and an editor chosen by kind or by
+`editor(EditorHint...)`. To build the page yourself, call `context.settings().page(panel)` during `start` with a
+`SettingsPanel`: `create(host)` builds the component, `host.row(setting)` gives you the standard row for a declared
+setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
+`modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel
+lives as long as your plugin, so Settings calls `reset` before `dispose` whenever it closes a page it showed without a
+successful Apply, as on Cancel; drop unapplied state of your own there. The Sample
+plugin's `SampleSettingsPanel` is a complete example; the testkit's `settingsPanel`, `pendingSettings` and
+`settingsPanelChanges` let you test it without a window.
 
 ## Testing
 
 ```java
 try (var host = new FakePluginHost()) {
-    host.setConfig("dev.example.tool", Map.of("enabled", true));
+    host.setSetting("dev.example.tool", "enabled", true);   // as if the user edited the file
     host.start(new PluginInfo("dev.example.tool", "Tool", "1.0.0", Set.of()), Set.of(), Set.of(), new ToolPlugin());
     host.runBackground();   // background tasks run when you say so
     host.flush();           // events are delivered when you say so
     assertThat(host.activityLog()).isNotEmpty();
 }
 ```
+
+`host.settingsReports(id)` lists what the last read of the plugin's file reported, as `key: message`, and
+`host.savedSettings(id)` what `set` wrote.
 
 `host.actions()`, `host.toolbar()`, `host.menu("VIEW")`, `host.status()` and
 `host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.

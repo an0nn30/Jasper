@@ -55,6 +55,7 @@ public final class Registers {
     private final VimHost host;
     private char previous;
     private String lastInserted = "";
+    private String lastCommand = "";
     private Content clipboardWritten;
 
     /** @param host reaches the clipboard */
@@ -70,6 +71,7 @@ public final class Registers {
             case '"' -> previous == 0 ? Optional.empty() : get(previous);
             case '*', '+' -> clipboard(register);
             case '.' -> lastInserted.isEmpty() ? Optional.empty() : Optional.of(Content.of(lastInserted, Type.CHAR));
+            case ':' -> lastCommand.isEmpty() ? Optional.empty() : Optional.of(Content.of(lastCommand, Type.CHAR));
             case '_' -> Optional.empty();
             default -> Optional.ofNullable(values.get(register));
         };
@@ -106,7 +108,7 @@ public final class Registers {
     /** @return whether the name is a register a command may name */
     static boolean valid(char name, boolean writing) {
         if (Character.isLetterOrDigit(name) && name < 128 || "\"-_*+".indexOf(name) >= 0) return true;
-        return !writing && name == '.';
+        return !writing && (name == '.' || name == ':');
     }
 
     /**
@@ -169,6 +171,28 @@ public final class Registers {
 
     /** @param text the text of the last insert, for {@code ".} and {@code i_CTRL-A} */
     void lastInserted(String text) { lastInserted = text; }
+
+    /**
+     * stuff_yank: a recorded macro goes into a register as one charwise line; an upper-case name appends it to the
+     * register's last line, keeping the register's type. {@code q"} records into register 0. The unnamed register
+     * keeps pointing where it did.
+     */
+    void record(char name, String text) {
+        char register = name == '"' ? '0' : Character.toLowerCase(name);
+        Content old = values.get(register);
+        Content added = Content.of(text, Type.CHAR);
+        if (!Character.isUpperCase(name) || old == null) {
+            values.put(register, added);
+            return;
+        }
+        List<String> lines = new ArrayList<>(old.lines());
+        lines.set(lines.size() - 1, lines.getLast() + added.lines().getFirst());
+        lines.addAll(added.lines().subList(1, added.lines().size()));
+        values.put(register, new Content(lines, old.type(), old.width()));
+    }
+
+    /** The {@code :} register: the last command line run. */
+    void lastCommand(String text) { lastCommand = text; }
 
     String lastInserted() { return lastInserted; }
 

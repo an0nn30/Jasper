@@ -73,20 +73,18 @@ public class RemotePlugin implements Plugin {
 
     private final Executor ui;
     private final Function<PluginContext,Executor> transferExecutor;
-    private volatile RemoteSettings.Sftp sftpSettings;
     private dev.jasper.remote.transfer.TransferCoordinator transfers;
     private dev.jasper.remote.ui.transfers.TransferUi transferUi;
     private dev.jasper.remote.ui.sftp.SftpUi sftpUi;
     private dev.jasper.remote.ui.sftp.DirectoryFollower follower;
     private dev.jasper.remote.edit.EditChannels editChannels;
     private final Map<UUID, PendingSession> attachedPanes = new java.util.HashMap<>();
-    private PluginAction sftpToggle;
     public static final String SFTP="dev.jasper.remote.sftp", SFTP_TOGGLE=dev.jasper.remote.ui.sftp.SftpUi.TOGGLE;
     private final Function<PluginContext, Optional<AgentClient>> agentFactory;
     private final BiFunction<Duration, Runnable, Runnable> schedule;
     private final Path sshDir;
     private PluginContext context;
-    private RemoteSettings settings;
+    private RemoteSettings.Declared settings;
     private HostStore store;
     private PanelState panelState;
     private KnownHosts trust;
@@ -95,8 +93,6 @@ public class RemotePlugin implements Plugin {
     private RemoteScope scope;
     private StatusItem status;
     private PluginAction splitAction;
-    private PluginAction connectAction, hostsAction;
-    private RemoteShortcuts shortcuts;
     private SessionsToolbar sessionsToolbar;
     private Timer poll;
     private Icon icon;
@@ -137,29 +133,28 @@ public class RemotePlugin implements Plugin {
     @Override public void start(PluginContext context) throws Exception {
         this.context = context;
         Files.createDirectories(context.dataDirectory());
-        settings = RemoteSettings.read(context.config());
+        settings = new RemoteSettings.Declared(context.settings());
         store = new HostStore(context.dataDirectory().resolve("hosts.toml"), context.background(), ui);
         panelState = new PanelState(context.dataDirectory().resolve("panel-state.toml"));
         hostInfo = new HostInfoCache(context.dataDirectory().resolve("host-info.properties"));
         context.background().execute(() -> { hostInfo.load(); ui.execute(() -> { if (!stopped) refreshPanels(); }); });
-        trust = new KnownHosts(context.dataDirectory().resolve("known_hosts"), () -> settings.readUserKnownHosts() ? Optional.of(sshDir.resolve("known_hosts")) : Optional.empty());
+        trust = new KnownHosts(context.dataDirectory().resolve("known_hosts"), () -> settings.connection().readUserKnownHosts() ? Optional.of(sshDir.resolve("known_hosts")) : Optional.empty());
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
         Optional<java.util.function.BiFunction<WindowHandle, UUID, CompletableFuture<Optional<dev.jasper.vault.api.Credential>>>> credentialSource = Optional.empty();
         if (vault.isPresent()) credentialSource = Optional.of((owner, id) -> vault.get().credential(owner, id));
-        connections = new Connections(() -> settings, trust, agentFactory.apply(context), store::host,
+        connections = new Connections(settings::connection, trust, agentFactory.apply(context), store::host,
             credentialSource, this::askHostKey, context.background(), ui, schedule);
         connections.onChanged(this::refreshStatus);
         icon = context.appearance().icon(dev.jasper.sdk.ui.IconName.NETWORK);
         serverIcon = context.appearance().icon(dev.jasper.sdk.ui.IconName.SERVER);
         // Before the panels: each names its toggle action, which must already be registered.
-        configureShortcuts();
+        registerNavigation();
 
-        sftpSettings=RemoteSettings.sftp(context.config());
         Executor transferBackground=transferExecutor.apply(context);
-        var endpoints=new dev.jasper.remote.sftp.EndpointFactory(connections,context.background(),ui,()->sftpSettings.requestTimeout());
+        var endpoints=new dev.jasper.remote.sftp.EndpointFactory(connections,context.background(),ui,()->settings.sftp().requestTimeout());
         transfers=new dev.jasper.remote.transfer.TransferCoordinator(context.dataDirectory().resolve("transfers"),transferBackground,ui,(ref,owner)-> {
             try { return endpoints.open(ref.identity(),owner,status->{}); }catch(IOException failure) { return CompletableFuture.failedFuture(failure); }
-        },()->sftpSettings.maxParallelFiles());
+        },()->settings.sftp().maxParallelFiles());
         transfers.setResumeValidator((ref,owner)-> {
             if(ref.hostId().isEmpty()) return CompletableFuture.completedFuture(null);
             try {
@@ -223,36 +218,22 @@ public class RemotePlugin implements Plugin {
         if (vault.isPresent()) context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> refreshPanels());
         context.events().subscribe(TerminalEvents.CWD_CHANGED,event->event.remoteDirectory().ifPresent(directory->{follower.reported(event.paneId());sftpUi.directory(event.paneId(),directory.path());}));
         context.events().subscribe(TerminalEvents.TAB_SELECTED,event->context.terminals().window(event.windowId()).flatMap(window->window.activeTab()).flatMap(tab->tab.activePane()).ifPresent(pane->sftpFocused(pane.id())));
-        context.config().onChanged(() -> {
-            if (stopped) return;
-            settings = RemoteSettings.read(context.config());sftpSettings=RemoteSettings.sftp(context.config());
-            configureShortcuts();
-        });
     }
 
-    private void configureShortcuts() {
-        RemoteShortcuts next = RemoteShortcuts.read(context.config());
-        // Binding preferences are immutable in the SDK. Replace only changed actions under their
-        // stable ids; the host refreshes shortcuts and existing placements in every open window.
-        if (shortcuts == null || !next.openPalette().equals(shortcuts.openPalette())) {
-            if (connectAction != null) connectAction.close();
-            connectAction = context.actions().register(ActionSpec.of(CONNECT, "Connect to SSH Host...").withIcon(icon)
-                .withKeywords(List.of("ssh", "remote", "host", "connect")).withDefaultBinding(next.openPalette().orElse(null)),
-                invoked -> context.palette().open(invoked.window(), RemoteScope.ID, Optional.empty(), Optional.empty()));
-        }
-        if (shortcuts == null || !next.togglePanel().equals(shortcuts.togglePanel())) {
-            if (hostsAction != null) hostsAction.close();
-            hostsAction = context.actions().register(ActionSpec.of(HOSTS, "Toggle SSH hosts").withIcon(icon)
-                .withKeywords(List.of("ssh", "hosts", "panel", "show", "hide")).withDefaultBinding(next.togglePanel().orElse(null)),
-                invoked -> showPanel(invoked.window()));
-        }
-        if(shortcuts==null || !next.toggleSftp().equals(shortcuts.toggleSftp())) {
-            if(sftpToggle!=null)sftpToggle.close();
-            sftpToggle=context.actions().register(ActionSpec.of(SFTP_TOGGLE,"Toggle SFTP")
-                .withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp", "files", "panel", "show", "hide")).withDefaultBinding(next.toggleSftp().orElse(null)),invoked->sftpUi.toggle(invoked.window()));
-        }
-        shortcuts = next;
+    /** Remote's navigation actions with their default bindings; Keymap rebinds them. */
+    private void registerNavigation() {
+        context.actions().register(ActionSpec.of(CONNECT, "Connect to SSH Host...").withIcon(icon)
+                .withKeywords(List.of("ssh", "remote", "host", "connect")).withDefaultBinding("cmd+shift+h"),
+            invoked -> context.palette().open(invoked.window(), RemoteScope.ID, Optional.empty(), Optional.empty()));
+        context.actions().register(ActionSpec.of(HOSTS, "Toggle SSH hosts").withIcon(icon)
+                .withKeywords(List.of("ssh", "hosts", "panel", "show", "hide")).withDefaultBinding("cmd+shift+s"),
+            invoked -> showPanel(invoked.window()));
+        context.actions().register(ActionSpec.of(SFTP_TOGGLE, "Toggle SFTP")
+                .withIcon(context.appearance().icon(dev.jasper.sdk.ui.IconName.FOLDER)).withKeywords(List.of("sftp", "files", "panel", "show", "hide")),
+            invoked -> sftpUi.toggle(invoked.window()));
     }
+
+    RemoteSettings.Sftp sftpSettings() { return settings.sftp(); }
 
     @Override public void stop() {
         stopped = true;

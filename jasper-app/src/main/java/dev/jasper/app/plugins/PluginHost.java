@@ -1,6 +1,8 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.settingsui.PageContext;
+import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.sdk.plugin.Plugin;
 import java.nio.file.Path;
@@ -25,10 +27,10 @@ import dev.jasper.app.terminals.TerminalRegistry;
  */
 final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
-                       Function<String, Map<String, Object>> settings, Function<String, Path> settingsFile, java.util.function.BiFunction<String, List<String>, java.util.Optional<PluginSettingsFiles.Position>> positions, Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
+                       Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
                        AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
-                       PluginRuntime.ShellProfiles profiles) { }
+                       PluginSettingsFiles settingsFiles, Consumer<Path> clearReports, PluginRuntime.ShellProfiles profiles) { }
 
     record Outcome(PluginStatus.State state, String reason) { }
 
@@ -66,8 +68,9 @@ final class PluginHost {
             return new Outcome(PluginStatus.State.SKIPPED, "requires " + required + ", which "
                 + (why == PluginStatus.State.FAILED ? "failed to start" : why == PluginStatus.State.SKIPPED ? "was skipped" : "is not running"));
         }
-        var context = new HostedContext(this, hosted, new PluginSettings(id, environment.settingsFile().apply(id), environment.settings().apply(id),
-            containment, path -> environment.positions().apply(id, path), environment.configReport()));
+        var declared = new DeclaredSettings(id, environment.settingsFiles(), containment, environment.ui(), environment.configReport(),
+            () -> settingsWritten(id));
+        var context = new HostedContext(this, hosted, declared);
         contexts.put(id, context);
         Set<String> providers = new HashSet<>(hosted.requires());
         providers.addAll(hosted.optional());
@@ -87,6 +90,7 @@ final class PluginHost {
         }
         services.commit(id);
         context.state = HostedContext.State.ACTIVE;
+        context.declared.complete();
         return new Outcome(PluginStatus.State.ACTIVE, "");
     }
 
@@ -103,8 +107,15 @@ final class PluginHost {
         for (HostedContext context : List.copyOf(contexts.values()))
             if (context.state == HostedContext.State.ACTIVE) {
                 String id = context.hosted.info().id();
-                context.settings.update(environment.settings().apply(id), reloaded.contains(id));
+                context.declared.reload(reloaded.contains(id));
             }
+    }
+
+    /** A plugin saved a setting: its file's old reports go and its handles see the file again. UI thread. */
+    void settingsWritten(String id) {
+        requireUi();
+        environment.clearReports().accept(environment.settingsFiles().file(id));
+        settingsChanged(Set.of(id));
     }
 
     /** Reverse start order. The returned futures complete when each plugin's background work has drained. */
@@ -124,6 +135,29 @@ final class PluginHost {
         }
         pending.add(cleanup.drained());
         return pending;
+    }
+
+    /** Settings pages for running plugins that declared settings or gave a page of their own, in start order. UI thread. */
+    List<SettingsPage> settingsPages(PageContext context) {
+        requireUi();
+        var pages = new ArrayList<SettingsPage>();
+        for (HostedContext hosted : contexts.values()) {
+            if (hosted.state != HostedContext.State.ACTIVE) continue;
+            var info = hosted.hosted.info();
+            var panel = hosted.declared.panel();
+            if (panel.isPresent())
+                pages.add(new PluginPanelPage(info.id(), info.name(), hosted.declared, panel.get(), containment, context));
+            else if (hosted.declared.declaresAnything())
+                pages.add(new PluginSettingsPage(info.id(), info.name(), hosted.declared, context));
+        }
+        return pages;
+    }
+
+    /** Whether a running plugin has a page in Settings. UI thread. */
+    boolean hasSettingsPage(String pluginId) {
+        HostedContext hosted = contexts.get(pluginId);
+        return hosted != null && hosted.state == HostedContext.State.ACTIVE
+            && (hosted.declared.panel().isPresent() || hosted.declared.declaresAnything());
     }
 
     String executing() { return containment.executing(); }

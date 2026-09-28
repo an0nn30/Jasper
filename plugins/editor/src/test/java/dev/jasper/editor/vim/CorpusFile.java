@@ -33,7 +33,8 @@ final class CorpusFile {
             }
             if (!line.startsWith("=== ")) throw error(file, i, "expected \"=== name\"");
             String name = line.substring(4).trim();
-            String divergent = null, set = "", keys = null;
+            String divergent = null, set = "", keys = null, window = null, folds = null;
+            boolean output = false;
             Map<Character, CorpusCase.Register> given = new LinkedHashMap<>();
             List<String> text = null;
             int cursorLine = 1, cursorCol = 1;
@@ -65,6 +66,9 @@ final class CorpusFile {
                 switch (key) {
                     case "divergent" -> divergent = value;
                     case "set" -> set = value;
+                    case "window" -> window = value;
+                    case "folds" -> folds = value;
+                    case "output" -> output = value.equals("yes");
                     case "cursor" -> {
                         String[] parts = value.split(",");
                         cursorLine = Integer.parseInt(parts[0].trim());
@@ -82,7 +86,7 @@ final class CorpusFile {
                 i++;
             }
             if (text == null || keys == null) throw error(file, i, "case \"" + name + "\" needs text: and keys:");
-            cases.add(new CorpusCase(file, name, divergent, set, given, text, cursorLine, cursorCol, keys, registers, expected));
+            cases.add(new CorpusCase(file, name, divergent, set, given, text, cursorLine, cursorCol, keys, registers, window, folds, output, expected));
         }
         return cases;
     }
@@ -92,7 +96,8 @@ final class CorpusFile {
     private static Parsed expectation(String file, List<String> lines, int i, String by) {
         List<String> text = List.of();
         int line = 1, col = 1;
-        String mode = "normal", visual = null;
+        String mode = "normal", visual = null, view = null, closedFolds = null;
+        List<String> output = null;
         Map<Character, CorpusCase.Register> registers = new LinkedHashMap<>();
         while (i < lines.size() && !lines.get(i).startsWith("=== ")) {
             String field = lines.get(i);
@@ -106,6 +111,12 @@ final class CorpusFile {
                 text = block;
                 continue;
             }
+            if (field.equals("expect-output:")) {
+                List<String> block = new ArrayList<>();
+                i = block(lines, i + 1, block);
+                output = block;
+                continue;
+            }
             int colon = field.indexOf(':', field.startsWith("expect-register ") ? 17 : 0);
             String key = field.substring(0, colon), value = field.substring(colon + 1).trim();
             switch (key) {
@@ -116,6 +127,8 @@ final class CorpusFile {
                 }
                 case "expect-mode" -> mode = value;
                 case "expect-visual" -> visual = value;
+                case "expect-view" -> view = value;
+                case "expect-folds" -> closedFolds = value;
                 default -> {
                     if (!key.startsWith("expect-register ")) throw error(file, i, "unknown field " + key);
                     if (!value.equals("none")) registers.put(key.charAt(16), register(value));
@@ -123,7 +136,7 @@ final class CorpusFile {
             }
             i++;
         }
-        return new Parsed(new CorpusCase.Expected(by, text, line, col, mode, visual, registers), i);
+        return new Parsed(new CorpusCase.Expected(by, text, line, col, mode, visual, registers, view, closedFolds, output), i);
     }
 
     private static CorpusCase.Register register(String value) {
@@ -183,6 +196,12 @@ final class CorpusFile {
         out.add("expect-cursor: " + expected.line() + "," + expected.col());
         out.add("expect-mode: " + expected.mode());
         if (expected.visual() != null) out.add("expect-visual: " + expected.visual());
+        if (expected.view() != null) out.add("expect-view: " + expected.view());
+        if (expected.folds() != null) out.add("expect-folds: " + expected.folds());
+        if (expected.output() != null) {
+            out.add("expect-output:");
+            for (String line : expected.output()) out.add(textLine(line));
+        }
         for (char name : c.registers()) {
             CorpusCase.Register register = expected.registers().get(name);
             out.add("expect-register " + name + ": " + (register == null ? "none" : register.type() + " " + Json.quote(register.text())));

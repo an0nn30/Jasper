@@ -1,4 +1,4 @@
-# Editor settings. Jasper reads this file live; changes apply at once to open tabs.
+# Editor settings. Change them in Settings > Tools > Editor or here; changes apply at once to open tabs.
 
 # The editor font; it must be an installed family. Default: the first installed of
 # JetBrains Mono, Menlo, Consolas and DejaVu Sans Mono, else Monospaced.

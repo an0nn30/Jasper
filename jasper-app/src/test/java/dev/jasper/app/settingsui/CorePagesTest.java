@@ -38,6 +38,14 @@ class CorePagesTest {
         assertThat(CorePages.DEFAULT_PAGE).isEqualTo("appearance");
     }
 
+    @Test void toolsPagesComeLastUnderTools() {
+        var extra = new GroupPage("plugin.dev.example", "Example", Optional.of("tools"), false, List::of, context);
+        var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins,
+            page -> List.of(extra)).apply(context);
+        assertThat(pages.getLast()).isSameAs(extra);
+        assertThat(pages.get(pages.size() - 2).id()).isEqualTo("tools");
+    }
+
     @Test void systemSettingsOffersTheConfigurationFileActions() {
         var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         var systemPage = (SchemaPage) pages.stream().filter(page -> page.id().equals("system")).findFirst().orElseThrow();

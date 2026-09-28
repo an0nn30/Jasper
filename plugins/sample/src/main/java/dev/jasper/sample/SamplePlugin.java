@@ -62,18 +62,14 @@ public final class SamplePlugin implements Plugin {
         context.log().log(System.Logger.Level.INFO, "Sample plugin " + context.plugin().version() + " started");
         context.events().subscribe(AppEvents.THEME_CHANGED,
             event -> context.log().log(System.Logger.Level.INFO, "The look is now " + event.variant()));
-        long delay = context.config().integer("demo_step_millis").orElse(300);
-        if (delay < 0 || delay > 5000) {
-            context.config().report("demo_step_millis", "Use 0 to 5000; using 300.");
-            delay = 300;
-        }
-        long stepMillis = delay;
-        if (context.config().bool("demo_ui").orElse(false)) installUi(context, stepMillis);
-        if (context.config().bool("demo_terminal").orElse(false)) installTerminalDemo(context);
-        if (context.config().bool("demo_session").orElse(false)) installSessionDemo(context, stepMillis);
-                if (context.config().bool("demo_scope").orElse(false)) installPaletteDemo(context);
-        if (context.config().bool("demo_activity").orElse(false))
-            context.background().execute(() -> demo(context, stepMillis));
+        var settings = new SampleSettings(context.settings());
+        context.settings().page(new SampleSettingsPanel(settings));
+        long stepMillis = settings.stepMillis.get();
+        if (settings.ui.get()) installUi(context, stepMillis);
+        if (settings.terminal.get()) installTerminalDemo(context);
+        if (settings.session.get()) installSessionDemo(context, stepMillis);
+        if (settings.scope.get()) installPaletteDemo(context);
+        if (settings.activity.get()) context.background().execute(() -> demo(context, stepMillis));
     }
     // example:plugin:end
 

@@ -8,7 +8,7 @@ import java.util.Optional;
  * A local terminal to open: the user's configured shell, or one of the shell profiles Jasper detected.
  *
  * @param workingDirectory where it starts; empty means where Jasper's own New Tab would start
- * @param profile the id of a profile from {@link Terminals#profiles()} (since 0.8.6); empty means the shell Jasper's own
+ * @param profile the id of a profile from {@link Terminals#profiles()} (since 0.9.1); empty means the shell Jasper's own
  *     New Tab or Split would start. An id the host does not list opens nothing.
  */
 public record LocalSpec(Optional<Path> workingDirectory, Optional<String> profile) {
@@ -33,7 +33,7 @@ public record LocalSpec(Optional<Path> workingDirectory, Optional<String> profil
      *
      * @param profileId an id from {@link Terminals#profiles()}
      * @return the spec
-     * @since 0.8.6
+     * @since 0.9.1
      */
     public static LocalSpec ofProfile(String profileId) { return new LocalSpec(Optional.empty(), Optional.of(profileId)); }
 }

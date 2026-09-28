@@ -139,7 +139,7 @@ misbehave in UNC directories and touching the share can start the WSL 2 VM.
 Breadcrumbs, the status bar and plugin `PaneInfo.directory` then show real, openable
 Windows paths.
 
-## 6. SDK 0.8.6 (`dev.jasper.sdk.terminal`)
+## 6. SDK 0.9.1 (`dev.jasper.sdk.terminal`; designed as 0.8.6, shipped as 0.9.1 after main's SDK 0.9.0)
 
 - `record ShellProfileInfo(String id, String name, Kind kind, Optional<String> detail)`,
   where `Kind` is `LOGIN_SHELL, LOCAL_SHELL, WSL, CUSTOM`, mirroring the app. For WSL, `detail` holds
@@ -156,7 +156,7 @@ Windows paths.
   - `OpenSpec.Local` gains the profile.
   - `FakeTerminals` implements `profiles()` with a settable list.
   - The contract suite covers a known profile, an unknown one, and the default.
-- Bump `JasperSdk.VERSION` to 0.8.6 and raise the `sdk` range of the bundled plugins
+- Bump `JasperSdk.VERSION` to 0.9.1 (0.8.6 before the merge) and raise the `sdk` range of the bundled plugins
   that need it (Remote).
 
 ## 7. Remote panel "WSL" group (plugins/remote)
@@ -239,6 +239,6 @@ Two plans, one per runnable deliverable:
   the terminal path mapper, WSL detection, shell profiles, WSL launch, per-pane
   profile inheritance and the Settings dropdown. Result: a WSL distro can be the
   default shell.
-- **Plan B** (`docs/superpowers/plans/2026-09-28-jasper-wsl-b-remote.md`): SDK 0.8.6
+- **Plan B** (`docs/superpowers/plans/2026-09-28-jasper-wsl-b-remote.md`): SDK 0.9.1
   profiles, the app's plugin wiring, the testkit, and the Remote panel's WSL group,
   Sessions menu and palette rows. Depends on plan A.

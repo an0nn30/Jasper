@@ -44,7 +44,7 @@ public sealed interface OpenRequest permits OpenRequest.Local, OpenRequest.Sessi
      *
      * @param profileId an id from {@link Terminals#profiles()}
      * @return the request
-     * @since 0.8.6
+     * @since 0.9.1
      */
     static OpenRequest localProfile(String profileId) { return new Local(LocalSpec.ofProfile(profileId)); }
 

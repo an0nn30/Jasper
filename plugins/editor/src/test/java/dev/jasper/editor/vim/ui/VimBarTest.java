@@ -37,6 +37,22 @@ class VimBarTest {
         });
     }
 
+    @Test void showsRecordingAfterTheMode() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var area = new VimTextArea();
+            area.setText("abc\n");
+            var editor = new VimEditor(new Vim(VimHost.detached()), area, EditorDefaults.VIM);
+            var bar = new VimBar();
+            bar.attach(editor);
+            type(editor, "qq");
+            assertThat(bar.statusText()).isEqualTo("recording @q");
+            type(editor, "i");
+            assertThat(bar.statusText()).isEqualTo("-- INSERT --recording @q");
+            type(editor, "<Esc>q");
+            assertThat(bar.statusText()).isEmpty();
+        });
+    }
+
     @Test void showsTheCommandLineWithItsCursor() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var area = new VimTextArea();
@@ -82,6 +98,30 @@ class VimBarTest {
             assertThat(bar.commandText()).isEqualTo("2");
             type(editor, "\"");
             assertThat(bar.commandText()).as("a pending key replaces the size").isEqualTo("\"");
+        });
+    }
+
+    @Test void showsTheOutputPanelAndQuestions() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var area = new VimTextArea();
+            area.setText("one\ntwo\n");
+            area.setCaretPosition(0);
+            var editor = new VimEditor(new Vim(VimHost.detached()), area, EditorDefaults.VIM);
+            var bar = new VimBar();
+            bar.attach(editor);
+            type(editor, ":%p");
+            assertThat(bar.statusText()).isEqualTo(":%p");
+            type(editor, "<CR>");
+            assertThat(bar.outputLines()).containsExactly("one", "two");
+            assertThat(bar.statusText()).isEqualTo("Press ENTER or type command to continue");
+            type(editor, "<CR>");
+            assertThat(bar.outputLines()).isEmpty();
+            type(editor, ":1s/one/1/c<CR>");
+            assertThat(bar.statusText()).isEqualTo("replace with 1 (y/n/a/q/l/^E/^Y)?");
+            type(editor, "y");
+            assertThat(bar.statusText()).isEmpty();
+            type(editor, ":foo<CR>");
+            assertThat(bar.statusText()).isEqualTo("E492: Not an editor command: foo");
         });
     }
 }
