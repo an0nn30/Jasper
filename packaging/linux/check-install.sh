@@ -6,10 +6,11 @@ set -eu
 package=$1
 root=/opt/jasper
 
-# The package's install script registers the menu entry with xdg-desktop-menu, which in system mode
-# fails unless writable applications and desktop-directories directories already exist under
-# $XDG_DATA_DIRS. Desktop systems have both; minimal containers (and some headless systems) do not.
-mkdir -p /usr/share/applications /usr/share/desktop-directories
+# Minimal images lack the applications and desktop-directories directories that xdg-desktop-menu needs,
+# like headless systems do; the package's own install script must create them.
+if [ -e /usr/share/desktop-directories ]; then
+    echo "This image already has /usr/share/desktop-directories; the headless install path is not exercised"
+fi
 
 case "$package" in
     *.deb)

@@ -16,9 +16,10 @@
   both packages on both architectures, and install/library/menu/removal checks on Debian 12, Ubuntu 24.04, Fedora
   and openSUSE Tumbleweed for x64 and aarch64 (`.deb` ~97 MB, `.rpm` ~119 MB). Earlier runs found and fixed
   jpackage replacing the menu icon with its generic Java icon (now supplied through `--resource-dir`) and the
-  install-check's container setup. Open: jpackage's install scripts fail on systems without
-  `/usr/share/applications` and `/usr/share/desktop-directories` (documented in `packaging.md`; overriding the
-  scripts would fix it); the regular `ci` workflow is red for unrelated tests already failing on `main`; Linux
+  install-check's container setup. At the user's request the install scripts are now generated from the JBR's
+  own templates with the menu registration made safe on headless systems (it creates the two directories
+  `xdg-desktop-menu` needs and never fails the install or removal); the install check no longer prepares them.
+  Open: the regular `ci` workflow is red for unrelated tests already failing on `main`; Linux
   desktop acceptance (checklist in `packaging.md`) is the user's. Not merged.
 
 - **Editor Vim mode, plan V1b** (branch `claude/vim-v1b`, plan

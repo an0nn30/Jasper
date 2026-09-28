@@ -528,6 +528,46 @@ if (normalizedHost().os == 'windows') {
         (needed - bundled).collect { "${it}()(64bit)".toString() }
     }
 
+    // jpackage's install scripts register the menu entry with xdg-desktop-menu under `set -e`. xdg-desktop-menu fails
+    // unless /usr/share/applications (or /usr/local/...) and /usr/share/desktop-directories already exist, as on
+    // minimal and headless systems, and the install then fails and leaves the package unconfigured. Rewrite the selected
+    // JBR's own templates so the scripts create those directories and never fail the install or removal over the menu
+    // entry. Every other line stays jpackage's; a template without the expected placeholder fails the build.
+    String menuDirectories = 'mkdir -p /usr/share/applications /usr/share/desktop-directories'
+    Map<String, String> menuCommands = [
+        DESKTOP_COMMANDS_INSTALL: "jasper_menu_install () {\nDESKTOP_COMMANDS_INSTALL\n}\n${menuDirectories}\n" +
+            'jasper_menu_install "$@" || echo "jasper: the desktop menu entry was not registered" >&2',
+        DESKTOP_COMMANDS_UNINSTALL: 'jasper_menu_uninstall () {\nDESKTOP_COMMANDS_UNINSTALL\n}\n' +
+            'jasper_menu_uninstall "$@" || echo "jasper: the desktop menu entry was not removed" >&2',
+    ]
+    def writeInstallScripts = { File sdkHome, File resources, String type ->
+        // Resource-directory names jpackage looks for, and the placeholders each template must contain.
+        Map<String, List> overrides = type == 'deb' ?
+            ['template.postinst': ['postinst', ['DESKTOP_COMMANDS_INSTALL']], 'template.prerm': ['prerm', ['DESKTOP_COMMANDS_UNINSTALL']]] :
+            ['template.spec': ['jasper.spec', ['DESKTOP_COMMANDS_INSTALL', 'DESKTOP_COMMANDS_UNINSTALL']]]
+        new ZipFile(new File(sdkHome, 'jmods/jdk.jpackage.jmod')).withCloseable { archive ->
+            overrides.each { template, override ->
+                def entry = archive.getEntry("classes/jdk/jpackage/internal/resources/${template}")
+                if (entry == null) throw new GradleException("The JBR SDK's jpackage has no Linux ${template}")
+                List<String> lines = archive.getInputStream(entry).withCloseable { new String(it.readAllBytes(), StandardCharsets.UTF_8) }.split('\n', -1) as List
+                override[1].each { String placeholder ->
+                    if (lines.count { it == placeholder } != 1) throw new GradleException("jpackage's ${template} no longer has exactly one ${placeholder} line; review the install-script override")
+                    lines[lines.indexOf(placeholder)] = menuCommands[placeholder]
+                }
+                new File(resources, override[0]).setText(lines.join('\n'), 'UTF-8')
+            }
+        }
+    }
+
+    // Checks the generated maintainer scripts: jpackage's menu commands inside the wrappers, all placeholders filled.
+    def verifyInstallScripts = { String scripts, String label ->
+        [menuDirectories, 'jasper_menu_install "$@" || ', 'jasper_menu_uninstall "$@" || ',
+         'xdg-desktop-menu install /opt/jasper/lib/jasper-Jasper.desktop', 'xdg-desktop-menu uninstall'].each { expected ->
+            if (!scripts.contains(expected)) throw new GradleException("${label} verification failed: install scripts lack '${expected}'\n${scripts}")
+        }
+        if (scripts.contains('DESKTOP_COMMANDS_')) throw new GradleException("${label} verification failed: install scripts keep an unfilled placeholder\n${scripts}")
+    }
+
     // Compares an unpacked package with the verified image (same bytes, no lost executable bits) and checks the menu entry.
     // jpackage rewrites its own app-image metadata, lib/app/.jpackage.xml, when it builds a package.
     def verifyUnpackedPackage = { File image, File unpacked, String label ->
@@ -573,6 +613,7 @@ if (normalizedHost().os == 'windows') {
                     File resources = new File(temporary, 'resources')
                     resources.mkdirs()
                     Files.copy(nativeIcon.get().toPath(), new File(resources, 'Jasper.png').toPath())
+                    writeInstallScripts(context.sdkHome, resources, type)
                     List<String> args = [context.jpackage.absolutePath, '--type', type, '--name', 'Jasper',
                         '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
                         '--about-url', 'https://github.com/an0nn30/moray',
@@ -601,10 +642,14 @@ if (normalizedHost().os == 'windows') {
                             field.find() ? field.group(1) : ''
                         }.join(' ')
                         executeNative(['dpkg-deb', '--extract', generated.absolutePath, unpacked.absolutePath], 'dpkg-deb --extract')
+                        verifyInstallScripts(['postinst', 'prerm'].collect { script ->
+                            executeNative(['dpkg-deb', '--info', generated.absolutePath, script], "dpkg-deb --info ${script}").stdout
+                        }.join('\n'), '.deb')
                     } else {
                         identity = executeNative(['rpm', '--query', '--package', '--queryformat', '%{NAME} %{VERSION} %{ARCH}', generated.absolutePath], 'rpm --query').stdout.trim()
                         executeNative(['bash', '-c', 'set -o pipefail; cd "$1" && rpm2cpio "$2" | cpio --extract --make-directories --preserve-modification-time --quiet',
                             'bash', unpacked.absolutePath, generated.absolutePath], 'rpm2cpio | cpio (install rpm2cpio and cpio)')
+                        verifyInstallScripts(executeNative(['rpm', '--query', '--package', '--scripts', generated.absolutePath], 'rpm --scripts').stdout, '.rpm')
                     }
                     def expectedIdentity = ~/^jasper ${java.util.regex.Pattern.quote(context.version)}(-[0-9]+)? ${packageArchitecture}$/
                     if (!(identity ==~ expectedIdentity)) throw new GradleException(".${type} verification failed: package identity is '${identity}'")
