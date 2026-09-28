@@ -55,3 +55,13 @@ unverified.
 - [ ] 38. `<C-g>` shows the file's path, line count and position (`[Modified]` after an edit); `ga` shows the code of the character under the cursor.
 - [ ] 39. `<C-a>` on `0x0f` gives `0x10`; `V` over three lines of `0` then `g<C-a>` numbers them 1, 2, 3.
 - [ ] 40. After edits in two places, `g;` returns to each in turn and `` `. `` to the last; `ma`, then `'a` elsewhere, returns to it.
+
+## Vim mode (plan V1c)
+
+- [ ] 41. `<C-d>`, `<C-u>`, `<C-f>` and `<C-b>` scroll by half or whole windows and the cursor follows; `<C-e>` and `<C-y>` scroll one line, the cursor staying put until it would leave the window.
+- [ ] 42. `zt`, `zz` and `zb` put the cursor line at the top, middle and bottom of the window; after resizing the window, `zz` still centres.
+- [ ] 43. `H`, `M` and `L` go to the top, middle and bottom lines on screen; `3H` to the third.
+- [ ] 44. With Wrap on, a long line wraps at any character; `gj`/`gk` move by screen line and `g0`/`g$` go to the start and end of the screen line.
+- [ ] 45. Scrolling with the mouse wheel or the scroll bar moves the view; the caret moves into the window when it was scrolled out, and the next `j` does not jump back.
+- [ ] 46. In a Java file, `zc` inside a method folds it (the fold marker in the gutter shows it), `j` steps over the closed fold, `zo` opens it; `zM` folds everything and `zR` opens everything; clicking the gutter's fold markers still works.
+- [ ] 47. With a method folded, `dd` on it deletes the whole method, `u` brings it back, and `/` for text inside it opens the fold.

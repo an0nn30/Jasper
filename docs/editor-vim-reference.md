@@ -75,6 +75,23 @@ In Normal and Visual mode and after an operator. A count repeats or scales them.
 | `g#` | search backward for the keyword under the cursor, also inside words |
 | `'{char}` | to the first non-blank of mark {char}'s line |
 | `` `{char} `` | to mark {char} |
+| `H` | to line {count} from the top of the window |
+| `M` | to the middle line of the window |
+| `L` | to line {count} from the bottom of the window |
+| `gj` | down {count} screen lines |
+| `gk` | up {count} screen lines |
+| `g<Down>` | down {count} screen lines |
+| `g<Up>` | up {count} screen lines |
+| `g0` | to the first character of the screen line |
+| `g<Home>` | to the first character of the screen line |
+| `g^` | to the first non-blank of the screen line |
+| `gm` | to the middle of the screen line |
+| `g$` | to the last character of the screen line |
+| `g<End>` | to the last non-blank of the screen line |
+| `zj` | to the start of the next fold |
+| `zk` | to the end of the previous fold |
+| `[z` | to the start of the open fold |
+| `]z` | to the end of the open fold |
 
 ## Operators
 
@@ -189,6 +206,33 @@ After an operator, and in Visual mode, where they extend the area.
 | `gi` | Insert mode where it was last left (the '^ mark) |
 | `<C-a>` | add {count} to the number at or after the cursor |
 | `<C-x>` | subtract {count} from the number at or after the cursor |
+| `<C-e>` | scroll the text up {count} lines |
+| `<C-y>` | scroll the text down {count} lines |
+| `<C-d>` | scroll down half a window ({count} sets 'scroll'), the cursor too |
+| `<C-u>` | scroll up half a window ({count} sets 'scroll'), the cursor too |
+| `<C-f>` | scroll down {count} pages |
+| `<PageDown>` | scroll down {count} pages |
+| `<S-Down>` | scroll down {count} pages |
+| `<C-b>` | scroll up {count} pages |
+| `<PageUp>` | scroll up {count} pages |
+| `<S-Up>` | scroll up {count} pages |
+| `zt` | line {count} (default the cursor line) to the top of the window |
+| `z<CR>` | as zt, the cursor on the first non-blank |
+| `zz` | line {count} to the middle of the window |
+| `z.` | as zz, the cursor on the first non-blank |
+| `zb` | line {count} to the bottom of the window |
+| `z-` | as zb, the cursor on the first non-blank |
+| `z+` | the line below the window to the top (line {count} with a count) |
+| `z^` | the line above the window to the bottom (line {count} with a count) |
+| `zo` | open {count} levels of folds at the cursor |
+| `zO` | open every fold at the cursor |
+| `zc` | close {count} levels of folds at the cursor |
+| `zC` | close every fold at the cursor |
+| `za` | open a closed fold, or close an open one |
+| `zA` | open or close every fold at the cursor |
+| `zv` | open the folds that hide the cursor line |
+| `zR` | open every fold |
+| `zM` | close every fold |
 
 ## Visual-mode commands
 
@@ -226,6 +270,16 @@ In Visual mode, besides the motions, operators and text objects above. A change 
 | `<C-x>` | subtract {count} from the first number in each line |
 | `g<C-a>` | add {count}, 2 × {count}, … to the numbers of successive lines |
 | `g<C-x>` | subtract {count}, 2 × {count}, … from the numbers of successive lines |
+| `<C-e>` | scroll the text up {count} lines |
+| `<C-y>` | scroll the text down {count} lines |
+| `<C-d>` | scroll down half a window ({count} sets 'scroll'), the cursor too |
+| `<C-u>` | scroll up half a window ({count} sets 'scroll'), the cursor too |
+| `<C-f>` | scroll down {count} pages |
+| `<PageDown>` | scroll down {count} pages |
+| `<S-Down>` | scroll down {count} pages |
+| `<C-b>` | scroll up {count} pages |
+| `<PageUp>` | scroll up {count} pages |
+| `<S-Up>` | scroll up {count} pages |
 
 ## Insert-mode keys
 
