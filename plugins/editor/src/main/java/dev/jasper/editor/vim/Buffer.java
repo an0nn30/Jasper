@@ -1,12 +1,11 @@
 package dev.jasper.editor.vim;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
+import javax.swing.text.Element;
 
 /**
  * The text as Vim sees it: lines without their newline, where a final newline ends the last line rather than
@@ -16,20 +15,15 @@ import javax.swing.text.Document;
  */
 final class Buffer {
     private final Document document;
-    private final DocumentListener listener = new DocumentListener() {
-        @Override public void insertUpdate(DocumentEvent event) { lines = null; }
-        @Override public void removeUpdate(DocumentEvent event) { lines = null; }
-        @Override public void changedUpdate(DocumentEvent event) { }
-    };
-    private String[] lines;
-    private int[] starts;
+    private final Element root;
 
     Buffer(Document document) {
         this.document = document;
-        document.addDocumentListener(listener);
+        this.root = document.getDefaultRootElement();
     }
 
-    void close() { document.removeDocumentListener(listener); }
+    /** Nothing to release: the buffer reads the document's own line elements. */
+    void close() { }
 
     Document document() { return document; }
 
@@ -41,19 +35,42 @@ final class Buffer {
 
     int length() { return document.getLength(); }
 
-    /** @return the number of lines, at least 1 */
-    int count() { return lines().length; }
+    /** @return the text from {@code from} to {@code to} */
+    String text(int from, int to) {
+        try { return document.getText(from, to - from); }
+        catch (BadLocationException bad) { throw new IllegalStateException(bad); }
+    }
 
-    String line(int line) { return lines()[line]; }
+    /** @return the character at {@code offset}, or -1 outside the text */
+    int charAt(int offset) {
+        if (offset < 0 || offset >= document.getLength()) return -1;
+        return text(offset, offset + 1).charAt(0);
+    }
+
+    /**
+     * @return the number of lines, at least 1: the document's line elements, less the empty one after a final
+     *     newline
+     */
+    int count() {
+        int elements = root.getElementCount();
+        int length = document.getLength();
+        return elements > 1 && length > 0 && charAt(length - 1) == '\n' ? elements - 1 : elements;
+    }
+
+    String line(int line) { return text(start(line), end(line)); }
 
     /** @return the offset of the line's first character */
     int start(int line) {
-        lines();
-        return starts[line];
+        check(line);
+        return root.getElement(line).getStartOffset();
     }
 
     /** @return the offset just after the line's last character (its newline, or the end of the text) */
-    int end(int line) { return start(line) + line(line).length(); }
+    int end(int line) {
+        check(line);
+        // A line element ends after its newline; the last one after the document's implied final break.
+        return root.getElement(line).getEndOffset() - 1;
+    }
 
     int offset(Pos pos) { return start(pos.line) + pos.col; }
 
@@ -61,19 +78,22 @@ final class Buffer {
 
     /** @return the line holding {@code offset}; an offset past the last line is on the last line */
     int lineOf(int offset) {
-        lines();
-        int found = Arrays.binarySearch(starts, offset);
-        int line = found >= 0 ? found : -found - 2;
-        return Math.max(0, Math.min(line, lines.length - 1));
+        int line = root.getElementIndex(Math.max(0, offset));
+        return Math.max(0, Math.min(line, count() - 1));
     }
 
     Pos pos(int offset) {
         int line = lineOf(offset);
-        return new Pos(line, Math.min(Math.max(0, offset - start(line)), line(line).length()));
+        int start = start(line);
+        return new Pos(line, Math.min(Math.max(0, offset - start), end(line) - start));
     }
 
     /** @return lines {@code first} to {@code last}, inclusive */
-    List<String> lines(int first, int last) { return List.of(Arrays.copyOfRange(lines(), first, last + 1)); }
+    List<String> lines(int first, int last) {
+        List<String> lines = new ArrayList<>(last - first + 1);
+        for (int line = first; line <= last; line++) lines.add(line(line));
+        return List.copyOf(lines);
+    }
 
     void insert(int offset, String text) {
         if (text.isEmpty()) return;
@@ -114,7 +134,7 @@ final class Buffer {
             return;
         }
         int length = length();
-        boolean newline = length > 0 && text().charAt(length - 1) == '\n';
+        boolean newline = length > 0 && charAt(length - 1) == '\n';
         insert(length, newline ? block + "\n" : "\n" + block);
     }
 
@@ -126,14 +146,7 @@ final class Buffer {
         else remove(end(first - 1), end(last));
     }
 
-    private String[] lines() {
-        if (lines == null) {
-            String text = text();
-            if (text.endsWith("\n")) text = text.substring(0, text.length() - 1);
-            lines = text.split("\n", -1);
-            starts = new int[lines.length];
-            for (int i = 1; i < lines.length; i++) starts[i] = starts[i - 1] + lines[i - 1].length() + 1;
-        }
-        return lines;
+    private void check(int line) {
+        if (line < 0 || line >= count()) throw new ArrayIndexOutOfBoundsException("Line " + line + " of " + count());
     }
 }

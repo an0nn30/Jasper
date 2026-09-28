@@ -98,8 +98,11 @@ recorded corpus.
   `E353: Nothing in register q`. A failing command flashes it; Jasper never beeps.
 - The caret is a block in Normal mode, a bar in Insert mode, and an underline after an operator and in Replace mode.
 - **Which keys Vim takes.** ⌘ shortcuts on macOS always stay with the Editor. Otherwise Vim takes a key when it has
-  a meaning for it in the current mode, and the Editor gets the rest: on Linux and Windows Ctrl+S still saves (Vim
-  has no `<C-s>`), while `<C-r>` redoes in Normal mode and `<C-w>` deletes a word in Insert mode.
+  a meaning for it in the current mode. In Insert and Replace mode the Editor gets the rest. In Normal mode (and
+  after an operator, or `<C-o>` from Insert mode) the Editor gets only the keys of its own commands, such as Save,
+  Find or Close Tab, and keys a `sethandler` entry gives it; any other key flashes the Vim bar and changes nothing,
+  so Tab, Shift+Tab and, on Linux and Windows, Ctrl+D or Alt+Up do not edit the text. On Linux and Windows Ctrl+S
+  still saves (Vim has no `<C-s>`), while `<C-r>` redoes in Normal mode and `<C-w>` deletes a word in Insert mode.
 - `"+` is the clipboard and `"*` the selection (the clipboard where there is none).
 - 'tabstop' and 'shiftwidth' start at `tab_size`, 'expandtab' follows the tab's Spaces or Tab setting, and
   'autoindent' is on.

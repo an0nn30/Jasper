@@ -24,7 +24,10 @@ final class SettingsFile {
      * @throws IOException when the file cannot be read or written
      */
     static void setBoolean(Path file, String key, boolean value) throws IOException {
-        List<String> lines = Files.exists(file) ? new ArrayList<>(Files.readAllLines(file, StandardCharsets.UTF_8)) : new ArrayList<>();
+        String content = Files.exists(file) ? Files.readString(file, StandardCharsets.UTF_8) : "";
+        // The file keeps its own line breaks: Windows ones if it has them, otherwise \n on every platform.
+        String separator = content.contains("\r\n") ? "\r\n" : "\n";
+        List<String> lines = new ArrayList<>(content.lines().toList());
         String setting = key + " = " + value;
         Pattern live = Pattern.compile("^\\s*" + Pattern.quote(key) + "\\s*=.*$");
         Pattern example = Pattern.compile("^\\s*#\\s*" + Pattern.quote(key) + "\\s*=.*$");
@@ -40,7 +43,7 @@ final class SettingsFile {
         Files.createDirectories(file.toAbsolutePath().getParent());
         Path temporary = Files.createTempFile(file.toAbsolutePath().getParent(), ".settings", ".tmp");
         try {
-            Files.write(temporary, lines, StandardCharsets.UTF_8);
+            Files.writeString(temporary, String.join(separator, lines) + separator, StandardCharsets.UTF_8);
             try { Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
             catch (AtomicMoveNotSupportedException notAtomic) { Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING); }
         } finally { Files.deleteIfExists(temporary); }

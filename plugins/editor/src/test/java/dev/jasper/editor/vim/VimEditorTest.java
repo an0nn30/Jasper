@@ -5,13 +5,20 @@ import java.awt.event.KeyEvent;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.awt.event.ActionEvent;
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.swing.AbstractAction;
+import javax.swing.JComponent;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.text.BadLocationException;
 import org.fife.ui.rtextarea.CaretStyle;
 import org.fife.ui.rtextarea.ConfigurableCaret;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeout;
 
 class VimEditorTest {
     private final Map<Character, String> clipboard = new HashMap<>();
@@ -268,5 +275,121 @@ class VimEditorTest {
             assertThat(editor.mode()).isEqualTo(Mode.NORMAL);
             assertThat(area.getText()).isEmpty();
         });
+    }
+
+    private static KeyEvent pressed(VimTextArea area, int modifiers, int keyCode) {
+        return new KeyEvent(area, KeyEvent.KEY_PRESSED, 0, modifiers, keyCode, KeyEvent.CHAR_UNDEFINED);
+    }
+
+    private static KeyEvent typed(VimTextArea area, int modifiers, char c) {
+        return new KeyEvent(area, KeyEvent.KEY_TYPED, 0, modifiers, KeyEvent.VK_UNDEFINED, c);
+    }
+
+    /** Binds a stroke in the area's own map, as EditorTab.bind does, to an action that counts its runs. */
+    private static AtomicInteger bind(VimTextArea area, KeyStroke stroke, String id) {
+        var runs = new AtomicInteger();
+        area.getInputMap(JComponent.WHEN_FOCUSED).put(stroke, id);
+        area.getActionMap().put(id, new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent event) { runs.incrementAndGet(); }
+        });
+        return runs;
+    }
+
+    @Test void aKeyVimDeclinesInNormalModeRingsTheBellInsteadOfEditing() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc\n");
+            int bells = editor.bells();
+            var tab = pressed(area, 0, KeyEvent.VK_TAB);
+            area.processKeyEvent(tab);
+            var tabTyped = typed(area, 0, '\t');
+            area.processKeyEvent(tabTyped);
+            assertThat(tab.isConsumed()).isTrue();
+            assertThat(tabTyped.isConsumed()).isTrue();
+            area.processKeyEvent(pressed(area, InputEvent.SHIFT_DOWN_MASK, KeyEvent.VK_BACK_SPACE));
+            area.processKeyEvent(pressed(area, InputEvent.SHIFT_DOWN_MASK, KeyEvent.VK_TAB));
+            assertThat(area.getText()).as("RSyntaxTextArea's editing actions do not run in Normal mode").isEqualTo("abc\n");
+            assertThat(editor.bells()).isEqualTo(bells + 3);
+            var notAllowed = bind(area, KeyStroke.getKeyStroke(KeyEvent.VK_F9, InputEvent.CTRL_DOWN_MASK), "not.an.editor.command");
+            area.processKeyEvent(pressed(area, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_F9));
+            assertThat(notAllowed).as("a text-area binding that is not an Editor command").hasValue(0);
+            type(editor, "i");
+            area.processKeyEvent(pressed(area, 0, KeyEvent.VK_TAB));
+            area.processKeyEvent(typed(area, 0, '\t'));
+            assertThat(area.getText()).as("Insert mode keeps the text area's bindings").isEqualTo("\tabc\n");
+        });
+    }
+
+    @Test void theEditorsOwnCommandsAndCommandKeysStillReachTheirBindingsInNormalMode() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc\n");
+            var save = bind(area, KeyStroke.getKeyStroke(KeyEvent.VK_F9, InputEvent.CTRL_DOWN_MASK), "editor.test");
+            area.allowInNormalMode("editor.test");
+            int bells = editor.bells();
+            var event = pressed(area, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_F9);
+            area.processKeyEvent(event);
+            assertThat(save).hasValue(1);
+            var meta = bind(area, KeyStroke.getKeyStroke(KeyEvent.VK_F10, InputEvent.META_DOWN_MASK), "not.allowed.but.command");
+            area.processKeyEvent(pressed(area, InputEvent.META_DOWN_MASK, KeyEvent.VK_F10));
+            assertThat(meta).as("a ⌘ key always goes on").hasValue(1);
+            assertThat(editor.bells()).isEqualTo(bells);
+            assertThat(area.getText()).isEqualTo("abc\n");
+        });
+    }
+
+    @Test void inputMethodTextIsDroppedOutsideInsertMode() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc\n");
+            var text = new java.text.AttributedString("\u00e9").getIterator();
+            var event = new java.awt.event.InputMethodEvent(area, java.awt.event.InputMethodEvent.INPUT_METHOD_TEXT_CHANGED, text, 1, null, null);
+            area.processInputMethodEvent(event);
+            assertThat(area.getText()).isEqualTo("abc\n");
+            assertThat(event.isConsumed()).isTrue();
+            assertThat(editor.mode()).isEqualTo(Mode.NORMAL);
+        });
+    }
+
+    @Test void aDotWhoseReplayedDelFailsEndsInNormalMode() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc\n\n");
+            type(editor, "i<Del><Esc>j.");
+            assertThat(editor.mode()).isEqualTo(Mode.NORMAL);
+            assertThat(area.vimUndo().stepOpen()).isFalse();
+            assertThat(area.getText()).isEqualTo("bc\n\n");
+        });
+    }
+
+    @Test void aRedoDuringAnInsertKeepsTheInsertOneStep() throws Exception {
+        onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, "abc");
+            type(editor, "xu");
+            type(editor, "ipq");
+            area.redoLastAction();
+            type(editor, "rs<Esc>");
+            assertThat(area.vimUndo().stepOpen()).isFalse();
+            type(editor, "u");
+            assertThat(area.getText()).as("the whole insert undoes as one step").isEqualTo("abc");
+        });
+    }
+
+    @Test void deletingCharactersInALargeFileDoesNotRescanTheText() throws Exception {
+        // The first line is the longest, so RSyntaxTextArea's own longest-line rescan stays out of the measurement.
+        var line = "0123456789".repeat(9) + "\n";
+        var text = "x".repeat(200) + "\n" + line.repeat(1_048_576 / line.length());
+        long[] took = new long[1];
+        assertTimeout(Duration.ofSeconds(10), () -> onEdt(() -> {
+            var area = new VimTextArea();
+            var editor = editor(area, text);
+            type(editor, "j");
+            long start = System.nanoTime();
+            for (int i = 0; i < 1000; i++) type(editor, "xj");
+            took[0] = (System.nanoTime() - start) / 1_000_000;
+            assertThat(area.getText()).startsWith("x".repeat(200) + "\n" + line.substring(1));
+        }));
+        System.out.println("1000 xj on a 1 MB document: " + took[0] + " ms");
     }
 }

@@ -115,7 +115,8 @@ final class InsertMode {
         if (argument != null) {
             Consumer<KeyInput> handler = argument;
             argument = null;
-            handler.accept(key);
+            try { handler.accept(key); }
+            catch (VimFailure failure) { editor.insertKeyFailed(failure); }
             return;
         }
         if (key.plainChar() >= 0) {
@@ -130,8 +131,14 @@ final class InsertMode {
         boolean selfRecorded = key.is("<Esc>") || key.is("<C-c>") || key.is("<C-o>") || key.is("<C-r>") || key.is("<C-v>") || key.is("<C-q>")
             || key.is("<C-a>") || key.is("<C-e>") || key.is("<C-y>") || arrowKey(key);
         // A key recorded only after its handler returns: a failing key (e.g. <BS> or <Del> with nothing to
-        // remove) never joins the recorded insert, so <Esc>'s repeat and . never replay a no-op.
-        ((VimCommands.InsertKey) entry.handler()).run(this, key);
+        // remove) never joins the recorded insert, so <Esc>'s repeat and . never replay a no-op. A failing key
+        // rings the bell and the insert goes on (Vim's ins_del and ins_bs beep without ending it), so a . whose
+        // replayed key fails still reaches its <Esc>.
+        try { ((VimCommands.InsertKey) entry.handler()).run(this, key); }
+        catch (VimFailure failure) {
+            editor.insertKeyFailed(failure);
+            return;
+        }
         if (!selfRecorded) record(key);
     }
 

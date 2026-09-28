@@ -176,9 +176,11 @@ public final class Registers {
     }
 
     private Optional<Content> clipboard(char register) {
-        Optional<String> text = host.readClipboard().apply(register);
-        if (text.isEmpty()) return Optional.empty();
-        if (clipboardWritten != null && clipboardWritten.text().equals(text.get())) return Optional.of(clipboardWritten);
-        return Optional.of(Content.of(text.get(), text.get().endsWith("\n") ? Type.LINE : Type.CHAR));
+        Optional<String> read = host.readClipboard().apply(register);
+        if (read.isEmpty()) return Optional.empty();
+        // Windows (and old Mac) text arrives with \r\n or \r; Vim's registers hold \n only.
+        String text = read.get().replace("\r\n", "\n").replace('\r', '\n');
+        if (clipboardWritten != null && clipboardWritten.text().equals(text)) return Optional.of(clipboardWritten);
+        return Optional.of(Content.of(text, text.endsWith("\n") ? Type.LINE : Type.CHAR));
     }
 }

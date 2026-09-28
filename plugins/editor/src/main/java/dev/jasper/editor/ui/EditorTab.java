@@ -191,6 +191,7 @@ public final class EditorTab extends JPanel {
             if (!command.bound() || command.stroke().isEmpty()) continue;
             area.getInputMap(JComponent.WHEN_FOCUSED).put(command.stroke().get(), command.id());
             area.getActionMap().put(command.id(), action(command));
+            area.allowInNormalMode(command.id());
         }
     }
 

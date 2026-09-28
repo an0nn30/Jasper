@@ -70,7 +70,7 @@ KeyEvent ─▶ VimTextArea.processKeyEvent
 For each normalized key, in order:
 1. On macOS, a key with ⌘ goes to the Editor (unless the user mapped `<D-…>` in the current mode).
 2. A `sethandler` entry for the key and current mode decides: `vim` or `ide`.
-3. Otherwise, **Vim takes the key if Vim, a user mapping or a pending command gives it a meaning in the current mode**, and the Editor gets it otherwise. Plain printable keys in Insert mode go to the text area's normal typing path (so RSyntaxTextArea's auto-indent and bracket handling apply) but are recorded by the insert session.
+3. Otherwise, **Vim takes the key if Vim, a user mapping or a pending command gives it a meaning in the current mode**. **Amended (V1a review):** in Insert and Replace mode the Editor gets any other key; outside them (Normal, Operator-pending, Insert-Normal, and later Visual) the Editor gets only a key bound to one of its own commands (Save, Find, Close Tab and the other Editor commands) and ⌘ keys, and any other key rings the bell without reaching RSyntaxTextArea's editing actions. Plain printable keys in Insert mode go to the text area's normal typing path (so RSyntaxTextArea's auto-indent and bracket handling apply) but are recorded by the insert session.
 
 `sethandler {key} {modes}:{vim|ide} …` takes modes `n`, `i`, `v` (Visual), `x`, `o`, `c`, `a` (all), joined with `-` (`n-v:vim i:ide`). On Linux and Windows this default gives Ctrl+S to Save (Vim has no `<C-s>`), `<C-f>` to Vim in Normal mode and to Find in Insert mode, and `<C-w>` to Vim's delete-word in Insert mode.
 

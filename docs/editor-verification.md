@@ -41,3 +41,4 @@ unverified.
 - [ ] 27. `"+yy` then pasting in another application gives the line; text copied elsewhere comes back with `"+p`.
 - [ ] 28. Clicking past the end of a line in Normal mode puts the caret on the line's last character.
 - [ ] 29. A remote file opened from the SFTP browser edits and saves in Vim mode as it does without it.
+- [ ] 30. In Normal mode, Tab and Shift+Tab change nothing and flash the Vim bar; on Linux or Windows so do Ctrl+D, Ctrl+Y and Alt+Up. macOS: holding a letter for its accent menu, or the emoji picker, types nothing in Normal mode.

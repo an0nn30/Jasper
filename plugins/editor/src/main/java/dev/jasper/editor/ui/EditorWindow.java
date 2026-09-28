@@ -181,8 +181,9 @@ public final class EditorWindow {
         try {
             SettingsFile.setBoolean(context.config().file(), "vim", on);
         } catch (IOException | RuntimeException failed) {
-            ask.apply(new Question("Vim mode", "Vim mode is " + (on ? "on" : "off") + " until Jasper restarts: the setting could not be saved ("
-                + failed.getMessage() + ").", List.of("OK")));
+            String reason = failed.getMessage() == null ? failed.getClass().getSimpleName() : failed.getMessage();
+            ask.apply(new Question("Vim mode", "Vim mode is " + (on ? "on" : "off") + " until the Editor closes: the setting could not be saved ("
+                + reason + ").", List.of("OK")));
         }
     }
 

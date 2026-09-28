@@ -1,10 +1,14 @@
 package dev.jasper.editor.vim;
 
+import java.awt.event.InputEvent;
 import java.awt.event.InputMethodEvent;
 import java.awt.event.KeyEvent;
 import java.text.CharacterIterator;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import javax.swing.KeyStroke;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rtextarea.RUndoManager;
 
@@ -19,6 +23,7 @@ public class VimTextArea extends RSyntaxTextArea {
     // Assigned from the superclass constructor through createUndoManager, so it has no initializer.
     private VimUndoManager undo;
     private VimEditor vim;
+    private final Set<Object> editorCommands = new HashSet<>();
     private boolean swallowTyped;
     private char highSurrogate;
 
@@ -32,6 +37,14 @@ public class VimTextArea extends RSyntaxTextArea {
     }
 
     VimUndoManager vimUndo() { return undo; }
+
+    /**
+     * Marks an action name as one of the Editor's own commands: outside Insert and Replace mode, a key Vim declines
+     * reaches the text area's bindings only when it holds ⌘ or is bound to one of these (spec 2.2).
+     *
+     * @param actionName the action map key the command is bound under
+     */
+    public void allowInNormalMode(Object actionName) { editorCommands.add(actionName); }
 
     /** @return the attached Vim editor, if Vim is on */
     public Optional<VimEditor> vim() { return Optional.ofNullable(vim); }
@@ -55,8 +68,14 @@ public class VimTextArea extends RSyntaxTextArea {
             case KeyEvent.KEY_PRESSED -> {
                 swallowTyped = false;
                 Optional<KeyInput> key = KeyTranslator.pressed(event.getKeyCode(), event.getModifiersEx(), MAC);
-                swallowTyped = key.isPresent() && editor.offer(key.get());
-                return swallowTyped;
+                if (key.isPresent() && editor.offer(key.get())) return swallowTyped = true;
+                if (key.isPresent() ? editor.passesOn(key.get()) : !editor.editing()) return false;
+                if (reachesEditor(event)) return false;
+                // A key the translator leaves to KEY_TYPED (a plain character, a lone modifier) is not a Vim key:
+                // only a binding it would trigger is held back, and its character still reaches Vim.
+                if (key.isEmpty()) return bound(event) != null;
+                editor.declined();
+                return swallowTyped = true;
             }
             case KeyEvent.KEY_TYPED -> {
                 if (swallowTyped) return true;
@@ -68,7 +87,11 @@ public class VimTextArea extends RSyntaxTextArea {
                 int codePoint = Character.isLowSurrogate(c) && highSurrogate != 0 ? Character.toCodePoint(highSurrogate, c) : c;
                 highSurrogate = 0;
                 Optional<KeyInput> key = KeyTranslator.typed(codePoint, event.getModifiersEx(), MAC);
-                return key.isPresent() && editor.offer(key.get());
+                if (key.isPresent() && editor.offer(key.get())) return true;
+                if (key.isPresent() ? editor.passesOn(key.get()) : !editor.editing()) return false;
+                if ((event.getModifiersEx() & InputEvent.META_DOWN_MASK) != 0) return false;
+                if (key.isPresent()) editor.declined();
+                return true;
             }
             default -> {
                 return false;
@@ -76,8 +99,27 @@ public class VimTextArea extends RSyntaxTextArea {
         }
     }
 
+    /** @return whether a key Vim declined outside Insert mode goes on: a ⌘ key, or one bound to an Editor command */
+    private boolean reachesEditor(KeyEvent event) {
+        if ((event.getModifiersEx() & InputEvent.META_DOWN_MASK) != 0) return true;
+        Object name = bound(event);
+        return name != null && editorCommands.contains(name);
+    }
+
+    /** @return the action name the text area's focused input map (or a parent) binds the event's stroke to, or null */
+    private Object bound(KeyEvent event) {
+        // InputMap.get consults the parent maps (RSyntaxTextArea's defaults, the keymap) itself.
+        return getInputMap(WHEN_FOCUSED).get(KeyStroke.getKeyStrokeForEvent(event));
+    }
+
     @Override protected void processInputMethodEvent(InputMethodEvent event) {
         VimEditor editor = vim;
+        if (editor != null && !editor.editing() && event.getID() == InputMethodEvent.INPUT_METHOD_TEXT_CHANGED) {
+            // Input methods are off outside Insert mode, but macOS press-and-hold accents and the emoji picker still
+            // commit text: it must not type into Normal mode.
+            event.consume();
+            return;
+        }
         String committed = editor != null && event.getID() == InputMethodEvent.INPUT_METHOD_TEXT_CHANGED ? committed(event) : "";
         super.processInputMethodEvent(event);
         if (!committed.isEmpty()) editor.typedByInputMethod(committed);

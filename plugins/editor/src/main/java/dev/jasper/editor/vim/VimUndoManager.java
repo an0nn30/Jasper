@@ -134,6 +134,15 @@ final class VimUndoManager extends RUndoManager {
     }
 
     /**
+     * Nothing is redoable while an open step has edits: closing it for the redo would put it on the undo stack and
+     * trim the redo stack, so the redo would fail (an outside ⌘⇧Z in the middle of an insert).
+     */
+    @Override public synchronized boolean canRedo() {
+        if (vimStep != null && vimStep.edits > 0 || internal != null && internal.edits > 0) return false;
+        return super.canRedo();
+    }
+
+    /**
      * An outside undo (⌘Z) while the engine has a step open: closes it so it is undoable, then reopens the same
      * nesting once the undo runs, so the engine's own {@link #endStep} later balances (spec: the rest of an insert
      * in progress stays one step).
@@ -141,16 +150,16 @@ final class VimUndoManager extends RUndoManager {
     @Override public void undo() {
         int depth = stepDepth;
         closeAll();
-        super.undo();
-        reopen(depth);
+        try { super.undo(); }
+        finally { reopen(depth); }
     }
 
     /** The redo counterpart of {@link #undo}. */
     @Override public void redo() {
         int depth = stepDepth;
         closeAll();
-        super.redo();
-        reopen(depth);
+        try { super.redo(); }
+        finally { reopen(depth); }
     }
 
     /** Reopens {@code depth} levels of Vim step after an outside undo/redo, cursor taken from the area's caret now. */

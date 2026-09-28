@@ -107,18 +107,46 @@ public final class VimEditor {
      * @return whether Vim took it
      */
     public boolean offer(KeyInput key) {
-        char handlerMode = switch (mode()) {
-            case INSERT, REPLACE -> 'i';
-            case OPERATOR_PENDING -> 'o';
-            default -> 'n';
-        };
-        boolean mine = switch (vim.handlers().handler(key, handlerMode)) {
+        boolean mine = switch (vim.handlers().handler(key, handlerMode())) {
             case VIM -> true;
             case IDE -> false;
             case DEFAULT -> (key.modifiers() & KeyInput.META) == 0 && (mode.inserting() ? insert.wants(key) : machine.wants(key));
         };
         if (mine) feed(key);
         return mine;
+    }
+
+    private char handlerMode() {
+        return switch (mode()) {
+            case INSERT, REPLACE -> 'i';
+            case OPERATOR_PENDING -> 'o';
+            default -> 'n';
+        };
+    }
+
+    /** @return whether the mode is Insert or Replace, where keys Vim declines go on to the text area */
+    boolean editing() { return mode.inserting(); }
+
+    /**
+     * For a key {@link #offer} declined: whether it goes on to the text area anyway. In Insert and Replace mode every
+     * declined key does; elsewhere only a ⌘ key or one a {@code sethandler} entry gives to the Editor. The text area
+     * also passes on a key bound to one of the Editor's own commands (spec 2.2).
+     */
+    boolean passesOn(KeyInput key) {
+        if (mode.inserting() || (key.modifiers() & KeyInput.META) != 0) return true;
+        return vim.handlers().handler(key, handlerMode()) == KeyHandlers.Handler.IDE;
+    }
+
+    /** A key the text area held back outside Insert mode: Vim has no meaning for it, so the bell rings. */
+    void declined() {
+        bells++;
+        fire();
+    }
+
+    /** A failing Insert-mode key: the bell rings and the insert goes on, as Vim's ins_del and ins_bs beep (spec 2.3). */
+    void insertKeyFailed(VimFailure failure) {
+        bells++;
+        if (!failure.getMessage().isEmpty()) message(failure.getMessage(), true);
     }
 
     /**
@@ -328,10 +356,7 @@ public final class VimEditor {
     /** @return the first line an undo event changed; text inserted at a line's end that starts with a break changes the next line */
     private int changedLine(DocumentEvent event, boolean inserted) {
         int line = buffer.lineOf(event.getOffset());
-        if (inserted && event.getOffset() == buffer.end(line)) {
-            String text = buffer.text();
-            if (event.getOffset() < text.length() && text.charAt(event.getOffset()) == '\n') return line + 1;
-        }
+        if (inserted && event.getOffset() == buffer.end(line) && buffer.charAt(event.getOffset()) == '\n') return line + 1;
         return line;
     }
 
@@ -343,6 +368,7 @@ public final class VimEditor {
         String text = buffer.line(p.line);
         if (!text.isEmpty() && p.col >= text.length()) {
             javax.swing.SwingUtilities.invokeLater(() -> {
+                if (area.vim().orElse(null) != this) return;
                 if (!busy && mode == Mode.NORMAL && area.getSelectionStart() == area.getSelectionEnd()) {
                     busy = true;
                     try { setCursor(cursor()); }

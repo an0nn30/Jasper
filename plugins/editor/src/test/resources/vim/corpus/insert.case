@@ -877,3 +877,29 @@ expect-text:
   xxxabc
 expect-cursor: 1,3
 expect-mode: normal
+
+=== dot after a failing Del ends in Normal mode
+text:
+  abc
+  $
+cursor: 1,1
+keys: i<Del><Esc>j.
+--- vim 9.1
+expect-text:
+  bc
+  $
+expect-cursor: 2,1
+expect-mode: normal
+
+=== a failing C-y does not end the insert
+text:
+  abc
+  x
+cursor: 1,3
+keys: a<C-y>z<Esc>
+--- vim 9.1
+expect-text:
+  abcz
+  x
+expect-cursor: 1,4
+expect-mode: normal

@@ -150,7 +150,7 @@ final class Operators {
             to = end(b, span);
         }
         if (to <= from) return;
-        String text = b.text().substring(from, to);
+        String text = b.text(from, to);
         StringBuilder out = new StringBuilder(text.length());
         text.codePoints().forEach(cp -> out.appendCodePoint(map.applyAsInt(cp)));
         if (!out.toString().equals(text)) b.replace(from, to, out.toString());
@@ -172,7 +172,7 @@ final class Operators {
     /** @return the span's text as a register holds it */
     static Content content(Buffer b, Span span) {
         if (span.linewise()) return new Content(b.lines(span.start().line, span.end().line), Registers.Type.LINE);
-        return Content.of(b.text().substring(b.offset(span.start()), end(b, span)), Registers.Type.CHAR);
+        return Content.of(b.text(b.offset(span.start()), end(b, span)), Registers.Type.CHAR);
     }
 
     /** @return the offset just after a charwise span; an inclusive end on the end of a line stops before its break */

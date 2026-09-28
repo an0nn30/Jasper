@@ -91,4 +91,12 @@ class RegistersTest {
         assertThat(Registers.valid('.', true)).isFalse();
         assertThat(Registers.valid('!', false)).isFalse();
     }
+
+    @Test void windowsLineBreaksFromTheClipboardBecomeVimsLineBreaks() {
+        clipboard.put('+', "one\r\ntwo\rthree\r\n");
+        assertThat(registers.get('+')).contains(lines("one\ntwo\nthree\n"));
+        registers.yank('+', chars("x\n"), "");
+        clipboard.put('+', "x\r\n");
+        assertThat(registers.get('+')).as("the text Jasper wrote, as the system clipboard gives it back").contains(chars("x\n"));
+    }
 }

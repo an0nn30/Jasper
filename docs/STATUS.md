@@ -9,7 +9,7 @@
   objects, operators, registers (with `"+` and `"*`), undo in Vim's steps, and `.`. The handler rule gives Vim only
   the keys it defines; ⌘ keys stay with the Editor. The Vim bar shows the mode, pending keys and messages. The
   `vim` setting, the Vim status item and Toggle Vim Mode switch it (the toggle writes the settings file).
-  - Fidelity: 467 corpus cases in `plugins/editor/src/test/resources/vim/corpus`, recorded from Vim 9.1 by
+  - Fidelity: 469 corpus cases in `plugins/editor/src/test/resources/vim/corpus`, recorded from Vim 9.1 by
     `./gradlew :jasper-plugin-editor:recordVimCorpus` (not part of `check`) and replayed by `VimCorpusTest`; every
     command in `VimCommands` has a case. Two `=` cases are divergent; `docs/vim-divergences.md` lists every
     difference and `docs/editor-vim-reference.md` is generated from the command table.
@@ -18,8 +18,16 @@
     undo from outside Vim during an insert reopens the insert's undo step, and a failing Insert-mode key is not
     recorded (so a count or `.` does not replay it, and `<Esc>` always leaves Insert mode); three corpus cases cover
     the last point.
-  - `./gradlew check`: 2812 tests, 2807 passed, 0 failed, 5 skipped.
-  - Not done: GUI checks 21–29 of the [checklist](editor-verification.md) (user-run); plans V1b, V2, V3 and V4; push.
+  - Final review fixes: (1) outside Insert and Replace mode a key Vim declines reaches the text area only if it is a
+    ⌘ key or bound to an Editor command (`VimTextArea.allowInNormalMode`), otherwise it rings the bell; (2) a
+    failing Insert-mode key rings the bell and the insert goes on, so `.` still ends in Normal mode; (3) no redo
+    while an insert's undo step has edits, and undo/redo reopen the step in a `finally`; (4) `SettingsFile` keeps
+    the file's own line breaks, and the save-failure dialog names the exception; (5) `"+`/`"*` text has `\r\n` and
+    `\r` turned into `\n`; (6) `Buffer` reads the document's line elements instead of re-splitting the text after
+    every edit; (7) the deferred caret clamp checks the editor is still attached, and committed IME text is dropped
+    outside Insert mode. Two corpus cases cover (2).
+  - `./gradlew check`: 2822 tests, 2817 passed, 0 failed, 5 skipped.
+  - Not done: GUI checks 21–30 of the [checklist](editor-verification.md) (user-run); plans V1b, V2, V3 and V4; push.
 
 - **App-hosted Editor tabs** (`codex/plugin-workspace-tabs`, 2026-09-27):
   Editor files now use the main workspace's tab strip, rounded content frame, commands,
