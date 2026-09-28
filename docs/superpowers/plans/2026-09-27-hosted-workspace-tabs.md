@@ -58,12 +58,14 @@ Interfaces: Editor.open(Path, WindowOwner) and open(EditorDocument, WindowOwner)
 
 ## Task 4: Integration, documentation and independent review
 
-- [ ] Bump SDK/plugin floors, document hosted-content contract, update architecture allowlists and approved spec amendments/status.
-- [ ] Run ./gradlew check and fix failures; inspect mixed-tab headless previews and build :jasper-app:packageDist.
-- [ ] One independent whole-branch review; fix material findings with regression checks.
-- [ ] Record actual verification and limitations, commit and deliver installer. No merge/push.
+- [x] Bump SDK/plugin floors, document hosted-content contract, update architecture allowlists and approved spec amendments/status.
+- [x] Run ./gradlew check and fix failures; inspect mixed-tab headless previews and build :jasper-app:packageDist.
+- [x] One independent whole-branch review; fix material findings with regression checks.
+- [x] Record actual verification and limitations, commit and deliver installer. Local main merge subsequently authorized and completed; no push.
 
 ## Decisions and execution notes
 
 - Approved native workflow supersedes the skill's extra user review stop.
 - Share the entire WindowContent for optional detached editor windows instead of extracting its renderer into a second presentation owner. This is less duplication, preserves every established chrome feature, and avoids a workspace/windows dependency cycle. Detached windows start without a shell and use the same application-managed frame lifecycle.
+
+Final verification: `check :jasper-app:packageDist` passed with 2,281 tests, zero failures/errors, five skips. Independent review’s two confirmed findings were fixed with RED→GREEN regressions; no deferred findings. Native GUI was not launched.

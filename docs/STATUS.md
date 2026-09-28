@@ -10,11 +10,14 @@
   require it. SFTP passes the originating workspace. Native inline implementation follows
   the approved hosted-workspace-tabs spec/plan. Rulings: reuse the whole WindowContent for
   shell-free detached windows; use stable session keys across Save As; defer individual
-  close/move commands during batch approval. Full check and native DMG build passed
-  before final review fixes (2,279 tests, zero failures/errors, five skips). Review
-  identified status actions targeting another host's selected document and new documents
-  bypassing an in-progress native close. Both have RED→GREEN regressions; focused app
-  and full Editor tests pass. Local main merge authorized; final package refresh pending.
+  close/move commands during batch approval. Independent review identified status actions
+  targeting another host's selected document and new documents bypassing an in-progress
+  native close; both have RED→GREEN regressions. Final `check :jasper-app:packageDist`
+  passed: 2,281 tests, zero failures/errors, five skips; app image verified and DMG rebuilt.
+  Dark/light and narrow/overflow headless previews inspected. No native GUI launched.
+  Merged into local main at the user's request; not pushed. No remaining confirmed review
+  findings. The full workspace is shared instead of extracting another host; model/SDK and
+  workspace wiring were developed together before separate commits to verify ownership.
 
 - **Local/remote integration and missing icon assets** (2026-09-27): merged
   `origin/main` at `2d59d455` with the local keyboard-panel changes, retaining both
