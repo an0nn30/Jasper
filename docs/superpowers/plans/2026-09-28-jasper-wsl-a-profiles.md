@@ -2,7 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 0-10 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
+**Status:** Implemented on `worktree-wsl-hosts` (subagent-driven); Windows `check` shows only the known failures;
+macOS/Linux check and native acceptance handed to the user. Windows `./gradlew check --continue` on 2026-09-28: 3458
+tests, 237 skipped, 8 failed, all on the list in `docs/windows-startup-verification.md`. Not merged. Worktree
+`C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far:
@@ -19,6 +22,11 @@ Deviations so far:
   `NOFOLLOW_LINKS` and also looks for the Store alias `%LOCALAPPDATA%\Microsoft\WindowsApps\pwsh.exe`; the
   `SessionLaunchOptions` javadoc says equality compares the path mapper by identity; non-ASCII literals the branch
   added are Java escapes.
+- Task 11: `SessionLaunchCoordinatorTest` was enabled on Windows (its OSC 2 readiness title now passes through
+  ConPTY; spec section 4 asked to revisit it), in its own commit. `docs/windows-startup-verification.md` replaces the
+  2026-09-27 failure list with the re-verified 2026-09-28 one instead of only appending, and its checklist adds the
+  Linux-home and refresh checks. The configuration text describes the review fixes (the `--cd ~` home rule, the
+  `7-preview` and Store-alias PowerShell 7 locations, case-insensitive `wsl:` ids, the registry-first fallback).
 
 **Goal:** On Windows, sessions run on ConPTY, Jasper detects PowerShell, PowerShell 7, Command Prompt and every
 installed WSL 1 and WSL 2 distribution as shell profiles, `terminal.shell.profile` (and a Settings dropdown) makes
@@ -3406,14 +3414,14 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 (The spec's section 3 names `docs/shell-integration.md`; that file does not exist. The manual shell-integration
 lines live in `docs/configuration.md` under "Shell integration", so the WSL line goes there.)
 
-- [ ] **Step 1: Run the full check**
+- [x] **Step 1: Run the full check**
 
 Run: `./gradlew check --continue` and keep the output.
 Expected on Windows: every failure is on the list in `docs/windows-startup-verification.md` (or, for
 `ShellIntegrationSessionTest`/`ShellCommandTrackerTest`, recorded in Task 1 Step 5). Any other failure is a
 regression: fix it before writing docs. Count tests from `*/build/test-results/test/*.xml`.
 
-- [ ] **Step 2: Update `docs/configuration.md`**
+- [x] **Step 2: Update `docs/configuration.md`**
 
 In "Settings dialog", after the sentence ending "filters the tree and highlights matching settings on the page.", add:
 
@@ -3461,7 +3469,7 @@ path, so add `[ -n "$JASPER_SHELL_INTEGRATION" ] && source "$JASPER_SHELL_INTEGR
 (or the same line with `jasper.zsh` to `~/.zshrc`) inside the distribution.
 ```
 
-- [ ] **Step 3: Update `docs/app-architecture.md`**
+- [x] **Step 3: Update `docs/app-architecture.md`**
 
 Replace the `launch` row of the package table with:
 
@@ -3469,7 +3477,7 @@ Replace the `launch` row of the package table with:
 | `launch` | Immutable launch capture, shell profiles (WSL distributions, PowerShell 7, Command Prompt, the login shell, Custom) and shell integration extraction; ShellLauncher starts off EDT and delivers on EDT; the EDT-confined ShellProfileCatalog detects off EDT and is closed by the application. Receiving pane owns the session. |
 ```
 
-- [ ] **Step 4: Update `docs/windows-startup-verification.md`**
+- [x] **Step 4: Update `docs/windows-startup-verification.md`**
 
 Append a section with the measured results (fill in what Task 1 Step 4/5 and Step 1 above showed):
 
@@ -3504,7 +3512,7 @@ Native acceptance for the user (no GUI was launched):
       `config.toml` starts PowerShell and shows a warning in the status bar.
 ```
 
-- [ ] **Step 5: Add the `docs/STATUS.md` entry**
+- [x] **Step 5: Add the `docs/STATUS.md` entry**
 
 Under "Current state — 2026-09-28", add as the first bullet (fill in the measured counts):
 
@@ -3524,12 +3532,12 @@ Under "Current state — 2026-09-28", add as the first bullet (fill in the measu
   `docs/windows-startup-verification.md`. Plan B (Remote panel WSL group, SDK 0.8.6) not started. Not merged.
 ```
 
-- [ ] **Step 6: Update this plan's status banner**
+- [x] **Step 6: Update this plan's status banner**
 
 Change the banner's first words from "Not started." to "Implemented on worktree-wsl-hosts (not merged); Windows
 check as recorded in docs/windows-startup-verification.md." and list every deviation under "Deviations so far".
 
-- [ ] **Step 7: Run the documentation tests and the source-hygiene check**
+- [x] **Step 7: Run the documentation tests and the source-hygiene check**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.documentation.*' --tests 'dev.jasper.app.config.ConfigTemplateTest'`
 Expected: PASS.
@@ -3546,7 +3554,7 @@ Get-ChildItem -Recurse -Include *.java jasper-terminal/src, jasper-app/src | For
 
 Expected: no output for files this plan touched. Also run `git diff --check main...HEAD` and expect no output.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git branch --show-current
@@ -3556,7 +3564,7 @@ git commit -m "Document shell profiles, WSL tabs and the ConPTY verification
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 9: Hand off**
+- [x] **Step 9: Hand off**
 
 Tell the user: the branch is ready for their native Windows acceptance (checklist in
 `docs/windows-startup-verification.md`) and for a macOS/Linux `./gradlew check`; nothing is pushed or merged; plan

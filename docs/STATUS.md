@@ -2,6 +2,32 @@
 
 ## Current state — 2026-09-28
 
+- **WSL shell profiles, plan A** (branch `worktree-wsl-hosts`, 2026-09-28; plan
+  `docs/superpowers/plans/2026-09-28-jasper-wsl-a-profiles.md`, spec
+  `docs/superpowers/specs/2026-09-28-jasper-wsl-shell-profiles-design.md`): Windows sessions run on ConPTY, so OSC
+  titles and working-directory reports pass through. `terminal.shell.profile` chooses the shell new tabs start:
+  PowerShell, PowerShell 7, Command Prompt, each detected WSL 1/WSL 2 distribution (registry, `wsl.exe -l -v`
+  fallback, Docker's hidden), the login shell on macOS/Linux, or Custom (`program`/`args`, which an empty profile
+  still selects when they are set). Settings › Terminal › Shell has a Profile dropdown; Program and Arguments apply
+  to Custom only. WSL tabs run `wsl.exe -d <name> --cd <dir>` from the home folder, forward Jasper's variables
+  through `WSLENV`, and report Windows paths (`SessionLaunchOptions.localPathMapper`). Splits start their pane's
+  profile. An unavailable profile starts the platform default with a status-bar warning. Automatic shell
+  integration does not reach WSL (manual line documented). `./gradlew check --continue` on Windows: 3458 tests,
+  237 skipped, 8 failed, no failures outside the known list (re-verified and shortened in
+  `docs/windows-startup-verification.md`: `ShellIntegrationSessionTest`/`ShellCommandTrackerTest` now pass, and
+  `SessionLaunchCoordinatorTest` is enabled on Windows because ConPTY passes its OSC 2 readiness title);
+  `ShellProfilesTest.anExecutionAliasCountsAsExistingThoughItCannotBeFollowed` is skipped on Windows (symlink
+  privilege) and runs on macOS/Linux. macOS/Linux check pending with the user. Native acceptance checklist in
+  `docs/windows-startup-verification.md`. Deviations from the plan: Task 10's `SchemaPage.showValue` changes a
+  row's enablement only when its `enabledWhen` condition changes (a `shownEnabled` flag), so the line-height
+  spinner stays disabled while "use the platform" is checked; review fixes after Task 10: a WSL launch in the
+  Windows home passes `--cd ~`, `wsl:NAME` ids match detected distributions case-insensitively
+  (`ShellProfiles.sameId`, also in the Settings dropdown), every spelling of `WSLENV` merges into one entry,
+  `WslDistributions.detect` asks `wsl.exe -l -v` only when `reg.exe` gives no answer (exit 1, a missing Lxss key,
+  means "no WSL"), PowerShell 7 detection uses `NOFOLLOW_LINKS` and also finds the Store alias under
+  `%LOCALAPPDATA%\Microsoft\WindowsApps`, the `SessionLaunchOptions` javadoc says the path mapper compares by
+  identity, and non-ASCII literals are Java escapes. Plan B (Remote panel WSL group, SDK 0.8.6) not started. Not
+  merged.
 - **Settings dialog B2** (`claude/settings-dialog-b2`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b2.md`): Keymap and Plugins are pages of Settings.
   Keymap stages shortcut edits (Set) and saves them in one write on Apply; shortcuts and sections that differ from
