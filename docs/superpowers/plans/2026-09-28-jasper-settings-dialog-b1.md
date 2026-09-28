@@ -7,6 +7,7 @@ Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far:
 - Task 4: the test and the implementation were written before the first run, so its failing run was not observed.
+- Task 5: `SchemaPage.Spec.settings()` uses an explicit `<Setting<?>>map` type witness.
 
 **Goal:** An IntelliJ-style Settings dialog, opened by Cmd+, and the macOS Settings… menu item, that edits
 every core setting through schema-generated pages, with search, highlighting, Apply/OK/Cancel and banners.
