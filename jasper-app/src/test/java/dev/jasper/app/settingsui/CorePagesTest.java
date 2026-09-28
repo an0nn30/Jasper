@@ -25,7 +25,7 @@ class CorePagesTest {
     }
 
     @Test void theTreeIsTheApprovedOne() {
-        var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, () -> calls.add("keymap"), () -> calls.add("plugins")).apply(context);
+        var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         assertThat(pages).extracting(SettingsPage::id).containsExactly("appearance-behavior", "appearance", "window", "notifications",
             "command-palette", "desk-buddy", "system", "keymap", "terminal", "terminal.font", "terminal.cursor", "terminal.shell",
             "plugins", "tools");
@@ -38,12 +38,20 @@ class CorePagesTest {
     }
 
     @Test void systemSettingsOffersTheConfigurationFileActions() {
-        var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, () -> { }, () -> { }).apply(context);
+        var pages = CorePages.pages(() -> List.of("Jasper Dark"), system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         var systemPage = (SchemaPage) pages.stream().filter(page -> page.id().equals("system")).findFirst().orElseThrow();
         systemPage.component();
         assertThat(systemPage.actionButtons()).extracting(javax.swing.JButton::getText)
             .containsExactly("Open in Editor", "Reveal", "Reload from Disk", "Migrate Config…");
         systemPage.actionButtons().forEach(javax.swing.JButton::doClick);
         assertThat(calls).containsExactly("open", "reveal", "reload", "migrate");
+    }
+
+    private static SettingsPage keymap(PageContext context) {
+        return new GroupPage("keymap", "Keymap", Optional.empty(), false, List::of, context);
+    }
+
+    private static SettingsPage plugins(PageContext context) {
+        return new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, context);
     }
 }

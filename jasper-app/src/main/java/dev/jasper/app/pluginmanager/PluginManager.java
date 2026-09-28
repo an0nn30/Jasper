@@ -3,30 +3,29 @@ package dev.jasper.app.pluginmanager;
 import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.restart.ResidentControl;
 import dev.jasper.app.restart.RestartFlow;
+import dev.jasper.app.settingsui.PageContext;
+import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
-import java.awt.Dimension;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /**
- * Opens the Plugins manager window and connects its view to the runtime's operations and to the restart
- * conversation. Every change takes effect at the next launch, so the manager's main job after an operation is
- * to say whether a restart is due. EDT only.
+ * Connects the Settings dialog's Plugins page to the runtime's operations and to the restart conversation. Every change
+ * takes effect at the next launch, so the manager's main job after an operation is to say whether a restart is due.
+ * EDT only.
  */
 public final class PluginManager {
-    /** The auxiliary window id, which is also the key its bounds are remembered under. */
-    public static final String WINDOW_ID = "app.plugins.manager";
-
     /**
      * What the manager needs from the application.
      *
-     * @param chooseZip asks the user for a plugin zip over the manager's window; empty when cancelled
+     * @param chooseZip asks the user for a plugin zip over the Settings dialog; empty when cancelled
      * @param restarts the restart conversation
      * @param quit quits Jasper, for when it cannot restart itself
      * @param resident the resident process, probed for the standalone notice
@@ -47,7 +46,7 @@ public final class PluginManager {
     private final PluginRuntime runtime;
     private final AuxiliaryWindows windows;
     private final Hooks hooks;
-    private AuxiliarySurface surface;
+    private Supplier<AuxiliarySurface> host;
     private PluginManagerPanel panel;
     private PluginRuntime.Snapshot snapshot = new PluginRuntime.Snapshot(List.of(), false, false);
     private AuxiliarySurface consentDialog;
@@ -56,10 +55,10 @@ public final class PluginManager {
     private AuxiliarySurface confirmDialog;
 
     /**
-     * Creates the manager; nothing is shown until {@link #open}.
+     * Creates the manager; nothing is shown until Settings shows its Plugins page.
      *
      * @param runtime the plugin runtime
-     * @param windows builds the manager's window and its dialogs
+     * @param windows builds the consent and confirm dialogs
      * @param hooks what the application provides
      */
     public PluginManager(PluginRuntime runtime, AuxiliaryWindows windows, Hooks hooks) {
@@ -72,31 +71,38 @@ public final class PluginManager {
     ConsentView consent() { return consent; }
     ConfirmView confirm() { return confirm; }
 
-    /** Shows the manager, or brings it forward, and lists the plugins afresh. */
-    public void open() {
-        AuxiliarySurface window = windows.window(WINDOW_ID, "Plugins", new Dimension(760, 520), true);
-        if (window != surface) {
-            surface = window;
-            panel = new PluginManagerPanel(new PluginManagerPanel.Handlers(this::toggle, this::review, this::remove, this::discardInstall, this::install,
-                this::openSettings, this::openFolder, this::openData));
-            window.setContent(panel);
-            // Another process may have changed plugins.toml while this window was in the background.
-            window.onActivated(this::refresh);
-            window.onClosed(() -> { if (surface == window) { surface = null; hooks.restarts().cancel(); } });
-        }
-        window.show();
-        window.toFront();
-        refresh();
+    /** The Plugins page for one opening of Settings; it lists the plugins afresh. */
+    public SettingsPage page(PageContext context) { return new PluginsPage(this, context); }
+
+    /** Builds the list for a page whose dialogs open over {@code host}; a later attachment replaces this one. */
+    PluginManagerPanel attach(Supplier<AuxiliarySurface> host) {
+        this.host = Objects.requireNonNull(host);
+        panel = new PluginManagerPanel(new PluginManagerPanel.Handlers(this::toggle, this::review, this::remove, this::discardInstall,
+            this::install, this::openSettings, this::openFolder, this::openData));
+        panel.show(snapshot);
+        renderBanner();
+        return panel;
     }
 
-    private void refresh() {
-        if (surface == null) return;
+    /** The page is gone: forget its list and end any restart conversation. */
+    void detach(PluginManagerPanel detached) {
+        if (panel != detached) return;
+        panel = null;
+        host = null;
+        hooks.restarts().cancel();
+    }
+
+    /** The plugins as last listed. */
+    List<PluginRuntime.Row> rows() { return snapshot.rows(); }
+
+    /** Lists the plugins again: another process may have changed plugins.toml since the page was last shown. */
+    void refresh() {
         runtime.snapshot(this::accept);
-        if (!hooks.standaloneNotice()) return;
+        if (panel == null || !hooks.standaloneNotice()) return;
         hooks.worker().execute(() -> {
             boolean live = hooks.resident().live().getAsBoolean();
             SwingUtilities.invokeLater(() -> {
-                if (surface != null) panel.notice(live
+                if (panel != null) panel.notice(live
                     ? "Another Jasper process is still running with the plugin set it started with. Quit it for your changes to apply there." : "");
             });
         });
@@ -105,17 +111,17 @@ public final class PluginManager {
     private void accept(PluginRuntime.Outcome outcome) { accept(outcome, ""); }
 
     private void accept(PluginRuntime.Outcome outcome, String success) {
-        if (surface == null) return;
+        if (outcome.ok()) snapshot = outcome.snapshot();
+        if (panel == null) return;
         panel.busy(false);
         if (!outcome.ok()) { panel.message(outcome.message(), true); return; }
-        snapshot = outcome.snapshot();
         panel.show(snapshot);
         panel.message(success, false);
         renderBanner();
     }
 
     private void renderBanner() {
-        if (surface == null) return;
+        if (panel == null) return;
         RestartFlow flow = hooks.restarts();
         var launchAnyway = new PluginManagerPanel.BannerAction("Launch Anyway", flow::launchAnyway);
         var cancel = new PluginManagerPanel.BannerAction("Cancel", flow::cancel);
@@ -145,7 +151,7 @@ public final class PluginManager {
 
     private void remove(PluginRuntime.Row row) {
         if (row.pendingRemoval()) { panel.busy(true); runtime.remove(row.id(), false, this::accept); return; }
-        AuxiliarySurface dialog = windows.dialog("Remove " + row.name(), true, surface);
+        AuxiliarySurface dialog = windows.dialog("Remove " + row.name(), true, host.get());
         var view = new ConfirmView("Remove " + row.name() + " " + row.version() + "?\n\nIts jars, settings and data in " + row.directory()
             + " are deleted the next time Jasper starts. Keep undoes this until then.", "Remove",
             () -> { dialog.close(); panel.busy(true); runtime.remove(row.id(), true, this::accept); }, dialog::close);
@@ -156,7 +162,7 @@ public final class PluginManager {
         dialog.show();
     }
 
-    /** Off the EDT: seeds the file if needed, then hands it to the editor; a failure is shown in the window. */
+    /** Off the EDT: seeds the file if needed, then hands it to the editor; a failure is shown on the page. */
     private void openSettings(PluginRuntime.Row row) {
         hooks.worker().execute(() -> {
             try { runtime.prepareSettings(row.id()); hooks.openInEditor().accept(row.settingsFile()); }
@@ -175,7 +181,7 @@ public final class PluginManager {
     }
 
     private void failed(Exception failure) {
-        javax.swing.SwingUtilities.invokeLater(() -> { if (surface != null) panel.message(failure.getMessage() == null ? failure.toString() : failure.getMessage(), true); });
+        SwingUtilities.invokeLater(() -> { if (panel != null) panel.message(failure.getMessage() == null ? failure.toString() : failure.getMessage(), true); });
     }
 
     private void discardInstall(PluginRuntime.Row row) {
@@ -191,12 +197,12 @@ public final class PluginManager {
     }
 
     private void install() {
-        Optional<Path> zip = hooks.chooseZip().apply(surface);
+        Optional<Path> zip = hooks.chooseZip().apply(host.get());
         if (zip.isEmpty()) return;
         panel.busy(true);
         panel.message("", false);
         runtime.inspect(zip.get(), (inspection, problem) -> {
-            if (surface == null) { if (inspection != null) runtime.discard(inspection); return; }
+            if (panel == null) { if (inspection != null) runtime.discard(inspection); return; }
             panel.busy(false);
             if (inspection == null) { panel.message(problem, true); return; }
             ask("Install " + inspection.name(), inspection.name(), inspection.version(), inspection.vendor(),
@@ -209,12 +215,12 @@ public final class PluginManager {
     }
 
     /**
-     * A modal consent dialog over the manager. The decision is taken in the button callbacks rather than after
+     * A modal consent dialog over Settings. The decision is taken in the button callbacks rather than after
      * {@code show()} returns: a modal show blocks until the dialog closes, and closing it by its title bar is a refusal.
      */
     private void ask(String title, String name, String version, String vendor, List<String> capabilities, boolean update,
                      String allowLabel, Runnable allowed, Runnable refused) {
-        AuxiliarySurface dialog = windows.dialog(title, true, surface);
+        AuxiliarySurface dialog = windows.dialog(title, true, host.get());
         boolean[] decided = {false};
         var view = new ConsentView(name, version, vendor, capabilities, update, allowLabel,
             () -> { decided[0] = true; dialog.close(); allowed.run(); }, dialog::close);

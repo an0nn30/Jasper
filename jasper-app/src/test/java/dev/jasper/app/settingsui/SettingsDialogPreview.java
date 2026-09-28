@@ -43,7 +43,9 @@ public final class SettingsDialogPreview {
                         (title, initial) -> Optional.empty());
                 });
                 var dialog = new SettingsDialog(windows, CorePages.pages(() -> List.of("Jasper Dark", "IntelliJ Light"),
-                    new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false), () -> { }, () -> { }),
+                    new CorePages.SystemActions(() -> file, () -> { }, () -> { }, () -> { }, () -> { }, () -> false),
+                    context -> new GroupPage("keymap", "Keymap", Optional.empty(), false, List::of, context),
+                    context -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, context)),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state,
                         listener -> new Subscription(() -> { }), () -> { }, () -> { }, uri -> { }, (parent, count) -> true));
                 String suffix = theme.id() + "-" + size + ".png";

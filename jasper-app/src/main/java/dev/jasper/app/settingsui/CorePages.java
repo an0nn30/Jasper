@@ -96,9 +96,13 @@ public final class CorePages {
                 .row(TERMINAL_SHELL_INTEGRATION, Editors.choice(Map.of("auto", "Automatic", "manual", "Manual", "off", "Off"))));
     }
 
-    /** The whole tree for one dialog: group, schema and launcher pages in display order. */
+    /**
+     * The whole tree for one dialog, in display order: group and schema pages, with the Keymap and Plugins pages the
+     * application supplies.
+     */
     public static Function<PageContext, List<SettingsPage>> pages(Supplier<List<String>> themeNames, SystemActions system,
-                                                                   Runnable openKeymap, Runnable openPlugins) {
+                                                                   Function<PageContext, SettingsPage> keymap,
+                                                                   Function<PageContext, SettingsPage> plugins) {
         return context -> {
             var specs = specs(themeNames, system);
             var all = new ArrayList<SettingsPage>();
@@ -107,11 +111,9 @@ public final class CorePages {
             all.add(new GroupPage("appearance-behavior", "Appearance & Behavior", Optional.empty(), false,
                 childrenOf.apply("appearance-behavior"), context));
             for (var spec : specs.subList(0, 6)) all.add(spec.build(context));
-            all.add(new LauncherPage("keymap", "Keymap", "Keyboard shortcuts for every action, including actions plugins add.",
-                "Open Keyboard Shortcuts…", openKeymap, List.of("keyboard", "shortcuts", "keys", "bindings"), context));
+            all.add(keymap.apply(context));
             for (var spec : specs.subList(6, specs.size())) all.add(spec.build(context));
-            all.add(new LauncherPage("plugins", "Plugins", "Install, enable, disable and remove plugins. Changes apply after a restart.",
-                "Manage Plugins…", openPlugins, List.of("extensions", "install", "enable", "disable"), context));
+            all.add(plugins.apply(context));
             all.add(new GroupPage("tools", "Tools", Optional.empty(), true, childrenOf.apply("tools"), context));
             return List.copyOf(all);
         };

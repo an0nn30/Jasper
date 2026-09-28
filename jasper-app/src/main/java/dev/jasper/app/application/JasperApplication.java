@@ -89,7 +89,6 @@ public final class JasperApplication {
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
     private PluginManager pluginManager;
-    private dev.jasper.app.shortcuthelp.ShortcutHelp shortcutHelp;
     private ResidentControl residentControl = ResidentControl.NONE;
     private boolean replacementHandsOff;
     private boolean standaloneNotice;
@@ -171,7 +170,6 @@ public final class JasperApplication {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             loginItems.accept(snapshot.backgroundEnabled());
             if (plugins != null) { plugins.configurationChanged(snapshot.plugins()); reportBindingProblems(); }
-            if (shortcutHelp != null) shortcutHelp.refresh();
             updateMigrateAction();
         });
         if (supports(Desktop.Action.APP_QUIT_HANDLER)) {
@@ -348,7 +346,7 @@ public final class JasperApplication {
             this::notice, new dev.jasper.app.platform.ConfigEditor()::open);
         // The application's own entry, contributed like any other action so it is in the palette, rebindable and in the menu.
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
-            Optional.empty(), invocation -> managePlugins());
+            Optional.empty(), invocation -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID));
         contributions.addMenuSection(MenuTarget.standard(MenuTarget.Slot.FILE)).set(List.of(new MenuEntry.Item("plugins.manage")));
         if (configuration != null) configuration.pluginSettingsExist(plugins::settingsFileExists);
         migrateAction = contributions.addAction("config.migrate", "Migrate Config", null,
@@ -361,15 +359,15 @@ public final class JasperApplication {
         });
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
         boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
-        shortcutHelp = new dev.jasper.app.shortcuthelp.ShortcutHelp(auxiliary, contributions,
-            () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).bindings(macOs),
+        var keymap = new dev.jasper.app.shortcuthelp.KeymapPage.Hooks(contributions,
+            () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).keybindings(),
             plugins::pluginNames, macOs, changes -> configuration == null
                 ? java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("Settings are unavailable."))
                 : configuration.saveKeybindings(changes, contributions.actions().stream()
                     .filter(a -> KeyBindings.extensionId(a.id()))
                     .map(a -> new KeyBindings.Extension(a.id(), a.defaultBinding())).toList()));
         contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("help", "keys", "bindings", "keymap", "edit shortcuts", "keyboard settings"),
-            Optional.empty(), invocation -> { if (!quitting && !stopped) shortcutHelp.open(); });
+            Optional.empty(), invocation -> openSettings(null, dev.jasper.app.shortcuthelp.KeymapPage.ID));
         contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(List.of(new MenuEntry.Item("app.shortcuts")));
         if (configuration != null) {
             var system = new dev.jasper.app.settingsui.CorePages.SystemActions(() -> configuration.state().file(),
@@ -377,7 +375,7 @@ public final class JasperApplication {
                 configuration::migrationAvailable);
             settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
                 dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(), system,
-                    () -> { if (!quitting && !stopped) shortcutHelp.open(); }, this::managePlugins),
+                    context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context)),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
                     this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));
             configuration.settingsOpener(owner -> openSettings(owner.id(), null));
@@ -602,8 +600,8 @@ public final class JasperApplication {
 
     dev.jasper.app.contributions.Contributions contributions() { return contributions; }
 
-    private void managePlugins() {
-        if (plugins == null || quitting || stopped) return;
+    /** The Plugins page's controller, created the first time Settings builds that page. */
+    private PluginManager pluginManager() {
         if (pluginManager == null) {
             java.util.concurrent.Executor worker = work -> Thread.ofPlatform().daemon().name("jasper-restart").start(work);
             // Only a plain replacement can be swallowed by a resident; any other is standalone and needs no conversation.
@@ -614,7 +612,7 @@ public final class JasperApplication {
                 surface -> shells.chooseFile(surface, "Install Plugin", ".zip"), flow, this::quit, residentControl, standaloneNotice, worker,
                 editor::open, editor::reveal));
         }
-        pluginManager.open();
+        return pluginManager;
     }
 
     /** Asks plugin windows first; any refusal leaves Jasper running with nothing changed. */

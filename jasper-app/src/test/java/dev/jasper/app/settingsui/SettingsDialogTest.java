@@ -54,10 +54,9 @@ class SettingsDialogTest {
             (parent, count) -> { asked[0] = count; return discard[0]; });
         return new SettingsDialog(windows, context -> {
             contexts.add(context);
-            var pages = new ArrayList<>(CorePages.pages(() -> List.of("Jasper Dark"), new CorePages.SystemActions(() -> FILE,
-                () -> { }, () -> { }, () -> { }, () -> { }, () -> false), () -> { }, () -> { }).apply(context));
-            pages.set(pages.indexOf(pages.stream().filter(page -> page.id().equals("keymap")).findFirst().orElseThrow()), fake);
-            return pages;
+            return CorePages.pages(() -> List.of("Jasper Dark"), new CorePages.SystemActions(() -> FILE,
+                    () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
+                page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context);
         }, hooks);
     }
 

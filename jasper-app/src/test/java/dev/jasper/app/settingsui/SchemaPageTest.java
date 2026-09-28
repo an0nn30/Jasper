@@ -119,14 +119,4 @@ class SchemaPageTest {
         var tools = new GroupPage("tools", "Tools", Optional.empty(), true, List::of, context);
         assertThat(tools.hiddenWhenChildless()).isTrue();
     }
-
-    @Test void launcherPagesCloseTheDialogThenOpenTheirWindow() {
-        int[] opened = {0};
-        var keymap = new LauncherPage("keymap", "Keymap", "Keyboard shortcuts.", "Open Keyboard Shortcuts…", () -> opened[0]++,
-            List.of("shortcuts"), context);
-        assertThat(keymap.searchTerms()).contains("Keymap", "shortcuts");
-        JButton open = keymap.button();
-        open.doClick();
-        assertThat(opened[0]).isEqualTo(1);
-    }
 }
