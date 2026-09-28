@@ -63,15 +63,26 @@ final class ViewportSync {
         viewport = null;
     }
 
-    /** The view's size from the viewport: whole lines and whole characters of the Editor's font. */
+    /**
+     * The view's size from the viewport: whole lines and whole characters of the Editor's font (the text area's own
+     * left and right insets hold no text). When the size changes, the view scrolls to keep the cursor shown, and the
+     * text area's room below the last line follows the new height.
+     */
     void resize() {
         JViewport port = viewport;
         if (port == null) return;
         Rectangle visible = port.getViewRect();
+        java.awt.Insets insets = area.getInsets();
         int lineHeight = Math.max(1, area.getLineHeight());
         int charWidth = Math.max(1, area.getFontMetrics(area.getFont()).charWidth('m'));
-        if (visible.height <= 0 || visible.width <= 0) return;
-        editor.view().resize(Math.max(1, visible.height / lineHeight), Math.max(1, visible.width / charWidth));
+        int textWidth = visible.width - insets.left - insets.right;
+        if (visible.height <= 0 || textWidth <= 0) return;
+        View view = editor.view();
+        int rows = Math.max(1, visible.height / lineHeight), columns = Math.max(1, textWidth / charWidth);
+        area.revalidate();
+        if (rows == view.height() && columns == view.width()) return;
+        view.resize(rows, columns);
+        editor.viewResized();
     }
 
     /** After a command: the viewport shows the view's first line and column. */
@@ -87,8 +98,12 @@ final class ViewportSync {
             Point target = new Point(x, y);
             if (!target.equals(port.getViewPosition())) {
                 moving = true;
-                try { port.setViewPosition(target); }
-                finally { moving = false; }
+                try {
+                    // The text area's room below the last line (VimTextArea's preferred size) must be laid out before
+                    // a first line near the end can be shown, or the scroll pane would pull the view back.
+                    if (area.getHeight() < area.getPreferredSize().height) port.doLayout();
+                    port.setViewPosition(target);
+                } finally { moving = false; }
             }
         } catch (BadLocationException ignored) { }
     }

@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-27-jasper-editor-vim-design.md` (plan V1c of section 13, sections 3.1, 4.1, 5.1 and 11). Plans V1a and V1b are merged; their headers describe the engine.
 
-**Status:** Written 2026-09-28 on branch `claude/vim-v1c` (worktree `.worktrees/vim-v1c`, from `main` at 7ef531b8). Every source file, test and corpus case below was compiled and run before the plan was written: against Vim 9.1 all 1125 corpus cases (179 new: view 113, folds 66) passed, three of them divergent, and every command in the table has a case. Applied to a fresh checkout of `7ef531b8` exactly as written, `./gradlew check` passed (3,593 tests, 0 failed, 5 skipped).
+**Status:** Written 2026-09-28 on branch `claude/vim-v1c` (worktree `.worktrees/vim-v1c`, from `main` at 7ef531b8). Every source file, test and corpus case below was compiled and run before the plan was written: against Vim 9.1 all 1125 corpus cases (179 new: view 113, folds 66) passed, three of them divergent, and every command in the table has a case. Applied to a fresh checkout of `7ef531b8` exactly as written, `./gradlew check` passed (3,593 tests, 0 failed, 5 skipped). **Executed 2026-09-28** (subagent-driven); the final review's fixes ('incsearch' scrolls to the match through the view and `<Esc>` puts the view back; word wrapping stays off while Vim is on and the text area wraps at any character; the view may scroll past the end of the text; `viewScrolled` keeps the busy flag; a resize updates the view at once; an unused local) changed VimEditor, ViewportSync, VimTextArea, View, EditorTab and ViewportSyncTest beyond the plan's code.
 
 ## Deviations from the spec (approved scope, adjusted in this plan)
 

@@ -65,3 +65,6 @@ unverified.
 - [ ] 45. Scrolling with the mouse wheel or the scroll bar moves the view; the caret moves into the window when it was scrolled out, and the next `j` does not jump back.
 - [ ] 46. In a Java file, `zc` inside a method folds it (the fold marker in the gutter shows it), `j` steps over the closed fold, `zo` opens it; `zM` folds everything and `zR` opens everything; clicking the gutter's fold markers still works.
 - [ ] 47. With a method folded, `dd` on it deletes the whole method, `u` brings it back, and `/` for text inside it opens the fold.
+- [ ] 48. With 'incsearch' (on by default), typing `/` and text that matches off screen shows the match while typing, and `<Esc>` returns the view to where it was.
+- [ ] 49. `G` `zt` and `<C-f>` at the end show blank rows below the last line, and `H` goes to the top line shown.
+- [ ] 50. The caret is visible on a closed fold's line when the cursor is inside the fold.

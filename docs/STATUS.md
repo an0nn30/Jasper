@@ -9,8 +9,20 @@
   folds (`zo zO zc zC za zA zv zR zM zj zk [z ]z`) with closed folds counted as one line and 'foldopen'. A port of
   Vim's move.c (`View`) kept in step with the text area's viewport (`ViewportSync`). Every file in the plan was
   compiled and run against Vim 9.1 before the plan was written: 1,125 corpus cases (1,122 recorded, 3 divergent).
-  - Not done: executing the plan; GUI checks 41–47 of the [checklist](editor-verification.md) (user-run); plans V2,
-    V3 and V4.
+  - Executed 2026-09-28 (subagent-driven: three task commits plus the final review's fix commit).
+  - Final review fixes: (1) while the command line reads a pattern, the view is not updated after each key;
+    'incsearch' scrolls the view to the match from the view as it was when the line opened (the caret stays), and
+    `<Esc>` or `<CR>` puts that view back before the usual update, as Vim's old_viewstate does; (2) `EditorTab.refresh`
+    no longer turns word wrapping back on while Vim is on, and because RSyntaxTextArea always wraps at words,
+    `VimTextArea` installs a wrapped view that honours `setWrapStyleWord(false)` and breaks at any character, so the
+    screen lines are Vim's; `ViewportSync` counts the view's columns without the text area's side insets; (3) with Vim
+    on, the text area is taller by the viewport's height less one line, so the view may scroll past the end of the
+    text (`G` `zt`, `<C-f>` at the end, `<C-e>`) and the screen shows the view's first line; (4) `viewScrolled` keeps
+    an enclosing command's busy flag and does not notify mid-command; (5) a viewport resize that changes the view's
+    size scrolls the view to the cursor at once; (6) an unused local in `View.scrollCursorTop` went. Six
+    `ViewportSyncTest` cases and one `EditorTabTest` case cover them.
+  - `./gradlew check`: 3,599 tests, 0 failed, 0 errors, 5 skipped.
+  - Not done: GUI checks 41–50 of the [checklist](editor-verification.md) (user-run); plans V2, V3 and V4; merge; push.
 - **Editor Vim mode, plan V1b** (branch `claude/vim-v1b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`, written 2026-09-28): Visual mode (charwise,
   linewise, blockwise, with block `I`/`A`/`c`, `p` over an area, `gv` and `.` on an area of the same size), `/` and `?`

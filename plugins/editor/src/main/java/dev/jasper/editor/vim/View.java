@@ -53,6 +53,18 @@ final class View {
         if (fold != null) topline = fold[0];
     }
 
+    /** save_viewstate: the window's position, for 'incsearch' to put back. */
+    int[] viewstate() { return new int[] { topline, botline, emptyRows, leftcol, skipcol }; }
+
+    /** restore_viewstate. */
+    void viewstate(int[] saved) {
+        topline = saved[0];
+        botline = saved[1];
+        emptyRows = saved[2];
+        leftcol = saved[3];
+        skipcol = saved[4];
+    }
+
     private boolean wrap() { return editor.options().flag("wrap"); }
 
     private int so() { return editor.options().number("scrolloff"); }
@@ -336,7 +348,7 @@ final class View {
     /** scroll_cursor_top: the cursor line at the top, with 'scrolloff', scrolling at least minScroll lines. */
     void scrollCursorTop(int minScroll, boolean always) {
         int scrolled = 0, extra = 0, used, i;
-        int oldTopline = topline, oldSkipcol = skipcol;
+        int oldTopline = topline;
         int off = so();
         validateCheight();
         used = clineHeight;
