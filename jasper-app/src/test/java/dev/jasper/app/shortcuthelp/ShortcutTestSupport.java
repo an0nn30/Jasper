@@ -12,7 +12,7 @@ public final class ShortcutTestSupport {
         panel.tree.setSelectionRow(1);
         panel.tree.getActionMap().get("editShortcut").actionPerformed(null);
         if (!panel.capture(shortcut)) throw new AssertionError("not recording");
-        panel.editor.save.doClick();
+        panel.editor.set.doClick();
     }
     public static boolean editing(AuxiliarySurface surface) {
         return ((ShortcutPanel) surface.holder().getComponent(0)).editor.isVisible();

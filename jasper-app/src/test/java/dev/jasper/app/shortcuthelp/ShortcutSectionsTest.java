@@ -112,6 +112,38 @@ class ShortcutSectionsTest {
         });
     }
 
+    @Test void rowsAndSectionsThatDifferFromTheirDefaultsAreBlue() throws Exception {
+        edt(() -> {
+            new ThemeController();
+            var panel = new ShortcutPanel(true, changes -> { throw new AssertionError("Unexpected save"); });
+            try {
+                panel.setRows(List.of(
+                    new ShortcutEntry("new_tab", "Tabs", "New tab", KeyStroke.getKeyStroke("meta Y"), "Terminal window", "", true, "cmd+t"),
+                    new ShortcutEntry("close_tab", "Tabs", "Close tab", KeyStroke.getKeyStroke("meta W"), "Terminal window", "", true, "cmd+w"),
+                    new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Terminal window", "", true, "cmd+c")));
+                panel.tree.expandSections(true);
+                var link = UIManager.getColor("Component.linkColor");
+                var plain = UIManager.getColor("Label.foreground");
+                assertThat(link).isNotNull();
+                assertThat(nameColor(panel.tree, "Tabs")).as("a section holding a changed row").isEqualTo(link);
+                assertThat(nameColor(panel.tree, "New tab")).isEqualTo(link);
+                assertThat(nameColor(panel.tree, "Close tab")).isEqualTo(plain);
+                assertThat(nameColor(panel.tree, "Clipboard")).isEqualTo(plain);
+            } finally { panel.close(); }
+        });
+    }
+
+    private static java.awt.Color nameColor(JTree tree, String text) {
+        for (int row = 0; row < tree.getRowCount(); row++) {
+            Object node = tree.getPathForRow(row).getLastPathComponent();
+            var cell = (Container) tree.getCellRenderer().getTreeCellRendererComponent(tree, node, false, tree.isExpanded(row),
+                tree.getModel().isLeaf(node), row, false);
+            var name = (JLabel) cell.getComponent(0);
+            if (name.getText().equals(text)) return name.getForeground();
+        }
+        throw new AssertionError("no row named " + text);
+    }
+
     private static <T> T find(Container root, Class<T> type) {
         for (Component child : root.getComponents()) {
             if (type.isInstance(child)) return type.cast(child);
