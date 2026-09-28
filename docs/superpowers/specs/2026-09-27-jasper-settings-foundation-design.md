@@ -1,6 +1,6 @@
 # Settings foundation: schema, key layout, writer and migration
 
-Status: Design approved section by section on 2026-09-27; awaiting review of this written spec.
+Status: Approved by the user on 2026-09-27; amended during planning (see "Amendments from planning").
 This is sub-project **A** of the Settings dialog work. Sub-projects B (dialog and core pages)
 and C (SDK settings API and plugin rework) get their own brainstorm, spec and plan; their
 already-settled decisions are recorded in [Roadmap](#roadmap-b-and-c) so they are not reopened.
@@ -372,6 +372,30 @@ modelled on IntelliJ's `Configurable` (create component, is-modified, apply, res
 Testkit fakes and contract tests in `PluginContractTest`. Editor, History, Remote, Vault and Sample
 move to declared settings; Remote's `[shortcuts]` table is removed in favour of the keymap; the
 stale `PluginConfig` Javadoc is fixed.
+
+## Amendments from planning (2026-09-27)
+
+Decided while writing the implementation plan; they refine, and where stated replace, the text above.
+
+- `Setting` gains `Optional<T> example`: the value the generated template shows when the default is not
+  a writable value (`ui.font.size`, whose default 0 means "platform size", shows `14`).
+- `TomlDocument.remove` keeps a same-line comment as a comment line of its own, so no edit loses a
+  comment (replaces "deletes the statement and its same-line comment"). Deleting a table header also
+  deletes one blank line directly above it.
+- `TomlDocument` also has `removeTable(prefix)` (values and headers at or below a table) and
+  `keysUnder(prefix)`. The safety net runs inside every operation rather than as a separate `verify`
+  call, and its message is file-agnostic: `Can't safely edit <key> here; edit the file by hand.`
+- Insertion rule 2 applies only to dotted siblings in the same table; a new sub-table otherwise gets its
+  own section at the end rather than a dotted key under its parent.
+- `ConfigService.State` gains `legacyKeys` and `deadTables` (with a four-argument constructor kept), and
+  `migratable()`. An edit that changes nothing is not written, so Migrate Config with nothing to do leaves
+  the file and its timestamp alone.
+- The diagnostics dialog shows a **Migrate Config…** button only when migration has work; results appear
+  through a new `WindowContent.onInfo`. Old plugin tables count as work only when that plugin's own file
+  exists (`PluginRuntime.settingsFileExists`).
+- Plugin reports are kept per settings file and are no longer cleared by `config.toml` reloads; recovering
+  from a broken plugin file counts as a reload (listeners rerun). The plugin settings poller now marshals
+  its reports to the EDT: before, a broken file reported from the poller thread into EDT-only code.
 
 ## Workflow
 
