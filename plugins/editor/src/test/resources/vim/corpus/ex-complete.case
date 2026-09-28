@@ -1,0 +1,237 @@
+# Ex command line: Tab completion (V2b). Command names and options Jasper has; Vim has more, so only cases where both complete the same way.
+
+=== tab completes a command name
+text:
+  pear
+  apple
+  fig
+cursor: 1,1
+keys: :sor<Tab><CR>
+--- vim 9.1
+expect-text:
+  apple
+  fig
+  pear
+expect-cursor: 1,1
+expect-mode: normal
+
+=== tab completes after a range
+text:
+  pear
+  apple
+  fig
+cursor: 1,1
+keys: :1,2sor<Tab><CR>
+--- vim 9.1
+expect-text:
+  apple
+  pear
+  fig
+expect-cursor: 1,1
+expect-mode: normal
+
+=== tab cycles through the matches
+text:
+  one
+  two
+cursor: 1,1
+keys: 2Gmx:mar<Tab><Tab> x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  mark line  col file/text
+   x      2    0 two
+
+=== tab comes back to what was typed
+text:
+  one
+  two
+cursor: 1,1
+keys: :mar<Tab><Tab><Tab><CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E471: Argument required
+
+=== shift tab goes backwards
+text:
+  one
+  two
+cursor: 1,1
+keys: 2Gmx:mar<S-Tab> x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  mark line  col file/text
+   x      2    0 two
+
+=== tab completes an option name
+text:
+  one
+  two
+cursor: 1,1
+keys: :set shiftw<Tab>=2<CR>>>
+--- vim 9.1
+expect-text:
+    one
+  two
+expect-cursor: 1,3
+expect-mode: normal
+
+=== tab completes an option value
+text:
+  one
+  two
+cursor: 1,1
+keys: :set sw=<Tab><BS>3<CR>>>
+--- vim 9.1
+expect-text:
+     one
+  two
+expect-cursor: 1,4
+expect-mode: normal
+
+=== tab completes a no option
+text:
+  one
+  two
+cursor: 1,1
+keys: :set noet<Tab>?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  noexpandtab
+
+=== tab completes an inv option
+text:
+  one
+  two
+cursor: 1,1
+keys: :set invet<Tab><CR>:set et?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    expandtab
+
+=== tab with nothing to complete
+text:
+  one
+  two
+cursor: 1,1
+keys: :s/o/0<Tab>/<CR>
+--- vim 9.1
+expect-text:
+  0	ne
+  two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== tab with no match keeps the text
+text:
+  one
+  two
+cursor: 1,1
+keys: :sorx<Tab><BS><CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== tab then more typing
+text:
+  pear
+  apple
+  fig
+cursor: 1,1
+keys: :so<Tab>!<CR>
+--- vim 9.1
+expect-text:
+  pear
+  fig
+  apple
+expect-cursor: 1,1
+expect-mode: normal
+
+=== tab in the middle of the line completes before the cursor
+text:
+  pear
+  apple
+  fig
+cursor: 1,1
+keys: :sor!<Left><Tab><CR>
+--- vim 9.1
+expect-text:
+  pear
+  fig
+  apple
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gt with one tab stays
+text:
+  one
+  two
+cursor: 1,1
+keys: gtx
+--- vim 9.1
+expect-text:
+  ne
+  two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== gT with one tab stays
+text:
+  one
+  two
+cursor: 1,1
+keys: gTx
+--- vim 9.1
+expect-text:
+  ne
+  two
+expect-cursor: 1,1
+expect-mode: normal
+
+=== relativenumber starts off
+text:
+  one
+  two
+cursor: 1,1
+keys: :set rnu?<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  norelativenumber

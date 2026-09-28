@@ -20,6 +20,18 @@
   - the discard count per plugin page
 
   Deviations: see the plan's status banner. Not pushed; not merged.
+- **Editor Vim mode, plan V2b** (branch `claude/vim-v2b`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2b.md`, written 2026-09-28): the Editor's tabs as Vim's buffers — `:w :wq :x :exi :sav :wa :xa :wqa :q :qa
+  :quita :e :ene :r :ls :buffers :files :b :bn :bN :bp :tabn :tabN :tabp :tabnew :tabe`, `ZZ`, `ZQ`, `gt`, `gT`,
+  through the Editor's save, conflict and close paths (`VimHost.Documents`, implemented by `EditorWindow`); `<Tab>`
+  completion of commands, options, paths and tab names; 'number' and 'relativenumber' on the gutter; uppercase marks
+  that select their tab. Every file in the plan was compiled and run before the plan was written: 1582 corpus
+  cases against Vim 9.1 (17 new), and the tab commands in `ExFilesTest` and `EditorWindowTest`.
+  - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
+  - `./gradlew check`: 4,135 tests, 0 failed, 0 errors, 5 skipped.
+  - Merged into local `main` on 2026-09-28 after merging main (plugin settings C2) into the branch; `./gradlew check`
+    on the merged tree: 4,153 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+  - Not done: GUI checks 61–70 of the [checklist](editor-verification.md) (user-run); plans V3 and V4; push.
 - **Plugin settings C2** (`claude/plugin-settings-c2`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c2.md`): Settings has a page under Tools for each running
   plugin with settings, generated from its declarations (`PluginSettingsPage`) or built by the plugin through the new

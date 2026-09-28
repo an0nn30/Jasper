@@ -102,6 +102,33 @@ final class Ex {
         def("set", BANG | TRLBAR | EXTRA, Addr.NONE, "show or set options: `opt`, `noopt`, `invopt`, `opt!`, `opt&`, `opt?`, `opt=val`, `+=`, `-=`, `^=`, `all`", ExInfo::set);
         def("setlocal", BANG | TRLBAR | EXTRA, Addr.NONE, "`:set` for this tab's local values only", ExInfo::set);
         def("setglobal", BANG | TRLBAR | EXTRA, Addr.NONE, "`:set` for the global values only", ExInfo::set);
+        int file = RANGE | WHOLEFOLD | BANG | EXTRA | DFLALL | TRLBAR;
+        def("write", file, Addr.LINES, "save the tab (`:w file` saves it as the file; `!` replaces a file that exists)", ExFiles::write);
+        def("wq", file, Addr.LINES, "save the tab, then close it", ExFiles::writeQuit);
+        def("xit", file, Addr.LINES, "save the tab if it has changes, then close it", ExFiles::exit);
+        def("exit", file, Addr.LINES, "as `:x`", ExFiles::exit);
+        def("saveas", BANG | EXTRA | TRLBAR, Addr.NONE, "save the tab as {file}", ExFiles::saveAs);
+        def("wall", BANG | TRLBAR, Addr.NONE, "save every tab with changes", ExFiles::writeAll);
+        def("xall", BANG | TRLBAR, Addr.NONE, "save every tab with changes, then close them all", ExFiles::exitAll);
+        def("wqall", BANG | TRLBAR, Addr.NONE, "as `:xa`", ExFiles::exitAll);
+        def("quit", BANG | TRLBAR, Addr.NONE, "close the tab; `!` discards its changes", ExFiles::quit);
+        def("qall", BANG | TRLBAR, Addr.NONE, "close every tab; `!` discards their changes", ExFiles::quitAll);
+        def("quitall", BANG | TRLBAR, Addr.NONE, "as `:qa`", ExFiles::quitAll);
+        def("edit", BANG | EXTRA | TRLBAR, Addr.NONE, "open {file} in a tab, or read the tab's file again (`!` discards changes)", ExFiles::edit);
+        def("enew", BANG | TRLBAR, Addr.NONE, "a new untitled tab", ExFiles::newTab);
+        def("read", BANG | RANGE | WHOLEFOLD | EXTRA | TRLBAR | ZEROR, Addr.LINES, "put {file}'s lines below the line (`:0r` above the first)", ExFiles::read);
+        def("ls", BANG | EXTRA | TRLBAR, Addr.NONE, "list the tabs as buffers", ExFiles::list);
+        def("buffers", BANG | EXTRA | TRLBAR, Addr.NONE, "as `:ls`", ExFiles::list);
+        def("files", BANG | EXTRA | TRLBAR, Addr.NONE, "as `:ls`", ExFiles::list);
+        def("buffer", BANG | RANGE | COUNT | EXTRA | TRLBAR, Addr.OTHER, "select the tab with buffer number N, or whose name holds {name}", ExFiles::buffer);
+        def("bnext", BANG | RANGE | COUNT | TRLBAR, Addr.OTHER, "the next tab, [N] times", ExFiles::step);
+        def("bNext", BANG | RANGE | COUNT | TRLBAR, Addr.OTHER, "the previous tab, [N] times", ExFiles::step);
+        def("bprevious", BANG | RANGE | COUNT | TRLBAR, Addr.OTHER, "the previous tab, [N] times", ExFiles::step);
+        def("tabnext", RANGE | ZEROR | EXTRA | TRLBAR, Addr.OTHER, "the next tab, or tab [N]", ExFiles::tabNext);
+        def("tabNext", RANGE | ZEROR | EXTRA | TRLBAR, Addr.OTHER, "[N] tabs back", ExFiles::tabPrevious);
+        def("tabprevious", RANGE | ZEROR | EXTRA | TRLBAR, Addr.OTHER, "[N] tabs back", ExFiles::tabPrevious);
+        def("tabnew", BANG | EXTRA | RANGE | ZEROR | TRLBAR, Addr.OTHER, "a new untitled tab, or {file} in a tab", ExFiles::newTab);
+        def("tabedit", BANG | EXTRA | RANGE | ZEROR | TRLBAR, Addr.OTHER, "as `:tabnew`", ExFiles::newTab);
     }
 
     /** @return the commands Jasper implements, in the reference's order */
@@ -114,6 +141,10 @@ final class Ex {
     static void register(VimCommands commands) {
         commands.action(":", "a command line; with a count, for that many lines (`:.,.+N`)", false, c -> c.editor.ex().open(c));
         commands.visual(":", "a command line for the Visual lines (`:'<,'>`)", false, false, c -> c.editor.ex().open(c));
+        commands.action("ZZ", "save the tab if it has changes and close it (`:x`)", false, c -> c.editor.ex().execute("x"));
+        commands.action("ZQ", "close the tab, discarding its changes (`:q!`)", false, c -> c.editor.ex().execute("q!"));
+        commands.action("gt", "the next tab, or tab {count}", false, ExFiles::gt);
+        commands.action("gT", "{count} tabs back", false, ExFiles::gT);
         commands.action("&", "repeat the last `:s` on the line, without its flags", false, c -> {
             String line = (c.hasCount ? c.count > 1 ? ".,.+" + (c.count - 1) : "." : "") + "s";
             c.editor.ex().execute(line);
@@ -178,6 +209,7 @@ final class Ex {
             initial = "'<,'>";
         } else if (c.hasCount) initial = c.count > 1 ? ".,.+" + (c.count - 1) : ".";
         Vim vim = editor.vim();
+        editor.commandLine().completer(before -> Completion.complete(editor, before));
         editor.commandLine().start(':', vim.commandHistory(), initial, null, text -> {
             // Only a typed line joins the history; one typed by :normal does not.
             if (typed()) vim.rememberCommand(text);
@@ -548,7 +580,7 @@ final class Ex {
     private static Found found(String name, int end, int flags) { return new Found(name, DEFS.get(name), end, flags); }
 
     /** skip_range: past the characters a range may hold, to where the command's name starts. */
-    private static int skipRange(String line, int start) {
+    static int skipRange(String line, int start) {
         int i = start, n = line.length();
         while (i < n && " \t0123456789.$%'/?-+,;\\".indexOf(line.charAt(i)) >= 0) {
             char c = line.charAt(i);

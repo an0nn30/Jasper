@@ -234,6 +234,10 @@ After an operator, and in Visual mode, where they extend the area.
 | `zR` | open every fold |
 | `zM` | close every fold |
 | `:` | a command line; with a count, for that many lines (`:.,.+N`) |
+| `ZZ` | save the tab if it has changes and close it (`:x`) |
+| `ZQ` | close the tab, discarding its changes (`:q!`) |
+| `gt` | the next tab, or tab {count} |
+| `gT` | {count} tabs back |
 | `&` | repeat the last `:s` on the line, without its flags |
 | `g&` | repeat the last `:s` on every line, with its flags (`:%s//~/&`) |
 
@@ -366,3 +370,29 @@ key is typed. A command Vim has and Jasper does not fails with E319.
 | `:se[t]` | show or set options: `opt`, `noopt`, `invopt`, `opt!`, `opt&`, `opt?`, `opt=val`, `+=`, `-=`, `^=`, `all` |
 | `:setl[ocal]` | `:set` for this tab's local values only |
 | `:setg[lobal]` | `:set` for the global values only |
+| `:w[rite]` | save the tab (`:w file` saves it as the file; `!` replaces a file that exists) |
+| `:wq` | save the tab, then close it |
+| `:x[it]` | save the tab if it has changes, then close it |
+| `:exi[t]` | as `:x` |
+| `:sav[eas]` | save the tab as {file} |
+| `:wa[ll]` | save every tab with changes |
+| `:xa[ll]` | save every tab with changes, then close them all |
+| `:wqa[ll]` | as `:xa` |
+| `:q[uit]` | close the tab; `!` discards its changes |
+| `:qa[ll]` | close every tab; `!` discards their changes |
+| `:quita[ll]` | as `:qa` |
+| `:e[dit]` | open {file} in a tab, or read the tab's file again (`!` discards changes) |
+| `:ene[w]` | a new untitled tab |
+| `:r[ead]` | put {file}'s lines below the line (`:0r` above the first) |
+| `:ls` | list the tabs as buffers |
+| `:buffers` | as `:ls` |
+| `:files` | as `:ls` |
+| `:b[uffer]` | select the tab with buffer number N, or whose name holds {name} |
+| `:bn[ext]` | the next tab, [N] times |
+| `:bN[ext]` | the previous tab, [N] times |
+| `:bp[revious]` | the previous tab, [N] times |
+| `:tabn[ext]` | the next tab, or tab [N] |
+| `:tabN[ext]` | [N] tabs back |
+| `:tabp[revious]` | [N] tabs back |
+| `:tabnew` | a new untitled tab, or {file} in a tab |
+| `:tabe[dit]` | as `:tabnew` |

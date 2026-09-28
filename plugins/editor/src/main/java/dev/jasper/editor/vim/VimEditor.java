@@ -52,6 +52,7 @@ public final class VimEditor {
     private final View view = new View(this);
     private final ViewportSync viewport;
     private final Folds folds;
+    private final LineNumbers lineNumbers;
     /** The text area's word-wrapping, put back when Vim turns off (Vim wraps at any character). */
     private final boolean originalWrapStyleWord;
     /** The text area's fold-aware navigation, put back when Vim turns off (Vim's cursor may be inside a closed fold). */
@@ -100,6 +101,7 @@ public final class VimEditor {
         this.highlights = new Highlights(area);
         this.folds = new Folds(area);
         this.viewport = new ViewportSync(this, area);
+        this.lineNumbers = new LineNumbers(this, area);
         this.originalWrapStyleWord = area.getWrapStyleWord();
         area.setWrapStyleWord(false);
         this.originalNavigation = area.getNavigationFilter();
@@ -137,6 +139,7 @@ public final class VimEditor {
         area.setWrapStyleWord(originalWrapStyleWord);
         area.setNavigationFilter(originalNavigation);
         viewport.close();
+        lineNumbers.close();
         highlights.clear();
         vim.forget(this);
         buffer.close();
@@ -320,6 +323,9 @@ public final class VimEditor {
             }
             look();
             fire();
+            List<Runnable> after = List.copyOf(afterKey);
+            afterKey.clear();
+            for (Runnable work : after) work.run();
         }
     }
 
@@ -850,6 +856,23 @@ public final class VimEditor {
     }
 
     String documentName() { return documentName.get(); }
+
+    /** @return the cursor's line, 1-based */
+    int cursorLine() { return cursor().line + 1; }
+
+    /** Work for after the key being handled ({@code :q} closes the tab once the key is done); at once outside a key. */
+    void afterKey(Runnable work) {
+        if (busy) afterKey.add(work);
+        else work.run();
+    }
+
+    private final List<Runnable> afterKey = new ArrayList<>();
+
+    /** A message given outside a key (a save that completed later): shown at once. */
+    void announce(String text) {
+        message(text, false);
+        if (!busy) fire();
+    }
 
     boolean documentModified() { return documentModified.getAsBoolean(); }
 }

@@ -122,6 +122,12 @@ recorded corpus.
   `:left`, `:right` and `:center`; `:marks`, `:reg`, `:jumps` and `:changes`; `:u`, `:noh` and `:set`. The
   [reference](editor-vim-reference.md#ex-commands) lists them. When a command line says several lines (`:reg`,
   `:g/pat/`) they stay above the strip until you type a key; `:` goes straight on to the next command line.
+- The tabs are Vim's buffers. `:w` saves through the Editor's Save (`:w file` saves as the file), `:q` closes the tab
+  (`:q!` without asking about changes), `:wq`, `:x` and `ZZ` save and close, `:e file` opens a file in a tab (a
+  relative name starts from the current file's folder), `:r file` puts a file's lines below the cursor, `:ls` lists
+  the tabs with their buffer numbers, and `:b N`, `:bn`, `:tabn`, `gt` and `gT` move between them. `<Tab>` completes
+  command names, options after `:set`, file names and tab names. 'relativenumber' shows each line's distance from the
+  cursor in the gutter.
 - `<C-g>` shows the file, its line count and the cursor's position; `ga` the character's code.
 - Scrolling (`<C-e>`, `<C-d>`, `<C-f>`, `zt`, `zz`), `H`, `M`, `L` and the screen-line motions (`gj`, `g0`, `g$`)
   work on a window as many lines high and characters wide as the text area shows. Scrolling with the mouse or the
@@ -129,9 +135,8 @@ recorded corpus.
 - The fold commands (`zo`, `zc`, `za`, `zR`, `zM`, `zj`, `[z`) work on the Editor's code folds. A closed fold counts as
   one line for `j`, `k` and scrolling, an operator takes it whole, and the motions Vim's 'foldopen' names (`l`, `w`,
   searches, marks, `%`, `{`, `u`) open the fold they land in.
-- Not yet: file, buffer and tab commands (`:w`, `:q`, `:e`, `ZZ`), Tab completion on the command line, relative line
-  numbers, macros, a vimrc, and emulated plugins such as surround and commentary. They follow in later releases. An
-  uppercase mark (`mA`) works within its own tab.
+- Not yet: macros, a vimrc, and emulated plugins such as surround and commentary. They follow in later releases. An
+  uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
 
 ## For other plugins
 
