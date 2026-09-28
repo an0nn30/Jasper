@@ -25,6 +25,21 @@ Use `--config <path>` to select a different file. Relative paths resolve from th
 
 The first command launches the desktop and a shell. `--help` prints usage without opening a window or reading configuration. Missing, duplicate and unknown arguments fail before desktop startup.
 
+## Settings dialog
+
+**Settings** (Cmd+, on macOS, or Jasper › Settings…) edits every setting in this guide without opening the file.
+The tree on the left groups them as Appearance & Behavior (Appearance, Window, Notifications, Command Palette,
+Desk Buddy, System Settings), Terminal (Font & Colors, Cursor, Shell), Keymap and Plugins; the search field
+filters the tree and highlights matching settings on the page.
+
+Changes wait until **Apply** or **OK**; **Cancel** (or Escape) discards them, asking first. A page with unsaved
+changes shows its name in blue, and a setting that differs from its default has a Reset button, which removes
+the key from the file. Settings writes `config.toml` in place and keeps your comments; a value the file would
+reject is refused with the same message the file would produce. If `config.toml` has errors, Settings shows a
+banner and saves nothing until the file is fixed; if it uses old setting names, the banner offers Migrate Config.
+System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config.
+Keymap and Plugins open their own windows for now.
+
 ## Supported settings
 
 These are the supported keys and defaults. Font and terminal behavior settings apply live; session and grid defaults take effect as described below.

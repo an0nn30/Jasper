@@ -14,9 +14,12 @@ import javax.swing.UIManager;
 /** Holds a row's label and paints a rounded search-match background behind it while highlighted. */
 final class HighlightBox extends JPanel {
     private boolean highlighted;
+    private final JComponent child;
+    private Color normal;
 
     HighlightBox(JComponent child) {
         super(new BorderLayout());
+        this.child = child;
         setOpaque(false);
         child.setOpaque(false);
         add(child, BorderLayout.CENTER);
@@ -25,9 +28,12 @@ final class HighlightBox extends JPanel {
 
     boolean highlighted() { return highlighted; }
 
+    /** Highlights the label; its text turns dark so it stays readable on the light match colour in every theme. */
     void setHighlighted(boolean value) {
         if (highlighted == value) return;
         highlighted = value;
+        if (value) { normal = child.getForeground(); child.setForeground(new Color(0x1e, 0x1f, 0x22)); }
+        else child.setForeground(normal);
         repaint();
     }
 

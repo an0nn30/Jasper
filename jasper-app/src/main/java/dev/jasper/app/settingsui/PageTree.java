@@ -70,6 +70,7 @@ final class PageTree extends JTree {
 
     @Override public void updateUI() {
         super.updateUI();
+        setBackground(UIManager.getColor("Panel.background"));
         if (getFont() != null) setRowHeight(getFontMetrics(getFont()).getHeight() + UIScale.scale(10));
     }
 
@@ -108,6 +109,8 @@ final class PageTree extends JTree {
             if (selection != null && nodes.containsKey(selection)) setSelectionPath(new TreePath(nodes.get(selection).getPath()));
         } finally { rebuilding = false; }
     }
+
+    @Override public boolean getScrollableTracksViewportWidth() { return true; }
 
     private static Optional<SettingsPage> find(List<SettingsPage> pages, String id) {
         return pages.stream().filter(page -> page.id().equals(id)).findFirst();

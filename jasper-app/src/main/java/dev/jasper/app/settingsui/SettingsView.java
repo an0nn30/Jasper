@@ -36,7 +36,7 @@ final class SettingsView extends JPanel {
         var left = new JPanel(new BorderLayout(0, 6));
         left.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 6));
         left.add(search, BorderLayout.NORTH);
-        var treeScroll = new JScrollPane(tree);
+        var treeScroll = new JScrollPane(tree, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         treeScroll.setBorder(BorderFactory.createEmptyBorder());
         left.add(treeScroll, BorderLayout.CENTER);
 
@@ -60,6 +60,9 @@ final class SettingsView extends JPanel {
         banner.setVisible(false);
 
         body.setBorder(BorderFactory.createEmptyBorder());
+        body.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        body.setOpaque(false);
+        body.getViewport().setOpaque(false);
         body.getVerticalScrollBar().setUnitIncrement(16);
         var page = new JPanel(new BorderLayout());
         page.add(banner, BorderLayout.NORTH);

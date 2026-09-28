@@ -21,6 +21,7 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.Scrollable;
 import javax.swing.UIManager;
 
 /** A page generated from a list of settings: IntelliJ-style rows of label, control, comment and Reset. EDT only. */
@@ -152,7 +153,7 @@ public final class SchemaPage implements SettingsPage {
 
     @Override public JComponent component() {
         if (panel != null) return panel;
-        panel = new JPanel(new GridBagLayout());
+        panel = new WidthTracking();
         panel.setOpaque(false);
         panel.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
         int y = 0;
@@ -172,6 +173,7 @@ public final class SchemaPage implements SettingsPage {
         }
         var filler = constraints(0, y, 3);
         filler.weighty = 1;
+        filler.weightx = 1;
         filler.fill = GridBagConstraints.BOTH;
         var space = new JPanel();
         space.setOpaque(false);
@@ -225,8 +227,8 @@ public final class SchemaPage implements SettingsPage {
     private int addAction(ActionItem action, int y) {
         var text = new JLabel();
         text.putClientProperty("html.disable", true);
-        var c = constraints(0, y, 1);
-        c.insets = new Insets(6, 0, 6, 12);
+        var c = constraints(0, y, 3);
+        c.insets = new Insets(8, 0, 2, 0);
         panel.add(text, c);
         var buttons = new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0));
         buttons.setOpaque(false);
@@ -238,14 +240,24 @@ public final class SchemaPage implements SettingsPage {
             made.add(control);
             actionButtons.add(control);
         }
-        var b = constraints(1, y, 2);
-        b.insets = new Insets(6, 0, 6, 0);
+        var b = constraints(0, y + 1, 3);
+        b.insets = new Insets(2, 0, 6, 0);
         panel.add(buttons, b);
         actionRefreshers.add(() -> {
             text.setText(action.text().get());
             for (int i = 0; i < made.size(); i++) made.get(i).setEnabled(action.buttons().get(i).enabled().getAsBoolean());
         });
-        return y + 1;
+        return y + 2;
+    }
+
+    /** The page follows the dialog's width, so it never scrolls sideways. */
+    private static final class WidthTracking extends JPanel implements Scrollable {
+        WidthTracking() { super(new GridBagLayout()); }
+        @Override public java.awt.Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(java.awt.Rectangle visible, int orientation, int direction) { return 16; }
+        @Override public int getScrollableBlockIncrement(java.awt.Rectangle visible, int orientation, int direction) { return visible.height; }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
     }
 
     private static GridBagConstraints constraints(int x, int y, int width) {

@@ -139,6 +139,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
 | `palette` | EDT scope/query/step state, keyboard routing, the Swing palette popup and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
 | `config` | Immutable values and pure parsing through CoreSettings.SCHEMA; ConfigService owns background watch/reload, the save transaction (settings, shortcuts) and Migrate Config, and marshals delivery to EDT. Application closes the service. |
+| `settingsui` | EDT Settings dialog: the shell, the draft of pending core-setting edits, schema-generated, group and launcher pages, editors and the core page tree. SettingsDialog owns each opening's pages and disposes them on close. |
 | `settings` | Pure declarative settings machinery: setting kinds, descriptors, the schema, loaded values and the comment-preserving TomlDocument editor. No Jasper dependencies; caller chooses thread. |
 | `contributions` | EDT model of what extensions contribute to the chrome, in app-native types. Application owns the single instance; the plugin runtime writes it and every window renders it. |
 | `appearance` | EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles. |

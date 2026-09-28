@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress (inline execution). Branch `claude/settings-dialog`, worktree `.worktrees/settings-dialog`.
+**Status:** Implemented on `claude/settings-dialog` (inline execution); `./gradlew check` green, 2,916 tests. Branch `claude/settings-dialog`, worktree `.worktrees/settings-dialog`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far:
@@ -12,6 +12,11 @@ Deviations so far:
   `SettingsView` falls back to grey when the theme has no `Separator.foreground`.
 - Task 9's README instruction no longer spells out a Markdown link in this plan, because `AppDocumentationTest`
   resolves every link in `docs/`, plans included.
+- Task 9, from inspecting the previews: highlighted labels switch to dark text so they stay readable on the match colour
+  in dark themes; schema pages track the viewport width (no sideways scrolling) and give their filler the spare width, so
+  rows stay left-aligned when no Reset icon shows; action rows put their buttons under their text; the tree never scrolls
+  sideways and uses the panel background; the page scroll pane is transparent so the dialog is one surface, as in the
+  reference screenshot. The package-table row for `settingsui` is placed before the `settings` row.
 
 **Goal:** An IntelliJ-style Settings dialog, opened by Cmd+, and the macOS Settings… menu item, that edits
 every core setting through schema-generated pages, with search, highlighting, Apply/OK/Cancel and banners.
