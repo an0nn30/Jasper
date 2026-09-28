@@ -3,6 +3,7 @@ package dev.jasper.app.config;
 import dev.jasper.app.config.PaletteSettings;
 import dev.jasper.app.config.ToolbarMode;
 
+import dev.jasper.app.settings.SettingValues;
 import dev.jasper.terminal.config.Palette;
 import dev.jasper.terminal.config.TerminalOptions;
 
@@ -140,6 +141,26 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
     public static ConfigSnapshot defaults() {
         return new ConfigSnapshot(30, ToolbarMode.ICONS_AND_LABELS, true,
             FontConfig.defaults(), DEFAULT_THEME, Map.of(), 100, 35, TerminalConfig.defaults());
+    }
+
+    /** The snapshot for loaded settings plus the keybindings and legacy plugin tables their own readers produced. */
+    public static ConfigSnapshot from(SettingValues values, Map<String, String> keybindings, Map<String, Map<String, Object>> plugins) {
+        return new ConfigSnapshot(values.get(CoreSettings.WINDOW_TAB_HEIGHT), values.get(CoreSettings.WINDOW_TOOLBAR),
+            values.get(CoreSettings.WINDOW_STATUS_BAR),
+            new FontConfig(values.get(CoreSettings.TERMINAL_FONT_FAMILY), values.get(CoreSettings.TERMINAL_FONT_SIZE),
+                values.get(CoreSettings.TERMINAL_FONT_FALLBACK), values.get(CoreSettings.TERMINAL_FONT_LIGATURES),
+                values.get(CoreSettings.TERMINAL_FONT_LINE_HEIGHT)),
+            values.get(CoreSettings.UI_THEME_NAME), keybindings, values.get(CoreSettings.WINDOW_COLUMNS), values.get(CoreSettings.WINDOW_LINES),
+            new TerminalConfig(new TerminalConfig.Shell(values.get(CoreSettings.TERMINAL_SHELL_PROGRAM), values.get(CoreSettings.TERMINAL_SHELL_ARGS)),
+                values.get(CoreSettings.TERMINAL_ENV), values.get(CoreSettings.TERMINAL_SCROLLBACK), values.get(CoreSettings.TERMINAL_OPTION_AS_META),
+                values.get(CoreSettings.TERMINAL_CURSOR_SHAPE), values.get(CoreSettings.TERMINAL_CURSOR_BLINK),
+                values.get(CoreSettings.TERMINAL_DIM_INACTIVE_PANES), values.get(CoreSettings.TERMINAL_COPY_ON_SELECT),
+                values.get(CoreSettings.TERMINAL_BELL), values.get(CoreSettings.TERMINAL_ON_EXIT), values.get(CoreSettings.TERMINAL_SHELL_INTEGRATION)),
+            values.get(CoreSettings.BUDDY_ENABLED), values.get(CoreSettings.PALETTE_MAX_RESULTS),
+            values.get(CoreSettings.NOTIFICATIONS_LONG_COMMAND_SECONDS), values.get(CoreSettings.SYSTEM_RUN_IN_BACKGROUND), plugins,
+            new UiFontConfig(values.get(CoreSettings.UI_FONT_FAMILY), values.get(CoreSettings.UI_FONT_SIZE)),
+            values.get(CoreSettings.TERMINAL_COLORS), values.get(CoreSettings.WINDOW_RAIL_WIDTH),
+            values.get(CoreSettings.WINDOW_TOOLBAR_HEIGHT), values.get(CoreSettings.WINDOW_STATUS_BAR_HEIGHT));
     }
 
     public KeyBindings bindings(boolean macOs) {
