@@ -2,6 +2,20 @@
 
 ## Current state — 2026-09-23
 
+- **Settings dialog B1** (`claude/settings-dialog`, 2026-09-28; spec
+  `docs/superpowers/specs/2026-09-28-jasper-settings-dialog-design.md`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b1.md`): Cmd+, and the macOS Settings… item open
+  an IntelliJ-style modal Settings dialog (`dev.jasper.app.settingsui`): search, category tree, breadcrumb with
+  back/forward, schema-generated pages for all 33 core settings with Reset and inline validation,
+  Apply/OK/Cancel with a discard prompt, and banners for old keys and rejected files. `ConfigService.State`
+  carries the loaded values and a `rejected` flag; `AuxiliaryWindows.modalDialog` remembers the dialog's bounds.
+  Keymap and Plugins are launcher pages until plan B2. Previews: `./gradlew :jasper-app:settingsPreview`
+  (24 renders, dark/light, default and 18 pt), inspected against the user's IntelliJ reference; four layout
+  defects found there were fixed. `./gradlew check`: 2,916 tests, 0 failures, 0 errors, 5 skipped. Executed
+  inline with checkpoints after Tasks 4 and 7. GUI checks pending with the user (open via Cmd+, and the
+  application menu, Apply a change, Cancel with changes, banners, remembered bounds, theme switch while open).
+  Deviations: see the plan's status banner. Not pushed; not merged.
+
 - **Editor Vim mode, plan V1a** (branch `claude/vim-mode`, plan
   `docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`, spec
   `docs/superpowers/specs/2026-09-27-jasper-editor-vim-design.md`, 2026-09-27): a headless Vim engine in

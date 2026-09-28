@@ -110,6 +110,8 @@ Settings opens the TOML configuration, creating a commented template only when a
 
 `terminal.on_exit` defaults to `"keep_open"`: a stopped shell retains its output and exit marker. Set it to `"close_on_success"` to close on exit code 0, or `"close"` for any shell-process exit. Add `on_exit = "close_on_success"` under the existing `[terminal]` table to opt in. Only the exited pane closes; its tab and window close when empty, while siblings keep running. A command returning to the shell does not trigger this behavior. Reload affects future exits and never closes already retained output or restarts the stopped shell.
 
+Settings (Cmd+,) edits every setting in a dialog; see [the Settings dialog](docs/configuration.md#settings-dialog).
+
 The root [config.example.toml](config.example.toml) is a copyable file containing every supported non-shortcut setting at its built-in default. From the repository or worktree root on macOS, install it with:
 
 ```bash
