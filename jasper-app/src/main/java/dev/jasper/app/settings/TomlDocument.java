@@ -103,6 +103,89 @@ public final class TomlDocument {
         throw refused(path);
     }
 
+    /** Moves {@code from}'s value, exactly as written, and its same-line comment to {@code to}, which must be unset. */
+    public TomlDocument move(List<String> from, List<String> to) {
+        requirePath(from);
+        requirePath(to);
+        Statement source = assignment(from);
+        if (source == null || source.inline() || values.keySet().stream().anyMatch(key -> SettingsSchema.startsWith(key, to)))
+            throw refused(from);
+        String value = text.substring(source.valueStart(), source.valueEnd());
+        String comment = source.comment(text) ? " " + text.substring(source.end(), lineContentEnd(source)).strip() : "";
+        var intended = new LinkedHashMap<>(values);
+        intended.remove(from);
+        return apply(from, intended, List.of(new Edit(source.start(), source.lineEnd(), ""))).set(to, value, comment);
+    }
+
+    /** Renames the {@code [from]} header, and any header below it, to {@code to}. */
+    public TomlDocument renameTable(List<String> from, List<String> to) {
+        requirePath(from);
+        requirePath(to);
+        var edits = new ArrayList<Edit>();
+        for (Statement statement : statements)
+            if (statement.kind() == Kind.HEADER && SettingsSchema.startsWith(statement.path(), from)) {
+                if (statement.array()) throw refused(from);
+                var renamed = new ArrayList<>(to);
+                renamed.addAll(statement.path().subList(from.size(), statement.path().size()));
+                int open = text.indexOf('[', statement.start());
+                int close = text.lastIndexOf(']', statement.end() - 1) + 1;
+                edits.add(new Edit(open, close, "[" + TomlLiterals.path(renamed) + "]"));
+            }
+        if (edits.isEmpty()) throw refused(from);
+        var intended = new LinkedHashMap<List<String>, Object>();
+        values.forEach((key, value) -> {
+            if (!SettingsSchema.startsWith(key, from)) { intended.put(key, value); return; }
+            var renamed = new ArrayList<>(to);
+            renamed.addAll(key.subList(from.size(), key.size()));
+            intended.put(List.copyOf(renamed), value);
+        });
+        return apply(from, intended, edits);
+    }
+
+    /** Removes every value at or below {@code table}, and every header naming it or a table below it. */
+    public TomlDocument removeTable(List<String> table) {
+        requirePath(table);
+        var intended = new LinkedHashMap<>(values);
+        intended.keySet().removeIf(key -> SettingsSchema.startsWith(key, table));
+        var edits = new ArrayList<Edit>();
+        for (Statement statement : statements) {
+            if (!SettingsSchema.startsWith(statement.path(), table)) continue;
+            if (statement.array()) throw refused(table);
+            edits.add(statement.kind() == Kind.HEADER ? deleteHeader(statement) : delete(statement));
+        }
+        if (edits.isEmpty() && intended.size() == values.size()) return this;
+        return apply(table, intended, edits);
+    }
+
+    /** Removes the {@code [table]} header when no assignment follows it before the next header. */
+    public TomlDocument removeTableIfEmpty(List<String> table) {
+        requirePath(table);
+        for (int index = 0; index < statements.size(); index++) {
+            Statement statement = statements.get(index);
+            if (statement.kind() != Kind.HEADER || statement.array() || !statement.path().equals(table)) continue;
+            boolean empty = index + 1 == statements.size() || statements.get(index + 1).kind() == Kind.HEADER;
+            return empty ? apply(table, values, List.of(deleteHeader(statement))) : this;
+        }
+        return this;
+    }
+
+    /** Deletes a header line and one blank line just above it; a same-line comment stays behind. */
+    private Edit deleteHeader(Statement header) {
+        if (header.comment(text)) return new Edit(header.start(), header.end(), "");
+        int start = header.start();
+        if (start > 0) {
+            int previous = text.lastIndexOf('\n', start - 2) + 1;
+            if (text.substring(previous, start).isBlank()) start = previous;
+        }
+        return new Edit(start, header.lineEnd(), "");
+    }
+
+    private int lineContentEnd(Statement statement) {
+        int at = statement.lineEnd();
+        while (at > statement.end() && (text.charAt(at - 1) == '\n' || text.charAt(at - 1) == '\r')) at--;
+        return at;
+    }
+
     private Statement assignment(List<String> path) {
         for (Statement statement : statements)
             if (statement.kind() == Kind.ASSIGNMENT && statement.path().equals(path)) {
