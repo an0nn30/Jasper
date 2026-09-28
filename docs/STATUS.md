@@ -10,7 +10,9 @@
   `<nowait>`, `<unique>`, `<Plug>`, `<Nop>`, `<Leader>`; a failing command ends a mapping or macro, a mapping's changes
   undo as one step, and Ctrl+C stops one that runs on. Every file in the plan was compiled and run against Vim 9.1
   before the plan was written: 1714 corpus cases (133 new in `macros.case` and `mappings.case`, 2 divergent).
-  - Not done: executing the plan; GUI checks 71–79 of the [checklist](editor-verification.md) (user-run); plan V3b
+  - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
+  - `./gradlew check`: 4,311 tests, 0 failed, 0 errors, 5 skipped.
+  - Not done: GUI checks 71–79 of the [checklist](editor-verification.md) (user-run); plan V3b
     (the vimrc, `sethandler` lines, `let mapleader`, `<Action>`); V4; push.
 - **Editor Vim mode, plan V2b** (branch `claude/vim-v2b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2b.md`, written 2026-09-28): the Editor's tabs as Vim's buffers — `:w :wq :x :exi :sav :wa :xa :wqa :q :qa
