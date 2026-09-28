@@ -83,6 +83,11 @@ Versions use `X.Y.Z`: major 1–255, minor 0–255, patch 0–65535, with no lea
 
 ## Build a Windows portable ZIP
 
+For a setup wizard with per-user installation, shortcut choices, upgrades, and
+Windows uninstall support, use `:jasper-app:packageInstaller` instead. It produces
+`jasper-app\build\packaging\dist\Jasper-<version>-windows-x64-setup.exe` and requires
+WiX in addition to JBR SDK 25 x64. See the [installer build instructions](docs/packaging.md#windows-setup-wizard).
+
 Run this **on Windows x64**, with a JBR SDK 25 x64 installation. From the repository root in PowerShell:
 
 ```powershell
@@ -114,7 +119,7 @@ cp -n config.example.toml ~/.config/jasper/config.toml
 
 If `config.toml` already exists, `cp -n` leaves it unchanged. Choose another filename to inspect the example separately.
 
-`ui.theme.name` names the UI theme — Jasper Dark (default), IntelliJ Light or an installed theme — and reloads live. `[ui.font]` sets UI typography independently of terminal `[font]`; its family and optional 8–32-point size update live. See [theme configuration](docs/configuration.md#theme). Native macOS and Windows packaging commands and acceptance checks are in the [packaging guide](docs/packaging.md). Bounded application logs and their privacy rules are described in [application diagnostics](docs/diagnostics.md). Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md).
+`ui.theme.name` names the UI theme — Jasper Dark (default), IntelliJ Light or an installed theme — and reloads live. `[ui.font]` sets UI typography independently of `[terminal.font]`; its family and optional 8–32-point size update live. See [theme configuration](docs/configuration.md#theme). Native macOS and Windows packaging commands and acceptance checks are in the [packaging guide](docs/packaging.md). Bounded application logs and their privacy rules are described in [application diagnostics](docs/diagnostics.md). Native font/input/audio and initial sizing acceptance is tracked in the [terminal configuration checklist](docs/superpowers/plans/2026-09-12-jasper-plan-4b-manual-check.md).
 
 On Linux/Windows, Ctrl+1–9 selects an existing tab and Ctrl+Shift+[ / Ctrl+Shift+] selects the previous/next tab. For other actions, `cmd` maps to Ctrl+Shift. Those defaults written with an additional explicit Shift add Alt to remain distinct (for example split down is Ctrl+Alt+Shift+D). Other ordinary Ctrl combinations remain available to terminal programs. Keybinding overrides also accept `{` and `}` as Shift+[ and Shift+].
 

@@ -2,26 +2,26 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelRegion;
+import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.testsupport.IdleTerminalSession;
 import java.awt.FocusTraversalPolicy;
 import java.util.ArrayDeque;
 import javax.swing.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledOnOs;
-import org.junit.jupiter.api.condition.OS;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class StartupFocusTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    // Starts DesktopTestSupport's /bin/sh shell, which Windows lacks (as MockUiTest's shell-starting test).
-    @Test @DisabledOnOs(OS.WINDOWS) void defaultFocusTracksTheActiveTerminalBeforeAndAfterShellStartup() throws Exception {
+    @Test void defaultFocusTracksTheActiveTerminalBeforeAndAfterShellStartup() throws Exception {
         var pending = new ArrayDeque<Runnable>();
         var owners = new WindowContent[1];
         var policies = new FocusTraversalPolicy[1];
         edt(() -> {
-            var owner = owners[0] = content(launcher(pending));
+            var owner = owners[0] = content(new ShellLauncher(pending::add,
+                directory -> IdleTerminalSession.start(), "idle-test-session"));
             var model = new Contributions();
             owner.connectContributions(model);
             model.addPanel("focus.panel", "Tool panel", new ImageIcon(), PanelRegion.LEFT, site -> new JTextField("Search hosts"));

@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.testsupport.PluginJars;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,8 +42,8 @@ class PluginSettingsFilesTest {
     }
 
     @Test void readsPollsAndKeepsTheLastGoodValuesWhenTheFileBreaks() throws Exception {
-        List<String> reports = new ArrayList<>();
-        var files = new PluginSettingsFiles(user(), (key, message) -> reports.add(key + ": " + message));
+        List<ConfigDiagnostic> reports = new ArrayList<>();
+        var files = new PluginSettingsFiles(user(), reports::add);
         Path file = PluginSettingsFiles.file(user(), "dev.example.tool");
         assertThat(files.current("dev.example.tool")).as("no file yet").isEmpty();
         Files.createDirectories(file.getParent());
@@ -54,7 +55,16 @@ class PluginSettingsFilesTest {
         Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 5000));
         assertThat(files.refresh(false)).isEmpty();
         assertThat(files.current("dev.example.tool")).as("last good kept").containsEntry("greeting", "hi");
-        assertThat(reports).singleElement().asString().startsWith("plugins.dev.example.tool: ").contains(file.getFileName().toString());
+        assertThat(reports).singleElement().satisfies(d -> {
+            assertThat(d.file()).isEqualTo(file);
+            assertThat(d.key()).isEmpty();
+            assertThat(d.line()).isEqualTo(2);
+            assertThat(d.message()).contains(file.getFileName().toString());
+        });
+        assertThat(files.position("dev.example.tool", List.of("greeting"))).hasValue(new PluginSettingsFiles.Position(1, 1));
+        Files.writeString(file, "greeting = \"hi\"\n[proxy]\nport = 22\n");
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 7000));
+        assertThat(files.refresh(false)).as("recovering from a broken file counts as a reload").containsExactly("dev.example.tool");
         Files.writeString(file, "greeting = \"again\"\n");
         Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 10000));
         assertThat(files.refresh(true)).containsExactly("dev.example.tool");

@@ -21,7 +21,7 @@
   - Final review fixes: (1) outside Insert and Replace mode a key Vim declines never runs one of RSyntaxTextArea's
     editing actions (only Editor commands, registered with `VimTextArea.allowInNormalMode`, run from the text area's
     own map) and rings the bell, while ancestor and window bindings (the app's shortcuts, the hosted Close Tab)
-    still fire, as a re-review required; (2) a
+    still fire; (2) a
     failing Insert-mode key rings the bell and the insert goes on, so `.` still ends in Normal mode; (3) no redo
     while an insert's undo step has edits, and undo/redo reopen the step in a `finally`; (4) `SettingsFile` keeps
     the file's own line breaks, and the save-failure dialog names the exception; (5) `"+`/`"*` text has `\r\n` and
@@ -30,6 +30,19 @@
     outside Insert mode. Two corpus cases cover (2).
   - `./gradlew check`: 2823 tests, 2818 passed, 0 failed, 5 skipped.
   - Not done: GUI checks 21–30 of the [checklist](editor-verification.md) (user-run); plans V1b, V2, V3 and V4; push.
+- **Settings foundation** (`claude/settings-foundation`, 2026-09-27; spec
+  `docs/superpowers/specs/2026-09-27-jasper-settings-foundation-design.md`, plan
+  `docs/superpowers/plans/2026-09-27-jasper-settings-foundation.md`): `config.toml` is described by one
+  schema (`dev.jasper.app.settings`, `config.CoreSettings`); the loader, the generated template and the
+  example/guide tests read it. Version 2 keys: `[terminal.font]`, `terminal.colors`,
+  `system.run_in_background`; version 1 keys load with "Moved to" warnings. `TomlDocument` edits TOML in
+  place, keeping comments, and refuses any edit that would not land exactly; `ConfigService.save` and
+  shortcut saves share one verified transaction. Migrate Config (palette and diagnostics button) rewrites
+  old keys after backing the file up to `config.toml.v1.bak`. Plugin settings problems name the plugin's
+  own file and line, survive app reloads and clear when that file reloads; the settings poller no longer
+  reports from its own thread. `./gradlew check`: 2,336 tests, 0 failures, 0 errors, 5 skipped. Executed
+  inline (user choice) with checkpoints after Tasks 4, 7 and 12; no GUI launched. Deviations: see the
+  plan's status banner. Next: sub-project B (Settings dialog), then C (SDK settings API). Not pushed; not merged.
 
 - **App-hosted Editor tabs** (`codex/plugin-workspace-tabs`, 2026-09-27):
   Editor files now use the main workspace's tab strip, rounded content frame, commands,
@@ -44,9 +57,50 @@
   native close; both have RED→GREEN regressions. Final `check :jasper-app:packageDist`
   passed: 2,281 tests, zero failures/errors, five skips; app image verified and DMG rebuilt.
   Dark/light and narrow/overflow headless previews inspected. No native GUI launched.
-  Merged into local main at the user's request; not pushed. No remaining confirmed review
+  Merged into main and pushed with the Windows setup wizard. No remaining confirmed review
   findings. The full workspace is shared instead of extracting another host; model/SDK and
   workspace wiring were developed together before separate commits to verify ownership.
+- **Windows setup wizard** (branch `codex/windows-setup-wizard`, 2026-09-27): approved
+  bounded packaging extension adds `:jasper-app:packageInstaller`, producing
+  `Jasper-<version>-windows-x64-setup.exe` alongside the existing ZIP. Uses the verified
+  JBR image, per-user installation, directory/shortcut dialogs, a stable upgrade UUID,
+  and standard Windows uninstall. User data outside the installation folder is preserved.
+  Built successfully with JBR SDK 25 x64 and WiX 3.14.1 on Windows ARM64 via emulation.
+  MSI metadata verification passes; negative checks reject wrong version/upgrade UUID
+  and machine-wide scope. The EXE's x64 architecture and all 20 official icon frames
+  were verified. Installer + ZIP builds and targeted packaged-resource/terminal tests
+  passed (12 tests: six passed, six Unix-only skips). Independent review found no issues.
+  Updated from `origin/main` at `90c2e574` in merge `7ce646f9`: preserved both status
+  entries at the sole conflict and applied main's LF checkout policy to existing files.
+  Rebuilt and verified the setup EXE and ZIP; packaged assets now have the pinned LF bytes.
+  Targeted resource, terminal integration, and startup verification passed (42 tests:
+  34 passed, eight skipped). Full `check --continue` also ran: seven tests require this
+  account to have Windows symlink privileges (listed below), and one reflow-search timeout
+  passed when its full test class was rerun. Initial checksum failures disappeared after
+  LF normalization. This is not a green full-suite claim. Remaining privilege failures:
+  `ShellIntegrationScriptsTest.installReplacesASymlinkRatherThanWritingThroughIt`,
+  `FileEndpointTest.localContract`, `FileEndpointTest.rejectsIntermediateLinksWithoutTouchingTheirReferents`,
+  `SftpEndpointTest.sftpV3ContractAndSubsystemCloseKeepsSharedSessionAlive`,
+  `TransferCoordinatorTest.folderTransferPreservesEmptyDirectoriesLinksAndUsesBoundedQueue`,
+  `KnownHostsTest.ownDanglingSymlinkIsNotAnEmptyTrustFile`, and
+  `FileOperationTest.recursiveDeleteNeverFollowsLinksAndTransferReservationsBlockIt`.
+  Refreshed again from `origin/main` at `da81da80` in merge `d0c0551e`. Restored 14
+  manifest-pinned `build/` icons omitted by the global build-directory ignore rule;
+  a source-only exception now keeps them tracked. Replaced the startup-focus test's
+  Unix shell fixture with an idle attached terminal session. Focused resource, icon,
+  startup, tab and terminal tests pass: 38 tests, 32 passed, six Unix-only skips.
+  Setup EXE and ZIP rebuilt successfully; MSI verification and all 14 restored asset
+  hashes in the packaged JAR pass. Independent review found no issues. Full `check`
+  was not rerun for this refresh; the earlier privilege limitations above still apply.
+  Resolved the subsequent pull of `origin/main` at `39b8a7e3`: kept both status
+  histories and the shared source-icon ignore exception. Retained Windows startup-focus
+  coverage because the branch's attached-session fixture needs no Unix shell.
+  Nine focused resource/icon/focus tests passed with no skips; Windows setup EXE and
+  ZIP rebuilt and package/MSI verification passed. Full `check` was not rerun.
+  Setup remains unsigned. Interactive install/upgrade/uninstall acceptance is
+  user-run; no installer or GUI was launched. [Build and acceptance](packaging.md#windows-setup-wizard).
+  Updated from local main at `8883f670` (hosted Editor tabs); sole conflict was this
+  file, both entries kept. Merged into main and pushed to `origin` on 2026-09-27.
 
 - **Local/remote integration and missing icon assets** (2026-09-27): merged
   `origin/main` at `2d59d455` with the local keyboard-panel changes, retaining both

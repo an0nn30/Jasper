@@ -112,7 +112,7 @@ closing clears model closures and all presentation resources.
 validation. `WorkspaceConfiguration` compares each live saved field with its previous
 saved value: unchanged defaults preserve temporary font, toolbar, status-bar and tab-height
 choices. `ConfigurationController` sends appearance to `ThemeController`, whose ThemeState
-separately preserves a temporary theme choice until the saved appearance changes.
+separately preserves a temporary terminal-colours choice until the saved `terminal.colors` changes.
 
 Existing terminal views copy current options before replacing configured fields, preserving
 unrelated options and temporary font size when the saved size is unchanged. Live fields
@@ -138,7 +138,8 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `workspace` | EDT windows, tabs, splits, panes, panel regions and the rail, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions. WindowContent closes subscriptions/panes; each pane closes its session. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
 | `palette` | EDT scope/query/step state, keyboard routing, the Swing palette popup and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
-| `config` | Immutable values and pure parsing; ConfigService owns background watch/reload and explicit shortcut-save work and marshals delivery to EDT. Application closes the service. |
+| `config` | Immutable values and pure parsing through CoreSettings.SCHEMA; ConfigService owns background watch/reload, the save transaction (settings, shortcuts) and Migrate Config, and marshals delivery to EDT. Application closes the service. |
+| `settings` | Pure declarative settings machinery: setting kinds, descriptors, the schema, loaded values and the comment-preserving TomlDocument editor. No Jasper dependencies; caller chooses thread. |
 | `contributions` | EDT model of what extensions contribute to the chrome, in app-native types. Application owns the single instance; the plugin runtime writes it and every window renders it. |
 | `appearance` | EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles. |
 | `launch` | Immutable launch capture and shell integration extraction; ShellLauncher starts off EDT and delivers on EDT. Receiving pane owns the session. |

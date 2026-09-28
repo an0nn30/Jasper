@@ -30,6 +30,8 @@ The first command launches the desktop and a shell. `--help` prints usage withou
 These are the supported keys and defaults. Font and terminal behavior settings apply live; session and grid defaults take effect as described below.
 
 ```toml
+version = 2
+
 [window]
 tab_height = 30
 rail_width = 28
@@ -46,18 +48,11 @@ enabled = false
 [notifications]
 long_command_seconds = 10
 
-[background]
-enabled = false
+[system]
+run_in_background = false
 
 [palette]
 max_results = 5
-
-[font]
-family = "JetBrains Mono"
-size = 16.0
-fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
-ligatures = true
-line_height = 1.0
 
 [terminal]
 scrollback = 10000
@@ -67,6 +62,14 @@ copy_on_select = false
 bell = "visual"
 on_exit = "keep_open"
 shell_integration = "auto"
+colors = "match"
+
+[terminal.font]
+family = "JetBrains Mono"
+size = 16.0
+fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
+ligatures = true
+line_height = 1.0
 
 [terminal.shell]
 program = ""
@@ -87,8 +90,6 @@ family = "system"
 [ui.theme]
 # A built-in or installed theme's name; see Themes.
 name = "Jasper Dark"
-# "match" (the theme's console colours), "light" or "dark" terminal colors.
-terminal = "match"
 
 [keybindings]
 # Optional action overrides; see examples below.
@@ -106,15 +107,15 @@ terminal = "match"
 | `window.lines` | `35` | Integer 2–200 | New windows |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
-| `background.enabled` | `false` | Boolean | Next start (residency); live (login item) |
+| `system.run_in_background` | `false` | Boolean | Next start (residency); live (login item) |
 | `palette.max_results` | `5` | Integer 1–20 | Live |
 | `ui.font.family` | `"system"` | Nonblank family name; unavailable fonts fall back to the platform font | Live, app and plugins |
 | `ui.font.size` | Platform default (omit key) | Finite number 8–32 points | Live, app and plugins |
-| `font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
-| `font.size` | `16.0` | Finite number 6–72 points | Live |
-| `font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
-| `font.ligatures` | `true` | Boolean | Live |
-| `font.line_height` | `1.0` | Finite multiplier 0.5–3.0 | Live |
+| `terminal.font.family` | `"JetBrains Mono"` | Nonblank string without NUL | Live |
+| `terminal.font.size` | `16.0` | Finite number 6–72 points | Live |
+| `terminal.font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
+| `terminal.font.ligatures` | `true` | Boolean | Live |
+| `terminal.font.line_height` | `1.0` | Finite multiplier 0.5–3.0 | Live |
 | `terminal.shell.program` | `""` | Empty selects the default shell; otherwise one nonblank executable string without NUL | New pane requests |
 | `terminal.shell.args` | `[]` | Array of exact argument strings without NUL; empty strings allowed | New pane requests |
 | `terminal.env` | `{}` | Table of string values without NUL; names match `[A-Za-z_][A-Za-z0-9_]*` | New pane requests |
@@ -128,7 +129,7 @@ terminal = "match"
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
 | `ui.theme.name` | `"Jasper Dark"` | A built-in or installed theme's name ([Themes](themes.md)) | Live |
-| `ui.theme.terminal` | `"match"` | `"match"`, `"light"`, `"dark"` | Live |
+| `terminal.colors` | `"match"` | `"match"`, `"light"`, `"dark"` | Live |
 | `keybindings.<action>` | Platform-specific | Shortcut string or `"none"` | Live |
 
 ### Desk buddy
@@ -144,8 +145,8 @@ saved change to `buddy.enabled` resets that session choice.
 ### Background residency
 
 ```toml
-[background]
-enabled = false
+[system]
+run_in_background = false
 ```
 
 With `enabled = true`, closing the last window no longer ends Jasper. The process stays with no
@@ -186,8 +187,8 @@ rather than being served a window built from the old code.
 binds the shared endpoint itself, is never itself resident, and never touches the login item. Any
 resident process was itself started without `--config`, so it is always holding the default
 configuration, never the one named on the command line; and the login item always points at the
-installed app with no `--config`, so an override's `background.enabled` could never arm autostart
-for the default configuration. `background.enabled` inside a `--config` file is therefore never
+installed app with no `--config`, so an override's `system.run_in_background` could never arm autostart
+for the default configuration. `system.run_in_background` inside a `--config` file is therefore never
 acted on.
 
 ### Palette
@@ -350,7 +351,7 @@ The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `font.size` is unchanged. Changing saved `font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary View → Terminal Colors choice remains shared until the saved `ui.theme.terminal` changes; unrelated reloads preserve it. The View menu's Tab height, Rail width, Toolbar height and Status bar height dialogs are such overrides too; each reset button restores the built-in value (30, 28, 30 and 24 pixels).
+View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary View → Terminal Colors choice remains shared until the saved `terminal.colors` changes; unrelated reloads preserve it. The View menu's Tab height, Rail width, Toolbar height and Status bar height dialogs are such overrides too; each reset button restores the built-in value (30, 28, 30 and 24 pixels).
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
@@ -548,6 +549,30 @@ redefined for the palette. Use literal `ctrl+k` or `ctrl+p` when that is the
 intended combination. Setting `command_palette = "none"` disables its accelerator
 while leaving View → Command Palette available.
 
+## Versions and Migrate Config
+
+`config.toml` starts with `version = 2`. A file without `version` is version 1, whose keys still work:
+
+| Version 1 key | Version 2 key |
+|---|---|
+| `[font]` `family`, `size`, `fallback`, `ligatures`, `line_height` | `[terminal.font]` with the same names |
+| `ui.theme.terminal` (version 1) | `terminal.colors` |
+| `background.enabled` (version 1) | `system.run_in_background` |
+
+Each old key is read as its new one, with a warning: *Moved to terminal.font.size. Use Migrate Config to
+update the file.* When a file sets both, the new key wins and the old one is reported as superseded.
+
+**Migrate Config** (in the command palette, and as a button in the configuration details when there is
+something to migrate) rewrites the file in place: it renames `[font]` to `[terminal.font]` when it can,
+moves the other old keys with their comments, removes the old `palette.scopes` table and any
+`[plugins."<id>"]` table whose plugin already has its own settings file, and sets `version = 2`. It first
+copies the original to `config.toml.v1.bak` beside the file (beside the link's target for a symlinked
+config), numbering the name instead of overwriting an existing backup. Nothing happens automatically, and
+a version 1 file keeps working until you migrate it.
+
+Jasper edits the file itself only for shortcut saves and Migrate Config. Both keep your comments and
+formatting and refuse, rather than guess, when a change cannot be made exactly.
+
 ## Reload and diagnostics
 
 **Reload config** forces a file read even if its timestamp and size did not change. The status indicator shows **Built-in defaults**, **Config loaded**, **Config warnings**, or **Config error**, with the first available diagnostic line. Green, amber and red distinguish successful, warning and error states. Its tooltip shows the path; click it for selectable plain-text diagnostics including file, line, column and key.
@@ -582,7 +607,7 @@ supported: a `[colors]` table is reported as an unknown setting and ignored. See
 
 ## Terminal colors
 
-`ui.theme.terminal` chooses the terminal palette independently of the UI chrome, for example a
+`terminal.colors` chooses the terminal palette independently of the UI chrome, for example a
 light UI with a dark terminal. `"match"` (the default) uses the theme's console colours, or
 Jasper Dark or Jasper Light by the theme's darkness when it has none ([Themes](themes.md));
 `"light"` and `"dark"` always use the Jasper Light or Jasper Dark palette. Terminal views, their
@@ -597,7 +622,7 @@ value rejects the configuration.
 
 ### Interface typography
 
-`[font]` controls terminal text. `[ui.font]` independently controls application and plugin UI:
+`[terminal.font]` controls terminal text. `[ui.font]` independently controls application and plugin UI:
 
 ```toml
 [ui.font]

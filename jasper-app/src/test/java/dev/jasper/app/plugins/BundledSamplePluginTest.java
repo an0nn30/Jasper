@@ -27,7 +27,7 @@ class BundledSamplePluginTest {
         onEdt(() -> {
             runtime.set(new PluginRuntime(new PluginRuntime.Options(staged, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock")),
-                new ActivityNotifier(deck.companion(), () -> { }), (key, message) -> { }, contributions,
+                new ActivityNotifier(deck.companion(), () -> { }), PluginRuntime.SettingsReports.IGNORED, contributions,
                 AppContractTest.headlessWindows(), new dev.jasper.app.terminals.TerminalRegistry()));
             runtime.get().start(Map.of("dev.jasper.sample", Map.<String, Object>of("demo_activity", true, "demo_ui", true, "demo_step_millis", 0L)), true);
         });
@@ -97,7 +97,7 @@ class BundledSamplePluginTest {
             new dev.jasper.app.appearance.ThemeController(dev.jasper.app.appearance.Theme.LIGHT);
             runtime.set(new PluginRuntime(new PluginRuntime.Options(remoteOnly, root.resolve("user"), null, false,
                 root.resolve("plugins.toml"), root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> {}),
-                (key, message) -> {}, contributions, AppContractTest.headlessWindows(),
+                PluginRuntime.SettingsReports.IGNORED, contributions, AppContractTest.headlessWindows(),
                 new dev.jasper.app.terminals.TerminalRegistry()));
             runtime.get().start(Map.of(), true);
         });

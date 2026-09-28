@@ -15,6 +15,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.tomlj.Toml;
+import dev.jasper.app.settings.Setting;
+import dev.jasper.app.settings.SettingKind;
+import dev.jasper.app.settings.TomlDocument;
+import dev.jasper.app.settings.TomlLiterals;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -44,22 +50,13 @@ class ConfigTemplateTest {
         String text = Files.readString(example, StandardCharsets.UTF_8);
         var toml = Toml.parse(text);
         assertThat(toml.errors()).isEmpty();
-        assertThat(toml.getTable("buddy").keySet()).containsExactly("enabled");
-        assertThat(toml.getTable("notifications").keySet()).containsExactly("long_command_seconds");
-        assertThat(toml.getTable("palette").keySet()).containsExactly("max_results");
-        assertThat(toml.getTable("window").keySet())
-            .containsExactlyInAnyOrder("tab_height", "rail_width", "toolbar", "toolbar_height", "status_bar",
-                "status_bar_height", "columns", "lines");
-        assertThat(toml.getTable("font").keySet())
-            .containsExactlyInAnyOrder("family", "size", "fallback", "ligatures", "line_height");
-        assertThat(toml.getTable("terminal").keySet())
-            .containsExactlyInAnyOrder("scrollback", "option_as_meta", "dim_inactive_panes", "copy_on_select",
-                "bell", "on_exit", "shell_integration", "shell", "cursor", "env");
-        assertThat(toml.getTable("terminal.shell").keySet()).containsExactlyInAnyOrder("program", "args");
-        assertThat(toml.getTable("terminal.cursor").keySet()).containsExactlyInAnyOrder("shape", "blink");
+        assertThat(toml.getLong("version")).isEqualTo(2L);
+        var expected = new ArrayList<List<String>>();
+        expected.add(List.of("version"));
+        for (Setting<?> setting : CoreSettings.SCHEMA.settings())
+            if (!(setting.kind() instanceof SettingKind.StringMap) && setting != CoreSettings.UI_FONT_SIZE) expected.add(setting.key());
+        assertThat(TomlDocument.leaves(text).keySet()).containsExactlyInAnyOrderElementsOf(expected);
         assertThat(toml.getTable("terminal.env").keySet()).isEmpty();
-        assertThat(toml.getTable("ui.font").keySet()).containsExactly("family");
-        assertThat(toml.getTable("ui.theme").keySet()).containsExactlyInAnyOrder("name", "terminal");
         assertThat(toml.getTable("keybindings").keySet()).isEmpty();
 
         for (boolean macOs : new boolean[]{true, false}) {
@@ -102,6 +99,36 @@ class ConfigTemplateTest {
                 assertThat(individual.snapshot().bindings(macOs).strokeFor(action)).isEqualTo(defaults.strokeFor(action));
                 assertThat(all.snapshot().bindings(macOs).strokeFor(action)).isEqualTo(defaults.strokeFor(action));
             }
+        }
+    }
+
+    @Test void theTemplateIsVersionTwoAndListsEverySettingUnderItsTableOnce() {
+        for (boolean macOs : new boolean[]{true, false}) {
+            String template = ConfigTemplate.text(macOs);
+            assertThat(template).contains("\nversion = 2\n").doesNotContain("[font]", "[background]");
+            String uncommented = template.lines()
+                .map(line -> line.matches("# ([a-z_0-9]+ = .*|\\[.*])") ? line.substring(2) : line)
+                .collect(java.util.stream.Collectors.joining("\n"));
+            var parsed = ConfigLoader.parse(directory.resolve("config.toml"), uncommented, macOs);
+            assertThat(parsed.diagnostics()).isEmpty();
+            for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
+                if (setting.kind() instanceof SettingKind.StringMap) continue;
+                assertThat(parsed.values().present(setting)).as(setting.name()).isTrue();
+                assertThat(parsed.values().get(setting)).as(setting.name()).isEqualTo(templateValue(setting));
+            }
+            var headers = template.lines().filter(line -> line.startsWith("[")).toList();
+            assertThat(headers).doesNotHaveDuplicates();
+        }
+    }
+
+    private static <T> T templateValue(Setting<T> setting) { return setting.example().orElse(setting.defaultValue()); }
+
+    @Test void theConfigurationGuideTableNamesEveryCurrentKeyAndNoOldOne() throws Exception {
+        Path guide = Path.of(System.getProperty("jasper.projectDir")).resolve("docs/configuration.md");
+        String text = Files.readString(guide, StandardCharsets.UTF_8);
+        for (Setting<?> setting : CoreSettings.SCHEMA.settings()) {
+            assertThat(text).as(setting.name()).contains("| `" + setting.name() + "` |");
+            for (List<String> alias : setting.aliases()) assertThat(text).doesNotContain("| `" + TomlLiterals.path(alias) + "` |");
         }
     }
 

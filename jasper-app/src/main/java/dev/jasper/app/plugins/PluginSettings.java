@@ -1,34 +1,43 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.plugin.PluginConfig;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import org.tomlj.Toml;
 
 /** One plugin's settings, read from its own file. Getters are safe from any thread; {@link #update} is UI-thread only. */
 final class PluginSettings implements PluginConfig {
     private final String pluginId;
     private final Containment containment;
-    private final BiConsumer<String, String> report;
+    private final Consumer<ConfigDiagnostic> report;
+    private final Function<List<String>, Optional<PluginSettingsFiles.Position>> positions;
     private final CopyOnWriteArrayList<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final View root;
     private volatile Map<String, Object> values;
 
     private final java.nio.file.Path file;
 
-    PluginSettings(String pluginId, java.nio.file.Path file, Map<String, Object> initial, Containment containment, BiConsumer<String, String> report) {
-        this.pluginId = pluginId; this.file = file; this.containment = containment; this.report = report;
+    PluginSettings(String pluginId, java.nio.file.Path file, Map<String, Object> initial, Containment containment,
+                   Function<List<String>, Optional<PluginSettingsFiles.Position>> positions, Consumer<ConfigDiagnostic> report) {
+        this.pluginId = pluginId; this.file = file; this.containment = containment; this.positions = positions; this.report = report;
         this.values = Map.copyOf(initial);
-        this.root = new View(() -> values, "");
+        this.root = new View(() -> values, List.of());
     }
 
-    void update(Map<String, Object> next) {
-        if (next.equals(values)) return;
+    void update(Map<String, Object> next) { update(next, false); }
+
+    /** Replaces the values; listeners run when they changed, or always when {@code force} (the file was reloaded). */
+    void update(Map<String, Object> next, boolean force) {
+        if (next.equals(values) && !force) return;
         values = Map.copyOf(next);
         for (Runnable listener : listeners) containment.run(pluginId, "configuration change", listener);
     }
@@ -46,9 +55,9 @@ final class PluginSettings implements PluginConfig {
 
     private final class View implements PluginConfig {
         private final Supplier<Map<String, Object>> table;
-        private final String prefix;
+        private final List<String> prefix;
 
-        View(Supplier<Map<String, Object>> table, String prefix) { this.table = table; this.prefix = prefix; }
+        View(Supplier<Map<String, Object>> table, List<String> prefix) { this.table = table; this.prefix = prefix; }
         @Override public java.nio.file.Path file() { return file; }
 
         @Override public Optional<String> string(String key) {
@@ -67,7 +76,9 @@ final class PluginSettings implements PluginConfig {
         }
         @Override public Optional<PluginConfig> table(String key) {
             if (!(table.get().get(key) instanceof Map<?, ?>)) return Optional.empty();
-            return Optional.of(new View(() -> nested(key), prefix + key + "."));
+            var nested = new ArrayList<>(prefix);
+            nested.add(key);
+            return Optional.of(new View(() -> nested(key), List.copyOf(nested)));
         }
         @SuppressWarnings("unchecked")
         private Map<String, Object> nested(String key) {
@@ -78,7 +89,12 @@ final class PluginSettings implements PluginConfig {
             return () -> listeners.remove(handler);
         }
         @Override public void report(String key, String message) {
-            report.accept("plugins.\"" + pluginId + "\"." + prefix + key, message);
+            var path = new ArrayList<>(prefix);
+            path.add(key);
+            var at = positions.apply(path);
+            report.accept(new ConfigDiagnostic(ConfigDiagnostic.Severity.WARNING, file,
+                at.map(PluginSettingsFiles.Position::line).orElse(0), at.map(PluginSettingsFiles.Position::column).orElse(0),
+                Toml.joinKeyPath(path), message));
         }
     }
 }
