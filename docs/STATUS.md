@@ -21,7 +21,8 @@
   throwing `modified()`/`keywords()`; contract cases for `page()`; the stub's Open in Editor failure going to a notice
   while Settings is modal; section-heading carry-over for unsectioned settings; the discard count per plugin page; the
   Sample `settings.toml` "reads this file live" wording. Deviations: see the plan's status banner. Merged into local `main` on 2026-09-28
-  after merging main (Vim V2a) into the branch. Not pushed.
+  after merging main (Vim V2a) into the branch; `./gradlew check` on the merged tree: 4,117 tests, 0 failures,
+  0 errors, 5 skipped. Not pushed.
 - **Editor Vim mode, plan V2a** (branch `claude/vim-v2a`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2a.md`, written 2026-09-28): the Ex command line — ranges (`;`, searches, marks, folds, `*`), `|`, Vim's 600
   command names for abbreviations (E319 for those Jasper lacks), `:s` with every flag including confirmation, `:&`,
