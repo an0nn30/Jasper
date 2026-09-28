@@ -196,6 +196,7 @@ public final class HostsPanel extends JPanel {
         switch (model.get(index)) {
             case HostRows.Host row -> activate.accept(row.host());
             case HostRows.Group group -> toggle(index);
+            case HostRows.Distro ignored -> { }
             case HostRows.Error ignored -> { }
         }
     }
