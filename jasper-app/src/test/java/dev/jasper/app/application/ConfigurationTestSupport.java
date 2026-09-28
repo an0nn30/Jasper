@@ -25,5 +25,10 @@ public final class ConfigurationTestSupport {
     public ConfigSnapshot snapshot() { return controller.snapshot(); }
     public java.util.concurrent.CompletableFuture<Void> saveKeybindings(java.util.Map<String, java.util.Optional<String>> changes,
             java.util.List<KeyBindings.Extension> extensions) { return controller.saveKeybindings(changes, extensions); }
+    public void report(ConfigDiagnostic diagnostic) { controller.report(diagnostic); }
+    public void clearReports(Path file) { controller.clearReports(file); }
+    public boolean migrationAvailable() { return controller.migrationAvailable(); }
+    public java.util.concurrent.CompletableFuture<String> migrate() { return controller.migrate(); }
+    public void pluginSettingsExist(java.util.function.Predicate<String> test) { controller.pluginSettingsExist(test); }
     public void close() { controller.close(); }
 }

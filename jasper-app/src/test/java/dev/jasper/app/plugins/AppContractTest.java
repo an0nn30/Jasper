@@ -62,7 +62,7 @@ class AppContractTest extends PluginContractTest {
                            TerminalRegistry terminals, List<String> notices, List<Path> edited) {
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()), id -> data.resolve(id + ".toml"),
-            (key, message) -> { }, drainGrace, contributions, dark::get, auxiliary, terminals, notices::add, edited::add)));
+            (id, path) -> java.util.Optional.empty(), diagnostic -> { }, drainGrace, contributions, dark::get, auxiliary, terminals, notices::add, edited::add)));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */

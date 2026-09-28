@@ -36,7 +36,7 @@ class RemoteShortcutConfigTest {
             var buddy = new BuddyTestSupport();
             runtime = new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")),
                 root.resolve("plugins"), null, false, root.resolve("plugins.toml"), root.resolve("plugins.lock")),
-                new ActivityNotifier(buddy.companion(), () -> { }), (key, message) -> { }, contributions,
+                new ActivityNotifier(buddy.companion(), () -> { }), PluginRuntime.SettingsReports.IGNORED, contributions,
                 AppContractTest.headlessWindows(), new TerminalRegistry());
             runtime.start(Map.of(), true);
         });

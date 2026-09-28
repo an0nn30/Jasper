@@ -49,7 +49,7 @@ Not supported:
 
 ## Terminal colours
 
-With `ui.theme.terminal = "match"` (the default), a theme that has an editor colour scheme
+With `terminal.colors = "match"` (the default), a theme that has an editor colour scheme
 colours the terminal with the scheme's console colours: background, text, cursor, selection and
 the 16 ANSI colours.
 - **Missing colours:** colours the scheme leaves out come from its parent scheme (IntelliJ's own Default or Darcula), as in IntelliJ's console.

@@ -16,14 +16,14 @@ class KeybindingSaveTest {
 
     @Test void savesAndPublishesWhilePreservingCommentsAndLatestUnrelatedSettings() throws Exception {
         Path file = directory.resolve("config.toml");
-        String original = "# mine\r\n[font]\r\nsize = 18 # keep\r\n[keybindings] # keys\r\ncopy = 'ctrl+c' # copy note\r\n";
+        String original = "# mine\r\n[terminal.font]\r\nsize = 18 # keep\r\n[keybindings] # keys\r\ncopy = 'ctrl+c' # copy note\r\n";
         Files.writeString(file, original);
         try (var service = new ConfigService(file, true)) {
             Files.writeString(file, original.replace("18", "20"));
             var result = service.saveKeybindings(Map.of("copy", "ctrl+c"),
                 Map.of("copy", Optional.of("ctrl+shift+c"), "app.shortcuts", Optional.of("ctrl+k")), List.of()).get(5, TimeUnit.SECONDS);
             assertThat(result.snapshot().keybindings()).containsEntry("copy", "ctrl+shift+c").containsEntry("app.shortcuts", "ctrl+k");
-            assertThat(Files.readString(file)).contains("# mine\r\n[font]\r\nsize = 20 # keep\r\n", "# keys", "# copy note");
+            assertThat(Files.readString(file)).contains("# mine\r\n[terminal.font]\r\nsize = 20 # keep\r\n", "# keys", "# copy note");
             try (var reopened = new ConfigService(file, true)) {
                 assertThat(reopened.initialState().snapshot().bindings(true).strokeFor("copy"))
                     .contains(KeyStroke.getKeyStroke("ctrl shift C"));
@@ -76,15 +76,15 @@ class KeybindingSaveTest {
 
     @Test void patchesQuotedDottedInlineAndMultilineBindingsWithoutChangingOtherValues() {
         for (String text : List.of(
-                "keybindings.copy = 'ctrl+c' # keep\n[font]\nsize=20\n",
-                "keybindings = { copy = 'ctrl+c' } # keep\n[font]\nsize=20\n",
-                "['keybindings'] # keep\ncopy = '''ctrl+c'''\n[font]\nsize=20\n",
-                "[keybindings]\ncopy = \"\"\"\nctrl+c\"\"\" # keep\n[font]\nsize=20\n")) {
+                "keybindings.copy = 'ctrl+c' # keep\n[terminal.font]\nsize=20\n",
+                "keybindings = { copy = 'ctrl+c' } # keep\n[terminal.font]\nsize=20\n",
+                "['keybindings'] # keep\ncopy = '''ctrl+c'''\n[terminal.font]\nsize=20\n",
+                "[keybindings]\ncopy = \"\"\"\nctrl+c\"\"\" # keep\n[terminal.font]\nsize=20\n")) {
             String edited = KeybindingText.update(text, Map.of("copy", Optional.empty(), "test.plugin", Optional.of("ctrl+k")));
             var parsed = ConfigLoader.parse(Path.of("config.toml"), edited, true);
             assertThat(parsed.rejected()).as(edited).isFalse();
             assertThat(parsed.snapshot().keybindings()).containsExactlyEntriesOf(Map.of("test.plugin", "ctrl+k"));
-            assertThat(edited).contains("# keep", "[font]\nsize=20\n");
+            assertThat(edited).contains("# keep", "[terminal.font]\nsize=20\n");
         }
     }
 

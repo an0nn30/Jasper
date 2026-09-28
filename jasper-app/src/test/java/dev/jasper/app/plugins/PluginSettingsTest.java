@@ -1,18 +1,23 @@
 package dev.jasper.app.plugins;
 
+import dev.jasper.app.config.ConfigDiagnostic;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 class PluginSettingsTest {
     @Test void typedGettersNestedTablesChangeDetectionAndQualifiedReports() {
-        List<String> reports = new ArrayList<>();
+        List<ConfigDiagnostic> reports = new ArrayList<>();
         List<String> changes = new ArrayList<>();
         var containment = new Containment(() -> true);
-        var settings = new PluginSettings("dev.example.tool", java.nio.file.Path.of("/tmp/dev.example.tool.toml"), Map.of("name", "x", "count", 3L, "on", true,
-            "hosts", List.of("a"), "proxy", Map.of("port", 22L)), containment, (key, message) -> reports.add(key + "=" + message));
+        var file = java.nio.file.Path.of("/tmp/dev.example.tool.toml");
+        java.util.function.Function<List<String>, java.util.Optional<PluginSettingsFiles.Position>> positions =
+            path -> path.equals(List.of("name")) ? java.util.Optional.of(new PluginSettingsFiles.Position(3, 1)) : java.util.Optional.empty();
+        var settings = new PluginSettings("dev.example.tool", file, Map.of("name", "x", "count", 3L, "on", true,
+            "hosts", List.of("a"), "proxy", Map.of("port", 22L)), containment, positions, reports::add);
         assertThat(settings.file()).isEqualTo(java.nio.file.Path.of("/tmp/dev.example.tool.toml"));
         assertThat(settings.string("name")).hasValue("x");
         assertThat(settings.string("count")).isEmpty();
@@ -36,9 +41,12 @@ class PluginSettingsTest {
         assertThat(changes).hasSize(1);
 
         settings.report("name", "too short");
-        new PluginSettings("dev.example.tool", java.nio.file.Path.of("/tmp/dev.example.tool.toml"), Map.of("proxy", Map.of()), containment, (key, message) -> reports.add(key + "=" + message))
+        new PluginSettings("dev.example.tool", file, Map.of("proxy", Map.of()), containment, positions, reports::add)
             .table("proxy").orElseThrow().report("port", "missing");
-        assertThat(reports).containsExactly("plugins.\"dev.example.tool\".name=too short",
-            "plugins.\"dev.example.tool\".proxy.port=missing");
+        assertThat(reports).extracting(ConfigDiagnostic::file, ConfigDiagnostic::key, ConfigDiagnostic::line, ConfigDiagnostic::message)
+            .containsExactly(tuple(file, "name", 3, "too short"), tuple(file, "proxy.port", 0, "missing"));
+        settings.onChanged(() -> changes.add("forced"));
+        settings.update(Map.of(), true);
+        assertThat(changes).as("a forced update reruns listeners on equal values").contains("forced");
     }
 }

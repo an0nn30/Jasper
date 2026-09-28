@@ -75,7 +75,7 @@ class ConfigServiceTest {
     @Test void invalidValuesApplyOtherValidFieldsAndRetainDiagnostics() throws Exception {
         Path file = directory.resolve("config.toml");
         try (var service = new ConfigService(file, false)) {
-            Files.writeString(file, "window.tab_height=44\nfont.size=100\nfont.future=1");
+            Files.writeString(file, "window.tab_height=44\nterminal.font.size=100\nfont.future=1");
             var state = service.reload().get(5, TimeUnit.SECONDS);
             assertThat(state.snapshot().tabHeight()).isEqualTo(44);
             assertThat(state.snapshot().fontSize()).isEqualTo(16f);

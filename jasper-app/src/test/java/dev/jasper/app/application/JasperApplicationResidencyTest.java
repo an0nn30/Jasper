@@ -87,7 +87,7 @@ class JasperApplicationResidencyTest {
     @Test void theLoginItemFollowsTheSettingWhileResidencyDoesNot(@org.junit.jupiter.api.io.TempDir
                                                                  java.nio.file.Path dir) throws Exception {
         java.nio.file.Path file = dir.resolve("config.toml");
-        java.nio.file.Files.writeString(file, "[background]\nenabled = true\n");
+        java.nio.file.Files.writeString(file, "[system]\nrun_in_background = true\n");
         ConfigService service = new ConfigService(file, true);
         java.util.List<Boolean> reconciled = new java.util.concurrent.CopyOnWriteArrayList<>();
         JasperApplication[] held = new JasperApplication[1];
@@ -103,7 +103,7 @@ class JasperApplicationResidencyTest {
             // Registering a listener replays the current snapshot, so the first value arrives at once.
             edt(() -> { });
             assertThat(reconciled).as("the setting as loaded").containsExactly(true);
-            java.nio.file.Files.writeString(file, "[background]\nenabled = false\n");
+            java.nio.file.Files.writeString(file, "[system]\nrun_in_background = false\n");
             edt(() -> service.reload());
             DesktopTestSupport.until(() -> reconciled.size() == 2);
             assertThat(reconciled).last().as("a saved change applies without a restart").isEqualTo(false);

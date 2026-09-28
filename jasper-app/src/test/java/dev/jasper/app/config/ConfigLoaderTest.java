@@ -19,7 +19,7 @@ class ConfigLoaderTest {
     private ConfigLoader.Result parse(String text) { return ConfigLoader.parse(FILE, text, true); }
 
     @Test void uiTypographyIsIndependentOfTerminalFontAndSurvivesBuilderCopies() {
-        var result = parse("ui.font.family='Serif'\nui.font.size=18.5\nfont.size=23");
+        var result = parse("ui.font.family='Serif'\nui.font.size=18.5\nterminal.font.size=23");
         assertThat(result.diagnostics()).isEmpty();
         assertThat(result.snapshot().uiFont()).isEqualTo(new UiFontConfig("Serif", 18.5f));
         assertThat(result.snapshot().fontSize()).isEqualTo(23);
@@ -77,7 +77,7 @@ class ConfigLoaderTest {
             "tab_height" = 44
             toolbar = "icons"
             status_bar = false
-            [font]
+            [terminal.font]
             size = 18
             [ui.theme]
             name = "IntelliJ Light"
@@ -105,7 +105,7 @@ class ConfigLoaderTest {
 
     @Test void acceptsNumericBoundariesAndEveryToolbarChoice() {
         for (int height : new int[]{20, 30, 72}) assertThat(parse("window.tab_height=" + height).snapshot().tabHeight()).isEqualTo(height);
-        for (float size : new float[]{6f, 72f, 13.5f}) assertThat(parse("font.size=" + size).snapshot().fontSize()).isEqualTo(size);
+        for (float size : new float[]{6f, 72f, 13.5f}) assertThat(parse("terminal.font.size=" + size).snapshot().fontSize()).isEqualTo(size);
         assertThat(parse("window.toolbar='hidden'").snapshot().toolbar()).isEqualTo(ToolbarMode.HIDDEN);
         assertThat(parse("window.toolbar='icons_and_labels'").diagnostics()).isEmpty();
     }
@@ -176,13 +176,13 @@ class ConfigLoaderTest {
     }
 
     @Test void invalidValuesDefaultOnlyTheirKeyWithExactPosition() {
-        var result = parse("[window]\ntab_height = 44\n[font]\n  size = 900");
+        var result = parse("[window]\ntab_height = 44\n[terminal.font]\n  size = 900");
         assertThat(result.rejected()).isFalse();
         assertThat(result.snapshot().tabHeight()).isEqualTo(44);
         assertThat(result.snapshot().fontSize()).isEqualTo(16f);
-        assertDiagnostic(result, "font.size", 4, 3, ConfigDiagnostic.Severity.ERROR);
-        for (String text : new String[]{"font.size=5.9",
-                "font.size=72.1", "font.size=nan", "font.size=inf", "font.size=-inf",
+        assertDiagnostic(result, "terminal.font.size", 4, 3, ConfigDiagnostic.Severity.ERROR);
+        for (String text : new String[]{"terminal.font.size=5.9",
+                "terminal.font.size=72.1", "terminal.font.size=nan", "terminal.font.size=inf", "terminal.font.size=-inf",
                 "window.toolbar='secret-value'"}) {
             var invalid = parse(text);
             assertThat(invalid.rejected()).as(text).isFalse();
@@ -195,7 +195,7 @@ class ConfigLoaderTest {
 
     @Test void wrongScalarTypesRejectWholeCandidate() {
         for (String assignment : new String[]{"window.tab_height=38.0", "window.toolbar=true", "window.status_bar=1",
-                "font.size='secret-value'", "ui.theme.name=1", "keybindings.copy=7", "font.size=[16]",
+                "terminal.font.size='secret-value'", "ui.theme.name=1", "keybindings.copy=7", "terminal.font.size=[16]",
                 "window.tab_height={x=38}"}) {
             var result = parse(assignment);
             assertThat(result.rejected()).as(assignment).isTrue();
@@ -218,10 +218,10 @@ class ConfigLoaderTest {
     }
 
     @Test void syntaxAndDuplicateKeysRejectWithoutEchoingValues() {
-        var duplicate = parse("[font]\nsize=16\nsize=20");
+        var duplicate = parse("[terminal.font]\nsize=16\nsize=20");
         assertThat(duplicate.rejected()).isTrue();
         assertThat(duplicate.diagnostics().getFirst().line()).isEqualTo(3);
-        var malformed = parse("[font]\nsize = secret-value");
+        var malformed = parse("[terminal.font]\nsize = secret-value");
         assertThat(malformed.rejected()).isTrue();
         assertThat(malformed.diagnostics().getFirst().line()).isEqualTo(2);
         assertThat(malformed.diagnostics().getFirst().column()).isPositive();
@@ -233,7 +233,7 @@ class ConfigLoaderTest {
             [window]
             tab_height=44
             future=9
-            [font]
+            [terminal.font]
             future_font='secret-value'
             [unknown]
             [keybindings]
@@ -244,7 +244,7 @@ class ConfigLoaderTest {
         assertThat(result.snapshot().keybindings()).isEmpty();
         assertThat(result.diagnostics()).hasSize(4);
         assertDiagnostic(result, "window.future", 3, 1, ConfigDiagnostic.Severity.WARNING);
-        assertDiagnostic(result, "font.future_font", 5, 1, ConfigDiagnostic.Severity.WARNING);
+        assertDiagnostic(result, "terminal.font.future_font", 5, 1, ConfigDiagnostic.Severity.WARNING);
         assertDiagnostic(result, "unknown", 6, 1, ConfigDiagnostic.Severity.WARNING);
         assertDiagnostic(result, "keybindings.\"future.action\"", 8, 1, ConfigDiagnostic.Severity.WARNING);
         assertThat(result.diagnostics()).allSatisfy(d -> assertThat(d.message()).doesNotContain("secret-value"));
@@ -313,8 +313,8 @@ class ConfigLoaderTest {
     }
 
     @Test void diagnosticsFormatPositionAndHandleUnavailableLocation() {
-        assertThat(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, FILE, 4, 3, "font.size", "Expected a number.").formatted())
-            .contains(FILE.toString() + ":4:3", "font.size", "Expected a number.");
+        assertThat(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, FILE, 4, 3, "terminal.font.size", "Expected a number.").formatted())
+            .contains(FILE.toString() + ":4:3", "terminal.font.size", "Expected a number.");
         assertThat(new ConfigDiagnostic(ConfigDiagnostic.Severity.ERROR, FILE, 0, 0, "", "Cannot read file.").formatted())
             .contains(FILE.toString(), "Cannot read file.").doesNotContain(":0");
     }
@@ -338,19 +338,19 @@ class ConfigLoaderTest {
     }
 
     @Test void backgroundEnabledDefaultsToOffAndRejectsNonBooleans() {
-        var on = parse("[background]\nenabled = true\n");
+        var on = parse("[system]\nrun_in_background = true\n");
         assertThat(on.rejected()).isFalse();
         assertThat(on.diagnostics()).isEmpty();
         assertThat(on.snapshot().backgroundEnabled()).isTrue();
         // Residency is opt-in: an absent table and an empty file both mean off.
         assertThat(ConfigSnapshot.defaults().backgroundEnabled()).isFalse();
         assertThat(parse("# empty").snapshot().backgroundEnabled()).isFalse();
-        var bad = parse("[background]\nenabled = 1\n");
+        var bad = parse("[system]\nrun_in_background = 1\n");
         assertThat(bad.rejected()).isTrue();
         assertThat(bad.snapshot().backgroundEnabled()).isFalse();
-        assertDiagnostic(bad, "background.enabled", 2, 1, ConfigDiagnostic.Severity.ERROR);
-        var unknown = parse("[background]\nstart_at_login = true\n");
-        assertDiagnostic(unknown, "background.start_at_login", 2, 1, ConfigDiagnostic.Severity.WARNING);
+        assertDiagnostic(bad, "system.run_in_background", 2, 1, ConfigDiagnostic.Severity.ERROR);
+        var unknown = parse("[system]\nstart_at_login = true\n");
+        assertDiagnostic(unknown, "system.start_at_login", 2, 1, ConfigDiagnostic.Severity.WARNING);
     }
 
     @Test void paletteMaxResultsParsesWithinRangeAndRejectsOthers() {
@@ -429,21 +429,21 @@ class ConfigLoaderTest {
     @Test void terminalColorsDefaultToMatchAndAcceptEveryChoice() {
         assertThat(parse("").snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
         for (var choice : TerminalColors.values())
-            assertThat(parse("[ui.theme]\nterminal = '" + choice.name().toLowerCase(java.util.Locale.ROOT) + "'\n")
+            assertThat(parse("[terminal]\ncolors = '" + choice.name().toLowerCase(java.util.Locale.ROOT) + "'\n")
                 .snapshot().terminalColors()).isEqualTo(choice);
-        var mixed = parse("ui.theme.terminal = 'dark'\nui.theme.name = 'IntelliJ Light'\n").snapshot();
+        var mixed = parse("terminal.colors = 'dark'\nui.theme.name = 'IntelliJ Light'\n").snapshot();
         assertThat(mixed.theme()).isEqualTo("IntelliJ Light");
         assertThat(mixed.terminalColors()).isEqualTo(TerminalColors.DARK);
     }
 
     @Test void invalidTerminalColorsUseTheExistingPerFieldDiagnosticPolicy() {
         for (String value : java.util.List.of("'private-value'", "7", "true")) {
-            var result = parse("[ui.theme]\nterminal=" + value + "\nname='IntelliJ Light'\n");
+            var result = parse("[terminal]\ncolors=" + value + "\n[ui.theme]\nname='IntelliJ Light'\n");
             assertThat(result.rejected()).isEqualTo(!value.startsWith("'"));
             assertThat(result.snapshot().terminalColors()).isEqualTo(TerminalColors.MATCH);
             assertThat(result.snapshot().theme()).isEqualTo("IntelliJ Light");
             assertThat(result.diagnostics()).singleElement().satisfies(problem -> {
-                assertThat(problem.key()).isEqualTo("ui.theme.terminal");
+                assertThat(problem.key()).isEqualTo("terminal.colors");
                 assertThat(problem.line()).isEqualTo(2);
                 assertThat(problem.message()).doesNotContain("private-value");
             });

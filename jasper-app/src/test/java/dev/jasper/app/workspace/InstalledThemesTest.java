@@ -65,7 +65,7 @@ class InstalledThemesTest {
             assertThat(UIManager.getColor("Panel.background")).isEqualTo(new Color(0x123456));
             assertThat(controller.shown().diagnostics()).isEmpty();
         });
-        reload("[ui.theme]\nname = 'fixture dark'\nterminal = 'light'\n");
+        reload("[ui.theme]\nname = 'fixture dark'\n[terminal]\ncolors = 'light'\n");
         edt(() -> {
             assertThat(themes.current().chrome().name()).isEqualTo("Fixture Dark");
             assertThat(themes.current().palette()).isEqualTo(Palette.jasperLight());

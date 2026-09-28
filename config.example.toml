@@ -1,6 +1,7 @@
 # Jasper example configuration
 # Copy this file to your platform's config.toml, then edit only the values you want to change.
 # All active values below are Jasper's built-in defaults.
+version = 2
 
 [window]
 # Live across open windows. Range: 20-72 logical pixels; out-of-range values use the nearest limit.
@@ -30,18 +31,18 @@ enabled = false
 # Needs shell integration: the duration comes from its command marks. Zero disables. Range 0-3600.
 long_command_seconds = 10
 
-[background]
+[system]
 # Restart required for residency; the login item updates on reload. Keep Jasper running with no
 # windows after the last one closes so the next launch can reuse the warm process, and start it in the background
 # at login. Quit (Cmd+Q) still exits completely. Autostart requires an installed Jasper: a
 # ./gradlew run development session stays resident but never registers a login item.
-enabled = false
+run_in_background = false
 
 [palette]
 # Live. Rows each palette scope shows, and the All tab shows per scope. Range: 1-20.
 max_results = 5
 
-[font]
+[terminal.font]
 # Live across existing and new panes. Missing fonts use JBR/system fallback.
 family = "JetBrains Mono"
 # Range: 6-72 points. A saved size change is live; new panes and Font reset use this value.
@@ -72,6 +73,8 @@ on_exit = "keep_open"
 # New panes only. "auto" loads Jasper's shell integration script (zsh, bash, fish) after your startup files;
 # "manual" only exports JASPER_SHELL_INTEGRATION for you to source; "off" does neither.
 shell_integration = "auto"
+# Terminal colors, live: "match" uses the theme's console colours; "light" or "dark" keeps Jasper's palette.
+colors = "match"
 
 [terminal.shell]
 # New panes only. An empty program selects the platform default login shell.
@@ -97,7 +100,7 @@ blink = true
 # MY_VARIABLE = "a value with spaces"
 
 [ui.font]
-# Live UI font for app chrome and plugin controls, independent of terminal [font].
+# Live UI font for app chrome and plugin controls, independent of [terminal.font].
 # "system" uses the platform font on macOS, Linux and Windows.
 # A missing named font falls back to that platform font.
 family = "system"
@@ -107,8 +110,6 @@ family = "system"
 [ui.theme]
 # Live across open windows: "Jasper Dark", "IntelliJ Light", or an installed theme plugin's name.
 name = "Jasper Dark"
-# Terminal colors, live: "match" uses the theme's console colours; "light" or "dark" keeps Jasper's palette.
-terminal = "match"
 
 [keybindings]
 # Optional live overrides. Shortcuts must be unique; use "none" to disable an action.
