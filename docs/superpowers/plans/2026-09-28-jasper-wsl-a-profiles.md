@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 0-4 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
+**Status:** In progress: Tasks 0-5 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far: none.
@@ -1135,7 +1135,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Produces: `CoreSettings.TERMINAL_SHELL_PROFILE` (`Setting<String>`, key `terminal.shell.profile`, default `""`, `Applies.NEW_PANES`); `TerminalConfig.Shell(String program, List<String> args, String profile)` plus the kept `Shell(String, List<String>)`; `Shell.custom()` and `static Shell.custom(String program, List<String> args, String profile)`.
 - Consumes: nothing new.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `ShellProfileSettingTest.java`:
 
@@ -1181,12 +1181,12 @@ class ShellProfileSettingTest {
 
 In `CoreSettingsTest.java`, change `hasSize(33)` to `hasSize(34)`.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.config.ShellProfileSettingTest' --tests 'dev.jasper.app.config.CoreSettingsTest'`
 Expected: FAIL: compilation errors (`TERMINAL_SHELL_PROFILE`, `profile()`, `custom()` do not exist).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `TerminalConfig.java`, replace the `Shell` record with:
 
@@ -1306,13 +1306,13 @@ and in the settings table replace the `terminal.shell.program` row with these tw
 | `terminal.shell.program` | `""` | For `"custom"`. Empty selects the default shell; otherwise one nonblank executable string without NUL | New pane requests |
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.config.*' --tests 'dev.jasper.app.settingsui.*' --tests 'dev.jasper.app.workspace.ExpandedConfigTest'`
 Expected: PASS (`ConfigTemplateTest` checks the example file and the configuration guide's table; `CorePagesTest`
 checks the new setting is on exactly one page).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current

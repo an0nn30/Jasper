@@ -90,6 +90,7 @@ public final class CorePages {
                 .row(TERMINAL_CURSOR_SHAPE)
                 .row(TERMINAL_CURSOR_BLINK),
             SchemaPage.page("terminal.shell", "Shell").parent("terminal").anchor("shell-environment-and-history")
+                .row(TERMINAL_SHELL_PROFILE)
                 .row(TERMINAL_SHELL_PROGRAM, Editors.executable()).note("Leave empty for your login shell.")
                 .row(TERMINAL_SHELL_ARGS, Editors.textList())
                 .row(TERMINAL_ENV, Editors.table())

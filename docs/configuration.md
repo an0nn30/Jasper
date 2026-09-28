@@ -90,6 +90,7 @@ ligatures = true
 line_height = 1.0
 
 [terminal.shell]
+profile = ""
 program = ""
 args = []
 
@@ -134,7 +135,8 @@ name = "Jasper Dark"
 | `terminal.font.fallback` | `["Symbols Nerd Font Mono", "Apple Color Emoji"]` | Array of nonblank strings without NUL; empty array allowed | Live |
 | `terminal.font.ligatures` | `true` | Boolean | Live |
 | `terminal.font.line_height` | `1.0` | Finite multiplier 0.5–3.0 | Live |
-| `terminal.shell.program` | `""` | Empty selects the default shell; otherwise one nonblank executable string without NUL | New pane requests |
+| `terminal.shell.profile` | `""` | `"login"` (macOS, Linux); `"powershell"`, `"pwsh"`, `"cmd"`, `"wsl:<name>"` (Windows); `"custom"`; empty picks `"custom"` when program or args are set, else the platform default | New pane requests |
+| `terminal.shell.program` | `""` | For `"custom"`. Empty selects the default shell; otherwise one nonblank executable string without NUL | New pane requests |
 | `terminal.shell.args` | `[]` | Array of exact argument strings without NUL; empty strings allowed | New pane requests |
 | `terminal.env` | `{}` | Table of string values without NUL; names match `[A-Za-z_][A-Za-z0-9_]*` | New pane requests |
 | `terminal.scrollback` | `10000` | Integer 0–1000000 retained history lines | New pane requests |

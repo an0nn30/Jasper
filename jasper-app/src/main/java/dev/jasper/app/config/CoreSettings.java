@@ -134,12 +134,21 @@ public final class CoreSettings {
     public static final Setting<Float> TERMINAL_FONT_LINE_HEIGHT = Setting.of("terminal.font.line_height", SettingKind.number(.5, 3), 1f)
         .alias("font.line_height").label("Line height").keywords("font", "line height", "spacing", "rows")
         .description("Line height multiplier, 0.5-3.0; updates live. Below 1.0 rows are tighter and glyphs may overlap.").build();
+    public static final Setting<String> TERMINAL_SHELL_PROFILE = Setting.of("terminal.shell.profile",
+            SettingKind.string(text -> text.isEmpty() || text.matches("[a-z][a-z0-9]*(:[A-Za-z0-9._-]+)?"),
+                "Use a shell profile id such as \"powershell\", \"cmd\" or \"wsl:Ubuntu\"; using the default."), "")
+        .label("Shell profile").keywords("shell", "profile", "default shell", "wsl", "powershell", "cmd", "command prompt")
+        .applies(Applies.NEW_PANES)
+        .description("New panes only. The shell new tabs start: \"powershell\", \"pwsh\" (PowerShell 7) or \"cmd\" on Windows,\n"
+            + "\"wsl:<name>\" for a WSL distribution, \"login\" on macOS and Linux, or \"custom\" (program and args).\n"
+            + "Empty means \"custom\" when program or args are set, otherwise the platform default. A split starts\n"
+            + "the shell of the pane it splits. A profile that is not installed starts the default with a warning.").build();
     public static final Setting<String> TERMINAL_SHELL_PROGRAM = Setting.of("terminal.shell.program",
             SettingKind.string(text -> (text.isEmpty() || !text.isBlank()) && noNul(text),
                 "Use an empty or nonblank executable name without NUL; using the default."), "")
         .label("Shell program").keywords("shell", "zsh", "bash", "fish", "command").applies(Applies.NEW_PANES)
-        .description("New panes only. Empty program resolves the default shell and appends configured args.\n"
-            + "An explicit program gets only configured args, with no implicit login flag.").build();
+        .description("New panes only, for the \"custom\" profile. Empty program resolves the default shell and appends\n"
+            + "configured args. An explicit program gets only configured args, with no implicit login flag.").build();
     public static final Setting<List<String>> TERMINAL_SHELL_ARGS = Setting.of("terminal.shell.args",
             SettingKind.stringList(CoreSettings::noNul), List.<String>of())
         .label("Shell arguments").keywords("shell", "arguments", "flags").applies(Applies.NEW_PANES)
@@ -188,7 +197,7 @@ public final class CoreSettings {
             WINDOW_COLUMNS, WINDOW_LINES, BUDDY_ENABLED, NOTIFICATIONS_LONG_COMMAND_SECONDS, SYSTEM_RUN_IN_BACKGROUND,
             PALETTE_MAX_RESULTS, TERMINAL_SCROLLBACK, TERMINAL_OPTION_AS_META, TERMINAL_DIM_INACTIVE_PANES, TERMINAL_COPY_ON_SELECT,
             TERMINAL_BELL, TERMINAL_ON_EXIT, TERMINAL_SHELL_INTEGRATION, TERMINAL_COLORS, TERMINAL_FONT_FAMILY, TERMINAL_FONT_SIZE,
-            TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
+            TERMINAL_FONT_FALLBACK, TERMINAL_FONT_LIGATURES, TERMINAL_FONT_LINE_HEIGHT, TERMINAL_SHELL_PROFILE, TERMINAL_SHELL_PROGRAM, TERMINAL_SHELL_ARGS,
             TERMINAL_CURSOR_SHAPE, TERMINAL_CURSOR_BLINK, TERMINAL_ENV, UI_FONT_FAMILY, UI_FONT_SIZE, UI_THEME_NAME),
         Set.of(List.of("keybindings"), List.of("plugins"), List.of("palette", "scopes")),
         Map.ofEntries(
