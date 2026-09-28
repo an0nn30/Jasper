@@ -54,7 +54,8 @@ public record EditorSettings(String fontFamily, int fontSize, int tabSize, boole
             softWrap = settings.declare(SettingSpec.of("soft_wrap", SettingKind.bool(), false)
                 .label("Soft wrap").description("Wrap long lines in tabs opened from now on.").section("Editing").keywords("editor", "wrap"));
             vim = settings.declare(SettingSpec.of("vim", SettingKind.bool(), false)
-                .label("Vim mode").description("Modal editing as in IdeaVim; the Vim status item and Toggle Vim Mode change it.")
+                .label("Vim mode").description("Modal editing as in IdeaVim; the Vim status item and Toggle Vim Mode change it. "
+                    + "Its vimrc is the file vimrc in the Editor's data folder (plugins/dev.jasper.editor/data).")
                 .section("Editing").keywords("editor", "vim", "modal"));
             maxFileMib = settings.declare(SettingSpec.of("max_file_mib", SettingKind.integer(1, 256), 10)
                 .label("Largest file (MiB)").description("Larger files are refused.").section("Files").keywords("editor", "size"));

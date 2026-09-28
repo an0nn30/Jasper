@@ -418,6 +418,52 @@ class EditorWindowTest {
         javax.swing.SwingUtilities.invokeAndWait(() -> { for (var key : dev.jasper.editor.vim.KeyInput.parse(keys)) vim.feed(key); });
     }
 
+    @Test void theVimrcIsReadWhenVimFirstTurnsOnAndReloadReadsItAgain() throws Exception {
+        Path vimrc = window.vimrcFile();
+        assertThat(vimrc).isEqualTo(home.resolve("plugins/dev.jasper.editor/data/vimrc"));
+        Files.writeString(vimrc, "nnoremap x dd\nbogus\nPlug 'tpope/vim-surround'\n");
+        EditorTab tab = opened(file("rc.txt", "one\ntwo\nthree\n"));
+        assertThat(host.notices()).as("Vim is off: nothing is read").isEmpty();
+        window.toggleVim();
+        assertThat(host.notices()).containsExactly("dev.jasper.editor: vimrc: 2 lines were skipped; see :messages");
+        vimKeys(tab, "x");
+        assertThat(tab.area().getText()).isEqualTo("two\nthree\n");
+        vimKeys(tab, ":messages<CR>");
+        assertThat(tab.vimEditor().orElseThrow().output()).extracting(dev.jasper.editor.vim.VimEditor.OutputLine::text)
+            .contains("E492: Not an editor command: bogus");
+        Files.writeString(vimrc, "nnoremap y dd\n");
+        vimKeys(tab, "<CR>\"ayy");
+        window.reloadVimrc();
+        vimKeys(tab, "x");
+        assertThat(tab.area().getText()).as("x is Vim's own again").isEqualTo("wo\nthree\n");
+        vimKeys(tab, "y\"ap");
+        assertThat(tab.area().getText()).as("the new vimrc's y, and register a kept").isEqualTo("three\ntwo\n");
+        window.toggleVim();
+        window.toggleVim();
+        assertThat(host.notices()).as("read once, and again only on Reload vimrc").hasSize(1);
+    }
+
+    @Test void aVimrcThatCannotBeReadIsReported() throws Exception {
+        Files.createDirectories(window.vimrcFile());
+        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        opened(file("rc.txt", "one\n"));
+        assertThat(host.notices()).singleElement().asString()
+            .startsWith("dev.jasper.editor: vimrc: could not read " + window.vimrcFile()).endsWith("; Vim runs with its defaults.");
+    }
+
+    @Test void vimActionsAreTheEditorsCommands() throws Exception {
+        settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
+        EditorTab tab = opened(file("act.txt", "one\n"));
+        vimKeys(tab, ":actionlist vim<CR>");
+        assertThat(tab.vimEditor().orElseThrow().output()).extracting(dev.jasper.editor.vim.VimEditor.OutputLine::text)
+            .containsExactly("--- Actions ---", "toggle-vim               Toggle Vim Mode", "reload-vimrc             Reload vimrc");
+        boolean wrap = tab.session().wrap();
+        vimKeys(tab, "<CR>:action wrap<CR>");
+        assertThat(tab.session().wrap()).isEqualTo(!wrap);
+        vimKeys(tab, ":nnoremap <lt>Space>w <lt>Action>(wrap)<CR> w");
+        assertThat(tab.session().wrap()).isEqualTo(wrap);
+    }
+
     @Test void vimWritesOpensListsSelectsAndClosesTabs() throws Exception {
         settings.set(new EditorSettings("Monospaced", 13, 4, false, 1, true));
         Path one = file("one.txt", "one\n");

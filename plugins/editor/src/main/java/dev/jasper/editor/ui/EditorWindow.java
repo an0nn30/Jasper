@@ -9,6 +9,7 @@ import dev.jasper.editor.session.Question;
 import dev.jasper.editor.session.SessionEnvironment;
 import dev.jasper.editor.vim.Vim;
 import dev.jasper.editor.vim.VimHost;
+import dev.jasper.editor.vim.Vimrc;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.IconName;
@@ -78,6 +79,8 @@ public final class EditorWindow {
     private final Set<EditorTab> discarding = new java.util.HashSet<>();
     /** Vim mode as toggled in this session, until the settings file says the same; null to follow the settings. */
     private Boolean vimToggled;
+    /** Whether the vimrc has been read into {@link #vim}: the first time Vim turns on, and again on Reload vimrc. */
+    private boolean vimrcRead;
 
     /**
      * Creates the window, not yet shown.
@@ -111,8 +114,9 @@ public final class EditorWindow {
             new Command("revert", "Revert to Saved", Optional.empty(), false, this::revert),
             new Command("language", "Language…", Optional.empty(), false, this::chooseLanguage),
             new Command("wrap", "Toggle Soft Wrap", Optional.empty(), false, this::toggleWrap),
-            new Command("toggle-vim", "Toggle Vim Mode", Optional.empty(), false, this::toggleVim));
-        vim = new Vim(new VimHost(SystemClipboard::read, SystemClipboard::write, documents()));
+            new Command("toggle-vim", "Toggle Vim Mode", Optional.empty(), false, this::toggleVim),
+            new Command("reload-vimrc", "Reload vimrc", Optional.empty(), false, this::reloadVimrc));
+        vim = new Vim(new VimHost(SystemClipboard::read, SystemClipboard::write, documents(), actions()));
         watcher = new LocalWatcher(context.background(), environment.ui(), model::sessions);
         ticker = new Timer(2000, event -> watcher.tick());
         noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> tab.session().clearNotice()));
@@ -173,6 +177,7 @@ public final class EditorWindow {
             tab.apply(settings, theme, context.appearance().variant(), context.appearance().editorPalette());
             tab.vim(vimOn() ? Optional.of(vim) : Optional.empty());
         }
+        readVimrcOnce();
         refreshStatus();
     }
 
@@ -187,6 +192,7 @@ public final class EditorWindow {
         boolean on = !vimOn();
         vimToggled = on;
         for (EditorTab tab : editorTabs()) tab.vim(on ? Optional.of(vim) : Optional.empty());
+        readVimrcOnce();
         refreshStatus();
         CompletableFuture<Void> saved;
         try { saved = environment.saveVim().apply(on); }
@@ -198,6 +204,55 @@ public final class EditorWindow {
             environment.ui().execute(() -> ask.apply(new Question("Vim mode", "Vim mode is " + (on ? "on" : "off")
                 + " until the Editor closes: the setting could not be saved (" + reason + ").", List.of("OK"))));
         });
+    }
+
+    /**
+     * Reload vimrc: mappings, options, {@code sethandler} entries and variables go back to their defaults, then the
+     * vimrc is read again, now if a tab has Vim on and otherwise when Vim next turns on; registers and marks stay
+     * (Vim spec 7.1).
+     */
+    public void reloadVimrc() {
+        vim.reset();
+        vimrcRead = false;
+        readVimrcOnce();
+    }
+
+    /** @return the vimrc: {@code vimrc} in the Editor's data folder, {@code <home>/plugins/dev.jasper.editor/data} */
+    public Path vimrcFile() { return context.dataDirectory().resolve("vimrc"); }
+
+    /**
+     * Reads the vimrc the first time a tab has Vim on (Vim spec 1.2), running its lines in that tab (the selected one
+     * if it can). Lines it skipped and a vimrc it cannot read are reported as a notice; a missing vimrc is not.
+     */
+    private void readVimrcOnce() {
+        if (vimrcRead) return;
+        Optional<dev.jasper.editor.vim.VimEditor> editor = selected().flatMap(EditorTab::vimEditor)
+            .or(() -> editorTabs().stream().flatMap(tab -> tab.vimEditor().stream()).findFirst());
+        if (editor.isEmpty()) return;
+        vimrcRead = true;
+        Path file;
+        try { file = vimrcFile(); }
+        catch (RuntimeException unavailable) {
+            context.notices().error("vimrc: the Editor's data folder is not available; Vim runs with its defaults.");
+            return;
+        }
+        Vimrc.Result read = Vimrc.read(editor.get(), file);
+        if (read.error() != null) context.notices().error("vimrc: could not read " + file + " (" + read.error() + "); Vim runs with its defaults.");
+        else if (read.skipped() > 0)
+            context.notices().error("vimrc: " + read.skipped() + (read.skipped() == 1 ? " line was" : " lines were") + " skipped; see :messages");
+    }
+
+    /** The Editor's commands for Vim's {@code <Action>(id)}, {@code :action} and {@code :actionlist}, run for the tab Vim is in. */
+    private VimHost.Actions actions() {
+        return new VimHost.Actions(
+            () -> commands.stream().map(command -> new VimHost.Action(command.id(), command.title())).toList(),
+            (editor, id) -> {
+                Optional<Command> command = commands.stream().filter(c -> c.id().equals(id)).findFirst();
+                if (command.isEmpty()) return false;
+                tabOf(editor).ifPresent(this::activate);
+                command.get().run().run();
+                return true;
+            });
     }
 
     /** Checks open local files for outside changes; the window's timer calls this every 2 s. */
@@ -482,6 +537,7 @@ public final class EditorWindow {
         descriptions.add(new dev.jasper.sdk.ui.ContentCommand("paste", "Paste", KeyNames.stroke(KeyEvent.VK_V, 0), true, tab.area()::paste));
         handle.setCommands(descriptions);
         activate(tab);
+        readVimrcOnce();
         refresh();
     }
 
