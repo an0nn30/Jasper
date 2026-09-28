@@ -8,9 +8,20 @@
   SDK `SettingsPanel` and `SettingsPanelHost` (`PluginPanelPage`); plugins that are enabled but not running get a stub
   with Open in Editor. Apply writes the plugin's own file. The Plugins page's Open Settings goes to a running plugin's
   page. The Sample plugin declares its settings and has its own page. Previews: `settingsPreview` renders 44 images.
-  `./gradlew check`: 3,660 tests, 0 failures. GUI checks pending with the user: change a plugin setting and Apply; the
-  Sample page's slider; Open Settings from the Plugins page; a plugin in safe mode (stub page). Deviations: see the
-  plan's status banner. Not pushed; not merged.
+  The preview did not render correctly on the first run: the final review found plugin-built pages stretched (the
+  Sample page's slider about 430 px below its checkbox), fixed in the final fix wave and checked in the re-rendered
+  preview. Final review fixes: F1 one page per plugin id (no stub for a superseded copy or a running plugin, no
+  duplicate stubs); F2 a rejected plugin file blocks only its own page's edits, and plugin-built pages show the
+  rejection message too; F3 plugin-built pages stay at the top and their standard rows keep their height; F4 closing a
+  plugin-built page without a successful Apply calls `SettingsPanel.reset()` before `dispose()`; minors: staging the
+  default of an unset key stages "unset", a failure without a message shows its type, `SettingsPanelHost.changed()`
+  Javadoc, and docs. `./gradlew check`: 3,666 tests, 0 failures, 5 skipped. GUI checks pending with the user: change
+  a plugin setting and Apply; the Sample page's slider; Open Settings from the Plugins page; a plugin in safe mode
+  (stub page). Deferred to C3: a pending-changed callback for plugin controls; per-page dedupe of warnings from a
+  throwing `modified()`/`keywords()`; contract cases for `page()`; the stub's Open in Editor failure going to a notice
+  while Settings is modal; section-heading carry-over for unsectioned settings; the discard count per plugin page; the
+  Sample `settings.toml` "reads this file live" wording. Deviations: see the plan's status banner. Not pushed; not
+  merged.
 
 - **Plugin settings C1** (`claude/plugin-settings`, 2026-09-28; spec
   `docs/superpowers/specs/2026-09-28-jasper-plugin-settings-design.md`, plan

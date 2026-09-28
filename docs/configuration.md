@@ -45,7 +45,8 @@ take effect after a restart. Help › Keyboard Shortcuts… and File › Manage 
 
 Tools holds a page for each running plugin that has settings, built from what the plugin declares or by the plugin
 itself; Apply writes the plugin's own file, keeping its comments. A plugin that is installed but not running (it
-needs review, failed to start, or safe mode is on) shows why, with Open in Editor for its file.
+needs review, failed to start, was skipped, for example because a plugin it requires is missing, or safe mode is on)
+shows why, with Open in Editor for its file.
 
 ## Supported settings
 

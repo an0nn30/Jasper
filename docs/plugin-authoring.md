@@ -471,7 +471,9 @@ heading wherever `section` changes, the description under each control, and an e
 `editor(EditorHint...)`. To build the page yourself, call `context.settings().page(panel)` during `start` with a
 `SettingsPanel`: `create(host)` builds the component, `host.row(setting)` gives you the standard row for a declared
 setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
-`modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. The Sample
+`modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel
+lives as long as your plugin, so Settings calls `reset` before `dispose` whenever it closes the page without a
+successful Apply, as on Cancel; drop unapplied state of your own there. The Sample
 plugin's `SampleSettingsPanel` is a complete example; the testkit's `settingsPanel`, `pendingSettings` and
 `settingsPanelChanges` let you test it without a window.
 

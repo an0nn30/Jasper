@@ -2,7 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Implemented on claude/plugin-settings-c2; ./gradlew check green, 3,660 tests.
+**Status:** Implemented on claude/plugin-settings-c2, with the final review's fixes; ./gradlew check green,
+3,666 tests, 0 failures (5 skipped).
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Scope notes (decided while writing this plan):
@@ -20,8 +21,15 @@ Deviations so far:
   with the title "Choose a shell program". Behaviour is unchanged.
 - Task 4: `PluginManagerTest` already existed, so its new test was added to the existing file instead of a new file.
 - Ruling: `EditorHint.Directory` stays a text field, as the plan's scope notes above already say.
-- Task 6: no deviations; the preview's plugin pages rendered correctly on the first run, so no page-code fix was
-  needed.
+- Task 6: no page-code fix was made then. The final review found that the preview's plugin-built page was stretched
+  (the Sample page's slider sat about 430 px below its checkbox); the final fix wave fixed it.
+- Final review fixes: F1 one Settings page per plugin id (a superseded copy gets no stub, a running plugin gets no stub,
+  duplicate stubs collapse); F2 a rejected plugin file blocks only its own page's edits, and plugin-built pages show
+  the same rejection message (shared `PluginPageBody`); F3 plugin-built pages sit at the top of a width-tracking
+  holder and their standard rows keep their preferred height; F4 closing a plugin-built page without a successful
+  Apply calls `SettingsPanel.reset()` before `dispose()`. Minors: staging a default for an unset key stages "unset";
+  a failure without a message shows its type; `SettingsPanelHost.changed()` Javadoc no longer mentions validity;
+  docs (SDK architecture, configuration's stub reasons, plugin authoring's reset note).
 
 **Goal:** Each running plugin with settings gets a page under Tools in Settings, generated from its declarations or
 built by the plugin itself, and a plugin that is not running gets a stub page.
