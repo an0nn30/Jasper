@@ -350,6 +350,8 @@ key is typed. A command Vim has and Jasper does not fails with E319.
 | `:s[ubstitute]` | `:s/pattern/string/flags [count]`: replace matches; flags `& c e g i I n p # l r` |
 | `:&` | repeat the last `:s` with the same pattern and string; `:&&` keeps its flags |
 | `:~` | repeat the last `:s` with the last used pattern |
+| `:g[lobal]` | `:g/pattern/cmd`: run cmd (default `:p`) on the matching lines; `!` on the others |
+| `:v[global]` | `:v/pattern/cmd`: run cmd on the lines that do not match |
 | `:k` | set a mark at the line (`:ka`, `:k a`) |
 | `:ma[rk]` | set a mark at the line |
 | `:delm[arks]` | delete marks (`a b-d`); `!` all lowercase ones |

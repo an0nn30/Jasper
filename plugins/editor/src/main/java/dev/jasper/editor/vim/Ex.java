@@ -85,6 +85,8 @@ final class Ex {
             "`:s/pattern/string/flags [count]`: replace matches; flags `& c e g i I n p # l r`", ExSubstitute::substitute);
         def("&", RANGE | WHOLEFOLD | EXTRA, Addr.LINES, "repeat the last `:s` with the same pattern and string; `:&&` keeps its flags", ExSubstitute::substitute);
         def("~", RANGE | WHOLEFOLD | EXTRA, Addr.LINES, "repeat the last `:s` with the last used pattern", ExSubstitute::substitute);
+        def("global", RANGE | WHOLEFOLD | BANG | EXTRA | DFLALL, Addr.LINES, "`:g/pattern/cmd`: run cmd (default `:p`) on the matching lines; `!` on the others", ExGlobal::global);
+        def("vglobal", RANGE | WHOLEFOLD | EXTRA | DFLALL, Addr.LINES, "`:v/pattern/cmd`: run cmd on the lines that do not match", ExGlobal::global);
         // Vim's EX_WORD1 includes EX_EXTRA: one word of argument.
         def("k", RANGE | EXTRA | TRLBAR, Addr.LINES, "set a mark at the line (`:ka`, `:k a`)", ExInfo::mark);
         def("mark", RANGE | EXTRA | TRLBAR, Addr.LINES, "set a mark at the line", ExInfo::mark);
