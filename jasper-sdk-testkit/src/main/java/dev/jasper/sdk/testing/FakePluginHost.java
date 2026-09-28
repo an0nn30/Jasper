@@ -238,10 +238,8 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * Builds a plugin's own settings page as Settings would, over a host whose rows are labelled placeholders.
      *
-     * @param pluginId
-     *     the plugin
-     * @return
-     *     the page's component; empty when the plugin gave no page or is not running
+     * @param pluginId the plugin
+     * @return the page's component; empty when the plugin gave no page or is not running
      */
     public java.util.Optional<javax.swing.JComponent> settingsPanel(String pluginId) {
         FakePluginContext context = contexts.get(pluginId);
@@ -256,10 +254,8 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * The values a plugin's own settings page staged since {@link #settingsPanel} built it.
      *
-     * @param pluginId
-     *     the plugin
-     * @return
-     *     the values by dotted key
+     * @param pluginId the plugin
+     * @return the values by dotted key
      */
     public Map<String, Object> pendingSettings(String pluginId) {
         FakeSettingsPanelHost rows = panelHosts.get(pluginId);
@@ -269,10 +265,8 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * How often a plugin's own settings page said its state changed.
      *
-     * @param pluginId
-     *     the plugin
-     * @return
-     *     the count since {@link #settingsPanel} built it
+     * @param pluginId the plugin
+     * @return the count since {@link #settingsPanel} built it
      */
     public int settingsPanelChanges(String pluginId) {
         FakeSettingsPanelHost rows = panelHosts.get(pluginId);
