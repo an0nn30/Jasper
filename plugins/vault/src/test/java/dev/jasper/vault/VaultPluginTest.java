@@ -138,7 +138,7 @@ class VaultPluginTest {
     @Test void autoLockFollowsTheSettingsAndStopLocks() {
         VaultPlugin plugin = plugin();
         try (var host = new FakePluginHost()) {
-            host.setConfig("dev.jasper.vault", Map.of("auto_lock_minutes", 1L));
+            host.setSetting("dev.jasper.vault", "auto_lock_minutes", 1L);
             host.start(INFO, Set.of(), Set.of(), plugin);
             plugin.lockManager().create("hunter2!".toCharArray(), false);
             host.runBackground();
@@ -148,7 +148,7 @@ class VaultPluginTest {
             plugin.clock = Duration.ofMinutes(1).toMillis();
             plugin.tick();
             assertThat(plugin.lockManager().state()).isEqualTo(LockState.LOCKED);
-            host.setConfig("dev.jasper.vault", Map.of("auto_lock_minutes", 0L));
+            host.setSetting("dev.jasper.vault", "auto_lock_minutes", 0L);
             host.flush();
             assertThat(plugin.timer().timeout()).isEqualTo(Duration.ZERO);
             plugin.lockManager().unlock("hunter2!".toCharArray());
@@ -163,16 +163,22 @@ class VaultPluginTest {
 
     @Test void settingsResolveTheKeysDirectoryAndDefaults() {
         try (var host = new FakePluginHost()) {
-            host.setConfig("dev.jasper.vault", Map.of("keys_directory", "/elsewhere/keys", "bind_new_vaults_to_device", false));
-            var context = host.start(INFO, Set.of(), Set.of(), plugin());
-            VaultSettings settings = VaultSettings.read(context.config(), context.dataDirectory());
-            assertThat(settings.keysDirectory()).isEqualTo(java.nio.file.Path.of("/elsewhere/keys"));
-            assertThat(settings.bindByDefault()).isFalse();
-            assertThat(settings.autoLock()).isEqualTo(Duration.ofMinutes(15));
+            host.setSetting("dev.jasper.vault", "keys_directory", "/elsewhere/keys");
+            host.setSetting("dev.jasper.vault", "bind_new_vaults_to_device", false);
+            VaultPlugin plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            assertThat(plugin.settings().keysDirectory()).isEqualTo(java.nio.file.Path.of("/elsewhere/keys"));
+            assertThat(plugin.settings().bindByDefault()).isFalse();
+            assertThat(plugin.settings().autoLock()).isEqualTo(Duration.ofMinutes(15));
+            assertThat(host.declared("dev.jasper.vault")).containsExactly("auto_lock_minutes", "keys_directory", "bind_new_vaults_to_device");
         }
         try (var host = new FakePluginHost()) {
-            var context = host.start(INFO, Set.of(), Set.of(), plugin());
-            assertThat(VaultSettings.read(context.config(), context.dataDirectory()).keysDirectory()).isEqualTo(context.dataDirectory().resolve("keys"));
+            host.setSetting("dev.jasper.vault", "auto_lock_minutes", -5L);
+            VaultPlugin plugin = plugin();
+            var context = host.start(INFO, Set.of(), Set.of(), plugin);
+            assertThat(plugin.settings().keysDirectory()).isEqualTo(context.dataDirectory().resolve("keys"));
+            assertThat(plugin.settings().autoLock()).as("out of range: the default").isEqualTo(Duration.ofMinutes(15));
+            assertThat(host.settingsReports("dev.jasper.vault")).singleElement().asString().startsWith("auto_lock_minutes: ");
         }
     }
     @Test void thePadlockFollowsTheLockStateAndTheFileMenuOpensTheVault() {
