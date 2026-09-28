@@ -1,5 +1,6 @@
 package dev.jasper.sdk.terminal;
 
+import dev.jasper.sdk.Subscription;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,21 +53,45 @@ public interface Terminals {
     Optional<WindowHandle> window(UUID id);
 
     /**
-     * Opens and selects a new tab. A local request needs {@code terminal.open}.
+     * Opens and selects a new tab. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
      *
      * @param window where
      * @param request what to run
-     * @return the new tab's pane, or empty when the window is gone
+     * @return the new tab's pane, or empty when the window is gone or the profile is unknown
      */
     Optional<PaneHandle> openTab(WindowHandle window, OpenRequest request);
 
     /**
-     * Splits a pane. A local request needs {@code terminal.open}.
+     * Splits a pane. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
      *
      * @param target the pane to split
      * @param direction where the new pane goes
      * @param request what to run
-     * @return the new pane, or empty when the target is gone or its session has ended
+     * @return the new pane, or empty when the target is gone, its session has ended or the profile is unknown
      */
     Optional<PaneHandle> split(PaneHandle target, Direction direction, OpenRequest request);
+
+    /**
+     * The shells Jasper detected for local panes, in the order its settings list them: on Windows PowerShell,
+     * PowerShell 7, Command Prompt and each WSL distribution, elsewhere the login shell, and the user's custom
+     * command when one is configured. Needs {@code terminal.open}. UI thread only.
+     *
+     * @return the profiles; empty when the host lists none, or has not finished detecting them
+     * @since 0.8.6
+     */
+    default List<ShellProfileInfo> profiles() { return List.of(); }
+
+    /**
+     * Calls the listener on the UI thread after {@link #profiles()} may have changed, for example when detection
+     * finishes or the user refreshes it after installing a WSL distribution. Needs {@code terminal.open}. The
+     * registration ends with the plugin.
+     *
+     * @param listener called with nothing; read {@link #profiles()} again
+     * @return the registration
+     * @since 0.8.6
+     */
+    default Subscription onProfilesChanged(Runnable listener) {
+        java.util.Objects.requireNonNull(listener, "listener");
+        return () -> { };
+    }
 }

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started — requires plan A merged (`docs/superpowers/plans/2026-09-28-jasper-wsl-a-profiles.md`).
+**Status:** In progress: Task 1 done (plan A is implemented on this branch, which satisfies "plan A merged").
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far: none.
@@ -119,7 +119,7 @@ Docs: `docs/remote.md`, `docs/sdk-architecture.md`, `docs/plugin-authoring.md`, 
   `default Subscription Terminals.onProfilesChanged(Runnable)`; `JasperSdk.VERSION = "0.8.6"`.
 - Consumes: nothing new.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `TerminalValuesTest.java` (inside the class, after `openRequestsAreLocalAndTakeAnAbsoluteDirectory`):
 
@@ -158,12 +158,12 @@ Add to `TerminalValuesTest.java` (inside the class, after `openRequestsAreLocalA
 In `PaletteValuesTest.java` and `AppearanceContractTest.java`, change `assertThat(JasperSdk.VERSION).isEqualTo("0.8.5");` to
 `assertThat(JasperSdk.VERSION).isEqualTo("0.8.6");` (one line in each).
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-sdk:test --tests "dev.jasper.sdk.terminal.TerminalValuesTest" --tests "dev.jasper.sdk.palette.PaletteValuesTest" --tests "dev.jasper.sdk.ui.AppearanceContractTest"`
 Expected: FAIL: compilation errors (`ShellProfileInfo`, `LocalSpec(Optional, Optional)`, `localProfile`, `ofProfile`, `profiles`, `onProfilesChanged` do not exist).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `ShellProfileInfo.java`:
 
@@ -302,7 +302,7 @@ Also change `openTab`'s and `split`'s Javadoc sentence "A local request needs {@
 
 In `JasperSdk.java`, change `VERSION = "0.8.5"` to `VERSION = "0.8.6"`.
 
-- [ ] **Step 4: Run the SDK check**
+- [x] **Step 4: Run the SDK check**
 
 Run: `./gradlew :jasper-sdk:check`
 Expected: BUILD SUCCESSFUL (tests, Javadoc doclint and `verifySdkArchitecture`).
@@ -310,7 +310,7 @@ Expected: BUILD SUCCESSFUL (tests, Javadoc doclint and `verifySdkArchitecture`).
 Run: `./gradlew :jasper-app:compileJava :jasper-sdk-testkit:compileJava`
 Expected: BUILD SUCCESSFUL (the default methods keep both implementers compiling).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current

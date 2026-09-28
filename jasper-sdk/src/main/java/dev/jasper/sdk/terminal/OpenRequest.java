@@ -40,6 +40,15 @@ public sealed interface OpenRequest permits OpenRequest.Local, OpenRequest.Sessi
     static OpenRequest local(LocalSpec spec) { return new Local(spec); }
 
     /**
+     * A detected shell profile, where New Tab would start it. Needs {@code terminal.open}.
+     *
+     * @param profileId an id from {@link Terminals#profiles()}
+     * @return the request
+     * @since 0.8.6
+     */
+    static OpenRequest localProfile(String profileId) { return new Local(LocalSpec.ofProfile(profileId)); }
+
+    /**
      * A session the plugin provides. Needs {@code session.provide}.
      *
      * @param spec how to connect it
