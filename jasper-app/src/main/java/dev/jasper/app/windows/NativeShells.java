@@ -132,7 +132,10 @@ public final class NativeShells {
     private AuxiliarySurface.Shell dialog(AuxiliarySurface surface) {
         Window owner = surface.ownerSurface().map(natives::get)
             .orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null));
-        var dialog = new JDialog(owner, surface.title(), surface.modal() ? Dialog.ModalityType.DOCUMENT_MODAL : Dialog.ModalityType.MODELESS);
+        boolean remembered = !surface.id().isEmpty();
+        Dialog.ModalityType modality = !surface.modal() ? Dialog.ModalityType.MODELESS
+            : owner == null ? Dialog.ModalityType.APPLICATION_MODAL : Dialog.ModalityType.DOCUMENT_MODAL;
+        var dialog = new JDialog(owner, surface.title(), modality);
         dialog.setIconImages(ApplicationIcon.images());
         MacTitleBar bar = installTitleBar(dialog.getRootPane(), surface, MacTitleBar.isSupported());
         dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
@@ -143,13 +146,21 @@ public final class NativeShells {
         });
         if (bar != null) bar.attach(dialog);
         dialog.pack();
-        dialog.setLocationRelativeTo(owner);
+        if (remembered) {
+            dialog.setSize(surface.preferredSize());
+            dialog.setLocationRelativeTo(owner);
+            state.window(surface.id()).map(saved -> new Rectangle(saved.x(), saved.y(), saved.width(), saved.height()))
+                .filter(NativeShells::onSomeScreen).ifPresent(dialog::setBounds);
+        } else dialog.setLocationRelativeTo(owner);
         Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
             if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
             if (bar != null) bar.setLight(!resolved.chrome().dark());
         });
         natives.put(surface, dialog);
-        return new AuxiliarySurface.Shell(() -> { dialog.pack(); dialog.setLocationRelativeTo(owner); dialog.setVisible(true); },
+        return new AuxiliarySurface.Shell(() -> {
+                if (!remembered) { dialog.pack(); dialog.setLocationRelativeTo(owner); }
+                dialog.setVisible(true);
+            },
             dialog::toFront, () -> {
                 theme.close();
                 if (bar != null) bar.close();

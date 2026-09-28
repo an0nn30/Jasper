@@ -10,6 +10,8 @@ import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
+import dev.jasper.app.config.SettingsEdit;
+import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.platform.ConfigEditor;
 import dev.jasper.app.workspace.WindowContent;
 import java.nio.file.Path;
@@ -37,6 +39,8 @@ final class ConfigurationController implements AutoCloseable {
     /** The theme catalog's problems, and an unknown theme name, from the last state applied. */
     private List<ConfigDiagnostic> themeProblems = List.of();
     private Predicate<String> pluginSettingsExist = id -> false;
+    private final List<Consumer<ConfigService.State>> stateListeners = new java.util.ArrayList<>();
+    private Consumer<WindowContent> settingsOpener;
     private final java.util.Map<Path, java.util.LinkedHashSet<ConfigDiagnostic>> pluginReports = new java.util.LinkedHashMap<>();
 
     /** The saved state plus theme problems, application problems since the last reload, and problems plugins reported about their own settings files. */
@@ -48,7 +52,8 @@ final class ConfigurationController implements AutoCloseable {
         pluginReports.values().forEach(merged::addAll);
         var removable = state.deadTables().stream()
             .filter(table -> !table.getFirst().equals("plugins") || pluginSettingsExist.test(table.get(1))).toList();
-        return new ConfigService.State(state.snapshot(), merged, state.file(), state.present(), state.legacyKeys(), removable);
+        return new ConfigService.State(state.snapshot(), merged, state.file(), state.present(), state.legacyKeys(), removable,
+            state.values(), state.rejected());
     }
 
     /** A plugin's problem with its own settings file; shown until that file is reloaded. */
@@ -86,6 +91,7 @@ final class ConfigurationController implements AutoCloseable {
         catch (ThemeController.InstallationFailure ignored) {
             // Already recorded as a theme problem below; a theme that cannot be installed never stops start-up.
         }
+        settingsOpener = owner -> reportFailure(owner, service.openSettings(editor));
         service.start(this::accept);
     }
 
@@ -107,7 +113,7 @@ final class ConfigurationController implements AutoCloseable {
     void register(WindowContent owner) {
         requireEdt();
         if (closed || !owners.add(owner)) return;
-        owner.connectConfiguration(() -> reportFailure(owner, service.openSettings(editor)),
+        owner.connectConfiguration(() -> settingsOpener.accept(owner),
             () -> reportFailure(owner, service.reload()), () -> migrateFor(owner), () -> unregister(owner));
         owner.applyConfiguration(state.snapshot(), service.macOs());
         owner.setConfigurationState(shown());
@@ -157,6 +163,43 @@ final class ConfigurationController implements AutoCloseable {
         }));
     }
 
+    /** What Cmd+, and each window's Settings command open; by default config.toml in an editor. */
+    void settingsOpener(Consumer<WindowContent> opener) {
+        requireEdt();
+        settingsOpener = java.util.Objects.requireNonNull(opener, "opener");
+    }
+
+    /** Opens config.toml in the user's editor, creating it from the template first when it is missing. */
+    CompletableFuture<Path> openConfigFile() {
+        requireEdt();
+        return service.openSettings(editor);
+    }
+
+    /** Reads config.toml again and publishes it, even when it did not change. */
+    CompletableFuture<ConfigService.State> reload() {
+        requireEdt();
+        return service.reload();
+    }
+
+    /** The state windows show: the saved state plus theme, application and plugin problems. */
+    ConfigService.State state() {
+        requireEdt();
+        return shown();
+    }
+
+    /** Saves settings; the new state also arrives through the normal reload. */
+    CompletableFuture<ConfigService.State> save(SettingsEdit edit) {
+        requireEdt();
+        return service.save(edit);
+    }
+
+    /** Calls {@code listener} with every state applied from now on. */
+    Subscription onState(Consumer<ConfigService.State> listener) {
+        requireEdt();
+        stateListeners.add(java.util.Objects.requireNonNull(listener, "listener"));
+        return new Subscription(() -> stateListeners.remove(listener));
+    }
+
     void unregister(WindowContent owner) {
         requireEdt();
         if (owners.remove(owner)) owner.disconnectConfiguration();
@@ -176,6 +219,8 @@ final class ConfigurationController implements AutoCloseable {
             owner.applyConfiguration(next.snapshot(), service.macOs());
             owner.setConfigurationState(shown());
         }
+        var visible = shown();
+        for (Consumer<ConfigService.State> listener : List.copyOf(stateListeners)) listener.accept(visible);
     }
 
     /**
@@ -212,6 +257,7 @@ final class ConfigurationController implements AutoCloseable {
         if (closed) return;
         closed = true;
         applicationListener = snapshot -> {};
+        stateListeners.clear();
         for (WindowContent owner : List.copyOf(owners)) unregister(owner);
         service.close();
     }

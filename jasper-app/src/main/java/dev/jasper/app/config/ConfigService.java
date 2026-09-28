@@ -4,6 +4,7 @@ import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.persistence.TomlStateFile;
 import dev.jasper.app.settings.LegacyKey;
 import dev.jasper.app.settings.Setting;
+import dev.jasper.app.settings.SettingValues;
 import dev.jasper.app.settings.SettingWriter;
 import dev.jasper.app.settings.TomlDocument;
 import java.io.UncheckedIOException;
@@ -41,20 +42,29 @@ public final class ConfigService implements AutoCloseable {
      *
      * @param legacyKeys old keys the file still uses
      * @param deadTables old tables Migrate Config may remove
+     * @param values each core setting's loaded value and where it came from (the last good values when rejected)
+     * @param rejected whether the file could not be applied (syntax or type errors, or an unreadable file)
      */
     public record State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present,
-                        List<LegacyKey> legacyKeys, List<List<String>> deadTables) {
+                        List<LegacyKey> legacyKeys, List<List<String>> deadTables, SettingValues values, boolean rejected) {
         public State {
             Objects.requireNonNull(snapshot, "snapshot");
             Objects.requireNonNull(file, "file");
+            Objects.requireNonNull(values, "values");
             diagnostics = List.copyOf(diagnostics);
             legacyKeys = List.copyOf(legacyKeys);
             deadTables = deadTables.stream().map(List::copyOf).toList();
         }
 
-        /** A state with nothing to migrate. */
+        /** A state with nothing to migrate, default values and nothing rejected. */
         public State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present) {
             this(snapshot, diagnostics, file, present, List.of(), List.of());
+        }
+
+        /** A state with default values and nothing rejected. */
+        public State(ConfigSnapshot snapshot, List<ConfigDiagnostic> diagnostics, Path file, boolean present,
+                     List<LegacyKey> legacyKeys, List<List<String>> deadTables) {
+            this(snapshot, diagnostics, file, present, legacyKeys, deadTables, SettingValues.defaults(CoreSettings.SCHEMA), false);
         }
 
         /** Whether Migrate Config has old keys or dead tables to rewrite. */
@@ -104,7 +114,7 @@ public final class ConfigService implements AutoCloseable {
         this.macOs = macOs;
         this.worker = Objects.requireNonNull(worker, "worker");
         this.publisher = Objects.requireNonNull(publisher, "publisher");
-        lastConfig = readState(ConfigSnapshot.defaults(), true);
+        lastConfig = readState(new State(ConfigSnapshot.defaults(), List.of(), file, false), true);
         initialState = lastConfig;
         state = initialState;
     }
@@ -329,7 +339,7 @@ public final class ConfigService implements AutoCloseable {
             if (closed) return state;
         }
         State previous = lastConfig;
-        lastConfig = readState(lastConfig.snapshot(), force);
+        lastConfig = readState(lastConfig, force);
         if (force || !lastConfig.equals(previous)) runCompanion();
         State next = lastConfig;
         synchronized (lifecycle) {
@@ -350,7 +360,7 @@ public final class ConfigService implements AutoCloseable {
         catch (Throwable failure) { LOG.log(System.Logger.Level.WARNING, "Configuration companion failed", failure); }
     }
 
-    private State readState(ConfigSnapshot lastGood, boolean force) {
+    private State readState(State lastGood, boolean force) {
         try {
             BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
             Fingerprint next = new Fingerprint(true, attributes.lastModifiedTime(), attributes.size());
@@ -369,8 +379,8 @@ public final class ConfigService implements AutoCloseable {
             String text = StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();
             var parsed = ConfigLoader.parse(file, text, macOs);
             return parsed.rejected()
-                ? new State(lastGood, parsed.diagnostics(), file, true)
-                : new State(parsed.snapshot(), parsed.diagnostics(), file, true, parsed.legacyKeys(), parsed.deadTables());
+                ? new State(lastGood.snapshot(), parsed.diagnostics(), file, true, List.of(), List.of(), lastGood.values(), true)
+                : new State(parsed.snapshot(), parsed.diagnostics(), file, true, parsed.legacyKeys(), parsed.deadTables(), parsed.values(), false);
         } catch (NoSuchFileException ignored) {
             return missingState(lastGood);
         } catch (CharacterCodingException ignored) {
@@ -382,7 +392,7 @@ public final class ConfigService implements AutoCloseable {
         }
     }
 
-    private State missingState(ConfigSnapshot lastGood) {
+    private State missingState(State lastGood) {
         // Some providers report ENOTDIR as NoSuchFileException. A file obstructing the
         // parent path is an access error, not deletion of a usable config location.
         for (Path parent = file.toAbsolutePath().getParent(); parent != null; parent = parent.getParent()) {
@@ -403,9 +413,9 @@ public final class ConfigService implements AutoCloseable {
         return new State(ConfigSnapshot.defaults(), List.of(), file, false);
     }
 
-    private State readError(ConfigSnapshot lastGood, String message) {
-        return new State(lastGood, List.of(new ConfigDiagnostic(
-            ConfigDiagnostic.Severity.ERROR, file, 0, 0, "", message)), file, true);
+    private State readError(State lastGood, String message) {
+        return new State(lastGood.snapshot(), List.of(new ConfigDiagnostic(
+            ConfigDiagnostic.Severity.ERROR, file, 0, 0, "", message)), file, true, List.of(), List.of(), lastGood.values(), true);
     }
 
     /** Called under lifecycle: the publication must still be current when it reaches the EDT. */

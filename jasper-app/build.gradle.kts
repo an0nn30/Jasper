@@ -96,6 +96,18 @@ tasks.register<JavaExec>("mockUiPreview") {
     args(rootProject.layout.projectDirectory.dir("docs/design").asFile.absolutePath)
 }
 
+// Opt-in render of the Settings dialog, dark and light, default and 18 pt UI font. Never creates a native window.
+tasks.register<JavaExec>("settingsPreview") {
+    group = "verification"
+    description = "Renders the Settings dialog headlessly into build/settings-preview."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "dev.jasper.app.settingsui.SettingsDialogPreview"
+    jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
+    args(layout.buildDirectory.dir("settings-preview").get().asFile.absolutePath)
+    providers.gradleProperty("jasper.uiScale").orNull?.let { systemProperty("flatlaf.uiScale", it) }
+}
+
 // Explicit opt-in verification tools. They use real app components from the test
 // runtime, but check never runs them and they never create a native window.
 for ((taskName, entryPoint) in listOf(

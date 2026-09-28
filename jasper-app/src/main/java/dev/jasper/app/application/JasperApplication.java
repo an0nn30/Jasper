@@ -83,6 +83,8 @@ public final class JasperApplication {
     private final CommandNotifier notifications;
     private PluginRuntime plugins;
     private ActionEntry migrateAction;
+    private dev.jasper.app.settingsui.SettingsDialog settings;
+    private boolean preferencesHandlerInstalled;
     private UiState uiState = UiState.inMemory();
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
@@ -189,6 +191,10 @@ public final class JasperApplication {
         if (supports(Desktop.Action.APP_EVENT_REOPENED)) {
             reopenListener = event -> SwingUtilities.invokeLater(() -> openOrRaise(Path.of(System.getProperty("user.home"))));
             Desktop.getDesktop().addAppEventListener(reopenListener);
+        }
+        if (supports(Desktop.Action.APP_PREFERENCES)) {
+            Desktop.getDesktop().setPreferencesHandler(event -> SwingUtilities.invokeLater(() -> openSettings(null, null)));
+            preferencesHandlerInstalled = true;
         }
     }
 
@@ -365,6 +371,17 @@ public final class JasperApplication {
         contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("help", "keys", "bindings", "keymap", "edit shortcuts", "keyboard settings"),
             Optional.empty(), invocation -> { if (!quitting && !stopped) shortcutHelp.open(); });
         contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(List.of(new MenuEntry.Item("app.shortcuts")));
+        if (configuration != null) {
+            var system = new dev.jasper.app.settingsui.CorePages.SystemActions(() -> configuration.state().file(),
+                this::openConfigFile, this::revealConfigFile, () -> configuration.reload(), this::migrateConfiguration,
+                configuration::migrationAvailable);
+            settings = new dev.jasper.app.settingsui.SettingsDialog(auxiliary,
+                dev.jasper.app.settingsui.CorePages.pages(() -> themeCatalog.latest().names(), system,
+                    () -> { if (!quitting && !stopped) shortcutHelp.open(); }, this::managePlugins),
+                new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
+                    this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));
+            configuration.settingsOpener(owner -> openSettings(owner.id(), null));
+        }
         boolean[] replayed = new boolean[1];
         // subscribe replays the current theme at once; plugins read the look on demand, so only later changes are events.
         pluginTheme = themes.subscribe((theme, chromeChanged) -> {
@@ -384,6 +401,38 @@ public final class JasperApplication {
                 if (failure == null) info(message);
                 else notice((failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null ? failure.getCause() : failure).getMessage());
             }));
+        }
+
+        /** Opens Settings over the given window, or the active one when null, at a page (the last visited when null). */
+        void openSettings(java.util.UUID ownerOrNull, String pageOrNull) {
+            if (settings == null || quitting || stopped) return;
+            java.util.UUID owner = ownerOrNull != null ? ownerOrNull
+                : lastActive != null && windows.contains(lastActive) ? lastActive.content().id() : null;
+            settings.open(owner, pageOrNull);
+        }
+
+        private void openConfigFile() {
+            if (configuration == null) return;
+            configuration.openConfigFile().whenComplete((file, failure) -> {
+                if (failure != null) SwingUtilities.invokeLater(() -> notice(failure.getMessage()));
+            });
+        }
+
+        private void revealConfigFile() {
+            if (configuration == null) return;
+            Path folder = configuration.state().file().toAbsolutePath().getParent();
+            CompletableFuture.runAsync(() -> new dev.jasper.app.platform.ConfigEditor().reveal(folder))
+                .whenComplete((ignored, failure) -> {
+                    if (failure != null) SwingUtilities.invokeLater(() -> notice("Could not reveal " + folder));
+                });
+        }
+
+        private void browse(java.net.URI uri) {
+            if (!supports(Desktop.Action.BROWSE)) return;
+            CompletableFuture.runAsync(() -> {
+                try { Desktop.getDesktop().browse(uri); }
+                catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+            });
         }
 
         /** A plain informational message: the window the user used last, or the log when there is none. */
@@ -618,6 +667,7 @@ public final class JasperApplication {
         buddy.close();
         if (configuration != null) configuration.close();
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
+        if (preferencesHandlerInstalled) { Desktop.getDesktop().setPreferencesHandler(null); preferencesHandlerInstalled = false; }
         if (reopenListener != null) { Desktop.getDesktop().removeAppEventListener(reopenListener); reopenListener = null; }
         // Cross-process locks and socket probes must not hold up Swing or the exit deadline.
         List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());

@@ -680,6 +680,31 @@ class ConfigurationControllerTest {
         edt(() -> assertThat(controller.shown().diagnostics()).extracting(d -> d.file()).containsExactly(b));
     }
 
+    @Test void settingsOpenerReplacesTheEditorForCmdComma() throws Exception {
+        start(""); edt(this::owner);
+        var owner = owners.getFirst();
+        var opened = new ArrayList<WindowContent>();
+        edt(() -> controller.settingsOpener(opened::add));
+        edt(owner::openSettings);
+        assertThat(opened).containsExactly(owner);
+    }
+
+    @Test void stateSaveAndListenersRoundTripThroughTheService() throws Exception {
+        start("[window]\ntab_height = 44\n"); edt(this::owner);
+        var seen = new java.util.concurrent.CopyOnWriteArrayList<ConfigService.State>();
+        edt(() -> {
+            assertThat(controller.state().values().get(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT)).isEqualTo(44);
+            controller.onState(seen::add);
+        });
+        var saved = new AtomicReference<java.util.concurrent.CompletableFuture<ConfigService.State>>();
+        edt(() -> saved.set(controller.save(new dev.jasper.app.config.SettingsEdit(
+            Map.of(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(50)),
+            Map.of(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT, Optional.of(44))))));
+        saved.get().get(5, java.util.concurrent.TimeUnit.SECONDS);
+        until(() -> !seen.isEmpty() && seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT) == 50);
+        edt(() -> assertThat(controller.state().values().get(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT)).isEqualTo(50));
+    }
+
     private static JButton find(java.awt.Component root, String name) {
         if (root instanceof JButton button && name.equals(button.getName())) return button;
         if (root instanceof java.awt.Container container)

@@ -30,5 +30,9 @@ public final class ConfigurationTestSupport {
     public boolean migrationAvailable() { return controller.migrationAvailable(); }
     public java.util.concurrent.CompletableFuture<String> migrate() { return controller.migrate(); }
     public void pluginSettingsExist(java.util.function.Predicate<String> test) { controller.pluginSettingsExist(test); }
+    public ConfigService.State state() { return controller.state(); }
+    public java.util.concurrent.CompletableFuture<ConfigService.State> save(SettingsEdit edit) { return controller.save(edit); }
+    public dev.jasper.app.lifecycle.Subscription onState(Consumer<ConfigService.State> listener) { return controller.onState(listener); }
+    public void settingsOpener(Consumer<WindowContent> opener) { controller.settingsOpener(opener); }
     public void close() { controller.close(); }
 }
