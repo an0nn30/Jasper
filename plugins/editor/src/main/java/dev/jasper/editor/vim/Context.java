@@ -39,6 +39,8 @@ final class Context {
     Walk walk(boolean bigword) {
         var walk = new Walk(buffer, options.keywords());
         walk.bigword = bigword;
+        Folds folds = editor.folds();
+        if (folds.any()) walk.folds = folds::closed;
         return walk;
     }
 

@@ -27,6 +27,12 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **The bell is visual.** A failing command flashes the Vim bar; Jasper never beeps. `<Esc>` in Normal mode is silent.
 - **Undo is linear.** There is no undo tree (`g-`, `g+`, `:earlier`) and no `U`.
 - **`go` counts characters.** Vim counts bytes.
+- **Folds are the Editor's code folds.** There are no manual folds (`zf`, `zd`, `zE`); `zo`, `zc` and the other fold
+  commands act on the folds the Editor finds in the code. A closed fold shows its first line with the Editor's fold
+  marker, where Vim shows a one-line summary such as `+--  4 lines: void f() {`.
+- **The window is the text area's.** Its height and width are the lines and characters of the Editor's font that the
+  text area shows. Vim mode wraps long lines at any character, as Vim does ('linebreak' is not supported); with a
+  font whose characters differ in width, a screen line can hold a different number of characters than Vim's would.
 - **`ga` shows no digraph.** Vim ends the line with the character's digraph; Jasper has no digraph table.
 - **Search patterns are translated.** `VimRegex` turns a Vim pattern into a Java one, and the corpus's `regex.case`
   checks the result against Vim. `\%V`, `\%#`, the `\%23l`-style position atoms, `\@` look-around, `\z(` and

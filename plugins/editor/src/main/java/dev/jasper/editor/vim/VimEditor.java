@@ -39,8 +39,19 @@ public final class VimEditor {
     /** In Visual mode, the other end of the area (Vim's VIsual). */
     private Pos visualAnchor;
     private final Highlights highlights;
+    private final View view = new View(this);
+    private final ViewportSync viewport;
+    private final Folds folds;
+    /** The text area's word-wrapping, put back when Vim turns off (Vim wraps at any character). */
+    private final boolean originalWrapStyleWord;
+    /** The text area's fold-aware navigation, put back when Vim turns off (Vim's cursor may be inside a closed fold). */
+    private final javax.swing.text.NavigationFilter originalNavigation;
     /** While a search pattern is typed with 'incsearch', the match it would find ({start, end} offsets), or null. */
     private int[] incsearch;
+    /** While 'incsearch' previews a match, the view as it was when the command line opened (Vim's old_viewstate). */
+    private int[] incsearchView;
+    /** While the view scrolls to an 'incsearch' match, the match's start stands in for the cursor, which stays put. */
+    private Pos previewCursor;
     /** Bumped by every text change, so the 'hlsearch' matches are found again only when needed. */
     private int textVersion;
     private List<Object> highlightedPattern;
@@ -75,6 +86,12 @@ public final class VimEditor {
         this.machine = new Machine(this);
         this.insert = new InsertMode(this);
         this.highlights = new Highlights(area);
+        this.folds = new Folds(area);
+        this.viewport = new ViewportSync(this, area);
+        this.originalWrapStyleWord = area.getWrapStyleWord();
+        area.setWrapStyleWord(false);
+        this.originalNavigation = area.getNavigationFilter();
+        area.setNavigationFilter(null);
         area.getDocument().addDocumentListener(highlightListener);
         area.addFocusListener(leaveListener);
         originalCaret = area.getCaret() instanceof ConfigurableCaret caret ? caret.getStyle() : CaretStyle.VERTICAL_LINE_STYLE;
@@ -102,6 +119,9 @@ public final class VimEditor {
         marks.close();
         area.getDocument().removeDocumentListener(highlightListener);
         area.removeFocusListener(leaveListener);
+        area.setWrapStyleWord(originalWrapStyleWord);
+        area.setNavigationFilter(originalNavigation);
+        viewport.close();
         highlights.clear();
         vim.forget(this);
         buffer.close();
@@ -119,6 +139,7 @@ public final class VimEditor {
         options.setLocal("shiftwidth", changed.tabstop());
         options.setLocal("expandtab", changed.expandtab());
         options.setLocal("autoindent", changed.autoindent());
+        options.setLocal("wrap", changed.wrap());
     }
 
     /** The text was replaced (a reload): any command or insert in progress is dropped. */
@@ -186,6 +207,47 @@ public final class VimEditor {
         fire();
     }
 
+    /** @return the window onto the text (topline, size, 'wrap') */
+    View view() { return view; }
+
+    /**
+     * The user scrolled the text area to show {@code topline} first: the view follows, and the cursor moves inside
+     * the window when it was scrolled out, keeping its column, as with Vim's scroll wheel.
+     */
+    void viewScrolled(int topline) {
+        if (mode.inserting() || commandLine.active()) {
+            view.topline(topline);
+            view.compBotline();
+            return;
+        }
+        view.topline(topline);
+        view.compBotline();
+        int lnum = cursor().line + 1;
+        int target = lnum < view.topline ? view.topline : lnum >= view.botline && view.botline <= buffer.count() ? view.botline - 1 : lnum;
+        boolean was = busy;
+        if (target != lnum) {
+            busy = true;
+            try { setCursor(new Pos(target - 1, wantedColumn(target - 1)), mode.visual()); }
+            finally { busy = was; }
+        }
+        if (!was) fire();
+    }
+
+    /** The viewport's size changed the view's: outside a command, the view scrolls to keep the cursor shown. */
+    void viewResized() {
+        // The constructor sizes the view before it has its viewport sync.
+        if (viewport == null || busy || commandLine.active()) return;
+        view.updateTopline();
+        view.cursColumns();
+        viewport.show();
+    }
+
+    /** @return the tab's code folds */
+    Folds folds() { return folds; }
+
+    /** @return the remembered display column, computed from the cursor when it was forgotten (Vim's w_curswant) */
+    int columnWanted() { return want(false); }
+
     /** Rings the bell without failing the command (a key the command line has no use for). */
     void bell() { bells++; }
 
@@ -230,6 +292,12 @@ public final class VimEditor {
             busy = false;
             if (!commandLine.active()) marks.checkpcmark(cursor());
             if (mode == Mode.NORMAL || mode == Mode.OPERATOR_PENDING) setCursor(cursor());
+            // While the command line reads a pattern the cursor stays and the view shows 'incsearch''s match.
+            if (!commandLine.active()) {
+                view.updateTopline();
+                view.cursColumns();
+                viewport.show();
+            }
             look();
             fire();
         }
@@ -333,7 +401,7 @@ public final class VimEditor {
     }
 
     /** @return the cursor as a position */
-    Pos cursor() { return buffer.pos(area.getCaretPosition()); }
+    Pos cursor() { return previewCursor != null ? previewCursor.copy() : buffer.pos(area.getCaretPosition()); }
 
     /** Moves the cursor, clamping it to the text; in Normal mode never past the last character. */
     void setCursor(Pos pos) { setCursor(pos, false); }
@@ -574,33 +642,41 @@ public final class VimEditor {
     List<int[]> highlights() { return highlights.shown(); }
 
     /**
-     * 'incsearch': while {@code /} or {@code ?} reads a pattern, the match it would find is drawn and scrolled to;
-     * the cursor stays where it is.
+     * 'incsearch': while {@code /} or {@code ?} reads a pattern, the match it would find is drawn and the view scrolls
+     * to it from where it was when the command line opened (ex_getln.c's may_do_incsearch_highlighting); the cursor
+     * stays where it is.
      */
     void incsearch(char type, String line) {
         incsearch = null;
+        if (incsearchView == null) incsearchView = view.viewstate();
+        view.viewstate(incsearchView);
         if (options.flag("incsearch") && !line.isEmpty()) {
             Search.Match match = vim.search().preview(this, type, line);
             if (match != null) {
                 int start = buffer.offset(match.start()), end = buffer.offset(match.end());
                 incsearch = new int[] { start, Math.max(end, start + 1) };
+                // The caret itself does not move: a moved caret would scroll back to itself once the key is done.
+                previewCursor = match.start().copy();
                 try {
-                    var rect = area.modelToView2D(start);
-                    if (rect != null) area.scrollRectToVisible(rect.getBounds());
-                } catch (javax.swing.text.BadLocationException ignored) { }
+                    view.updateTopline();
+                    view.cursColumns();
+                } finally { previewCursor = null; }
             }
         }
+        viewport.show();
         refreshHighlights();
     }
 
-    /** The command line closed: the incremental-search match goes. */
+    /**
+     * The command line closed: the incremental-search match goes and the view is put back as it was when the line
+     * opened (finish_incsearch_highlighting); after the key the view scrolls to the cursor as after any command.
+     */
     void incsearchDone() {
         incsearch = null;
-        Pos p = cursor();
-        try {
-            var rect = area.modelToView2D(buffer.offset(p));
-            if (rect != null) area.scrollRectToVisible(rect.getBounds());
-        } catch (javax.swing.text.BadLocationException ignored) { }
+        if (incsearchView != null) {
+            view.viewstate(incsearchView);
+            incsearchView = null;
+        }
     }
 
     /** @return while a command line is typed, its text with the {@code /} or {@code ?} in front; else empty */

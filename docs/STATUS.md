@@ -11,6 +11,29 @@
   contract suite cover the same behaviour. `PluginConfig` stays until C3; Settings pages come in C2.
   `./gradlew check`: 3,450 tests, 0 failures, 0 errors, 5 skipped. Executed inline with checkpoints after Tasks 3 and 5. Deviations: see the plan's status banner. Not pushed; not merged.
 
+- **Editor Vim mode, plan V1c** (branch `claude/vim-v1c`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1c.md`, written 2026-09-28): the view — scrolling
+  (`<C-e> <C-y> <C-d> <C-u> <C-f> <C-b>`, page keys, `zt z<CR> zz z. zb z- z+ z^`), `H M L`, the screen-line motions
+  (`gj gk g0 g^ gm g$`), 'scrolloff', 'sidescroll' and 'sidescrolloff', and the fold commands on the Editor's code
+  folds (`zo zO zc zC za zA zv zR zM zj zk [z ]z`) with closed folds counted as one line and 'foldopen'. A port of
+  Vim's move.c (`View`) kept in step with the text area's viewport (`ViewportSync`). Every file in the plan was
+  compiled and run against Vim 9.1 before the plan was written: 1,125 corpus cases (1,122 recorded, 3 divergent).
+  - Executed 2026-09-28 (subagent-driven: three task commits plus the final review's fix commit).
+  - Final review fixes: (1) while the command line reads a pattern, the view is not updated after each key;
+    'incsearch' scrolls the view to the match from the view as it was when the line opened (the caret stays), and
+    `<Esc>` or `<CR>` puts that view back before the usual update, as Vim's old_viewstate does; (2) `EditorTab.refresh`
+    no longer turns word wrapping back on while Vim is on, and because RSyntaxTextArea always wraps at words,
+    `VimTextArea` installs a wrapped view that honours `setWrapStyleWord(false)` and breaks at any character, so the
+    screen lines are Vim's; `ViewportSync` counts the view's columns without the text area's side insets; (3) with Vim
+    on, the text area is taller by the viewport's height less one line, so the view may scroll past the end of the
+    text (`G` `zt`, `<C-f>` at the end, `<C-e>`) and the screen shows the view's first line; (4) `viewScrolled` keeps
+    an enclosing command's busy flag and does not notify mid-command; (5) a viewport resize that changes the view's
+    size scrolls the view to the cursor at once; (6) an unused local in `View.scrollCursorTop` went. Six
+    `ViewportSyncTest` cases and one `EditorTabTest` case cover them.
+  - `./gradlew check`: 3,599 tests, 0 failed, 0 errors, 5 skipped.
+  - Merged into local `main` on 2026-09-28 after merging main (settings dialog B2) into the branch; not pushed.
+  - Not done: GUI checks 41–50 of the [checklist](editor-verification.md) (user-run); plans V2, V3 and V4; push.
+
 - **Settings dialog B2** (`claude/settings-dialog-b2`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b2.md`): Keymap and Plugins are pages of Settings.
   Keymap stages shortcut edits (Set) and saves them in one write on Apply; shortcuts and sections that differ from
@@ -24,6 +47,28 @@
   windows; a View choice with a broken config.toml; Window Settings… Deviations: see the plan's status banner.
   Merged into local `main` on 2026-09-28 after merging main (Vim V1b) into the branch; `./gradlew check` on the
   merged tree: 3,419 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+
+- **Linux .deb and .rpm packages** (branch `claude/linux-packages`, 2026-09-28, no plan; the user chose native
+  Linux builds plus CI over cross-building from macOS): on Linux, `:jasper-app:packageDist` runs `packageDeb` and
+  `packageRpm` (jpackage from the verified app image, installed to `/opt/jasper` with a menu entry), for x64 and
+  aarch64 hosts. `verifyPackage` gained the Linux image layout, the ELF machine of the launcher and bundled Java, and
+  the icon. The `.rpm` requires libraries by soname, read with `readelf`, because jpackage's lookup needs an RPM
+  database. Each package is unpacked and compared byte for byte with the image before it is published. The new
+  `linux-packages` workflow builds on `ubuntu-22.04` and `ubuntu-22.04-arm`, then installs every package into
+  Debian 12, Ubuntu 24.04, Fedora and openSUSE Tumbleweed containers (`packaging/linux/check-install.sh`). See
+  [Linux packages](packaging.md#linux-packages). Locally: `./gradlew check` (3,410 tests, 0 failures, 5 skipped)
+  and macOS `verifyPackage`. Pushed with the user's approval; the
+  [fifth `linux-packages` run](https://github.com/an0nn30/Jasper/actions/runs/36449030992) passed all ten jobs:
+  both packages on both architectures, and install/library/menu/removal checks on Debian 12, Ubuntu 24.04, Fedora
+  and openSUSE Tumbleweed for x64 and aarch64 (`.deb` ~97 MB, `.rpm` ~119 MB). Earlier runs found and fixed
+  jpackage replacing the menu icon with its generic Java icon (now supplied through `--resource-dir`) and the
+  install-check's container setup. At the user's request the install scripts are now generated from the JBR's
+  own templates with the menu registration made safe on headless systems (it creates the two directories
+  `xdg-desktop-menu` needs and never fails the install or removal); the install check no longer prepares them.
+  Open: the regular `ci` workflow is red for unrelated tests already failing on `main`; Linux
+  desktop acceptance (checklist in `packaging.md`) is the user's. Final run
+  [36450141658](https://github.com/an0nn30/Jasper/actions/runs/36450141658) green on all ten jobs; merged into local
+  `main` on 2026-09-28 at the user's request (the branch is on origin; `main` not pushed).
 
 - **Editor Vim mode, plan V1b** (branch `claude/vim-v1b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`, written 2026-09-28): Visual mode (charwise,
@@ -96,6 +141,19 @@
   inline (user choice) with checkpoints after Tasks 4, 7 and 12; no GUI launched. Deviations: see the
   plan's status banner. Next: sub-project B (Settings dialog), then C (SDK settings API). Not pushed; not merged.
 
+- **Windows tray icon and installer build script** (`codex/windows-build-script-and-resident`,
+  2026-09-27): user-approved amendment to the background-residency spec. A resident Windows
+  process shows a notification-area icon with Open Jasper (also double-click) and Quit Jasper;
+  Quit is the normal quit path with plugin guards. `platform.ResidentTray` is a no-op when
+  headless, outside Windows or when unsupported; `JasperApplication.residentIndicator` injects it.
+  Removed when residency ends or at shutdown. `packaging\windows\Build-Installer.ps1` finds an x64
+  JBR SDK 25 and WiX 3 and builds the setup EXE (or ZIP) on Windows ARM64; verified building
+  the installer and rejecting an ARM64 SDK. On Windows: `ResidentIndicatorTest` (6),
+  `ResidentTrayTest` (3), `ApplicationBootstrapTest` (13, one existing skip) and
+  `verifyApplicationArchitecture` pass. `JasperApplicationResidencyTest` stays disabled on
+  Windows (no recorded reason). Full `check` not run. Manual, user-run: the icon appears
+  when resident, Open/double-click reveals a window, Quit exits, no icon when not resident.
+  Not merged or pushed.
 - **App-hosted Editor tabs** (`codex/plugin-workspace-tabs`, 2026-09-27):
   Editor files now use the main workspace's tab strip, rounded content frame, commands,
   status and breadcrumbs. The tab menu moves live content to/from a separate app-owned

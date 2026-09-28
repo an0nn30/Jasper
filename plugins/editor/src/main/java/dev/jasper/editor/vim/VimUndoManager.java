@@ -17,7 +17,7 @@ import org.fife.ui.rtextarea.RUndoManager;
 final class VimUndoManager extends RUndoManager {
     /** One undo step, remembering where the cursor was before it, for Vim's cursor placement after undo. */
     static final class Step extends CompoundEdit {
-        final int cursorLine, cursorCol;
+        int cursorLine, cursorCol;
         int edits;
 
         Step(int cursorLine, int cursorCol) {
@@ -51,6 +51,17 @@ final class VimUndoManager extends RUndoManager {
     void vim(boolean on) {
         vim = on;
         typing = seal(typing);
+    }
+
+    /**
+     * The cursor moved before the open step's first change (an operator goes to its span's start, as Vim's
+     * do_pending_operator does before u_save): the step records the cursor there.
+     */
+    void stepCursor(int cursorLine, int cursorCol) {
+        if (vimStep != null && vimStep.edits == 0) {
+            vimStep.cursorLine = cursorLine;
+            vimStep.cursorCol = cursorCol;
+        }
     }
 
     /** Opens a Vim step, or nests inside the open one. */

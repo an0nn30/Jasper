@@ -14,6 +14,26 @@ final class Walk {
     /** Vim's cls_bigword: every non-blank is one class, for W, B, E and gE. */
     boolean bigword;
 
+    /** The closed fold holding a line (1-based) as {first, last}, or null; null when there are no folds. */
+    java.util.function.IntFunction<int[]> folds;
+
+    /** fwd_word and end_word: from inside a closed fold, go to the last character of its last line first. */
+    private void toFoldEnd(Pos pos) {
+        int[] fold = folds == null ? null : folds.apply(pos.line + 1);
+        if (fold == null) return;
+        pos.line = fold[1] - 1;
+        String text = buffer.line(pos.line);
+        pos.col = text.isEmpty() ? 0 : Text.last(text);
+    }
+
+    /** bck_word: from inside a closed fold, go to the start of its first line first. */
+    private void toFoldStart(Pos pos) {
+        int[] fold = folds == null ? null : folds.apply(pos.line + 1);
+        if (fold == null) return;
+        pos.line = fold[0] - 1;
+        pos.col = 0;
+    }
+
     Walk(Buffer buffer, Keywords keywords) {
         this.buffer = buffer;
         this.keywords = keywords;
@@ -86,6 +106,7 @@ final class Walk {
     /** Vim's fwd_word: moves to the start of the {@code count}-th next word. */
     boolean fwdWord(Pos pos, int count, boolean eol) {
         while (--count >= 0) {
+            toFoldEnd(pos);
             int sclass = cls(pos);
             boolean lastLine = pos.line == buffer.count() - 1;
             int i = inc(pos);
@@ -109,6 +130,7 @@ final class Walk {
     /** Vim's bck_word: moves to the start of the {@code count}-th previous word. */
     boolean bckWord(Pos pos, int count, boolean stop) {
         while (--count >= 0) {
+            toFoldStart(pos);
             int sclass = cls(pos);
             if (dec(pos) == FAIL) return false;
             boolean finished = false;
@@ -131,6 +153,7 @@ final class Walk {
     /** Vim's end_word: moves to the end of the {@code count}-th word. */
     boolean endWord(Pos pos, int count, boolean stop, boolean empty) {
         while (--count >= 0) {
+            toFoldEnd(pos);
             int sclass = cls(pos);
             if (inc(pos) == FAIL) return false;
             boolean finished = false;

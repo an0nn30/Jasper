@@ -171,9 +171,12 @@ final class Search {
         Buffer b = c.buffer;
         Pos pos = c.cursor();
         lastWrapped = false;
+        int[] fold = c.editor.folds().closed(pos.line + 1);
         if (dir == 0) dir = direction;
         else direction = dir;
         if (reverse) dir = dir == '/' ? '?' : '/';
+        // do_search: from inside a closed fold, a search starts after its end (forward) or at its start (backward).
+        if (fold != null) pos = dir == '/' ? new Pos(fold[1] - 1, Integer.MAX_VALUE / 2) : new Pos(fold[0] - 1, 0);
         noHighlight = false;
         boolean end = false;
         int retval;

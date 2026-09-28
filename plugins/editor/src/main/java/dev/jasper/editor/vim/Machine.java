@@ -151,6 +151,42 @@ final class Machine {
         });
     }
 
+    /** Motions and the 'foldopen' item that makes them open the folds at the cursor (normal.c's FDO_ checks). */
+    private static final java.util.Map<String, String> FOLDOPEN = foldopenTable();
+
+    private static java.util.Map<String, String> foldopenTable() {
+        var table = new java.util.HashMap<String, String>();
+        for (String k : List.of("h", "l", "<Left>", "<Right>", "<BS>", " ", "$", "<End>", "f", "F", "t", "T", ";", ",", "w", "W", "b", "B",
+            "e", "E", "0", "^", "<S-Right>", "<C-Right>", "<S-Left>", "<C-Left>")) table.put(k, "hor");
+        for (String k : List.of("(", ")", "{", "}", "[[", "]]", "[]", "][", "[(", "[{", "])", "]}")) table.put(k, "block");
+        table.put("%", "percent");
+        for (String k : List.of("'", "`")) table.put(k, "mark");
+        for (String k : List.of("/", "?", "n", "N", "*", "#", "g*", "g#")) table.put(k, "search");
+        for (String k : List.of("G", "gg")) table.put(k, "jump");
+        return table;
+    }
+
+    /**
+     * 'foldopen': a typed motion (not replayed by {@code .}, not after an operator) opens the folds that hide the
+     * cursor. Marks, % and <C-o> only when they changed the line; h and l only when they moved.
+     */
+    private void foldOpen(String keys, Pos before) {
+        String item = FOLDOPEN.get(keys);
+        if (item == null || replaying || !editor.options().has("foldopen", item)) return;
+        Pos after = editor.cursor();
+        if ((item.equals("mark") || item.equals("percent")) && after.line == before.line) return;
+        if (item.equals("hor") && after.equals(before) && (keys.equals("h") || keys.equals("l") || keys.equals("<Left>") || keys.equals("<Right>"))) return;
+        editor.folds().openCursor(after.line + 1);
+    }
+
+    /** 'foldopen' for commands that are not motions: undo and redo ({@code undo}), the jumplist and change list ({@code mark}). */
+    void foldOpenAfter(String item, Pos before) {
+        if (replaying || !editor.options().has("foldopen", item)) return;
+        Pos after = editor.cursor();
+        if (item.equals("mark") && after.line == before.line) return;
+        editor.folds().openCursor(after.line + 1);
+    }
+
     /** A key in Visual mode: a Visual command, a motion that moves the cursor, an operator, or a text object. */
     private void visualKey() {
         VimCommands.Entry entry = vim.commands().visualKey(keys);
@@ -181,7 +217,9 @@ final class Machine {
                 Target target = ((VimCommands.Motion) entry.handler()).move(context);
                 if (target == null) throw Context.fail();
                 if (target.jump()) editor.marks().setpcmark(editor.cursor());
+                Pos before = editor.cursor();
                 editor.moveTo(target);
+                foldOpen(entry.keys(), before);
                 complete(false);
             }
             case OBJECT -> {
@@ -274,7 +312,9 @@ final class Machine {
                     return;
                 }
                 if (operator == null) {
+                    Pos before = editor.cursor();
                     editor.moveTo(target);
+                    foldOpen(entry.keys(), before);
                     complete(false);
                 } else applyOperator(context, span(context, target));
             }
@@ -291,7 +331,8 @@ final class Machine {
                     return;
                 }
                 boolean change = entry.change();
-                if (!entry.keys().equals("u") && !entry.keys().equals("<C-r>")) editor.forgetColumn();
+                if (!entry.keys().equals("u") && !entry.keys().equals("<C-r>") && !ViewCommands.KEEP_COLUMN.contains(entry.keys()))
+                    editor.forgetColumn();
                 if (change) beginChange();
                 try {
                     ((VimCommands.Action) entry.handler()).run(context);
@@ -313,8 +354,10 @@ final class Machine {
     private Span lineSpan(Context context) {
         Pos cursor = context.cursor();
         int last = editor.buffer().count() - 1;
-        if (context.count > 1 && cursor.line >= last) throw Context.fail();
-        int end = Math.min(last, cursor.line + context.count - 1);
+        // cursor_down(count - 1): a closed fold counts as one line.
+        int[] fold = editor.folds().closed(cursor.line + 1);
+        if (context.count > 1 && (fold != null ? fold[1] - 1 : cursor.line) >= last) throw Context.fail();
+        int end = editor.view().downFrom(cursor.line + 1, context.count - 1) - 1;
         if (forced == 'v') return new Span(cursor.copy(), new Pos(end, editor.wantedColumn(end)), Kind.EXCLUSIVE);
         String text = editor.buffer().line(end);
         boolean sol = operator.equals("d") || operator.equals(">") || operator.equals("<lt>");
@@ -323,7 +366,12 @@ final class Machine {
         else if (sol && !editor.options().flag("startofline")) col = editor.wantedColumn(end);
         else col = Text.firstNonBlank(text) >= text.length() && !text.isEmpty() ? Text.last(text) : Text.firstNonBlank(text);
         Pos target = new Pos(end, col);
-        return new Span(Pos.min(cursor, target).copy(), Pos.max(cursor, target).copy(), Kind.LINEWISE);
+        Pos start = Pos.min(cursor, target).copy(), stop = Pos.max(cursor, target).copy();
+        // Closed folds are taken whole.
+        int[] first = editor.folds().closed(start.line + 1), lastFold = editor.folds().closed(stop.line + 1);
+        if (first != null) start = new Pos(first[0] - 1, 0);
+        if (lastFold != null) stop = new Pos(lastFold[1] - 1, 0);
+        return new Span(start, stop, Kind.LINEWISE);
     }
 
     /** Runs {@code x}, {@code D} and the other abbreviations as their operator and motion, inside their own step. */
@@ -350,7 +398,22 @@ final class Machine {
         Kind kind = target.kind();
         if (forced == 'v') kind = kind == Kind.LINEWISE ? Kind.EXCLUSIVE : kind == Kind.EXCLUSIVE ? Kind.INCLUSIVE : Kind.EXCLUSIVE;
         else if (forced == 'V') kind = Kind.LINEWISE;
-        Pos start = Pos.min(cursor, target.pos()).copy(), end = Pos.max(cursor, target.pos()).copy();
+        Pos orig = cursor.copy(), moved = target.pos().copy();
+        // do_pending_operator: closed folds are taken whole.
+        Folds folds = editor.folds();
+        Buffer b = editor.buffer();
+        if (orig.compareTo(moved) < 0) {
+            int[] f = folds.closed(orig.line + 1);
+            if (f != null) orig = new Pos(f[0] - 1, 0);
+            int[] g = folds.closed(moved.line + 1);
+            if ((moved.col > 0 || kind != Kind.EXCLUSIVE) && g != null) moved = new Pos(g[1] - 1, b.line(g[1] - 1).length());
+        } else if (kind == Kind.LINEWISE) {
+            int[] f = folds.closed(moved.line + 1);
+            if (f != null) moved = new Pos(f[0] - 1, 0);
+            int[] g = folds.closed(orig.line + 1);
+            if (g != null) orig = new Pos(g[1] - 1, b.line(g[1] - 1).length());
+        }
+        Pos start = Pos.min(orig, moved).copy(), end = Pos.max(orig, moved).copy();
         boolean adjusted = false;
         if (kind == Kind.EXCLUSIVE && forced == 0 && target.adjust() && end.col == 0 && end.line > start.line) {
             adjusted = true;
@@ -404,6 +467,7 @@ final class Machine {
         VimCommands.Entry entry = vim.commands().normal(operator);
         vim.covered(entry.id());
         editor.setCursor(span.start(), true);
+        editor.area().vimUndo().stepCursor(span.start().line, span.start().col);
         ((VimCommands.Operator) entry.handler()).apply(context, span);
         setChangeMarks(span);
     }

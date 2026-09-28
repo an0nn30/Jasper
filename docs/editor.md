@@ -117,9 +117,14 @@ recorded corpus.
 - 'tabstop' and 'shiftwidth' start at `tab_size`, 'expandtab' follows the tab's Spaces or Tab setting, and
   'autoindent' is on. 'incsearch' is on; 'hlsearch' is off until the `:` command line (with `:noh`) arrives.
 - `<C-g>` shows the file, its line count and the cursor's position; `ga` the character's code.
-- Not yet: scrolling commands (`<C-d>`, `zz`), `H`, `M`, `L` and the other screen-line motions, folds, the `:`
-  command line, macros, a vimrc, and emulated plugins such as surround and commentary. They follow in later releases.
-  An uppercase mark (`mA`) works within its own tab.
+- Scrolling (`<C-e>`, `<C-d>`, `<C-f>`, `zt`, `zz`), `H`, `M`, `L` and the screen-line motions (`gj`, `g0`, `g$`)
+  work on a window as many lines high and characters wide as the text area shows. Scrolling with the mouse or the
+  scroll bar keeps the cursor inside it, as in Vim. With Vim on, long lines wrap at any character, as Vim wraps them.
+- The fold commands (`zo`, `zc`, `za`, `zR`, `zM`, `zj`, `[z`) work on the Editor's code folds. A closed fold counts as
+  one line for `j`, `k` and scrolling, an operator takes it whole, and the motions Vim's 'foldopen' names (`l`, `w`,
+  searches, marks, `%`, `{`, `u`) open the fold they land in.
+- Not yet: the `:` command line, macros, a vimrc, and emulated plugins such as surround and commentary. They follow in
+  later releases. An uppercase mark (`mA`) works within its own tab.
 
 ## For other plugins
 

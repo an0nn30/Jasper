@@ -18,8 +18,12 @@ The feature is opt-in and off by default. It is for the user's own machine and i
 - **Nothing of the user's runs while resident.** No shell, no PTY, no child process. Sessions have already exited through the normal pane-close path before the last window goes.
 - **Close is not quit.** Closing the last window goes resident; Quit (Cmd+Q, the palette's Quit, the native quit handler) exits for good. This is how a macOS app that survives window close is expected to behave, and it is the off switch that does not require editing config. Rejected: Quit also going resident, which reads as a bug. Rejected: respawning a fresh daemon behind a Quit, which means Quit never quits.
 - **One key does both.** Enabling residency also registers the login item; there is no second switch. Rejected: separate residency and autostart settings, which is more surface and more states for a feature whose entire point is "be running when I want you".
-- **No new UI.** No tray icon, no menu-bar extra, and the resident process stays visible in the Dock on macOS. You summon a window by launching Jasper the way you already do. Rejected: a tray icon, which is discoverable and gives a kill switch but adds a surface that cannot be verified headlessly. Rejected: hiding the process entirely (`LSUIElement`), which also drops it out of Cmd+Tab.
+- **No new UI** (amended 2026-09-27, see below). No tray icon, no menu-bar extra, and the resident process stays visible in the Dock on macOS. You summon a window by launching Jasper the way you already do. Rejected: a tray icon, which is discoverable and gives a kill switch but adds a surface that cannot be verified headlessly. Rejected: hiding the process entirely (`LSUIElement`), which also drops it out of Cmd+Tab.
 - **Warm means warm.** A resident process that has never initialized AWT is barely warmer than a cold one, so it runs an explicit warm-up pass at start. Rejected, for now: an invisible anchor frame to pre-warm native peer creation — the obvious next lever, but it edges toward the pre-built-window model the user declined, and it should be added only if measurement shows window creation dominates.
+
+## Amendment 2026-09-27: Windows tray icon
+
+Approved by the user after using residency on Windows, where a windowless process is invisible and has nothing to Quit from (macOS keeps its Dock icon). While a Windows process is resident it shows a notification-area icon with **Open Jasper** (also a double-click on the icon) and **Quit Jasper**. Open is the handoff's `openOrRaise`; Quit is the normal `quit()`, so plugin closing guards still apply and Quit still exits for good. The icon appears when startup settles residency and goes when residency ends (a stale handoff) or at shutdown. `platform.ResidentTray` owns the AWT tray and is a no-op when headless, outside Windows or when the tray is unsupported; `JasperApplication.residentIndicator` injects it so tests never touch the real tray. Headless tests cover the wiring and icon choice; the icon itself is on the user's manual checklist. macOS and Linux are unchanged.
 
 ## The setting
 
@@ -170,7 +174,7 @@ The user's, on the desktop, because none of it can be verified headlessly:
 ## Out of scope
 
 - A global hotkey or a drop-down/Quake-style window. Java has no portable global hotkey without native code, and it is a separate feature.
-- A tray or menu-bar icon.
+- A menu-bar icon, and a tray icon outside Windows (the Windows tray icon is the 2026-09-27 amendment).
 - Pre-spawning a shell or a PTY.
 - A pre-built hidden window, and the invisible anchor frame that would pre-warm peer creation.
 - Opening a new window in the launching shell's working directory. It is a good idea and a separate one: it has to change the cold path and the handoff path together, or the two diverge.

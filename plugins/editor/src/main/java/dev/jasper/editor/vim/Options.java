@@ -33,6 +33,7 @@ public final class Options {
         new Def("clipboard", "cb", Type.STRING, "", false),
         new Def("comments", "com", Type.STRING, "s1:/*,mb:*,ex:*/,://,b:#,:%,:XCOMM,n:>,fb:-", true),
         new Def("expandtab", "et", Type.BOOLEAN, false, true),
+        new Def("foldopen", "fdo", Type.STRING, "block,hor,mark,percent,quickfix,search,tag,undo", false),
         new Def("formatoptions", "fo", Type.STRING, "tcq", true),
         new Def("hlsearch", "hls", Type.BOOLEAN, false, false),
         new Def("ignorecase", "ic", Type.BOOLEAN, false, false),
@@ -42,10 +43,14 @@ public final class Options {
         new Def("matchpairs", "mps", Type.STRING, "(:),{:},[:]", true),
         new Def("nrformats", "nf", Type.STRING, "bin,octal,hex", true),
         new Def("report", "report", Type.NUMBER, 2, false),
+        new Def("scrolljump", "sj", Type.NUMBER, 1, false),
+        new Def("scrolloff", "so", Type.NUMBER, 0, false),
         new Def("shiftround", "sr", Type.BOOLEAN, false, false),
         new Def("shiftwidth", "sw", Type.NUMBER, 8, true),
         new Def("showcmd", "sc", Type.BOOLEAN, true, false),
         new Def("showmode", "smd", Type.BOOLEAN, true, false),
+        new Def("sidescroll", "ss", Type.NUMBER, 0, false),
+        new Def("sidescrolloff", "siso", Type.NUMBER, 0, false),
         new Def("smartcase", "scs", Type.BOOLEAN, false, false),
         new Def("softtabstop", "sts", Type.NUMBER, 0, true),
         new Def("startofline", "sol", Type.BOOLEAN, true, false),
@@ -53,6 +58,7 @@ public final class Options {
         new Def("textwidth", "tw", Type.NUMBER, 0, true),
         new Def("tildeop", "top", Type.BOOLEAN, false, false),
         new Def("whichwrap", "ww", Type.STRING, "b,s", false),
+        new Def("wrap", "wrap", Type.BOOLEAN, true, true),
         new Def("wrapscan", "ws", Type.BOOLEAN, true, false));
 
     private final Options global;

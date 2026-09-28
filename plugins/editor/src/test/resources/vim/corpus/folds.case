@@ -1,0 +1,2142 @@
+# The fold commands on the text's code folds, and closed folds counted as one line.
+
+=== folds start open
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java
+keys: 
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 1,1
+expect-mode: normal
+expect-folds: none
+
+=== zc closes the fold at the cursor
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java
+keys: zc
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: 2-5
+
+=== zc twice closes the outer fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java
+keys: zczc
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: 1-9
+
+=== zc with a count
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java
+keys: 2zc
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: 1-9
+
+=== zo opens a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 2
+keys: zo
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: none
+
+=== zo on a nested closed fold opens one level
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 1 2
+keys: zo
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: 2-5
+
+=== zo with a count
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 1 2
+keys: 2zo
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: none
+
+=== zO opens every level
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 1 2
+keys: zO
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: none
+
+=== zC closes every level
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java
+keys: zC
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: 1-9
+
+=== za closes an open fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java
+keys: za
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: 2-5
+
+=== za opens a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 2
+keys: za
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: none
+
+=== zA on an open fold closes every level
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java
+keys: zA
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: 1-9
+
+=== zA on a closed fold opens every level
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 1 2
+keys: zA
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: none
+
+=== zv opens the folds at the cursor
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 1 2
+keys: zv
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,1
+expect-mode: normal
+expect-folds: none
+
+=== zR opens every fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 1 2 6
+keys: zR
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 1,1
+expect-mode: normal
+expect-folds: none
+
+=== zM closes every fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 10,1
+folds: java
+keys: zM
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 10,1
+expect-mode: normal
+expect-folds: 1-9
+
+=== zo without a fold fails
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 10,1
+folds: java
+keys: zo
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 10,1
+expect-mode: normal
+expect-folds: none
+
+=== zc without a fold fails
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 10,1
+folds: java
+keys: zc
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 10,1
+expect-mode: normal
+expect-folds: none
+
+=== j skips a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 2
+keys: jj
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 6,1
+expect-mode: normal
+expect-folds: 2-5
+
+=== j onto a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 2
+keys: j
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,1
+expect-mode: normal
+expect-folds: 2-5
+
+=== k skips a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 6,1
+folds: java 2
+keys: k
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,1
+expect-mode: normal
+expect-folds: 2-5
+
+=== k from a line inside a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 4,1
+folds: java 2
+keys: k
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 1,1
+expect-mode: normal
+expect-folds: 2-5
+
+=== j from inside a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 4,1
+folds: java 2
+keys: j
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 6,1
+expect-mode: normal
+expect-folds: 2-5
+
+=== j with a count over folds
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 2 6
+keys: 3j
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 9,1
+expect-mode: normal
+expect-folds: 2-5 6-8
+
+=== G into a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 2
+keys: 4G
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 4,5
+expect-mode: normal
+expect-folds: 2-5
+
+=== dd on a closed fold deletes it whole
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 2
+keys: dd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  class A {
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,3
+expect-mode: normal
+expect-folds: none
+expect-register ": l "  void f() {\n    one();\n    two();\n  }\n"
+expect-register 0: none
+expect-register 1: l "  void f() {\n    one();\n    two();\n  }\n"
+expect-register -: none
+
+=== dj over a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 2
+keys: jdj
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  class A {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,5
+expect-mode: normal
+expect-folds: none
+expect-register ": l "  void f() {\n    one();\n    two();\n  }\n  void g() {\n"
+expect-register 0: none
+expect-register 1: l "  void f() {\n    one();\n    two();\n  }\n  void g() {\n"
+expect-register -: none
+
+=== yy on a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 2
+keys: yy
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,1
+expect-mode: normal
+expect-folds: 2-5
+expect-register ": l "  void f() {\n    one();\n    two();\n  }\n"
+expect-register 0: l "  void f() {\n    one();\n    two();\n  }\n"
+expect-register 1: none
+expect-register -: none
+
+=== 2dd with a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 2,1
+folds: java 2
+keys: 2dd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  class A {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,5
+expect-mode: normal
+expect-folds: none
+expect-register ": l "  void f() {\n    one();\n    two();\n  }\n  void g() {\n"
+expect-register 0: none
+expect-register 1: l "  void f() {\n    one();\n    two();\n  }\n  void g() {\n"
+expect-register -: none
+
+=== dk onto a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 6,1
+folds: java 2
+keys: dk
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+  class A {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,5
+expect-mode: normal
+expect-folds: none
+expect-register ": l "  void f() {\n    one();\n    two();\n  }\n  void g() {\n"
+expect-register 0: none
+expect-register 1: l "  void f() {\n    one();\n    two();\n  }\n  void g() {\n"
+expect-register -: none
+
+=== x in a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 2
+keys: x
+--- vim 9.1
+expect-text:
+  class A {
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,3
+expect-mode: normal
+expect-folds: none
+
+=== l opens a fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 2
+keys: l
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,2
+expect-mode: normal
+expect-folds: none
+
+=== w opens a fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 2
+keys: w
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 6,3
+expect-mode: normal
+expect-folds: 2-5
+
+=== dollar opens a fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java 2
+keys: $
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 3,10
+expect-mode: normal
+expect-folds: none
+
+=== search opens a fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 2
+keys: /two<CR>
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 4,5
+expect-mode: normal
+expect-folds: none
+
+=== n opens a fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 2
+keys: /two<CR>ggn
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 4,5
+expect-mode: normal
+expect-folds: none
+
+=== percent into a fold opens it
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 9,1
+folds: java 2
+keys: %
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 1,9
+expect-mode: normal
+expect-folds: 2-5
+
+=== mark jump opens a fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 4,1
+folds: java 2
+keys: magg'a
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 4,5
+expect-mode: normal
+expect-folds: none
+
+=== G does not open a fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 2
+keys: 4G
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 4,5
+expect-mode: normal
+expect-folds: 2-5
+
+=== brace motion opens a fold
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 1,1
+folds: java 2
+keys: }
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 13,1
+expect-mode: normal
+expect-folds: 2-8
+
+=== u opens a fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 4,1
+folds: java 2
+keys: xggu
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,1
+expect-mode: normal
+expect-folds: none
+
+=== zj goes to the next fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java
+keys: zj
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,1
+expect-mode: normal
+expect-folds: none
+
+=== zj from inside a fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java
+keys: zj
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 6,1
+expect-mode: normal
+expect-folds: none
+
+=== zj with a count
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 1,1
+folds: java
+keys: 2zj
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 4,1
+expect-mode: normal
+expect-folds: none
+
+=== zj past the last fold fails
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 10,1
+folds: java
+keys: zj
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 10,1
+expect-mode: normal
+expect-folds: none
+
+=== zk goes to the previous fold end
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 7,1
+folds: java
+keys: zk
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 5,1
+expect-mode: normal
+expect-folds: none
+
+=== zk before the first fold fails
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 1,1
+folds: java
+keys: zk
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 1,1
+expect-mode: normal
+expect-folds: none
+
+=== bracket z goes to the fold start
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 4,1
+folds: java
+keys: [z
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,1
+expect-mode: normal
+expect-folds: none
+
+=== close bracket z goes to the fold end
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 4,1
+folds: java
+keys: ]z
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 5,1
+expect-mode: normal
+expect-folds: none
+
+=== bracket z at the start goes to the outer fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 2,1
+folds: java
+keys: [z
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 1,1
+expect-mode: normal
+expect-folds: none
+
+=== bracket z outside a fold fails
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 10,1
+folds: java
+keys: [z
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 10,1
+expect-mode: normal
+expect-folds: none
+
+=== d zj
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java
+keys: dzj
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 1,3
+expect-mode: normal
+expect-folds: none
+expect-register ": l "class A {\n"
+expect-register 0: none
+expect-register 1: l "class A {\n"
+expect-register -: none
+
+=== C-e over a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+window: 20x4
+folds: java 2
+keys: <C-e><C-e>
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 6,1
+expect-mode: normal
+expect-view: 6,0
+expect-folds: 2-5
+
+=== C-y over a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 10,1
+window: 20x4
+folds: java 2
+keys: <C-y><C-y>
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 8,1
+expect-mode: normal
+expect-view: 2,0
+expect-folds: 2-5
+
+=== C-d with folds
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 1,1
+window: 20x4
+folds: java 2 10
+keys: <C-d>
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 9,1
+expect-mode: normal
+expect-view: 2,0
+expect-folds: 2-8 10-12
+
+=== C-f with folds
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 1,1
+window: 20x4
+folds: java 2 10
+keys: <C-f>
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 10,1
+expect-mode: normal
+expect-view: 10,0
+expect-folds: 2-8 10-12
+
+=== H with folds
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 13,1
+window: 20x4
+folds: java 2
+keys: 2H
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 11,3
+expect-mode: normal
+expect-view: 10,0
+expect-folds: 2-8
+
+=== L with folds
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 1,1
+window: 20x4
+folds: java 2
+keys: L
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 10,1
+expect-mode: normal
+expect-view: 1,0
+expect-folds: 2-8
+
+=== M with folds
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 1,1
+window: 20x4
+folds: java 2
+keys: M
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 2,1
+expect-mode: normal
+expect-view: 1,0
+expect-folds: 2-8
+
+=== zt with folds
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 10,1
+window: 20x4
+folds: java 2
+keys: zt
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 10,1
+expect-mode: normal
+expect-view: 10,0
+expect-folds: 2-8
+
+=== zb with folds
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 12,1
+window: 20x4
+folds: java 2
+keys: zb
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 12,1
+expect-mode: normal
+expect-view: 9,0
+expect-folds: 2-8
+
+=== the window scrolls past a closed fold
+text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+cursor: 1,1
+window: 20x3
+folds: java 2
+keys: G
+--- vim 9.1
+expect-text:
+  x
+  a {
+    b
+    c {
+      d
+    }
+    e
+  }
+  y
+  f {
+    g
+  }
+  z
+expect-cursor: 13,1
+expect-mode: normal
+expect-view: 11,0
+expect-folds: 2-8
+
+=== gj over a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 2
+keys: gjgj
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 6,1
+expect-mode: normal
+expect-folds: 2-5
+
+=== gk over a closed fold
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 6,1
+folds: java 2
+keys: gk
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,1
+expect-mode: normal
+expect-folds: 2-5
+
+=== V over a closed fold then d
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 1,1
+folds: java 2
+keys: Vjd
+registers: " 0 1 -
+--- vim 9.1
+expect-text:
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 1,5
+expect-mode: normal
+expect-folds: 1-3
+expect-register ": l "class A {\n  void f() {\n"
+expect-register 0: none
+expect-register 1: l "class A {\n  void f() {\n"
+expect-register -: none
+
+=== zc then undo
+text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+cursor: 3,1
+folds: java
+keys: zcxu
+--- vim 9.1
+expect-text:
+  class A {
+    void f() {
+      one();
+      two();
+    }
+    void g() {
+      three();
+    }
+  }
+  after
+expect-cursor: 2,1
+expect-mode: normal
+expect-folds: none

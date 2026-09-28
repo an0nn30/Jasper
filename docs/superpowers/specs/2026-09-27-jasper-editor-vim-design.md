@@ -1,6 +1,6 @@
 # Editor Vim mode
 
-**Status:** Approved by the user on 2026-09-27. Plan V1a (`docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`) amends sections 3.8, 4.1 and 13, as marked **Amended (V1a)**. Plan V1b (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`) amends sections 3.5, 3.6, 3.8, 5.2, 5.3, 11.1 and 13, as marked **Amended (V1b)**. Amends the [Editor plugin](2026-09-27-jasper-editor-plugin-design.md) spec (settings, key handling, package layout) as hosted by [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md). Branch `claude/vim-mode`.
+**Status:** Approved by the user on 2026-09-27. Plan V1a (`docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`) amends sections 3.8, 4.1 and 13, as marked **Amended (V1a)**. Plan V1b (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`) amends sections 3.5, 3.6, 3.8, 5.2, 5.3, 11.1 and 13, as marked **Amended (V1b)**. Plan V1c (`docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1c.md`) amends sections 3.1, 4.1 and 11.1, as marked **Amended (V1c)**. Amends the [Editor plugin](2026-09-27-jasper-editor-plugin-design.md) spec (settings, key handling, package layout) as hosted by [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md). Branch `claude/vim-mode`.
 
 ## Purpose and scope
 
@@ -86,7 +86,7 @@ For each normalized key, in order:
 - The cursor is a buffer offset in the text area's `\n`-separated document. Positions are reported to the user 1-based (line, column in characters).
 - A "character" is a grapheme: `BreakIterator.getCharacterInstance` decides boundaries, so surrogate pairs and a base letter with combining marks move and delete as one.
 - In Normal and Visual modes the cursor never sits after the last character of a non-empty line. `curswant`: vertical motions keep the desired **display** column (tabs expanded with `tabstop`); `$` sets it to end-of-line.
-- `j`/`k` move by buffer lines; `gj`/`gk`, `g0`, `g^`, `g$`, `gm` use screen lines when wrap is on.
+- `j`/`k` move by buffer lines; `gj`/`gk`, `g0`, `g^`, `g$`, `gm` use screen lines when wrap is on. **Amended (V1c):** the window is Vim's model of the text area (its height and width in lines and characters of the Editor font), kept in step with the scroll pane; while Vim is on the text area wraps at any character, as Vim does, and the cursor may be inside a closed fold.
 - Mouse: a click in Normal mode places the cursor and clamps it; a drag, a Find-bar match, or the Editor's Select All enters charwise Visual mode; clearing the selection returns to Normal.
 
 ### 3.2 Modes
@@ -174,8 +174,8 @@ Defaults where the Editor has its own setting: `tabstop` and `shiftwidth` = the 
 - Entering Insert or Visual: `i a I A o O gi gI v V <C-v> gv`.
 - Undo and repeat: `u <C-r> .`, `&` (in V2).
 - Numbers: `<C-a> <C-x>` with `nrformats` (default `bin,octal,hex`, Vim's value with `-u NONE`; **Amended (V1a)**), on the number under or after the cursor.
-- Scrolling: `<C-e> <C-y> <C-d> <C-u> <C-f> <C-b> zt zz zb z<CR> z. z-`, `scrolloff` respected.
-- Folds: `zo zc za zO zC zA zR zM zv zj zk [z ]z` on the tab's code folds.
+- Scrolling: `<C-e> <C-y> <C-d> <C-u> <C-f> <C-b> zt zz zb z<CR> z. z-`, `scrolloff` respected. **Amended (V1c):** also `z+ z^ <PageUp> <PageDown> <S-Up> <S-Down>`, the scroll keys in Visual mode, `g<Down> g<Up> g<Home> g<End>`; 'scrolljump', 'sidescroll' and 'sidescrolloff' are respected.
+- Folds: `zo zc za zO zC zA zR zM zv zj zk [z ]z` on the tab's code folds. **Amended (V1c):** a code fold covers its first to last line; a closed fold counts as one line for vertical motions and scrolling, an operator takes it whole, word motions, `{`, `}` and searches start past it, and the motions Vim's default 'foldopen' names open it.
 - Other: `<C-g>` (file name, line count, position in the Vim bar), `ga` (character code), `ZZ` (`:x`), `ZQ` (`:q!`), `m{mark}`. The command-line window (`q:`, `q/`) is not supported.
 
 **Visual mode:** every operator; `o`, `O` (block corners), `$` in block mode, `r J gJ u U ~ > < p P y d c s x X D C S R Y`; block `I` and `A` (replayed on each line on `<Esc>`), block `c`; `gv`; `g<C-a>`/`g<C-x>` (progressive); text objects and motions extend the selection; `:` starts with `'<,'>`; `*`/`#` are Normal-mode only, as in Vim.
@@ -339,7 +339,7 @@ Everything else about Vim is configured in the vimrc, as with IdeaVim.
   expect-register 1: (empty)
   ```
 
-  Keys use the notation of section 2.1. Text lines are indented two spaces; trailing spaces are shown with a `$` end marker option (`text$:`) when significant. Optional fields: `set:` (options), `marks:` (initial marks), `clipboard:`, `vimrc:` (lines for mapping and extension cases), `ext:` (extensions to enable), `expect-marks:`, `expect-search:`, `expect-message:`. **Amended (V1b):** `expect-visual:` gives a Visual area's other end; a blockwise register's type is `b` and its width (`b3`, `getregtype()` in letters); the mode `command-line` is Vim's `c`.
+  Keys use the notation of section 2.1. Text lines are indented two spaces; trailing spaces are shown with a `$` end marker option (`text$:`) when significant. Optional fields: `set:` (options), `marks:` (initial marks), `clipboard:`, `vimrc:` (lines for mapping and extension cases), `ext:` (extensions to enable), `expect-marks:`, `expect-search:`, `expect-message:`. **Amended (V1b):** `expect-visual:` gives a Visual area's other end; a blockwise register's type is `b` and its width (`b3`, `getregtype()` in letters); the mode `command-line` is Vim's `c`. **Amended (V1c):** `window:` sets the window's size (`20x5`, columns by rows); `folds: java 2 7` makes the text's code folds with RSyntaxTextArea's Java fold parser and closes those starting on the listed lines (the recorder makes the same folds in Vim as manual folds); `expect-view:` (`topline,leftcol`) and `expect-folds:` (the closed folds) are then compared.
 - **Recording:** `./gradlew :jasper-plugin-editor:recordVimCorpus` (not part of `check`; needs `vim` on `PATH`, or `-PvimBinary=…`). For each case it runs `vim -u NONE -i NONE -N -Es` with a generated script that sets options and the buffer, places the cursor, runs the vimrc lines, feeds the keys with `feedkeys(keys, 'xt')`, and writes text, cursor, mode, registers, marks and messages as JSON; the task rewrites everything below each case's `---` line. For `ext:` cases it first clones each extension's upstream repository at the commit pinned in `plugins/editor/vim-oracle.properties` into `build/vim-oracle/` and adds it to `runtimepath`. `-Pcase=<pattern>` records a subset.
 - **Replay:** a JUnit dynamic test per case builds a headless `VimTextArea` with a recording `VimHost`, applies the fields, feeds the keys through the same entry point real key events reach after normalization, and compares every recorded field. A case with no `---` block fails with "not recorded". `check` never runs Vim.
 - **Divergences:** a case with `divergent: <reason>` keeps a hand-written expected block and is exempt from recording. Every divergent case is listed with its reason in `docs/vim-divergences.md`; a test fails if the document and the corpus disagree.
