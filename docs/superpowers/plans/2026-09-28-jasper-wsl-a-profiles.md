@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 0-5 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
+**Status:** In progress: Tasks 0-6 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far: none.
@@ -1335,7 +1335,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Produces: `ShellProfile` and `ShellProfile.Kind`; `ShellProfiles.LOGIN/POWERSHELL/PWSH/CMD/CUSTOM/WSL_PREFIX`, `available(String osName, Map<String,String> environment, List<WslDistro> distros, TerminalConfig.Shell shell)` (checks for PowerShell 7 on disk), `available(..., Optional<String> pwsh, TerminalConfig.Shell shell)` (pure), `platformDefault(String)`, `configuredId(String, TerminalConfig.Shell)`, `custom(String, Map, TerminalConfig.Shell)`, `findPwsh(String, Map, Predicate<String>)`, `resolve(Optional<String> requested, List<ShellProfile> available, boolean detectionComplete, String osName, Map<String,String> environment, TerminalConfig.Shell shell)` returning `ShellProfiles.Resolution(ShellProfile profile, Optional<String> warning)`.
 - Consumes: `WslDistro` (Task 3), `TerminalConfig.Shell.profile()/custom()` (Task 5), `DefaultShell.command`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 package dev.jasper.app.launch;
@@ -1445,12 +1445,12 @@ class ShellProfilesTest {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.launch.ShellProfilesTest'`
 Expected: FAIL: compilation errors (`ShellProfile`, `ShellProfiles` do not exist).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 `ShellProfile.java`:
 
@@ -1698,12 +1698,12 @@ public final class ShellProfiles {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.launch.ShellProfilesTest' --tests 'dev.jasper.app.launch.DefaultShellTest'`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current
