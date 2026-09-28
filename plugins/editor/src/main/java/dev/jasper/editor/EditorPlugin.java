@@ -23,7 +23,7 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
-/** Edits local and remote text files in tabs in one Editor window; publishes {@link Editor} for other plugins. */
+/** Edits local and remote text files in app-owned workspace tabs; publishes {@link Editor} for other plugins. */
 public final class EditorPlugin implements Plugin {
     static final String OPEN = "dev.jasper.editor.open", NEW = "dev.jasper.editor.new", SHOW = "dev.jasper.editor.show";
 
@@ -57,15 +57,17 @@ public final class EditorPlugin implements Plugin {
         context.services().publish(Editor.class, new Editor() {
             @Override public void open(Path file) { window().openLocal(file); }
             @Override public void open(EditorDocument document) { window().open(document); }
+            @Override public void open(Path file, dev.jasper.sdk.WindowOwner owner) { window().openLocal(file, owner); }
+            @Override public void open(EditorDocument document, dev.jasper.sdk.WindowOwner owner) { window().open(document, owner); }
         });
         context.actions().register(ActionSpec.of(OPEN, "Open in Editor…").withIcon(context.appearance().icon(IconName.FILE))
                 .withKeywords(List.of("editor", "open", "file", "edit")).withDefaultBinding("cmd+o"),
             invoked -> {
                 List<Path> files = context.windows().chooseFiles(invoked.window(), "Open in Editor", Optional.empty());
-                if (!files.isEmpty()) window().openLocalFiles(files);
+                if (!files.isEmpty()) window().openLocalFiles(files, invoked.window());
             });
         context.actions().register(ActionSpec.of(NEW, "New Editor File").withKeywords(List.of("editor", "new", "file", "untitled")),
-            invoked -> window().newUntitled());
+            invoked -> window().newUntitled(invoked.window()));
         context.actions().register(ActionSpec.of(SHOW, "Show Editor").withKeywords(List.of("editor", "tabs")), invoked -> window().show());
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(OPEN);

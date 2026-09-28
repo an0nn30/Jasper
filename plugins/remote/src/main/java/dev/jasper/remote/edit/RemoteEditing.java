@@ -44,7 +44,7 @@ public final class RemoteEditing {
      */
     public void open(ConnectionIdentity identity, String path, WindowHandle from) {
         try {
-            editor.open(new RemoteDocument(identity, path, channels, owner(from)));
+            editor.open(new RemoteDocument(identity, path, channels, owner(from)), from);
         } catch (RuntimeException failure) {
             // The host does not contain calls between plugins.
             notice.accept("Could not open " + path + " in the Editor: "

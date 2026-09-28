@@ -6,7 +6,6 @@ import java.awt.Font;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import javax.swing.UIManager;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rsyntaxtextarea.Theme;
 import org.fife.ui.rtextarea.Gutter;
@@ -14,7 +13,7 @@ import org.fife.ui.rtextarea.RTextScrollPane;
 
 /**
  * Editor colours (spec 3.4): token colours from RSyntaxTextArea's {@code idea.xml} or {@code dark.xml}, and every
- * surface from the running Jasper theme's {@code UIManager} colours.
+ * surface from the host's semantic editor palette.
  */
 public final class EditorTheme {
     private final Theme light = load("idea.xml");
@@ -26,22 +25,26 @@ public final class EditorTheme {
      * @param variant Jasper's light or dark look
      */
     public void apply(RSyntaxTextArea area, RTextScrollPane scroll, Variant variant) {
+        apply(area, scroll, variant, dev.jasper.sdk.ui.EditorPalette.current());
+    }
+
+    /** Applies the active host's semantic palette to every document surface. */
+    public void apply(RSyntaxTextArea area, RTextScrollPane scroll, Variant variant, dev.jasper.sdk.ui.EditorPalette palette) {
         Font font = area.getFont();
         (variant == Variant.DARK ? dark : light).apply(area);
         area.setFont(font);
-        Color background = color("TextArea.background", area.getBackground());
-        Color foreground = color("TextArea.foreground", area.getForeground());
-        area.setBackground(background);
-        area.setForeground(foreground);
-        area.setCaretColor(color("TextArea.caretForeground", foreground));
-        area.setSelectionColor(color("TextArea.selectionBackground", area.getSelectionColor()));
-        area.setCurrentLineHighlightColor(blend(background, foreground, 0.06));
+        area.setBackground(palette.background());
+        area.setForeground(palette.foreground());
+        area.setCaretColor(palette.caret());
+        area.setSelectionColor(palette.selection());
+        area.setCurrentLineHighlightColor(palette.currentLine());
+        scroll.setBackground(palette.background());
+        scroll.getViewport().setBackground(palette.background());
         Gutter gutter = scroll.getGutter();
-        Color panel = color("Panel.background", background);
-        gutter.setBackground(panel);
-        gutter.setBorderColor(panel);
-        gutter.setFoldBackground(panel);
-        gutter.setLineNumberColor(color("Label.disabledForeground", foreground));
+        gutter.setBackground(palette.gutter());
+        gutter.setBorderColor(palette.gutter());
+        gutter.setFoldBackground(palette.gutter());
+        gutter.setLineNumberColor(palette.lineNumbers());
     }
 
     /**
@@ -54,12 +57,6 @@ public final class EditorTheme {
         return new Color((int) Math.round(base.getRed() + (toward.getRed() - base.getRed()) * amount),
             (int) Math.round(base.getGreen() + (toward.getGreen() - base.getGreen()) * amount),
             (int) Math.round(base.getBlue() + (toward.getBlue() - base.getBlue()) * amount));
-    }
-
-    /** A plain copy, so a later {@code updateUI} does not replace it with the look and feel's default. */
-    private static Color color(String key, Color fallback) {
-        Color value = UIManager.getColor(key);
-        return value == null ? fallback : new Color(value.getRGB(), true);
     }
 
     private static Theme load(String name) {

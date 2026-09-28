@@ -44,7 +44,8 @@ class EditorPluginTest {
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
             Editor editor = consumer.get().services().require(Editor.class);
             editor.open(Files.writeString(home.resolve("a.json"), "{}\n"));
-            assertThat(host.windows()).containsExactly("dev.jasper.editor.window|Editor|true");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.contentTabs()).hasSize(1);
             while (host.runBackground() > 0) { }
             assertThat(host.failures()).isEmpty();
         }
@@ -56,13 +57,15 @@ class EditorPluginTest {
             UUID terminal = host.addTerminalWindow();
             host.queuePathSelection(List.of(Files.writeString(home.resolve("b.yaml"), "a: 1\n")));
             assertThat(host.invoke("dev.jasper.editor.open", terminal, null)).isTrue();
-            assertThat(host.windows()).containsExactly("dev.jasper.editor.window|Editor|true");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.contentTabs()).hasSize(1);
             while (host.runBackground() > 0) { }
-            assertThat(host.closeCommand(EditorWindow.WINDOW_ID)).as("closes the one clean tab").isFalse();
-            assertThat(host.closeCommand(EditorWindow.WINDOW_ID)).as("then the window").isTrue();
+            assertThat(host.contentOwner(host.contentTabs().getFirst())).isInstanceOf(dev.jasper.sdk.terminal.WindowHandle.class);
+            assertThat(host.contentTabs().getFirst().requestClose().join()).isTrue();
             assertThat(host.windows()).isEmpty();
             assertThat(host.invoke("dev.jasper.editor.new", terminal, null)).isTrue();
-            assertThat(host.windows()).containsExactly("dev.jasper.editor.window|Editor|true");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.contentTabs()).hasSize(1);
         }
     }
 
@@ -73,7 +76,7 @@ class EditorPluginTest {
             host.start(new PluginInfo("test.consumer", "Consumer", "1.0.0", Set.of()), Set.of("dev.jasper.editor"), Set.of(), consumer::set);
             consumer.get().services().require(Editor.class).open(Files.writeString(home.resolve("a.json"), "{\"a\": true}\n"));
             while (host.runBackground() > 0) { }
-            RSyntaxTextArea area = find(host.windowContent("dev.jasper.editor", "Editor").orElseThrow()).orElseThrow();
+            RSyntaxTextArea area = find(host.contentComponent(host.contentTabs().getFirst())).orElseThrow();
             Color before = area.getSyntaxScheme().getStyle(TokenTypes.RESERVED_WORD).foreground;
             host.setVariant(consumer.get().appearance().variant() == Variant.DARK ? Variant.LIGHT : Variant.DARK);
             host.flush();

@@ -345,8 +345,38 @@ final class HostedUi {
 
     private final java.util.Map<AuxiliarySurface, OwnedWindow> ownedWindows = new java.util.HashMap<>();
 
+    private final java.util.Map<dev.jasper.app.contributions.ContentEntry, OwnedContent> ownedContent = new java.util.IdentityHashMap<>();
+    private final class OwnedContent implements dev.jasper.sdk.ui.ContentTab {
+        final dev.jasper.app.contributions.ContentEntry entry;
+        OwnedContent(dev.jasper.app.contributions.ContentEntry entry) { this.entry = entry; }
+        public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) { requireUi("content presentation"); entry.presentation(v.title(), v.detail(), v.icon(), v.dirty(), v.location(), v.host()); }
+        public void setCommands(List<dev.jasper.sdk.ui.ContentCommand> values) { requireUi("content commands"); entry.commands(values.stream().map(v ->
+            new dev.jasper.app.contributions.ContentCommand(v.id(), v.title(), v.shortcut(), v.enabled(), () -> containment.run(pluginId, "content command", v.run()))).toList()); }
+        public void setStatus(List<dev.jasper.sdk.ui.ContentStatus> values) { requireUi("content status"); entry.status(values.stream().map(v ->
+            new dev.jasper.app.contributions.ContentStatus(v.text(), v.tooltip(), v.run() == null ? null : () -> containment.run(pluginId, "content status", v.run()))).toList()); }
+        public void setFocusTarget(Runnable focus) { requireUi("content focus"); entry.focusTarget(() -> containment.run(pluginId, "content focus", focus)); }
+        public void select() { requireUi("select content"); entry.select(); }
+        public void move(boolean separate) { requireUi("move content"); entry.move(separate); }
+        public boolean isSeparate() { requireUi("content host"); return entry.detached(); }
+        public boolean isActive() { requireUi("content active"); return entry.active(); }
+        public boolean isClosed() { requireUi("content closed"); return entry.closed(); }
+        public java.util.concurrent.CompletableFuture<Boolean> requestClose() { requireUi("close content"); return entry.requestClose(); }
+        public Subscription onActive(Consumer<Boolean> listener) { requireUi("content activation"); return wrap(entry.onActive(value -> containment.run(pluginId,"content activation",()->listener.accept(value)))); }
+        public Subscription onClosed(Runnable listener) { requireUi("content disposal"); return wrap(entry.onClosed(()->containment.run(pluginId,"content disposal",listener))); }
+        public void close() { subscription(entry::close).close(); }
+    }
+    private WindowOwner resolveContentOwner(WindowOwner owner) {
+        if (owner instanceof OwnedContent content) {
+            if (ownedContent.get(content.entry) != content || content.entry.closed()) throw new IllegalArgumentException("Closed or foreign content owner");
+            return terminals.window(content.entry.window()).orElseThrow(() -> new IllegalArgumentException("Closed content host"));
+        }
+        return owner;
+    }
+
     private java.util.List<Path> choosePaths(WindowOwner owner, String title, Optional<Path> initial, dev.jasper.app.windows.PathChoice.Mode mode) {
         guard("choosePaths");
+        OwnedContent document = owner instanceof OwnedContent content ? content : null;
+        owner = resolveContentOwner(owner);
         java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial);
         var cancelled = new AtomicBoolean();
         var cancelAction = new java.util.concurrent.atomic.AtomicReference<Runnable>(() -> {});
@@ -361,6 +391,8 @@ final class HostedUi {
             ownerClosed = wrap(terminals.onWindowClosed(terminal.id(), cancel));
         } else throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
         Subscription stopped = tracked(cancel);
+        var pin = document == null ? null : document.entry.pin();
+        var documentClosed = document == null ? null : document.entry.onClosed(cancel);
         try {
             var paths = windows.choose(choice, action -> {
                 cancelAction.set(action);
@@ -368,11 +400,47 @@ final class HostedUi {
             });
             if (cancelled.get() || !open.getAsBoolean()) return java.util.List.of();
             return paths.stream().map(path -> path.toAbsolutePath().normalize()).toList();
-        } finally { stopped.close(); ownerClosed.close(); }
+        } finally {
+            stopped.close(); ownerClosed.close();
+            if (documentClosed != null) documentClosed.close();
+            if (pin != null) pin.close();
+        }
     }
 
     Windows windows() {
         return new Windows() {
+            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
+                guard("openTab");
+                java.util.UUID window = null;
+                if (owner != null) {
+                    owner = resolveContentOwner(owner);
+                    if (!(owner instanceof WindowHandle handle)) throw new IllegalArgumentException("Content needs a workspace owner");
+                    if (terminals.ownsOpenWindow(handle)) window = handle.id();
+                    else if (!terminals.ownsWindow(handle)) throw new IllegalArgumentException("Foreign workspace owner");
+                }
+                var entry = model.content().open(pluginId, spec.key(), spec.title(), window, component);
+                var existing = ownedContent.get(entry); if (existing != null) return existing;
+                var owned = new OwnedContent(entry); ownedContent.put(entry, owned);
+                Runnable cleanup = entry::close;
+                closers.add(cleanup);
+                entry.onClosed(() -> { ownedContent.remove(entry); closers.remove(cleanup); });
+                return owned;
+            }
+            @Override public Subscription onTabsClosing(java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean,java.util.concurrent.CompletableFuture<Boolean>> guard) {
+                HostedUi.this.guard("content close guard");
+                var registration = model.content().guard(pluginId, (entries,batch) -> {
+                    var result = new java.util.concurrent.CompletableFuture<Boolean>();
+                    boolean invoked = containment.run(pluginId, "content close guard", () -> {
+                        try { guard.apply(entries.stream().map(ownedContent::get).map(v -> (dev.jasper.sdk.ui.ContentTab)v).toList(),batch)
+                            .whenComplete((allowed, error) -> { if (error != null) result.complete(false); else result.complete(Boolean.TRUE.equals(allowed)); }); }
+                        catch (RuntimeException failure) { result.complete(false); }
+                    });
+                    if (!invoked) result.complete(false);
+                    return result;
+                });
+                return tracked(registration::close);
+            }
+
             @Override public java.util.List<Path> chooseFiles(WindowOwner owner, String title, Optional<Path> initial) {
                 return choosePaths(owner, title, initial, dev.jasper.app.windows.PathChoice.Mode.FILES);
             }
@@ -406,12 +474,17 @@ final class HostedUi {
             }
             @Override public PluginDialog dialog(DialogSpec spec) {
                 guard("dialog");
-                WindowOwner owner = spec.owner();
+                WindowOwner owner = resolveContentOwner(spec.owner());
                 AuxiliarySurface surface;
                 if (owner instanceof OwnedWindow window && ownedWindows.get(window.surface) == window)
                     surface = windows.dialog(spec.title(), spec.modal(), window.surface);
-                else if (owner instanceof WindowHandle terminalWindow) surface = windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
+                else if (owner instanceof WindowHandle terminalWindow && terminals.ownsOpenWindow(terminalWindow)) surface = windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
                 else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
+                if (spec.owner() instanceof OwnedContent content) {
+                    var pin = spec.modal() ? content.entry.pin() : null;
+                    var registration = content.entry.onClosed(surface::close);
+                    surface.onClosed(() -> { registration.close(); if (pin != null) pin.close(); });
+                }
                 closers.add(surface::close);
                 return new OwnedDialog(surface);
             }

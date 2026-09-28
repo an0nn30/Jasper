@@ -11,12 +11,11 @@ import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.IconName;
 import dev.jasper.sdk.ui.PluginDialog;
-import dev.jasper.sdk.ui.PluginWindow;
-import dev.jasper.sdk.ui.WindowSpec;
+import dev.jasper.sdk.WindowOwner;
+import dev.jasper.sdk.ui.ContentTab;
+import dev.jasper.sdk.ui.ContentSpec;
+import dev.jasper.sdk.ui.ContentPresentation;
 import java.awt.BorderLayout;
-import java.awt.CardLayout;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
@@ -30,25 +29,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import javax.swing.Action;
-import javax.swing.BorderFactory;
 import javax.swing.Icon;
-import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
-import javax.swing.JTabbedPane;
-import javax.swing.SwingConstants;
 import javax.swing.Timer;
-import javax.swing.UIManager;
 import javax.swing.text.BadLocationException;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextAreaEditorKit;
 
-/** The Editor window (spec 2): tabs, commands, find, the status line, and closing and quitting. UI thread only. */
+/** Document sessions and commands for app-owned tabs, including closing and quitting. UI thread only. */
 public final class EditorWindow {
-    /** The window's id; it is a singleton. */
-    public static final String WINDOW_ID = "dev.jasper.editor.window";
     private static final Set<String> POPUP = Set.of("save", "find", "go-to-line", "toggle-comment");
 
     private final EditorEnvironment environment;
@@ -56,22 +46,21 @@ public final class EditorWindow {
     private final Runnable onClosed;
     private final EditorModel model = new EditorModel();
     private final EditorTheme theme = new EditorTheme();
-    private final PluginWindow window;
+    private final java.util.Map<EditorTab, ContentTab> hosted = new java.util.LinkedHashMap<>();
+    private EditorTab selectedTab;
+    private WindowOwner origin;
+    private WindowOwner promptOwner;
+    private dev.jasper.sdk.Subscription closeRegistration;
+    private boolean disposed;
     private final Function<Question, String> ask;
     private final BiFunction<String, CompletableFuture<Boolean>, Boolean> await;
-    private final SessionEnvironment sessions;
-    private final JPanel root = new JPanel(new BorderLayout());
-    private final CardLayout cards = new CardLayout();
-    private final JPanel center = new JPanel(cards);
-    private final JTabbedPane tabs = new JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
-    private final JLabel empty = new JLabel();
     private final FindBar findBar;
     private final StatusLine status;
     private final List<Command> commands;
     private final LocalWatcher watcher;
     private final Timer ticker;
     private final Timer noticeTimer;
-    private final Icon fileIcon, serverIcon, closeIcon;
+    private final Icon fileIcon, serverIcon;
     private boolean showingEmpty = true;
     private boolean guarding;
 
@@ -87,11 +76,8 @@ public final class EditorWindow {
         this.onClosed = onClosed;
         fileIcon = context.appearance().icon(IconName.FILE);
         serverIcon = context.appearance().icon(IconName.SERVER);
-        closeIcon = context.appearance().icon(IconName.CLOSE);
-        window = context.windows().create(new WindowSpec(WINDOW_ID, "Editor", new Dimension(900, 650), true));
-        ask = environment.askers().apply(window);
-        await = environment.waits().apply(window);
-        sessions = new SessionEnvironment(context.background(), environment.ui(), ask, () -> environment.settings().get().maxFileBytes());
+        ask = question -> environment.askers().apply(owner()).apply(question);
+        await = (message, saves) -> environment.waits().apply(owner()).apply(message, saves);
         findBar = new FindBar(() -> selected().map(EditorTab::area));
         status = new StatusLine(this::chooseLanguage, this::toggleWrap);
         commands = List.of(
@@ -107,8 +93,6 @@ public final class EditorWindow {
             command("find-previous", "Find Previous", KeyEvent.VK_G, InputEvent.SHIFT_DOWN_MASK, findBar::previous),
             command("go-to-line", "Go to Line…", KeyEvent.VK_L, 0, this::goToLine),
             command("toggle-comment", "Toggle Comment", KeyEvent.VK_SLASH, 0, this::toggleComment),
-            command("next-tab", "Next Tab", KeyEvent.VK_CLOSE_BRACKET, InputEvent.SHIFT_DOWN_MASK, () -> step(1)),
-            command("previous-tab", "Previous Tab", KeyEvent.VK_OPEN_BRACKET, InputEvent.SHIFT_DOWN_MASK, () -> step(-1)),
             new Command("revert", "Revert to Saved", Optional.empty(), false, this::revert),
             new Command("language", "Language…", Optional.empty(), false, this::chooseLanguage),
             new Command("wrap", "Toggle Soft Wrap", Optional.empty(), false, this::toggleWrap));
@@ -116,49 +100,58 @@ public final class EditorWindow {
         ticker = new Timer(2000, event -> watcher.tick());
         noticeTimer = new Timer(3000, event -> selected().ifPresent(tab -> tab.session().clearNotice()));
         noticeTimer.setRepeats(false);
-        layOut();
-        window.setContent(root);
-        window.onClosing(this::mayClose);
-        window.onCloseCommand(this::closeCommand);
-        window.onClosed(this::closed);
+        closeRegistration = context.windows().onTabsClosing((handles, batch) -> {
+            var closing = hosted.entrySet().stream().filter(e -> handles.contains(e.getValue())).map(java.util.Map.Entry::getKey).toList();
+            if (closing.isEmpty()) return CompletableFuture.completedFuture(true);
+            if (!batch && closing.size() == 1) return approveTab(closing.getFirst());
+            promptOwner = handles.getFirst();
+            try { return CompletableFuture.completedFuture(mayClose(closing)); }
+            finally { promptOwner = null; }
+        });
         if (environment.timers()) ticker.start();
     }
 
     /** @param document opened in a new tab, or its open tab selected; the window comes to the front */
-    public void open(EditorDocument document) {
+    public void open(EditorDocument document) { open(document, null); }
+
+    /** Opens a file in the originating workspace; null chooses the last main workspace. */
+    public void open(EditorDocument document, WindowOwner owner) {
+        origin = owner;
         DocumentSession session = model.find(document.key()).orElseGet(() -> {
-            var created = new DocumentSession(document, sessions);
-            add(created);
-            created.load();
-            return created;
+            var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
+            var created = new DocumentSession(document, sessionEnvironment(ref));
+            add(created, ref); created.load(); return created;
         });
         select(session);
-        show();
     }
-
-    public void openLocal(Path file) { open(new LocalDocument(file, context.background())); }
-
-    public void openLocalFiles(List<Path> files) { for (Path file : files) openLocal(file); }
-
-    public void newUntitled() {
-        var session = DocumentSession.untitled(model.nextUntitledName(), sessions);
-        add(session);
-        select(session);
-        show();
+    private SessionEnvironment sessionEnvironment(java.util.concurrent.atomic.AtomicReference<WindowOwner> owner) {
+        return new SessionEnvironment(context.background(), environment.ui(),
+            question -> owner.get() instanceof ContentTab tab && tab.isClosed() ? question.dismissed() : environment.askers().apply(owner.get()).apply(question), () -> environment.settings().get().maxFileBytes());
     }
-
-    public void show() {
-        window.show();
-        window.toFront();
+    private WindowOwner owner() { return promptOwner != null ? promptOwner : selectedTab == null ? origin : hosted.get(selectedTab); }
+    private WindowOwner owner(DocumentSession session) { return hosted.entrySet().stream().filter(e -> e.getKey().session() == session).map(e -> (WindowOwner)e.getValue()).findFirst().orElseGet(this::owner); }
+    public void openLocal(Path file) { openLocal(file, null); }
+    public void openLocal(Path file, WindowOwner owner) { open(new LocalDocument(file, context.background()), owner); }
+    public void openLocalFiles(List<Path> files) { openLocalFiles(files, owner()); }
+    public void openLocalFiles(List<Path> files, WindowOwner owner) { for (Path file : files) openLocal(file, owner); }
+    public void newUntitled() { newUntitled(owner()); }
+    public void newUntitled(WindowOwner owner) {
+        origin = owner;
+        var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
+        var session = DocumentSession.untitled(model.nextUntitledName(), sessionEnvironment(ref));
+        add(session, ref); select(session);
     }
-
-    /** Closes the window at once, without asking; the plugin is stopping. */
-    public void dispose() { window.close(); }
+    public void show() { if (selectedTab == null) newUntitled(); else hosted.get(selectedTab).select(); }
+    public void dispose() {
+        if (disposed) return; disposed = true;
+        for (var handle : List.copyOf(hosted.values())) handle.close();
+        closeRegistration.close(); closed();
+    }
 
     /** Settings or the theme changed: applies them to every tab. */
     public void apply() {
         EditorSettings settings = environment.settings().get();
-        for (EditorTab tab : editorTabs()) tab.apply(settings, theme, context.appearance().variant());
+        for (EditorTab tab : editorTabs()) tab.apply(settings, theme, context.appearance().variant(), context.appearance().editorPalette());
         refreshStatus();
     }
 
@@ -176,34 +169,30 @@ public final class EditorWindow {
 
     public void openChooser() {
         Optional<Path> near = selected().flatMap(tab -> localFile(tab.session())).map(Path::getParent);
-        openLocalFiles(context.windows().chooseFiles(window, "Open", near));
+        openLocalFiles(context.windows().chooseFiles(owner(), "Open", near));
     }
 
     public void closeCurrent() { selected().ifPresent(this::closeTab); }
 
     /** @param tab closed after asking about unsaved changes; a tab that is saving closes when its save succeeds */
-    public void closeTab(EditorTab tab) {
+    public void closeTab(EditorTab tab) { var handle = hosted.get(tab); if (handle != null) handle.requestClose(); }
+
+    private CompletableFuture<Boolean> approveTab(EditorTab tab) {
+        if (!hosted.containsKey(tab)) return CompletableFuture.completedFuture(true);
         DocumentSession session = tab.session();
-        Optional<CompletableFuture<Boolean>> pending = session.pendingSave();
-        if (pending.isPresent()) {
-            // Re-enters closeTab rather than removing outright: DocumentSession adopts the save's snapshot as
-            // the saved text, so edits typed during the save leave the tab dirty, and closing must ask again.
-            pending.get().thenAccept(saved -> environment.ui().execute(() -> { if (saved) closeTab(tab); }));
-            return;
-        }
-        if (session.dirty()) {
-            String answer = ask.apply(new Question("Unsaved changes", "Save changes to " + session.name() + "?", List.of("Save", "Don't Save", "Cancel")));
-            if ("Don't Save".equals(answer)) remove(tab);
-            else if ("Save".equals(answer)) saveSession(session).thenAccept(saved -> environment.ui().execute(() -> { if (saved) closeTab(tab); }));
-            return;
-        }
-        remove(tab);
+        var pending = session.pendingSave();
+        if (pending.isPresent()) return pending.get().thenCompose(saved -> saved ? approveTab(tab) : CompletableFuture.completedFuture(false));
+        if (!session.dirty()) return CompletableFuture.completedFuture(true);
+        String answer = environment.askers().apply(hosted.get(tab)).apply(new Question("Unsaved changes", "Save changes to " + session.name() + "?", List.of("Save", "Don't Save", "Cancel")));
+        if ("Don't Save".equals(answer)) return CompletableFuture.completedFuture(true);
+        if (!"Save".equals(answer)) return CompletableFuture.completedFuture(false);
+        return saveSession(session).thenCompose(saved -> saved ? approveTab(tab) : CompletableFuture.completedFuture(false));
     }
 
     public void goToLine() {
         selected().filter(tab -> tab.session().state() == DocumentSession.State.READY).ifPresent(tab -> {
             RSyntaxTextArea area = tab.area();
-            PluginDialog dialog = context.windows().dialog(new DialogSpec("Go to Line", window, true));
+            PluginDialog dialog = context.windows().dialog(new DialogSpec("Go to Line", owner(), true));
             dialog.setContent(new GoToLinePanel(area.getCaretLineNumber() + 1, area.getLineCount(), line -> {
                 dialog.close();
                 try { area.setCaretPosition(area.getLineStartOffset(line - 1)); }
@@ -216,7 +205,7 @@ public final class EditorWindow {
 
     public void chooseLanguage() {
         selected().ifPresent(tab -> {
-            PluginDialog dialog = context.windows().dialog(new DialogSpec("Language", window, true));
+            PluginDialog dialog = context.windows().dialog(new DialogSpec("Language", owner(), true));
             dialog.setContent(new LanguagePicker(tab.session().style(), style -> { dialog.close(); tab.session().setStyle(style); }));
             dialog.show();
         });
@@ -236,11 +225,11 @@ public final class EditorWindow {
     public List<DocumentSession> sessions() { return model.sessions(); }
 
     public Optional<EditorTab> selected() {
-        return tabs.getSelectedComponent() instanceof EditorTab tab ? Optional.of(tab) : Optional.empty();
+        return Optional.ofNullable(selectedTab);
     }
 
-    String headerTitle(int index) { return ((TabHeader) tabs.getTabComponentAt(index)).name.getText(); }
-    String headerDetail(int index) { return ((TabHeader) tabs.getTabComponentAt(index)).detail.getText(); }
+    String headerTitle(int index) { var session = editorTabs().get(index).session(); return (session.dirty() ? "\u25cf " : "") + session.name(); }
+    String headerDetail(int index) { return model.detail(editorTabs().get(index).session()); }
     boolean showingEmpty() { return showingEmpty; }
 
     JPopupMenu menu() {
@@ -256,15 +245,16 @@ public final class EditorWindow {
      * Refuses while it is already asking or waiting: a quit or close that arrives during its prompt or wait
      * would otherwise wait on saves that cannot finish until the outer prompt returns.
      */
-    boolean mayClose() {
+    boolean mayClose() { return mayClose(editorTabs()); }
+    private boolean mayClose(List<EditorTab> closing) {
         if (guarding) {
-            window.toFront();
+            if (selectedTab != null) hosted.get(selectedTab).select();
             return false;
         }
         guarding = true;
         try {
             while (true) {
-                List<DocumentSession> running = model.sessions().stream().filter(DocumentSession::saving).toList();
+                List<DocumentSession> running = closing.stream().map(EditorTab::session).filter(model.sessions()::contains).filter(DocumentSession::saving).toList();
                 if (!running.isEmpty()) {
                     // Waits only on the saves already in flight; it starts none of its own, so a tab whose save
                     // finishes and is then edited again is not silently written without asking.
@@ -272,7 +262,7 @@ public final class EditorWindow {
                     if (!await.apply(saving(running.size()), allSucceeded(inFlight))) return false;
                     continue;
                 }
-                List<DocumentSession> dirty = model.sessions().stream().filter(DocumentSession::dirty).toList();
+                List<DocumentSession> dirty = closing.stream().map(EditorTab::session).filter(model.sessions()::contains).filter(DocumentSession::dirty).toList();
                 if (dirty.isEmpty()) return true;
                 String answer = ask.apply(new Question("Unsaved changes", unsaved(dirty), List.of("Save All", "Discard", "Cancel")));
                 if ("Discard".equals(answer)) return true;
@@ -291,12 +281,6 @@ public final class EditorWindow {
         }
     }
 
-    private boolean closeCommand() {
-        if (tabs.getTabCount() == 0) return false;
-        closeCurrent();
-        return true;
-    }
-
     private void closed() {
         ticker.stop();
         noticeTimer.stop();
@@ -310,7 +294,7 @@ public final class EditorWindow {
 
     private CompletableFuture<Boolean> saveAsSession(DocumentSession session) {
         Optional<Path> initial = localFile(session).or(() -> Optional.of(Path.of(System.getProperty("user.home"), session.name())));
-        Optional<Path> chosen = context.windows().chooseSaveFile(window, "Save As", initial);
+        Optional<Path> chosen = context.windows().chooseSaveFile(owner(session), "Save As", initial);
         if (chosen.isEmpty()) return CompletableFuture.completedFuture(false);
         if (model.find(LocalDocument.key(chosen.get())).filter(other -> other != session).isPresent()) {
             ask.apply(new Question("Already open", chosen.get() + " is open in another tab.", List.of("OK")));
@@ -355,13 +339,15 @@ public final class EditorWindow {
         return combined;
     }
 
-    private void add(DocumentSession session) {
+    private void add(DocumentSession session, java.util.concurrent.atomic.AtomicReference<WindowOwner> ownerRef) {
         EditorSettings settings = environment.settings().get();
         session.setWrap(settings.softWrap());
         var tab = new EditorTab(session, this::closeTab, environment.timers());
-        tab.apply(settings, theme, context.appearance().variant());
-        tab.bind(commands);
-        tab.addToPopup(commands.stream().filter(command -> POPUP.contains(command.id())).toList());
+        tab.apply(settings, theme, context.appearance().variant(), context.appearance().editorPalette());
+        var tabCommands = commands.stream().map(command -> new Command(command.id(), command.title(), command.stroke(), command.bound(),
+            () -> { activate(tab); command.run().run(); })).toList();
+        tab.bind(tabCommands);
+        tab.addToPopup(tabCommands.stream().filter(command -> POPUP.contains(command.id())).toList());
         tab.area().setTransferHandler(new FileDrop(tab.area().getTransferHandler(), this::openLocalFiles));
         tab.area().addCaretListener(event -> { if (selected().orElse(null) == tab) refreshStatus(); });
         session.addListener(() -> {
@@ -369,87 +355,63 @@ public final class EditorWindow {
             if (selected().orElse(null) == tab) refreshStatus();
         });
         model.add(session);
-        tabs.addTab(session.name(), tab);
-        tabs.setTabComponentAt(tabs.getTabCount() - 1, new TabHeader(tab));
+        var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab);
+        hosted.put(tab, handle); ownerRef.set(handle);
+        handle.setFocusTarget(tab.area()::requestFocusInWindow);
+        handle.onActive(active -> { if (active) activate(tab); });
+        handle.onClosed(() -> remove(tab));
+        var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
+        for (var command : commands) {
+            if (command.id().equals("next-tab") || command.id().equals("previous-tab")) continue;
+            descriptions.add(new dev.jasper.sdk.ui.ContentCommand(command.id(), command.title(), command.stroke().orElse(null), true,
+                () -> { activate(tab); command.run().run(); }));
+        }
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("copy", "Copy", KeyNames.stroke(KeyEvent.VK_C, 0), true, tab.area()::copy));
+        descriptions.add(new dev.jasper.sdk.ui.ContentCommand("paste", "Paste", KeyNames.stroke(KeyEvent.VK_V, 0), true, tab.area()::paste));
+        handle.setCommands(descriptions);
+        activate(tab);
         refresh();
     }
 
     private void remove(EditorTab tab) {
-        int index = tabs.indexOfComponent(tab);
-        if (index < 0) return;
-        tab.session().cancelLoad();
-        model.remove(tab.session());
-        tabs.removeTabAt(index);
+        if (hosted.remove(tab) == null) return;
+        tab.dispose(); tab.session().cancelLoad(); model.remove(tab.session());
+        if (selectedTab == tab) selectedTab = hosted.keySet().stream().findFirst().orElse(null);
+        if (selectedTab != null) activate(selectedTab);
         refresh();
     }
-
     private void select(DocumentSession session) {
-        int index = model.indexOf(session);
-        if (index >= 0) tabs.setSelectedIndex(index);
+        for (var entry : hosted.entrySet()) if (entry.getKey().session() == session) { activate(entry.getKey()); entry.getValue().select(); return; }
     }
-
+    private void activate(EditorTab tab) {
+        if (!hosted.containsKey(tab)) return;
+        if (selectedTab != tab && selectedTab != null) selectedTab.remove(findBar);
+        selectedTab = tab; tab.add(findBar, BorderLayout.SOUTH); tab.revalidate(); refreshStatus();
+    }
     private void step(int delta) {
-        int count = tabs.getTabCount();
-        if (count > 1) tabs.setSelectedIndex(Math.floorMod(tabs.getSelectedIndex() + delta, count));
+        var all = editorTabs(); if (all.size() > 1) select(all.get(Math.floorMod(all.indexOf(selectedTab) + delta, all.size())).session());
     }
-
-    private List<EditorTab> editorTabs() {
-        List<EditorTab> out = new ArrayList<>();
-        for (int i = 0; i < tabs.getTabCount(); i++) if (tabs.getComponentAt(i) instanceof EditorTab tab) out.add(tab);
-        return out;
-    }
-
-    private void layOut() {
-        empty.setHorizontalAlignment(SwingConstants.CENTER);
-        empty.putClientProperty("html.disable", true);
-        empty.setText("Open a file with " + KeyNames.describe(KeyNames.stroke(KeyEvent.VK_O, 0)) + ", or double-click one in the SFTP panel.");
-        empty.setForeground(UIManager.getColor("Label.disabledForeground"));
-        tabs.putClientProperty("JTabbedPane.trailingComponent", moreButton());
-        tabs.addChangeListener(event -> refreshStatus());
-        center.add(empty, "empty");
-        center.add(tabs, "tabs");
-        var south = new JPanel(new BorderLayout());
-        south.add(findBar, BorderLayout.NORTH);
-        south.add(status, BorderLayout.SOUTH);
-        root.add(center, BorderLayout.CENTER);
-        root.add(south, BorderLayout.SOUTH);
-        for (Command command : commands) {
-            if (!command.bound() || command.stroke().isEmpty()) continue;
-            root.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(command.stroke().get(), command.id());
-            root.getActionMap().put(command.id(), EditorTab.action(command));
-        }
-        var drop = new FileDrop(null, this::openLocalFiles);
-        for (JComponent target : List.of(root, empty, tabs)) target.setTransferHandler(drop);
-        refresh();
-    }
-
-    private JButton moreButton() {
-        var more = new JButton("⋯");
-        more.setToolTipText("Editor commands");
-        more.getAccessibleContext().setAccessibleName("Editor commands");
-        more.putClientProperty("JButton.buttonType", "borderless");
-        more.addActionListener(event -> menu().show(more, 0, more.getHeight()));
-        return more;
-    }
-
-    private void refresh() {
-        showingEmpty = tabs.getTabCount() == 0;
-        cards.show(center, showingEmpty ? "empty" : "tabs");
-        refreshHeaders();
-        refreshStatus();
-    }
+    private List<EditorTab> editorTabs() { return List.copyOf(hosted.keySet()); }
+    private void refresh() { showingEmpty = hosted.isEmpty(); refreshHeaders(); refreshStatus(); }
 
     private void refreshHeaders() {
-        for (int i = 0; i < tabs.getTabCount(); i++) {
-            if (!(tabs.getComponentAt(i) instanceof EditorTab tab) || !(tabs.getTabComponentAt(i) instanceof TabHeader header)) continue;
-            DocumentSession session = tab.session();
-            header.update((session.dirty() ? "● " : "") + session.name(), model.detail(session), session.host().isPresent() ? serverIcon : fileIcon);
-            tabs.setToolTipTextAt(i, session.location());
+        for (var entry : hosted.entrySet()) {
+            DocumentSession session = entry.getKey().session();
+            entry.getValue().setPresentation(new ContentPresentation(session.name(), model.detail(session),
+                session.host().isPresent() ? serverIcon : fileIcon, session.dirty(), session.location(), session.host().orElse("")));
         }
     }
 
     private void refreshStatus() {
         status.display(selected(), environment.settings().get().tabSize());
+        if (selectedTab != null && hosted.containsKey(selectedTab)) {
+            var tab = selectedTab;
+            hosted.get(tab).setStatus(status.items().stream().map(item -> new dev.jasper.sdk.ui.ContentStatus(
+                item.text(), item.tooltip(), item.run() == null ? null : () -> {
+                    if (!hosted.containsKey(tab)) return;
+                    activate(tab); item.run().run();
+                })).toList());
+        }
         if (environment.timers() && selected().flatMap(tab -> tab.session().notice()).isPresent()) noticeTimer.restart();
     }
 
@@ -471,34 +433,4 @@ public final class EditorWindow {
 
     private static String saving(int count) { return count == 1 ? "Saving 1 file…" : "Saving " + count + " files…"; }
 
-    /** A tab's title: its icon, name, dim detail and a close button. */
-    private final class TabHeader extends JPanel {
-        private final JLabel name = new JLabel();
-        private final JLabel detail = new JLabel();
-
-        TabHeader(EditorTab tab) {
-            super(new FlowLayout(FlowLayout.LEFT, 4, 0));
-            setOpaque(false);
-            name.putClientProperty("html.disable", true);
-            detail.putClientProperty("html.disable", true);
-            detail.setForeground(UIManager.getColor("Label.disabledForeground"));
-            var close = new JButton(closeIcon);
-            close.setToolTipText("Close tab");
-            close.getAccessibleContext().setAccessibleName("Close tab");
-            close.putClientProperty("JButton.buttonType", "toolBarButton");
-            close.setFocusable(false);
-            close.setBorder(BorderFactory.createEmptyBorder(1, 1, 1, 1));
-            close.addActionListener(event -> closeTab(tab));
-            add(name);
-            add(detail);
-            add(close);
-        }
-
-        void update(String title, String detailText, Icon icon) {
-            name.setText(title);
-            name.setIcon(icon);
-            detail.setText(detailText);
-            detail.setVisible(!detailText.isEmpty());
-        }
-    }
 }

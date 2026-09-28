@@ -1062,4 +1062,39 @@ public abstract class PluginContractTest {
             assertThat(h.notices()).containsExactly("test.a: It broke");
             assertThat(h.openedInEditor()).containsExactly(Path.of("/tmp/x.toml"));
         }
+    @Test void hostedTabsPreserveIdentityAndDeferMovesDuringPromptsAndCloseDecisions() {
+        try (var harness = newHarness()) {
+            var context = new AtomicReference<PluginContext>();
+            harness.start(new PluginInfo("dev.test.hosted", "Hosted", "1.0.0", Set.of()), Set.of(), Set.of(), context::set);
+            harness.ui(() -> {
+                var windows = context.get().windows();
+                var component = new javax.swing.JTextArea("keep this text");
+                var tab = windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "File"), null, component);
+                assertThat(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "Again"), null, new javax.swing.JPanel())).isSameAs(tab);
+                var disposed = new AtomicInteger(); tab.onClosed(disposed::incrementAndGet);
+                var dialog = windows.dialog(new DialogSpec("Question", tab, true));
+                dialog.show(); tab.move(true);
+                assertThat(tab.isSeparate()).isFalse();
+                assertThat(tab.requestClose().join()).isFalse();
+                dialog.close(); tab.move(true);
+                assertThat(tab.isSeparate()).isTrue();
+                tab.move(false); assertThat(tab.isSeparate()).isFalse();
+                var answer = new CompletableFuture<Boolean>();
+                windows.onTabsClosing((tabs, batch) -> answer);
+                var closing = tab.requestClose();
+                assertThat(tab.requestClose()).isSameAs(closing);
+                tab.move(true); assertThat(tab.isSeparate()).isFalse();
+                answer.complete(false);
+                assertThat(closing.join()).isFalse(); assertThat(tab.isClosed()).isFalse();
+                windows.onTabsClosing((tabs, batch) -> CompletableFuture.failedFuture(new IllegalStateException("save failed")));
+                assertThat(tab.requestClose().join()).isFalse();
+                windows.onTabsClosing((tabs, batch) -> CompletableFuture.completedFuture(true));
+                assertThat(tab.requestClose().join()).isTrue();
+                tab.close(); tab.select(); tab.move(true);
+                assertThat(disposed.get()).isEqualTo(1);
+                assertThat(component.getText()).isEqualTo("keep this text");
+                assertThatIllegalArgumentException().isThrownBy(() -> windows.dialog(new DialogSpec("Closed", tab, true)));
+            });
+        }
+    }
 }

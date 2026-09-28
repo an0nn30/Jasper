@@ -131,6 +131,8 @@ final class FakeTerminals implements Terminals {
         @Override public int hashCode() { return id.hashCode(); }
     }
 
+    boolean ownsWindow(WindowHandle handle) { return handle instanceof Window window && window.hostWorkspace() == workspace; }
+
     boolean ownsOpenWindow(WindowHandle handle) {
         return handle instanceof Window window && window.hostWorkspace() == workspace && workspace.window(window.id()).isPresent();
     }

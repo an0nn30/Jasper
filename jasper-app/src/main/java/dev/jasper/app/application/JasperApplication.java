@@ -213,6 +213,11 @@ public final class JasperApplication {
     }
 
     public TerminalWindow newWindow(Path directory) {
+        contributions.content().setFactory(separate -> {
+            var created = newWindow(separate ? null : Path.of(System.getProperty("user.home")));
+            if (created == null) throw new IllegalStateException("Application is closing");
+            return created.content().id();
+        });
         if (quitting) return null;
         boolean first = windows.isEmpty();
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
@@ -335,6 +340,11 @@ public final class JasperApplication {
         contributions.addAction("plugins.manage", "Manage Plugins…", null, List.of("plugins", "extensions", "install", "safe mode"),
             Optional.empty(), invocation -> managePlugins());
         contributions.addMenuSection(MenuTarget.standard(MenuTarget.Slot.FILE)).set(List.of(new MenuEntry.Item("plugins.manage")));
+        contributions.content().setFactory(separate -> {
+            var created = newWindow(separate ? null : Path.of(System.getProperty("user.home")));
+            if (created == null) throw new IllegalStateException("Application is closing");
+            return created.content().id();
+        });
         plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
         boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
         shortcutHelp = new dev.jasper.app.shortcuthelp.ShortcutHelp(auxiliary, contributions,
@@ -539,7 +549,11 @@ public final class JasperApplication {
     }
 
     /** Plugin windows' closing guards, asked before quit or restart changes anything and before the exit deadline is armed. */
-    private boolean pluginWindowsMayClose() { return auxiliary == null || auxiliary.mayQuit(); }
+    private boolean pluginWindowsMayClose() {
+        var requested = contributions.content().entries();
+        return contributions.content().mayClose(requested) && (auxiliary == null || auxiliary.mayQuit())
+            && requested.equals(contributions.content().entries());
+    }
 
     /** Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. EDT. */
     public void quitNow() {

@@ -2,6 +2,22 @@
 
 ## Current state — 2026-09-23
 
+- **App-hosted Editor tabs** (`codex/plugin-workspace-tabs`, 2026-09-27):
+  Editor files now use the main workspace's tab strip, rounded content frame, commands,
+  status and breadcrumbs. The tab menu moves live content to/from a separate app-owned
+  workspace, preserving undo and unsaved edits. SDK 0.8.5 supplies hosted content handles,
+  asynchronous close guards and semantic editor palettes; Editor 0.2.0 and Remote 0.4.1
+  require it. SFTP passes the originating workspace. Native inline implementation follows
+  the approved hosted-workspace-tabs spec/plan. Rulings: reuse the whole WindowContent for
+  shell-free detached windows; use stable session keys across Save As; defer individual
+  close/move commands during batch approval. Independent review identified status actions
+  targeting another host's selected document and new documents bypassing an in-progress
+  native close; both have RED→GREEN regressions. Final `check :jasper-app:packageDist`
+  passed: 2,281 tests, zero failures/errors, five skips; app image verified and DMG rebuilt.
+  Dark/light and narrow/overflow headless previews inspected. No native GUI launched.
+  Merged into main and pushed with the Windows setup wizard. No remaining confirmed review
+  findings. The full workspace is shared instead of extracting another host; model/SDK and
+  workspace wiring were developed together before separate commits to verify ownership.
 - **Windows setup wizard** (branch `codex/windows-setup-wizard`, 2026-09-27): approved
   bounded packaging extension adds `:jasper-app:packageInstaller`, producing
   `Jasper-<version>-windows-x64-setup.exe` alongside the existing ZIP. Uses the verified
@@ -41,7 +57,8 @@
   ZIP rebuilt and package/MSI verification passed. Full `check` was not rerun.
   Setup remains unsigned. Interactive install/upgrade/uninstall acceptance is
   user-run; no installer or GUI was launched. [Build and acceptance](packaging.md#windows-setup-wizard).
-  Not merged or pushed.
+  Updated from local main at `8883f670` (hosted Editor tabs); sole conflict was this
+  file, both entries kept. Merged into main and pushed to `origin` on 2026-09-27.
 
 - **Local/remote integration and missing icon assets** (2026-09-27): merged
   `origin/main` at `2d59d455` with the local keyboard-panel changes, retaining both

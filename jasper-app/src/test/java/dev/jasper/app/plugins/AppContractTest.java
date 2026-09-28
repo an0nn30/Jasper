@@ -82,6 +82,14 @@ class AppContractTest extends PluginContractTest {
         var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
         AuxiliaryWindows auxiliary = onEdtValue(AppContractTest::headlessWindows);
         TerminalFixture terminalFixture = onEdtValue(TerminalFixture::new);
+        onEdt(() -> contributions.content().setFactory(separate -> {
+            UUID id = terminalFixture.addWindow();
+            contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(id, separate,
+                entry -> {}, entry -> {}, entry -> {
+                    for (var other : contributions.content().inWindow(id)) other.active(other == entry);
+                }, () -> {}));
+            return id;
+        }));
         List<String> notices = new CopyOnWriteArrayList<>();
         List<Path> edited = new CopyOnWriteArrayList<>();
         PluginHost host = host(data, Map.of(), Duration.ofMillis(200), contributions, dark, auxiliary, terminalFixture.registry, notices, edited);
@@ -181,7 +189,7 @@ class AppContractTest extends PluginContractTest {
                 return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
                     .map(dev.jasper.app.windows.AuxiliarySurface::closeCommand).orElse(false));
             }
-            @Override public boolean requestQuit() { return onEdtValue(auxiliary::mayQuit); }
+            @Override public boolean requestQuit() { return onEdtValue(() -> contributions.content().mayClose(contributions.content().entries()) && auxiliary.mayQuit()); }
             @Override public UUID addTerminalWindow() { return onEdtValue(terminalFixture::addWindow); }
             @Override public UUID addTerminalTab(UUID windowId, String title) { return onEdtValue(() -> terminalFixture.addTab(windowId, title)); }
             @Override public UUID addTerminalPane(UUID tabId, String title, java.nio.file.Path directory) {

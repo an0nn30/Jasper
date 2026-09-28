@@ -42,6 +42,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Consumer<Path> newWindow;
     private final Runnable quit;
     private final Runnable onEmpty;
+    private final java.util.Map<Component, dev.jasper.app.contributions.ContentEntry> hosted = new IdentityHashMap<>();
+    private dev.jasper.app.contributions.ContentRegistry contentRegistry;
+    private Subscription contentHost;
+    private Runnable bringToFront = () -> {};
+    private final boolean detached;
     private final JTabbedPane tabs = new TerminalDeck();
     private final WindowTabs windowTabs;
     private final WorkspaceActions workspaceActions;
@@ -72,6 +77,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final ThemeController themes;
     private final Subscription themeRegistration;
     private JRootPane bindingRoot;
+    private final Map<KeyStroke, String> contentBindings = new HashMap<>();
+    private final Map<Component, dev.jasper.app.lifecycle.Subscription> contentListeners = new IdentityHashMap<>();
     Runnable onMinimumSizeChanged = () -> {};
     static final int DEFAULT_TAB_HEIGHT = 30;
     static final int MIN_TAB_HEIGHT = 20;
@@ -113,8 +120,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return new Subscription(() -> {});
         activityListeners.add(listener);
         try {
-            for (int i = 0; i < tabs.getTabCount(); i++)
-                for (TerminalPane pane : ((TerminalTab) tabs.getComponentAt(i)).panes())
+            for (TerminalTab tab : terminalTabs())
+                for (TerminalPane pane : tab.panes())
                     listener.accept(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
         } catch (RuntimeException | Error failure) { activityListeners.remove(listener); throw failure; }
         return new Subscription(() -> activityListeners.remove(listener));
@@ -144,11 +151,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowContent(ShellLauncher launcher, Path directory, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
         super(new BorderLayout());
+        detached = directory == null;
         setFocusTraversalPolicyProvider(true);
         setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
             @Override public Component getDefaultComponent(Container root) {
                 TerminalPane pane = currentPane();
-                if (closed || pane == null) return null;
+                if (closed) return null;
+                if (selectedContent() != null) return selectedContent().component();
+                if (pane == null) return null;
                 return pane.view() == null ? pane : pane.view();
             }
         });
@@ -189,11 +199,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 if (terminals != null) terminals.tabSelected();
                 if (commandPalette != null) commandPalette.dismiss();
                 update();
-                if (currentTab() != null) currentTab().focusTerminal();
+                focusSelected();
             }
         });
         themeRegistration = themes.subscribe(this::applyTheme);
-        newTab(directory);
+        if (directory != null) newTab(directory);
+        else setPreferredSize(new Dimension(900, 650));
     }
 
     /** Workspace adapter: wires title/theme values to the platform-only title bar. */
@@ -209,9 +220,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         }
         content.onTitle = value -> {
             TerminalPane pane = content.currentPane();
+            var document = content.selectedContent();
             var context = WindowHeaderContext.from(pane == null ? null : pane.snapshot(),
                 Path.of(System.getProperty("user.home")), pane == null ? "" : pane.programTitle(),
                 pane == null ? "" : pane.commandLabel());
+            if (document != null) context = new WindowHeaderContext(document.title() + (document.host().isEmpty() ? "" : " — " + document.host()), document.location(), document.host().isEmpty() ? "FILE" : "SERVER");
             nativeTitle.accept(context.label());
             if (bar != null) {
                 bar.setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
@@ -236,6 +249,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 }
             });
         });
+        syncContentBindings();
         commandPalette.install(root);
         syncPaletteDispatcher();
     }
@@ -283,8 +297,36 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         }
     }
 
+    private void syncContentBindings() {
+        if (bindingRoot == null) return;
+        var input = bindingRoot.getInputMap(WHEN_IN_FOCUSED_WINDOW);
+        contentBindings.forEach((stroke, key) -> {
+            input.remove(stroke); bindingRoot.getActionMap().remove(key);
+            bindings.idFor(stroke).ifPresent(id -> input.put(stroke, id));
+        });
+        contentBindings.clear();
+        var entry = selectedContent();
+        if (entry == null) return;
+        for (var command : entry.commands()) {
+            var stroke = command.shortcut();
+            if (stroke == null) continue;
+            String key = "hosted:" + command.id();
+            contentBindings.put(stroke, key); input.put(stroke, key);
+            bindingRoot.getActionMap().put(key, new AbstractAction() {
+                @Override public void actionPerformed(ActionEvent event) {
+                    dispatchShortcut(stroke, KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner());
+                }
+            });
+        }
+    }
+
     private void removeRootBindings() {
         if (bindingRoot == null) return;
+        contentBindings.forEach((stroke, key) -> {
+            bindingRoot.getInputMap(WHEN_IN_FOCUSED_WINDOW).remove(stroke);
+            bindingRoot.getActionMap().remove(key);
+        });
+        contentBindings.clear();
         bindings.strokes().forEach((actionId, stroke) -> {
             bindingRoot.getInputMap(WHEN_IN_FOCUSED_WINDOW).remove(stroke);
             bindingRoot.getActionMap().remove(actionId);
@@ -380,12 +422,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Connects this window to the application-wide terminal registry, once. {@code toFront} raises the native window. */
     public void connectTerminals(TerminalRegistry registry, Runnable toFront) {
         if (closed || terminals != null) return;
+        bringToFront = toFront;
         terminals = new WindowTerminals(this, Objects.requireNonNull(registry), Objects.requireNonNull(toFront));
     }
 
     java.util.List<TerminalTab> terminalTabs() {
         var result = new ArrayList<TerminalTab>();
-        for (int i = 0; i < tabs.getTabCount(); i++) result.add((TerminalTab) tabs.getComponentAt(i));
+        for (int i = 0; i < tabs.getTabCount(); i++) if (tabs.getComponentAt(i) instanceof TerminalTab tab) result.add(tab);
         return result;
     }
 
@@ -399,8 +442,44 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed || contributed != null) return;
         uiState = Objects.requireNonNull(state);
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
+        contentRegistry = model.content();
+        contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,
+            this::mountContent, this::unmountContent, entry -> selectTab(entry.component()), () -> bringToFront.run()));
         rebind();
     }
+
+    private void mountContent(dev.jasper.app.contributions.ContentEntry entry) {
+        hosted.put(entry.component(), entry);
+        contentListeners.put(entry.component(), entry.onChanged(this::update));
+        tabs.addTab(entry.title(), entry.component());
+        selectTab(entry.component()); update();
+    }
+    private void unmountContent(dev.jasper.app.contributions.ContentEntry entry) {
+        var listener = contentListeners.remove(entry.component());
+        if (listener != null) listener.close();
+        hosted.remove(entry.component()); tabs.remove(entry.component()); update();
+        if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
+    }
+    public dev.jasper.app.contributions.ContentEntry selectedContent() { return hosted.get(tabs.getSelectedComponent()); }
+    Component selectedComponent() { return tabs.getSelectedComponent(); }
+    String tabTitle(Component component) {
+        var entry = hosted.get(component);
+        return entry == null ? ((TerminalTab) component).title() : (entry.dirty() ? "\u25cf " : "") + entry.title() + (entry.detail().isEmpty() ? "" : "  " + entry.detail());
+    }
+    Icon tabIcon(Component component) { var entry = hosted.get(component); return entry == null ? ((TerminalTab)component).icon() : entry.icon(); }
+    String tabTooltip(Component component) { var entry = hosted.get(component); return entry == null ? tabTitle(component) : entry.location(); }
+    JPopupMenu tabMenu(Component component) {
+        var menu = new JPopupMenu(); var entry = hosted.get(component);
+        if (entry != null) {
+            var move = new JMenuItem(entry.detached() ? "Move to Main Window" : "Open in Separate Window");
+            move.addActionListener(event -> entry.move(!entry.detached())); menu.add(move);
+            for (var command : entry.commands()) { var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
+                item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut()); item.addActionListener(event -> command.run().run()); menu.add(item); }
+        }
+        var close = new JMenuItem("Close Tab"); close.addActionListener(event -> closeTab(component)); menu.add(close); return menu;
+    }
+    public void focusSelected() { var entry = selectedContent(); if (entry != null) entry.focus(); else if (currentTab() != null) currentTab().focusTerminal(); }
+    public boolean mayClose() { return contentRegistry == null || contentRegistry.mayClose(() -> contentRegistry.inWindow(id)); }
 
     WorkspaceRegions regions() { return regions; }
     WindowRail rail() { return rail; }
@@ -429,7 +508,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowTabs windowTabs() { return windowTabs; }
     private void refreshTabs() { windowTabs.refresh(); }
 
-    public TerminalTab currentTab() { return (TerminalTab) tabs.getSelectedComponent(); }
+    public TerminalTab currentTab() { return tabs.getSelectedComponent() instanceof TerminalTab tab ? tab : null; }
     public TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
     Path directory() { return currentPane() == null ? Path.of(System.getProperty("user.home")) : currentPane().directory(); }
 
@@ -517,28 +596,32 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         });
     }
 
-    void selectTab(TerminalTab tab) {
-        if (tabs.indexOfComponent(tab) >= 0) { tabs.setSelectedComponent(tab); tab.focusTerminal(); }
+    void selectTab(Component tab) {
+        if (tabs.indexOfComponent(tab) >= 0) { tabs.setSelectedComponent(tab); focusSelected(); }
     }
 
     void reorderTab(int from, int to) {
         if (from == to || from < 0 || to < 0 || from >= tabs.getTabCount() || to >= tabs.getTabCount()) return;
         Component selected = tabs.getSelectedComponent();
-        TerminalTab tab = (TerminalTab) tabs.getComponentAt(from);
+        Component tab = tabs.getComponentAt(from);
+        String title = tabTitle(tab);
         rearranging = true;
         try {
-            tabs.removeTabAt(from); tabs.insertTab(tab.title(), null, tab, null, to);
+            tabs.removeTabAt(from); tabs.insertTab(title, null, tab, null, to);
             tabs.setSelectedComponent(selected);
         } finally { rearranging = false; }
         update();
     }
 
-    public void closeTab(TerminalTab tab) {
+    public void closeTab(Component tab) {
+        var entry = hosted.get(tab);
+        if (entry != null) { entry.requestClose(); return; }
+        if (!(tab instanceof TerminalTab terminal)) return;
         int index = tabs.indexOfComponent(tab);
         if (index < 0) return;
         Runnable change = () -> {
-            tab.close();
-            if (terminals != null) terminals.tabClosed(tab);
+            terminal.close();
+            if (terminals != null) terminals.tabClosed(terminal);
             tabs.removeTabAt(index); update();
         };
         if (terminals != null) terminals.atomically(change); else change.run();
@@ -548,6 +631,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean dispatchShortcut(KeyStroke stroke, Component source) {
         if (dev.jasper.app.platform.WindowInput.blocked(source == null ? this : source)) return true;
         if (paletteKeys.dispatchShortcut(stroke, source == null ? this : source)) return true;
+        var document = selectedContent();
+        // Text controls retain their native selection/clipboard behavior (including find fields).
+        if (source instanceof JTextComponent && document != null && document.commands().stream().anyMatch(command ->
+            stroke.equals(command.shortcut()) && (command.id().equals("copy") || command.id().equals("paste")))) return false;
+        if (document != null) for (var command : document.commands()) if (stroke.equals(command.shortcut())) {
+            if (command.enabled()) command.run().run(); return true;
+        }
         Optional<String> found = bindings.idFor(stroke);
         if (found.isEmpty()) return false;
         Optional<ActionId> builtIn = ActionId.forId(found.get());
@@ -570,15 +660,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void update() {
         if (closed) return;
         for (int i = 0; i < tabs.getTabCount(); i++) {
-            TerminalTab tab = (TerminalTab) tabs.getComponentAt(i);
-            tabs.setTitleAt(i, tab.title());
-            tab.setActive(active && tab == currentTab());
+            Component tab = tabs.getComponentAt(i);
+            tabs.setTitleAt(i, tabTitle(tab));
+            if (tab instanceof TerminalTab terminal) terminal.setActive(active && tab == currentTab());
+            else { var entry = hosted.get(tab); if (entry != null) entry.active(tab == selectedComponent()); }
         }
         TerminalPane pane = currentPane();
         String size = pane == null || pane.session() == null ? "Starting terminal" :
             pane.session().columns() + " \u00d7 " + pane.session().rows();
         chrome.status().setMetadata(pane == null ? null : pane.snapshot(), pane == null ? "" : size, pane != null && pane.running());
-        onTitle.accept(currentTab() == null ? "Jasper" : currentTab().title());
+        chrome.status().setContent(selectedContent());
+        onTitle.accept(selectedComponent() == null ? "Jasper" : tabTitle(selectedComponent()));
+        syncContentBindings();
         updateActions(); refreshTabs(); onMinimumSizeChanged.run();
         if (terminals != null) terminals.refresh();
     }
@@ -605,8 +698,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Updates all retained panes without reparenting them; the native boundary hooks in last. */
     void applyTheme(ResolvedTheme theme, boolean updateDelegates) {
         if (closed) return;
-        var retained = new ArrayList<TerminalTab>();
-        for (int i = 0; i < tabs.getTabCount(); i++) retained.add((TerminalTab) tabs.getComponentAt(i));
+        var retained = terminalTabs();
         retained.forEach(TerminalTab::beginThemeUpdate);
         try {
             if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
@@ -688,7 +780,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     void setActive(boolean value) {
         if (!value && commandPalette != null) commandPalette.dismiss();
-        active = value; if (windowTabs != null) windowTabs.setActive(value); update();
+        active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();
     }
     void setToolbarMode(ToolbarMode mode) {
         toolbarMode = mode; chrome.setToolbarMode(mode);
@@ -707,6 +799,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         commandPalette.close(); windowCommands.close(); commands.close();
         scopes.close();
         closed = true;
+        if (contentHost != null) { contentHost.close(); contentHost = null; }
         syncPaletteDispatcher();
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};

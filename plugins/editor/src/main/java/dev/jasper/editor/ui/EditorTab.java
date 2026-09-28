@@ -114,6 +114,9 @@ public final class EditorTab extends JPanel {
         refresh();
     }
 
+    /** Stops a pending typing notification on final disposal (not on a move). */
+    public void dispose() { edits.stop(); }
+
     public DocumentSession session() { return session; }
     public RSyntaxTextArea area() { return area; }
     public RTextScrollPane scroll() { return scroll; }
@@ -124,7 +127,12 @@ public final class EditorTab extends JPanel {
      * @param variant Jasper's light or dark look
      */
     public void apply(EditorSettings settings, EditorTheme theme, Variant variant) {
-        theme.apply(area, scroll, variant);
+        apply(settings, theme, variant, dev.jasper.sdk.ui.EditorPalette.current());
+    }
+
+    /** Applies settings and the host's editor palette. */
+    public void apply(EditorSettings settings, EditorTheme theme, Variant variant, dev.jasper.sdk.ui.EditorPalette palette) {
+        theme.apply(area, scroll, variant, palette);
         Font font = settings.font();
         area.setFont(font);
         scroll.getGutter().setLineNumberFont(font);

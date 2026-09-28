@@ -1,5 +1,7 @@
 # Editor plugin
 
+> Hosting amendment (2026-09-27): [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md) supersedes the separate-window default and plugin-owned outer tab/status chrome. Document/save behavior below remains authoritative.
+
 **Status:** Approved by the user on 2026-09-27. Plan A (SDK 0.8.4 and the Editor for local files) is executed and merged. The SDK additions were numbered 0.8.2 until the Editor work was merged with `origin/main`, whose 0.8.2 and 0.8.3 are the New UI icon catalog and remote-directory hints; they are now 0.8.4. Plan B (SFTP editing through Remote) amends sections 4.4, 6.1, 6.2 and 6.4, as marked **Amended (Plan B)**, with the user's approval of that plan. Depends on the [plugin SDK](2026-09-21-jasper-plugin-sdk-design.md) and, for Plan B, on [Remote SFTP](2026-09-23-jasper-remote-sftp-design.md).
 
 ## Purpose and scope

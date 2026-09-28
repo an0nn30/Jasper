@@ -264,7 +264,7 @@ class HostedUiTest {
         manager.onClosing(() -> { throw new IllegalStateException("guard failure"); });
         manager.onClosed(() -> events.add("closed"));
         var prompt = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Unlock", manager, true));
-        var trust = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Trust?", terminals.windowHandle(UUID.randomUUID()), false));
+        var trust = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Trust?", terminals.windowHandle(terminalFixture.addWindow()), false));
         assertThatIllegalArgumentException().as("an owner this application did not create")
             .isThrownBy(() -> ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Bad", new dev.jasper.sdk.WindowOwner() { }, true)));
         assertThat(auxiliary.open()).hasSize(3);

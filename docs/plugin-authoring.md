@@ -608,3 +608,20 @@ call `pending.reportRemoteDirectory(new RemoteDirectory(host, path))` from any t
 reports OSC 7. It does not emit `CWD_CHANGED`, affect command events, or create a local
 working directory. Calls made before attach, after exit/close, or by an old reconnect
 attempt have no effect. Declare a minimum SDK of 0.8.3 when using this method.
+
+### Documents in workspace tabs
+
+Use SDK 0.8.5's `Windows.openTab` for document surfaces. Supply only specialized content;
+the app provides the tab strip, frame, window, status controls and menus. Update the returned
+`ContentTab` with `ContentPresentation`, `ContentCommand` and `ContentStatus` snapshots,
+and set a focus callback. Pass the handle as the owner of save pickers and dialogs so those
+follow moves to another window. `move(true)` opens a separate app-managed workspace;
+`move(false)` returns to the last main workspace. Preserve the component/session during moves.
+
+Register one `onTabsClosing` guard per plugin. It receives the closing subset and a batch
+flag. Complete false on cancellation or save failure. Recheck edits made during an async
+save before completing true. Use `onClosed` to stop per-document work; plugin shutdown may
+force-close remaining handles after the application's quit/restart guard has approved.
+Use stable session keys when Save As changes document identity; deduplicate file paths in
+the document model, not by changing a live tab's key. Do not encode remote paths as local
+`Path` values. Use `Appearance.editorPalette()` for specialized text surfaces.

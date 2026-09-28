@@ -29,8 +29,8 @@ final class WorkspaceConfiguration {
         boolean exitChanged = previous == null || previous.terminal().onExit() != next.terminal().onExit();
         configuredFontSize = next.fontSize();
         if (optionsChanged || dimChanged || exitChanged) {
-            for (int i = 0; i < owner.tabStrip().getTabCount(); i++) {
-                for (TerminalPane pane : ((TerminalTab) owner.tabStrip().getComponentAt(i)).panes()) {
+            for (TerminalTab tab : owner.terminalTabs()) {
+                for (TerminalPane pane : tab.panes()) {
                     if (optionsChanged && pane.view() != null) {
                         float size = sizeChanged ? next.fontSize() : pane.view().fontSize();
                         pane.view().applyOptions(pane.view().options().toBuilder()
