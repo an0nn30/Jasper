@@ -80,7 +80,7 @@ class EditorsTest {
         assertThat(env.value()).containsExactly(Map.entry("A", "1"), Map.entry("B", "2"));
         env.addRow("C", "3");
         assertThat(env.value()).containsEntry("C", "3");
-        var shell = (Editors.Executable) build(Editors.executable(), CoreSettings.TERMINAL_SHELL_PROGRAM, context);
+        var shell = (Editors.Browse) build(Editors.executable(), CoreSettings.TERMINAL_SHELL_PROGRAM, context);
         shell.browse();
         assertThat(shell.value()).isEqualTo("/bin/zsh");
     }

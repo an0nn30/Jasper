@@ -91,7 +91,7 @@ public final class Editors {
 
     /** A text field with Browse…, for a program path. */
     public static Factory<String> executable() {
-        return new Factory<>((setting, context) -> new Executable(context), List.of());
+        return new Factory<>((setting, context) -> new Browse(context, "Choose a shell program"), List.of());
     }
 
     /** A text field with Browse…, for a file path. */
@@ -229,27 +229,6 @@ public final class Editors {
             try { box.setSelectedItem(value); editor().setText(value); } finally { showing = false; }
         }
         @Override public void onEdit(Runnable listener) { onText(editor(), () -> { if (!showing) listener.run(); }); }
-    }
-
-    static final class Executable implements ValueEditor<String> {
-        private final Line line = new Line();
-        private final JComponent component;
-        private final PageContext context;
-        Executable(PageContext context) {
-            this.context = context;
-            var browse = new JButton("Browse…");
-            browse.addActionListener(event -> browse());
-            component = line(line.field, browse);
-        }
-        void browse() {
-            String current = line.value();
-            context.chooseFile().apply("Choose a shell program", current.isBlank() ? Optional.empty() : Optional.of(java.nio.file.Path.of(current)))
-                .ifPresent(path -> line.field.setText(path.toString()));
-        }
-        @Override public JComponent component() { return component; }
-        @Override public String value() { return line.value(); }
-        @Override public void show(String value) { line.show(value); }
-        @Override public void onEdit(Runnable listener) { line.onEdit(listener); }
     }
 
     static final class Browse implements ValueEditor<String> {
