@@ -19,7 +19,9 @@
   - section-heading carry-over for unsectioned settings
   - the discard count per plugin page
 
-  Deviations: see the plan's status banner. Not pushed; not merged.
+  Deviations: see the plan's status banner. Merged into local `main` on 2026-09-28 after merging main (Vim V2b)
+  into the branch, which needed `EditorWindow`'s `IOException` import back for V2b's new catch; `./gradlew check` on the
+  merged tree: 4,153 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
 - **Editor Vim mode, plan V2b** (branch `claude/vim-v2b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2b.md`, written 2026-09-28): the Editor's tabs as Vim's buffers — `:w :wq :x :exi :sav :wa :xa :wqa :q :qa
   :quita :e :ene :r :ls :buffers :files :b :bn :bN :bp :tabn :tabN :tabp :tabnew :tabe`, `ZZ`, `ZQ`, `gt`, `gT`,
