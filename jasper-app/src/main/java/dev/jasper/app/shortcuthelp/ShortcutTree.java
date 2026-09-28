@@ -20,9 +20,11 @@ final class ShortcutTree extends JTree {
     private final DefaultMutableTreeNode root = new DefaultMutableTreeNode();
     private final DefaultTreeModel rows = new DefaultTreeModel(root);
     private final Set<String> expanded = new HashSet<>();
+    private final boolean macOs;
     private boolean filtering, rebuilding;
 
-    ShortcutTree(Consumer<ShortcutEntry> edit) {
+    ShortcutTree(boolean macOs, Consumer<ShortcutEntry> edit) {
+        this.macOs = macOs;
         setModel(rows); setRootVisible(false); setShowsRootHandles(true);
         setToggleClickCount(1);
         setCellRenderer(new Row());
@@ -146,7 +148,12 @@ final class ShortcutTree extends JTree {
             var node = (DefaultMutableTreeNode) value;
             var item = node.getUserObject();
             Color foreground = UIManager.getColor(selected && tree.hasFocus() ? "Tree.selectionForeground" : "Label.foreground");
-            name.setForeground(foreground);
+            Color link = UIManager.getColor("Component.linkColor");
+            // A row whose shortcut differs from its default is blue, and so is a section holding one, as IntelliJ shows them.
+            boolean customized = item instanceof ShortcutEntry shortcut ? shortcut.customized(macOs)
+                : java.util.Collections.list(node.children()).stream().anyMatch(child ->
+                    ((DefaultMutableTreeNode) child).getUserObject() instanceof ShortcutEntry entry && entry.customized(macOs));
+            name.setForeground(customized && link != null && !(selected && tree.hasFocus()) ? link : foreground);
             binding.setForeground(selected && tree.hasFocus() ? foreground : UIManager.getColor("Label.disabledForeground"));
             name.setFont(tree.getFont().deriveFont(item instanceof ShortcutEntry ? Font.PLAIN : Font.BOLD));
             binding.setFont(tree.getFont());

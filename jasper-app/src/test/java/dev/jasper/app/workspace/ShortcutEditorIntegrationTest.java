@@ -7,12 +7,9 @@ import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.palette.PaletteScope;
 import dev.jasper.app.palette.PaletteTestSupport;
-import dev.jasper.app.persistence.UiState;
-import dev.jasper.app.shortcuthelp.ShortcutHelp;
+import dev.jasper.app.settingsui.PageContext;
+import dev.jasper.app.shortcuthelp.KeymapPage;
 import dev.jasper.app.shortcuthelp.ShortcutTestSupport;
-import dev.jasper.app.windows.AuxiliarySurface;
-import dev.jasper.app.windows.AuxiliaryWindows;
-import java.awt.Rectangle;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -21,6 +18,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.Action;
 import javax.swing.JRootPane;
 import javax.swing.KeyStroke;
@@ -32,26 +30,26 @@ import static org.assertj.core.api.Assertions.*;
 class ShortcutEditorIntegrationTest {
     @TempDir Path directory;
 
-    @Test void commandsOpensOneEditorAndSavingChangesBothWindowsAndDisk() throws Exception {
+    @Test void thePaletteOpensKeymapAndApplyChangesBothWindowsAndDisk() throws Exception {
         Path file = directory.resolve("config.toml");
         try (var service = new ConfigService(file, true)) {
             WindowContent[] owners = new WindowContent[2];
-            AuxiliaryWindows[] windows = new AuxiliaryWindows[1];
+            KeymapPage[] page = new KeymapPage[1];
             ConfigurationTestSupport[] config = new ConfigurationTestSupport[1];
-            var saved = new CompletableFuture<Void>();
+            var applied = new AtomicReference<CompletableFuture<Void>>();
+            int[] opened = {0};
             try {
                 edt(() -> {
                     var themes = new ThemeController();
                     config[0] = new ConfigurationTestSupport(themes, service);
                     var contributions = new Contributions();
-                    windows[0] = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(
-                        () -> {}, () -> {}, () -> {}, title -> {}, () -> new Rectangle(0, 0, 1000, 640), (title, initial) -> Optional.empty()));
-                    var help = new ShortcutHelp(windows[0], contributions, () -> config[0].snapshot().bindings(true), Map::of, true,
-                        changes -> config[0].saveKeybindings(changes, List.of()).whenComplete((value, failure) -> {
-                            if (failure == null) saved.complete(null); else saved.completeExceptionally(failure);
-                        }));
-                    config[0].onSnapshot(snapshot -> help.refresh());
-                    contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("keymap"), Optional.empty(), ignored -> help.open());
+                    page[0] = new KeymapPage(new KeymapPage.Hooks(contributions, () -> config[0].snapshot().keybindings(), Map::of, true,
+                        changes -> config[0].saveKeybindings(changes, List.of())),
+                        new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { }));
+                    page[0].component();
+                    config[0].onSnapshot(snapshot -> page[0].refresh());
+                    contributions.addAction("app.shortcuts", "Keyboard Shortcuts…", null, List.of("keymap"), Optional.empty(),
+                        ignored -> opened[0]++);
                     for (int i = 0; i < owners.length; i++) {
                         owners[i] = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
                         var root = new JRootPane(); root.setContentPane(owners[i]); owners[i].installRootBindings(root);
@@ -63,21 +61,26 @@ class ShortcutEditorIntegrationTest {
                     assertThat(PaletteTestSupport.selectedRow(palette.component()).id()).isEqualTo("app.shortcuts");
                     PaletteTestSupport.executeSelected(palette.component());
                     assertThat(palette.isOpen()).isFalse();
-                    assertThat(windows[0].open()).hasSize(1);
-                    help.open(); assertThat(windows[0].open()).hasSize(1);
-                    ShortcutTestSupport.save(windows[0].open().getFirst(), "New tab", KeyStroke.getKeyStroke("ctrl alt N"));
+                    assertThat(opened[0]).isEqualTo(1);
+                    ShortcutTestSupport.set(page[0], "New tab", KeyStroke.getKeyStroke("ctrl alt N"));
                 });
-                saved.get(5, TimeUnit.SECONDS);
-                edt(() -> {}); // Drain publication and the editor's completion callback.
+                assertThat(Files.exists(file) ? Files.readString(file) : "").as("Set writes nothing").doesNotContain("ctrl+alt+n");
+                edt(() -> {
+                    assertThat(page[0].modified()).isTrue();
+                    assertThat(ShortcutTestSupport.editing(page[0])).isFalse();
+                    applied.set(page[0].apply());
+                });
+                applied.get().get(5, TimeUnit.SECONDS);
+                edt(() -> {}); // Drain publication.
                 edt(() -> {
                     for (var owner : owners)
                         assertThat(owner.action(ActionId.NEW_TAB).getValue(Action.ACCELERATOR_KEY)).isEqualTo(KeyStroke.getKeyStroke("ctrl alt N"));
-                    assertThat(ShortcutTestSupport.editing(windows[0].open().getFirst())).isFalse();
+                    assertThat(page[0].modified()).isFalse();
                 });
                 assertThat(Files.readString(file)).contains("ctrl+alt+n");
             } finally {
                 edt(() -> {
-                    if (windows[0] != null) windows[0].close();
+                    if (page[0] != null) page[0].dispose();
                     for (var owner : owners) if (owner != null) owner.close();
                     if (config[0] != null) config[0].close();
                 });

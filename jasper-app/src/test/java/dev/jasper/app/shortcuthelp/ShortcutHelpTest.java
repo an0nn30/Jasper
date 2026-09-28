@@ -3,10 +3,6 @@ package dev.jasper.app.shortcuthelp;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
-import dev.jasper.app.persistence.UiState;
-import dev.jasper.app.windows.AuxiliarySurface;
-import dev.jasper.app.windows.AuxiliaryWindows;
-import java.awt.Rectangle;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.util.List;
@@ -120,31 +116,6 @@ class ShortcutHelpTest {
             panel.record.doClick();
             assertThat(panel.capture(KeyStroke.getKeyStroke("meta W"))).isFalse();
             panel.close();
-        });
-    }
-
-    @Test void windowIsReusedAndRefreshesLiveWithoutLosingSearchAndReleasesItsListener() throws Exception {
-        edt(() -> {
-            var c = new Contributions();
-            var windows = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(
-                () -> {}, () -> {}, () -> {}, title -> {}, () -> new Rectangle(0, 0, 850, 600), (title, initial) -> Optional.empty()));
-            KeyBindings[] base = {KeyBindings.defaults(true)};
-            var help = new ShortcutHelp(windows, c, () -> base[0], () -> Map.of("dev.test", "Test Plugin"), true, changes -> { throw new AssertionError("Unexpected save"); });
-            help.open(); var surface = windows.open().getFirst();
-            var panel = (ShortcutPanel) surface.holder().getComponent(0);
-            panel.search.setText("hello"); assertThat(panel.tree.getRowCount()).isZero();
-            var action = c.addAction("dev.test.hello", "Hello", null, List.of(), Optional.of("cmd+h"), ignored -> {});
-            assertThat(panel.tree.getRowCount()).isEqualTo(2);
-            base[0] = KeyBindings.withOverrides(true, Map.of("dev.test.hello", "ctrl+h")); help.refresh();
-            assertThat(ShortcutText.format(panel.tree.entryAt(1).stroke())).isEqualTo("Ctrl+H");
-            help.open(); assertThat(windows.open()).containsExactly(surface);
-            assertThat(panel.search.getText()).isEqualTo("hello");
-            action.close(); assertThat(panel.tree.getRowCount()).isZero();
-            surface.close();
-            c.addAction("dev.test.hello", "Hello", null, List.of(), Optional.of("cmd+h"), ignored -> {});
-            assertThat(panel.tree.getRowCount()).isZero();
-            help.open(); assertThat(windows.open()).hasSize(1).doesNotContain(surface);
-            windows.close();
         });
     }
 

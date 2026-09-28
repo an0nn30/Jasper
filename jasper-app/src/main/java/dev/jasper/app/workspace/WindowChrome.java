@@ -87,11 +87,7 @@ final class WindowChrome {
             @Override public void menuCanceled(MenuEvent event) {}
         });
         view.add(terminalColors);
-        JMenuItem tabHeight = new JMenuItem(owner.windowCommands().view("view.tab_height"));
-        view.add(tabHeight);
-        view.add(new JMenuItem(owner.windowCommands().view("view.rail_width")));
-        view.add(new JMenuItem(owner.windowCommands().view("view.toolbar_height")));
-        view.add(new JMenuItem(owner.windowCommands().view("view.status_bar_height")));
+        view.add(new JMenuItem(owner.windowCommands().view("view.window_settings")));
         pluginSeparator.setName("pluginSeparator");
         buildToolbar();
     }
@@ -259,51 +255,6 @@ final class WindowChrome {
             }
         }
         menuBar.revalidate(); menuBar.repaint();
-    }
-
-    void editTabHeight() {
-        editSize("tabHeight", "tab height", "Height", owner.tabHeight(), WindowContent.MIN_TAB_HEIGHT,
-            WindowContent.MAX_TAB_HEIGHT, WindowContent.DEFAULT_TAB_HEIGHT, owner.confirmTabHeight, owner::setTabHeight);
-    }
-
-    void editRailWidth() {
-        editSize("railWidth", "rail width", "Width", owner.railWidth(), ConfigSnapshot.MIN_RAIL_WIDTH,
-            ConfigSnapshot.MAX_RAIL_WIDTH, ConfigSnapshot.DEFAULT_RAIL_WIDTH, owner.confirmRailWidth, owner::setRailWidth);
-    }
-
-    void editToolbarHeight() {
-        editSize("toolbarHeight", "toolbar height", "Height", owner.toolbarHeight(), ConfigSnapshot.MIN_TOOLBAR_HEIGHT,
-            ConfigSnapshot.MAX_TOOLBAR_HEIGHT, ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT, owner.confirmToolbarHeight,
-            owner::setToolbarHeight);
-    }
-
-    void editStatusBarHeight() {
-        editSize("statusBarHeight", "status bar height", "Height", owner.statusBarHeight(),
-            ConfigSnapshot.MIN_STATUS_BAR_HEIGHT, ConfigSnapshot.MAX_STATUS_BAR_HEIGHT,
-            ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT, owner.confirmStatusBarHeight, owner::setStatusBarHeight);
-    }
-
-    /**
-     * A session-only size dialog: a spinner named {@code name} over the range, and a reset button named
-     * {@code reset<Name>}. The size applies only on OK; an entry outside the range reports an error instead.
-     */
-    private void editSize(String name, String setting, String dimension, int current, int min, int max, int reset,
-                          java.util.function.ToIntFunction<JComponent> confirm, java.util.function.IntConsumer apply) {
-        var control = new JPanel(new FlowLayout(FlowLayout.LEADING));
-        var size = new JSpinner(new SpinnerNumberModel(current, min, max, 1));
-        size.setName(name);
-        var label = new JLabel(dimension + " (pixels):"); label.setLabelFor(size);
-        var resetButton = new JButton("Reset to default");
-        resetButton.setName("reset" + Character.toUpperCase(name.charAt(0)) + name.substring(1));
-        resetButton.addActionListener(event -> size.setValue(reset));
-        control.add(label); control.add(size); control.add(resetButton);
-        if (confirm.applyAsInt(control) != JOptionPane.OK_OPTION) return;
-        try {
-            size.commitEdit();
-            apply.accept(((Number) size.getValue()).intValue());
-        } catch (java.text.ParseException | IllegalArgumentException failure) {
-            owner.onError.accept("Enter a " + setting + " between " + min + " and " + max + " pixels.");
-        }
     }
 
     private JMenu menu(String label, ActionId... ids) {

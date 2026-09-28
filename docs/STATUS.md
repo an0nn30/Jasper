@@ -22,7 +22,22 @@
     size scrolls the view to the cursor at once; (6) an unused local in `View.scrollCursorTop` went. Six
     `ViewportSyncTest` cases and one `EditorTabTest` case cover them.
   - `./gradlew check`: 3,599 tests, 0 failed, 0 errors, 5 skipped.
-  - Not done: GUI checks 41–50 of the [checklist](editor-verification.md) (user-run); plans V2, V3 and V4; merge; push.
+  - Merged into local `main` on 2026-09-28 after merging main (settings dialog B2) into the branch; not pushed.
+  - Not done: GUI checks 41–50 of the [checklist](editor-verification.md) (user-run); plans V2, V3 and V4; push.
+- **Settings dialog B2** (`claude/settings-dialog-b2`, 2026-09-28; plan
+  `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b2.md`): Keymap and Plugins are pages of Settings.
+  Keymap stages shortcut edits (Set) and saves them in one write on Apply; shortcuts and sections that differ from
+  their defaults are blue. Plugins hosts the plugin list, with its consent and confirm dialogs over Settings. Help ›
+  Keyboard Shortcuts… and File › Manage Plugins… open those pages; their old windows are gone. The View menu saves
+  toolbar mode, the status bar and terminal colours; View › Window Settings… replaces the four size dialogs; the
+  session overrides in `WorkspaceConfiguration` and `ThemeState` are removed. Previews: `settingsPreview` renders 36
+  images, inspected against the IntelliJ reference. `./gradlew check`: 2,925 tests, 0 failures, 0 errors, 5 skipped.
+  Executed inline with checkpoints after Tasks 3 and 5. GUI checks pending with the user: record a shortcut, Set,
+  Apply and use it; the plugin restart banner and an install's consent dialog over Settings; View choices in two
+  windows; a View choice with a broken config.toml; Window Settings… Deviations: see the plan's status banner.
+  Merged into local `main` on 2026-09-28 after merging main (Vim V1b) into the branch; `./gradlew check` on the
+  merged tree: 3,419 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+
 - **Editor Vim mode, plan V1b** (branch `claude/vim-v1b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`, written 2026-09-28): Visual mode (charwise,
   linewise, blockwise, with block `I`/`A`/`c`, `p` over an area, `gv` and `.` on an area of the same size), `/` and `?`
@@ -36,6 +51,7 @@
     Vim's result unchanged). `./gradlew check`: 3,372 tests, 0 failed, 5 skipped.
   - Merged into local `main` on 2026-09-28 after merging main (settings dialog B1) into the branch; not pushed.
   - Not done: GUI checks 31–40 of the [checklist](editor-verification.md) (user-run); plans V1c, V2, V3 and V4; push.
+
 - **Settings dialog B1** (`claude/settings-dialog`, 2026-09-28; spec
   `docs/superpowers/specs/2026-09-28-jasper-settings-dialog-design.md`, plan
   `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b1.md`): Cmd+, and the macOS Settings… item open
@@ -48,7 +64,7 @@
   defects found there were fixed. `./gradlew check`: 2,916 tests, 0 failures, 0 errors, 5 skipped. Executed
   inline with checkpoints after Tasks 4 and 7. GUI checks pending with the user (open via Cmd+, and the
   application menu, Apply a change, Cancel with changes, banners, remembered bounds, theme switch while open).
-  Deviations: see the plan's status banner. Not pushed; not merged.
+  Deviations: see the plan's status banner. Merged to local main (3cb249e5); not pushed.
 
 - **Editor Vim mode, plan V1a** (branch `claude/vim-mode`, plan
   `docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`, spec

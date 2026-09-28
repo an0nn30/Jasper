@@ -29,14 +29,11 @@ class ThemeStateTest {
         }
     }
 
-    @Test void temporaryTerminalChoiceOverridesSavedUntilTheSavedValueChanges() {
-        var chosen = ThemeState.defaults().chooseTerminal(TerminalColors.LIGHT);
-        assertThat(chosen.terminalChoice()).isEqualTo(TerminalColors.LIGHT);
-        assertThat(chosen.configureTerminal(TerminalColors.MATCH).terminalChoice())
-            .as("rewriting the same saved value keeps the session choice").isEqualTo(TerminalColors.LIGHT);
-        assertThat(chosen.configureTerminal(TerminalColors.DARK).terminalOverride()).isNull();
-        assertThat(chosen.configureTerminal(TerminalColors.DARK).terminalChoice()).isEqualTo(TerminalColors.DARK);
-        assertThat(chosen.configure(Theme.LIGHT).terminalChoice())
+    @Test void theTerminalChoiceIsTheConfiguredOneAndSurvivesThemeChanges() {
+        var configured = ThemeState.defaults().configureTerminal(TerminalColors.LIGHT);
+        assertThat(configured.terminalChoice()).isEqualTo(TerminalColors.LIGHT);
+        assertThat(configured.configure(Theme.LIGHT).terminalChoice())
             .as("a theme change keeps the terminal choice").isEqualTo(TerminalColors.LIGHT);
+        assertThat(configured.configureTerminal(TerminalColors.DARK).terminalChoice()).isEqualTo(TerminalColors.DARK);
     }
 }

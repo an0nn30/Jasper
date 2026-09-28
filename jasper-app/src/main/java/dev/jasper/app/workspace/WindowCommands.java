@@ -55,9 +55,9 @@ final class WindowCommands implements AutoCloseable {
         for (var mode : ToolbarMode.values()) {
             String label = switch (mode) { case ICONS_AND_LABELS -> "Icons and Labels"; case ICONS -> "Icons Only"; case HIDDEN -> "Hidden"; };
             add(registry, "view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT), label,
-                "Toolbar: " + label, () -> owner.setToolbarMode(mode));
+                "Toolbar: " + label, () -> owner.chooseToolbarMode(mode));
         }
-        add(registry, "view.status_bar", "Status Bar", "Hide Status Bar", () -> owner.setStatusVisible(!owner.status().isVisible()));
+        add(registry, "view.status_bar", "Status Bar", "Hide Status Bar", () -> owner.chooseStatusVisible(!owner.status().isVisible()));
         add(registry, "view.rail", "Rail", "Hide Rail", () -> owner.setRailVisible(!owner.railVisible()), List.of("panels", "sidebar"));
         add(registry, "view.buddy", "Show Jasper", "Hide Jasper", () -> { owner.onToggleBuddy.run(); owner.updateActions(); },
             List.of("jasper", "mascot", "turtle", "desk buddy"));
@@ -66,11 +66,8 @@ final class WindowCommands implements AutoCloseable {
             add(registry, "view.terminal_colors." + colors.name().toLowerCase(java.util.Locale.ROOT), "Terminal: " + label,
                 "Terminal Colors: " + label, () -> owner.selectTerminalColors(colors), List.of("terminal", "colors", "palette"));
         }
-        add(registry, "view.tab_height", "Tab height\u2026", "Tab Height\u2026", () -> owner.chrome().editTabHeight());
-        add(registry, "view.rail_width", "Rail width\u2026", "Rail Width\u2026", () -> owner.chrome().editRailWidth());
-        add(registry, "view.toolbar_height", "Toolbar height\u2026", "Toolbar Height\u2026", () -> owner.chrome().editToolbarHeight());
-        add(registry, "view.status_bar_height", "Status bar height\u2026", "Status Bar Height\u2026",
-            () -> owner.chrome().editStatusBarHeight());
+        add(registry, "view.window_settings", "Window Settings\u2026", "Window Settings\u2026", owner::openWindowSettings,
+            List.of("tab height", "rail width", "toolbar height", "status bar height", "size"));
     }
 
     private void add(CommandRegistry registry, String id, String label, String title, Runnable callback) {
@@ -111,10 +108,7 @@ final class WindowCommands implements AutoCloseable {
             action.putValue(Action.SELECTED_KEY, owner.terminalColors() == colors);
             action.setEnabled(true);
         }
-        view("view.tab_height").setEnabled(true);
-        view("view.rail_width").setEnabled(true);
-        view("view.toolbar_height").setEnabled(true);
-        view("view.status_bar_height").setEnabled(true);
+        view("view.window_settings").setEnabled(owner.settingsConnected());
     }
 
     @Override public void close() {

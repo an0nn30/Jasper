@@ -27,13 +27,13 @@ class ShortcutEditingTest {
             assertThat(panel.editor.isVisible()).isTrue();
             assertThat(panel.dispatch(key(panel, KeyEvent.KEY_PRESSED, KeyEvent.VK_V, InputEvent.META_DOWN_MASK))).isTrue();
             assertThat(panel.dispatch(key(panel, KeyEvent.KEY_RELEASED, KeyEvent.VK_V, 0))).isTrue();
-            assertThat(panel.editor.save.isEnabled()).isFalse();
+            assertThat(panel.editor.set.isEnabled()).isFalse();
             assertThat(panel.editor.message.getText()).contains("Paste");
             panel.editor.reassign.doClick();
-            assertThat(panel.editor.save.isEnabled()).isTrue();
-            panel.editor.save.doClick();
+            assertThat(panel.editor.set.isEnabled()).isTrue();
+            panel.editor.set.doClick();
             assertThat(saved).containsExactly(Map.of("copy", Optional.of("cmd+v"), "paste", Optional.of("none")));
-            assertThat(panel.editor.save.isEnabled()).isFalse();
+            assertThat(panel.editor.set.isEnabled()).isFalse();
             panel.close();
         });
     }
@@ -45,17 +45,17 @@ class ShortcutEditingTest {
             panel.setRows(ShortcutCatalog.rows(KeyBindings.withOverrides(true, Map.of("copy", "none")), List.of(), Map.of(), true));
             panel.search.setText("Copy"); clickShortcut(panel);
             assertThat(panel.capture(KeyStroke.getKeyStroke("ctrl H"))).isTrue();
-            panel.editor.save.doClick();
+            panel.editor.set.doClick();
             assertThat(saved.getFirst()).isEqualTo(Map.of("copy", Optional.of("ctrl+h")));
             panel.close();
             var remove = new ShortcutPanel(true, changes -> { saved.add(changes); return new CompletableFuture<>(); });
             remove.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
-            remove.search.setText("Copy"); clickShortcut(remove); remove.editor.remove.doClick(); remove.editor.save.doClick();
+            remove.search.setText("Copy"); clickShortcut(remove); remove.editor.remove.doClick(); remove.editor.set.doClick();
             assertThat(saved.getLast()).isEqualTo(Map.of("copy", Optional.of("none")));
             remove.close();
             var reset = new ShortcutPanel(true, changes -> { saved.add(changes); return new CompletableFuture<>(); });
             reset.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
-            reset.search.setText("Copy"); clickShortcut(reset); reset.editor.restore.doClick(); reset.editor.save.doClick();
+            reset.search.setText("Copy"); clickShortcut(reset); reset.editor.restore.doClick(); reset.editor.set.doClick();
             assertThat(saved.getLast()).isEqualTo(Map.of("copy", Optional.empty()));
             reset.close();
             var fixed = new ShortcutPanel(true, changes -> { throw new AssertionError("contextual binding saved"); });
@@ -91,13 +91,14 @@ class ShortcutEditingTest {
             panel[0] = new ShortcutPanel(true, changes -> failure);
             panel[0].setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
             panel[0].search.setText("Copy"); clickShortcut(panel[0]);
-            panel[0].capture(KeyStroke.getKeyStroke("ctrl H")); panel[0].editor.save.doClick();
+            panel[0].capture(KeyStroke.getKeyStroke("ctrl H")); panel[0].editor.set.doClick();
         });
         failure.completeExceptionally(new java.io.IOException("Permission denied"));
         SwingUtilities.invokeAndWait(() -> {
             assertThat(panel[0].editor.isVisible()).isTrue();
             assertThat(panel[0].editor.message.getText()).contains("Permission denied");
-            assertThat(panel[0].editor.save.isEnabled()).isTrue();
+            assertThat(panel[0].editor.message.getText()).startsWith("Could not set: ");
+            assertThat(panel[0].editor.set.isEnabled()).isTrue();
             panel[0].close();
         });
     }
@@ -130,6 +131,20 @@ class ShortcutEditingTest {
             assertThat(panel.capture(KeyStroke.getKeyStroke("ctrl H"))).isTrue();
             panel.editor.cancel.doClick();
             assertThat(panel.capture(KeyStroke.getKeyStroke("ctrl H"))).isFalse();
+            panel.close();
+        });
+    }
+
+    @Test void theEditCardSetsRatherThanSaves() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var panel = new ShortcutPanel(true, changes -> new CompletableFuture<>());
+            panel.setRows(ShortcutCatalog.rows(KeyBindings.defaults(true), List.of(), Map.of(), true));
+            panel.search.setText("Copy");
+            clickShortcut(panel);
+            assertThat(panel.editor.set.getText()).isEqualTo("Set");
+            assertThat(panel.editor.message.getText()).contains("click Set");
+            panel.editor.record.doClick();
+            assertThat(panel.editor.message.getText()).contains("Apply or OK");
             panel.close();
         });
     }

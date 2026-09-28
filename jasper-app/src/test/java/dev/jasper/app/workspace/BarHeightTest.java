@@ -5,13 +5,8 @@ import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.ToolbarMode;
 import java.awt.Font;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
-import java.util.function.IntConsumer;
-import java.util.function.IntSupplier;
-import java.util.function.ToIntFunction;
 import javax.swing.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -176,7 +171,7 @@ class BarHeightTest {
         });
     }
 
-    @Test void savedHeightsApplyLiveAndAnUnrelatedReloadKeepsTheSessionChoice() throws Exception {
+    @Test void savedHeightsApplyOnEveryReload() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var saved = ConfigSnapshot.defaults().toBuilder().toolbarHeight(40).statusBarHeight(26).build();
@@ -185,25 +180,11 @@ class BarHeightTest {
             assertThat(owner.statusBarHeight()).isEqualTo(26);
             owner.setToolbarHeight(50); owner.setStatusBarHeight(34);
             owner.applyConfiguration(saved.toBuilder().tabHeight(40).build(), true);
-            assertThat(owner.toolbarHeight()).as("an unrelated change keeps the session height").isEqualTo(50);
-            assertThat(owner.statusBarHeight()).isEqualTo(34);
-            owner.applyConfiguration(saved.toBuilder().tabHeight(40).toolbarHeight(44).build(), true);
-            assertThat(owner.toolbarHeight()).isEqualTo(44);
-            assertThat(owner.statusBarHeight()).as("only the key that changed applies").isEqualTo(34);
+            assertThat(owner.toolbarHeight()).as("the saved height is the only height").isEqualTo(40);
+            assertThat(owner.statusBarHeight()).isEqualTo(26);
             owner.applyConfiguration(saved.toBuilder().tabHeight(40).toolbarHeight(44).statusBarHeight(22).build(), true);
+            assertThat(owner.toolbarHeight()).isEqualTo(44);
             assertThat(owner.statusBarHeight()).isEqualTo(22);
-        });
-    }
-
-    @Test void viewControlsStartAtTheCurrentHeightCommitOnlyOnOkAndCanReset() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>()));
-            exercise(owner, "Toolbar height…", "toolbarHeight", hook -> owner.confirmToolbarHeight = hook,
-                owner::toolbarHeight, owner::setToolbarHeight, 28, 64, 30);
-            exercise(owner, "Status bar height…", "statusBarHeight", hook -> owner.confirmStatusBarHeight = hook,
-                owner::statusBarHeight, owner::setStatusBarHeight, 20, 48, 24);
-            assertThat(owner.commands().entries().stream().map(entry -> entry.command().id()))
-                .contains("view.toolbar_height", "view.status_bar_height");
         });
     }
 
@@ -215,43 +196,10 @@ class BarHeightTest {
             owner.setToolbarHeight(50); owner.setStatusBarHeight(34);
             assertThat(owner.toolbarHeight()).isEqualTo(40);
             assertThat(owner.statusBarHeight()).isEqualTo(26);
-            assertThat(owner.confirmToolbarHeight.applyAsInt(new JPanel())).isEqualTo(JOptionPane.CANCEL_OPTION);
-            assertThat(owner.confirmStatusBarHeight.applyAsInt(new JPanel())).isEqualTo(JOptionPane.CANCEL_OPTION);
         });
     }
 
     /** Drives one size dialog through OK with a typed value, Cancel, Reset and an out-of-range entry. */
-    private static void exercise(WindowContent owner, String itemText, String name, Consumer<ToIntFunction<JComponent>> confirm,
-                                 IntSupplier current, IntConsumer set, int min, int max, int defaultValue) {
-        String reset = "reset" + Character.toUpperCase(name.charAt(0)) + name.substring(1);
-        set.accept(40);
-        JMenuItem item = item(owner, itemText);
-        confirm.accept(panel -> {
-            JSpinner spinner = spinner(panel, name);
-            assertThat(spinner.getValue()).isEqualTo(40);
-            assertThat(((SpinnerNumberModel) spinner.getModel()).getMinimum()).isEqualTo(min);
-            assertThat(((SpinnerNumberModel) spinner.getModel()).getMaximum()).isEqualTo(max);
-            ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().setText("44");
-            return JOptionPane.OK_OPTION;
-        });
-        item.doClick(); assertThat(current.getAsInt()).as(itemText).isEqualTo(44);
-        confirm.accept(panel -> { spinner(panel, name).setValue(max); return JOptionPane.CANCEL_OPTION; });
-        item.doClick(); assertThat(current.getAsInt()).isEqualTo(44);
-        confirm.accept(panel -> {
-            ((JButton) WindowTabsTest.named(panel, reset)).doClick();
-            assertThat(spinner(panel, name).getValue()).isEqualTo(defaultValue);
-            return JOptionPane.OK_OPTION;
-        });
-        item.doClick(); assertThat(current.getAsInt()).isEqualTo(defaultValue);
-        var errors = new ArrayList<String>(); owner.onError = errors::add;
-        confirm.accept(panel -> {
-            ((JSpinner.DefaultEditor) spinner(panel, name).getEditor()).getTextField().setText("99");
-            return JOptionPane.OK_OPTION;
-        });
-        item.doClick(); assertThat(current.getAsInt()).isEqualTo(defaultValue);
-        assertThat(errors).singleElement().asString().contains(String.valueOf(min)).contains(String.valueOf(max));
-    }
-
     private static void layOut(JToolBar toolbar) {
         toolbar.setSize(UIScale.scale(1200), toolbar.getPreferredSize().height);
         toolbar.doLayout();
@@ -263,16 +211,4 @@ class BarHeightTest {
             .map(JButton.class::cast).findFirst().orElseThrow();
     }
 
-    private static JSpinner spinner(java.awt.Container panel, String name) {
-        return (JSpinner) WindowTabsTest.named(panel, name);
-    }
-
-    private static JMenuItem item(WindowContent owner, String text) {
-        JMenu view = owner.menuBar().getMenu(2);
-        for (int i = 0; i < view.getItemCount(); i++) {
-            JMenuItem item = view.getItem(i);
-            if (item != null && text.equals(item.getText())) return item;
-        }
-        throw new AssertionError("View must expose " + text);
-    }
 }

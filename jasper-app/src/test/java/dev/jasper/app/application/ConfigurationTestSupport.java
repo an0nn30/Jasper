@@ -33,6 +33,6 @@ public final class ConfigurationTestSupport {
     public ConfigService.State state() { return controller.state(); }
     public java.util.concurrent.CompletableFuture<ConfigService.State> save(SettingsEdit edit) { return controller.save(edit); }
     public dev.jasper.app.lifecycle.Subscription onState(Consumer<ConfigService.State> listener) { return controller.onState(listener); }
-    public void settingsOpener(Consumer<WindowContent> opener) { controller.settingsOpener(opener); }
+    public void settingsOpener(java.util.function.BiConsumer<WindowContent, String> opener) { controller.settingsOpener(opener); }
     public void close() { controller.close(); }
 }

@@ -21,9 +21,9 @@ import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
-/** One pending row edit. Only Save calls the asynchronous settings writer. Owned by ShortcutPanel. */
+/** One row edit. Set hands it to the page, which stages it until Apply. Owned by ShortcutPanel. */
 final class ShortcutEditPanel extends JPanel {
-    final JButton save = new JButton("Save");
+    final JButton set = new JButton("Set");
     final JButton cancel = new JButton("Cancel");
     final JButton remove = new JButton("Remove shortcut");
     final JButton restore = new JButton("Restore default");
@@ -57,7 +57,7 @@ final class ShortcutEditPanel extends JPanel {
         var bottom = new JPanel(new BorderLayout()); bottom.setOpaque(false);
         bottom.add(reassign, BorderLayout.NORTH);
         var buttons = new JPanel(new FlowLayout(FlowLayout.LEADING, 6, 0)); buttons.setOpaque(false);
-        buttons.add(save); buttons.add(cancel); buttons.add(remove); buttons.add(restore);
+        buttons.add(set); buttons.add(cancel); buttons.add(remove); buttons.add(restore);
         bottom.add(buttons, BorderLayout.SOUTH); add(bottom, BorderLayout.SOUTH);
         record.addActionListener(e -> { recording = !recording; if (recording) recordingStarted.run(); update(); value.requestFocusInWindow(); });
         value.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -67,7 +67,7 @@ final class ShortcutEditPanel extends JPanel {
         remove.addActionListener(e -> choose(Optional.of("none"), null));
         restore.addActionListener(e -> choose(Optional.empty(), KeyBindings.parse(entry.defaultBinding(), macOs).orElse(null)));
         reassign.addActionListener(e -> update());
-        save.addActionListener(e -> save());
+        set.addActionListener(e -> set());
         setVisible(false);
     }
 
@@ -123,17 +123,17 @@ final class ShortcutEditPanel extends JPanel {
         record.setText(recording ? "Stop recording" : "Record shortcut");
         reassign.setVisible(!conflicts.isEmpty());
         reassign.setEnabled(!saving);
-        save.setEnabled(!saving && binding != null && (conflicts.isEmpty() || reassign.isSelected()));
+        set.setEnabled(!saving && binding != null && (conflicts.isEmpty() || reassign.isSelected()));
         cancel.setEnabled(!saving); remove.setEnabled(!saving); restore.setEnabled(!saving); record.setEnabled(!saving);
-        message.setText(saving ? "Saving shortcut…" : !conflicts.isEmpty()
+        message.setText(saving ? "Setting shortcut\u2026" : !conflicts.isEmpty()
             ? "Already used by: " + String.join(", ", conflicts.stream().map(ShortcutEntry::name).toList()) + ". Reassigning removes their shortcuts."
-            : recording ? "Press the new shortcut, then click Save. Use Cancel to keep the current binding."
-            : "Save applies this shortcut to terminal windows and stores it in settings.");
+            : recording ? "Press the new shortcut, then click Set. Use Cancel to keep the current binding."
+            : "Set stages this shortcut; Apply or OK in Settings saves it.");
         revalidate(); repaint();
     }
 
-    private void save() {
-        if (!save.isEnabled()) return;
+    private void set() {
+        if (!set.isEnabled()) return;
         var changes = new LinkedHashMap<String, Optional<String>>();
         changes.put(entry.id(), binding);
         for (var conflict : conflicts) changes.put(conflict.id(), Optional.of("none"));
@@ -149,7 +149,7 @@ final class ShortcutEditPanel extends JPanel {
                 update();
                 Throwable cause = failure;
                 while (cause instanceof java.util.concurrent.CompletionException && cause.getCause() != null) cause = cause.getCause();
-                message.setText("Could not save: " + cause.getMessage());
+                message.setText("Could not set: " + cause.getMessage());
             }
         }));
     }

@@ -38,7 +38,10 @@ the key from the file. Settings writes `config.toml` in place and keeps your com
 reject is refused with the same message the file would produce. If `config.toml` has errors, Settings shows a
 banner and saves nothing until the file is fixed; if it uses old setting names, the banner offers Migrate Config.
 System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config.
-Keymap and Plugins open their own windows for now.
+Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from their defaults, and the
+sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
+at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
+take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
 
 ## Supported settings
 
@@ -366,7 +369,7 @@ The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see
 
 Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
-View menu choices and per-pane font sizes are temporary runtime overrides; they do not rewrite the file. An unrelated file change preserves those choices. Changing a saved field reapplies that field across open owners. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size. A temporary View → Terminal Colors choice remains shared until the saved `terminal.colors` changes; unrelated reloads preserve it. The View menu's Tab height, Rail width, Toolbar height and Status bar height dialogs are such overrides too; each reset button restores the built-in value (30, 28, 30 and 24 pixels).
+View menu choices save: Toolbar, Status Bar and Terminal Colors write `window.toolbar`, `window.status_bar` and `terminal.colors` to `config.toml`, and every window follows. View › Window Settings… opens Settings at the Window page for the tab, rail, toolbar and status bar sizes. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and View › Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
 Missing font families use JBR/system fallback. Ordered `font.fallback` names can supply missing symbols, such as Nerd Font glyphs; macOS also uses JBR/system cascading for CJK and emoji. The default line height preserves the natural font metrics. Larger values increase cell height and vertically center text without changing cell width. Values from 0.5 to below 1.0 tighten rows the same way; tall glyphs and descenders may then overlap neighbouring rows, and a neighbouring row's own background colour (a selection, search highlight or colored TUI bar) can clip them. The standalone terminal library retains its 14-point default; the app uses 16 points by default.
 
@@ -461,8 +464,8 @@ until you delete it), or as a two-line header. Jasper reads the file live, once 
 Reload Config; a file that fails to parse keeps its last good values and is reported in the
 Configuration status under `plugins.<id>`. Jasper never rewrites the file once it exists. Values may
 be strings, integers, floats, booleans, arrays of strings and nested tables; a plugin reports
-problems with its settings through the same diagnostics. Right-click a plugin in File → Manage
-Plugins… and choose Open Settings to edit the file. The sample plugin's example, for instance:
+problems with its settings through the same diagnostics. Right-click a plugin in Settings › Plugins
+(File → Manage Plugins…) and choose Open Settings to edit the file. The sample plugin's example, for instance:
 
 ```toml
 # Settings for the sample plugin. Jasper reads this file live. Every demo is off until you set it.
@@ -486,6 +489,8 @@ window bounds; it is written by Jasper and is not meant to be edited.
 ## Shortcuts
 
 The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `open_settings` and `reload_config`.
+
+Settings › Keymap edits these bindings without opening the file; it writes the same `[keybindings]` entries.
 
 On macOS, `cmd` means Command and `alt`/`option` means Option. For example:
 
@@ -523,7 +528,7 @@ Plugin actions are bound by their quoted id, for example:
 A plugin may suggest a default shortcut; yours always wins, and Jasper's built-in shortcuts win
 over a plugin's suggestion. A binding for an action that no installed plugin provides is
 reported as a configuration warning. Every panel also has a `<panel id>.toggle` action you can
-bind the same way. `"plugins.manage"` opens the Plugins manager and has no default shortcut.
+bind the same way. `"plugins.manage"` opens Settings at Plugins and `"app.shortcuts"` at Keymap; neither has a default shortcut.
 
 ## Command palette shortcuts
 
@@ -592,7 +597,7 @@ formatting and refuse, rather than guess, when a change cannot be made exactly.
 
 **Reload config** forces a file read even if its timestamp and size did not change. The status indicator shows **Built-in defaults**, **Config loaded**, **Config warnings**, or **Config error**, with the first available diagnostic line. Green, amber and red distinguish successful, warning and error states. Its tooltip shows the path; click it for selectable plain-text diagnostics including file, line, column and key.
 
-Syntax errors, wrong types, unreadable files, invalid UTF-8 and files larger than 1 MiB retain the last working settings (built-in defaults before any valid load). An invalid value of the correct type falls back to that key's default while other valid values apply. Invalid font fallback or shell argument lists default as a whole; a wrong element type rejects the candidate. Invalid environment entries are omitted individually while valid entries apply. Unknown keys, including nested keys and empty unknown tables, warn without blocking valid settings. Fixing the file recovers automatically. Deleting the file restores saved defaults to built-in values; unchanged fields still preserve temporary runtime overrides. Settings/editor failures do not roll back a successfully loaded file.
+Syntax errors, wrong types, unreadable files, invalid UTF-8 and files larger than 1 MiB retain the last working settings (built-in defaults before any valid load). An invalid value of the correct type falls back to that key's default while other valid values apply. Invalid font fallback or shell argument lists default as a whole; a wrong element type rejects the candidate. Invalid environment entries are omitted individually while valid entries apply. Unknown keys, including nested keys and empty unknown tables, warn without blocking valid settings. Fixing the file recovers automatically. Deleting the file restores saved defaults to built-in values. Settings/editor failures do not roll back a successfully loaded file.
 
 ## Remaining configuration work
 
@@ -630,10 +635,8 @@ padding and the area behind the panes follow this choice; the title row, toolbar
 bar, status bar, split dividers, menus and dialogs keep the UI chrome. Changes apply live to every
 window without reinstalling the look and feel, keeping shells, scrollback and splits.
 
-View → Terminal Colors offers Terminal: Match UI, Light and Dark as a temporary choice for the
-session that never rewrites the configuration; it clears when the saved `terminal` value
-changes. An unrecognized value produces an error diagnostic and keeps `"match"`; a non-string
-value rejects the configuration.
+View → Terminal Colors offers Terminal: Match UI, Light and Dark; choosing one saves `terminal.colors`. An
+unrecognized value produces an error diagnostic and keeps `"match"`; a non-string value rejects the configuration.
 
 ### Interface typography
 

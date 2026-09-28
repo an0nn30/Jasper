@@ -97,7 +97,7 @@ class ConfigurationControllerTest {
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
-    void unrelatedChangesPreserveTemporaryChoicesAndNewOwnersUseSavedDefaults() throws Exception {
+    void reloadsReapplyTheSavedChromeKeepPaneFontSizesAndNewOwnersUseSavedDefaults() throws Exception {
         start("[terminal.font]\nsize=19\n"); edt(this::owner); launchAll();
         var first = owners.getFirst();
         edt(() -> {
@@ -106,9 +106,10 @@ class ConfigurationControllerTest {
         });
         reload("# comment\n[terminal.font]\nsize=19\nunknown=1\n");
         edt(() -> {
-            assertThat(first.tabHeight()).isEqualTo(60); assertThat(first.toolbar().isVisible()).isFalse();
-            assertThat(first.status().isVisible()).isFalse(); assertThat(first.theme().chrome()).isEqualTo(Theme.DARK);
-            assertThat(first.currentPane().view().fontSize()).isEqualTo(28);
+            assertThat(first.tabHeight()).as("the saved chrome is reapplied").isEqualTo(30);
+            assertThat(first.toolbar().isVisible()).isTrue();
+            assertThat(first.status().isVisible()).isTrue(); assertThat(first.theme().chrome()).isEqualTo(Theme.DARK);
+            assertThat(first.currentPane().view().fontSize()).as("a pane's own size stays").isEqualTo(28);
             var next = owner(); assertThat(next.tabHeight()).isEqualTo(30);
             assertThat(next.toolbar().isVisible()).isTrue(); assertThat(next.status().isVisible()).isTrue();
             assertThat(next.theme().chrome()).isEqualTo(Theme.DARK);
@@ -680,13 +681,57 @@ class ConfigurationControllerTest {
         edt(() -> assertThat(controller.shown().diagnostics()).extracting(d -> d.file()).containsExactly(b));
     }
 
-    @Test void settingsOpenerReplacesTheEditorForCmdComma() throws Exception {
+    @Test void settingsOpenerServesCmdCommaAndWindowSettings() throws Exception {
         start(""); edt(this::owner);
         var owner = owners.getFirst();
-        var opened = new ArrayList<WindowContent>();
-        edt(() -> controller.settingsOpener(opened::add));
+        var opened = new ArrayList<String>();
+        edt(() -> controller.settingsOpener((window, page) -> opened.add((window == owner) + ":" + page)));
         edt(owner::openSettings);
-        assertThat(opened).containsExactly(owner);
+        edt(() -> {
+            owner.setActive(true);
+            owner.windowCommands().view("view.window_settings").actionPerformed(new java.awt.event.ActionEvent(owner, 0, "menu"));
+        });
+        assertThat(opened).containsExactly("true:null", "true:window");
+    }
+
+    @Test void viewMenuChoicesSaveAndEveryWindowFollowsTheReload() throws Exception {
+        start("[window]\ntab_height = 44\n"); edt(() -> { owner(); owner(); });
+        var first = owners.getFirst(); var second = owners.get(1);
+        var seen = new java.util.concurrent.CopyOnWriteArrayList<ConfigService.State>();
+        edt(() -> controller.onState(seen::add));
+        edt(() -> {
+            first.setActive(true);
+            first.windowCommands().view("view.toolbar.hidden").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu"));
+        });
+        until(() -> !seen.isEmpty() && seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_TOOLBAR) == ToolbarMode.HIDDEN);
+        edt(() -> first.windowCommands().view("view.status_bar").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
+        until(() -> Boolean.FALSE.equals(seen.getLast().values().get(dev.jasper.app.config.CoreSettings.WINDOW_STATUS_BAR)));
+        edt(() -> first.windowCommands().view("view.terminal_colors.dark").actionPerformed(new java.awt.event.ActionEvent(first, 0, "menu")));
+        until(() -> seen.getLast().values().get(dev.jasper.app.config.CoreSettings.TERMINAL_COLORS) == dev.jasper.app.config.TerminalColors.DARK);
+        edt(() -> {
+            for (var owner : List.of(first, second)) {
+                assertThat(owner.toolbar().isVisible()).isFalse();
+                assertThat(owner.status().isVisible()).isFalse();
+                assertThat(owner.terminalColors()).isEqualTo(dev.jasper.app.config.TerminalColors.DARK);
+            }
+        });
+        assertThat(Files.readString(directory.resolve("config.toml"))).contains("tab_height = 44");
+    }
+
+    @Test void aRejectedFileRefusesViewChoicesAndTheMenuStaysTruthful() throws Exception {
+        start("[window\n"); edt(this::owner);
+        var owner = owners.getFirst();
+        var errors = new ArrayList<String>();
+        edt(() -> {
+            owner.onError = errors::add;
+            owner.setActive(true);
+            var status = owner.windowCommands().view("view.status_bar");
+            status.putValue(javax.swing.Action.SELECTED_KEY, false); // what a clicked check box does before the action runs
+            status.actionPerformed(new java.awt.event.ActionEvent(owner, 0, "menu"));
+            assertThat(errors).containsExactly("config.toml has errors, so changes can't be saved until they're fixed.");
+            assertThat(owner.status().isVisible()).isTrue();
+            assertThat(status.getValue(javax.swing.Action.SELECTED_KEY)).isEqualTo(true);
+        });
     }
 
     @Test void stateSaveAndListenersRoundTripThroughTheService() throws Exception {

@@ -13,7 +13,7 @@ plugin writer's view.
 | `dev.jasper.app.terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane | `lifecycle` |
 | `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `lifecycle` |
 | `dev.jasper.app.windows` | Application-built auxiliary windows: headless `AuxiliarySurface`, native `NativeShells` | `appearance`, `lifecycle`, `persistence`, `platform` |
-| `dev.jasper.app.pluginmanager` | The Plugins manager window: passive Swing view, consent view and controller over app-native rows | `plugins`, `restart`, `windows` |
+| `dev.jasper.app.pluginmanager` | The Settings dialog's Plugins page: passive Swing view, consent view and controller over app-native rows | `plugins`, `restart`, `settingsui`, `windows` |
 | `dev.jasper.app.restart` | Restart planning from the process's own command line, `ResidentControl`, and the Restart normally conversation | none |
 | `plugins/sample` | Bundled end-to-end fixture and documentation example | SDK (`compileOnly`) |
 

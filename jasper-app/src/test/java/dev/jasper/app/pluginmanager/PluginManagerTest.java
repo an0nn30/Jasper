@@ -7,6 +7,8 @@ import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.restart.ResidentControl;
 import dev.jasper.app.restart.RestartFlow;
 import dev.jasper.app.restart.RestartMode;
+import dev.jasper.app.settingsui.PageContext;
+import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.app.testsupport.PluginJars;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
@@ -43,6 +45,8 @@ class PluginManagerTest {
     private AuxiliaryWindows windows;
     private PluginManager manager;
     private Path chosenZip;
+    private SettingsPage page;
+    private AuxiliarySurface host;
     private boolean residentLive;
 
     private Path user() { return root.resolve("plugins"); }
@@ -67,7 +71,7 @@ class PluginManagerTest {
         var pending = new CompletableFuture<List<CompletableFuture<?>>>();
         edt(() -> pending.complete(runtime.stop()));
         CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
-        edt(() -> windows.close());
+        edt(() -> { if (page != null) page.dispose(); windows.close(); });
     }
 
     private Path zipOf(String id, String version, String extraToml) throws Exception {
@@ -82,25 +86,35 @@ class PluginManagerTest {
         return zip;
     }
 
+    /** Opens the Plugins page as Settings would: over a Settings surface, built, then shown. */
+    private void open() throws Exception {
+        edt(() -> {
+            host = windows.window("app.settings", "Settings", new java.awt.Dimension(1000, 700), true);
+            page = manager.page(new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> { },
+                () -> host));
+            page.component();
+            page.selected();
+        });
+    }
+
     private List<String> bannerButtons() { return manager.panel().bannerButtons().stream().map(JButton::getText).toList(); }
 
     @Test void installsAZipAfterConsentAndOffersTheRestart() throws Exception {
         start(false, false);
         chosenZip = zipOf("dev.example.zipped", "1.0.0", "capabilities = [\"terminal.inject\"]\n");
-        edt(manager::open);
+        open();
         until(() -> manager.panel().details().contains("No plugins"));
         edt(() -> {
-            assertThat(windows.open()).singleElement().satisfies(surface -> {
-                assertThat(surface.id()).isEqualTo(PluginManager.WINDOW_ID);
-                assertThat(surface.title()).isEqualTo("Plugins");
-            });
+            assertThat(windows.open()).as("the manager opens no window of its own").containsExactly(host);
+            assertThat(page.id()).isEqualTo("plugins");
+            assertThat(page.modified()).isFalse();
             assertThat(manager.panel().bannerText()).isEmpty();
             manager.panel().install.doClick();
         });
         until(() -> manager.consent() != null);
         edt(() -> {
             assertThat(manager.consent().text()).contains("zipped 1.0.0", "Type into your terminals (terminal.inject)");
-            assertThat(windows.open()).as("the consent dialog belongs to the manager window").hasSize(2);
+            assertThat(windows.open()).as("the consent dialog opens over Settings").hasSize(2);
             manager.consent().allow.doClick();
         });
         until(() -> manager.panel().listed().size() == 1);
@@ -120,7 +134,7 @@ class PluginManagerTest {
     @Test void decliningConsentDiscardsTheStagedPluginAndABadZipIsExplained() throws Exception {
         start(false, false);
         chosenZip = zipOf("dev.example.zipped", "1.0.0", "");
-        edt(manager::open);
+        open();
         until(() -> manager.panel().details().contains("No plugins"));
         edt(() -> manager.panel().install.doClick());
         until(() -> manager.consent() != null);
@@ -146,7 +160,7 @@ class PluginManagerTest {
         PluginJars.build(user().resolve("dev.example.found"), "main.jar", PluginJars.descriptor("dev.example.found", "1.0.0", "fix.Main")
             + "capabilities = [\"terminal.observe\"]\n", Map.of(), List.of());
         start(false, false);
-        edt(manager::open);
+        open();
         until(() -> manager.panel().listed().size() == 1);
         edt(() -> {
             assertThat(manager.panel().listed()).containsExactly("dev.example.found  1.0.0 — Needs review");
@@ -157,16 +171,16 @@ class PluginManagerTest {
         until(() -> manager.panel().bannerText().startsWith("Restart Jasper"));
         assertThat(Files.readString(root.resolve("plugins.toml"))).contains("consented = [\"terminal.observe\"]");
 
-        // Another process disables it; the manager notices when its window regains focus.
+        // Another process disables it; the page notices when it is shown again.
         Files.writeString(root.resolve("plugins.toml"), "version = 1\n\n[plugins.\"dev.example.found\"]\nenabled = false\nconsented = [\"terminal.observe\"]\nremove = false\n");
-        edt(() -> windows.open().get(0).notifyActivated());
+        edt(() -> page.selected());
         until(() -> manager.panel().bannerText().isEmpty());
     }
 
     @Test void safeModeOffersRestartNormallyAndWalksTheResidentConversation() throws Exception {
         residentLive = true;
         start(true, false);
-        edt(manager::open);
+        open();
         until(() -> manager.panel().bannerText().startsWith("Safe mode"));
         edt(() -> {
             assertThat(bannerButtons()).containsExactly("Restart Normally");
@@ -185,11 +199,11 @@ class PluginManagerTest {
     @Test void aStandaloneReplacementSaysThatTheOtherProcessStillRunsThePreviousSet() throws Exception {
         residentLive = true;
         start(false, true);
-        edt(manager::open);
+        open();
         until(() -> !manager.panel().noticeText().isEmpty());
         edt(() -> assertThat(manager.panel().noticeText()).contains("still running with the plugin set it started with"));
         residentLive = false;
-        edt(() -> windows.open().get(0).notifyActivated());
+        edt(() -> page.selected());
         until(() -> manager.panel().noticeText().isEmpty());
     }
 
@@ -198,7 +212,7 @@ class PluginManagerTest {
             Files.writeString(root.resolve("plugins.toml"), "version = 1\n[plugins.\"dev.example.gone\"]\nenabled = true\nconsented = []\n");
             start(false, false);
             // Built before start so the launch discovers it; consented so Remove is offered.
-            edt(manager::open);
+            open();
             until(() -> manager.panel().listed().stream().anyMatch(line -> line.contains("dev.example.gone")));
             edt(() -> manager.panel().select("dev.example.gone"));
             edt(() -> manager.panel().remove.doClick());
@@ -217,4 +231,20 @@ class PluginManagerTest {
             assertThat(revealed).containsExactly(user().resolve("dev.example.gone"), user().resolve("dev.example.gone/data"));
             assertThat(user().resolve("dev.example.gone/data")).isDirectory();
         }
+
+    @Test void thePageSearchesPluginNamesSelectsAMatchAndLetsGoWhenDisposed() throws Exception {
+        PluginJars.build(user().resolve("dev.example.found/jars"), "main.jar",
+            PluginJars.descriptor("dev.example.found", "1.0.0", "fix.Main"), Map.of(), List.of());
+        start(false, false);
+        open();
+        until(() -> manager.panel().listed().size() == 1);
+        edt(() -> {
+            assertThat(page.searchTerms()).anySatisfy(term -> assertThat(term).contains("dev.example.found"));
+            page.highlight("example found");
+            assertThat(manager.panel().selected()).isEqualTo("dev.example.found");
+            page.dispose();
+            assertThat(manager.panel()).isNull();
+        });
+        page = null;
+    }
 }

@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Validated saved defaults; runtime View choices are kept separately by each owner. */
+/** Validated saved defaults; only a pane's own font size is kept separately, by the pane. */
 public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusBar,
                       FontConfig font, String theme, Map<String, String> keybindings,
                       int columns, int lines, TerminalConfig terminal, boolean buddyEnabled,

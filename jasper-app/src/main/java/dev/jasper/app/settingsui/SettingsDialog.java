@@ -102,7 +102,8 @@ public final class SettingsDialog {
         ConfigService.State state = hooks.state().get();
         draft = new SettingsDraft(state.values());
         view = new SettingsView(this::select, this::cancel);
-        pages = List.copyOf(pageFactory.apply(new PageContext(draft, this::select, this::closeThen, this::chooseFile, this::refreshNow)));
+        pages = List.copyOf(pageFactory.apply(new PageContext(draft, this::select, this::closeThen, this::chooseFile, this::refreshNow,
+            () -> isOpen() ? surface : null)));
         backStack.clear();
         forwardStack.clear();
         current = null;
@@ -170,6 +171,7 @@ public final class SettingsDialog {
         view.breadcrumb.setText(breadcrumb(page));
         view.tree.select(page.id());
         page.highlight(query);
+        page.selected();
         refreshNow();
     }
 

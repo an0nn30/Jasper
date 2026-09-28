@@ -18,15 +18,16 @@ class WindowCommandsTest {
                 assertThat(CommandSearch.find(entries, "paste", java.util.List.of(), 5).stream().map(Command::id)).doesNotContain("paste");
                 assertThat(owner.action(ActionId.SPLIT_RIGHT).getValue(Action.NAME)).isEqualTo(ActionId.SPLIT_RIGHT.label());
                 assertThat(owner.action(ActionId.SPLIT_RIGHT).getValue(Command.TITLE)).isEqualTo("Split Right \u00b7 Vertical");
-                var sizes = java.util.List.of("view.tab_height", "view.rail_width", "view.toolbar_height", "view.status_bar_height");
-                assertThat(entries.stream().map(e -> e.command().id())).contains("select_tab_1", "view.terminal_colors.dark");
-                assertThat(entries.stream().map(e -> e.command().id())).containsAll(sizes);
+                assertThat(entries.stream().map(e -> e.command().id())).contains("select_tab_1", "view.terminal_colors.dark", "view.window_settings")
+                    .doesNotContain("view.tab_height", "view.rail_width", "view.toolbar_height", "view.status_bar_height");
+                var windowSettings = entries.stream().map(CommandSearch.Entry::command)
+                    .filter(c -> c.id().equals("view.window_settings")).findFirst().orElseThrow();
+                assertThat(windowSettings.title()).isEqualTo("Window Settings\u2026");
                 var view = owner.menuBar().getMenu(2);
-                for (int i = 0; i < sizes.size(); i++) {
-                    String id = sizes.get(i);
-                    assertThat(view.getItem(view.getItemCount() - sizes.size() + i).getAction()).as("View ends with the size dialogs: %s", id)
-                        .isSameAs(entries.stream().map(CommandSearch.Entry::command).filter(c -> c.id().equals(id)).findFirst().orElseThrow().action());
-                }
+                assertThat(view.getItem(view.getItemCount() - 1).getAction()).as("View ends with Window Settings\u2026")
+                    .isSameAs(windowSettings.action());
+                owner.updateActions();
+                assertThat(windowSettings.action().isEnabled()).as("nothing to open without a configuration").isFalse();
             }
         });
     }

@@ -60,7 +60,7 @@ in the application image, never on the application classpath. `run` and the Inte
 (dev home)" configuration use `build/dev-home` as the home, so the installed app's plugins,
 consent (`plugins.toml`), settings and data (`plugins/<id>/`) stay untouched; `--plugin-dir <dir>` loads one more
 plugin with consent pre-granted, and `--safe-mode` loads no user plugins. The user-facing manager
-is `pluginmanager/PluginManager` (File → Manage Plugins…); installs, removals and restarts are
+is the Settings dialog's Plugins page, `pluginmanager/PluginsPage` (File → Manage Plugins…); installs, removals and restarts are
 described in the root [README](../README.md#plugins) and [plugin authoring](../docs/plugin-authoring.md).
 
 ## Change workflow

@@ -49,6 +49,9 @@ public interface SettingsPage {
     /** The application's state changed; re-read anything shown from it. */
     default void refresh() { }
 
+    /** The dialog shows this page now; called each time it is shown. */
+    default void selected() { }
+
     /** The configuration guide section that documents this page. */
     default String helpAnchor() { return "supported-settings"; }
 }

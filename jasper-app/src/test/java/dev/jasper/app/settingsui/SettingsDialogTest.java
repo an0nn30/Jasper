@@ -42,6 +42,7 @@ class SettingsDialogTest {
     }
 
     private final List<String> opened = new ArrayList<>();
+    private final List<PageContext> contexts = new ArrayList<>();
     private final FakePage fake = new FakePage("keymap", "Keymap", List.of("shortcuts", "copy"));
 
     private SettingsDialog dialog() {
@@ -52,10 +53,10 @@ class SettingsDialogTest {
             () -> opened.add("config"), () -> opened.add("migrate"), browsed::add,
             (parent, count) -> { asked[0] = count; return discard[0]; });
         return new SettingsDialog(windows, context -> {
-            var pages = new ArrayList<>(CorePages.pages(() -> List.of("Jasper Dark"), new CorePages.SystemActions(() -> FILE,
-                () -> { }, () -> { }, () -> { }, () -> { }, () -> false), () -> { }, () -> { }).apply(context));
-            pages.set(pages.indexOf(pages.stream().filter(page -> page.id().equals("keymap")).findFirst().orElseThrow()), fake);
-            return pages;
+            contexts.add(context);
+            return CorePages.pages(() -> List.of("Jasper Dark"), new CorePages.SystemActions(() -> FILE,
+                    () -> { }, () -> { }, () -> { }, () -> { }, () -> false), page -> fake,
+                page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context);
         }, hooks);
     }
 
@@ -210,6 +211,24 @@ class SettingsDialogTest {
         });
     }
 
+    @Test void showingAPageTellsItAndPagesCanOpenDialogsOverSettings() throws Exception {
+        var dialog = dialog();
+        edt(() -> {
+            dialog.open(null, "window");
+            assertThat(fake.selections).isZero();
+            dialog.select("keymap");
+            assertThat(fake.selections).isEqualTo(1);
+            dialog.select("window");
+            dialog.back();
+            assertThat(fake.selections).as("Back shows it again").isEqualTo(2);
+            var surface = contexts.getLast().surface().get();
+            assertThat(surface).isNotNull();
+            assertThat(surface.title()).isEqualTo("Settings");
+            dialog.cancel();
+            assertThat(contexts.getLast().surface().get()).as("gone once the dialog closes").isNull();
+        });
+    }
+
     /** A page standing in for Keymap: settable modification, counted applies and recorded highlights. */
     static final class FakePage implements SettingsPage {
         final String id;
@@ -218,6 +237,7 @@ class SettingsDialogTest {
         final List<String> highlights = new ArrayList<>();
         boolean modified;
         int applied;
+        int selections;
         FakePage(String id, String title, List<String> terms) { this.id = id; this.title = title; this.terms = terms; }
         @Override public String id() { return id; }
         @Override public String title() { return title; }
@@ -229,5 +249,6 @@ class SettingsDialogTest {
         @Override public CompletableFuture<Void> apply() { applied++; return CompletableFuture.completedFuture(null); }
         @Override public void highlight(String query) { highlights.add(query); }
         @Override public void dispose() { }
+        @Override public void selected() { selections++; }
     }
 }

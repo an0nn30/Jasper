@@ -65,7 +65,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         var buttons = new JPanel(new java.awt.GridLayout(1, 2, 6, 0)); buttons.setOpaque(false);
         buttons.add(record); buttons.add(clear); top.add(buttons, BorderLayout.EAST);
         add(top, BorderLayout.NORTH);
-        tree = new ShortcutTree(this::editRow);
+        tree = new ShortcutTree(macOs, this::editRow);
         javax.swing.ToolTipManager.sharedInstance().registerComponent(tree);
         var scroll = new JScrollPane(tree) {
             @Override public void updateUI() {
