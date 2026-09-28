@@ -27,7 +27,8 @@ final class PluginHost {
     record Environment(Consumer<Runnable> ui, BooleanSupplier onUi, Function<String, Path> dataDirectory,
                        Function<String, Map<String, Object>> settings, Function<String, Path> settingsFile, java.util.function.BiFunction<String, List<String>, java.util.Optional<PluginSettingsFiles.Position>> positions, Consumer<dev.jasper.app.config.ConfigDiagnostic> configReport,
                        Duration drainGrace, Contributions contributions, BooleanSupplier dark,
-                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor) { }
+                       AuxiliaryWindows windows, TerminalRegistry terminals, Consumer<String> notice, Consumer<Path> editor,
+                       PluginSettingsFiles settingsFiles, Consumer<Path> clearReports) { }
 
     record Outcome(PluginStatus.State state, String reason) { }
 
@@ -65,8 +66,10 @@ final class PluginHost {
             return new Outcome(PluginStatus.State.SKIPPED, "requires " + required + ", which "
                 + (why == PluginStatus.State.FAILED ? "failed to start" : why == PluginStatus.State.SKIPPED ? "was skipped" : "is not running"));
         }
+        var declared = new DeclaredSettings(id, environment.settingsFiles(), containment, environment.ui(), environment.configReport(),
+            () -> settingsWritten(id));
         var context = new HostedContext(this, hosted, new PluginSettings(id, environment.settingsFile().apply(id), environment.settings().apply(id),
-            containment, path -> environment.positions().apply(id, path), environment.configReport()));
+            containment, path -> environment.positions().apply(id, path), environment.configReport()), declared);
         contexts.put(id, context);
         Set<String> providers = new HashSet<>(hosted.requires());
         providers.addAll(hosted.optional());
@@ -86,6 +89,7 @@ final class PluginHost {
         }
         services.commit(id);
         context.state = HostedContext.State.ACTIVE;
+        context.declared.complete();
         return new Outcome(PluginStatus.State.ACTIVE, "");
     }
 
@@ -103,7 +107,15 @@ final class PluginHost {
             if (context.state == HostedContext.State.ACTIVE) {
                 String id = context.hosted.info().id();
                 context.settings.update(environment.settings().apply(id), reloaded.contains(id));
+                context.declared.reload(reloaded.contains(id));
             }
+    }
+
+    /** A plugin saved a setting: its file's old reports go and its handles see the file again. UI thread. */
+    void settingsWritten(String id) {
+        requireUi();
+        environment.clearReports().accept(environment.settingsFiles().file(id));
+        settingsChanged(Set.of(id));
     }
 
     /** Reverse start order. The returned futures complete when each plugin's background work has drained. */

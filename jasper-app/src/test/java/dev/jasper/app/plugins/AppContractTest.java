@@ -60,9 +60,19 @@ class AppContractTest extends PluginContractTest {
     static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
                            Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
                            TerminalRegistry terminals, List<String> notices, List<Path> edited) {
+        return host(data, tables, drainGrace, contributions, dark, auxiliary, terminals, notices, edited, new CopyOnWriteArrayList<>());
+    }
+
+    /** As above; configuration problems land in {@code diagnostics}, and a file's reload or save clears that file's. */
+    static PluginHost host(Path data, Map<String, Map<String, Object>> tables, Duration drainGrace,
+                           Contributions contributions, java.util.concurrent.atomic.AtomicBoolean dark, AuxiliaryWindows auxiliary,
+                           TerminalRegistry terminals, List<String> notices, List<Path> edited,
+                           List<dev.jasper.app.config.ConfigDiagnostic> diagnostics) {
+        var files = new PluginSettingsFiles(data, diagnostics::add);
         return onEdtValue(() -> new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
             SwingUtilities::isEventDispatchThread, data::resolve, id -> tables.getOrDefault(id, Map.of()), id -> data.resolve(id + ".toml"),
-            (id, path) -> java.util.Optional.empty(), diagnostic -> { }, drainGrace, contributions, dark::get, auxiliary, terminals, notices::add, edited::add)));
+            (id, path) -> java.util.Optional.empty(), diagnostics::add, drainGrace, contributions, dark::get, auxiliary, terminals,
+            notices::add, edited::add, files, file -> diagnostics.removeIf(diagnostic -> diagnostic.file().equals(file)))));
     }
 
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
