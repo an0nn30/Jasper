@@ -4,13 +4,17 @@ import dev.jasper.app.appearance.Theme;
 import dev.jasper.app.appearance.ThemeCatalog;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigService;
+import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.FontConfig;
 import dev.jasper.app.config.KeyBindings;
+import dev.jasper.app.config.TerminalConfig;
 import dev.jasper.app.contributions.ActionEntry;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.LaunchSettings;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.launch.ShellProfileCatalog;
+import dev.jasper.app.launch.ShellProfiles;
 import dev.jasper.app.lifecycle.Subscription;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.notifications.CommandNotice;
@@ -77,6 +81,7 @@ public final class JasperApplication {
     private boolean quitHandlerInstalled;
     private final CommandHistory history;
     private final ShellLauncher suppliedLauncher;
+    private final ShellProfileCatalog shellProfiles;
     private final ApplicationShutdown shutdown;
     private final Path shellIntegrationDir;
     private final BuddyIntegration buddy;
@@ -168,6 +173,8 @@ public final class JasperApplication {
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), nativeNotifier::send, buddy.companion()::setWorking, JasperApplication::afterDelay);
         configuration = service == null ? null : new ConfigurationController(themes, service, themeCatalog);
+        shellProfiles = ShellProfileCatalog.system(() -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell());
+        shellProfiles.refresh();
         if (configuration != null) configuration.onSnapshot(snapshot -> {
             buddy.configured(snapshot.buddyEnabled()); updateBuddyActions();
             loginItems.accept(snapshot.backgroundEnabled());
@@ -230,7 +237,7 @@ public final class JasperApplication {
         boolean first = windows.isEmpty();
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
-            (path, settings) -> track(startSession(path, settings)), shellIntegrationDir);
+            (path, settings) -> track(startSession(path, settings)), shellIntegrationDir, shellProfiles::resolve, this::shellProfileProblem);
         TerminalWindow window = new TerminalWindow(new WindowCallbacks(this::newWindow, this::quit,
             this::windowActivated, this::windowClosed,
             state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
@@ -498,10 +505,40 @@ public final class JasperApplication {
 
     static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
                                         BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir) {
-        ConfigSnapshot initial = snapshots.get();
-        return new ShellLauncher(executor, () -> LaunchSettings.resolve(snapshots.get(),
-            System.getProperty("os.name"), System.getenv(), initial.columns(), initial.lines(), integrationDir), start);
+        String os = System.getProperty("os.name");
+        Map<String, String> environment = System.getenv();
+        return windowLauncher(executor, snapshots, start, integrationDir, (requested, shell) -> ShellProfiles.resolve(requested,
+                ShellProfiles.available(os, environment, List.of(), Optional.empty(), shell), true, os, environment, shell),
+            message -> LOG.log(System.Logger.Level.WARNING, message));
     }
+
+    /**
+     * Each request's profile is resolved on the EDT by {@code profiles}, from the requested id (empty: the configured
+     * default) and the saved shell settings; {@code problems} hears why a profile was replaced.
+     */
+    static ShellLauncher windowLauncher(Executor executor, Supplier<ConfigSnapshot> snapshots,
+                                        BiFunction<Path, LaunchSettings, TerminalSession> start, Path integrationDir,
+                                        BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution> profiles,
+                                        Consumer<String> problems) {
+        ConfigSnapshot initial = snapshots.get();
+        String os = System.getProperty("os.name");
+        Map<String, String> environment = System.getenv();
+        return new ShellLauncher(executor, (Optional<String> requested) -> {
+            ConfigSnapshot snapshot = snapshots.get();
+            ShellProfiles.Resolution resolution = profiles.apply(requested, snapshot.terminal().shell());
+            resolution.warning().ifPresent(problems);
+            return LaunchSettings.resolve(snapshot, resolution.profile(), os, environment, initial.columns(), initial.lines(), integrationDir);
+        }, start);
+    }
+
+    /** A shell profile that could not start: shown with the configuration problems until the next reload. */
+    private void shellProfileProblem(String message) {
+        if (configuration != null) configuration.report(CoreSettings.TERMINAL_SHELL_PROFILE.name(), message);
+        else LOG.log(System.Logger.Level.WARNING, message);
+    }
+
+    /** The detected shell profiles, for Settings, new panes and plugins. EDT. */
+    ShellProfileCatalog shellProfiles() { return shellProfiles; }
 
     private static TerminalSession startSession(Path directory, LaunchSettings settings) {
         try {
@@ -678,6 +715,7 @@ public final class JasperApplication {
         // await() below is never reached in that case.
         shutdown.arm(() -> plugins == null ? null : plugins.executing());
         launches.close();
+        shellProfiles.close();
         // Application-owned state first, so none of it depends on plugins behaving.
         history.close();
         List<CompletableFuture<?>> pluginWork = plugins == null ? List.of() : plugins.stop();

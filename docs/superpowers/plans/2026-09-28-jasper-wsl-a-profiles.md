@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 0-7 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
+**Status:** In progress: Tasks 0-8 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far: none.
@@ -2227,7 +2227,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Produces: `ShellProfileCatalog(String osName, Map<String,String> environment, Supplier<TerminalConfig.Shell> shell, Supplier<List<WslDistro>> distros, Supplier<Optional<String>> pwsh, Executor background)`, `ShellProfileCatalog.system(Supplier<TerminalConfig.Shell>)`, `current()`, `complete()`, `resolve(Optional<String>, TerminalConfig.Shell)`, `refresh()`, `onChanged(Runnable)` returning `Subscription`, `close()`; `JasperApplication.shellProfiles()` (package-private); `JasperApplication.windowLauncher(Executor, Supplier<ConfigSnapshot>, BiFunction<Path, LaunchSettings, TerminalSession>, Path, BiFunction<Optional<String>, TerminalConfig.Shell, ShellProfiles.Resolution>, Consumer<String>)`; `ConfigurationController.report(String, String)` shows each distinct problem once.
 - Consumes: Tasks 3, 6 and 7.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `ShellProfileCatalogTest.java`:
 
@@ -2425,13 +2425,13 @@ Add to `ConfigurationControllerTest.java`:
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.launch.ShellProfileCatalogTest' --tests 'dev.jasper.app.application.ShellProfileLaunchTest' --tests 'dev.jasper.app.workspace.ConfigurationControllerTest'`
 Expected: FAIL: compilation errors (`ShellProfileCatalog` and the six-argument `windowLauncher` do not exist). Once
 those compile, `applicationProblemsAreShownOnceUntilTheNextReload` still fails until `report` stops adding duplicates.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 `ShellProfileCatalog.java`:
 
@@ -2654,7 +2654,7 @@ with
 
 6. In `shutdown()`, after `launches.close();` add `shellProfiles.close();`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.launch.*' --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.workspace.ConfigurationControllerTest' --tests 'dev.jasper.app.workspace.ShellLauncherTest'`
 Expected: PASS.
@@ -2662,7 +2662,7 @@ Expected: PASS.
 Run: `./gradlew verifyApplicationArchitecture verifyTerminalArchitecture`
 Expected: PASS (`launch` now depends on `lifecycle`, which depends on nothing).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current
