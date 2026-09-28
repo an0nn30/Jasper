@@ -64,41 +64,6 @@ class TabHeightTest {
         });
     }
 
-    @Test void viewControlStartsAtCurrentHeightCommitsOnlyOnOkAndCanReset() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>())); owner.setTabHeight(47);
-            JMenuItem item = heightItem(owner);
-            owner.confirmTabHeight = panel -> {
-                JSpinner spinner = spinner(panel);
-                assertThat(spinner.getValue()).isEqualTo(47);
-                assertThat(((SpinnerNumberModel) spinner.getModel()).getMinimum()).isEqualTo(20);
-                assertThat(((SpinnerNumberModel) spinner.getModel()).getMaximum()).isEqualTo(72);
-                ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().setText("52");
-                return JOptionPane.OK_OPTION;
-            };
-            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(52);
-            owner.confirmTabHeight = panel -> {
-                assertThat(spinner(panel).getValue()).isEqualTo(52);
-                spinner(panel).setValue(66); return JOptionPane.CANCEL_OPTION;
-            };
-            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(52);
-            owner.confirmTabHeight = panel -> {
-                ((JButton) WindowTabsTest.named(panel, "resetTabHeight")).doClick();
-                assertThat(spinner(panel).getValue()).isEqualTo(30);
-                return JOptionPane.OK_OPTION;
-            };
-            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(30);
-            owner.confirmTabHeight = panel -> { spinner(panel).setValue(65); return JOptionPane.CLOSED_OPTION; };
-            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(30);
-            owner.onError = message -> {};
-            owner.confirmTabHeight = panel -> {
-                ((JSpinner.DefaultEditor) spinner(panel).getEditor()).getTextField().setText("99");
-                return JOptionPane.OK_OPTION;
-            };
-            item.doClick(); assertThat(owner.tabHeight()).isEqualTo(30);
-        });
-    }
-
     @Test void closingOwnerClearsGeometryCallbackAndIgnoresLaterAppearanceEdits() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>())); var changes = new AtomicInteger();
@@ -110,15 +75,4 @@ class TabHeightTest {
         });
     }
 
-    private static JSpinner spinner(java.awt.Container panel) {
-        return (JSpinner) WindowTabsTest.named(panel, "tabHeight");
-    }
-    private static JMenuItem heightItem(WindowContent owner) {
-        JMenu view = owner.menuBar().getMenu(2);
-        for (int i = 0; i < view.getItemCount(); i++) {
-            JMenuItem item = view.getItem(i);
-            if (item != null && item.getText().equals("Tab height\u2026")) return item;
-        }
-        throw new AssertionError("View must expose Tab height");
-    }
 }

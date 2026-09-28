@@ -378,7 +378,7 @@ public final class JasperApplication {
                     context -> new dev.jasper.app.shortcuthelp.KeymapPage(keymap, context), context -> pluginManager().page(context)),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
                     this::openConfigFile, this::migrateConfiguration, this::browse, dev.jasper.app.settingsui.SettingsDialog::askDiscard));
-            configuration.settingsOpener(owner -> openSettings(owner.id(), null));
+            configuration.settingsOpener((owner, page) -> openSettings(owner.id(), page));
         }
         boolean[] replayed = new boolean[1];
         // subscribe replays the current theme at once; plugins read the look on demand, so only later changes are events.

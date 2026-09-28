@@ -4,9 +4,7 @@ import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.contributions.PanelRegion;
 import java.awt.Rectangle;
-import java.awt.event.ActionEvent;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -111,38 +109,6 @@ class RailWidthTest {
         });
     }
 
-    @Test void viewControlStartsAtCurrentWidthCommitsOnlyOnOkAndCanReset() throws Exception {
-        edt(() -> {
-            var owner = content(launcher(new ArrayDeque<>())); owner.setRailWidth(40);
-            JMenuItem item = widthItem(owner);
-            owner.confirmRailWidth = panel -> {
-                JSpinner spinner = spinner(panel);
-                assertThat(spinner.getValue()).isEqualTo(40);
-                assertThat(((SpinnerNumberModel) spinner.getModel()).getMinimum()).isEqualTo(28);
-                assertThat(((SpinnerNumberModel) spinner.getModel()).getMaximum()).isEqualTo(64);
-                ((JSpinner.DefaultEditor) spinner.getEditor()).getTextField().setText("50");
-                return JOptionPane.OK_OPTION;
-            };
-            item.doClick(); assertThat(owner.railWidth()).isEqualTo(50);
-            owner.confirmRailWidth = panel -> { spinner(panel).setValue(60); return JOptionPane.CANCEL_OPTION; };
-            item.doClick(); assertThat(owner.railWidth()).isEqualTo(50);
-            owner.confirmRailWidth = panel -> {
-                ((JButton) WindowTabsTest.named(panel, "resetRailWidth")).doClick();
-                assertThat(spinner(panel).getValue()).isEqualTo(28);
-                return JOptionPane.OK_OPTION;
-            };
-            item.doClick(); assertThat(owner.railWidth()).isEqualTo(28);
-            var errors = new ArrayList<String>(); owner.onError = errors::add;
-            owner.confirmRailWidth = panel -> {
-                ((JSpinner.DefaultEditor) spinner(panel).getEditor()).getTextField().setText("99");
-                return JOptionPane.OK_OPTION;
-            };
-            item.doClick(); assertThat(owner.railWidth()).isEqualTo(28);
-            assertThat(errors).singleElement().asString().contains("28").contains("64");
-            assertThat(owner.commands().entries().stream().map(entry -> entry.command().id())).contains("view.rail_width");
-        });
-    }
-
     @Test void closingTheWindowIgnoresLaterWidthChanges() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
@@ -150,20 +116,7 @@ class RailWidthTest {
             owner.close();
             owner.setRailWidth(60);
             assertThat(owner.railWidth()).isEqualTo(44);
-            assertThat(owner.confirmRailWidth.applyAsInt(new JPanel())).isEqualTo(JOptionPane.CANCEL_OPTION);
         });
     }
 
-    private static JSpinner spinner(java.awt.Container panel) {
-        return (JSpinner) WindowTabsTest.named(panel, "railWidth");
-    }
-
-    private static JMenuItem widthItem(WindowContent owner) {
-        JMenu view = owner.menuBar().getMenu(2);
-        for (int i = 0; i < view.getItemCount(); i++) {
-            JMenuItem item = view.getItem(i);
-            if (item != null && item.getText().equals("Rail width…")) return item;
-        }
-        throw new AssertionError("View must expose Rail width");
-    }
 }

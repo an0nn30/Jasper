@@ -40,7 +40,7 @@ final class ConfigurationController implements AutoCloseable {
     private List<ConfigDiagnostic> themeProblems = List.of();
     private Predicate<String> pluginSettingsExist = id -> false;
     private final List<Consumer<ConfigService.State>> stateListeners = new java.util.ArrayList<>();
-    private Consumer<WindowContent> settingsOpener;
+    private java.util.function.BiConsumer<WindowContent, String> settingsOpener;
     private final java.util.Map<Path, java.util.LinkedHashSet<ConfigDiagnostic>> pluginReports = new java.util.LinkedHashMap<>();
 
     /** The saved state plus theme problems, application problems since the last reload, and problems plugins reported about their own settings files. */
@@ -91,7 +91,7 @@ final class ConfigurationController implements AutoCloseable {
         catch (ThemeController.InstallationFailure ignored) {
             // Already recorded as a theme problem below; a theme that cannot be installed never stops start-up.
         }
-        settingsOpener = owner -> reportFailure(owner, service.openSettings(editor));
+        settingsOpener = (owner, page) -> reportFailure(owner, service.openSettings(editor));
         service.start(this::accept);
     }
 
@@ -113,8 +113,9 @@ final class ConfigurationController implements AutoCloseable {
     void register(WindowContent owner) {
         requireEdt();
         if (closed || !owners.add(owner)) return;
-        owner.connectConfiguration(() -> settingsOpener.accept(owner),
+        owner.connectConfiguration(() -> settingsOpener.accept(owner, null),
             () -> reportFailure(owner, service.reload()), () -> migrateFor(owner), () -> unregister(owner));
+        owner.connectSettings(this::save, page -> settingsOpener.accept(owner, page));
         owner.applyConfiguration(state.snapshot(), service.macOs());
         owner.setConfigurationState(shown());
     }
@@ -163,8 +164,11 @@ final class ConfigurationController implements AutoCloseable {
         }));
     }
 
-    /** What Cmd+, and each window's Settings command open; by default config.toml in an editor. */
-    void settingsOpener(Consumer<WindowContent> opener) {
+    /**
+     * What Cmd+, each window's Settings command and View \u203a Window Settings\u2026 open, with the page to show (null for the
+     * last one visited); by default config.toml in an editor.
+     */
+    void settingsOpener(java.util.function.BiConsumer<WindowContent, String> opener) {
         requireEdt();
         settingsOpener = java.util.Objects.requireNonNull(opener, "opener");
     }

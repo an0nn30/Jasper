@@ -85,23 +85,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     static final int MAX_TAB_HEIGHT = 72;
     private int tabHeight = DEFAULT_TAB_HEIGHT;
     Runnable onTabHeightChanged = () -> {};
-    java.util.function.ToIntFunction<JComponent> confirmTabHeight = control -> JOptionPane.showConfirmDialog(
-        this, control, "Tab height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
-    java.util.function.ToIntFunction<JComponent> confirmRailWidth = control -> JOptionPane.showConfirmDialog(
-        this, control, "Rail width", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     private int toolbarHeight = ConfigSnapshot.DEFAULT_TOOLBAR_HEIGHT;
-    java.util.function.ToIntFunction<JComponent> confirmToolbarHeight = control -> JOptionPane.showConfirmDialog(
-        this, control, "Toolbar height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     private int statusBarHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
-    java.util.function.ToIntFunction<JComponent> confirmStatusBarHeight = control -> JOptionPane.showConfirmDialog(
-        this, control, "Status bar height", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     private boolean closed;
     private boolean rearranging;
     private WindowTerminals terminals;
     private boolean active = true;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
     private Runnable openSettings, reloadConfiguration, migrateConfiguration;
+    private java.util.function.Function<dev.jasper.app.config.SettingsEdit, java.util.concurrent.CompletableFuture<?>> saveSettings;
+    private Consumer<String> openSettingsAt;
+    private ConfigService.State configurationState;
+    static final String REJECTED_CHOICE = "config.toml has errors, so changes can't be saved until they're fixed.";
     private Runnable unregisterConfiguration = () -> {};
     Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
         this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
@@ -367,8 +363,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         updateActions();
     }
 
+    /** How View choices save, and how Window Settings\u2026 opens a Settings page; connected with the configuration. */
+    public void connectSettings(java.util.function.Function<dev.jasper.app.config.SettingsEdit, java.util.concurrent.CompletableFuture<?>> save,
+                                Consumer<String> openAt) {
+        if (closed) return;
+        saveSettings = java.util.Objects.requireNonNull(save);
+        openSettingsAt = java.util.Objects.requireNonNull(openAt);
+        updateActions();
+    }
+
     public void disconnectConfiguration() {
         openSettings = null; reloadConfiguration = null; migrateConfiguration = null; unregisterConfiguration = () -> {};
+        saveSettings = null; openSettingsAt = null; configurationState = null;
         status().onConfigurationDetails = () -> {};
         status().configButton().setEnabled(false);
         updateActions();
@@ -376,6 +382,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     public void setConfigurationState(ConfigService.State state) {
         if (closed) return;
+        configurationState = state;
         status().setConfiguration(state);
         status().onConfigurationDetails = () -> {
             String details = state.file() + "\n\n" + (state.diagnostics().isEmpty()
@@ -411,6 +418,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean closed() { return closed; }
     boolean configurationConnected() { return openSettings != null && reloadConfiguration != null; }
     void openSettings() { openSettings.run(); }
+    boolean settingsConnected() { return openSettingsAt != null; }
+    void openWindowSettings() { if (openSettingsAt != null) openSettingsAt.accept("window"); }
     void reloadConfiguration() { reloadConfiguration.run(); }
     void requestNewWindow() { newWindow.accept(directory()); }
     void requestQuit() { quit.run(); }
@@ -713,10 +722,52 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     TerminalColors terminalColors() { return themes.terminalColors(); }
 
-    /** A session-only terminal palette choice shared by every window; the chrome is unchanged. */
+    /** View \u203a Terminal Colors: saved for every window; applied to this window's themes when no configuration is connected. */
     void selectTerminalColors(TerminalColors colors) {
+        choose(dev.jasper.app.config.CoreSettings.TERMINAL_COLORS, colors, () -> {
+            themes.selectTerminalColors(colors);
+            chrome.refreshTheme();
+        });
+    }
+
+    /** View \u203a Toolbar. */
+    void chooseToolbarMode(ToolbarMode mode) {
+        choose(dev.jasper.app.config.CoreSettings.WINDOW_TOOLBAR, mode, () -> setToolbarMode(mode));
+    }
+
+    /** View \u203a Status Bar. */
+    void chooseStatusVisible(boolean visible) {
+        choose(dev.jasper.app.config.CoreSettings.WINDOW_STATUS_BAR, visible, () -> setStatusVisible(visible));
+    }
+
+    /**
+     * A View choice. With a configuration it is saved, and every window follows the reload; a rejected file or a
+     * failed save leaves everything as it was and says why. Without one it applies here only.
+     */
+    private <T> void choose(dev.jasper.app.settings.Setting<T> setting, T value, Runnable locally) {
         if (closed) return;
-        themes.selectTerminalColors(colors);
+        var save = saveSettings;
+        var state = configurationState;
+        if (save == null || state == null) { locally.run(); return; }
+        if (state.rejected()) { revertChoices(); onError.accept(REJECTED_CHOICE); return; }
+        java.util.concurrent.CompletableFuture<?> result;
+        try { result = save.apply(dev.jasper.app.config.SettingsEdit.of(setting, value, state.values())); }
+        catch (RuntimeException failure) { result = java.util.concurrent.CompletableFuture.failedFuture(failure); }
+        result.whenComplete((ignored, failure) -> {
+            if (failure == null) return;
+            SwingUtilities.invokeLater(() -> {
+                if (closed) return;
+                revertChoices();
+                Throwable cause = failure instanceof java.util.concurrent.CompletionException && failure.getCause() != null
+                    ? failure.getCause() : failure;
+                onError.accept(cause.getMessage());
+            });
+        });
+    }
+
+    /** A clicked check box or radio item shows its new state at once; put the menus back to what is in effect. */
+    private void revertChoices() {
+        updateActions();
         chrome.refreshTheme();
     }
 
@@ -840,10 +891,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         refreshTabs();
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
-        confirmTabHeight = control -> JOptionPane.CANCEL_OPTION;
-        confirmRailWidth = control -> JOptionPane.CANCEL_OPTION;
-        confirmToolbarHeight = control -> JOptionPane.CANCEL_OPTION;
-        confirmStatusBarHeight = control -> JOptionPane.CANCEL_OPTION;
         onTitle = title -> {}; onError = message -> {}; onMinimumSizeChanged = () -> {};
         onToggleBuddy = () -> {}; buddyEnabled = () -> false;
         activityListeners.clear();
