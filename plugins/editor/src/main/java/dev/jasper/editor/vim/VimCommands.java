@@ -64,6 +64,7 @@ public final class VimCommands {
         Numbers.register(commands);
         Format.register(commands);
         ViewCommands.register(commands);
+        Ex.register(commands);
         return commands;
     }
 

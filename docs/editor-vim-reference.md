@@ -233,6 +233,9 @@ After an operator, and in Visual mode, where they extend the area.
 | `zv` | open the folds that hide the cursor line |
 | `zR` | open every fold |
 | `zM` | close every fold |
+| `:` | a command line; with a count, for that many lines (`:.,.+N`) |
+| `&` | repeat the last `:s` on the line, without its flags |
+| `g&` | repeat the last `:s` on every line, with its flags (`:%s//~/&`) |
 
 ## Visual-mode commands
 
@@ -280,6 +283,7 @@ In Visual mode, besides the motions, operators and text objects above. A change 
 | `<C-b>` | scroll up {count} pages |
 | `<PageUp>` | scroll up {count} pages |
 | `<S-Up>` | scroll up {count} pages |
+| `:` | a command line for the Visual lines (`:'<,'>`) |
 
 ## Insert-mode keys
 
@@ -313,3 +317,52 @@ Printable keys type text; these keys do more.
 | `<Down>` | move the cursor, starting a new insert for undo and . |
 | `<Home>` | move the cursor, starting a new insert for undo and . |
 | `<End>` | move the cursor, starting a new insert for undo and . |
+
+## Ex commands
+
+Typed after `:` and ended by `<CR>`. A range goes before the name: `3`, `.`, `$`, `%`, `'x`, `/pattern/`, `?pattern?`,
+`\/`, `\?` and `\&`, each with `+N` or `-N` offsets, separated by `,` or `;`; `'<,'>` and `*` are the last Visual lines.
+`|` separates commands. When a command line says more than one line, the output stays above the Vim bar until a
+key is typed. A command Vim has and Jasper does not fails with E319.
+
+| Command | What it does |
+|---|---|
+| `:p[rint]` | print the lines ([range], default the cursor line); `P` too |
+| `:P[rint]` | print the lines, as `:print` |
+| `:l[ist]` | print the lines with tabs as `^I` and `$` at the end |
+| `:nu[mber]` | print the lines with their numbers |
+| `:#` | print the lines with their numbers, as `:number` |
+| `:=` | show the last line's number, or the range's last |
+| `:d[elete]` | delete the lines [into a register] [count] |
+| `:y[ank]` | yank the lines [into a register] [count] |
+| `:>` | shift the lines right; `>>` twice, and so on |
+| `:<` | shift the lines left; `<<` twice, and so on |
+| `:pu[t]` | put a register as lines below the line; `!` above; `:0put` above the first |
+| `:j[oin]` | join the lines (at least two); `!` without spaces |
+| `:co[py]` | copy the lines below {address} |
+| `:t` | copy the lines below {address}, as `:copy` |
+| `:m[ove]` | move the lines below {address} |
+| `:norm[al]` | run {keys} as Normal-mode keys, on each line of the range |
+| `:sor[t]` | sort the lines (all by default); `!` reverses; `i`, `n`, `x`, `o`, `b`, `f`, `u`, `r` and a `/pattern/` |
+| `:le[ft]` | align the lines left, with [indent] |
+| `:ri[ght]` | align the lines right at [width] ('textwidth', or 80) |
+| `:ce[nter]` | center the lines in [width] ('textwidth', or 80) |
+| `:s[ubstitute]` | `:s/pattern/string/flags [count]`: replace matches; flags `& c e g i I n p # l r` |
+| `:&` | repeat the last `:s` with the same pattern and string; `:&&` keeps its flags |
+| `:~` | repeat the last `:s` with the last used pattern |
+| `:g[lobal]` | `:g/pattern/cmd`: run cmd (default `:p`) on the matching lines; `!` on the others |
+| `:v[global]` | `:v/pattern/cmd`: run cmd on the lines that do not match |
+| `:k` | set a mark at the line (`:ka`, `:k a`) |
+| `:ma[rk]` | set a mark at the line |
+| `:delm[arks]` | delete marks (`a b-d`); `!` all lowercase ones |
+| `:marks` | list the marks, or those named |
+| `:ju[mps]` | list the jumplist |
+| `:changes` | list the change list |
+| `:reg[isters]` | list the registers, or those named |
+| `:di[splay]` | list the registers, as `:registers` |
+| `:u[ndo]` | undo one change; `:undo N` goes to the text after change N |
+| `:red[o]` | redo one change |
+| `:noh[lsearch]` | hide the 'hlsearch' matches until the next search |
+| `:se[t]` | show or set options: `opt`, `noopt`, `invopt`, `opt!`, `opt&`, `opt?`, `opt=val`, `+=`, `-=`, `^=`, `all` |
+| `:setl[ocal]` | `:set` for this tab's local values only |
+| `:setg[lobal]` | `:set` for the global values only |

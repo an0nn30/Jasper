@@ -1,0 +1,1733 @@
+# Ex :s, :&, :&&, :~, & and g& (V2a).
+
+=== s replaces the first match
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s g replaces all in the line
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/g<CR>
+--- vim 9.1
+expect-text:
+  X bar X
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s on a range
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar X
+  baz
+  X foo foo
+expect-cursor: 4,1
+expect-mode: normal
+expect-output:
+  3 substitutions on 3 lines
+
+=== s g on all lines reports
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/g<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  X bar X
+  bar X
+  baz
+  X X X
+expect-cursor: 4,1
+expect-mode: normal
+expect-output:
+  6 substitutions on 3 lines
+
+=== s puts the cursor on the last changed line
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar X
+  baz
+  X foo foo
+expect-cursor: 4,1
+expect-mode: normal
+
+=== s cursor goes to the first non-blank
+text:
+    foo
+    bar
+cursor: 2,1
+keys: :%s/foo/X/<CR>
+--- vim 9.1
+expect-text:
+    X
+    bar
+expect-cursor: 1,3
+expect-mode: normal
+
+=== s not found
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/zzz/X/<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E486: Pattern not found: zzz
+
+=== s not found with e is silent
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/zzz/X/e<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+
+=== s with an empty pattern uses the last search
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 2,1
+keys: /bar<CR>:s//X/<CR>
+--- vim 9.1
+expect-text:
+  foo X foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s sets the last search for n
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/bar/X/<CR>n
+--- vim 9.1
+expect-text:
+  foo X foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s pattern with a different delimiter
+text:
+  a/b/c
+cursor: 1,1
+keys: :s#/#-#g<CR>
+--- vim 9.1
+expect-text:
+  a-b-c
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s delimiter escaped in the pattern
+text:
+  a/b/c
+cursor: 1,1
+keys: :s/\//-/<CR>
+--- vim 9.1
+expect-text:
+  a-b/c
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s letters as delimiter fail
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :sxfooxbarx<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: sxfooxbarx
+
+=== s without closing delimiter
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s without a substitute deletes
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo<CR>
+--- vim 9.1
+expect-text:
+   bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,2
+expect-mode: normal
+
+=== s ampersand is the match
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/fo*/<&>/g<CR>
+--- vim 9.1
+expect-text:
+  <foo> bar <foo>
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s backslash zero is the match
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/bar/[\0]/<CR>
+--- vim 9.1
+expect-text:
+  foo [bar] foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s groups
+text:
+  john smith
+cursor: 1,1
+keys: :s/\(\w\+\) \(\w\+\)/\2, \1/<CR>
+--- vim 9.1
+expect-text:
+  smith, john
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s upper case one
+text:
+  hello world
+cursor: 1,1
+keys: :s/\w\+/\u&/g<CR>
+--- vim 9.1
+expect-text:
+  Hello World
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s upper case all
+text:
+  hello world
+cursor: 1,1
+keys: :s/o w/\U&/<CR>
+--- vim 9.1
+expect-text:
+  hellO World
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s upper case until e
+text:
+  hello world
+cursor: 1,1
+keys: :s/\(hello\) \(world\)/\U\1\e \2/<CR>
+--- vim 9.1
+expect-text:
+  HELLO world
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s lower case
+text:
+  HELLO WORLD
+cursor: 1,1
+keys: :s/\w\+/\L&/<CR>
+--- vim 9.1
+expect-text:
+  hello WORLD
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s lower then upper first
+text:
+  hELLO
+cursor: 1,1
+keys: :s/.*/\L\u&/<CR>
+--- vim 9.1
+expect-text:
+  Hello
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s backslash r splits the line
+text:
+  a,b,c
+cursor: 1,1
+keys: :s/,/\r/g<CR>
+--- vim 9.1
+expect-text:
+  a
+  b
+  c
+expect-cursor: 3,1
+expect-mode: normal
+
+=== s backslash n makes a nul
+text:
+  a,b
+cursor: 1,1
+keys: :s/,/-\t-/<CR>
+--- vim 9.1
+expect-text:
+  a-	-b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s literal ampersand
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/a\&b/<CR>
+--- vim 9.1
+expect-text:
+  a&b bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s backslash backslash
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/a\\b/<CR>
+--- vim 9.1
+expect-text:
+  a\b bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s tilde is the previous substitute
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>:s/bar/~Y/<CR>
+--- vim 9.1
+expect-text:
+  X XY foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s escaped tilde
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/a\~b/<CR>
+--- vim 9.1
+expect-text:
+  a~b bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s tilde in the pattern
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/bar/<CR>:s/~/Z/<CR>
+--- vim 9.1
+expect-text:
+  Z bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s with a count
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/ 2<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar X
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+
+=== s count after a range starts at its end
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :1,2s/foo/X/ 2<CR>
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar X
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s zero count
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/ 0<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E939: Positive count required
+
+=== s trailing characters
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/ q<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E488: Trailing characters: q
+
+=== s then bar
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/|2d<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s n counts matches
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 2,1
+keys: :%s/foo//gn<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  6 matches on 3 lines
+
+=== s n counts without moving
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 2,2
+keys: :%s/foo//n<CR>
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s i ignores case
+text:
+  Foo foo
+cursor: 1,1
+keys: :s/FOO/x/gi<CR>
+--- vim 9.1
+expect-text:
+  x x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s I keeps case with ignorecase
+text:
+  Foo foo
+cursor: 1,1
+set: ic
+keys: :s/foo/x/gI<CR>
+--- vim 9.1
+expect-text:
+  Foo x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s with ignorecase
+text:
+  Foo foo
+cursor: 1,1
+set: ic
+keys: :s/foo/x/<CR>
+--- vim 9.1
+expect-text:
+  x foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s with smartcase
+text:
+  Foo foo
+cursor: 1,1
+set: ic scs
+keys: :s/Foo/x/g<CR>
+--- vim 9.1
+expect-text:
+  x foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s p prints the line
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/p<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  X bar foo
+
+=== s hash prints it numbered
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/#<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+    1 X bar foo
+
+=== s l lists it
+text:
+  a	foo
+cursor: 1,1
+keys: :s/foo/X/l<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a	X
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  a^IX$$
+
+=== s with gdefault replaces all
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+set: gd
+keys: :s/foo/X/<CR>
+--- vim 9.1
+expect-text:
+  X bar X
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s with gdefault and g replaces the first
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+set: gd
+keys: :s/foo/X/g<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s repeat with s alone
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>j:s<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar X
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s repeat keeps no flags
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/g<CR>:4s<CR>
+--- vim 9.1
+expect-text:
+  X bar X
+  bar foo
+  baz
+  X foo foo
+expect-cursor: 4,1
+expect-mode: normal
+
+=== s repeat with ampersand keeps flags
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/g<CR>:4&&<CR>
+--- vim 9.1
+expect-text:
+  X bar X
+  bar foo
+  baz
+  X X X
+expect-cursor: 4,1
+expect-mode: normal
+
+=== s repeat with new flags
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>:4s g<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  X X X
+expect-cursor: 4,1
+expect-mode: normal
+
+=== sg is s with g
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>:4sg<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  X X X
+expect-cursor: 4,1
+expect-mode: normal
+
+=== s without a previous substitute
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E33: No previous substitute regular expression
+
+=== s empty pattern without any previous
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s//x/<CR><CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  E35: No previous regular expression
+  E476: Invalid command
+
+=== s bad pattern
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/\(/x/<CR><CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  E54: Unmatched \(
+  E476: Invalid command
+
+=== s backslash slash uses the search pattern
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: /bar<CR>:s/foo/X/<CR>:2s\/Y/<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  Y foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s backslash ampersand uses the substitute pattern
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: /bar<CR>:s/foo/X/<CR>/baz<CR>:4s\&Y/<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  Y/ foo foo
+expect-cursor: 4,1
+expect-mode: normal
+
+=== s r uses the last search pattern
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>/bar<CR>:2s//Y/r<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  Y foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== tilde command uses the last pattern
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>/bar<CR>:~<CR>
+--- vim 9.1
+expect-text:
+  X X foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== ampersand command
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>:4&<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  X foo foo
+expect-cursor: 4,1
+expect-mode: normal
+
+=== ampersand normal repeats on the line
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>j&
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar X
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== ampersand normal with a count
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>j2&
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar X
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== ampersand normal without a previous
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: &
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E33: No previous substitute regular expression
+
+=== g ampersand repeats everywhere with flags
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/g<CR>ug&
+--- vim 9.1
+expect-text:
+  X bar X
+  bar X
+  baz
+  X X X
+expect-cursor: 4,1
+expect-mode: normal
+
+=== g ampersand uses the last search
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/g<CR>u/bar<CR>g&
+--- vim 9.1
+expect-text:
+  foo X foo
+  X foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s then undo
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/g<CR>u
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s then undo the cursor
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 3,2
+keys: :%s/foo/X/g<CR>u
+--- vim 9.1
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s empty match at every position
+text:
+  abc
+cursor: 1,1
+keys: :s/x*/-/g<CR>
+--- vim 9.1
+expect-text:
+  -a-b-c
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s dollar appends
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/$/!/<CR>
+--- vim 9.1
+expect-text:
+  foo bar foo!
+  bar foo!
+  baz!
+  foo foo foo!
+expect-cursor: 4,1
+expect-mode: normal
+
+=== s caret prepends
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/^/> /<CR>
+--- vim 9.1
+expect-text:
+  > foo bar foo
+  > bar foo
+  > baz
+  > foo foo foo
+expect-cursor: 4,1
+expect-mode: normal
+
+=== s join lines with backslash n
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/\n//<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foobar foobazfoo foo foo
+expect-cursor: 1,22
+expect-mode: normal
+expect-output:
+  3 substitutions on 1 line
+
+=== s join two lines
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/\n//<CR>
+--- vim 9.1
+expect-text:
+  foo bar foobar foo
+  baz
+  foo foo foo
+expect-cursor: 1,12
+expect-mode: normal
+
+=== s join with a flag
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :1,2s/\n//p<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar foobar foobaz
+  foo foo foo
+expect-cursor: 1,19
+expect-mode: normal
+expect-output:
+  foo bar foobar foobaz
+
+=== s newline to comma
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/\n/,/<CR>
+--- vim 9.1
+expect-text:
+  foo bar foo,bar foo,baz,foo foo foo,
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s multi line match
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo\nbar/X/<CR>
+--- vim 9.1
+expect-text:
+  foo bar X foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s match across lines with g
+text:
+  a1
+  b2
+  a3
+  b4
+cursor: 1,1
+keys: :%s/\d\n\(b\)/-\1/g<CR>
+--- vim 9.1
+expect-text:
+  a-b2
+  a-b4
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s zs
+text:
+  foobar
+cursor: 1,1
+keys: :s/foo\zsbar/X/<CR>
+--- vim 9.1
+expect-text:
+  fooX
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s ze
+text:
+  foobar
+cursor: 1,1
+keys: :s/foo\zebar/X/<CR>
+--- vim 9.1
+expect-text:
+  Xbar
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s zs after a newline
+text:
+  a
+  b
+cursor: 1,1
+keys: :%s/a\n\zsb/X/<CR>
+--- vim 9.1
+expect-text:
+  a
+  X
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s group across lines
+text:
+  ab
+  cd
+cursor: 1,1
+keys: :s/\(b\nc\)/[\1]/<CR>
+--- vim 9.1
+expect-text:
+  a[b
+  c]d
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s replaces a mark line and keeps marks
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 2,1
+keys: ma:%s/foo/X/g<CR>'a
+--- vim 9.1
+expect-text:
+  X bar X
+  bar X
+  baz
+  X X X
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s sets the jumplist
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 4,1
+keys: :1s/foo/X/<CR><C-o>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 4,1
+expect-mode: normal
+
+=== s repeat keeps the cursor column after dollar
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/<CR>2G$:s<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar X
+  baz
+  foo foo foo
+expect-cursor: 2,5
+expect-mode: normal
+
+=== s confirm y
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/gc<CR>yy
+--- vim 9.1
+expect-text:
+  X bar X
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s confirm n then y
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/gc<CR>ny
+--- vim 9.1
+expect-text:
+  foo bar X
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s confirm q stops
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/gc<CR>yq
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,7
+expect-mode: normal
+
+=== s confirm a does the rest
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/gc<CR>na
+output: yes
+--- vim 9.1
+expect-text:
+  foo bar X
+  bar X
+  baz
+  X X X
+expect-cursor: 4,1
+expect-mode: normal
+expect-output:
+  replace with X (y/n/a/q/l/^E/^Y)?
+  replace with X (y/n/a/q/l/^E/^Y)?
+  5 substitutions on 3 lines
+
+=== s confirm l does this and stops
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/gc<CR>nl
+--- vim 9.1
+expect-text:
+  foo bar X
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s confirm Esc stops
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/gc<CR>y<Esc>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,7
+expect-mode: normal
+
+=== s confirm other keys ask again
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/gc<CR>xzyn
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,7
+expect-mode: normal
+
+=== s confirm across lines
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/c<CR>ynyy
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  X foo foo
+expect-cursor: 4,1
+expect-mode: operator-pending
+
+=== s confirm with a split
+text:
+  a,b,c
+cursor: 1,1
+keys: :s/,/\r/gc<CR>yny
+--- vim 9.1
+expect-text:
+  a
+  b,c
+expect-cursor: 2,2
+expect-mode: operator-pending
+
+=== s confirm then undo
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/gc<CR>yyyyyy<Esc>u
+--- vim 9.1
+expect-text:
+  X bar X
+  bar X
+  baz
+  foo foo foo
+expect-cursor: 4,1
+expect-mode: normal
+
+=== s confirm cursor stays on the last match
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/gc<CR>ny
+--- vim 9.1
+expect-text:
+  foo bar X
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s confirm reports
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :%s/foo/X/gc<CR>yyyy<Esc>
+output: yes
+--- vim 9.1
+expect-text:
+  X bar X
+  bar X
+  baz
+  X foo foo
+expect-cursor: 4,3
+expect-mode: normal
+expect-output:
+  replace with X (y/n/a/q/l/^E/^Y)?
+  replace with X (y/n/a/q/l/^E/^Y)?
+  replace with X (y/n/a/q/l/^E/^Y)?
+  replace with X (y/n/a/q/l/^E/^Y)?
+  replace with X (y/n/a/q/l/^E/^Y)?
+  4 substitutions on 3 lines
+
+=== s confirm then more of the line
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/c|2d<CR>y
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  X bar foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "bar foo\n"
+expect-register 0: none
+expect-register 1: l "bar foo\n"
+expect-register a: none
+expect-register -: none
+
+=== s on a visual range
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: Vj:s/foo/X/g<CR>
+--- vim 9.1
+expect-text:
+  X bar X
+  bar X
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== colon backslash ampersand uses the substitute pattern
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :s/o/o/<CR>:\&<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+
+=== backslash bar is not a separator
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :s/o/a\|b/<CR>
+--- vim 9.1
+expect-text:
+  a|bne
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s with a tab typed in the substitute
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/<C-v><Tab>/<CR>
+--- vim 9.1
+expect-text:
+  	 bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,3
+expect-mode: normal
+
+=== s literal CR splits
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/ /<C-v><CR>/<CR>
+--- vim 9.1
+expect-text:
+  foo
+  bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 2,1
+expect-mode: normal
+
+=== s with a backslash bar in the pattern
+text:
+  a|b
+cursor: 1,1
+keys: :s/a\|b/X/g<CR>
+--- vim 9.1
+expect-text:
+  X|X
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s reports lines with report 0
+text:
+  a
+  b
+cursor: 1,1
+set: report=0
+keys: :s/a/b/<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  b
+  b
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  1 substitution on 1 line
+
+=== s keeps a trailing comment
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/X/ "hello<CR>
+--- vim 9.1
+expect-text:
+  X bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+
+=== s expression is not available
+divergent: Jasper has no expressions: \= in a substitute string fails with E319 (docs/vim-divergences.md)
+text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+cursor: 1,1
+keys: :s/foo/\=1+1/<CR>
+output: yes
+--- expected
+expect-text:
+  foo bar foo
+  bar foo
+  baz
+  foo foo foo
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E319: Sorry, the command is not available in this version

@@ -20,9 +20,22 @@
   (stub page). Deferred to C3: a pending-changed callback for plugin controls; per-page dedupe of warnings from a
   throwing `modified()`/`keywords()`; contract cases for `page()`; the stub's Open in Editor failure going to a notice
   while Settings is modal; section-heading carry-over for unsectioned settings; the discard count per plugin page; the
-  Sample `settings.toml` "reads this file live" wording. Deviations: see the plan's status banner. Not pushed; not
-  merged.
-
+  Sample `settings.toml` "reads this file live" wording. Deviations: see the plan's status banner. Merged into local `main` on 2026-09-28
+  after merging main (Vim V2a) into the branch. Not pushed.
+- **Editor Vim mode, plan V2a** (branch `claude/vim-v2a`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v2a.md`, written 2026-09-28): the Ex command line — ranges (`;`, searches, marks, folds, `*`), `|`, Vim's 600
+  command names for abbreviations (E319 for those Jasper lacks), `:s` with every flag including confirmation, `:&`,
+  `:&&`, `:~`, `&`, `g&`, `:g`/`:g!`/`:v`, `:d :y :> :< :pu :j :m :t :co :norm :sort :left :right :center`,
+  `:p :P :l :nu :# :=`, `:k :mark :delm :marks :jumps :changes :reg :di`, `:u :red :noh`, `:set`/`:setlocal`/
+  `:setglobal` with do_set's syntax, the output panel (Vim's hit-enter prompt), questions that pause a command,
+  'report' messages, 'hlsearch' on and 'gdefault'. The corpus compares output (`output: yes`). Every file in the plan
+  was compiled and run against Vim 9.1 before the plan was written: 1565 corpus cases
+  (1560 recorded, 5 divergent).
+  - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
+  - `./gradlew check`: 4,068 tests, 0 failed, 0 errors, 5 skipped.
+  - Merged into local `main` on 2026-09-28 after merging main (plugin settings C1) into the branch; `./gradlew check`
+    on the merged tree: 4,099 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
+  - Not done: GUI checks 51–60 of the [checklist](editor-verification.md) (user-run); plans V2b, V3 and V4; push.
 - **Plugin settings C1** (`claude/plugin-settings`, 2026-09-28; spec
   `docs/superpowers/specs/2026-09-28-jasper-plugin-settings-design.md`, plan
   `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c1.md`): SDK `dev.jasper.sdk.settings` (declarations,

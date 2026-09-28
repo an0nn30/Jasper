@@ -52,7 +52,13 @@ final class CorpusRunner {
         editor.setCursor(new Pos(c.line() - 1, Text.column(start, c.col() - 1)));
         // Vim scrolls to the cursor before it reads the first key.
         editor.view().updateTopline();
+        editor.messageLog().clear();
         for (KeyInput key : KeyInput.parse(c.keys())) editor.feed(key);
+        List<String> output = null;
+        if (c.output()) {
+            output = new ArrayList<>();
+            for (String said : editor.messageLog()) for (String line : said.split("\n", -1)) if (!line.isEmpty()) output.add(line);
+        }
         Buffer buffer = editor.buffer();
         List<String> text = new ArrayList<>();
         for (int line = 0; line < buffer.count(); line++) text.add(buffer.line(line));
@@ -69,8 +75,9 @@ final class CorpusRunner {
             visual = (anchor.line + 1) + "," + (Text.characters(buffer.line(anchor.line), Math.min(anchor.col, buffer.line(anchor.line).length())) + 1);
         String view = c.window() == null ? null : editor.view().topline + "," + editor.view().leftcol;
         String folds = c.folds() == null ? null : closedFolds(editor);
+        String mode = editor.mode().id();
         editor.close();
-        return new CorpusCase.Expected("jasper", text, cursor.line + 1, col, editor.mode().id(), visual, registers, view, folds);
+        return new CorpusCase.Expected("jasper", text, cursor.line + 1, col, mode, visual, registers, view, folds, output);
     }
 
     /** The text's code folds as RSyntaxTextArea's Java fold parser finds them, those starting on the given lines closed. */
@@ -122,6 +129,7 @@ final class CorpusRunner {
         if (!java.util.Objects.equals(expected.view(), actual.view())) problems.add("view " + actual.view() + " (Vim: " + expected.view() + ")");
         if (!java.util.Objects.equals(expected.folds(), actual.folds())) problems.add("folds " + actual.folds() + " (Vim: " + expected.folds() + ")");
         if (!expected.registers().equals(actual.registers())) problems.add("registers " + show(actual.registers()) + " (Vim: " + show(expected.registers()) + ")");
+        if (expected.output() != null && !expected.output().equals(actual.output())) problems.add("output " + actual.output() + " (Vim: " + expected.output() + ")");
         return String.join("; ", problems);
     }
 

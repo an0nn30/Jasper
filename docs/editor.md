@@ -115,7 +115,13 @@ recorded corpus.
   mode, `<C-w>` deletes a word in Insert mode, and Tab (`<C-i>`) goes forward in the jumplist.
 - `"+` is the clipboard and `"*` the selection (the clipboard where there is none).
 - 'tabstop' and 'shiftwidth' start at `tab_size`, 'expandtab' follows the tab's Spaces or Tab setting, and
-  'autoindent' is on. 'incsearch' is on; 'hlsearch' is off until the `:` command line (with `:noh`) arrives.
+  'autoindent' is on. 'incsearch' and 'hlsearch' are on; `:noh` hides the highlight until the next search.
+- `:` opens the command line in the strip, with the same keys as `/` and its own history. It runs Vim's Ex commands
+  for editing, with Vim's ranges (`:3,5`, `:%`, `:'<,'>` after Visual mode, `:/pat/`, `:.,+3`): `:s` with every flag,
+  including `c`, which asks in the strip; `:g` and `:v`; `:d`, `:y`, `:m`, `:t`, `:j`, `:>`, `:pu`, `:norm`, `:sort`,
+  `:left`, `:right` and `:center`; `:marks`, `:reg`, `:jumps` and `:changes`; `:u`, `:noh` and `:set`. The
+  [reference](editor-vim-reference.md#ex-commands) lists them. When a command line says several lines (`:reg`,
+  `:g/pat/`) they stay above the strip until you type a key; `:` goes straight on to the next command line.
 - `<C-g>` shows the file, its line count and the cursor's position; `ga` the character's code.
 - Scrolling (`<C-e>`, `<C-d>`, `<C-f>`, `zt`, `zz`), `H`, `M`, `L` and the screen-line motions (`gj`, `g0`, `g$`)
   work on a window as many lines high and characters wide as the text area shows. Scrolling with the mouse or the
@@ -123,8 +129,9 @@ recorded corpus.
 - The fold commands (`zo`, `zc`, `za`, `zR`, `zM`, `zj`, `[z`) work on the Editor's code folds. A closed fold counts as
   one line for `j`, `k` and scrolling, an operator takes it whole, and the motions Vim's 'foldopen' names (`l`, `w`,
   searches, marks, `%`, `{`, `u`) open the fold they land in.
-- Not yet: the `:` command line, macros, a vimrc, and emulated plugins such as surround and commentary. They follow in
-  later releases. An uppercase mark (`mA`) works within its own tab.
+- Not yet: file, buffer and tab commands (`:w`, `:q`, `:e`, `ZZ`), Tab completion on the command line, relative line
+  numbers, macros, a vimrc, and emulated plugins such as surround and commentary. They follow in later releases. An
+  uppercase mark (`mA`) works within its own tab.
 
 ## For other plugins
 

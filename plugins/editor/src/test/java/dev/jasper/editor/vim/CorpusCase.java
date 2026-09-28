@@ -20,10 +20,11 @@ import java.util.Map;
  * @param window the window's size as {@code columnsxrows} ({@code 20x5}), or null; with it the view is compared
  * @param folds with {@code java}, the text's code folds as RSyntaxTextArea's Java fold parser finds them, followed
  *     by the first lines of the folds that start closed ({@code java 2 7}); null for none. The fold state is compared
+ * @param output whether what the keys said (messages, listings, errors) is compared
  * @param expected what Vim did, or null when the case has not been recorded
  */
 record CorpusCase(String file, String name, String divergent, String set, Map<Character, Register> given, List<String> text,
-                  int line, int col, String keys, List<Character> registers, String window, String folds, Expected expected) {
+                  int line, int col, String keys, List<Character> registers, String window, String folds, boolean output, Expected expected) {
     /**
      * A register's content as the corpus writes it.
      *
@@ -63,12 +64,13 @@ record CorpusCase(String file, String name, String divergent, String set, Map<Ch
      * @param registers the compared registers; a missing value means empty
      * @param view for a case with a window, its first line and (without 'wrap') first column: {@code topline,leftcol}
      * @param folds for a case with folds, the closed folds as {@code first-last} line ranges, or {@code none}
+     * @param output for a case that compares output, the lines said, empty lines left out; null otherwise
      */
     record Expected(String recordedBy, List<String> text, int line, int col, String mode, String visual, Map<Character, Register> registers,
-                    String view, String folds) { }
+                    String view, String folds, List<String> output) { }
 
     CorpusCase withExpected(Expected value) {
-        return new CorpusCase(file, name, divergent, set, given, text, line, col, keys, registers, window, folds, value);
+        return new CorpusCase(file, name, divergent, set, given, text, line, col, keys, registers, window, folds, output, value);
     }
 
     /** @return the window's columns and rows, from {@link #window} */

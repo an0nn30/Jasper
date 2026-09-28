@@ -331,7 +331,8 @@ final class Machine {
                     return;
                 }
                 boolean change = entry.change();
-                if (!entry.keys().equals("u") && !entry.keys().equals("<C-r>") && !ViewCommands.KEEP_COLUMN.contains(entry.keys()))
+                if (!entry.keys().equals("u") && !entry.keys().equals("<C-r>") && !ViewCommands.KEEP_COLUMN.contains(entry.keys())
+                    && !Ex.KEEP_COLUMN.contains(entry.keys()))
                     editor.forgetColumn();
                 if (change) beginChange();
                 try {

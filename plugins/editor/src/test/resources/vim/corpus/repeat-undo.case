@@ -428,3 +428,42 @@ expect-text:
   one two three
 expect-cursor: 1,5
 expect-mode: normal
+
+=== undo after A puts the cursor where the insert began
+text:
+  one
+  two
+cursor: 1,1
+keys: Ax<Esc>u
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,3
+expect-mode: normal
+
+=== undo after A on the second line puts the cursor where the insert began
+text:
+  one
+  two
+cursor: 2,1
+keys: Axyz<Esc>u
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 2,3
+expect-mode: normal
+
+=== undo after o
+text:
+  one
+  two
+cursor: 1,1
+keys: oxyz<Esc>u
+--- vim 9.1
+expect-text:
+  one
+  two
+expect-cursor: 1,1
+expect-mode: normal

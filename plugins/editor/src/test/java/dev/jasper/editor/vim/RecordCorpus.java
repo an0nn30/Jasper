@@ -78,6 +78,7 @@ public final class RecordCorpus {
             if (!Files.exists(out)) throw new IllegalStateException(c + ": Vim wrote no result; check the keys");
             @SuppressWarnings("unchecked")
             Map<String, Object> result = (Map<String, Object>) Json.parse(Files.readString(out, StandardCharsets.UTF_8).trim());
+            if (!result.containsKey("text")) throw new IllegalStateException(c + ": the keys left Vim waiting for more (a prompt?)");
             @SuppressWarnings("unchecked")
             List<String> text = (List<String>) result.get("text");
             Map<Character, CorpusCase.Register> registers = new LinkedHashMap<>();
@@ -98,10 +99,22 @@ public final class RecordCorpus {
             List<Long> view = (List<Long>) result.get("view");
             @SuppressWarnings("unchecked")
             List<String> closed = (List<String>) result.get("folds");
+            List<String> output = null;
+            if (c.output()) {
+                output = new ArrayList<>();
+                @SuppressWarnings("unchecked")
+                List<String> said = (List<String>) result.get("out");
+                // The recorder's Vim runs the keys while sourcing its script, so each error message comes with a
+                // header naming the script and line; a typed command line has none.
+                for (String line : said) {
+                    if (line.isEmpty() || line.startsWith("Error detected while processing ") || line.matches("line +\\d+:")) continue;
+                    output.add(line);
+                }
+            }
             return new CorpusCase.Expected(version, text, ((Long) result.get("line")).intValue(), ((Long) result.get("col")).intValue(),
                 mode((String) result.get("mode")), visual.isEmpty() ? null : visual.get(0) + "," + visual.get(1), registers,
                 c.window() == null ? null : view.get(0) + "," + view.get(1),
-                c.folds() == null ? null : closed.isEmpty() ? "none" : String.join(" ", closed));
+                c.folds() == null ? null : closed.isEmpty() ? "none" : String.join(" ", closed), output);
         } finally {
             try (Stream<Path> files = Files.list(folder)) { for (Path p : files.toList()) Files.deleteIfExists(p); }
             Files.deleteIfExists(folder);
@@ -165,7 +178,13 @@ public final class RecordCorpus {
         if (c.folds() != null) lines.addAll(foldCommands(c));
         lines.add("call setcursorcharpos(" + c.line() + ", " + c.col() + ")");
         lines.add("let g:jasper = {}");
+        // What the keys say is captured; 'nomore' keeps a long listing from waiting for a key.
+        lines.add("set nomore");
+        lines.add("let g:jasper_out = ''");
+        lines.add("redir => g:jasper_out");
         lines.add("call feedkeys(\"" + vimKeys(c.keys()) + "\\<Cmd>call JasperRecord()\\<CR>\", 'xt')");
+        lines.add("redir END");
+        lines.add("let g:jasper.out = split(g:jasper_out, \"\\n\", 1)");
         lines.add("call writefile([json_encode(g:jasper)], " + Json.quote(out.toString()) + ")");
         lines.add("qa!");
         return String.join("\n", lines) + "\n";

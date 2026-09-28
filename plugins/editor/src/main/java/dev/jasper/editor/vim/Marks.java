@@ -30,6 +30,8 @@ final class Marks {
     private final List<Pos> jumps = new ArrayList<>();
     private final List<Pos> changes = new ArrayList<>();
     private final List<Pos> extra = new ArrayList<>();
+    /** The lines {@code :global} marked (Vim's ml_setmarked): they move with the text and go when deleted. */
+    private final List<Pos> marked = new ArrayList<>();
     private final DocumentListener listener = new DocumentListener() {
         @Override public void insertUpdate(DocumentEvent event) { inserted(event.getOffset(), event.getLength()); }
         @Override public void removeUpdate(DocumentEvent event) { removed(event.getOffset(), event.getLength()); }
@@ -79,6 +81,14 @@ final class Marks {
         else marks.put(name, pos.copy());
     }
 
+    /** clrallmarks ({@code :delmarks!}): the lowercase marks, {@code '[ '] '^ '.} and the change list go; {@code '"} goes to the start. */
+    void clearAll() {
+        marks.keySet().removeIf(name -> name >= 'a' && name <= 'z' || "[]^.".indexOf(name) >= 0);
+        marks.put('"', new Pos(0, 0));
+        changes.clear();
+        changeIndex = 0;
+    }
+
     /** Clears every mark and list, after the text was replaced. */
     void clear() {
         marks.clear();
@@ -95,8 +105,12 @@ final class Marks {
     /** @return the previous-context mark, or null */
     Pos pcmark() { return pcmark == null ? null : pcmark.copy(); }
 
+    /** While {@code :global} runs, the previous context stays where the command started (setpcmark does nothing). */
+    boolean frozen;
+
     /** setpcmark: the cursor becomes the previous context and a new jumplist entry. */
     void setpcmark(Pos cursor) {
+        if (frozen) return;
         prevPcmark = pcmark;
         pcmark = cursor.copy();
         jumps.add(cursor.copy());
@@ -136,7 +150,7 @@ final class Marks {
     }
 
     /** cleanup_jumplist: an entry with a later entry on the same line goes. */
-    private void cleanupJumps() {
+    void cleanupJumps() {
         int to = 0;
         List<Pos> kept = new ArrayList<>();
         for (int from = 0; from < jumps.size(); from++) {
@@ -213,6 +227,43 @@ final class Marks {
 
     List<Pos> changes() { return changes; }
 
+    /**
+     * do_move's mark_adjust: the marks on lines {@code first}..{@code last} (0-based) follow the lines to where
+     * {@code edit} moves them, the first to {@code target}. The edit deletes and inserts lines, which alone would
+     * delete those marks. {@code :global}'s marks stay behind, as Vim's line flags do.
+     */
+    void moving(int first, int last, int target, Runnable edit) {
+        Map<Character, Pos> named = new HashMap<>();
+        for (var entry : marks.entrySet())
+            if (entry.getKey() != '.' && entry.getValue().line >= first && entry.getValue().line <= last) named.put(entry.getKey(), entry.getValue());
+        Map<Pos, Pos> was = new java.util.IdentityHashMap<>();
+        for (Pos pos : all()) if (pos.line >= first && pos.line <= last && marked.stream().noneMatch(m -> m == pos)) was.put(pos, pos.copy());
+        edit.run();
+        for (var entry : was.entrySet()) {
+            entry.getKey().line = target + entry.getValue().line - first;
+            entry.getKey().col = entry.getValue().col;
+        }
+        marks.putAll(named);
+    }
+
+    /** ml_setmarked: marks lines (0-based) for {@code :global}'s second pass. */
+    void markLines(List<Integer> lines) {
+        marked.clear();
+        for (int line : lines) marked.add(new Pos(line, 0));
+    }
+
+    /** ml_firstmarked: the first marked line, which is unmarked; -1 when none is left. */
+    int firstMarked() {
+        Pos first = null;
+        for (Pos pos : marked) if (first == null || pos.line < first.line) first = pos;
+        if (first == null) return -1;
+        marked.remove(first);
+        return first.line;
+    }
+
+    /** ml_clearmarked. */
+    void clearMarked() { marked.clear(); }
+
     /** Positions owned elsewhere (uppercase marks in this document) that move with the text too. */
     void track(Pos pos) { extra.add(pos); }
 
@@ -258,6 +309,8 @@ final class Marks {
                 adjust(line2 + 1, Integer.MAX_VALUE, -lines, 0);
             } else {
                 delete(line1 + 1, line2 - 1);
+                // The joined line is gone, and with it its :global mark.
+                marked.removeIf(pos -> pos.line == line2);
                 for (Pos pos : all()) {
                     if (pos.line == line2) {
                         pos.line = line1;
@@ -283,6 +336,7 @@ final class Marks {
     private void delete(int from, int to) {
         if (to < from) return;
         marks.entrySet().removeIf(entry -> DELETABLE.indexOf(entry.getKey()) >= 0 && entry.getValue().line >= from && entry.getValue().line <= to);
+        marked.removeIf(pos -> pos.line >= from && pos.line <= to);
         for (Pos pos : all()) if (pos.line >= from && pos.line <= to) {
             pos.line = from;
             pos.col = 0;
@@ -296,6 +350,7 @@ final class Marks {
         all.addAll(jumps);
         all.addAll(changes);
         all.addAll(extra);
+        all.addAll(marked);
         return all;
     }
 

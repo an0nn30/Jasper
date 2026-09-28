@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The command line that {@code /} and {@code ?} read (spec 5.3), with Vim's editing keys (ex_getln.c): moving and
+ * The command line that {@code :}, {@code /} and {@code ?} read (spec 5.3), with Vim's editing keys (ex_getln.c): moving and
  * deleting, {@code <C-r>} for registers and the word under the cursor, {@code <C-v>} for a literal key, and history
  * walked by {@code <Up>}/{@code <Down>} filtered by the typed prefix. The Vim bar draws it; the editor feeds it keys
  * while it is active.
@@ -35,13 +35,19 @@ final class CommandLine {
      * @param cancelled runs on {@code <Esc>}, {@code <C-c>}, or {@code <BS>} on an empty line
      */
     void start(char type, List<String> history, Consumer<String> changed, Consumer<String> done, Runnable cancelled) {
+        start(type, history, "", changed, done, cancelled);
+    }
+
+    /** Opens the command line with {@code initial} typed on it ({@code '<,'>} after Visual {@code :}). */
+    void start(char type, List<String> history, String initial, Consumer<String> changed, Consumer<String> done, Runnable cancelled) {
         this.type = type;
         this.history = history;
         this.changed = changed;
         this.done = done;
         this.cancelled = cancelled;
         text.setLength(0);
-        cursor = 0;
+        text.append(initial);
+        cursor = text.length();
         typed.clear();
         historyIndex = history.size();
         historyPrefix = null;

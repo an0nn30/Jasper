@@ -28,6 +28,12 @@ final class Operators {
 
     /** op_delete. {@code change} is true for {@code c}, which keeps charwise spans charwise. */
     static void delete(Context c, Span span, boolean change) {
+        int before = c.buffer.count();
+        deleteSpan(c, span, change);
+        if (!change) c.editor.msgmore(c.buffer.count() - before);
+    }
+
+    private static void deleteSpan(Context c, Span span, boolean change) {
         Buffer b = c.buffer;
         Span s = span;
         if (s.blockwise()) {
@@ -135,17 +141,37 @@ final class Operators {
         });
     }
 
-    /** op_yank. */
+    /** op_yank, with its message when more than 'report' lines were yanked. */
     static void yank(Context c, Span span) {
         c.registers.yank(c.register, content(c, span), c.options.string("clipboard"));
+        if (c.register == '_') return;
+        int lines = span.lineCount();
+        if (!span.linewise() && !span.blockwise() && lines == 1) lines = 0;
+        if (lines <= c.options.number("report")) return;
+        String into = c.register == 0 ? "" : " into \"" + c.register;
+        c.editor.say((span.blockwise() ? "block of " : "") + lines + (lines == 1 ? " line" : " lines") + " yanked" + into);
     }
 
     /** op_shift, with shift_line's 'shiftround'; a Visual area shifts {count} times. */
     static void shift(Context c, Span span, boolean left) {
+        shift(c, span, left, span.visual() && c.hasCount ? c.count : 1, true);
+    }
+
+    /**
+     * op_shift: each line {@code times} 'shiftwidth's; the cursor goes to the first line ({@code >>}), or for
+     * {@code :>} to the last line's indent. More than 'report' lines give a message.
+     */
+    static void shift(Context c, Span span, boolean left, int times, boolean cursorTop) {
+        shiftLines(c, span, left, times, cursorTop);
+        int lines = span.lineCount();
+        if (lines > c.options.number("report"))
+            c.editor.say(lines + (lines == 1 ? " line " : " lines ") + (left ? "<" : ">") + "ed " + times + (times == 1 ? " time" : " times"));
+    }
+
+    private static void shiftLines(Context c, Span span, boolean left, int times, boolean cursorTop) {
         Buffer b = c.buffer;
         int sw = c.options.shiftwidth(), ts = c.tabstop();
         boolean et = c.options.flag("expandtab"), round = c.options.flag("shiftround");
-        int times = span.visual() && c.hasCount ? c.count : 1;
         if (span.blockwise()) {
             int col = c.cursor().col;
             for (int line = span.start().line; line <= span.end().line; line++)
@@ -164,6 +190,13 @@ final class Operators {
                 width = i * sw;
             } else width = left ? Math.max(0, indent - sw * amount) : indent + sw * amount;
             b.setLine(line, Text.makeIndent(width, ts, et) + text.substring(Text.firstNonBlank(text)));
+        }
+        if (!cursorTop) {
+            // ":>": set_indent leaves the cursor after the last line's new indent.
+            int last = span.end().line;
+            String text = b.line(last);
+            c.editor.setCursor(new Pos(last, text.isEmpty() ? 0 : Text.firstNonBlank(text)));
+            return;
         }
         int first = span.start().line;
         c.editor.setCursor(new Pos(first, c.options.flag("startofline") ? Text.firstNonBlank(b.line(first)) : c.editor.wantedColumn(first)));

@@ -49,7 +49,23 @@ class VimDocsTest {
         section(out, commands, VimCommands.Kind.VISUAL, "Visual-mode commands",
             "In Visual mode, besides the motions, operators and text objects above. A change repeats with `.` on an area of the same size.");
         section(out, commands, VimCommands.Kind.INSERT, "Insert-mode keys", "Printable keys type text; these keys do more.");
+        exCommands(out);
         return out.toString();
+    }
+
+    /** The Ex commands, with Vim's shortest abbreviation outside the brackets ({@code :s[ubstitute]}). */
+    private static void exCommands(StringBuilder out) {
+        out.append("\n## Ex commands\n\n");
+        out.append("Typed after `:` and ended by `<CR>`. A range goes before the name: `3`, `.`, `$`, `%`, `'x`, `/pattern/`, `?pattern?`,\n");
+        out.append("`\\/`, `\\?` and `\\&`, each with `+N` or `-N` offsets, separated by `,` or `;`; `'<,'>` and `*` are the last Visual lines.\n");
+        out.append("`|` separates commands. When a command line says more than one line, the output stays above the Vim bar until a\n");
+        out.append("key is typed. A command Vim has and Jasper does not fails with E319.\n\n");
+        out.append("| Command | What it does |\n|---|---|\n");
+        for (Ex.Def def : Ex.implemented()) {
+            String abbreviation = def.abbreviation();
+            String name = abbreviation.equals(def.name()) ? ":" + def.name() : ":" + abbreviation + "[" + def.name().substring(abbreviation.length()) + "]";
+            out.append("| `").append(name.replace("|", "\\|")).append("` | ").append(def.description().replace("|", "\\|")).append(" |\n");
+        }
     }
 
     private static void section(StringBuilder out, VimCommands commands, VimCommands.Kind kind, String title, String note) {

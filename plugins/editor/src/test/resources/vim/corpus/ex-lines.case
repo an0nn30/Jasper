@@ -1,0 +1,3007 @@
+# Ex line commands: :d :y :> :< :put :join :move :copy :normal :sort :left :right :center :undo (V2a).
+
+=== d deletes the line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,1
+keys: :d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "three\n"
+expect-register 0: none
+expect-register 1: l "three\n"
+expect-register a: none
+expect-register -: none
+
+=== d range into a register
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :2,3d a<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-register ": l "two\nthree\n"
+expect-register 0: none
+expect-register 1: l "two\nthree\n"
+expect-register a: l "two\nthree\n"
+expect-register -: none
+
+=== d uppercase register appends
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1d a<CR>:1d A<CR>
+registers: a
+--- vim 9.1
+expect-text:
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-register a: l "one\ntwo\n"
+
+=== d black hole
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1d _<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": none
+expect-register 0: none
+expect-register 1: none
+expect-register a: none
+expect-register -: none
+
+=== d reports fewer lines
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,4d<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  4 fewer lines
+
+=== d of three lines says nothing
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,3d<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  3 fewer lines
+
+=== dl prints the line after
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :dl<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  two$$
+
+=== dp prints the line after
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :dp<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  two
+
+=== delete with the p flag spelled out
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :delp<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  two
+
+=== d sets the jumplist
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: G:3d<CR><C-o>
+--- vim 9.1
+expect-text:
+  one
+  two
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 9,1
+expect-mode: normal
+
+=== d keeps the first non-blank
+text:
+  alpha
+    beta
+      gamma
+  delta
+cursor: 1,1
+keys: :1d<CR>
+--- vim 9.1
+expect-text:
+    beta
+      gamma
+  delta
+expect-cursor: 1,3
+expect-mode: normal
+
+=== d with nostartofline keeps the column
+text:
+  abcdef
+  abcdef
+  abcdef
+cursor: 1,5
+set: nosol
+keys: :1d<CR>
+--- vim 9.1
+expect-text:
+  abcdef
+  abcdef
+expect-cursor: 1,1
+expect-mode: normal
+
+=== d of every line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,1
+keys: :%d<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  $
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": l "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"
+expect-register 0: none
+expect-register 1: l "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"
+expect-register a: none
+expect-register -: none
+
+=== y yanks lines
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,2
+keys: :y<CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,2
+expect-mode: normal
+expect-register ": l "three\n"
+expect-register 0: l "three\n"
+expect-register 1: none
+expect-register a: none
+expect-register -: none
+
+=== y range into a register keeps the cursor
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,2
+keys: :1,2y b<CR>
+registers: " 0 b
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,2
+expect-mode: normal
+expect-register ": l "one\ntwo\n"
+expect-register 0: none
+expect-register b: l "one\ntwo\n"
+
+=== y reports the lines yanked
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,3y<CR>:1,3y x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  3 lines yanked
+  3 lines yanked into "x
+
+=== yy reports lines yanked
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 4yy
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  4 lines yanked
+
+=== dd reports fewer lines
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 4dd
+output: yes
+--- vim 9.1
+expect-text:
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  4 fewer lines
+
+=== p reports more lines
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 4yyp
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  one
+  two
+  three
+  four
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  4 lines yanked
+  4 more lines
+
+=== greater shifts right
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :><CR>
+--- vim 9.1
+expect-text:
+  	  one
+  two
+      three
+  four
+expect-cursor: 1,4
+expect-mode: normal
+
+=== greater greater shifts twice
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :2,3>><CR>
+--- vim 9.1
+expect-text:
+    one
+  		two
+  		    three
+  four
+expect-cursor: 3,7
+expect-mode: normal
+
+=== greater with a count
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :> 3<CR>
+--- vim 9.1
+expect-text:
+  	  one
+  	two
+  	    three
+  four
+expect-cursor: 3,6
+expect-mode: normal
+
+=== greater reports
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :1,3><CR>
+output: yes
+--- vim 9.1
+expect-text:
+  	  one
+  	two
+  	    three
+  four
+expect-cursor: 3,6
+expect-mode: normal
+expect-output:
+  3 lines >ed 1 time
+
+=== less shifts left
+text:
+    one
+  two
+      three
+  four
+cursor: 3,1
+keys: :<lt><CR>
+--- vim 9.1
+expect-text:
+    one
+  two
+  three
+  four
+expect-cursor: 3,1
+expect-mode: normal
+
+=== less less on a range
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :%<lt><lt><CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+expect-cursor: 4,1
+expect-mode: normal
+
+=== greater leaves the cursor on the last line
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :1,3><CR>
+--- vim 9.1
+expect-text:
+  	  one
+  	two
+  	    three
+  four
+expect-cursor: 3,6
+expect-mode: normal
+
+=== greater with p prints
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :>p<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  	  one
+  two
+      three
+  four
+expect-cursor: 1,4
+expect-mode: normal
+expect-output:
+            one
+
+=== shift reports in normal mode
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: 3>>
+output: yes
+--- vim 9.1
+expect-text:
+  	  one
+  	two
+  	    three
+  four
+expect-cursor: 1,4
+expect-mode: normal
+expect-output:
+  3 lines >ed 1 time
+
+=== put below
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: yy:3pu<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  one
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 4,1
+expect-mode: normal
+
+=== put above with bang
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: yy:3pu!<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  one
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== put at zero goes above the first line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 5,1
+keys: yy:0pu<CR>
+--- vim 9.1
+expect-text:
+  five
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== put a charwise register as a line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: yiw:$pu<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+  one
+expect-cursor: 11,1
+expect-mode: normal
+
+=== put a named register
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: "ayy:4pu a<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  one
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,1
+expect-mode: normal
+
+=== put a multiline charwise register
+text:
+  ab
+  cd
+cursor: 1,2
+keys: vjy:2put<CR>
+--- vim 9.1
+expect-text:
+  ab
+  cd
+  b
+  cd
+expect-cursor: 4,1
+expect-mode: normal
+
+=== put an empty register
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :pu x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E353: Nothing in register x
+
+=== put reports more lines
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: 3yy:pu<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  one
+  two
+  three
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 4,1
+expect-mode: normal
+expect-output:
+  3 lines yanked
+  3 more lines
+
+=== put the colon register
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :3<CR>:pu :<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  3
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 4,1
+expect-mode: normal
+
+=== join joins two lines
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :j<CR>
+--- vim 9.1
+expect-text:
+  one two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== join a range
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :2,4j<CR>
+--- vim 9.1
+expect-text:
+  one
+  two three four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+
+=== join with a count
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :j 3<CR>
+--- vim 9.1
+expect-text:
+  one two three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== join bang keeps the spaces out
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :j!<CR>
+--- vim 9.1
+expect-text:
+    onetwo
+      three
+  four
+expect-cursor: 1,3
+expect-mode: normal
+
+=== join of one address pair does nothing
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :2,2j<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+
+=== join on the last line fails
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 10,1
+keys: :j<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 10,1
+expect-mode: normal
+
+=== join with p prints
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :jp<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: jp
+
+=== join cursor goes to the first non-blank
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :1,3j<CR>
+--- vim 9.1
+expect-text:
+    one two three
+  four
+expect-cursor: 1,3
+expect-mode: normal
+
+=== move down
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :m 3<CR>
+--- vim 9.1
+expect-text:
+  two
+  three
+  one
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== move up
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 5,1
+keys: :m 1<CR>
+--- vim 9.1
+expect-text:
+  one
+  five
+  two
+  three
+  four
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+
+=== move to the top
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 5,1
+keys: :m0<CR>
+--- vim 9.1
+expect-text:
+  five
+  one
+  two
+  three
+  four
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== move to the end
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :m$<CR>
+--- vim 9.1
+expect-text:
+  one
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+  two
+expect-cursor: 10,1
+expect-mode: normal
+
+=== move a range
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,3m 6<CR>
+--- vim 9.1
+expect-text:
+  four
+  five
+  six
+  one
+  two
+  three
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 6,1
+expect-mode: normal
+
+=== move reports
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,3m$<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+  one
+  two
+  three
+expect-cursor: 10,1
+expect-mode: normal
+expect-output:
+  3 lines moved
+
+=== move into itself fails
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,4m 2<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E134: Cannot move a range of lines into itself
+
+=== move to where it is
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,1
+keys: :m 2<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== move to below itself
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,1
+keys: :m 3<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== move with relative address
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 3,1
+keys: :m+2<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  four
+  five
+  three
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,1
+expect-mode: normal
+
+=== move keeps a mark on the moved line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,3
+keys: ma:m 5<CR>`a
+--- vim 9.1
+expect-text:
+  one
+  three
+  four
+  five
+  two
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,3
+expect-mode: normal
+
+=== move needs an address
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :m<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  E16: Invalid range
+
+=== move past the end fails
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :m 20<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  E16: Invalid range
+
+=== move then undo
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,2m$<CR>u
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== t copies below
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :t 3<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  one
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 4,1
+expect-mode: normal
+
+=== t dot copies the line
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 2,1
+keys: :t.<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+
+=== copy a range
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,3co 5<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  one
+  two
+  three
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 8,1
+expect-mode: normal
+
+=== copy to zero
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 4,1
+keys: :co 0<CR>
+--- vim 9.1
+expect-text:
+  four
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== copy into itself
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,3co 2<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  one
+  two
+  three
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 5,1
+expect-mode: normal
+
+=== copy reports more lines
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,3co$<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+  one
+  two
+  three
+expect-cursor: 13,1
+expect-mode: normal
+expect-output:
+  3 more lines
+
+=== copy then p flag
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :t$p<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+  one
+expect-cursor: 11,1
+expect-mode: normal
+expect-output:
+  one
+
+=== normal runs keys
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :norm x<CR>
+--- vim 9.1
+expect-text:
+  ne
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== normal on a range
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1,3norm Ax<CR>
+--- vim 9.1
+expect-text:
+  onex
+  twox
+  threex
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,6
+expect-mode: normal
+
+=== normal bang
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :norm! dd<CR>
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== normal on a range from the line start
+text:
+    one
+  two
+      three
+  four
+cursor: 1,3
+keys: :%norm x<CR>
+--- vim 9.1
+expect-text:
+   one
+  wo
+     three
+  our
+expect-cursor: 4,1
+expect-mode: normal
+
+=== normal ends insert mode
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :norm ihello<CR>
+--- vim 9.1
+expect-text:
+  helloone
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,5
+expect-mode: normal
+
+=== normal ends a pending operator
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :norm d<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== normal ends a count
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :norm 3<CR>x
+--- vim 9.1
+expect-text:
+  ne
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== normal leaves visual mode
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :norm vl<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,2
+expect-mode: visual
+expect-visual: 1,1
+
+=== normal then undo is one step
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :%norm Ax<CR>u
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,3
+expect-mode: normal
+
+=== normal then dot repeats its change
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :norm Ax<CR>j.
+--- vim 9.1
+expect-text:
+  onex
+  twox
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 2,4
+expect-mode: normal
+
+=== normal failure drops the rest
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 10,1
+keys: :norm jx<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 10,1
+expect-mode: normal
+
+=== normal needs an argument
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :norm<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E471: Argument required
+
+=== normal with a colon command
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :norm :3d<C-v><CR><CR>
+registers: " 0 1 a -
+--- vim 9.1
+expect-text:
+  one
+  two
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 3,1
+expect-mode: normal
+expect-register ": l "three\n"
+expect-register 0: none
+expect-register 1: l "three\n"
+expect-register a: none
+expect-register -: none
+
+=== normal escape key by ctrl v
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :norm ix<C-v><Esc>dd<CR>
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort sorts
+text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+cursor: 3,1
+keys: :sort<CR>
+--- vim 9.1
+expect-text:
+  Banana -3
+  apple 2
+  apple 2
+  cherry x7
+  date 0x1F
+  pear 10
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort reverse
+text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+cursor: 1,1
+keys: :sort!<CR>
+--- vim 9.1
+expect-text:
+  pear 10
+  date 0x1F
+  cherry x7
+  apple 2
+  apple 2
+  Banana -3
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort ignoring case
+text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+cursor: 1,1
+keys: :sort i<CR>
+--- vim 9.1
+expect-text:
+  apple 2
+  apple 2
+  Banana -3
+  cherry x7
+  date 0x1F
+  pear 10
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort numbers
+text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+cursor: 1,1
+keys: :sort n<CR>
+--- vim 9.1
+expect-text:
+  Banana -3
+  date 0x1F
+  apple 2
+  apple 2
+  cherry x7
+  pear 10
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort hex
+text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+cursor: 1,1
+keys: :sort x<CR>
+--- vim 9.1
+expect-text:
+  apple 2
+  apple 2
+  cherry x7
+  Banana -3
+  date 0x1F
+  pear 10
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort unique
+text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+cursor: 1,1
+keys: :sort u<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  Banana -3
+  apple 2
+  cherry x7
+  date 0x1F
+  pear 10
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+
+=== sort a range
+text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+cursor: 1,1
+keys: :2,4sort<CR>
+--- vim 9.1
+expect-text:
+  pear 10
+  Banana -3
+  apple 2
+  cherry x7
+  apple 2
+  date 0x1F
+expect-cursor: 2,1
+expect-mode: normal
+
+=== sort by pattern skips it
+text:
+  a3 z
+  b1 y
+  c2 x
+cursor: 1,1
+keys: :sort /./<CR>
+--- vim 9.1
+expect-text:
+  b1 y
+  c2 x
+  a3 z
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort on the pattern with r
+text:
+  a3 z
+  b1 y
+  c2 x
+cursor: 1,1
+keys: :sort /\d/ r<CR>
+--- vim 9.1
+expect-text:
+  b1 y
+  c2 x
+  a3 z
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort n with r
+text:
+  x10y2
+  x9y30
+  x1y4
+cursor: 1,1
+keys: :sort /y\d\+/ r n<CR>
+--- vim 9.1
+expect-text:
+  x10y2
+  x1y4
+  x9y30
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort floats
+text:
+  1.5
+  -2
+  1e2
+  x
+  0.25
+cursor: 1,1
+keys: :sort f<CR>
+--- vim 9.1
+expect-text:
+  -2
+  x
+  0.25
+  1.5
+  1e2
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort two formats fails
+text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+cursor: 1,1
+keys: :sort nx<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E474: Invalid argument
+
+=== sort bad argument
+text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+cursor: 1,1
+keys: :sort q<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E475: Invalid argument: q
+
+=== sort then bar
+text:
+  pear 10
+  apple 2
+  Banana -3
+  cherry x7
+  apple 2
+  date 0x1F
+cursor: 1,1
+keys: :sort | 1d<CR>
+--- vim 9.1
+expect-text:
+  apple 2
+  apple 2
+  cherry x7
+  date 0x1F
+  pear 10
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort unique ignoring case
+text:
+  a
+  A
+  b
+  B
+  a
+cursor: 1,1
+keys: :sort ui<CR>
+--- vim 9.1
+expect-text:
+  a
+  b
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort b
+text:
+  0b101 x
+  11
+  0b1
+  z
+cursor: 1,1
+keys: :sort b<CR>
+--- vim 9.1
+expect-text:
+  z
+  0b1
+  11
+  0b101 x
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort keeps equal lines in order
+text:
+  b 1
+  a 1
+  c 0
+cursor: 1,1
+keys: :sort /\a / n<CR>
+--- vim 9.1
+expect-text:
+  c 0
+  b 1
+  a 1
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort empty pattern uses the last search
+text:
+  a3
+  b1
+  c2
+cursor: 1,1
+keys: /\d<CR>:sort // r<CR>
+--- vim 9.1
+expect-text:
+  b1
+  c2
+  a3
+expect-cursor: 1,1
+expect-mode: normal
+
+=== sort cursor goes to the first line
+text:
+    one
+  two
+      three
+  four
+cursor: 4,1
+keys: :sort<CR>
+--- vim 9.1
+expect-text:
+      three
+    one
+  four
+  two
+expect-cursor: 1,5
+expect-mode: normal
+
+=== left removes indent
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :%left<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+expect-cursor: 1,1
+expect-mode: normal
+
+=== left with an indent
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :%left 3<CR>
+--- vim 9.1
+expect-text:
+     one
+     two
+     three
+     four
+expect-cursor: 1,4
+expect-mode: normal
+
+=== right aligns to 80
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :%right<CR>
+--- vim 9.1
+expect-text:
+  									     one
+  									     two
+  									   three
+  									    four
+expect-cursor: 1,15
+expect-mode: normal
+
+=== right aligns to a width
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :%right 20<CR>
+--- vim 9.1
+expect-text:
+  		 one
+  		 two
+  	       three
+  		four
+expect-cursor: 1,4
+expect-mode: normal
+
+=== right uses textwidth
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+set: tw=30
+keys: :%right<CR>
+--- vim 9.1
+expect-text:
+  			   one
+  			   two
+  			 three
+  			  four
+expect-cursor: 1,7
+expect-mode: normal
+
+=== center centers
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+keys: :%center 20<CR>
+--- vim 9.1
+expect-text:
+  	one
+  	two
+         three
+  	four
+expect-cursor: 1,2
+expect-mode: normal
+
+=== center with tabs
+text:
+    one
+  two
+      three
+  four
+cursor: 1,1
+set: noet
+keys: :%center 21<CR>
+--- vim 9.1
+expect-text:
+  	 one
+  	 two
+  	three
+  	four
+expect-cursor: 1,3
+expect-mode: normal
+
+=== right with a tab inside
+text:
+  a	b
+  ab
+cursor: 1,1
+keys: :%right 20<CR>
+--- vim 9.1
+expect-text:
+  	      a	b
+  		  ab
+expect-cursor: 1,8
+expect-mode: normal
+
+=== center skips blank lines
+text:
+  x
+     $
+  y
+cursor: 1,1
+keys: :%center 10<CR>
+--- vim 9.1
+expect-text:
+      x
+     $
+      y
+expect-cursor: 1,5
+expect-mode: normal
+
+=== undo undoes
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: dd:u<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== undo then redo
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: dddd:u<CR>:u<CR>:red<CR>
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== undo number goes back
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: dddddd:u 1<CR>
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== undo zero undoes all
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: dddddd:u 0<CR>
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== undo number forward
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: dddddd:u 0<CR>:u 2<CR>
+--- vim 9.1
+expect-text:
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+
+=== undo unknown number
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: dd:u 7<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E830: Undo number 7 not found
+
+=== redo with nothing to redo
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :red<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Already at newest change
+
+=== undo with nothing to undo
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :u<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  Already at oldest change
+
+=== an ex command is one undo step
+text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+cursor: 1,1
+keys: :1d|1d|1d<CR>u
+--- vim 9.1
+expect-text:
+  one
+  two
+  three
+  four
+  five
+  six
+  seven
+  eight
+  nine
+  ten
+expect-cursor: 1,1
+expect-mode: normal

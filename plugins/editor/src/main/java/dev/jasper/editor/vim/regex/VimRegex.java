@@ -38,13 +38,16 @@ public final class VimRegex {
 
     private final Pattern pattern;
     private final boolean ignoreCase;
-    private final boolean hasStart, hasEnd;
+    private final boolean hasStart, hasEnd, multiline;
+    private final int groups;
 
-    private VimRegex(Pattern pattern, boolean ignoreCase, boolean hasStart, boolean hasEnd) {
+    private VimRegex(Pattern pattern, boolean ignoreCase, boolean hasStart, boolean hasEnd, boolean multiline, int groups) {
         this.pattern = pattern;
         this.ignoreCase = ignoreCase;
         this.hasStart = hasStart;
         this.hasEnd = hasEnd;
+        this.multiline = multiline;
+        this.groups = groups;
     }
 
     /**
@@ -60,7 +63,7 @@ public final class VimRegex {
         int flags = Pattern.MULTILINE | Pattern.UNIX_LINES;
         if (ic) flags |= Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
         try {
-            return new VimRegex(Pattern.compile(java, flags), ic, t.hasStart, t.hasEnd);
+            return new VimRegex(Pattern.compile(java, flags), ic, t.hasStart, t.hasEnd, t.multiline, t.groups);
         } catch (PatternSyntaxException bad) {
             throw new IllegalArgumentException("E486: Pattern not found: " + vim, bad);
         }
@@ -86,6 +89,26 @@ public final class VimRegex {
     /** @return whether the pattern ignores case */
     public boolean ignoreCase() { return ignoreCase; }
 
+    /** @return whether a match may span lines (Vim's re_multiline) */
+    public boolean multiline() { return multiline; }
+
+    /**
+     * @param m a matcher after a successful find
+     * @param n a group number: 0 for the whole match (narrowed by {@code \zs} and {@code \ze}), 1 to 9 for
+     *     {@code \(\)}
+     * @return where the group starts, or -1 when it took no part in the match
+     */
+    public int groupStart(Matcher m, int n) {
+        if (n == 0) return start(m);
+        return n <= groups ? m.start("g" + n) : -1;
+    }
+
+    /** @return where the group ends, or -1 when it took no part in the match */
+    public int groupEnd(Matcher m, int n) {
+        if (n == 0) return end(m);
+        return n <= groups ? m.end("g" + n) : -1;
+    }
+
     /** @return where the match starts, after {@code \zs} */
     public int start(Matcher m) {
         if (hasStart && m.start("zs") >= 0) return m.start("zs");
@@ -109,6 +132,8 @@ public final class VimRegex {
         private int afterSlash;
         private int prevchrLen;
         boolean forceIgnore, forceMatch, hasStart, hasEnd;
+        /** Whether a match may span lines ({@code \n}, the {@code \_} items, {@code \%^}, {@code \%$}): Vim's RF_HASNL. */
+        boolean multiline;
         private int groups;
 
         Translator(String src, Settings settings) {
@@ -363,6 +388,7 @@ public final class VimRegex {
             if (c == magic('<')) return "(?<![" + settings.keyword() + "])(?=[" + settings.keyword() + "])";
             if (c == magic('>')) return "(?<=[" + settings.keyword() + "])(?![" + settings.keyword() + "])";
             if (c == magic('_')) {
+                multiline = true;
                 char n = at(pos);
                 if (n == '^') {
                     pos++;
@@ -392,7 +418,10 @@ public final class VimRegex {
             }
             if (c == magic('.')) return ".";
             if (isMagic(c) && classFor(noMagic(c)) != null) return classFor(noMagic(c));
-            if (c == magic('n')) return "\\n";
+            if (c == magic('n')) {
+                multiline = true;
+                return "\\n";
+            }
             if (c == magic('(')) {
                 String name = "g" + ++groups;
                 if (groups > 9) throw error("E51: Too many \\(");
@@ -453,11 +482,13 @@ public final class VimRegex {
                 case '^' -> {
                     pos++;
                     resync();
+                    multiline = true;
                     return "\\A";
                 }
                 case '$' -> {
                     pos++;
                     resync();
+                    multiline = true;
                     return "(?=\\n?\\z)";
                 }
                 case '[' -> {

@@ -19,6 +19,8 @@ final class VimUndoManager extends RUndoManager {
     static final class Step extends CompoundEdit {
         int cursorLine, cursorCol;
         int edits;
+        /** Its change number, counting every step added (Vim's uh_seq). */
+        int seq;
 
         Step(int cursorLine, int cursorCol) {
             this.cursorLine = cursorLine;
@@ -40,6 +42,9 @@ final class VimUndoManager extends RUndoManager {
     private boolean vim;
     private Step vimStep, internal, typing;
     private int stepDepth, internalDepth, lastOffset;
+    /** The change numbers of the steps on the stack, oldest first; the first {@link #done} are done. */
+    private final java.util.List<Integer> seqs = new java.util.ArrayList<>();
+    private int done, seqLast;
 
     VimUndoManager(RTextArea area) {
         super(area);
@@ -78,11 +83,38 @@ final class VimUndoManager extends RUndoManager {
         Step step = vimStep;
         vimStep = null;
         step.end();
-        if (step.edits > 0) addEdit(step);
+        if (step.edits > 0) add(step);
         updateActions();
     }
 
+    /** Adds a new step to the stack, numbering it; the steps that were undone are gone. */
+    private void add(Step step) {
+        step.seq = ++seqLast;
+        while (seqs.size() > done) seqs.removeLast();
+        seqs.add(step.seq);
+        done++;
+        if (seqs.size() > getLimit()) {
+            seqs.removeFirst();
+            done--;
+        }
+        addEdit(step);
+    }
+
+    /** @return the change numbers of the done steps, oldest first */
+    java.util.List<Integer> doneSeqs() { return java.util.List.copyOf(seqs.subList(0, done)); }
+
+    /** @return the change numbers of the undone steps, in the order redo brings them back */
+    java.util.List<Integer> undoneSeqs() { return java.util.List.copyOf(seqs.subList(done, seqs.size())); }
+
     boolean stepOpen() { return stepDepth > 0; }
+
+    /** u_sync: the open step ends here if it changed anything, and a new one goes on at the same depth. */
+    void sync() {
+        if (vimStep == null || vimStep.edits == 0) return;
+        int depth = stepDepth;
+        closeAll();
+        reopen(depth);
+    }
 
     /** @return the step {@link #undo} would undo, or null when there is none or it is not a Vim step */
     Step nextUndo() { return editToBeUndone() instanceof Step step ? step : null; }
@@ -104,7 +136,7 @@ final class VimUndoManager extends RUndoManager {
             Step step = new Step(-1, -1);
             step.take(edit);
             step.end();
-            addEdit(step);
+            add(step);
             updateActions();
             return;
         }
@@ -118,7 +150,7 @@ final class VimUndoManager extends RUndoManager {
         typing = seal(typing);
         typing = new Step(-1, -1);
         typing.take(edit);
-        addEdit(typing);
+        add(typing);
         lastOffset = caret;
         updateActions();
     }
@@ -135,7 +167,7 @@ final class VimUndoManager extends RUndoManager {
         Step step = internal;
         internal = null;
         step.end();
-        if (step.edits > 0) addEdit(step);
+        if (step.edits > 0) add(step);
         updateActions();
     }
 
@@ -161,16 +193,20 @@ final class VimUndoManager extends RUndoManager {
     @Override public void undo() {
         int depth = stepDepth;
         closeAll();
-        try { super.undo(); }
-        finally { reopen(depth); }
+        try {
+            super.undo();
+            done--;
+        } finally { reopen(depth); }
     }
 
     /** The redo counterpart of {@link #undo}. */
     @Override public void redo() {
         int depth = stepDepth;
         closeAll();
-        try { super.redo(); }
-        finally { reopen(depth); }
+        try {
+            super.redo();
+            done++;
+        } finally { reopen(depth); }
     }
 
     /** Reopens {@code depth} levels of Vim step after an outside undo/redo, cursor taken from the area's caret now. */
@@ -190,6 +226,8 @@ final class VimUndoManager extends RUndoManager {
     @Override public void discardAllEdits() {
         stepDepth = internalDepth = 0;
         vimStep = internal = typing = null;
+        seqs.clear();
+        done = 0;
         super.discardAllEdits();
     }
 
