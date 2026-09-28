@@ -10,7 +10,9 @@
   set; `:syntax` and `:filetype` accepted. Every file in the plan was compiled and run against Vim 9.1 before the plan
   was written: 1742 corpus cases (28 new in `vimrc.case`), with files and the Editor's commands in `VimrcTest` and
   `EditorWindowTest`.
-  - Not done: executing the plan; GUI checks 80–88 of the [checklist](editor-verification.md) (user-run); plan V4
+  - Executed 2026-09-28 (inline, one commit per task); every task's tests and re-recording matched the plan.
+  - `./gradlew check`: 4,359 tests, 0 failed, 0 errors, 5 skipped.
+  - Not done: GUI checks 80–88 of the [checklist](editor-verification.md) (user-run); plan V4
     (extensions); push.
 - **Editor Vim mode, plan V3a** (branch `claude/vim-v3a`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v3a.md`, written 2026-09-28): macros (`q`, `@`, `@@`, `{n}@`, `@:`, `@.`,
