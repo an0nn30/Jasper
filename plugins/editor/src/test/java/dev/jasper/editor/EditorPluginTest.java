@@ -31,7 +31,7 @@ class EditorPluginTest {
 
     private static EditorPlugin plugin() {
         return new EditorPlugin(Runnable::run, (context, settings) -> new EditorEnvironment(context, Runnable::run,
-            owner -> Question::dismissed, owner -> (message, saves) -> saves.getNow(false), settings, false));
+            owner -> Question::dismissed, owner -> (message, saves) -> saves.getNow(false), settings::current, settings::saveVim, false));
     }
 
     @Test void registersItsActionsAndPublishesTheEditorService() throws Exception {
@@ -96,11 +96,11 @@ class EditorPluginTest {
 
     @Test void badSettingsAreReportedAtStartAndOnEveryChange() {
         try (var host = new FakePluginHost(home.resolve("plugins"))) {
-            host.setConfig("dev.jasper.editor", Map.of("font_size", 99L));
+            host.setSetting("dev.jasper.editor", "font_size", 99L);
             host.start(INFO, Set.of(), Set.of(), plugin());
-            assertThat(host.reports()).containsExactly("dev.jasper.editor: font_size: Use 8 to 48; using 13.");
-            host.setConfig("dev.jasper.editor", Map.of("tab_size", 0L));
-            assertThat(host.reports()).contains("dev.jasper.editor: tab_size: Use 1 to 16; using 4.");
+            assertThat(host.settingsReports("dev.jasper.editor")).containsExactly("font_size: Use a whole number from 8\u201348.");
+            host.setSetting("dev.jasper.editor", "tab_size", 0L);
+            assertThat(host.settingsReports("dev.jasper.editor")).contains("tab_size: Use a whole number from 1\u201316.");
         }
     }
 }

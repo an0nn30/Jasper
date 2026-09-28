@@ -1,13 +1,17 @@
 package dev.jasper.editor.ui;
 
-import dev.jasper.sdk.plugin.PluginConfig;
+import dev.jasper.sdk.settings.EditorHint;
+import dev.jasper.sdk.settings.PluginSettings;
+import dev.jasper.sdk.settings.Setting;
+import dev.jasper.sdk.settings.SettingKind;
+import dev.jasper.sdk.settings.SettingSpec;
 import java.awt.Font;
 import java.util.List;
-import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * The Editor's settings file (spec 7); bad values are reported and their defaults used.
+ * The Editor's settings as its window uses them (spec 7).
  *
  * @param fontFamily the editor font's family
  * @param fontSize points, 8 to 48
@@ -20,55 +24,53 @@ public record EditorSettings(String fontFamily, int fontSize, int tabSize, boole
     /** Tried in order for the default font. */
     public static final List<String> PREFERRED_FONTS = List.of("JetBrains Mono", "Menlo", "Consolas", "DejaVu Sans Mono");
 
-    /**
-     * @param config the plugin's settings
-     * @param installed the installed font families
-     * @return the settings, reporting each bad value under its key
-     */
-    public static EditorSettings read(PluginConfig config, Set<String> installed) {
-        String font = PREFERRED_FONTS.stream().filter(installed::contains).findFirst().orElse("Monospaced");
-        var family = config.string("font_family");
-        if (family.isPresent()) {
-            if (installed.contains(family.get())) font = family.get();
-            else config.report("font_family", "No installed font family is named \"" + family.get() + "\"; using " + font + ".");
-        } else if (present(config, "font_family")) config.report("font_family", "Use a font family name in quotes; using " + font + ".");
-        int size = number(config, "font_size", 13, 8, 48);
-        int tab = number(config, "tab_size", 4, 1, 16);
-        boolean wrap = flag(config, "soft_wrap", false);
-        int max = number(config, "max_file_mib", 10, 1, 256);
-        boolean vim = flag(config, "vim", false);
-        return new EditorSettings(font, size, tab, wrap, max, vim);
-    }
-
     /** @return {@link #maxFileMib()} in bytes */
     public long maxFileBytes() { return maxFileMib * 1024L * 1024L; }
 
     /** @return the plain editor font */
     public Font font() { return new Font(fontFamily, Font.PLAIN, fontSize); }
 
-    private static int number(PluginConfig config, String key, int fallback, int min, int max) {
-        OptionalLong value = config.integer(key);
-        if (value.isEmpty()) {
-            if (present(config, key)) config.report(key, "Use a whole number from " + min + " to " + max + "; using " + fallback + ".");
-            return fallback;
-        }
-        if (value.getAsLong() < min || value.getAsLong() > max) {
-            config.report(key, "Use " + min + " to " + max + "; using " + fallback + ".");
-            return fallback;
-        }
-        return (int) value.getAsLong();
-    }
+    /** The Editor's declared settings; Settings checks their values and reports bad ones. */
+    public static final class Declared {
+        private final Setting<String> fontFamily;
+        private final Setting<Integer> fontSize, tabSize, maxFileMib;
+        private final Setting<Boolean> softWrap, vim;
 
-    private static boolean flag(PluginConfig config, String key, boolean fallback) {
-        var value = config.bool(key);
-        if (value.isPresent()) return value.get();
-        if (present(config, key)) config.report(key, "Use true or false; using " + fallback + ".");
-        return fallback;
-    }
+        /**
+         * Declares the settings; call while the plugin starts.
+         *
+         * @param settings the plugin's settings
+         * @param installed the installed font families; the default font is the first of {@link #PREFERRED_FONTS} installed, else Monospaced
+         */
+        public Declared(PluginSettings settings, Set<String> installed) {
+            String fallback = PREFERRED_FONTS.stream().filter(installed::contains).findFirst().orElse("Monospaced");
+            fontFamily = settings.declare(SettingSpec.of("font_family",
+                    SettingKind.text(family -> family.equals(fallback) || installed.contains(family), "No installed font family has that name."), fallback)
+                .label("Font").description("An installed font family.").editor(EditorHint.font(true)).section("Font").keywords("editor", "font"));
+            fontSize = settings.declare(SettingSpec.of("font_size", SettingKind.integer(8, 48), 13)
+                .label("Font size").description("Points.").section("Font").keywords("editor", "font"));
+            tabSize = settings.declare(SettingSpec.of("tab_size", SettingKind.integer(1, 16), 4)
+                .label("Tab size").description("Columns per tab stop.").section("Editing").keywords("editor", "indent"));
+            softWrap = settings.declare(SettingSpec.of("soft_wrap", SettingKind.bool(), false)
+                .label("Soft wrap").description("Wrap long lines in tabs opened from now on.").section("Editing").keywords("editor", "wrap"));
+            vim = settings.declare(SettingSpec.of("vim", SettingKind.bool(), false)
+                .label("Vim mode").description("Modal editing as in IdeaVim; the Vim status item and Toggle Vim Mode change it.")
+                .section("Editing").keywords("editor", "vim", "modal"));
+            maxFileMib = settings.declare(SettingSpec.of("max_file_mib", SettingKind.integer(1, 256), 10)
+                .label("Largest file (MiB)").description("Larger files are refused.").section("Files").keywords("editor", "size"));
+        }
 
-    /** A value another accessor can see is present but of the wrong type; a float has no accessor and counts as absent. */
-    private static boolean present(PluginConfig config, String key) {
-        return config.string(key).isPresent() || config.integer(key).isPresent() || config.bool(key).isPresent()
-            || !config.stringList(key).isEmpty() || config.table(key).isPresent();
+        /** @return the current values */
+        public EditorSettings current() {
+            return new EditorSettings(fontFamily.get(), fontSize.get(), tabSize.get(), softWrap.get(), maxFileMib.get(), vim.get());
+        }
+
+        /**
+         * Saves Vim mode to the settings file.
+         *
+         * @param on the new value
+         * @return completes when the file is written, exceptionally when it could not be
+         */
+        public CompletableFuture<Void> saveVim(boolean on) { return vim.set(on); }
     }
 }

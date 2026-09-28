@@ -34,6 +34,8 @@ class EditorWindowTest {
     private Runnable duringWait = () -> { };
     private Runnable duringAsk = () -> { };
     private boolean cancelWait;
+    private final List<Boolean> savedVim = new ArrayList<>();
+    private java.util.concurrent.CompletableFuture<Void> vimSave = java.util.concurrent.CompletableFuture.completedFuture(null);
 
     @BeforeEach void open() {
         Languages.register();
@@ -54,7 +56,7 @@ class EditorWindowTest {
                 drain();
                 return saves.getNow(false);
             },
-            settings::get, false);
+            settings::get, on -> { savedVim.add(on); return vimSave; }, false);
         window = new EditorWindow(environment, () -> windowClosed = true);
     }
 
@@ -355,7 +357,7 @@ class EditorWindowTest {
         window.toggleVim();
         assertThat(first.vimEditor()).isPresent();
         assertThat(second.vimEditor()).isPresent();
-        assertThat(Files.readString(context.config().file())).contains("vim = true");
+        assertThat(savedVim).containsExactly(true);
         var item = host.contentStatus(host.contentTabs().getLast()).stream().filter(status -> status.text().startsWith("Vim:")).findFirst().orElseThrow();
         assertThat(item.text()).isEqualTo("Vim: On");
         assertThat(opened(file("three.txt", "three\n")).vimEditor()).as("a new tab follows").isPresent();
@@ -364,7 +366,16 @@ class EditorWindowTest {
         assertThat(window.vimOn()).isTrue();
         item.run().run();
         assertThat(first.vimEditor()).isEmpty();
-        assertThat(Files.readString(context.config().file())).contains("vim = false");
+        assertThat(savedVim).containsExactly(true, false);
+    }
+
+    @Test void aVimModeThatCannotBeSavedLastsForTheSessionAndSaysSo() throws Exception {
+        opened(file("one.txt", "one\n"));
+        vimSave = java.util.concurrent.CompletableFuture.failedFuture(new java.io.IOException("disk full"));
+        window.toggleVim();
+        assertThat(window.vimOn()).isTrue();
+        assertThat(asked).extracting(Question::message)
+            .contains("Vim mode is on until the Editor closes: the setting could not be saved (disk full).");
     }
 
     @Test void vimKeysEditTheDocumentAndUndoItsChange() throws Exception {

@@ -20,7 +20,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
-import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /** Edits local and remote text files in app-owned workspace tabs; publishes {@link Editor} for other plugins. */
@@ -28,9 +27,8 @@ public final class EditorPlugin implements Plugin {
     static final String OPEN = "dev.jasper.editor.open", NEW = "dev.jasper.editor.new", SHOW = "dev.jasper.editor.show";
 
     private final Executor ui;
-    private final BiFunction<PluginContext, Supplier<EditorSettings>, EditorEnvironment> environments;
+    private final BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments;
     private EditorEnvironment environment;
-    private EditorSettings settings;
     private EditorWindow window;
 
     /** The production plugin: Swing's event queue, modal dialogs and running timers. */
@@ -38,7 +36,7 @@ public final class EditorPlugin implements Plugin {
         this(SwingUtilities::invokeLater, (context, settings) -> EditorEnvironment.production(context, SwingUtilities::invokeLater, settings));
     }
 
-    EditorPlugin(Executor ui, BiFunction<PluginContext, Supplier<EditorSettings>, EditorEnvironment> environments) {
+    EditorPlugin(Executor ui, BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments) {
         this.ui = ui;
         this.environments = environments;
     }
@@ -47,12 +45,9 @@ public final class EditorPlugin implements Plugin {
         Languages.register();
         // Set.copyOf tolerates a platform that lists a family twice; Set.of would throw.
         Set<String> fonts = Set.copyOf(Arrays.asList(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()));
-        settings = EditorSettings.read(context.config(), fonts);
-        environment = environments.apply(context, () -> settings);
-        context.config().onChanged(() -> ui.execute(() -> {
-            settings = EditorSettings.read(context.config(), fonts);
-            if (window != null) window.apply();
-        }));
+        EditorSettings.Declared settings = new EditorSettings.Declared(context.settings(), fonts);
+        environment = environments.apply(context, settings);
+        context.settings().onChanged(() -> ui.execute(() -> { if (window != null) window.apply(); }));
         context.appearance().onChanged(variant -> ui.execute(() -> { if (window != null) window.apply(); }));
         context.services().publish(Editor.class, new Editor() {
             @Override public void open(Path file) { window().openLocal(file); }
