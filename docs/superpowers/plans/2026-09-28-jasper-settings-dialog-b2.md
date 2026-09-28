@@ -2,8 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/settings-dialog-b2`, worktree `.worktrees/settings-dialog-b2`, from local `main` at 3cb249e5
-(B1 merged; `./gradlew check` there: 2,916 tests, 0 failures, 5 skipped).
+**Status:** Implemented on `claude/settings-dialog-b2` (inline execution, checkpoints after Tasks 3 and 5); `./gradlew check`
+green: 2,925 tests, 0 failures, 0 errors, 5 skipped. Worktree `.worktrees/settings-dialog-b2`, from local `main` at 3cb249e5.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Planned deviations from the spec (decided while writing this plan):
@@ -17,7 +17,15 @@ Planned deviations from the spec (decided while writing this plan):
 - Without a configuration service (benchmark and tests only), there is no Settings dialog, so Keyboard Shortcuts… and
   Manage Plugins… do nothing, and View choices apply to that window directly instead of saving.
 
-Deviations so far: none.
+Deviations so far:
+- Task 1: `FillingPageTest` also lays out the page (`page.doLayout()`) before comparing its content's size.
+- Task 2: the renderer's new pattern variable is `entry`, not `row`, which clashed with the `int row` parameter.
+- Task 4: the architecture check is the root task `./gradlew verifyApplicationArchitecture`, not a `:jasper-app` task.
+- Task 6: the first run stopped at compilation (`configureTerminal` missing), so the reload tests' behavioural failure
+  before the change was not observed separately.
+- Task 7: `docs/sdk-architecture.md`'s package row for `pluginmanager` also changed (it still described a window). The
+  preview renders were inspected with no defects found; at 18 pt, long tree labels are truncated and the plugin list scrolls
+  sideways, both behaviours of existing components, left as they are.
 
 **Goal:** Keymap and Plugins become real pages of the Settings dialog, and the View menu's chrome choices save to
 `config.toml` instead of lasting one session.

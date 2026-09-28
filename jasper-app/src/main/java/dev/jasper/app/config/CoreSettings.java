@@ -123,7 +123,7 @@ public final class CoreSettings {
         .alias("font.size").label("Font size").keywords("font", "size", "points", "zoom")
         .description("Font size in points, 6-72; changes update all panes live.\n"
             + "Reset Font Size restores this saved default.\n"
-            + "Temporary size/appearance choices survive reloads until their respective saved value changes.").build();
+            + "A pane's own size (Cmd+= and Cmd+-) survives reloads until this saved size changes.").build();
     public static final Setting<List<String>> TERMINAL_FONT_FALLBACK = Setting.of("terminal.font.fallback",
             SettingKind.stringList(CoreSettings::fontName), FontConfig.defaults().fallback())
         .alias("font.fallback").label("Fallback fonts").keywords("font", "fallback", "emoji", "nerd font")

@@ -2,6 +2,19 @@
 
 ## Current state — 2026-09-23
 
+- **Settings dialog B2** (`claude/settings-dialog-b2`, 2026-09-28; plan
+  `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b2.md`): Keymap and Plugins are pages of Settings.
+  Keymap stages shortcut edits (Set) and saves them in one write on Apply; shortcuts and sections that differ from
+  their defaults are blue. Plugins hosts the plugin list, with its consent and confirm dialogs over Settings. Help ›
+  Keyboard Shortcuts… and File › Manage Plugins… open those pages; their old windows are gone. The View menu saves
+  toolbar mode, the status bar and terminal colours; View › Window Settings… replaces the four size dialogs; the
+  session overrides in `WorkspaceConfiguration` and `ThemeState` are removed. Previews: `settingsPreview` renders 36
+  images, inspected against the IntelliJ reference. `./gradlew check`: 2,925 tests, 0 failures, 0 errors, 5 skipped.
+  Executed inline with checkpoints after Tasks 3 and 5. GUI checks pending with the user: record a shortcut, Set,
+  Apply and use it; the plugin restart banner and an install's consent dialog over Settings; View choices in two
+  windows; a View choice with a broken config.toml; Window Settings… Deviations: see the plan's status banner. Not
+  pushed; not merged.
+
 - **Settings dialog B1** (`claude/settings-dialog`, 2026-09-28; spec
   `docs/superpowers/specs/2026-09-28-jasper-settings-dialog-design.md`, plan
   `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b1.md`): Cmd+, and the macOS Settings… item open
@@ -14,7 +27,7 @@
   defects found there were fixed. `./gradlew check`: 2,916 tests, 0 failures, 0 errors, 5 skipped. Executed
   inline with checkpoints after Tasks 4 and 7. GUI checks pending with the user (open via Cmd+, and the
   application menu, Apply a change, Cancel with changes, banners, remembered bounds, theme switch while open).
-  Deviations: see the plan's status banner. Not pushed; not merged.
+  Deviations: see the plan's status banner. Merged to local main (3cb249e5); not pushed.
 
 - **Editor Vim mode, plan V1a** (branch `claude/vim-mode`, plan
   `docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`, spec
