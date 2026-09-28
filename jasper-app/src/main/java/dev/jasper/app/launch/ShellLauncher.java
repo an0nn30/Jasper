@@ -4,6 +4,7 @@ import dev.jasper.terminal.session.TerminalSession;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -14,9 +15,17 @@ import javax.swing.SwingUtilities;
 /** Captures request settings before dispatch; every completion is delivered on the EDT. */
 public final class ShellLauncher {
     private final Executor executor;
-    private final Supplier<LaunchSettings> settings;
+    private final Function<Optional<String>, LaunchSettings> settings;
     private final BiFunction<Path, LaunchSettings, TerminalSession> start;
     private final String label;
+
+    /**
+     * What a launch request started with.
+     *
+     * @param label the pane's shell label
+     * @param profile the profile id the settings resolved to; empty when the launcher captures no settings
+     */
+    public record Launch(String label, Optional<String> profile) { }
 
     public ShellLauncher(Executor executor, Function<Path, TerminalSession> start, String label) {
         this.executor = executor;
@@ -25,12 +34,23 @@ public final class ShellLauncher {
         this.label = label;
     }
 
+    /** Every request gets {@code settings}, whatever profile it asks for. */
     public ShellLauncher(Executor executor, Supplier<LaunchSettings> settings,
+                  BiFunction<Path, LaunchSettings, TerminalSession> start) {
+        this(executor, profileless(Objects.requireNonNull(settings)), start);
+    }
+
+    /** {@code settings} resolves a requested profile id (empty: the user's default) on the EDT when a launch is requested. */
+    public ShellLauncher(Executor executor, Function<Optional<String>, LaunchSettings> settings,
                   BiFunction<Path, LaunchSettings, TerminalSession> start) {
         this.executor = executor;
         this.settings = Objects.requireNonNull(settings);
         this.start = start;
         this.label = "shell";
+    }
+
+    private static Function<Optional<String>, LaunchSettings> profileless(Supplier<LaunchSettings> settings) {
+        return requested -> settings.get();
     }
 
     public String label() { return label; }
@@ -41,31 +61,43 @@ public final class ShellLauncher {
     /** From the current launch settings; a conventional terminal when there are none. EDT, like {@link #launch}. */
     public SessionDefaults sessionDefaults() {
         try {
-            LaunchSettings captured = settings == null ? null : settings.get();
+            LaunchSettings captured = settings == null ? null : settings.apply(Optional.empty());
             if (captured != null) return new SessionDefaults(captured.columns(), captured.lines(), captured.scrollback());
         } catch (RuntimeException unavailable) { /* fall through */ }
         return new SessionDefaults(80, 24, 10_000);
     }
 
+    /** The user's default profile in {@code directory}; returns the pane's label. */
     public String launch(Path directory, BiConsumer<TerminalSession, Throwable> completion) {
+        return launch(directory, Optional.empty(), completion).label();
+    }
+
+    /** Starts {@code profile} (empty: the user's default) in {@code directory}; settings are captured now, on the EDT. */
+    public Launch launch(Path directory, Optional<String> profile, BiConsumer<TerminalSession, Throwable> completion) {
         final LaunchSettings captured;
-        final String capturedLabel;
         try {
-            captured = settings == null ? null : Objects.requireNonNull(settings.get());
-            capturedLabel = captured == null ? label : captured.label();
+            captured = settings == null ? null : Objects.requireNonNull(settings.apply(profile));
         } catch (RuntimeException failure) {
             SwingUtilities.invokeLater(() -> completion.accept(null, failure));
-            return label;
+            return new Launch(label, Optional.empty());
         }
+        Launch launched = captured == null ? new Launch(label, Optional.empty())
+            : new Launch(captured.label(), Optional.of(captured.profile().id()));
+        Path home = Path.of(System.getProperty("user.home"));
         try {
             executor.execute(() -> {
                 TerminalSession session = null;
                 Throwable failure = null;
                 try {
-                    if (!Files.isDirectory(directory)) {
-                        throw new IllegalArgumentException("Directory is unavailable: " + directory);
+                    if (captured == null) {
+                        if (!Files.isDirectory(directory)) {
+                            throw new IllegalArgumentException("Directory is unavailable: " + directory);
+                        }
+                        session = start.apply(directory, null);
+                    } else {
+                        LaunchSettings.Start target = captured.at(directory, home, Files::isDirectory);
+                        session = start.apply(target.directory(), target.settings());
                     }
-                    session = start.apply(directory, captured);
                 } catch (Exception e) { failure = e; }
                 TerminalSession result = session;
                 Throwable error = failure;
@@ -74,6 +106,6 @@ public final class ShellLauncher {
         } catch (RuntimeException failure) {
             SwingUtilities.invokeLater(() -> completion.accept(null, failure));
         }
-        return capturedLabel;
+        return launched;
     }
 }

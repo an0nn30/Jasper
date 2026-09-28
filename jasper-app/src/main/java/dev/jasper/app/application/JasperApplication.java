@@ -506,7 +506,7 @@ public final class JasperApplication {
     private static TerminalSession startSession(Path directory, LaunchSettings settings) {
         try {
             return TerminalSession.start(SessionLaunchOptions.builder().command(settings.command()).environment(settings.environment()).workingDirectory(directory).grid(new GridSize(settings.columns(), settings.lines())).scrollback(settings.scrollback())
-                .localHostNames(dev.jasper.app.launch.LocalHostNames.cached()).build());
+                .localHostNames(dev.jasper.app.launch.LocalHostNames.cached()).localPathMapper(settings.localPaths()).build());
         } catch (IOException failure) {
             LOG.log(System.Logger.Level.ERROR, "Shell launch failed", failure);
             throw new UncheckedIOException(failure);

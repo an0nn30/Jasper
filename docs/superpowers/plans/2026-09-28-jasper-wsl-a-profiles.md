@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 0-6 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
+**Status:** In progress: Tasks 0-7 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far: none.
@@ -1727,7 +1727,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Produces: `LaunchSettings(List<String>, Map<String,String>, int, int, int, ShellProfile)` with the five-argument constructor kept (Custom profile); `LaunchSettings.resolve(ConfigSnapshot, ShellProfile, String osName, Map<String,String>, int, int, Path integrationDir)`; the old `resolve` overloads kept (they resolve the configured id against the undetected profile list); `LaunchSettings.at(Path directory, Path home, Predicate<Path> isDirectory)` returning `LaunchSettings.Start(Path directory, LaunchSettings settings)`; `LaunchSettings.localPaths()`; package-private `LaunchSettings.wslEnv(String, List<String>)`; `ShellLauncher(Executor, Function<Optional<String>, LaunchSettings>, BiFunction<Path, LaunchSettings, TerminalSession>)`; `ShellLauncher.launch(Path, Optional<String>, BiConsumer)` returning `ShellLauncher.Launch(String label, Optional<String> profile)`.
 - Consumes: `ShellProfile`, `ShellProfiles` (Task 6), `WslPaths` (Task 4), `SessionLaunchOptions.localPathMapper`/`DEFAULT_LOCAL_PATHS` (Task 2).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `LaunchSettingsTest.java` (add imports `dev.jasper.app.config.ConfigLoader`,
 `dev.jasper.terminal.session.SessionLaunchOptions`):
@@ -1802,12 +1802,12 @@ Add to `LaunchSettingsTest.java` (add imports `dev.jasper.app.config.ConfigLoade
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.launch.LaunchSettingsTest'`
 Expected: FAIL: compilation errors (the profile-taking `resolve`, `profile()`, `localPaths()`, `wslEnv`, `at`, the six-argument constructor do not exist).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Replace `LaunchSettings.java` with (the `inject` method body is unchanged; it is repeated in full here):
 
@@ -2192,14 +2192,14 @@ with
                 .localHostNames(dev.jasper.app.launch.LocalHostNames.cached()).localPathMapper(settings.localPaths()).build());
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.launch.*' --tests 'dev.jasper.app.workspace.ShellLauncherTest' --tests 'dev.jasper.app.workspace.ConfigurationControllerTest' --tests 'dev.jasper.app.application.SessionLaunchCoordinatorTest'`
 Expected: PASS (existing `ShellLauncherTest`/`ConfigurationControllerTest` launch expectations are unchanged: a
 configured program is the Custom profile, labels stay the program name, a missing directory still fails with
 "Directory is unavailable").
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current
