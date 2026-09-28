@@ -448,8 +448,9 @@ is reported as a notice.
   `publish` or, to learn who is calling, `publishPerConsumer`. Consumers must declare
   `requires` on the provider. Put the interfaces in a separate API jar that consumers compile
   against.
-- **Configuration.** Users write `[plugins."<id>"]` in `config.toml`. It is read-only to
-  the plugin; keep your own state under `context.dataDirectory()`.
+- **Configuration.** Users edit `plugins/<id>/<id>.toml`; see [plugin settings](configuration.md#plugins). It is read-only to
+  the plugin; keep your own state under `context.dataDirectory()`. Problems you report with
+  `config().report(key, message)` are shown against that file, at the key's line, until the file is next reloaded.
 - **Your own threads and sockets** are yours to release, including before `start` throws.
 
 ## Testing

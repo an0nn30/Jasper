@@ -136,7 +136,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm links, working-directory status, config live reload, and broken-config reporting.
 - [ ] Confirm the packaged app runs without a separately installed Java runtime.
 - [ ] Connect a Remote SSH host by Vault key, by agent and on a LAN address; the first LAN connection shows the Local Network prompt, and after allowing it the host connects.
-- [ ] With `[background] enabled = true`, confirm `~/Library/LaunchAgents/dev.jasper.background.plist` appears, log out and back in, and confirm Jasper is running with no windows.
+- [ ] With `[system] run_in_background = true`, confirm `~/Library/LaunchAgents/dev.jasper.background.plist` appears, log out and back in, and confirm Jasper is running with no windows.
 - [ ] Confirm the Dock icon is present with no windows open and that clicking it produces a window noticeably faster than a cold start; record both times.
 - [ ] Confirm Cmd+Q exits completely and that the next launch is cold.
 - [ ] Record the resident process's idle memory (`ps -o rss= -p <pid>`).
@@ -158,7 +158,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm split, close, zoom, pane navigation, search, and prompt navigation.
 - [ ] Confirm links, working-directory status, and broken-config reporting.
 - [ ] Confirm the packaged app runs without a separately installed Java runtime.
-- [ ] Confirm `AF_UNIX` sockets work: with `[background] enabled = true`, confirm a second `Jasper.exe` launch reveals a window and the second process exits rather than opening its own window.
+- [ ] Confirm `AF_UNIX` sockets work: with `[system] run_in_background = true`, confirm a second `Jasper.exe` launch reveals a window and the second process exits rather than opening its own window.
 - [ ] Confirm the `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, sign out and back in, and confirm Jasper is resident.
 - [ ] Confirm Quit exits completely and that setting `enabled = false` removes the Run value.
 

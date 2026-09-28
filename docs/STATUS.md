@@ -2,6 +2,20 @@
 
 ## Current state — 2026-09-23
 
+- **Settings foundation** (`claude/settings-foundation`, 2026-09-27; spec
+  `docs/superpowers/specs/2026-09-27-jasper-settings-foundation-design.md`, plan
+  `docs/superpowers/plans/2026-09-27-jasper-settings-foundation.md`): `config.toml` is described by one
+  schema (`dev.jasper.app.settings`, `config.CoreSettings`); the loader, the generated template and the
+  example/guide tests read it. Version 2 keys: `[terminal.font]`, `terminal.colors`,
+  `system.run_in_background`; version 1 keys load with "Moved to" warnings. `TomlDocument` edits TOML in
+  place, keeping comments, and refuses any edit that would not land exactly; `ConfigService.save` and
+  shortcut saves share one verified transaction. Migrate Config (palette and diagnostics button) rewrites
+  old keys after backing the file up to `config.toml.v1.bak`. Plugin settings problems name the plugin's
+  own file and line, survive app reloads and clear when that file reloads; the settings poller no longer
+  reports from its own thread. `./gradlew check`: 2,336 tests, 0 failures, 0 errors, 5 skipped. Executed
+  inline (user choice) with checkpoints after Tasks 4, 7 and 12; no GUI launched. Deviations: see the
+  plan's status banner. Next: sub-project B (Settings dialog), then C (SDK settings API). Not pushed; not merged.
+
 - **App-hosted Editor tabs** (`codex/plugin-workspace-tabs`, 2026-09-27):
   Editor files now use the main workspace's tab strip, rounded content frame, commands,
   status and breadcrumbs. The tab menu moves live content to/from a separate app-owned

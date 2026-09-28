@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress (inline execution). Branch `claude/settings-foundation`, worktree `.worktrees/settings-foundation`.
+**Status:** Implemented on `claude/settings-foundation` (inline execution); `./gradlew check` green, 2,336 tests. Branch `claude/settings-foundation`, worktree `.worktrees/settings-foundation`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far:
@@ -14,6 +14,11 @@ Deviations so far:
   and `ConfigLoaderTest.unknownKeysAndEmptyTablesWarnWhileSupportedSettingsApply` (key `terminal.font.future_font`).
 - Task 12's plugin-authoring instruction no longer spells out a Markdown link in this plan, because
   `AppDocumentationTest` resolves every link in `docs/`, plans included.
+- Task 10: the new diagnostics panel's local variable is `panel`, not `details`, which `setConfigurationState`
+  already uses for the text.
+- Task 11: `PluginRuntimeTest` checks the broken-file report while ignoring the new per-file "clear" entries;
+  the recovery clear is covered in `PluginSettingsFilesTest` (recovering counts as a reload) and in
+  `ConfigurationControllerTest.pluginReportsSurviveAppReloadsAndClearPerFile` rather than in the runtime test.
 
 **Goal:** Give `config.toml` one declarative schema, the version 2 key layout, a comment-preserving writer
 with a single save transaction, an opt-in migration with a backup, and plugin diagnostics attributed to
