@@ -21,7 +21,9 @@ import java.util.function.Function;
  * @param scrollback history capacity from 0 through 1,000,000 lines
  * @param localHostNames names this machine is known by, for classifying reported working directories; resolve them off the EDT, empty when unknown
  * @param localPathMapper turns the path of a working-directory report classified as local into a directory on this machine;
- *        empty ignores the report. It runs on the session's reader thread and must not block
+ *        empty ignores the report. It runs on the session's reader thread and must not block. Record equality compares
+ *        the mapper with its own {@code equals}, which for a lambda is identity: options that differ only in two
+ *        separately created mappers are not equal
  */
 public record SessionLaunchOptions(List<String> command, Map<String, String> environment,
         Path workingDirectory, GridSize grid, int scrollback, Set<String> localHostNames,

@@ -51,6 +51,14 @@ class LaunchSettingsTest {
         assertThat(local.localPaths()).isSameAs(SessionLaunchOptions.DEFAULT_LOCAL_PATHS);
     }
 
+    @Test void wslenvSpelledTwoWaysBecomesOneMergedEntry() {
+        var snapshot = snapshot("", List.of(), Map.of("WSLENV", "GOPATH/l"), 100, 80, 24);
+        var settings = LaunchSettings.resolve(snapshot, wsl(), "Windows 11", Map.of("WslEnv", "USERPROFILE/p"), 80, 24, null);
+        var names = settings.environment().keySet().stream().filter(name -> name.equalsIgnoreCase("WSLENV")).toList();
+        assertThat(names).as("Windows would keep only one of them").containsExactly("WslEnv");
+        assertThat(settings.environment()).containsEntry("WslEnv", "USERPROFILE/p:GOPATH/l:TERM:COLORTERM:TERM_PROGRAM:JASPER_TERMINAL");
+    }
+
     @Test void wslenvKeepsTheUsersEntriesAndAddsEachNameOnce() {
         assertThat(LaunchSettings.wslEnv(null, List.of("TERM", "JASPER_SHELL_INTEGRATION/p"))).isEqualTo("TERM:JASPER_SHELL_INTEGRATION/p");
         assertThat(LaunchSettings.wslEnv("", List.of("TERM"))).isEqualTo("TERM");
@@ -80,6 +88,8 @@ class LaunchSettingsTest {
         var windows = wsl.at(Path.of("C:\\Users\\me"), home, path -> true);
         assertThat(windows.settings().command()).containsExactly("wsl.exe", "-d", "Ubuntu", "--cd", Path.of("C:\\Users\\me").toString());
         assertThat(wsl.at(Path.of("C:\\gone"), home, path -> false).settings().command()).endsWith("--cd", "~");
+        assertThat(wsl.at(home, home, path -> true).settings().command()).as("the Windows home is the Linux home, not /mnt/c/Users/...")
+            .endsWith("--cd", "~");
         assertThat(wsl.at(Path.of("\\\\wsl$\\Debian\\srv"), home, untouchable).settings().command()).as("another distribution's share")
             .endsWith("--cd", "~");
         assertThat(wsl.command()).as("the captured settings are unchanged").containsExactly("wsl.exe", "-d", "Ubuntu");

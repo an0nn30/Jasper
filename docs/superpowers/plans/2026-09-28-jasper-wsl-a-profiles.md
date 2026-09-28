@@ -11,6 +11,14 @@ Deviations so far:
   `shownEnabled` flag on `Row`, initially true), instead of recursively enabling every row's control on every draft
   change. The plan text would have re-enabled the optional line-height spinner while its "use the platform" box is
   checked. Tests and names are unchanged.
+- Review fixes after Task 10: a WSL launch in the user's home passes `--cd ~` (not the Windows home, which opened
+  `/mnt/c/Users/NAME`); `wsl:NAME` ids match detected distributions case-insensitively (`ShellProfiles.sameId`) and
+  resolve to the detected spelling, and the Settings dropdown selects the same way; every spelling of WSLENV in the
+  environment merges into one entry; `WslDistributions.detect` asks `wsl.exe -l -v` only when `reg.exe` gives no
+  answer (the system runner accepts reg.exe's exit 1, a missing Lxss key, as "no WSL"); PowerShell 7 detection uses
+  `NOFOLLOW_LINKS` and also looks for the Store alias `%LOCALAPPDATA%\Microsoft\WindowsApps\pwsh.exe`; the
+  `SessionLaunchOptions` javadoc says equality compares the path mapper by identity; non-ASCII literals the branch
+  added are Java escapes.
 
 **Goal:** On Windows, sessions run on ConPTY, Jasper detects PowerShell, PowerShell 7, Command Prompt and every
 installed WSL 1 and WSL 2 distribution as shell profiles, `terminal.shell.profile` (and a Settings dropdown) makes

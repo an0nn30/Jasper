@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
@@ -104,6 +105,17 @@ class WslDistributionsTest {
         assertThat(WslDistributions.detect("Windows 11", listOnly)).containsExactly(new WslDistro("Debian", 2, false), new WslDistro("Ubuntu", 1, true));
         assertThat(asked).containsExactly(WslDistributions.REGISTRY_QUERY, List.of("wsl.exe", "-l", "-v"));
         assertThat(WslDistributions.detect("Windows 11", command -> Optional.empty())).as("no WSL, or wsl.exe missing").isEmpty();
+        asked.clear();
+        String dockerOnly = MORE_DISTROS.substring(MORE_DISTROS.indexOf("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\{6e4b"));
+        for (String registry : List.of("", dockerOnly)) {
+            Function<List<String>, Optional<byte[]>> readable = command -> {
+                asked.add(command);
+                return command.getFirst().equals("reg.exe") ? Optional.of(registry.getBytes(ISO_8859_1)) : Optional.of(LIST.getBytes(UTF_16LE));
+            };
+            assertThat(WslDistributions.detect("Windows 11", readable)).as("the registry answered: %s", registry.isEmpty() ? "no Lxss key" : "only Docker").isEmpty();
+            assertThat(asked).as("so wsl.exe is not asked").containsExactly(WslDistributions.REGISTRY_QUERY);
+            asked.clear();
+        }
         assertThat(WslDistributions.detect("Windows 11", command -> { throw new IllegalStateException("broken runner"); })).isEmpty();
         assertThat(WslDistributions.detect("Mac OS X", command -> { throw new AssertionError("never runs a process off Windows"); })).isEmpty();
         assertThat(WslDistributions.detect("Linux")).isEmpty();
@@ -115,6 +127,16 @@ class WslDistributionsTest {
             .hasValueSatisfying(bytes -> assertThat(new String(bytes, UTF_8)).isEqualTo("abc"));
         assertThat(WslDistributions.run(List.of("/bin/sh", "-c", "printf abc; exit 3"), Duration.ofSeconds(5))).isEmpty();
         assertThat(WslDistributions.run(List.of("/bin/sh", "-c", "exec sleep 10"), Duration.ofMillis(200))).isEmpty();
+    }
+
+    @Test void theRunnerAcceptsOnlyTheGivenExitCodes() {
+        String launcher = ProcessHandle.current().info().command().orElseThrow();
+        // With no arguments the launcher prints its usage to standard error and exits with 1, as reg.exe does for a missing key.
+        assertThat(WslDistributions.run(List.of(launcher), Duration.ofSeconds(30), Set.of(0))).isEmpty();
+        assertThat(WslDistributions.run(List.of(launcher), Duration.ofSeconds(30), Set.of(0, 1))).isPresent();
+        assertThat(WslDistributions.successes(WslDistributions.REGISTRY_QUERY)).as("reg.exe exits 1 when the Lxss key is missing: no WSL")
+            .containsExactlyInAnyOrder(0, 1);
+        assertThat(WslDistributions.successes(WslDistributions.LIST_QUERY)).containsExactly(0);
     }
 
     @Test void aMissingProgramIsNoOutput() {

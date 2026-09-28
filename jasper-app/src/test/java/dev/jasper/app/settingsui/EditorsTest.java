@@ -123,6 +123,8 @@ class EditorsTest {
         editor.box.setSelectedIndex(1);
         assertThat(editor.value()).isEqualTo("wsl:Ubuntu");
         assertThat(edits[0]).isEqualTo(1);
+        editor.show("wsl:ubuntu");
+        assertThat(editor.box.getSelectedItem()).as("WSL names ignore case").isEqualTo("Ubuntu (WSL 1)");
         editor.show("wsl:Gone");
         assertThat(editor.box.getSelectedItem()).isEqualTo("wsl:Gone (not detected)");
         assertThat(editor.value()).isEqualTo("wsl:Gone");

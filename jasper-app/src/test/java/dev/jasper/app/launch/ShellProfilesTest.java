@@ -57,6 +57,22 @@ class ShellProfilesTest {
         assertThat(ShellProfiles.findPwsh("Windows 11", WINDOWS_ENV, files::contains)).as("a PATH entry wins; its quotes are stripped")
             .contains("pwsh.exe");
         assertThat(ShellProfiles.findPwsh("Linux", WINDOWS_ENV, name -> true)).isEmpty();
+        String alias = "C:\\Users\\me\\AppData\\Local\\Microsoft\\WindowsApps\\pwsh.exe";
+        assertThat(ShellProfiles.findPwsh("Windows 11", Map.of("LOCALAPPDATA", "C:\\Users\\me\\AppData\\Local"), Set.of(alias)::contains))
+            .as("the Store package's execution alias, when WindowsApps is not on PATH").contains(alias);
+    }
+
+    @Test void anExecutionAliasCountsAsExistingThoughItCannotBeFollowed(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir)
+            throws java.io.IOException {
+        // A Store app's execution alias is a reparse point that Files.exists cannot follow; a dangling link stands in.
+        java.nio.file.Path link = dir.resolve("pwsh.exe");
+        try {
+            java.nio.file.Files.createSymbolicLink(link, dir.resolve("missing-target.exe"));
+        } catch (java.io.IOException | UnsupportedOperationException noLinks) {
+            org.junit.jupiter.api.Assumptions.abort("symbolic links are unavailable here: " + noLinks);
+        }
+        assertThat(ShellProfiles.exists(link.toString())).isTrue();
+        assertThat(ShellProfiles.exists(dir.resolve("absent.exe").toString())).isFalse();
     }
 
     @Test void theConfiguredIdComesFromTheProfileOrTheOldProgramSettings() {
@@ -72,6 +88,11 @@ class ShellProfilesTest {
         var chosen = ShellProfiles.resolve(Optional.of("wsl:Ubuntu"), available, true, "Windows 11", WINDOWS_ENV, DEFAULT);
         assertThat(chosen.profile().id()).isEqualTo("wsl:Ubuntu");
         assertThat(chosen.warning()).isEmpty();
+        var otherCase = ShellProfiles.resolve(Optional.of("wsl:UBUNTU"), available, true, "Windows 11", WINDOWS_ENV, DEFAULT);
+        assertThat(otherCase.profile()).as("WSL names ignore case; the detected spelling wins").isEqualTo(chosen.profile());
+        assertThat(otherCase.warning()).isEmpty();
+        assertThat(ShellProfiles.resolve(Optional.of("CMD"), available, true, "Windows 11", WINDOWS_ENV, DEFAULT).warning())
+            .as("the other ids are exact").isPresent();
         var byDefault = ShellProfiles.resolve(Optional.empty(), available, true, "Windows 11", WINDOWS_ENV,
             new TerminalConfig.Shell("", List.of(), "wsl:Ubuntu"));
         assertThat(byDefault.profile().id()).isEqualTo("wsl:Ubuntu");

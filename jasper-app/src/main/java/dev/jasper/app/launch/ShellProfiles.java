@@ -3,6 +3,7 @@ package dev.jasper.app.launch;
 import dev.jasper.app.config.TerminalConfig;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,15 +86,25 @@ public final class ShellProfiles {
     }
 
     /**
-     * The profile to start for {@code requested} (empty: the configured id). Custom always follows {@code shell}. While
-     * detection has not completed, a well-formed {@code wsl:NAME} or {@code pwsh} is trusted; otherwise an id that is
-     * not {@code available} starts the platform default with a warning.
+     * Whether two profile ids name the same profile: equal, or both {@code wsl:NAME} with names that differ only in
+     * case, because WSL distribution names are case-insensitive.
+     */
+    public static boolean sameId(String a, String b) {
+        return a.equals(b) || a.startsWith(WSL_PREFIX) && b.startsWith(WSL_PREFIX) && a.equalsIgnoreCase(b);
+    }
+
+    /**
+     * The profile to start for {@code requested} (empty: the configured id). Custom always follows {@code shell}. An
+     * {@code available} profile matches by {@link #sameId}, so a {@code wsl:NAME} in another case resolves to the
+     * detected spelling. While detection has not completed, a well-formed {@code wsl:NAME} (as written; wsl.exe
+     * ignores case) or {@code pwsh} is trusted; otherwise an id that is not {@code available} starts the platform
+     * default with a warning.
      */
     public static Resolution resolve(Optional<String> requested, List<ShellProfile> available, boolean detectionComplete,
                                      String osName, Map<String, String> environment, TerminalConfig.Shell shell) {
         String id = requested.filter(value -> !value.isBlank()).orElseGet(() -> configuredId(osName, shell));
         if (id.equals(CUSTOM)) return new Resolution(custom(osName, environment, shell), Optional.empty());
-        for (ShellProfile profile : available) if (profile.id().equals(id)) return new Resolution(profile, Optional.empty());
+        for (ShellProfile profile : available) if (sameId(profile.id(), id)) return new Resolution(profile, Optional.empty());
         if (!detectionComplete && windows(osName)) {
             Matcher wsl = WSL_ID.matcher(id);
             if (wsl.matches()) return new Resolution(wsl(wsl.group(1), Optional.empty()), Optional.empty());
@@ -108,7 +119,8 @@ public final class ShellProfiles {
 
     /**
      * PowerShell 7's program: {@code pwsh.exe} when a {@code PATH} directory holds it, else its full path under
-     * {@code %ProgramFiles%\PowerShell\7} or {@code 7-preview}; empty off Windows or when it is not installed.
+     * {@code %ProgramFiles%\PowerShell\7} or {@code 7-preview}, else the Microsoft Store package's execution alias
+     * {@code %LOCALAPPDATA%\Microsoft\WindowsApps\pwsh.exe}; empty off Windows or when it is not installed.
      */
     public static Optional<String> findPwsh(String osName, Map<String, String> environment, Predicate<String> exists) {
         if (!windows(osName)) return Optional.empty();
@@ -129,13 +141,22 @@ public final class ShellProfiles {
                 if (exists.test(candidate)) return Optional.of(candidate);
             }
         }
+        String localAppData = variable(environment, "LOCALAPPDATA");
+        if (localAppData != null && !localAppData.isBlank()) {
+            String alias = localAppData + "\\Microsoft\\WindowsApps\\pwsh.exe";
+            if (exists.test(alias)) return Optional.of(alias);
+        }
         return Optional.empty();
     }
 
-    /** Whether something exists at {@code name}; false for a name that is not a path here. Touches the file system. */
+    /**
+     * Whether something exists at {@code name}; false for a name that is not a path here. Links are not followed: a
+     * Store app's execution alias is a reparse point that {@code Files.exists} cannot follow, yet it starts the app.
+     * Touches the file system.
+     */
     static boolean exists(String name) {
         try {
-            return Files.exists(Path.of(name));
+            return Files.exists(Path.of(name), LinkOption.NOFOLLOW_LINKS);
         } catch (InvalidPathException | SecurityException notHere) {
             return false;
         }
@@ -163,7 +184,7 @@ public final class ShellProfiles {
     }
 
     private static ShellProfile wsl(WslDistro distro) {
-        return wsl(distro.name(), Optional.of("WSL " + distro.version() + (distro.isDefault() ? " · default" : "")));
+        return wsl(distro.name(), Optional.of("WSL " + distro.version() + (distro.isDefault() ? " \u00B7 default" : "")));
     }
 
     private static ShellProfile wsl(String name, Optional<String> detail) {

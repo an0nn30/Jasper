@@ -388,8 +388,8 @@ public final class Editors {
         Profile(ShellChoices shells, SettingsDraft draft) {
             this.shells = shells;
             this.draft = draft;
-            box.setPrototypeDisplayValue("Ubuntu-22.04 (WSL 2 · default)");
-            detect = Items.button("↻", "Detect shells again", shells.refresh());
+            box.setPrototypeDisplayValue("Ubuntu-22.04 (WSL 2 \u00B7 default)");
+            detect = Items.button("\u21BB", "Detect shells again", shells.refresh());
             component = line(box, detect);
             fill();
             listening = shells.onChanged().apply(this::fill);
@@ -411,10 +411,16 @@ public final class Editors {
         private void add(String id, String label) { ids.add(id); box.addItem(label); }
 
         private void select(String value) {
-            String id = effective(value);
+            String wanted = effective(value);
+            // WSL distribution names ignore case, as the launcher's resolution does: select the detected spelling.
+            String id = ids.stream().filter(known -> known.equals(wanted)
+                || known.startsWith(WSL_PREFIX) && wanted.startsWith(WSL_PREFIX) && known.equalsIgnoreCase(wanted))
+                .findFirst().orElse(wanted);
             if (!ids.contains(id)) add(id, id + " (not detected)");
             box.setSelectedIndex(ids.indexOf(id));
         }
+
+        private static final String WSL_PREFIX = "wsl:";
 
         /** Empty means Custom while the old program or args settings are in use, else the platform default (the first choice). */
         private String effective(String value) {

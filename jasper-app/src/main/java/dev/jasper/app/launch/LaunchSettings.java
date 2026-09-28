@@ -89,8 +89,17 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
             // /p makes WSL translate the Windows script directory into its /mnt/c/... path.
             var shared = new ArrayList<>(WSL_SHARED);
             if (environment.containsKey("JASPER_SHELL_INTEGRATION")) shared.add("JASPER_SHELL_INTEGRATION/p");
-            String key = environment.keySet().stream().filter(name -> name.equalsIgnoreCase("WSLENV")).findFirst().orElse("WSLENV");
-            environment.put(key, wslEnv(environment.get(key), shared));
+            // Windows names are case-insensitive, so the inherited "WslEnv" and a [terminal.env] "WSLENV" are one
+            // variable: merge every spelling (inherited first) into a single entry under the first name.
+            List<String> names = environment.keySet().stream().filter(name -> name.equalsIgnoreCase("WSLENV"))
+                .sorted(java.util.Comparator.comparing((String name) -> terminal.env().containsKey(name)).thenComparing(name -> name))
+                .toList();
+            String existing = null;
+            for (String name : names) {
+                String value = environment.remove(name);
+                existing = existing == null ? value : existing + ":" + value;
+            }
+            environment.put(names.isEmpty() ? "WSLENV" : names.getFirst(), wslEnv(existing, shared));
         }
         if (integrationDir != null && terminal.shellIntegration() == ShellIntegrationMode.AUTO) {
             String effective = environment.get("JASPER_SHELL_INTEGRATION");
@@ -121,8 +130,8 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
 
     /**
      * The start for {@code directory}. A WSL profile starts its PTY in {@code home} and passes the directory to
-     * {@code wsl.exe --cd}: the Linux path for its own distribution's share, a Windows directory that exists as it is,
-     * and {@code ~} otherwise. Any other profile asked to start on a WSL share starts in {@code home}, because
+     * {@code wsl.exe --cd}: the Linux path for its own distribution's share, a Windows directory other than
+     * {@code home} that exists as it is, and {@code ~} otherwise. Any other profile asked to start on a WSL share starts in {@code home}, because
      * PowerShell and cmd misbehave in UNC directories and touching the share can start the WSL 2 VM; otherwise the
      * directory must exist. {@code isDirectory} touches the file system: call this off the EDT.
      */
@@ -130,8 +139,10 @@ public record LaunchSettings(List<String> command, Map<String, String> environme
         boolean onShare = WslPaths.distroOf(directory).isPresent();
         Optional<String> distro = profile.distro();
         if (distro.isPresent()) {
+            // The Windows home stands for "wherever a new shell starts" (every new window and tab asks for it), so
+            // it becomes the Linux home rather than /mnt/c/Users/NAME.
             String cd = WslPaths.toLinux(distro.get(), directory)
-                .orElseGet(() -> !onShare && isDirectory.test(directory) ? directory.toString() : "~");
+                .orElseGet(() -> !onShare && !directory.equals(home) && isDirectory.test(directory) ? directory.toString() : "~");
             var started = new ArrayList<>(command);
             started.add("--cd");
             started.add(cd);

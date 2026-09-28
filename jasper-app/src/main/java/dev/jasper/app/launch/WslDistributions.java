@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -21,7 +22,7 @@ import java.util.regex.Pattern;
 
 /**
  * The WSL distributions installed for this user, read from the {@code Lxss} registry keys through {@code reg.exe}
- * (no native access in the app), with {@code wsl.exe -l -v} as the fallback. Parsing is pure; only {@code run}
+ * (no native access in the app), with {@code wsl.exe -l -v} as the fallback when {@code reg.exe} gives no answer. Parsing is pure; only {@code run}
  * starts processes, and nothing runs off Windows. Docker Desktop's own distributions and ones that are not fully
  * installed are left out.
  */
@@ -39,16 +40,17 @@ public final class WslDistributions {
 
     /** The distributions on this machine; empty off Windows or without WSL. Blocks for up to 20 seconds: never call it on the EDT. */
     public static List<WslDistro> detect(String osName) {
-        return detect(osName, command -> run(command, TIMEOUT));
+        return detect(osName, command -> run(command, TIMEOUT, successes(command)));
     }
 
     /** As above with {@code runner} standing in for the process: a command in, its standard output (or nothing) out. */
     public static List<WslDistro> detect(String osName, Function<List<String>, Optional<byte[]>> runner) {
         if (!osName.toLowerCase(Locale.ROOT).startsWith("windows")) return List.of();
         // Distribution names follow NAME, which is ASCII, so the console code page does not matter.
-        List<WslDistro> registry = output(runner, REGISTRY_QUERY).map(bytes -> parseRegistry(new String(bytes, StandardCharsets.ISO_8859_1)))
-            .orElse(List.of());
-        if (!registry.isEmpty()) return registry;
+        // An answer from the registry is final, even with no usable distribution (no Lxss key, or only Docker's):
+        // wsl.exe is asked only when reg.exe could not run, failed or took too long.
+        Optional<byte[]> registry = output(runner, REGISTRY_QUERY);
+        if (registry.isPresent()) return parseRegistry(new String(registry.get(), StandardCharsets.ISO_8859_1));
         return output(runner, LIST_QUERY).map(WslDistributions::parseList).orElse(List.of());
     }
 
@@ -110,7 +112,7 @@ public final class WslDistributions {
     static List<WslDistro> parseList(byte[] output) {
         boolean utf16 = output.length >= 2 && (output[1] == 0 || output[0] == (byte) 0xFF && output[1] == (byte) 0xFE);
         String text = new String(output, utf16 ? StandardCharsets.UTF_16LE : StandardCharsets.UTF_8);
-        if (text.startsWith("﻿")) text = text.substring(1);
+        if (text.startsWith("\uFEFF")) text = text.substring(1);
         var distros = new ArrayList<WslDistro>();
         for (String raw : text.split("\r?\n")) {
             Matcher row = LIST_ROW.matcher(raw);
@@ -122,9 +124,25 @@ public final class WslDistributions {
 
     /**
      * Runs {@code command} with no input and returns its standard output when it exits with 0 within
-     * {@code timeout}; empty when it cannot start, fails or takes too long (then it is killed).
+     * {@code timeout}; empty when it cannot start, fails or takes too long (then it is killed). The system runner
+     * accepts the exit codes in {@link #successes} instead.
      */
     static Optional<byte[]> run(List<String> command, Duration timeout) {
+        return run(command, timeout, Set.of(0));
+    }
+
+    /**
+     * The exit codes that count as an answer. reg.exe exits with 1 when the {@code Lxss} key does not exist, which
+     * means no distribution was ever registered: that is "no WSL", not "could not ask", so it must not lead to
+     * {@code wsl.exe}. (reg.exe also exits with 1 for other failures such as access denied; those are rare enough for
+     * HKCU that the cost of treating them as "no WSL" is lower than starting wsl.exe on every machine without WSL.)
+     */
+    static Set<Integer> successes(List<String> command) {
+        return command.equals(REGISTRY_QUERY) ? Set.of(0, 1) : Set.of(0);
+    }
+
+    /** As above, returning the output when the exit code is one of {@code successes}. */
+    static Optional<byte[]> run(List<String> command, Duration timeout, Set<Integer> successes) {
         Process process;
         try {
             process = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
@@ -141,7 +159,7 @@ public final class WslDistributions {
                 return Optional.empty();
             }
             byte[] bytes = reading.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
-            return process.exitValue() == 0 ? Optional.of(bytes) : Optional.empty();
+            return successes.contains(process.exitValue()) ? Optional.of(bytes) : Optional.empty();
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             process.destroyForcibly();
