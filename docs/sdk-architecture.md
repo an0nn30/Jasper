@@ -362,3 +362,15 @@ report terminal content only. Plugins must tolerate an empty active pane while e
 
 `Appearance.editorPalette()` provides semantic surface, text, caret, selection, current-line
 and gutter colors. Jasper derives missing theme tokens; plugins retain syntax classification.
+
+### Declared settings (plan C1; SDK 0.9 completes them)
+
+`PluginContext.settings()` returns `PluginSettings`. A plugin declares each setting during `start` with a
+`SettingSpec` (dotted key, `SettingKind`, default, label, description, keywords, section, applies-when, editor hint)
+and gets a typed `Setting` handle: `get()` is the file's value when its kind allows it, else the default; `set(value)`
+saves through the same comment-preserving, atomic write as `config.toml`; `onChanged` runs on the UI thread. The
+application translates declarations into its own settings schema inside `dev.jasper.app.plugins`, reads the plugin's
+file with `dev.jasper.app.settings.SchemaReader`, and reports rejected values and undeclared keys against the file.
+The testkit's `FakePluginHost` offers `setSetting`, `savedSettings`, `settingsReports` and `declared`, and the contract
+suite holds the fake and the application to the same behaviour. `PluginConfig` remains until SDK 0.9 removes it; the
+Settings pages for plugins arrive in plan C2.

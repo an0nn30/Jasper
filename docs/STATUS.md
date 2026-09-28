@@ -2,6 +2,15 @@
 
 ## Current state — 2026-09-28
 
+- **Plugin settings C1** (`claude/plugin-settings`, 2026-09-28; spec
+  `docs/superpowers/specs/2026-09-28-jasper-plugin-settings-design.md`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-plugin-settings-c1.md`): SDK `dev.jasper.sdk.settings` (declarations,
+  kinds, typed handles) and `PluginContext.settings()`; the application reads each plugin's declared settings with its
+  own schema (`SchemaReader`, moved out of `ConfigLoader`), reports bad values and unknown keys against the file,
+  runs listeners on the UI thread and saves through a comment-preserving atomic write; the testkit fake and the
+  contract suite cover the same behaviour. `PluginConfig` stays until C3; Settings pages come in C2.
+  `./gradlew check`: 3,450 tests, 0 failures, 0 errors, 5 skipped. Executed inline with checkpoints after Tasks 3 and 5. Deviations: see the plan's status banner. Not pushed; not merged.
+
 - **Settings dialog B2** (`claude/settings-dialog-b2`, 2026-09-28; plan
   `docs/superpowers/plans/2026-09-28-jasper-settings-dialog-b2.md`): Keymap and Plugins are pages of Settings.
   Keymap stages shortcut edits (Set) and saves them in one write on Apply; shortcuts and sections that differ from

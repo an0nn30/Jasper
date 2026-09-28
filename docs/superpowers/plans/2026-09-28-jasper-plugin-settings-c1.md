@@ -2,7 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** Not started. Branch `claude/plugin-settings`, worktree `.worktrees/plugin-settings`, from local `main` at ef745526.
+**Status:** Implemented on `claude/plugin-settings` (inline, checkpoints after Tasks 3 and 5); `./gradlew check` green:
+3,450 tests, 0 failures, 0 errors, 5 skipped. Worktree `.worktrees/plugin-settings`, from local `main` at ef745526.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Scope notes (decided while writing this plan):
@@ -14,7 +15,13 @@ Scope notes (decided while writing this plan):
   throws `UnsupportedOperationException` from it until Task 5 replaces that line. No bundled plugin calls it in between.
 - The spec's contract case "listeners run on the UI thread" is an application test (Task 5): the fake has no UI thread.
 
-Deviations so far: none.
+Deviations so far:
+- Tasks 2 and 3: tests and code were written together; each test's failure was observed by moving the new
+  implementation aside before running it.
+- Task 5: a plugin that declares no settings is neither read nor reported by `DeclaredSettings.reload`. Without this,
+  every key of a plugin still using `PluginConfig` counted as unknown (`PluginRuntimeTest` caught it). A new
+  `DeclaredSettingsTest` case, `aPluginThatDeclaresNothingGetsNoReports`, covers it and was seen failing without the
+  guard.
 
 **Goal:** Plugins can declare their settings in code through SDK `dev.jasper.sdk.settings` and read, watch and save
 them through typed handles, validated by the application and by the testkit fake alike.

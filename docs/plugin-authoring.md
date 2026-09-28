@@ -453,6 +453,23 @@ is reported as a notice.
   `config().report(key, message)` are shown against that file, at the key's line, until the file is next reloaded.
 - **Your own threads and sockets** are yours to release, including before `start` throws.
 
+## Declared settings
+
+Declare each setting while the plugin starts; the handle reads the file's value, reports bad values for you and
+saves new ones:
+
+```java
+Setting<Integer> size = context.settings().declare(
+    SettingSpec.of("font_size", SettingKind.integer(8, 48), 13).label("Font size")
+        .description("Font size in points.").section("Editor"));
+size.onChanged(points -> window.setFontSize(points));
+size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
+```
+
+Kinds are `bool`, `integer`, `number`, `text` (optionally with a rule and message), `choice` and `stringList`. A value
+the kind rejects falls back to the default and is reported against the file with its line; keys nothing declares are
+reported as unknown. Declaring after `start` returns throws. `context.config()` still works until SDK 0.9 removes it.
+
 ## Testing
 
 ```java
