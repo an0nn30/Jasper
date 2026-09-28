@@ -94,6 +94,11 @@ public final class Editors {
         return new Factory<>((setting, context) -> new Executable(context), List.of());
     }
 
+    /** A text field with Browse…, for a file path. */
+    public static Factory<String> path(String title) {
+        return new Factory<>((setting, context) -> new Browse(context, title), List.of());
+    }
+
     /** An ordered list of strings; + asks for text. */
     public static Factory<List<String>> textList() {
         return new Factory<>((setting, context) -> new Items(parent ->
@@ -239,6 +244,29 @@ public final class Editors {
         void browse() {
             String current = line.value();
             context.chooseFile().apply("Choose a shell program", current.isBlank() ? Optional.empty() : Optional.of(java.nio.file.Path.of(current)))
+                .ifPresent(path -> line.field.setText(path.toString()));
+        }
+        @Override public JComponent component() { return component; }
+        @Override public String value() { return line.value(); }
+        @Override public void show(String value) { line.show(value); }
+        @Override public void onEdit(Runnable listener) { line.onEdit(listener); }
+    }
+
+    static final class Browse implements ValueEditor<String> {
+        private final Line line = new Line();
+        private final JComponent component;
+        private final PageContext context;
+        private final String title;
+        Browse(PageContext context, String title) {
+            this.context = context;
+            this.title = title;
+            var browse = new JButton("Browse…");
+            browse.addActionListener(event -> browse());
+            component = line(line.field, browse);
+        }
+        void browse() {
+            String current = line.value();
+            context.chooseFile().apply(title, current.isBlank() ? Optional.empty() : Optional.of(java.nio.file.Path.of(current)))
                 .ifPresent(path -> line.field.setText(path.toString()));
         }
         @Override public JComponent component() { return component; }

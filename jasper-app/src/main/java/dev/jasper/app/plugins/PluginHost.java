@@ -1,6 +1,8 @@
 package dev.jasper.app.plugins;
 
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.settingsui.PageContext;
+import dev.jasper.app.settingsui.SettingsPage;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.sdk.plugin.Plugin;
 import java.nio.file.Path;
@@ -135,6 +137,18 @@ final class PluginHost {
         }
         pending.add(cleanup.drained());
         return pending;
+    }
+
+    /** Settings pages for running plugins that declared settings, in start order. UI thread. */
+    List<SettingsPage> settingsPages(PageContext context) {
+        requireUi();
+        var pages = new ArrayList<SettingsPage>();
+        for (HostedContext hosted : contexts.values()) {
+            if (hosted.state != HostedContext.State.ACTIVE || !hosted.declared.declaresAnything()) continue;
+            var info = hosted.hosted.info();
+            pages.add(new PluginSettingsPage(info.id(), info.name(), hosted.declared, context));
+        }
+        return pages;
     }
 
     String executing() { return containment.executing(); }

@@ -102,4 +102,12 @@ class EditorsTest {
         assertThat(Fonts.families(false)).contains("Monospaced", "Dialog");
         assertThat(Fonts.families(true)).contains("Monospaced").doesNotContain("Dialog");
     }
+
+    @Test void aPathEditorBrowsesForAFile() {
+        var tool = dev.jasper.app.settings.Setting.of("tool", dev.jasper.app.settings.SettingKind.string(text -> true, ""), "")
+            .label("Tool").build();
+        var editor = (Editors.Browse) build(Editors.path("Choose a file"), tool, context);
+        editor.browse();
+        assertThat(editor.value()).isEqualTo("/bin/zsh");
+    }
 }

@@ -29,6 +29,9 @@ final class DeclaredSetting<T> implements Setting<T> {
     @SuppressWarnings("unchecked")
     T value(SettingValues values) { return (T) translated.toSdk().apply(values.get(translated.setting())); }
 
+    @SuppressWarnings("unchecked")
+    T sdkValue(Object appValue) { return (T) translated.toSdk().apply(appValue); }
+
     @Override public String key() { return translated.spec().key(); }
 
     @Override public T get() { return value(owner.values()); }

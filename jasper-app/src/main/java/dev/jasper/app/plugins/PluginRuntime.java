@@ -35,6 +35,17 @@ import dev.jasper.app.terminals.TerminalRegistry;
  * and {@link #maintain}.
  */
 public final class PluginRuntime {
+    /** The parent of plugins' pages in Settings. */
+    public static final String TOOLS = "tools";
+
+    /**
+     * The id of a plugin's page in Settings.
+     *
+     * @param pluginId the plugin
+     * @return {@code plugin.<id>}
+     */
+    public static String settingsPageId(String pluginId) { return "plugin." + pluginId; }
+
     /**
      * Where plugins and their state live.
      *
