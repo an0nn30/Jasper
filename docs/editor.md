@@ -142,10 +142,19 @@ recorded corpus.
 - Mappings: `:nmap`, `:vmap`, `:xmap`, `:omap`, `:imap`, `:cmap`, `:map` and `:map!`, their `noremap` forms, and the
   `unmap` and `mapclear` forms, as in Vim (`:nnoremap <Space>w :w<CR>`); without a right-hand side they list the
   mappings. Keys that start a longer mapping wait 'timeoutlen' (1000 ms) for the rest, and the strip shows them.
-  `<nowait>`, `<unique>`, `<Plug>`, `<Nop>` and `<Leader>` (a backslash for now) work as in Vim. A key that starts a
+  `<nowait>`, `<unique>`, `<Plug>`, `<Nop>` and `<Leader>` (`let mapleader`, a backslash by default) work as in Vim. A key that starts a
   mapping is Vim's, even a ⌘ key.
-- Not yet: a vimrc, `sethandler` lines and emulated plugins such as surround and commentary. They follow in later
-  releases. An uppercase mark (`mA`) set in one tab takes you back to that tab (`'A`).
+- The vimrc: `plugins/dev.jasper.editor/data/vimrc` under Jasper's home, in UTF-8, read the first time Vim turns on
+  and again with **Reload vimrc** (in the ⋯ menu and the command palette), which first puts mappings, options and
+  `sethandler` entries back to their defaults. It holds command lines, as a Vim or IdeaVim vimrc does: `set`,
+  `let mapleader = ","`, the mapping commands, `sethandler`, `source ~/.vimrc`, and `if has('ide')` … `endif` blocks
+  (true in Jasper, so IdeaVim's blocks apply). Lines Jasper cannot run are skipped: a notice says how many, and
+  `:messages` lists each with its line and the reason.
+- `sethandler <C-f> n:vim i:ide` decides who gets a key in each mode (`n i v x o c`, or `a` for all), as in IdeaVim.
+- `<Action>(id)` in a mapping runs one of the Editor's commands (`:nnoremap <Space>w <Action>(save)`), in any mode;
+  `:action id` runs one, and `:actionlist` lists the ids.
+- Not yet: emulated plugins such as surround and commentary. They follow in a later release. An uppercase mark
+  (`mA`) set in one tab takes you back to that tab (`'A`).
 
 ## For other plugins
 

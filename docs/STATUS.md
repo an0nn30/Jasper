@@ -2,6 +2,16 @@
 
 ## Current state — 2026-09-28
 
+- **Editor Vim mode, plan V3b** (branch `claude/vim-v3b`, plan
+  `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v3b.md`, written 2026-09-28): the vimrc (`plugins/dev.jasper.editor/data/vimrc`), read the
+  first time Vim turns on and on Reload vimrc, with comments, continuation, `source` (10 deep), `if has('ide')`, and
+  skipped lines counted in a notice and listed in `:messages`; `:let` for `mapleader`, registers, options and
+  variables; `:sethandler`; `<Action>(id)`, `:action` and `:actionlist` over the Editor's commands; the options vimrcs
+  set; `:syntax` and `:filetype` accepted. Every file in the plan was compiled and run against Vim 9.1 before the plan
+  was written: 1742 corpus cases (28 new in `vimrc.case`), with files and the Editor's commands in `VimrcTest` and
+  `EditorWindowTest`.
+  - Not done: executing the plan; GUI checks 80–88 of the [checklist](editor-verification.md) (user-run); plan V4
+    (extensions); push.
 - **Editor Vim mode, plan V3a** (branch `claude/vim-v3a`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v3a.md`, written 2026-09-28): macros (`q`, `@`, `@@`, `{n}@`, `@:`, `@.`,
   `recording @q` in the Vim bar) and the mapping commands typed on the command line (`:map :nmap :vmap :xmap :omap

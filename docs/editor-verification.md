@@ -106,3 +106,15 @@ unverified.
 - [ ] 77. `:nmap x ggx` and then `x` runs on; Ctrl+C stops it, the Vim bar flashes, and the Editor answers again.
 - [ ] 78. `:s/a/b/`, `j`, `@:` repeats the substitution on the next line.
 - [ ] 79. `qai`, typing 日本 with the Japanese input method, `<Esc>q`, then `@a` on another line inserts 日本 again.
+
+## Vim mode (plan V3b)
+
+- [ ] 80. With `nnoremap <Space>w :w<CR>` in `plugins/dev.jasper.editor/data/vimrc` under Jasper's home, turning Vim on makes Space and `w` save the tab, and no notice appears.
+- [ ] 81. A vimrc with a line `bogus` shows the notice `vimrc: 1 line was skipped; see :messages`; `:messages` shows `line    N:` and `E492: Not an editor command: bogus`.
+- [ ] 82. After editing the vimrc, **Reload vimrc** (⋯ menu or command palette) applies the change without restarting; a mapping removed from the file is gone.
+- [ ] 83. `let mapleader = ","` and then `nmap <Leader>d dd` in the vimrc: `,d` deletes a line.
+- [ ] 84. `if has('ide')` … `endif` around a mapping applies it; the same block with `has('nvim')` does not.
+- [ ] 85. `sethandler <C-d> n:ide` in the vimrc: in Normal mode Ctrl+D no longer scrolls half a page.
+- [ ] 86. `:nnoremap <Space>f <Action>(find)`: Space and `f` opens the Find bar; `:actionlist` lists the Editor's command ids; `:action wrap` toggles soft wrap.
+- [ ] 87. `source ~/.vimrc` in the vimrc reads a Vim vimrc; the lines Jasper lacks are counted in the notice.
+- [ ] 88. A folder named `vimrc` in place of the file shows `vimrc: could not read …; Vim runs with its defaults.`, and Vim still works.

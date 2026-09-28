@@ -104,3 +104,21 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 - **`<nowait>` in the corpus.** The recorder types a case's keys all at once, so Vim sees a longer mapping's keys
   together and `<nowait>` never matters there; Jasper's corpus runner gives the keys one at a time, as typing does, and
   the case that shows the difference is divergent.
+- **The vimrc runs in a tab.** Its lines run as command lines in the selected tab that has Vim on when it is read, so
+  a `:normal` or `:s` in a vimrc changes that tab; mappings, options, variables and `sethandler` entries are global.
+- **Vim script is literals only.** `:let` sets a global variable (`mapleader`, `g:name`), a register (`@a`, `@/`) or
+  an option (`&tw`, `&l:sw`) to one string or number; expressions, `s:` variables, functions and `:echo` fail with
+  E319. In a vimrc `if` is true only for `has('ide')`, `has('jasper')` and a number other than 0.
+- **Extensions come later.** `Plug '…'` and `packadd` lines fail, and are counted in the vimrc's notice, as in a Vim
+  without a plugin manager; `let g:…` settings for extensions are kept for when they come.
+- **`:messages` keeps errors.** Jasper's history holds the errors given and the vimrc's report of skipped lines;
+  Vim's holds every message.
+- **`:source` paths.** In a vimrc a relative name starts from the sourcing file's folder, and typed from the current
+  file's folder; Vim starts from the current directory. `:source` needs a name (Vim 9 sources the current buffer
+  without one), and `:source!` fails.
+- **Options vimrcs set change nothing.** 'compatible', 'encoding', 'fileformat', 'ruler', 'laststatus', 'mouse',
+  'belloff', 'ttimeout', 'ttimeoutlen', 'syntax', 'undolevels' and 'visualbell' can be set and read back: the Editor
+  keeps each file's encoding and line ends, the Vim bar always shows, the bell is always visual and the Editor's undo
+  limit applies. `:syntax` and `:filetype` do nothing; the Editor highlights and indents by language.
+- **`<Action>(id)`, `:action` and `:actionlist`** are IdeaVim's, with the Editor's command ids (`save`, `find`,
+  `toggle-comment`, `reload-vimrc`); an unknown id fails with `Not an Editor command: id`.
