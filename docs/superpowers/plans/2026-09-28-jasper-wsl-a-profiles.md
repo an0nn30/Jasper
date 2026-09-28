@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** In progress: Tasks 0-1 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
+**Status:** In progress: Tasks 0-2 done. Branch `worktree-wsl-hosts`, worktree `C:\Users\dustin\Documents\moray\.claude\worktrees\wsl-hosts`.
 Record every deviation from this text here and in `docs/STATUS.md`.
 
 Deviations so far: none.
@@ -242,7 +242,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Produces: `SessionLaunchOptions.localPathMapper()`, `Builder.localPathMapper(Function<String, Optional<Path>>)`, `SessionLaunchOptions.DEFAULT_LOCAL_PATHS`, the kept six-argument `SessionLaunchOptions` constructor; `DirectoryProvenance(boolean, Set<String>, Function<String, Optional<Path>>)`, `DirectoryProvenance.fileUriPath(String)`; `TerminalAccess(PtyChild, int, int, int, Set<String>, Function<String, Optional<Path>>, JediTermEngine.Events)`.
 - Consumes: nothing new.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `DirectoryProvenanceTest.java` (add `import java.net.URI;`):
 
@@ -312,12 +312,12 @@ class SessionLocalPathsTest {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-terminal:test --tests 'dev.jasper.terminal.internal.shell.DirectoryProvenanceTest' --tests 'dev.jasper.terminal.session.SessionLaunchOptionsNamesTest' --tests 'dev.jasper.terminal.session.SessionLocalPathsTest'`
 Expected: FAIL: compilation errors (`fileUriPath`, the three-argument `DirectoryProvenance`, `localPathMapper`, `DEFAULT_LOCAL_PATHS` do not exist).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Replace `DirectoryProvenance.java` with:
 
@@ -580,7 +580,7 @@ reported under another host is not taken for a local path, and `localPathMapper`
 local report's path means a different directory on this machine (a WSL distribution's paths).
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-terminal:test --tests 'dev.jasper.terminal.internal.shell.*' --tests 'dev.jasper.terminal.session.*'`
 Expected: PASS (on Windows, `SessionLocalPathsTest` is skipped and the two known `ShellIntegrationSessionTest`/`ShellCommandTrackerTest` failures may remain).
@@ -588,7 +588,7 @@ Expected: PASS (on Windows, `SessionLocalPathsTest` is skipped and the two known
 Run: `./gradlew :jasper-terminal:check verifyTerminalArchitecture :jasper-app:compileJava`
 Expected: PASS (javadoc clean, compiled documentation examples unchanged, app still compiles against the kept constructor).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git branch --show-current

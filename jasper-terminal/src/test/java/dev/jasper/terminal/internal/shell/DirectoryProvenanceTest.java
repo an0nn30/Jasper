@@ -1,5 +1,6 @@
 package dev.jasper.terminal.internal.shell;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
@@ -49,5 +50,25 @@ class DirectoryProvenanceTest {
         assertThat(local.classify("not a uri")).isEmpty();
         assertThat(local.classify("file://host")).isEmpty();
         assertThat(local.classify("")).isEmpty();
+    }
+
+    @Test void aMapperDecidesWhereALocalReportPointsAndEmptyIgnoresIt() {
+        var mapped = new DirectoryProvenance(true, Set.of("workstation"),
+            path -> path.startsWith("/mnt/") ? Optional.of(Path.of("mapped" + path.length())) : Optional.empty());
+        assertThat(mapped.classify("file://workstation/mnt/c")).isEqualTo(local(Path.of("mapped6")));
+        assertThat(mapped.classify("file:///home/x")).as("no mapping: the report is ignored").isEmpty();
+        assertThat(mapped.classify("file://elsewhere/home/x")).as("remote reports never reach the mapper")
+            .isEqualTo(remote("elsewhere", "/home/x"));
+        assertThat(new DirectoryProvenance(false, Set.of(), path -> { throw new AssertionError("attached sessions are never mapped"); })
+            .classify("file:///srv")).isEqualTo(remote("", "/srv"));
+        assertThat(new DirectoryProvenance(true, Set.of(), path -> { throw new IllegalStateException("broken"); })
+            .classify("file:///tmp")).as("a failing mapper counts as no mapping").isEmpty();
+        assertThat(new DirectoryProvenance(true, Set.of(), path -> null).classify("file:///tmp")).isEmpty();
+    }
+
+    @Test void theDefaultMappingIsTheFileUriPath() throws Exception {
+        assertThat(DirectoryProvenance.fileUriPath("/tmp/My Dir")).contains(Path.of(new URI("file:///tmp/My%20Dir")));
+        assertThat(DirectoryProvenance.fileUriPath("relative")).isEmpty();
+        assertThat(new DirectoryProvenance(true, Set.of()).classify("file:///tmp")).isEqualTo(local(Path.of(new URI("file:///tmp"))));
     }
 }
