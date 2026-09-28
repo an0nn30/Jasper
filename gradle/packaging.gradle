@@ -529,9 +529,12 @@ if (normalizedHost().os == 'windows') {
     }
 
     // Compares an unpacked package with the verified image (same bytes, no lost executable bits) and checks the menu entry.
+    // jpackage rewrites its own app-image metadata, lib/app/.jpackage.xml, when it builds a package.
     def verifyUnpackedPackage = { File image, File unpacked, String label ->
         File installed = new File(unpacked, installRoot.substring(1))
+        File jpackageMetadata = new File(image, 'lib/app/.jpackage.xml')
         image.eachFileRecurse(groovy.io.FileType.FILES) { expected ->
+            if (expected == jpackageMetadata) return
             File actual = new File(installed, image.toPath().relativize(expected.toPath()).toString())
             if (!actual.isFile() || Files.mismatch(expected.toPath(), actual.toPath()) != -1L) {
                 throw new GradleException("${label} verification failed: ${actual} differs from the verified image or is missing")
@@ -565,11 +568,16 @@ if (normalizedHost().os == 'windows') {
                 temporary.mkdirs()
                 try {
                     File output = new File(temporary, 'output')
+                    // Packaging an app image, jpackage ignores --icon and installs its generic 32px Java icon
+                    // as lib/Jasper.png (the menu entry's icon) unless the resource directory supplies one.
+                    File resources = new File(temporary, 'resources')
+                    resources.mkdirs()
+                    Files.copy(nativeIcon.get().toPath(), new File(resources, 'Jasper.png').toPath())
                     List<String> args = [context.jpackage.absolutePath, '--type', type, '--name', 'Jasper',
                         '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
                         '--about-url', 'https://github.com/an0nn30/moray',
                         '--icon', nativeIcon.get().absolutePath,
-                        '--app-image', image.absolutePath,
+                        '--app-image', image.absolutePath, '--resource-dir', resources.absolutePath,
                         '--dest', output.absolutePath, '--temp', new File(temporary, 'jpackage').absolutePath,
                         '--linux-package-name', 'jasper', '--linux-shortcut',
                         '--linux-menu-group', 'System;TerminalEmulator;',

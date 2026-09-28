@@ -47,7 +47,7 @@ jobs:
       - name: Package
         env:
           JASPER_VERSION: ${{ inputs.version || '1.0.0' }}
-        run: ./gradlew :jasper-app:packageDist "-PjasperVersion=$JASPER_VERSION" --stacktrace
+        run: ./gradlew :jasper-app:packageDist "-PjasperVersion=$JASPER_VERSION" --continue --stacktrace
       - uses: actions/upload-artifact@v7
         with:
           name: jasper-linux-${{ matrix.arch }}
@@ -61,6 +61,7 @@ jobs:
         with:
           name: jasper-linux-${{ matrix.arch }}-work
           path: jasper-app/build/packaging/*-work
+          include-hidden-files: true
           if-no-files-found: ignore
 
   install:
