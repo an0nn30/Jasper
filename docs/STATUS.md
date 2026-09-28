@@ -28,7 +28,8 @@
     `\r` turned into `\n`; (6) `Buffer` reads the document's line elements instead of re-splitting the text after
     every edit; (7) the deferred caret clamp checks the editor is still attached, and committed IME text is dropped
     outside Insert mode. Two corpus cases cover (2).
-  - `./gradlew check`: 2823 tests, 2818 passed, 0 failed, 5 skipped.
+  - `./gradlew check` after merging `main` (settings foundation): 2,878 tests, 2,873 passed, 0 failed, 5 skipped. One earlier run failed `TerminalAppIntegrationTest`'s "reflow" row-reset search case once; it passed in three isolated reruns and in the full rerun (no terminal code changed on this branch).
+  - Merged into local `main` on 2026-09-28; not pushed.
   - Not done: GUI checks 21–30 of the [checklist](editor-verification.md) (user-run); plans V1b, V2, V3 and V4; push.
 - **Settings foundation** (`claude/settings-foundation`, 2026-09-27; spec
   `docs/superpowers/specs/2026-09-27-jasper-settings-foundation-design.md`, plan
