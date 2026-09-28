@@ -2,6 +2,25 @@
 
 ## Current state — 2026-09-23
 
+- **Editor Vim mode, plan V1a** (branch `claude/vim-mode`, plan
+  `docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`, spec
+  `docs/superpowers/specs/2026-09-27-jasper-editor-vim-design.md`, 2026-09-27): a headless Vim engine in
+  `dev.jasper.editor.vim` on every tab's `VimTextArea`: Normal, Insert and Replace modes, counts, motions, text
+  objects, operators, registers (with `"+` and `"*`), undo in Vim's steps, and `.`. The handler rule gives Vim only
+  the keys it defines; ⌘ keys stay with the Editor. The Vim bar shows the mode, pending keys and messages. The
+  `vim` setting, the Vim status item and Toggle Vim Mode switch it (the toggle writes the settings file).
+  - Fidelity: 467 corpus cases in `plugins/editor/src/test/resources/vim/corpus`, recorded from Vim 9.1 by
+    `./gradlew :jasper-plugin-editor:recordVimCorpus` (not part of `check`) and replayed by `VimCorpusTest`; every
+    command in `VimCommands` has a case. Two `=` cases are divergent; `docs/vim-divergences.md` lists every
+    difference and `docs/editor-vim-reference.md` is generated from the command table.
+  - Deviations from the spec are in the plan's header and the spec's amended sections 3.8, 4.1 and 13.
+  - Review fixes beyond the plan's code: the undo manager keeps Vim's grouping after a reload (discardAllEdits), an
+    undo from outside Vim during an insert reopens the insert's undo step, and a failing Insert-mode key is not
+    recorded (so a count or `.` does not replay it, and `<Esc>` always leaves Insert mode); three corpus cases cover
+    the last point.
+  - `./gradlew check`: 2812 tests, 2807 passed, 0 failed, 5 skipped.
+  - Not done: GUI checks 21–29 of the [checklist](editor-verification.md) (user-run); plans V1b, V2, V3 and V4; push.
+
 - **App-hosted Editor tabs** (`codex/plugin-workspace-tabs`, 2026-09-27):
   Editor files now use the main workspace's tab strip, rounded content frame, commands,
   status and breadcrumbs. The tab menu moves live content to/from a separate app-owned

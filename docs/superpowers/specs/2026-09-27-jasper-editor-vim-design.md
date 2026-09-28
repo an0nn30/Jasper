@@ -1,6 +1,6 @@
 # Editor Vim mode
 
-**Status:** Draft for the user's review, 2026-09-27. Amends the [Editor plugin](2026-09-27-jasper-editor-plugin-design.md) spec (settings, key handling, package layout) as hosted by [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md). Branch `claude/vim-mode`.
+**Status:** Approved by the user on 2026-09-27. Plan V1a (`docs/superpowers/plans/2026-09-27-jasper-editor-vim-v1a.md`) amends sections 3.8, 4.1 and 13, as marked **Amended (V1a)**. Amends the [Editor plugin](2026-09-27-jasper-editor-plugin-design.md) spec (settings, key handling, package layout) as hosted by [app-owned workspace tabs](2026-09-27-hosted-workspace-tabs-design.md). Branch `claude/vim-mode`.
 
 ## Purpose and scope
 
@@ -102,7 +102,7 @@ Normal, Insert, Replace, Visual (charwise, linewise, blockwise), Operator-pendin
 ### 3.4 Insert sessions and dot repeat
 
 - An insert session records the keys typed in it (after mapping). `.` repeats the whole change: the entering command (`cw`, `A`, `o`, `3i`) and the recorded keys, replayed through the same path, so auto-indent behaves as it did. A count on `.` replaces the original count.
-- Leaving Insert mode with `<Esc>` moves the cursor one character left unless at column 1; `<C-c>` leaves without abbreviation or count repetition, as in Vim.
+- Leaving Insert mode with `<Esc>` moves the cursor one character left unless at column 1; `<C-c>` leaves the same way, repeating a count as Vim 9 does (`3ix<C-c>` inserts three) (**Amended (V1a)**).
 - The `.` register holds the last inserted text; `<C-a>` in Insert inserts it; `gi` returns to the `'^` mark.
 
 ### 3.5 Registers
@@ -144,7 +144,7 @@ Each register holds text and a type: charwise, linewise or blockwise (with width
 
 Options have global and, where Vim has them, buffer-local values (`tabstop`, `shiftwidth`, `softtabstop`, `expandtab`, `autoindent`, `textwidth`, `iskeyword`, `nrformats`, `matchpairs`) and window-local ones (`number`, `relativenumber`, `wrap`, `scrolloff`, `sidescrolloff`), which live on the tab. The full list is in section 6.3.
 
-Defaults where the Editor has its own setting: `tabstop` and `shiftwidth` = the Editor's `tab_size`; `expandtab` = the tab's Spaces state; `wrap` = the tab's Wrap state; `number` on. Setting one of these through `:set` also changes the Editor's matching per-tab state, so the status line stays true. Other options default to Vim's (`-u NONE`) values, except `incsearch`, `hlsearch`, `showcmd` and `showmode`, which are on, as in IdeaVim.
+Defaults where the Editor has its own setting: `tabstop` and `shiftwidth` = the Editor's `tab_size`; `expandtab` = the tab's Spaces state; `autoindent` on, like the Editor's own auto-indent (**Amended (V1a)**); `wrap` = the tab's Wrap state; `number` on. Setting one of these through `:set` also changes the Editor's matching per-tab state, so the status line stays true. Other options default to Vim's (`-u NONE`) values, except `incsearch`, `hlsearch`, `showcmd` and `showmode`, which are on, as in IdeaVim.
 
 ### 3.9 Indentation
 
@@ -173,7 +173,7 @@ Defaults where the Editor has its own setting: `tabstop` and `shiftwidth` = the 
 - Putting: `p P gp gP ]p [p ]P [P`, with counts and all three register types.
 - Entering Insert or Visual: `i a I A o O gi gI v V <C-v> gv`.
 - Undo and repeat: `u <C-r> .`, `&` (in V2).
-- Numbers: `<C-a> <C-x>` with `nrformats` (default `bin,hex`, as in Vim 9), on the number under or after the cursor.
+- Numbers: `<C-a> <C-x>` with `nrformats` (default `bin,octal,hex`, Vim's value with `-u NONE`; **Amended (V1a)**), on the number under or after the cursor.
 - Scrolling: `<C-e> <C-y> <C-d> <C-u> <C-f> <C-b> zt zz zb z<CR> z. z-`, `scrolloff` respected.
 - Folds: `zo zc za zO zC zA zR zM zv zj zk [z ]z` on the tab's code folds.
 - Other: `<C-g>` (file name, line count, position in the Vim bar), `ga` (character code), `ZZ` (`:x`), `ZQ` (`:q!`), `m{mark}`. The command-line window (`q:`, `q/`) is not supported.
@@ -375,10 +375,10 @@ No SDK change is needed.
 
 One plan per runnable deliverable, each written with `superpowers:writing-plans` and executed in order. Each ends with `./gradlew check` green and its corpus recorded.
 
-- **Plan V1a: engine foundation.** `VimTextArea`, key normalization, the handler rule, the `Machine`, Normal/Insert/Replace modes, counts, motions other than search and marks, text objects, operators, registers (including the clipboard), undo grouping, insert sessions and `.`, caret styles, the Vim bar without the command line, the setting, toggle and status item, the corpus format, recorder, replay test and coverage guard. Runnable: Vim-mode editing without Visual mode or search.
-- **Plan V1b: Visual mode, search and navigation.** Visual char/line/block with the block highlighter, `VimRegex`, `/ ? n N * #` with offsets, `hlsearch`/`incsearch`, marks, jumplist and change list, scrolling, folds, `<C-a>`/`<C-x>`, `gq`/`gw`.
-- **Plan V2: ex command line.** Section 6, the output panel and the relative-number gutter.
-- **Plan V3: macros and mappings.** Section 4.3 and section 7.
+- **Plan V1a: engine foundation.** `VimTextArea`, key normalization, the handler rule, the `Machine`, Normal/Insert/Replace modes, counts, motions other than search and marks, text objects, operators, registers (including the clipboard), undo grouping, insert sessions and `.`, caret styles, the Vim bar without the command line, the setting, toggle and status item, the corpus format, recorder, replay test and coverage guard. Runnable: Vim-mode editing without Visual mode or search. **Amended (V1a):** the screen-line motions `H M L gj gk g0 g^ g$ gm`, `gi`, `<C-g>`, `ga` and blockwise forced motions (`d<C-v>j`) move to V1b; `ZZ` and `ZQ` to V2; `timeoutlen` and reading `sethandler` from the vimrc to V3.
+- **Plan V1b: Visual mode, search and navigation.** Visual char/line/block with the block highlighter, `VimRegex`, `/ ? n N * #` with offsets, `hlsearch`/`incsearch`, marks, jumplist and change list, scrolling, folds, `<C-a>`/`<C-x>`, `gq`/`gw`; and, moved from V1a, the screen-line motions, `gi`, `<C-g>`, `ga` and blockwise forced motions.
+- **Plan V2: ex command line.** Section 6, the output panel and the relative-number gutter; `ZZ` and `ZQ`.
+- **Plan V3: macros and mappings.** Section 4.3 and section 7, with `timeoutlen` (section 2.3) and `sethandler` lines.
 - **Plan V4: extensions.** Section 8, with the pinned-upstream oracle.
 
 Documentation lands with each plan: a Vim section in the Editor README (enabling, the vimrc location, `sethandler`, `<Action>`), `docs/vim-divergences.md`, the supported-command reference generated from `VimCommands` into `docs/editor-vim-reference.md` by a test that fails when it is stale, and `docs/STATUS.md` entries.

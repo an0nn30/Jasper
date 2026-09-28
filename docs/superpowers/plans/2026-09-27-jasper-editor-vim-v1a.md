@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-27-jasper-editor-vim-design.md` (plan V1a of section 13). Read sections 1–5, 9–13.
 
-**Status:** Written 2026-09-27 on branch `claude/vim-mode` (worktree `.worktrees/vim-mode`). Every source file, test and corpus case below was compiled and run before the plan was written: against Vim 9.1, the 464 corpus cases (462 recorded, 2 divergent) and the 195 other Editor tests passed, and every command in the table had a case.
+**Status:** Written 2026-09-27 on branch `claude/vim-mode` (worktree `.worktrees/vim-mode`). Every source file, test and corpus case below was compiled and run before the plan was written: against Vim 9.1, the 464 corpus cases (462 recorded, 2 divergent) and the 195 other Editor tests passed, and every command in the table had a case. Executed 2026-09-27; task reviews found three engine bugs, fixed beyond the plan's code in 543c7d89 (see docs/STATUS.md), and added three corpus cases.
 
 ## Deviations from the spec (approved scope, adjusted in this plan)
 

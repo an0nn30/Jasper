@@ -1,0 +1,63 @@
+package dev.jasper.editor.vim;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Keeps the Vim documentation true (spec 11.1 and 12): every divergent corpus case is listed in
+ * docs/vim-divergences.md, and docs/editor-vim-reference.md is generated from {@link VimCommands}. Regenerate the
+ * reference with {@code ./gradlew :jasper-plugin-editor:test --tests '*VimDocsTest' -PupdateDocs=true}.
+ */
+class VimDocsTest {
+    private static final Path DOCS = Path.of(System.getProperty("jasper.repoRoot", "../..")).toAbsolutePath().normalize().resolve("docs");
+
+    @Test void everyDivergentCaseIsListedWithItsReason() throws IOException {
+        String doc = Files.readString(DOCS.resolve("vim-divergences.md"), StandardCharsets.UTF_8);
+        List<CorpusCase> divergent = VimCorpusTest.cases().stream().filter(c -> c.divergent() != null).toList();
+        for (CorpusCase c : divergent)
+            assertThat(doc).as("docs/vim-divergences.md lists %s", c).contains("| " + c.file() + " | " + c.name() + " | " + c.divergent() + " |");
+        long rows = doc.lines().filter(line -> line.startsWith("| ") && line.contains(".case | ")).count();
+        assertThat(rows).as("rows in docs/vim-divergences.md's corpus table").isEqualTo(divergent.size());
+    }
+
+    @Test void theReferenceIsGeneratedFromTheCommandTable() throws IOException {
+        Path file = DOCS.resolve("editor-vim-reference.md");
+        String expected = reference(VimCommands.standard());
+        if (Boolean.parseBoolean(System.getProperty("jasper.updateDocs", "false"))) Files.writeString(file, expected, StandardCharsets.UTF_8);
+        assertThat(Files.readString(file, StandardCharsets.UTF_8))
+            .as("docs/editor-vim-reference.md is stale: run ./gradlew :jasper-plugin-editor:test --tests '*VimDocsTest' -PupdateDocs=true")
+            .isEqualTo(expected);
+    }
+
+    static String reference(VimCommands commands) {
+        StringBuilder out = new StringBuilder();
+        out.append("# Editor Vim mode: supported keys\n\n");
+        out.append("Generated from `VimCommands` by `VimDocsTest`; do not edit by hand. Regenerate with\n");
+        out.append("`./gradlew :jasper-plugin-editor:test --tests '*VimDocsTest' -PupdateDocs=true`. How Vim mode works: [Editor](editor.md#vim-mode);\n");
+        out.append("where it differs from Vim: [divergences](vim-divergences.md).\n");
+        section(out, commands, VimCommands.Kind.MOTION, "Motions", "In Normal mode and after an operator. A count repeats or scales them.");
+        section(out, commands, VimCommands.Kind.OPERATOR, "Operators", "Followed by a motion or text object; doubled (`dd`, `gUU`, `gUgU`) for whole lines.");
+        section(out, commands, VimCommands.Kind.OBJECT, "Text objects", "After an operator.");
+        section(out, commands, VimCommands.Kind.ACTION, "Normal-mode commands", "");
+        section(out, commands, VimCommands.Kind.INSERT, "Insert-mode keys", "Printable keys type text; these keys do more.");
+        return out.toString();
+    }
+
+    private static void section(StringBuilder out, VimCommands commands, VimCommands.Kind kind, String title, String note) {
+        out.append("\n## ").append(title).append("\n\n");
+        if (!note.isEmpty()) out.append(note).append("\n\n");
+        out.append("| Keys | What it does |\n|---|---|\n");
+        for (VimCommands.Entry entry : commands.entries()) {
+            if (entry.kind() != kind) continue;
+            String keys = entry.keys().equals(" ") ? "<Space>" : entry.keys();
+            if (entry.needsChar()) keys += "{char}";
+            String code = keys.contains("`") ? "`` " + keys + " ``" : "`" + keys + "`";
+            out.append("| ").append(code.replace("|", "\\|")).append(" | ").append(entry.description().replace("|", "\\|")).append(" |\n");
+        }
+    }
+}

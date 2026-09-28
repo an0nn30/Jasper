@@ -29,3 +29,15 @@ unverified.
 - [ ] 18. After the SSH connection ends (close its tabs and wait for it to drop), saving an edited remote tab reconnects, asking for sign-in in a terminal window if needed; with every terminal window closed, the save fails with "Reconnecting to <host> needs an open terminal window for the sign-in prompt."
 - [ ] 19. With the Editor disabled in the Plugins manager (after the restart), double-clicking a file in the SFTP browser does nothing and Open in Editor is not in the menu.
 - [ ] 20. On a host at least 50 ms away (ping), saving an edited remote file and Save All with about five remote tabs complete in reasonable time; note the times (each save currently costs several dozen sequential SFTP round trips).
+
+## Vim mode (plan V1a)
+
+- [ ] 21. The Vim status item and Toggle Vim Mode switch every open tab between Vim mode and plain editing, keeping text and undo; after a restart the choice holds (`vim = true` is in the settings file).
+- [ ] 22. The caret is a block in Normal mode, a bar in Insert mode (`i`) and an underline after `d`; the strip under the text shows `-- INSERT --` and pending keys such as `2d`, and `"qp` on an empty register shows `E353: Nothing in register q` and flashes.
+- [ ] 23. Typing fast in Insert mode keeps every character in order; `u` then undoes the whole insert, and `.` repeats it elsewhere.
+- [ ] 24. macOS: Option characters (⌥e e for é) insert in Insert mode and work after `f`; ⌘S, ⌘F, ⌘Z and ⌘W still reach the Editor.
+- [ ] 25. Linux or Windows: Ctrl+S saves in Normal mode, Ctrl+R redoes, and Ctrl+W in Insert mode deletes a word rather than closing the tab.
+- [ ] 26. With a Japanese or Chinese input method on, `dd` and `x` work in Normal mode, and composed text inserts in Insert mode and repeats with `.`.
+- [ ] 27. `"+yy` then pasting in another application gives the line; text copied elsewhere comes back with `"+p`.
+- [ ] 28. Clicking past the end of a line in Normal mode puts the caret on the line's last character.
+- [ ] 29. A remote file opened from the SFTP browser edits and saves in Vim mode as it does without it.
