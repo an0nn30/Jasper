@@ -140,6 +140,8 @@ public final class RecordCorpus {
         lines.add("set encoding=utf-8");
         lines.add("scriptencoding utf-8");
         lines.add("set nocompatible");
+        // Vim on macOS maps <D-v> and Visual <BS> even with -u NONE; Jasper starts with no mappings.
+        lines.add("mapclear | mapclear!");
         lines.add("function! JasperRecord()");
         lines.add("  let g:jasper = {'text': getline(1, '$'), 'line': line('.'), 'col': charcol('.'), 'mode': mode(1), 'regs': {}, 'visual': []}");
         lines.add("  let g:jasper.view = [winsaveview().topline, winsaveview().leftcol]");

@@ -16,6 +16,7 @@ A divergent case keeps a hand-written expectation, and `recordVimCorpus` skips i
 | marks.case | backtick dot after o | '. takes each typed character's column, as when typing; Vim fed a whole string at once records where it started |
 | ex-range.case | a Vim command Jasper lacks | Jasper has no abbreviations; a command it lacks fails with E319 (docs/vim-divergences.md) |
 | ex-substitute.case | s expression is not available | Jasper has no expressions: \= in a substitute string fails with E319 (docs/vim-divergences.md) |
+| mappings.case | nowait does not wait for a longer mapping | the recorder types every key at once, so Vim sees ab whole and never waits; Jasper gets the keys one at a time, as typing does |
 
 ## Other differences
 

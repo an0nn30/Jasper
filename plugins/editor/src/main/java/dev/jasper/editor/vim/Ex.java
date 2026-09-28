@@ -129,6 +129,36 @@ final class Ex {
         def("tabprevious", RANGE | ZEROR | EXTRA | TRLBAR, Addr.OTHER, "[N] tabs back", ExFiles::tabPrevious);
         def("tabnew", BANG | EXTRA | RANGE | ZEROR | TRLBAR, Addr.OTHER, "a new untitled tab, or {file} in a tab", ExFiles::newTab);
         def("tabedit", BANG | EXTRA | RANGE | ZEROR | TRLBAR, Addr.OTHER, "as `:tabnew`", ExFiles::newTab);
+        // The mapping commands take | only escaped and keep CTRL-V (EX_TRLBAR, EX_NOTRLCOM, EX_CTRLV).
+        int map = EXTRA | TRLBAR | NOTRLCOM | CTRLV;
+        def("map", BANG | map, Addr.NONE, "map {lhs} to {rhs} in Normal, Visual and Operator-pending mode (`!`: Insert and Command-line); list mappings", ExMaps::map);
+        def("nmap", map, Addr.NONE, "map {lhs} to {rhs} in Normal mode; list the mappings", ExMaps::map);
+        def("vmap", map, Addr.NONE, "map {lhs} to {rhs} in Visual mode; list the mappings", ExMaps::map);
+        def("xmap", map, Addr.NONE, "map {lhs} to {rhs} in Visual mode, as `:vmap`; list the mappings", ExMaps::map);
+        def("omap", map, Addr.NONE, "map {lhs} to {rhs} in Operator-pending mode; list the mappings", ExMaps::map);
+        def("imap", map, Addr.NONE, "map {lhs} to {rhs} in Insert mode; list the mappings", ExMaps::map);
+        def("cmap", map, Addr.NONE, "map {lhs} to {rhs} on the command line; list the mappings", ExMaps::map);
+        def("noremap", BANG | map, Addr.NONE, "as `:map`, but {rhs} is not mapped again", ExMaps::map);
+        def("nnoremap", map, Addr.NONE, "as `:nmap`, but {rhs} is not mapped again", ExMaps::map);
+        def("vnoremap", map, Addr.NONE, "as `:vmap`, but {rhs} is not mapped again", ExMaps::map);
+        def("xnoremap", map, Addr.NONE, "as `:xmap`, but {rhs} is not mapped again", ExMaps::map);
+        def("onoremap", map, Addr.NONE, "as `:omap`, but {rhs} is not mapped again", ExMaps::map);
+        def("inoremap", map, Addr.NONE, "as `:imap`, but {rhs} is not mapped again", ExMaps::map);
+        def("cnoremap", map, Addr.NONE, "as `:cmap`, but {rhs} is not mapped again", ExMaps::map);
+        def("unmap", BANG | map, Addr.NONE, "remove the mapping of {lhs} in Normal, Visual and Operator-pending mode (`!`: Insert and Command-line)", ExMaps::map);
+        def("nunmap", map, Addr.NONE, "remove the Normal-mode mapping of {lhs}", ExMaps::map);
+        def("vunmap", map, Addr.NONE, "remove the Visual-mode mapping of {lhs}", ExMaps::map);
+        def("xunmap", map, Addr.NONE, "remove the Visual-mode mapping of {lhs}, as `:vunmap`", ExMaps::map);
+        def("ounmap", map, Addr.NONE, "remove the Operator-pending mapping of {lhs}", ExMaps::map);
+        def("iunmap", map, Addr.NONE, "remove the Insert-mode mapping of {lhs}", ExMaps::map);
+        def("cunmap", map, Addr.NONE, "remove the command-line mapping of {lhs}", ExMaps::map);
+        def("mapclear", BANG | EXTRA | TRLBAR, Addr.NONE, "remove every mapping of `:map` (`!`: of `:map!`)", ExMaps::mapclear);
+        def("nmapclear", EXTRA | TRLBAR, Addr.NONE, "remove every Normal-mode mapping", ExMaps::mapclear);
+        def("vmapclear", EXTRA | TRLBAR, Addr.NONE, "remove every Visual-mode mapping", ExMaps::mapclear);
+        def("xmapclear", EXTRA | TRLBAR, Addr.NONE, "remove every Visual-mode mapping, as `:vmapclear`", ExMaps::mapclear);
+        def("omapclear", EXTRA | TRLBAR, Addr.NONE, "remove every Operator-pending mapping", ExMaps::mapclear);
+        def("imapclear", EXTRA | TRLBAR, Addr.NONE, "remove every Insert-mode mapping", ExMaps::mapclear);
+        def("cmapclear", EXTRA | TRLBAR, Addr.NONE, "remove every command-line mapping", ExMaps::mapclear);
     }
 
     /** @return the commands Jasper implements, in the reference's order */

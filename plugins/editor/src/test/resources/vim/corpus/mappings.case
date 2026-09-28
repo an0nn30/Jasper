@@ -1,0 +1,1686 @@
+# Mappings: :map and its forms define, list and remove mappings; keys are mapped before they run.
+
+=== nmap maps a key
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 2,1
+keys: :nmap x dd<CR>x
+--- vim 9.1
+expect-text:
+  one two three
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 2,1
+expect-mode: normal
+
+=== a mapping's changes undo together
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap x ddjdd<CR>xu
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a typed key after a mapping starts a new undo step
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap x dd<CR>xxu
+--- vim 9.1
+expect-text:
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== nnoremap does not map its right-hand side again
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:nnoremap y x<CR>y
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== nmap maps its right-hand side again
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:nmap y x<CR>y
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a right-hand side starting with its left-hand side
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap j jj<CR>j
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 6,1
+expect-mode: normal
+
+=== mappings that map each other fail with E223
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap x y<CR>:nmap y x<CR>xj
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 2,1
+expect-mode: normal
+expect-output:
+  E223: Recursive mapping
+
+=== maxmapdepth limits the depth
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :set mmd=3<CR>:nmap a b<CR>:nmap b c<CR>:nmap c dd<CR>a
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E223: Recursive mapping
+
+=== maxmapdepth deep enough
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :set mmd=4<CR>:nmap a b<CR>:nmap b c<CR>:nmap c dd<CR>a
+--- vim 9.1
+expect-text:
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a count applies to the first command of a mapping
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap x ddj<CR>2x
+--- vim 9.1
+expect-text:
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 2,1
+expect-mode: normal
+
+=== zero after count digits is not mapped
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+  g7
+  h8
+  i9
+  j10
+  k11
+  l12
+cursor: 1,1
+keys: :nmap 0 dd<CR>10j0
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+  g7
+  h8
+  i9
+  j10
+  l12
+expect-cursor: 11,1
+expect-mode: normal
+
+=== a register applies to a mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x yy<CR>"ax
+registers: a
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register a: l "one two three\n"
+
+=== the character after f is not mapped
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap e x<CR>fe
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,3
+expect-mode: normal
+
+=== the key after g is not mapped
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,9
+keys: :nmap e w<CR>ge
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,7
+expect-mode: normal
+
+=== the key after an operator's i is not mapped
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,6
+keys: :nmap w e<CR>diw
+--- vim 9.1
+expect-text:
+  one  three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,5
+expect-mode: normal
+
+=== omap maps a motion after an operator
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :omap w e<CR>dw
+--- vim 9.1
+expect-text:
+   two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== omap does not apply in Normal mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :omap w e<CR>w
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,5
+expect-mode: normal
+
+=== xmap maps in Visual mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :xmap x y<CR>vlx
+registers: "
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "on"
+
+=== vmap maps in Visual mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :vmap x y<CR>vlx
+registers: "
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-register ": c "on"
+
+=== nmap does not apply in Visual mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x y<CR>vlx
+--- vim 9.1
+expect-text:
+  e two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== map applies after an operator
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :map x w<CR>dx
+--- vim 9.1
+expect-text:
+  two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== map applies in Visual mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :map x w<CR>vxd
+--- vim 9.1
+expect-text:
+  wo three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== imap maps in Insert mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :imap jk <lt>Esc><CR>iabjkx
+--- vim 9.1
+expect-text:
+  aone two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,2
+expect-mode: normal
+
+=== inoremap does not map again
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :imap b c<CR>:inoremap a b<CR>iaa<Esc>
+--- vim 9.1
+expect-text:
+  bbone two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,2
+expect-mode: normal
+
+=== imap in Replace mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :imap a Z<CR>Raa<Esc>
+--- vim 9.1
+expect-text:
+  ZZe two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,2
+expect-mode: normal
+
+=== an Insert-mode mapping that is not completed
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :imap ab X<CR>iacb<Esc>
+--- vim 9.1
+expect-text:
+  acbone two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,3
+expect-mode: normal
+
+=== the key after CTRL-V is not mapped in Insert mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :imap a X<CR>i<C-v>a<Esc>
+--- vim 9.1
+expect-text:
+  aone two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== cmap maps on the command line
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :cmap XX s/$/!/<CR>:XX<CR>
+--- vim 9.1
+expect-text:
+  a1!
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== cnoremap does not map again
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :cmap Y s/$/!/<CR>:cnoremap XX Y<CR>:XX<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  a1!
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+
+=== map! maps in Insert mode and on the command line
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :map! ab AB<CR>iab<Esc>:s/$/ab/<CR>
+--- vim 9.1
+expect-text:
+  ABa1AB
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== nunmap removes a mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:nunmap x<CR>x
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== unmap of a missing mapping fails with E31
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nunmap x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E31: No such mapping
+
+=== unmap with no argument fails with E474
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :unmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E474: Invalid argument
+
+=== nunmap of a map leaves its other modes
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :map x dd<CR>:nunmap x<CR>:map<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  ov x             dd
+
+=== xunmap of a vmap leaves Select mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :vmap x y<CR>:xunmap x<CR>:map<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  s  x             y
+
+=== unmap by the right-hand side
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x abc<CR>:nunmap abc<CR>:nmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  No mapping found
+
+=== mapclear removes the mappings
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:mapclear<CR>x
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== imapclear leaves Normal-mode mappings
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:imap x y<CR>:imapclear<CR>:map!<CR>x
+output: yes
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  No mapping found
+
+=== mapclear! removes Insert-mode mappings
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :imap a b<CR>:mapclear!<CR>ia<Esc>
+--- vim 9.1
+expect-text:
+  aone two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== mapclear with an argument fails with E474
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :mapclear x<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E474: Invalid argument
+
+=== the listing
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:nnoremap y <lt>C-a><lt>Esc><CR>:imap jk <lt>Esc><CR>:omap w e<CR>:map ,f <lt>Space>a <CR>:map<CR>:map!<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+     ,f            <Space>a<Space>
+  o  w             e
+  n  x             dd
+  n  y           * <C-A><Esc>
+  i  jk            <Esc>
+
+=== the listing orders mappings by their first key, newest first
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap ab 1<CR>:nmap aa 2<CR>:nmap ac 3<CR>:nmap <lt>F5> 5<CR>:nmap <lt>Del> 6<CR>:nmap <lt>C-]> 4<CR>:nmap Z 7<CR>:nmap é 8<CR>:nmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  Z             7
+  n  ac            3
+  n  aa            2
+  n  ab            1
+  n  <C-]>         4
+  n  <Del>         6
+  n  <F5>          5
+  n  é             8
+
+=== the listing shows special keys as Vim does
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x <lt>Tab><lt>lt>\|<lt>Bar><lt>Bslash><lt>C-v><lt>C-a><lt>NL><lt>S-Tab><CR>:nmap y <lt>Leader>x<lt>LocalLeader><CR>:nmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  x             <Tab><||\<C-V><C-A><NL><S-Tab>
+  n  y             \x\
+
+=== a listing for a prefix
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap ab x<CR>:nmap ac y<CR>:nmap b z<CR>:nmap a<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  ac            y
+  n  ab            x
+
+=== a listing for keys longer than the mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap ab x<CR>:nmap abc<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  ab            x
+
+=== an empty listing
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  No mapping found
+
+=== unique fails when the mapping exists
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:nmap <lt>unique> x yy<CR>x
+output: yes
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E227: Mapping already exists for x
+
+=== unique adds a new mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap <lt>unique> <lt>silent> x dd<CR>x
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a mapping replaced keeps its place
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap ab 1<CR>:nmap ac 2<CR>:nmap ab 3<CR>:nmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  ac            2
+  n  ab            3
+
+=== nmap after map splits the mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :map x a<CR>:nmap x b<CR>:map<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  x             b
+  ov x             a
+
+=== Nop does nothing
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x <lt>Nop><CR>xw
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,5
+expect-mode: normal
+
+=== Nop in the listing
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x <lt>nop><CR>:nmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  x             <Nop>
+
+=== a longer mapping waits for its keys
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap a x<CR>:nmap ab dd<CR>ab
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a shorter mapping when the longer one does not follow
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap a x<CR>:nmap ab dd<CR>aw
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,4
+expect-mode: normal
+
+=== nowait does not wait for a longer mapping
+divergent: the recorder types every key at once, so Vim sees ab whole and never waits; Jasper gets the keys one at a time, as typing does
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap ab dd<CR>:nmap <lt>nowait> a x<CR>ab
+--- expected
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== nowait on an older mapping still waits
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap <lt>nowait> a x<CR>:nmap ab dd<CR>ab
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== keys at the end that start a mapping run unmapped
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap ab dd<CR>a
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,2
+expect-mode: insert
+
+=== a Plug mapping is mapped even from nnoremap
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nnoremap <lt>Plug>(del) dd<CR>:nnoremap x <lt>Plug>(del)<CR>x
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== the leader is a backslash
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap <lt>Leader>d dd<CR>\d
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a space in a mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap <lt>Space>x dd<CR> x
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a special key as the left-hand side
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap <lt>F2> dd<CR><F2>
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== CTRL keys in a mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap <lt>C-x> dd<CR>:nmap y <lt>C-x><CR>y
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a mapping to a command line
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap x :s/$/!/<lt>CR><CR>x
+--- vim 9.1
+expect-text:
+  a1!
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a mapping with two commands joined by a bar
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap x :s/$/!/\|s/^/-/<lt>CR><CR>x
+--- vim 9.1
+expect-text:
+  -a1!
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a mapping with the Bar key
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap x :s/$/!/<lt>Bar>s/^/-/<lt>CR><CR>x
+--- vim 9.1
+expect-text:
+  -a1!
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a failing command ends the mapping
+text:
+  a1
+  b2
+cursor: 1,1
+keys: :nmap x jjjx<CR>x
+--- vim 9.1
+expect-text:
+  a1
+  b2
+expect-cursor: 2,1
+expect-mode: normal
+
+=== a failing command line ends the mapping
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap x :foo<lt>CR>x<CR>x
+output: yes
+--- vim 9.1
+expect-text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  E492: Not an editor command: foo
+
+=== normal uses mappings
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:normal x<CR>
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== normal! does not
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:normal! x<CR>
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== normal ends a mapping it only started
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap ab dd<CR>:normal a<CR>
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a mapping in Insert-Normal mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>i<C-o>xZ<Esc>
+--- vim 9.1
+expect-text:
+  Zfour five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== the second key of z is not mapped
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 2,1
+keys: :nmap t x<CR>zt
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 2,1
+expect-mode: normal
+
+=== a trailing space is part of the right-hand side
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd <CR>x
+--- vim 9.1
+expect-text:
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,2
+expect-mode: normal
+
+=== a mapping of a digit
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap 2 dd<CR>2
+--- vim 9.1
+expect-text:
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a mapping of a count digit after an operator
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :omap 2 j<CR>d2
+--- vim 9.1
+expect-text:
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== a mapping of the register key
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap " x<CR>"
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== the hit-enter prompt maps the key
+text:
+  a1
+  b2
+  c3
+  d4
+  e5
+  f6
+cursor: 1,1
+keys: :nmap x dd<CR>:nmap<CR>x
+--- vim 9.1
+expect-text:
+  b2
+  c3
+  d4
+  e5
+  f6
+expect-cursor: 1,1
+expect-mode: normal
+
+=== noremap does not map its right-hand side again
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:noremap y x<CR>y
+--- vim 9.1
+expect-text:
+  ne two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== vnoremap does not map its right-hand side again
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :vmap x y<CR>:vnoremap z x<CR>vlz
+--- vim 9.1
+expect-text:
+  e two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== xnoremap maps in Visual mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :xnoremap z d<CR>vlz
+--- vim 9.1
+expect-text:
+  e two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== onoremap maps after an operator
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :onoremap w e<CR>dw
+--- vim 9.1
+expect-text:
+   two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== vunmap removes a Visual-mode mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :vmap x y<CR>:vunmap x<CR>vlx
+--- vim 9.1
+expect-text:
+  e two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== ounmap removes an Operator-pending mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :omap w e<CR>:ounmap w<CR>dw
+--- vim 9.1
+expect-text:
+  two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== iunmap removes an Insert-mode mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :imap a b<CR>:iunmap a<CR>ia<Esc>
+--- vim 9.1
+expect-text:
+  aone two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== cunmap removes a command-line mapping
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :cmap XX s/$/!/<CR>:cunmap XX<CR>:cmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  No mapping found
+
+=== nmapclear leaves the other modes
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :nmap x dd<CR>:omap w e<CR>:nmapclear<CR>:map<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  o  w             e
+
+=== vmapclear removes Visual-mode mappings
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :vmap x y<CR>:nmap y z<CR>:vmapclear<CR>:map<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  n  y             z
+
+=== xmapclear leaves Select mode
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :vmap x y<CR>:xmapclear<CR>:map<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  s  x             y
+
+=== omapclear removes Operator-pending mappings
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :omap w e<CR>:omapclear<CR>dw
+--- vim 9.1
+expect-text:
+  two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+
+=== cmapclear removes command-line mappings
+text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+cursor: 1,1
+keys: :cmap XX s/$/!/<CR>:cmapclear<CR>:cmap<CR>
+output: yes
+--- vim 9.1
+expect-text:
+  one two three
+  four five six
+  seven eight nine
+  ten eleven twelve
+expect-cursor: 1,1
+expect-mode: normal
+expect-output:
+  No mapping found

@@ -396,3 +396,31 @@ key is typed. A command Vim has and Jasper does not fails with E319.
 | `:tabp[revious]` | [N] tabs back |
 | `:tabnew` | a new untitled tab, or {file} in a tab |
 | `:tabe[dit]` | as `:tabnew` |
+| `:map` | map {lhs} to {rhs} in Normal, Visual and Operator-pending mode (`!`: Insert and Command-line); list mappings |
+| `:nm[ap]` | map {lhs} to {rhs} in Normal mode; list the mappings |
+| `:vm[ap]` | map {lhs} to {rhs} in Visual mode; list the mappings |
+| `:xm[ap]` | map {lhs} to {rhs} in Visual mode, as `:vmap`; list the mappings |
+| `:om[ap]` | map {lhs} to {rhs} in Operator-pending mode; list the mappings |
+| `:im[ap]` | map {lhs} to {rhs} in Insert mode; list the mappings |
+| `:cm[ap]` | map {lhs} to {rhs} on the command line; list the mappings |
+| `:no[remap]` | as `:map`, but {rhs} is not mapped again |
+| `:nn[oremap]` | as `:nmap`, but {rhs} is not mapped again |
+| `:vn[oremap]` | as `:vmap`, but {rhs} is not mapped again |
+| `:xn[oremap]` | as `:xmap`, but {rhs} is not mapped again |
+| `:ono[remap]` | as `:omap`, but {rhs} is not mapped again |
+| `:ino[remap]` | as `:imap`, but {rhs} is not mapped again |
+| `:cno[remap]` | as `:cmap`, but {rhs} is not mapped again |
+| `:unm[ap]` | remove the mapping of {lhs} in Normal, Visual and Operator-pending mode (`!`: Insert and Command-line) |
+| `:nun[map]` | remove the Normal-mode mapping of {lhs} |
+| `:vu[nmap]` | remove the Visual-mode mapping of {lhs} |
+| `:xu[nmap]` | remove the Visual-mode mapping of {lhs}, as `:vunmap` |
+| `:ou[nmap]` | remove the Operator-pending mapping of {lhs} |
+| `:iu[nmap]` | remove the Insert-mode mapping of {lhs} |
+| `:cu[nmap]` | remove the command-line mapping of {lhs} |
+| `:mapc[lear]` | remove every mapping of `:map` (`!`: of `:map!`) |
+| `:nmapc[lear]` | remove every Normal-mode mapping |
+| `:vmapc[lear]` | remove every Visual-mode mapping |
+| `:xmapc[lear]` | remove every Visual-mode mapping, as `:vmapclear` |
+| `:omapc[lear]` | remove every Operator-pending mapping |
+| `:imapc[lear]` | remove every Insert-mode mapping |
+| `:cmapc[lear]` | remove every command-line mapping |

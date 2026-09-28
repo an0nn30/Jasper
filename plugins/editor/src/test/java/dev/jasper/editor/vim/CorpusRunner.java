@@ -54,6 +54,8 @@ final class CorpusRunner {
         editor.view().updateTopline();
         editor.messageLog().clear();
         for (KeyInput key : KeyInput.parse(c.keys())) editor.feed(key);
+        // The recorder's <Cmd> after the keys ends a mapping they only started: they resolve as if the time ran out.
+        if (editor.typeahead().waiting()) editor.timeoutNow();
         List<String> output = null;
         if (c.output()) {
             output = new ArrayList<>();
