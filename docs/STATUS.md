@@ -12,8 +12,9 @@
   images, inspected against the IntelliJ reference. `./gradlew check`: 2,925 tests, 0 failures, 0 errors, 5 skipped.
   Executed inline with checkpoints after Tasks 3 and 5. GUI checks pending with the user: record a shortcut, Set,
   Apply and use it; the plugin restart banner and an install's consent dialog over Settings; View choices in two
-  windows; a View choice with a broken config.toml; Window Settings… Deviations: see the plan's status banner. Not
-  pushed; not merged.
+  windows; a View choice with a broken config.toml; Window Settings… Deviations: see the plan's status banner.
+  Merged into local `main` on 2026-09-28 after merging main (Vim V1b) into the branch; `./gradlew check` on the
+  merged tree: 3,419 tests, 0 failures, 0 errors, 5 skipped. Not pushed.
 
 - **Editor Vim mode, plan V1b** (branch `claude/vim-v1b`, plan
   `docs/superpowers/plans/2026-09-28-jasper-editor-vim-v1b.md`, written 2026-09-28): Visual mode (charwise,
